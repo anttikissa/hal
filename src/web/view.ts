@@ -18,6 +18,7 @@ import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { sendKeys } from '../common/send-keys.ts'
+import { hints as stateHints, type Hint } from '../common/hints.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
@@ -233,22 +234,16 @@ function line(st: ViewState, connected: boolean): Line {
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
-// Include an incomplete / command, but not an absolute file path.
-const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
-
-function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
-	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift+enter', 'newline'], ['esc', 'cancel']]
-
-	let busy = st.transcript && states.busy(st.transcript.state)
-	let command = view.commandDraft(text)
+// The web help row: the shared state hints (common/hints.ts), or the
+// keys of the completion menu or a queue edit, which only the web has.
+function hints(st: ViewState, text = '', menu?: Menu): Hint[] {
+	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift-enter', 'newline'], ['esc', 'cancel']]
+	if (!menu) return stateHints.keys(st.transcript?.state, text)
+	let busy = !!st.transcript && states.busy(st.transcript.state)
+	let command = stateHints.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
-	// Send chords as sendKeys binds them (task 8kx), named with '+' here.
-	let web = (h: [string, string][]): [string, string][] => h.map(([k, does]) => [k.replace('-', '+'), does])
-	let queue = busy && !command ? web(sendKeys.hints(true).filter((h) => h[1] === 'queue')) : []
-	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
-	if (busy && command) return [['enter', enter], ['shift+enter', 'newline'], ['esc', 'pause']]
-	if (busy) return [...web(sendKeys.hints(true)), ['shift+enter', 'newline'], ['esc', 'pause']]
-	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
+	let queue = busy && !command ? sendKeys.hints(true).filter((h) => h[1] === 'queue') : []
+	return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift-enter', 'newline'], ...queue, ['esc', 'dismiss']]
 }
 
 // A transcript row: an item, and for a tool call its result once it
@@ -385,7 +380,7 @@ export const view = {
 	streaming,
 	line,
 	hints,
-	commandDraft,
+	commandDraft: stateHints.commandDraft,
 	rows,
 	withPending,
 	jobs,

@@ -551,7 +551,7 @@ test('slash commands never queue, including modified Enter; ordinary messages st
 	expect(view.hints(app.state.view, app.state.text, app.state.menu).some((h) => h[1] === 'queue')).toBe(false)
 	for (let text of ['later', '/tmp/file is broken']) {
 		app.input(text)
-		expect(view.hints(app.state.view, text)).toContainEqual(['alt+enter', 'queue'])
+		expect(view.hints(app.state.view, text)).toContainEqual(['alt-enter', 'queue'])
 		press('Enter', message(text), { altKey: true })
 		expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text, delivery: 'queue' })
 	}

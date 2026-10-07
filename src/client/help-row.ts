@@ -2,19 +2,19 @@
 // row, so the prompt never jumps when what it says changes. In
 // priority order: the keys of an open question, the hint while editing
 // the last prompt, tab completion's choices, else the key hints for
-// the session's state (then 'ctrl-r: reload' when a new commit
+// the session's state (common/hints.ts, shared with the web; then 'ctrl-r: reload' when a new commit
 // is checked out) with '/keys: shortcuts' at the right. Keys in
 // the help key color, descriptions in its description color, as in
 // the old Hal. Pure.
 
 import { colors } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
-import { sendKeys } from '../common/send-keys.ts'
+import { hints as stateHints, type Hint } from '../common/hints.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 
-export type Hint = [key: string, description: string]
+export type { Hint }
 
 // What the help row needs to know; the frame's View fits.
 export type HelpInput = {
@@ -38,21 +38,6 @@ function question(st: FormState): Hint[] {
 	return [...out, ['enter', 'submit'], ['esc', 'pause']]
 }
 
-// The key hints for the session's state and whether the prompt has text.
-function keys(state: SessionState | undefined, text: boolean): Hint[] {
-	let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
-	if (working && text) return [...sendKeys.hints(true), ['esc', 'pause']]
-	if (state?.type === 'retrying' && !text) return [['enter', 'retry now'], ['esc', 'pause']]
-	if (working) return [['esc', 'pause']]
-	if (text) {
-		let h = sendKeys.hints(false)
-		return [...h.filter((x) => x[1] === 'send'), ['shift-enter', 'newline'], ...h.filter((x) => x[1] === 'queue')]
-	}
-	if (state?.type === 'paused') return [['enter', 'continue']]
-	if (state?.type === 'error') return [['enter', 'retry']]
-	return []
-}
-
 // Hints painted: each key in the key color, its description dimmer.
 function paint(hints: Hint[]): string {
 	let h = colors.help()
@@ -70,7 +55,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
 	if (v.editing) return line(v.editing, colors.warning().fg!)
 	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
-	let hints = helpRow.keys(v.transcript?.state, v.prompt.text.trim() !== '')
+	let hints = stateHints.keys(v.transcript?.state, v.prompt.text)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
 	let right = helpRow.paint([['/keys', 'shortcuts']])
@@ -94,4 +79,4 @@ function rows(v: HelpInput, cols: number, resize = false, max = 10): string[] {
 	return out
 }
 
-export const helpRow = { question, keys, paint, row, rows }
+export const helpRow = { question, paint, row, rows }

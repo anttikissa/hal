@@ -239,7 +239,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
 						<span>
-							<b>{h[0]}</b> {h[1]}
+							<b>{h[0]}</b>: {h[1]}
 						</span>
 					)}
 				</For>
@@ -247,9 +247,12 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				    have no help row and keep the badge over the transcript. */}
 				<Show when={props.update}>
 					<button type="button" class="update" aria-label="Reload to update Hal" onClick={() => location.reload()}>
-						<b>ctrl+r</b> reload
+						<b>ctrl-r</b>: reload
 					</button>
 				</Show>
+				<span class="keys">
+					<b>/keys</b>: shortcuts
+				</span>
 			</div>
 		</footer>
 	)

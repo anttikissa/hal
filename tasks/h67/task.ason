@@ -1,0 +1,7 @@
+{
+	title: 'Web and terminal help rows show the same key hints',
+	spec: "The terminal help row (task p0) and the web composer help row show one list of state key hints from src/common/hints.ts (hints.keys(state, text)), so they never drift apart. The list: idle with an empty prompt, none; text: enter: send, shift-enter: newline, plus the queue chord; a slash-command draft (bare / too, not an absolute path): enter: run, shift-enter: newline, plus esc: pause while working, never queue (task 7t); working: esc: pause; working with text: the steer, interrupt and queue chords (task 8kx), shift-enter: newline, esc: pause; retrying: enter: retry now, esc: pause; paused: enter: continue; failed: enter: retry. No hint names a key that needs none (no 'edit last', 'tab complete' or 'ctrl-m model' while idle; /keys lists them). Both write 'key: description' separated by commas, with keys named as in /keys (shift-enter, ctrl-r), and put '/keys: shortcuts' at the right; the reload hint reads 'ctrl-r: reload'. Only the web has a completion menu (enter: choose/run/send/steer, ↑/↓: select, tab: complete, shift-enter: newline, queue while busy, esc: dismiss) and a queue edit (enter: save queue edit, shift-enter: newline, esc: cancel); those stay in web/view.ts hints(). Colors and fonts are each surface's own (user decision 2026-10-07: the terminal's format, web slightly more compact is acceptable). Invariant restored: the two help rows show the same hints for the same state.",
+	status: 'done',
+	needs: ['p0', '7t', '8kx'],
+	foldInto: ['p0', '7t']
+}
