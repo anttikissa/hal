@@ -286,9 +286,11 @@ test("every response's usage windows are kept for its account, a 429's too", asy
 	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' })]), { headers: { 'x-codex-primary-used-percent': '10', 'x-codex-primary-window-minutes': '300' } }))
 	await all(provider.stream('fake/m1', req))
 	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(10)
-	fakeFetch(() => new Response('{}', { status: 429, headers: { 'x-codex-primary-used-percent': '100', 'x-codex-primary-window-minutes': '300' } }))
+	fakeFetch(() => new Response('{}', { status: 429, headers: { 'x-codex-primary-used-percent': '100', 'x-codex-primary-window-minutes': '300', 'x-codex-primary-reset-after-seconds': '7200' } }))
 	await all(provider.stream('fake/m1', req))
 	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(100)
+	// No reset in the 429 itself: the spent window says when.
+	expect(limits.on('fake/m1', 'a@x')).toBe(now + 7200_000)
 })
 
 test('a 401 tells the provider which account was rejected', async () => {

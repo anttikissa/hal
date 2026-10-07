@@ -228,6 +228,14 @@ async function who(kind: string, name: string | undefined, status: number): Prom
 	return ` (${label}${changed ? `; plan changed ${changed}` : ''})`
 }
 
+// When the account's spent usage windows (100% used) reset, if any:
+// the 429 itself may not say, and guessing a minute retries the
+// account every minute for hours.
+function spentUntil(kind: string, account: string): number | undefined {
+	let times = Object.values(usage.windows(kind, account)).filter((w) => w.used >= 100 && w.resets).map((w) => Date.parse(w.resets!))
+	return times.length ? Math.max(...times) : undefined
+}
+
 function failed(p: Provider, modelId: string, account: string | undefined, e: ErrorEvent, reset?: number): ErrorEvent {
 	e.failure ??= provider.failure(e.status)
 	let now = clock.now()
@@ -252,7 +260,7 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 			// A subscription's models share one quota, except a model with
 			// its own credits (Anthropic credits_required: Fable).
 			let own = /credits_required/.test(e.body ?? '') ? modelId : modelId.split('/')[0]!
-			limits.set(limits.key(own, account), reset ?? now + provider.accountLimitMs)
+			limits.set(limits.key(own, account), reset ?? spentUntil(modelId.split('/')[0]!, account) ?? now + provider.accountLimitMs)
 			e.retryAt = now
 		} else if (reset !== undefined) {
 			limits.set(limits.key(modelId), reset)
