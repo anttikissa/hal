@@ -1,6 +1,6 @@
 {
 	title: 'README: what Hal is and how to install it',
-	spec: 'The repository root holds README.md, the user-written front page: what Hal is, a screenshot of Hal in a terminal and a browser, its ten holy commandments (the principles Hal is built on), its goals, the install steps (clone, ./install, hal) and how plugins work. README.md and hal.png are artifacts in this task directory; a rebuild copies both to the root unchanged, and the user edits both copies together. Agents do not rewrite them on their own; they update the install steps when ./install (task hd) changes how Hal is installed.',
+	spec: 'The repository root holds README.md, the user-written front page: what Hal is, a screenshot of Hal in a terminal and a browser, its holy commandments (the principles Hal is built on; the user keeps only the best, not a fixed ten), its goals, the install steps (clone, ./install, hal) and how plugins work. README.md and hal.png are artifacts in this task directory; a rebuild copies both to the root unchanged, and the user edits both copies together. Agents do not rewrite them on their own; they update the install steps when ./install (task hd) changes how Hal is installed.',
 	status: 'done',
 	needs: ['hd']
 }

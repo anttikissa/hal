@@ -4,7 +4,7 @@ This is HAL 9001, an agent harness.
 
 ![Hal in a terminal (left) and a web browser (right)](hal.png)
 
-# Ten holy commandments of HAL
+# Holy commandments of HAL
 
 1. **Respect the terminal.** Ctrl-C quits and Ctrl-Z suspends, always.
    Scrolling, search and links stay native.
@@ -14,21 +14,24 @@ This is HAL 9001, an agent harness.
    cmd-z undoes, cut, copy and paste just work.
 4. **Excellent in the terminal, good on the web.** The web covers what
    the terminal can't: clickable links, images, pastes, phones.
-5. **No dependencies we can avoid.** Each one is a supply-chain attack
+5. **Fast and efficient.** Hal is quite obsessively micro-optimized in
+   places: startup speed, response time, how much code loads at
+   startup.
+6. **No dependencies we can avoid.** Each one is a supply-chain attack
    waiting to happen.
-6. **A minimal system prompt.** It makes agents do the right thing 90%
+7. **A minimal system prompt.** It makes agents do the right thing 90%
    of the time; the rest is yours to tweak (SYSTEM.md, AGENTS.md).
-7. **Bash for all the things.** Agents are very good at editing with
+8. **Bash for all the things.** Agents are very good at editing with
    bash and python nowadays, so Hal embraces that: there is no edit
    tool. You can implement one if you like.
-8. **Never lose work.** Tabs, sessions and half-typed prompts survive
+9. **Never lose work.** Tabs, sessions and half-typed prompts survive
    restarts, crashes and reconnects. Ctrl-R restarts Hal and continues
    where you left off.
-9. **Mac first, Linux second, Windows maybe some day.** I have a
-   MacBook, so keyboard shortcuts are designed to work in macOS. Linux
-   users may want to rebind e.g. Ctrl-commands to something else. (Edit
-   the source code, that's not a configurable feature yet.)
-10. **Yours to hack.** Hal is small enough to read and can edit itself.
+10. **Mac first, Linux second, Windows maybe some day.** I have a
+    MacBook, so keyboard shortcuts are designed to work in macOS. Linux
+    users may want to rebind e.g. Ctrl-commands to something else. (Edit
+    the source code, that's not a configurable feature yet.)
+11. **Yours to hack.** Hal is small enough to read and can edit itself.
     Every function is a hook point, and plugins reload when you save
     them.
 
