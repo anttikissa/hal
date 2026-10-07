@@ -19,7 +19,8 @@ Tests: the exact replay of a short history with a prompt, a steering message, th
 	notes: [
 		'Measured with scripts/framing: 04-car framing share 2.3% before (17244/744083 chars), 3.5% after (26496/753335); 06-hdd 2.1% and 06-hum 1.6% after.',
 		"Decision: replay omits the ' in <origin>' suffix on forked blocks. A fork must replay byte-identical to its parent (forks.test.ts) so the prompt cache hits; the suffix would change every copied header. Block numbers stay unique within a session, so the bare id is still citeable.",
-		'Records without n (built by hand in tests) get no id and no tool header. host-fixture strips tool result headers before tests see provider input; heard() maps a tab label to its header form.'
+		'Records without n (built by hand in tests) get no id and no tool header. host-fixture strips tool result headers before tests see provider input; heard() maps a tab label to its header form.',
+		"Imported tool results replay with the block header prefixed (import-old.test.ts matches the output's last line)."
 	],
 	needs: ['7', '9p', 'nn', 'nzv', 'wm0', 'qtg'],
 	foldInto: ['nn']
