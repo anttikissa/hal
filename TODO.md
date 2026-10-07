@@ -13,3 +13,4 @@ a task and remove it here.
 - Restart (Ctrl-R) still flashes for about one frame, too fast to see
   what. Record a screen video to find which frame it is.
 - make the 400 loc limit, say, 450
+- Review tool descriptions (send, spawn, etc.) and make them minimal
