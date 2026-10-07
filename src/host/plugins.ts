@@ -47,6 +47,10 @@ function report(text: string, _path?: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
+// Hears a plugin file loaded, reloaded, removed or expired; on the host,
+// main.ts sends it on (task b66).
+function changed(_path: string, _what: 'loaded' | 'reloaded' | 'removed' | 'expired'): void {}
+
 // "host/auth.pickAccount": the module exporting `obj`, then the key.
 function targetName(obj: object, key: string): string {
 	for (let [file, mod] of Object.entries(require.cache)) {
@@ -189,6 +193,7 @@ function expire(path: string): void {
 	plugins.state.latest.set(path, ++plugins.state.gen)
 	plugins.deactivate(entry)
 	entry.expired = true
+	plugins.changed(path, 'expired')
 }
 
 function hashOf(path: string): string {
@@ -249,7 +254,7 @@ async function load(path: string): Promise<void> {
 	let old = st.files.get(path)
 	if (old) plugins.deactivate(old)
 	st.files.set(path, entry)
-	if (entry.expires && Date.parse(entry.expires) <= Date.now()) return void (entry.expired = true)
+	if (entry.expires && Date.parse(entry.expires) <= Date.now()) return void ((entry.expired = true), plugins.changed(path, 'expired'))
 	entry.open = true
 	try {
 		let out = mod.default(plugins.api(entry))
@@ -264,6 +269,7 @@ async function load(path: string): Promise<void> {
 		delete entry.open
 	}
 	if (entry.expires) plugins.arm(entry)
+	plugins.changed(path, old && !old.error ? 'reloaded' : 'loaded')
 }
 
 function remove(path: string): void {
@@ -273,7 +279,9 @@ function remove(path: string): void {
 	// A broken file's entry stays, so /plugins shows why it went.
 	if (entry?.error) return
 	st.files.delete(path)
-	if (entry) plugins.deactivate(entry)
+	if (!entry) return
+	plugins.deactivate(entry)
+	plugins.changed(path, 'removed')
 }
 
 // Brings file `name` in dir `d` up to date: loads it if its content
@@ -331,6 +339,7 @@ export const plugins = {
 	},
 	dir,
 	report,
+	changed,
 	patchOf,
 	settle,
 	deactivate,

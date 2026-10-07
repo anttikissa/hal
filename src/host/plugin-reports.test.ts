@@ -2,9 +2,12 @@
 // last declared and changed it; with no such call, to everyone, naming
 // no session.
 import { expect, test } from 'bun:test'
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { history } from './history.ts'
 import { calls, client, created, until, useHost } from './host-fixture.test.ts'
 import { pluginReports } from './plugin-reports.ts'
+import { plugins } from './plugins.ts'
 
 useHost()
 let failure = (path: string) => `plugin ${path} failed and was renamed to ${path}.broken, so it does not load again; Hal runs without it. Fix it and rename it back to x.ts to enable it.\nError: boom\n    at x.ts:1:7`
@@ -28,4 +31,27 @@ test('a plugin no session declared is a notice to every client, naming no sessio
 	let warning = c.of('warning').at(-1)!.text as string
 	expect(warning).toContain('Error: boom')
 	expect(warning).not.toContain(id)
+})
+
+// Task b66: after the initial scan, each lifecycle change is one notice
+// naming the file; startup loads are quiet.
+test('plugin load, reload and removal notify every client after a quiet startup', async () => {
+	let c = client(), dir = mkdtempSync('/tmp/hal-b66-')
+	plugins.changed = pluginReports.changed
+	try {
+		writeFileSync(join(dir, 'a.ts'), 'export default () => {}\n')
+		await plugins.init(dir)
+		expect(c.of('notice')).toEqual([])
+		let b = join(dir, 'b.ts'), seen = (n: number) => until(() => c.of('notice').length === n)
+		writeFileSync(b, 'export default () => {}\n')
+		await seen(1)
+		writeFileSync(b, 'export default () => () => {}\n')
+		await seen(2)
+		unlinkSync(b)
+		await seen(3)
+		expect(c.of('notice').map((n) => [n.name, n.what, n.line])).toEqual([['b.ts', 'loaded', b], ['b.ts', 'reloaded', b], ['b.ts', 'removed', b]])
+	} finally {
+		plugins.close()
+		rmSync(dir, { recursive: true, force: true })
+	}
 })
