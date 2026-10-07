@@ -10,7 +10,7 @@
 // always adds one). The host answers it with `ack`, or `rejected`
 // carrying the id, and ignores a repeat of an id it has acted on, so a
 // command resent after a reconnect never acts twice.
-// Tasks: 6, qt, svt, 6eq.
+// Tasks: 6, qt, svt, 6eq, zh7.
 
 import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
@@ -27,6 +27,7 @@ import type { RebaseRows } from './rebase-rows.ts'
 import { commandCheck } from './command-check.ts'
 import { eventCheck } from './event-check.ts'
 import type { PromptChange } from './prompt-changes.ts'
+import type { PluginSyncCommand, PluginSyncEvent } from './plugin-sync.ts'
 
 export type { TurnStatus } from './replay.ts'
 
@@ -199,6 +200,8 @@ export type Command = (
 	// A terminal client's size and terminal (TERM, program, color depth),
 	// on connecting and on every resize, for the inspect tool; untrusted.
 	| { type: 'screen'; cols: number; rows: number; term?: string }
+	// A remote terminal compares portable plugins (task zh7).
+	| PluginSyncCommand
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -342,6 +345,8 @@ export type Event =
 	// some other tab (task qm); `session`, not sessionId, so no client
 	// takes it as that session's event.
 	| NoticeEvent
+	// Plugin sync answers and changes (task zh7), to that client only.
+	| PluginSyncEvent
 export type EventType = Event['type']
 
 export const protocol = { commandTypes: commandCheck.commandTypes, invalid: commandCheck.invalid, invalidEvent: eventCheck.invalidEvent }

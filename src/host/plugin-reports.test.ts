@@ -35,7 +35,7 @@ test('a plugin no session declared is a notice to every client, naming no sessio
 
 // Task b66: after the initial scan, each lifecycle change is one notice
 // naming the file; startup loads are quiet.
-test('plugin load, reload and removal notify every client after a quiet startup', async () => {
+test('plugin load, sync replacement and removal notify every client after a quiet startup', async () => {
 	let c = client(), dir = mkdtempSync('/tmp/hal-b66-')
 	plugins.changed = pluginReports.changed
 	try {
@@ -45,11 +45,12 @@ test('plugin load, reload and removal notify every client after a quiet startup'
 		let b = join(dir, 'b.ts'), seen = (n: number) => until(() => c.of('notice').length === n)
 		writeFileSync(b, 'export default () => {}\n')
 		await seen(1)
+		pluginReports.via(b, 'server example.com', 'client')
 		writeFileSync(b, 'export default () => () => {}\n')
 		await seen(2)
 		unlinkSync(b)
 		await seen(3)
-		expect(c.of('notice').map((n) => [n.name, n.what, n.line])).toEqual([['b.ts', 'loaded', b], ['b.ts', 'reloaded', b], ['b.ts', 'removed', b]])
+		expect(c.of('notice').map((n) => [n.name, n.what, n.line])).toEqual([['b.ts', 'loaded', b], ['b.ts', 'replaced', `${b} on client from server example.com`], ['b.ts', 'removed', b]])
 	} finally {
 		plugins.close()
 		rmSync(dir, { recursive: true, force: true })
