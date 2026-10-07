@@ -308,7 +308,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'prompt':
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
-			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: bashResult.background(item) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
+			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: bashResult.background(item) ? bashResult.display(item.text) : item.report ? summary.answer(item.text) : item.summary ? summary.strip(item.text) : item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }

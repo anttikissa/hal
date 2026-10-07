@@ -38,3 +38,11 @@ test('folded messages identify the sender before the summary, keeping full attri
 	expect(titles.who(item)).toBe('From tab 4 (163-gad), Review')
 	expect(titles.messageHead({ ...item, label: undefined })).toBe('From 163-gad: Report completion')
 })
+
+test('subagent reports show their outcome after sender identity; ordinary chatter is unchanged', () => {
+	let item = { type: 'prompt' as const, text: '<question>Which format?</question>', from: '07-kim', label: 'tab 124 · 07-kim · Review', summary: 'Which format?', report: 'question' as const, ts: at(19, 12) }
+	expect(titles.messageHead(item)).toBe('Message from tab 124 (07-kim) · Needs info: Which format?')
+	expect(titles.title(item)).toBe('19:12 Message from tab 124 (07-kim), Review · Needs info: Which format?')
+	expect(titles.messageHead({ ...item, report: 'summary', summary: 'Import added' })).toBe('Message from tab 124 (07-kim) · Finished: Import added')
+	expect(titles.messageHead({ ...item, report: undefined })).toBe('From tab 124 (07-kim): Which format?')
+})

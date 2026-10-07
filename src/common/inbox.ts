@@ -49,6 +49,7 @@ function sender(s: Sender): Sender {
 	if (s.steering) out.steering = true
 	if (s.interject) out.interject = true
 	if (s.summary) out.summary = s.summary
+	if (s.report) out.report = s.report
 	return out
 }
 

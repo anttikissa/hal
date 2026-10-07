@@ -29,7 +29,7 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // `interject`: to steer it at its next round (task csn). Both retained for display.
 // `summary`: one line for the user, heading the message folded.
 // queuedAt: original inbox receipt time, retained after queue delivery.
-export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; interject?: true; summary?: string; origin?: 'model'; generatingCommand?: 'clear' }
+export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; interject?: true; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; generatingCommand?: 'clear' }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

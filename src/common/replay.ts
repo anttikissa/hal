@@ -49,7 +49,7 @@ export type HistoryRecord = Numbered &
 	// record with the same id is an edit of the waiting message (task
 	// dg): its new text, in the same place; `withdrawn` takes it out
 	// (edited into a slash command). `command`: the edit's command id.
-	| { type: 'inbox'; id: string; text: string; queue?: true; interject?: true; from?: string; label?: string; advisory?: true; summary?: string; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
+	| { type: 'inbox'; id: string; text: string; queue?: true; interject?: true; from?: string; label?: string; advisory?: true; summary?: string; report?: 'question' | 'summary'; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	// `ts`: when the block started streaming; `model`, `effort`: what
 	// wrote it (task hp; older records have neither).
