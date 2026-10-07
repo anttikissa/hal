@@ -25,7 +25,13 @@ export type Plugin = {
 	after<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void): void
 	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>): void
 	set<T extends object, K extends Exclude<keyof T & string, Keys<T>>>(obj: T, key: K, value: NoInfer<T[K]>): void
+	// Switches this file off until it changes (task hvk): the body stops
+	// here and what it registered so far goes.
+	disable(): never
 }
+
+// What disable() throws; load() catches it.
+const DISABLED = Symbol('plugin disabled')
 
 type Kind = 'before' | 'after' | 'around' | 'set'
 type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: Fn; value?: unknown; target: string }
@@ -35,7 +41,7 @@ type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 // A value patch (set) holds the value it applied instead of a wrapper.
 type Patch = { original: any; wrapper: Fn; hooks: Hook[]; run: Run; value?: true; applied?: unknown }
 // open: the registration body is running, so hooks may register.
-export type Loaded = { path: string; hash: string; expires?: string; portable?: true; expired?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
+export type Loaded = { path: string; hash: string; expires?: string; portable?: true; expired?: true; disabled?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -49,9 +55,9 @@ function report(text: string, _path?: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
-// Hears a plugin file loaded, reloaded, removed or expired; on the host,
+// Hears a plugin file loaded, reloaded, removed, expired or disabled; on the host,
 // main.ts sends it on (task b66).
-function changed(_path: string, _what: 'loaded' | 'reloaded' | 'removed' | 'expired'): void {}
+function changed(_path: string, _what: 'loaded' | 'reloaded' | 'removed' | 'expired' | 'disabled'): void {}
 
 // "host/auth.pickAccount": the module exporting `obj`, then the key.
 function targetName(obj: object, key: string): string {
@@ -177,6 +183,9 @@ function api(entry: Loaded): Plugin {
 		set(obj, key, value) {
 			override(entry, obj, key, value)
 		},
+		disable() {
+			throw DISABLED
+		},
 	}
 	return plugin
 }
@@ -268,12 +277,16 @@ async function load(path: string): Promise<void> {
 		}
 		entry.cleanup = out
 	} catch (e) {
-		return plugins.broken(path, hash, e)
+		if (e !== DISABLED) return plugins.broken(path, hash, e)
+		delete entry.open
+		plugins.deactivate(entry)
+		entry.disabled = true
+		return plugins.changed(path, 'disabled')
 	} finally {
 		delete entry.open
 	}
 	if (entry.expires) plugins.arm(entry)
-	plugins.changed(path, old && !old.error ? 'reloaded' : 'loaded')
+	plugins.changed(path, old && !old.error && !old.disabled ? 'reloaded' : 'loaded')
 }
 
 function remove(path: string): void {
@@ -328,6 +341,7 @@ function describe(): string {
 		.map((f) => {
 			let parts = [basename(f.path), f.hash]
 			if (f.portable) parts.push('portable')
+			if (f.disabled) parts.push('disabled')
 			if (f.expires) parts.push(`${f.expired ? 'expired' : 'expires'} ${f.expires}`)
 			parts.push(f.hooks.length ? f.hooks.map((h) => h.target).join(', ') : 'no hooks')
 			if (f.error) parts.push(`error: ${f.error}`)

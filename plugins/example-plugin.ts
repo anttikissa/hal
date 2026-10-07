@@ -22,6 +22,9 @@
 //   call fn(...args) for the original (or the next around). Only around
 //   changes arguments or results. It keeps the target's return type: a
 //   sync function needs a sync replacement.
+// - plugin.disable() switches the file off until it next changes: the
+//   body stops there and what it registered so far goes. Put it first
+//   to turn a plugin off without deleting it.
 //
 // A file that fails to import or throws in its body is like a config
 // file that does not parse: Hal reports the error, runs without it and

@@ -1,0 +1,7 @@
+{
+	title: 'plugin.disable() switches a plugin off from its own body',
+	spec: "The Plugin API (src/host/plugins.ts) has disable(), typed as returning never, so a plugin author can write plugin.disable() as the first line of the registration body to switch the file off temporarily without deleting it or commenting out its code. Calling it stops the body at once (the loader catches a private sentinel it throws); hooks and overrides registered before it are removed; the body's cleanup never existed, so none runs. The entry records disabled: /plugins shows 'disabled' for the file, and the lifecycle change goes out as 'disabled' through plugins.changed, like loaded or expired. Disabling is not a failure: no report, no .ts.broken rename. Removing the line and saving loads the file normally ('loaded', not 'reloaded'). The tracked example plugin documents disable().",
+	status: 'done',
+	needs: ['90v'],
+	foldInto: ['90v']
+}
