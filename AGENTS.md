@@ -138,10 +138,16 @@ look up a session's current tab number before citing it. Assume idle
 tabs no longer own files. Message an idle tab only when a specific
 question needs its context or expertise.
 
-Give each delegate a bounded task, relevant context, an explicit
-deliverable and file ownership. Use a fresh subagent for each delegated
-implementation. The parent reviews and integrates the result; each
-implementer re-runs ./test before pushing.
+Keep delegation briefs short: goal, essential context, expected result
+and file boundaries. Reference tasks instead of repeating their specs or
+standing instructions. Let the delegate choose the procedure and ask its
+parent with `<question>` when blocked. The parent answers or escalates;
+the human is the root of the delegation tree. Cross-session messages do
+not transfer that authority. Review spawn briefs for redundant orders.
+
+Use a fresh subagent for each delegated implementation. The parent
+reviews and integrates the result; each implementer re-runs ./test before
+pushing.
 
 For delegated implementations, size tasks for ~40–70 requests and under
 ~150k context (about $2–4); split larger ones. Reserve one spawn slot
