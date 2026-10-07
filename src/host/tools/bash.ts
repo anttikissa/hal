@@ -25,7 +25,7 @@ export const tool: Tool = {
 			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
 			// Its effect stays unsaid (task ker): steering lets it finish.
 			unsafeToStop: { type: 'boolean', description: 'Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning).' },
-			modifies: { type: 'array', items: { type: 'string' }, description: 'Paths or globs relative to cwd, or absolute beneath /tmp; no .. components that this command creates, changes or deletes. Declare for every writing command.' },
+			modifies: { type: 'array', items: { type: 'string' }, description: 'Project paths or globs relative to cwd, without .. components, that this command creates, changes or deletes. Omit /tmp scratch files and .git internals.' },
 		},
 		required: ['command', 'description'],
 	},

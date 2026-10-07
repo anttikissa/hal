@@ -1,0 +1,7 @@
+{
+	title: 'Declare project edits, not scratch or Git internals',
+	spec: 'SYSTEM.md and bash tool guidance ask for modifies declarations only for project files created, changed, or deleted. Scratch files under /tmp and Git internals under .git are not declared. Existing project-file snapshots, validation, and overlap protection remain. Existing absolute scratch declarations remain accepted for compatibility, but are not prescribed.',
+	status: 'planned',
+	needs: ['x1'],
+	foldInto: ['x1']
+}
