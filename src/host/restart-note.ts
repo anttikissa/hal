@@ -3,11 +3,13 @@ import { readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
 let written = false
+const modelText = 'Hal restarted.'
 
 // First writer wins: /restart also exits through the terminal's path.
 function write(text: string): void {
@@ -32,10 +34,14 @@ function announce(): void {
 		}
 		for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 	}
+	// Models hear one line per idle stretch: no cause, no repeat while the
+	// last one is unread, none for a turn turn-recovery continues (it says so).
 	for (let id of tabs.file().open) {
 		try {
 			sessions.open(id)
-			history.append(id, { type: 'notice', text: text ?? 'Hal restarted; cause unknown (crash, kill or quit)' })
+			let last = pages.page(id, undefined, 1).records.at(-1)
+			if ((history.unfinished(id) && last?.type !== 'question') || (last?.type === 'notice' && last.text === modelText)) continue
+			history.append(id, { type: 'notice', text: modelText })
 		} catch (e) { process.stderr.write(`restart notice for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
 	}
 }
