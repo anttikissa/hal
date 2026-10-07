@@ -1,0 +1,7 @@
+{
+	title: 'Autoclose: a session property, /autoclose, title mark',
+	spec: 'Every session has autoclose on or off, a property like cwd and model: stored in session meta, and every change recorded in history so the transcript shows it (Autoclose: off → on), as /cd shows a directory change. Defaults: off for an ordinary session, on for a spawned kind subagent; spawn kinds subagent and subagent-leave-open differ only in that initial value. A session with autoclose on closes its tab after a completed turn whose reply ends with <summary> or no tag, when it is idle with nothing queued and no running subagents or jobs. A reply ending with <question> (nd6), a failed, paused or canceled turn never closes it. /autoclose on|off sets it; bare /autoclose shows it. Promotion: a human steer or soft-steer sets autoclose off; a human message queued as a follow-up keeps it. The title bar shows a short mark next to the session name while autoclose is on, the same in web and terminal. Raised by the user in session 07-bah on 2026-10-07: autoclose belongs to every session, not only subagents.',
+	status: 'planned',
+	needs: ['t0', 'nd6'],
+	foldInto: ['t0']
+}

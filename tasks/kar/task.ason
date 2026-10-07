@@ -1,0 +1,7 @@
+{
+	title: "A parent's message answers its subagent's question",
+	spec: "Invariant: a spawned session whose turn ended with <question> accepts a message from its parent as the reply; it is delivered, not held until a human answers (nd6 still holds every other agent message). The question reaches the parent through the usual report. The subagent's first prompt says: ask your parent with <question> only when blocked; otherwise finish with a final answer. Raised in session 07-bah on 2026-10-07: without it a subagent's question and its parent's answer deadlock.",
+	status: 'planned',
+	needs: ['nd6', 't0'],
+	foldInto: ['nd6']
+}
