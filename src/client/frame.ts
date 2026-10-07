@@ -347,16 +347,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// comes before the chrome. A question being answered has the cursor.
 	// It is the work now, so it comes before waiting messages (the future).
 	if (view.hal?.at === 'idle' && !formCursor) {
-		// Normalize only the tail gap, including ANSI-painted padding (task fcn).
-		let end = lines.length
-		while (end) {
-			let row = lines[end - 1]!, visible = false
-			strings.walk(row, 0, (i, _width, length) => { if (row.slice(i, i + length).trim()) visible = true })
-			if (visible) break
-			end--
-		}
-		if (end < lines.length) lines.length = end ? end + 1 : 0
-		else if (lines.length || above) lines.push('')
+		if (lines.length || above) lines.push('')
 		lines.push(ansi.PAD + halCursor.glyph(view.hal))
 	}
 	// Unsent and waiting messages use the normal prompt renderer; queued
