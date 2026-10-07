@@ -72,7 +72,7 @@ test('Anthropic usage endpoint utilization is already percent', () => {
 test('fresh usage with room clears the account skip and wakes waiting turns', async () => {
 	let all = auth.all, credential = auth.credential, store = usage.store, lstore = limits.store, save = liveFiles.save, fetchOld = globalThis.fetch
 	let account = { name: 'a@example.com', entry: { accessToken: 't', email: 'a@example.com' }, replace: () => {} }
-	let skips: Record<string, string> = { 'openai/m a@example.com': new Date(Date.now() + 3600_000).toISOString(), 'openai/m b@example.com': new Date(Date.now() + 3600_000).toISOString() }
+	let skips: Record<string, string> = { 'openai/m a@example.com': new Date(Date.now() + 3600_000).toISOString(), 'openai a@example.com': new Date(Date.now() + 3600_000).toISOString(), 'openai/m b@example.com': new Date(Date.now() + 3600_000).toISOString() }
 	auth.all = (() => ({ data: {}, list: [account] })) as typeof all
 	auth.credential = (async () => ({ type: 'token', value: 't', account: account.name })) as typeof credential
 	usage.store = () => ({})
@@ -82,7 +82,7 @@ test('fresh usage with room clears the account skip and wakes waiting turns', as
 	try {
 		globalThis.fetch = (async () => Response.json({ rate_limit: { primary_window: { used_percent: 100, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
 		await statusUsage.refresh('openai', account as any)
-		expect(Object.keys(skips)).toHaveLength(2)
+		expect(Object.keys(skips)).toHaveLength(3)
 		globalThis.fetch = (async () => Response.json({ rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
 		await statusUsage.refresh('openai', account as any)
 		expect(Object.keys(skips)).toEqual(['openai/m b@example.com'])
@@ -96,7 +96,7 @@ test('recheck rereads only the provider\'s skipped accounts, once unless forced'
 	let all = auth.all, refresh = statusUsage.refresh, lstore = limits.store
 	let names = ['a@example.com', 'b@example.com']
 	auth.all = ((kind: string) => ({ data: {}, list: kind === 'openai' ? names.map((name) => ({ name, entry: {}, replace: () => {} })) : [] })) as typeof all
-	limits.store = () => ({ 'openai/m a@example.com': '2099-01-01T00:00:00Z', 'anthropic/m b@example.com': '2099-01-01T00:00:00Z' })
+	limits.store = () => ({ 'openai a@example.com': '2099-01-01T00:00:00Z', 'anthropic/m b@example.com': '2099-01-01T00:00:00Z' })
 	let read: string[] = []
 	statusUsage.refresh = (async (kind: string, a: { name: string }) => { read.push(`${kind} ${a.name}`) }) as typeof refresh
 	statusUsage.state.checked.clear()

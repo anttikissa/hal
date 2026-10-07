@@ -43,12 +43,18 @@ function set(key: string, at: number): void {
 	if (at > clock.now()) data[key] = new Date(at).toISOString()
 }
 
+// Whether a key limits `kind`: a model ("openai/m a@x") or a whole
+// subscription account ("openai a@x").
+function ofKind(key: string, kind: string): boolean {
+	return key.startsWith(`${kind}/`) || key.startsWith(`${kind} `)
+}
+
 // Drops every limit on one account of a provider: a fresh login is new
 // evidence that outdates them (a plan refusal before an upgrade).
 // Drops the account's skips; true if there were any.
 function forget(kind: string, account: string): boolean {
 	let data = limits.store()
-	let keys = Object.keys(data).filter((k) => k.startsWith(`${kind}/`) && k.endsWith(` ${account}`))
+	let keys = Object.keys(data).filter((k) => limits.ofKind(k, kind) && k.endsWith(` ${account}`))
 	for (let k of keys) delete data[k]
 	return keys.length > 0
 }
@@ -66,6 +72,7 @@ export const limits = {
 	until,
 	on,
 	set,
+	ofKind,
 	forget,
 	close,
 	state: { store: null as Record<string, string> | null, path: '' },
