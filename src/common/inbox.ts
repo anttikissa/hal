@@ -5,6 +5,7 @@
 // after-this-turn delivery (`queue`) starts a turn after the current one ends.
 // Not a state: every client shows these as normal prompt cards, with
 // sender and delivery in the header; why it waits belongs to the status.
+// Tasks: rqq.
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
@@ -13,7 +14,7 @@ import { titles } from './titles.ts'
 // Sender fields: another session sent it (task rj); none, the human.
 // `ts`: when it was first written to the inbox.
 // n: the history line of the inbox record that first sent it.
-export type InboxItem = { id: string; text: string; queue?: true; ts?: string; n?: number } & Sender
+export type InboxItem = { id: string; text: string; ts?: string; n?: number } & Sender
 
 // Messages sent and not yet delivered, as last edited, in delivery
 // order: those read at the next round, then queued ones; each oldest first.
@@ -27,14 +28,13 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 			let item: InboxItem = { id: r.id, text: r.text, ts: first?.ts ?? r.ts }
 			let n = first ? first.n : r.n
 			if (n !== undefined) item.n = n
-			if (r.queue) item.queue = true
 			Object.assign(item, inbox.sender(r))
 			waiting.set(r.id, item)
 		}
 		else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
 	}
 	let all = [...waiting.values()]
-	return [...all.filter((m) => !m.queue), ...all.filter((m) => m.queue)]
+	return [...all.filter((m) => m.delivery !== 'after-turn'), ...all.filter((m) => m.delivery === 'after-turn')]
 }
 
 // The sender fields of a record or item, and nothing else.
@@ -46,8 +46,7 @@ function sender(s: Sender): Sender {
 	if (s.from !== undefined) out.from = s.from
 	if (s.label !== undefined) out.label = s.label
 	if (s.advisory) out.advisory = true
-	if (s.steering) out.steering = true
-	if (s.interject) out.interject = true
+	if (s.delivery !== undefined) out.delivery = s.delivery
 	if (s.summary) out.summary = s.summary
 	if (s.report) out.report = s.report
 	return out
@@ -56,7 +55,7 @@ function sender(s: Sender): Sender {
 // Provenance a waiting message retains when delivered. Next-round and
 // after-this-turn messages do not interrupt; delivery belongs to each text.
 function provenance(item: InboxItem): Sender {
-	return { ...inbox.sender(item), ...(item.queue && item.ts !== undefined ? { queuedAt: item.ts } : {}), ...(!item.queue && !item.advisory && !item.interject ? { steering: true as const } : {}) }
+	return { ...inbox.sender(item), delivery: item.delivery ?? 'now', ...((item.delivery === 'after-turn') && item.ts !== undefined ? { queuedAt: item.ts } : {}) }
 }
 
 // What leads a waiting message's compact row (task 16):

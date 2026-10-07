@@ -1,4 +1,5 @@
 // Shared terminal/web rows and the interactive todo-file format (tasks 01d, svt).
+// Tasks: rqq.
 import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'
 import type { UserBlock } from './blocks.ts'
@@ -92,7 +93,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 			}
 		} else if (r.type === 'inbox' && waiting.has(r.n)) {
 			let item = waiting.get(r.n)!
-			let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : item.interject ? 'interjecting' : 'steering'
+			let kind = (item.delivery === 'after-turn') ? 'queued' : item.advisory ? 'advisory' : (item.delivery === 'next-round') ? 'interjecting' : 'steering'
 			let row = add(r, kind, `${item.from === undefined ? 'You' : item.label ?? item.from}: ${item.text}`, item.text.length)
 			row.ns = revisions.get(r.id)!
 			row.editable = true; row.editN = row.ns.at(-1); row.text = item.text

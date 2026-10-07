@@ -49,12 +49,12 @@ test('subagent reports show their outcome after sender identity; ordinary chatte
 
 test('receipts distinguish inbox delivery from model history without marking immediate messages', () => {
 	let prompt = { type: 'prompt' as const, text: 'change direction' }
-	for (let flags of [{ interject: true as const }, { advisory: true as const, from: 'other' }, { queued: true as const }, { queuedAt: at(19, 12) }]) {
+	for (let flags of [{ delivery: 'next-round' as const }, { advisory: true as const, from: 'other', delivery: 'next-round' as const }, { delivery: 'after-turn' as const }, { queuedAt: at(19, 12) }]) {
 		expect(titles.receipt({ ...prompt, ...flags, waiting: true })).toBe(1)
 		expect(titles.receipt({ ...prompt, ...flags })).toBe(2)
 	}
 	expect(titles.receipt(prompt)).toBe(0)
-	expect(titles.receipt({ ...prompt, steering: true })).toBe(0)
-	expect(titles.title({ ...prompt, interject: true, waiting: true })).toBe('You (soft-steering)')
-	expect(titles.title({ ...prompt, interject: true })).toBe('You (soft-steered)')
+	expect(titles.receipt({ ...prompt, delivery: 'now' })).toBe(0)
+	expect(titles.title({ ...prompt, delivery: 'next-round', waiting: true })).toBe('You (soft-steering)')
+	expect(titles.title({ ...prompt, delivery: 'next-round' })).toBe('You (soft-steered)')
 })

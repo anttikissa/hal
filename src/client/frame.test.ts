@@ -562,12 +562,12 @@ test('idle cursor has one blank row after text, fences and whitespace tails', ()
 
 test('receipt ticks follow waiting messages into history and leave optimistic and immediate prompts unmarked', () => {
 	let v = view([])
-	v.transcript!.inbox = [{ id: 'soft', text: 'pending soft', interject: true }, { id: 'queue', text: 'pending queue', queue: true }]
+	v.transcript!.inbox = [{ id: 'soft', text: 'pending soft', delivery: 'next-round' }, { id: 'queue', text: 'pending queue', delivery: 'after-turn' }]
 	v.pending = ['optimistic prompt']
 	let waiting = plain(frame.build(v, 90).lines)
 	expect(waiting.filter((l) => l.includes('✓'))).toHaveLength(2)
 	expect(waiting.some((l) => l.includes('✓✓'))).toBe(false)
 	expect(waiting.find((l) => l.includes('optimistic prompt'))).not.toContain('✓')
-	let read = plain(frame.build(view([{ type: 'prompt', text: 'read soft', interject: true }, { type: 'prompt', text: 'read queue', queued: true }, { type: 'prompt', text: 'immediate', steering: true }]), 90).lines)
+	let read = plain(frame.build(view([{ type: 'prompt', text: 'read soft', delivery: 'next-round' }, { type: 'prompt', text: 'read queue', delivery: 'after-turn' }, { type: 'prompt', text: 'immediate', delivery: 'now' }]), 90).lines)
 	expect(read.filter((l) => l.includes('✓✓'))).toHaveLength(2)
 })

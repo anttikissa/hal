@@ -5,6 +5,7 @@
 // restart releases it, leaving the message queued and unchanged.
 // The host is single-threaded: acquire and every dequeue check and act
 // synchronously, so exactly one of them wins.
+// Tasks: rqq.
 import type { Command, Event } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
@@ -25,7 +26,7 @@ function acquire(id: string, owner: object, edit: string, message: string): { re
 	let hold = queueEdits.state.get(id)
 	if (hold && (hold.edit !== edit || hold.message !== message)) return { refused: 'Another window is editing a queued message of this session.' }
 	let item = status.inboxOf(id).find((m) => m.id === message)
-	if (!item?.queue || item.from !== undefined || item.origin === 'model') return { refused: 'This message is no longer queued: it was already delivered.' }
+	if (!(item?.delivery === 'after-turn') || item.from !== undefined || item.origin === 'model') return { refused: 'This message is no longer queued: it was already delivered.' }
 	// The same edit from a new connection is its window reconnecting.
 	if (hold) hold.owner = owner
 	else {
@@ -92,7 +93,7 @@ function refused(id: string, name: string, args = ''): string | undefined {
 // /queue next on the locked message: it goes when the edit ends.
 function deferNext(id: string): boolean {
 	let hold = queueEdits.state.get(id)
-	if (!hold || status.inboxOf(id).find((m) => m.queue)?.id !== hold.message) return false
+	if (!hold || status.inboxOf(id).find((m) => m.delivery === 'after-turn')?.id !== hold.message) return false
 	hold.next = true
 	return true
 }

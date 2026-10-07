@@ -7,6 +7,7 @@
 // ends it: a live request, stream or tool (running), a time (retrying)
 // or a human-facing reason (blocked). A session that waits on nothing is
 // a bug.
+// Tasks: rqq.
 
 import type { InboxItem } from './inbox.ts'
 import type { Delivery } from './protocol.ts'
@@ -152,7 +153,7 @@ function enter(sessionId: string, state: SessionState, text: string, delivery: D
 // Whether undo on an empty prompt may take back a message sent early
 // from the queue (task csn): one of the user's waits to interject.
 function promoted(items: InboxItem[]): boolean {
-	return items.some((m) => m.interject && m.from === undefined && m.origin !== 'model')
+	return items.some((m) => (m.delivery === 'next-round') && m.from === undefined && m.origin !== 'model')
 }
 
 // What a client sends for Escape: a pause, if anything is running.

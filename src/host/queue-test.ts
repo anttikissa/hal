@@ -6,6 +6,7 @@
 // later message that is just a number, means 'run that many more
 // rounds' (default `rounds`); a message that is just 'stop' ends the
 // turn at the next round. Round 1 says so. Nothing it does writes files.
+// Tasks: rqq.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { Reply } from './synthetic.ts'
@@ -40,10 +41,10 @@ function arrived(records: HistoryRecord[]): string[] {
 		let texts = r.blocks.filter((b) => b.type === 'text')
 		for (let [i, b] of texts.entries()) {
 			let id = r.inbox?.[i]
-			let how = b.from !== undefined ? `from ${b.label ?? b.from}, ${b.advisory ? 'default delivery' : b.steering ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
+			let how = b.from !== undefined ? `from ${b.label ?? b.from}, ${b.advisory ? 'default delivery' : (b.delivery === 'now') ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
 				: b.origin === 'model' ? 'from Hal'
-				: b.steering ? 'You, steering'
-				: b.queuedAt !== undefined || r.queued ? 'You, queued'
+				: (b.delivery === 'now') ? 'You, steering'
+				: b.queuedAt !== undefined || b.delivery === 'after-turn' ? 'You, queued'
 				: 'You, prompt'
 			let at = b.queuedAt ?? (id && sent.get(id)) ?? r.ts
 			lines.push(`- sent ${clock(at)}, arrived ${clock(r.ts)} · ${how}: ${JSON.stringify(b.text)}`)

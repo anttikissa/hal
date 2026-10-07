@@ -117,7 +117,7 @@ test('while a turn runs, Enter steers, Ctrl-Enter soft-steers, Alt-Enter queues,
 
 test('waiting messages stay on screen, each once, until delivered', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
-	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', queue: true }] })
+	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', delivery: 'after-turn' }] })
 	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	expect(rows().filter((r) => r.includes('steer me'))).toHaveLength(1)
 	expect(rows().filter((r) => r.includes('run me later'))).toHaveLength(1)
@@ -867,7 +867,7 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 	connection.send = record
 	try {
 		app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
-		app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'q1', text: 'queued text', queue: true }] })
+		app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'q1', text: 'queued text', delivery: 'after-turn' }] })
 		app.onKeys([key('up')])
 		let acquire = sent.at(-1)
 		expect(acquire).toMatchObject({ type: 'queue-edit', message: 'q1' })

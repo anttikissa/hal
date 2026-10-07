@@ -16,7 +16,7 @@ const texts = (message: any) => message.blocks.map((b: any) => b.text)
 test('a queued message written 1 MB before the end of history runs after a host restart', async () => {
 	let id = sessions.create({ cwd: '/tmp/w', model: 'fake/m1' }).id
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'go' }] })
-	let queuedAt = history.append(id, { type: 'inbox', id: 'q1', text: 'later', queue: true }).ts
+	let queuedAt = history.append(id, { type: 'inbox', id: 'q1', text: 'later', delivery: 'after-turn' }).ts
 	// The turn goes on for a megabyte of tool rounds, then the host dies
 	// after its end, before the queued prompt.
 	for (let i = 0; i < 100; i++) {

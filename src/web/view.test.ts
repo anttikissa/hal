@@ -268,13 +268,13 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 	expect(before.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', true]])
 	// The durable inbox replaces the optimistic row before acknowledgement,
 	// using the same key; it lives in the transcript, not the fixed footer.
-	let waiting = [{ id: 'c7', text: 'go', queue: true as const }]
+	let waiting = [{ id: 'c7', text: 'go', delivery: 'after-turn' as const }]
 	let queued = view.withPending(view.rows(st.transcript!.items, st.sent), sending, waiting)
 	expect(queued.map((r) => [r.key, r.pending, r.waiting])).toEqual([['c7', undefined, true]])
-	expect(queued[0]!.item).toMatchObject({ queued: true })
+	expect(queued[0]!.item).toMatchObject({ delivery: 'after-turn' })
 	let steering = view.withPending([], sending, [{ id: 'c7', text: 'go' }])
 	expect(steering).toHaveLength(1)
-	expect(steering[0]!.item).toMatchObject({ type: 'prompt', text: 'go', steering: true })
+	expect(steering[0]!.item).toMatchObject({ type: 'prompt', text: 'go', delivery: 'now' })
 	// The host's item arrives before the ack that ends the pending one.
 	st = fold([{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 4, command: 'c7' }] as Event[], st)
 	let after = view.withPending(view.rows(st.transcript!.items, st.sent), sending)

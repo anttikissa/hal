@@ -12,6 +12,7 @@
 // line-delimited ASON (src/common/lines.ts). The host also serves the
 // web endpoint (web.ts), started by main.ts after the first frame and
 // stopped here with the host.
+// Tasks: ja, rqq.
 
 import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, openSync, rmSync } from 'fs'
@@ -19,6 +20,7 @@ import { createServer, type Server, type Socket } from 'net'
 import { lines } from '../common/lines.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { deliveryMigration } from './delivery-migration.ts'
 import { historyMigration } from './history-migration.ts'
 import { secrets } from './secrets.ts'
 import { web } from './web.ts'
@@ -66,6 +68,7 @@ async function serve(): Promise<boolean> {
 	// auth.ason would leave a stale copy that wins.
 	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	try {
+		await deliveryMigration.run()
 		await historyMigration.run()
 		server.state.listener = await server.listen(server.socketPath())
 	} catch (e) {

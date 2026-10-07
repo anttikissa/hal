@@ -2,7 +2,7 @@
 // answer, their tools and questions, pausing, and recovering turns left
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
-// Tasks: yq, xz, svt, 6eq.
+// Tasks: yq, xz, svt, 6eq, rqq.
 
 import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
@@ -68,7 +68,7 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; queued?: true; ts?: string }): void {
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; ts?: string }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
 	let effort = target(running, model, sessions.open(id).effort)
@@ -77,7 +77,6 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 	if (effort !== undefined) event.effort = effort
 	if (prompt !== undefined && record?.ts !== undefined) event.ts = record.ts
 	if (prompt !== undefined) event.prompt = prompt
-	if (prompt !== undefined && record?.queued) event.queued = true
 	if (images?.length) event.images = images
 	if (prompt !== undefined && record?.sender && Object.keys(record.sender).length) event.sender = record.sender
 	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
@@ -287,7 +286,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				// A finished answer with steering waiting: the model hears it.
 				if (!calls.length) {
 					if (contextTransitions.pending(id)) continue
-					if (signal.aborted || !status.inboxOf(id).some((m) => !m.queue)) break
+					if (signal.aborted || !status.inboxOf(id).some((m) => m.delivery !== 'after-turn')) break
 					continue
 				}
 			}
@@ -329,7 +328,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			if (signal.aborted) continue
 			// A wait: the turn ends, done, unless steering waits to be read.
-			if (ending && !status.inboxOf(id).some((m) => !m.queue)) {
+			if (ending && !status.inboxOf(id).some((m) => m.delivery !== 'after-turn')) {
 				last = { type: 'done', reason: 'tool_use' }
 				break
 			}

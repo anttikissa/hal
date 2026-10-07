@@ -2,7 +2,7 @@
 // from host events (the same transcript.fold the terminal uses), a
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
-// Tasks: dz, a1k, kx0.
+// Tasks: dz, a1k, kx0, rqq.
 
 import { queueEdit } from '../common/queue-edit.ts'
 import { completions, type Menu } from './completions.ts'
@@ -142,7 +142,7 @@ function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { co
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.queue))
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.delivery === 'after-turn'))
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
 }
@@ -276,7 +276,7 @@ function withPending(rows: Row[], pending: { id: string; text: string; ts?: stri
 	let at = (rows.at(-1)?.at ?? -1) + 1
 	let row = (m: InboxItem): Row => {
 		let r: Row = { item: transcript.waitingItem(m), at, key: m.id, waiting: true }
-		if (m.queue) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
+		if ((m.delivery === 'after-turn')) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
 		return r
 	}
 	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)

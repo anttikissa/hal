@@ -81,7 +81,7 @@ test('sending the edit rewinds there, and the draft comes back; an emptied edit 
 
 test('queued card Edit preserves the draft and waits for protection; save and cancel do not use prompt rewind', () => {
 	open({ type: 'running', phase: 'streaming' })
-	app.onEvent({ type: 'inbox', sessionId, inbox: [{ id: 'queued', text: 'queued text', queue: true, ts }] })
+	app.onEvent({ type: 'inbox', sessionId, inbox: [{ id: 'queued', text: 'queued text', delivery: 'after-turn', ts }] })
 	app.input('my draft')
 	expect(editPrompt.edit('queued')).toBe(true)
 	let acquire = sent.at(-1)

@@ -49,7 +49,7 @@ test('an advisory message reaches a working session with its next request, frame
 	expect(resultOf(next).isError).toBeUndefined()
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
-	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true, summary: 'Ask for checks' }])
+	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' }])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)
@@ -57,7 +57,7 @@ test('an advisory message reaches a working session with its next request, frame
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go' },
-		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true, summary: 'Ask for checks' },
+		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
 	])
 	calls[next + 1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.views.get(a)!.state.type === 'idle')
@@ -88,7 +88,7 @@ test('emergency is read like the user steering; queue waits for the turn to end'
 	calls[next]!.push(sendCall({ to: '1', text: 'now', delivery: 'emergency' }, 's2'), { type: 'done', reason: 'tool_use' })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a && lastText(i).endsWith('now'))
 	await until(() => recipient() >= 0)
-	expect(c.views.get(a)!.inbox.map((m) => [m.text, m.queue, m.advisory])).toEqual([
+	expect(c.views.get(a)!.inbox.map((m) => [m.text, (m.delivery === 'after-turn'), m.advisory])).toEqual([
 		['later', true, undefined],
 	])
 	let queuedAt = c.views.get(a)!.inbox[0]!.ts!
@@ -145,7 +145,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	let body = (t: string) => t.replace(/^\[[^\]\n]*\]$/gm, '[]')
 	expect(body(lastText(next + 2))).toBe(body(delivered.replace('hury', 'hurry')))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
-		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, summary: 'Ask for checks' },
+		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
 		{ type: 'prompt', text: 'and hurry' },
 	])
 })

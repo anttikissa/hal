@@ -12,7 +12,7 @@
 // effects ran since: a new record that supersedes it and its turn for the
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
-// Tasks: yq, 2r, zb0, kar.
+// Tasks: yq, 2r, zb0, kar, rqq.
 
 import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
@@ -73,13 +73,12 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	let queue = delivery === 'queue' || (agent && !emergency && !parentAnswer && asked)
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
-	let behind = queue && status.inboxOf(id).some((m) => m.queue)
+	let behind = queue && status.inboxOf(id).some((m) => m.delivery === 'after-turn')
 	// After an asking turn (task nd6), a queued message waits for the reply's turn.
 	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || (agent && !emergency)) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
-		if (queue) record.queue = true
-		else if (delivery === 'soft-steer' && sender?.advisory !== true) record.interject = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
+		record.delivery = queue ? 'after-turn' : delivery === 'soft-steer' || sender?.advisory ? 'next-round' : 'now'
 		history.append(id, record)
 		// A steer swaps in a fresh controller and aborts the old one: the
 		// turn goes on with the inbox once the old work has settled. A
@@ -97,8 +96,8 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	}
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
-	let steering = status.inboxOf(id).filter((m) => !m.queue)
-	let own = { ...inbox.sender(sender ?? {}), advisory: undefined }
+	let steering = status.inboxOf(id).filter((m) => m.delivery !== 'after-turn')
+	let own = { ...inbox.sender(sender ?? {}), advisory: undefined, delivery: undefined }
 	if (!steering.length) {
 		let list = prompts.blocks(id, [{ text, ...own }])
 		let record = history.submit(id, list, command) as HistoryRecord & { type: 'user' }
@@ -169,7 +168,7 @@ function edit(id: string, message: string, text: string, command?: string, held 
 	if (refused) return refused
 	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: message, text }
 	if (call) record.withdrawn = true
-	else if (waiting.queue) record.queue = true
+	else Object.assign(record, inbox.sender(waiting))
 	if (command !== undefined) record.command = command
 	history.append(id, record)
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
@@ -193,8 +192,7 @@ function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string
 	let blocks = prompts.blocks(id, extra ? [...parts, extra] : parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
-	if (items.length === 1 && items[0]!.queue) {
-		record.queued = true
+	if (items.length === 1 && items[0]!.delivery === 'after-turn') {
 		record.command ??= items[0]!.id
 	}
 	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
@@ -219,7 +217,6 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 	if (who.some((s) => Object.keys(s).length)) event.senders = who
 	let shown = prompts.images(record.blocks)
 	if (shown.length) event.images = shown
-	if (record.queued) event.queued = true
 	if (record.replaces) event.replaces = true
 	if (record.n !== undefined) event.n = record.n
 	if (record.command !== undefined) event.command = record.command
@@ -229,7 +226,7 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 
 // Before a request: delivers the steering messages waiting, if any.
 function steer(id: string): void {
-	let steering = status.inboxOf(id).filter((m) => !m.queue)
+	let steering = status.inboxOf(id).filter((m) => m.delivery !== 'after-turn')
 	if (steering.length) prompts.deliver(id, steering)
 }
 
@@ -238,7 +235,7 @@ function steer(id: string): void {
 // A turn that ended with <question> waits for the user's reply first
 // (task nd6); queued messages run after a final answer.
 function next(id: string): void {
-	let queued = status.inboxOf(id).find((m) => m.queue)
+	let queued = status.inboxOf(id).find((m) => m.delivery === 'after-turn')
 	if (!queued || queued.id === queueEdits.held(id) || notify.asked(id) || status.transition(id, { type: 'submit' })) return
 	let record = prompts.deliver(id, [queued], undefined, undefined, true)
 	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
@@ -256,12 +253,12 @@ function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>)
 // it runs as a fresh turn, even if paused. One being edited goes when
 // the edit ends.
 function queueNext(id: string, now = false): { say?: string; error?: string } {
-	let item = status.inboxOf(id).find((m) => m.queue)
+	let item = status.inboxOf(id).find((m) => m.delivery === 'after-turn')
 	if (!item) return { say: 'queue is empty' }
 	if (queueEdits.deferNext(id)) return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
 	if (states.busy(status.stateOf(id))) {
 		// Editing this inbox id preserves its place, sender and provenance.
-		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...(item.from ? { from: item.from, label: item.label } : {}), ...(now ? {} : { interject: true as const }) })
+		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...inbox.sender(item), delivery: now ? 'now' : 'next-round' })
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		let running = turns.state.running.get(id)
 		if (!now) prompts.promoted.set(id, item.id)
@@ -282,10 +279,10 @@ function queueNext(id: string, now = false): { say?: string; error?: string } {
 // /queue undo: the message /queue next last moved goes back to the
 // front of the queue, if the turn has not read it yet (task csn).
 function unqueueUndo(id: string): { say?: string; error?: string } {
-	let item = status.inboxOf(id).find((m) => m.id === prompts.promoted.get(id) && !m.queue)
+	let item = status.inboxOf(id).find((m) => m.id === prompts.promoted.get(id) && m.delivery !== 'after-turn')
 	prompts.promoted.delete(id)
 	if (!item) return { error: 'Nothing to undo: no message was sent early, or the turn already read it.' }
-	history.append(id, { type: 'inbox', id: item.id, text: item.text, queue: true, ...(item.from ? { from: item.from, label: item.label } : {}) })
+	history.append(id, { type: 'inbox', id: item.id, text: item.text, ...inbox.sender(item), delivery: 'after-turn' })
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 	return { say: 'queued again' }
 }

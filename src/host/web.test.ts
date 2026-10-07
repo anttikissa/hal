@@ -797,7 +797,7 @@ browserTest('in a browser a queued message address shows its card at the bottom'
 		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
 		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n\nmore` } })
 	}
-	let queued = history.append(id, { type: 'inbox', id: 'q1', text: 'Queued one', queue: true })
+	let queued = history.append(id, { type: 'inbox', id: 'q1', text: 'Queued one', delivery: 'after-turn' })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'still working' } })
 	let b = await browser()
 	try {
@@ -1353,7 +1353,7 @@ browserTest('transcript card variants share first-line geometry in open and clos
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = '2026-10-02T06:20:00Z'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Human prompt body' }], ts })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Delivered queued prompt body', queuedAt: '2026-10-01T23:13:07.456Z' }], queued: true, ts })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Delivered queued prompt body', queuedAt: '2026-10-01T23:13:07.456Z', delivery: 'after-turn' }], ts })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Assistant body\n\nAnother paragraph' }, ts })
 	history.append(id, { type: 'output', text: 'Command output body', ts })
 	history.append(id, { type: 'command', text: '/help', ts })
@@ -1367,9 +1367,9 @@ browserTest('transcript card variants share first-line geometry in open and clos
 		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name!, name: 'bash', input: { description, command: 'printf example', modifies: [] } }, ts })
 		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name!, output: 'Example output' }], ts })
 	}
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout', queuedAt: '2026-10-01T23:13:07.456Z' }], queued: true, ts })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout', queuedAt: '2026-10-01T23:13:07.456Z', delivery: 'after-turn' }], ts })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nJob complete', from: 'worker', label: 'bash #6' }], ts })
-	history.append(id, { type: 'inbox', id: 'queued-review', text: '**Queued message**\n\nLine three\nLine four', queue: true, from: 'reviewer', label: 'Review agent', ts })
+	history.append(id, { type: 'inbox', id: 'queued-review', text: '**Queued message**\n\nLine three\nLine four', delivery: 'after-turn', from: 'reviewer', label: 'Review agent', ts })
 	history.append(id, { type: 'compact', summary: 'Example context summary', prompts: 1, ts })
 	history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
 	history.append(id, { type: 'turn_end', status: 'error', error: 'Example turn failure', usage: {}, ts })
@@ -1737,8 +1737,8 @@ browserTest('queued message edits retain the draft and require host protection t
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = '2026-10-04T20:13:07.456Z'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier prompt' }], ts })
-	history.append(id, { type: 'inbox', id: 'queued-first', text: 'First queued message with a long line that wraps on phones and remains readable beside the pencil and reference.\nSecond line\nThird line\nFourth line', queue: true, ts })
-	history.append(id, { type: 'inbox', id: 'queued-last', text: 'Last queued message', queue: true, ts })
+	history.append(id, { type: 'inbox', id: 'queued-first', text: 'First queued message with a long line that wraps on phones and remains readable beside the pencil and reference.\nSecond line\nThird line\nFourth line', delivery: 'after-turn', ts })
+	history.append(id, { type: 'inbox', id: 'queued-last', text: 'Last queued message', delivery: 'after-turn', ts })
 	history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
 	let b = await browser()
 	try {

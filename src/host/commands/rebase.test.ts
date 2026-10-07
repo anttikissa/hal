@@ -93,7 +93,7 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 	let a = client(), id = created(a)
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'go' }] })
 	history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
-	let message = history.append(id, { type: 'inbox', id: 'cross-session-message', text: 'waiting message', from: 'other-session', label: 'Other session', interject: true })
+	let message = history.append(id, { type: 'inbox', id: 'cross-session-message', text: 'waiting message', from: 'other-session', label: 'Other session', delivery: 'next-round' })
 	a.conn.send({ type: 'open', sessionId: id })
 	expect(a.views.get(id)?.inbox).toHaveLength(1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })

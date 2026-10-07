@@ -1,5 +1,5 @@
 // Validate durable conversation records; corruption fails loudly.
-// Tasks: jf, nvm, svt, 6eq.
+// Tasks: jf, nvm, svt, 6eq, rqq.
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
@@ -10,6 +10,7 @@ const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
 	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	if ((r.type === 'user' || r.type === 'inbox') && ('queue' in r || 'queued' in r || (r.type === 'user' && 'delivery' in r))) throw new Error('retired delivery flags')
 	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
 	if ((r.type === 'command' || r.type === 'output') && r.origin !== undefined && r.origin !== 'model') throw new Error(`invalid ${r.type} origin`)
 	if (r.type === 'assistant' && r.interrupted !== undefined && (r.interrupted !== true || r.block?.type !== 'text')) throw new Error('invalid assistant interruption')
