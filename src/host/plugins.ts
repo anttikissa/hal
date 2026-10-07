@@ -370,6 +370,7 @@ export const plugins = {
 	arm,
 	expire,
 	broken,
+	hashOf,
 	load,
 	remove,
 	sync,

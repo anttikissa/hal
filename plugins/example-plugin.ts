@@ -24,7 +24,8 @@
 //   sync function needs a sync replacement.
 // - plugin.disable() switches the file off until it next changes: the
 //   body stops there and what it registered so far goes. Put it first
-//   to turn a plugin off without deleting it.
+//   to turn a plugin off without deleting it; /plugins disable <file>
+//   adds that line and /plugins enable <file> removes it.
 //
 // A file that fails to import or throws in its body is like a config
 // file that does not parse: Hal reports the error, runs without it and

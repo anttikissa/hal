@@ -1,0 +1,10 @@
+{
+	title: '/plugins disable|enable toggles a plugin without a model',
+	spec: "/plugins disable <file> and /plugins enable <file> (src/host/commands/plugins.ts) turn a plugin off and on with no editor or model round trip. The file stays the only record: disable inserts '<param>.disable() // /plugins enable removes this line' as the first line of the inline registration body (export default (p) => { or export default function (p) {, async allowed), so every process watching the directory follows it, and a plugin that syncs to other hosts carries it. Enable removes every whole line that only calls <param>.disable(). The .ts suffix is optional; only a file directly in plugins.dir() is accepted. Each refusal is an error naming the path: no such file, or no inline registration function to edit (a named reference such as export default r), or a conditional disable() that enable cannot edit. Already disabled and not disabled are plain replies. After writing, the command waits up to 2 s for the loaded entry's hash (plugins.hashOf) to match the written content. The watcher's load of the same write can supersede the command's own sync, so awaiting sync alone could report the old state. It replies with the new state (disabled, loaded or expired) or the load error. Completion offers disable/enable, then the plugin files. /help plugins and the example plugin's disable() comment name both subcommands.",
+	status: 'done',
+	notes: [
+		"Invariant restored with the hash wait: the reply reports the state of the content just written. Without it, a toggle about 50 ms or 1 s after the previous one reported the earlier state (disable said 'loaded') because fs.watch started a newer load generation."
+	],
+	needs: ['hvk'],
+	foldInto: ['hvk']
+}
