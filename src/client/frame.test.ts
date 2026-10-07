@@ -525,18 +525,17 @@ test('help and rebase command cards open directly to full input and output witho
 	}
 })
 
-test('a self-removed rebase report toggles its complete details with counts collapsed and IDs and pause in full detail', () => {
+test('rebase reports show colored edits immediately, separately from an earlier editor error', () => {
 	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 user:\n```diff\n-old\n+replacement\n```'
-	let v = view([{ type: 'output', text: report }])
-	let closed = plain(frame.build(v, 45).lines).join('\n')
-	expect(closed.replace(/\s+/g, ' ')).toContain('dropped 11 entries, edited 1')
-	expect(closed).not.toContain('--paused')
-	expect(closed).not.toContain('+replacement')
-	v.folds = { states: new Map([['~0', 'open']]), sig: 'open' }
-	let opened = plain(frame.build(v, 45).lines).join('\n')
-	expect(opened).toContain('+replacement')
-	expect(opened).toContain('--paused')
-	expect(opened).toContain('Edited #169')
-	v.folds = { states: new Map([['~0', 'closed']]), sig: 'closed' }
-	expect(plain(frame.build(v, 45).lines).join('\n')).toBe(closed)
+	let v = view([{ type: 'output', text: 'Rebase failed: editor exited with code 1', error: true }, { type: 'output', text: report }])
+	let rows = frame.build(v, 80).lines
+	let text = plain(rows).join('\n')
+	expect(text).toContain('Rebase failed: editor exited with code 1')
+	expect(text).toContain('dropped 11 entries, edited 1')
+	expect(text).toContain('--paused')
+	expect(text).toContain('Edited #169')
+	expect(text).not.toContain('```')
+	for (let [line, fg] of [['-old', colors.diff().removeFg], ['+replacement', colors.diff().addFg]] as const) {
+		expect(rows.find((r) => plain([r])[0]!.includes(line))).toContain(ansi.sgr({ fg: fg! }))
+	}
 })

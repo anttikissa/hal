@@ -20,7 +20,7 @@ function parse(url: string, session: string | undefined): Target | undefined {
 
 // The row showing block `key`: its own, or a tool result's call.
 function row(rows: Row[], key: string): Row | undefined {
-	return rows.find((r) => r.item.key === key || r.result?.key === key || (r.item.type === 'output' && r.item.rebaseReports?.some((i) => i.key === key)))
+	return rows.find((r) => r.item.key === key || r.result?.key === key)
 }
 
 // What to do for target `t` given the shown session's rows: show a

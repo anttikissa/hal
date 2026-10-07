@@ -1,0 +1,10 @@
+{
+	title: 'Restore visible colored rebase results without grouping',
+	spec: 'Invariant: each successful rebase report is immediately visible as normal Markdown output, with removed lines red, added lines green and no literal fence markers, in terminal and web. User-editor and model-command rebases use the same existing report generator and normal output rendering. Remove display-only rebase card merging and its constituent targeting, fold state and raw-text renderer rather than add another special path. Earlier failed attempts remain separate complete error outputs and do not mark a subsequent successful report as failed. Native tool call/result pairing, history dividers and web Undo remain. Keep literal slash command labels and full /help and /rebase tool output behavior from 18n. No changes to report generation, history rewriting, editor exit handling or model context.',
+	status: 'done',
+	notes: [
+		'Removed rebase-cards.ts and its targeting/folding adapters rather than repairing aggregation. The aggregation spread an old editor error onto a later successful output and rendered Markdown fences as raw text. Ordinary output already renders diff fences in both clients; native command tool/result pairing and existing full-command behavior remain. Replaced grouping tests with terminal and browser regressions for immediate colored output after a preceding error.'
+	],
+	needs: ['18n'],
+	foldInto: ['18n']
+}

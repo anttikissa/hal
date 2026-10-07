@@ -17,7 +17,6 @@ import { ansi } from './ansi.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
-import { rebaseCards } from '../common/rebase-cards.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
 import { resolve } from 'path'
@@ -239,10 +238,6 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output': {
-			if (item.rebaseReports) {
-				let head = ansi.wrap(`${fold === 'open' ? '▾' : '▸'} ${titles.stamp(item.ts, item.text)}`, width)
-				return fold === 'open' ? [...head, ...item.rebaseReports.flatMap((r) => ['', ...ansi.wrap(rebaseCards.detail(r), width)])] : head
-			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
 			if (item.change) {

@@ -36,7 +36,6 @@ import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import { toolDetails } from '../common/tool-details.ts'
-import { rebaseCards } from '../common/rebase-cards.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -217,8 +216,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
 	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
 	let fits = (batch: Item[]) => height(batch) <= screen
-	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(rebaseCards.group(promptChanges.group(src)), fits) } }
-	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: rebaseCards.group(promptChanges.group(src)), at: { i: 0, out: [] } }
+	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src), fits) } }
+	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
 	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, fits, deadline, memo.at)
 	if (save) frame.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
@@ -322,7 +321,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		ends.push(lines.length)
 	}
 	keep()
-	let at = view.target ? items.findIndex((i) => i.key === view.target || rebaseCards.members(i).some((m) => m.key === view.target)) : -1
+	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
 	// An image drawn in its prompt's card is found at that card.
 	while (at > 0 && items[at]!.type === 'image' && ['prompt', 'image'].includes(items[at - 1]!.type)) at--
 	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }

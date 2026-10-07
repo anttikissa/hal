@@ -1842,9 +1842,10 @@ browserTest('interrupted answers keep accessible decoration outside prose at pho
 	} finally { await b.close() }
 })
 
-browserTest('rebase summaries toggle complete reports and help opens all output at phone and desktop widths', async () => {
+browserTest('rebase diffs are visible and colored after an earlier error and help opens full output', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id, b = await browser()
 	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 prompt:\n```diff\n-old\n+replacement\n```'
+	history.append(id, { type: 'output', text: 'Rebase failed: editor exited with code 1', error: true })
 	history.append(id, { type: 'output', text: report })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'A conversation message separates these cards.' }] })
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'help', name: 'command', input: { command: '/help rebase' } } })
@@ -1854,20 +1855,24 @@ browserTest('rebase summaries toggle complete reports and help opens all output 
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.Card.rebase .mark') && !!document.querySelector('.tool-command .mark')`)
+		await b.waitFor(`!!document.querySelector('pre[data-lang=diff] .add') && !!document.querySelector('.tool-command .mark')`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			let header = await b.evaluate(`document.querySelector('.Card.rebase .CardHeader').innerText`)
-			expect(header).toContain('dropped 11 entries, edited 1')
-			expect(header).not.toContain('--paused')
-			expect(await b.evaluate(`document.querySelector('.Card.rebase .mark').getAttribute('aria-expanded')`)).toBe('false')
-			expect(await b.evaluate(`document.querySelector('.Card.rebase .report') === null`)).toBe(true)
-			await b.evaluate(`document.querySelector('.Card.rebase .mark').click()`)
-			await b.waitFor(`document.querySelector('.Card.rebase .report')?.textContent.includes('+replacement')`)
-			expect(await b.evaluate(`document.querySelector('.Card.rebase .report').textContent`)).toContain(report)
-			expect(await b.evaluate(`document.querySelector('.Card.rebase .more') === null`)).toBe(true)
-			await b.evaluate(`document.querySelector('.Card.rebase .mark').click()`)
-			await b.waitFor(`document.querySelector('.Card.rebase .mark').getAttribute('aria-expanded') === 'false'`)
+			let result = await b.evaluate(`(() => {
+				let code = document.querySelector('pre[data-lang=diff]'), card = code.closest('.Card');
+				return { text: card.textContent, error: card.classList.contains('error'),
+					colors: ['del', 'add'].map(c => getComputedStyle(code.querySelector('.' + c)).color),
+					visible: code.getBoundingClientRect().height > 0,
+					errorSeparate: [...document.querySelectorAll('.Card.error')].some(el => el.textContent.includes('editor exited with code 1')) };
+			})()`)
+			expect(result.text).toContain('Dropped 11 entries: #170-180 (11 entries)')
+			expect(result.text).toContain('--paused')
+			expect(result.text).toContain('+replacement')
+			expect(result.text).not.toContain('```')
+			expect(result.error).toBe(false)
+			expect(result.visible).toBe(true)
+			expect(result.errorSeparate).toBe(true)
+			expect(result.colors[0]).not.toBe(result.colors[1])
 			expect(await b.evaluate(`document.querySelector('.tool-command .label').textContent`)).toBe('/help rebase')
 			await b.evaluate(`document.querySelector('.tool-command .mark').click()`)
 			await b.waitFor(`document.querySelector('.tool-command .mark').getAttribute('aria-expanded') === 'true'`)
