@@ -3,11 +3,15 @@
 // so that session can fix its own work; otherwise, naming no session,
 // to every open session and client. Activity, never a guessed writer.
 import { realpathSync } from 'fs'
+import type { NoticeEvent } from '../common/notices.ts'
 import { basename, dirname, resolve } from 'path'
 import { changes } from './changes.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
+import { noticeHistory } from './notice-history.ts'
 import { pages } from './pages.ts'
+import { paths } from './paths.ts'
+import { plugins } from './plugins.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
@@ -54,4 +58,24 @@ async function report(text: string, path?: string): Promise<void> {
 	ready.then(deliver, (e) => { diag.log(`plugin report to ${editor.id}: ${e?.message ?? e}`); everyone(text) })
 }
 
-export const pluginReports = { canonical, lastEditor, everyone, report }
+// Names where the next change to plugin `path` came from, such as a
+// sync replacement, so its one notice says so.
+function via(path: string, source: string): void {
+	pluginReports.state.sources.set(path, source)
+}
+
+// A plugin lifecycle change after the initial scan (task b66): one
+// notice per file to every client, kept in the notice history. Startup
+// and shutdown (no watcher) stay quiet; failures go through report().
+function changed(path: string, what: string): void {
+	if (!plugins.state.watcher) return
+	let source = pluginReports.state.sources.get(path)
+	pluginReports.state.sources.delete(path)
+	if (source && what === 'reloaded') what = 'replaced'
+	let name = basename(path), line = `${paths.display(path)}${source ? ` from ${source}` : ''}`
+	noticeHistory.record({ session: '', name, kind: 'update', line, what })
+	let notice: NoticeEvent = { type: 'notice', session: '', name, kind: 'update', what, line, key: `plugin:${path}` }
+	for (let client of host.state.clients) client.deliver(notice)
+}
+
+export const pluginReports = { state: { sources: new Map<string, string>() }, canonical, lastEditor, everyone, report, via, changed }
