@@ -45,3 +45,12 @@ test('compact report shows counts and continuation, preserving ranges, IDs and p
 	expect(report).toContain('-old')
 	expect(report).toContain('+replacement')
 })
+
+test('rebase omits newline metadata but preserves literal edited content', () => {
+	let marker = '\\ No newline at end of file'
+	let report = rebaseReport.text(rebaseRows.build([prompt(1, 'old')]), { base: 1, drop: [], edit: [{ n: 1, text: `new\n${marker}` }] })
+	let code = markdown.parse(report).find((b) => b.type === 'code')!
+	expect(code.lines).toEqual(['-old', '+new', `+${marker}`])
+	// File diff consumers still receive the metadata.
+	expect(textDiff.text('old', 'new')).toContain(`\n${marker}`)
+})
