@@ -42,8 +42,8 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 export const tool: Tool = {
 	name: 'send',
 	description:
-		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) is read at its next round without interrupting its work; queue waits until its current turn ends; emergency interrupts its round at once (calls marked unsafe to stop finish first), and also ends a pause or failure and skips the wait for a human answer — only for stopping harmful or wasted work. ' +
-		'An idle recipient starts a turn. Otherwise a paused or failed recipient keeps the message until the user continues it; one waiting for a login or a human answer keeps it until then. A parent’s default send answers its child’s clarification question; automatic reports do not. The result says which happened.',
+		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round; queue waits for the current turn to end; emergency interrupts all but unsafe and background work — only to stop harmful or wasted work, or restart a stuck agent. ' +
+		'When a child asks you a question, use send to answer.',
 	parameters: {
 		type: 'object',
 		properties: {
