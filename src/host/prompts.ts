@@ -34,6 +34,7 @@ import { status } from './status.ts'
 import { sessions } from './sessions.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
+import { autoclose } from './autoclose.ts'
 import { notify } from './notify.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
@@ -60,7 +61,7 @@ import { turns } from './turns.ts'
 function submit(id: string, text: string, command?: string, delivery: Delivery = 'steer', sender?: Sender): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
-	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
+	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
 	// Automatic reports never answer a question. A deliberate soft-steer
@@ -134,7 +135,7 @@ function senders(list: UserBlock[]): Sender[] {
 // the other texts it delivered from the inbox stay. A prompt with no
 // text of the human's is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string): string | undefined {
-	subagents.promote(id)
+	autoclose.promote(id)
 	let records = history.readSync(id)
 	let at = replay.lastPrompt(records)
 	let old = records[at]

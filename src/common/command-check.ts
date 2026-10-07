@@ -42,6 +42,7 @@ function invalid(value: unknown): string | undefined {
 		return str('request') ?? str('query') ?? ((c.query as string).length > 4096 ? 'find: query exceeds 4096 characters' : valid ? undefined : 'find: invalid kinds')
 	}
 	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
+	if ((c.type === 'create' || c.type === 'tab-new') && c.autoclose !== undefined && typeof c.autoclose !== 'boolean') return `${c.type}: autoclose must be a boolean`
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)

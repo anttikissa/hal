@@ -116,7 +116,7 @@ test('fork gives the child the history so far; fresh does not', async () => {
 	expect(messages[2].blocks.map((b: any) => b.id)).toEqual(['s1', 's2'])
 })
 
-test('a human prompt to a subagent keeps its tab open, and its turns report nothing to the parent', async () => {
+test('a human queued follow-up keeps autoclose, and its turn reports nothing to the parent', async () => {
 	let c = client()
 	let p = await parent(c)
 	calls[0]!.push(call('s1', 'spawn', { task: 'small job' }), { type: 'done', reason: 'tool_use' })
@@ -129,8 +129,8 @@ test('a human prompt to a subagent keeps its tab open, and its turns report noth
 	let again = await callWith('and tidy up', k + 1)
 	calls[again]!.push({ type: 'text', text: 'tidied' }, { type: 'done', reason: 'end' })
 	await until(() => status.stateOf(child).type === 'idle')
-	expect(sessions.open(child).spawn).toBe('subagent-leave-open')
-	expect(tabs.file().open).toContain(child)
+	expect(sessions.open(child)).toMatchObject({ spawn: 'subagent', autoclose: true })
+	await until(() => !tabs.file().open.includes(child))
 	let reports = () => history.readSync(p).filter((r) => r.type === 'inbox' || r.type === 'user').map((r) => JSON.stringify(r))
 	await until(() => reports().some((r) => r.includes('job done')))
 	await Bun.sleep(20)

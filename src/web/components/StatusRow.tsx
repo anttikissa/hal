@@ -37,7 +37,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 		<div class="StatusRow status" aria-label="Session status">
 			<button type="button" class="overview" aria-label="Session details" aria-describedby="status-quota" aria-haspopup="dialog" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }} onClick={() => details.showModal()}>
 				<span class="primary">
-					<span class="name"><span class="id">{meta() ? `${meta()!.id}: ` : ''}</span>{meta()?.name ?? (meta() ? names.fallback(meta()!.id) : 'Connecting')}</span>
+					<span class="name"><span class="id">{meta() ? `${meta()!.id}: ` : ''}</span>{meta()?.name ?? (meta() ? names.fallback(meta()!.id) : 'Connecting')}{meta()?.autoclose && <span title="Autoclose on" aria-label="Autoclose on"> ↧</span>}</span>
 					<span class={['activity', tone()]} aria-live="polite"><span class={['dot', tone()]} aria-hidden="true">●</span> {line().text}</span>
 					<span class={heat(context()?.heat)}>{context()?.text}</span>
 					<span aria-hidden="true">▾</span>

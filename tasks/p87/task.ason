@@ -1,7 +1,13 @@
 {
 	title: 'Autoclose: a session property, /autoclose, title mark',
 	spec: 'Every session has autoclose on or off, a property like cwd and model: stored in session meta, and every change recorded in history so the transcript shows it (Autoclose: off → on), as /cd shows a directory change. Defaults: off for an ordinary session, on for a spawned kind subagent; spawn kinds subagent and subagent-leave-open differ only in that initial value. A session with autoclose on closes its tab after a completed turn whose reply ends with <summary> or no tag, when it is idle with nothing queued and no running subagents or jobs. A reply ending with <question> (nd6), a failed, paused or canceled turn never closes it. /autoclose on|off sets it; bare /autoclose shows it. Promotion: a human steer or soft-steer sets autoclose off; a human message queued as a follow-up keeps it. The title bar shows a short mark next to the session name while autoclose is on, the same in web and terminal. Raised by the user in session 07-bah on 2026-10-07: autoclose belongs to every session, not only subagents.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Autoclose is independent of spawn kind; promotion changes only autoclose, and queued human follow-ups retain it. The first prompt of a fresh session preserves its explicitly configured autoclose, so an atomic create/tab-new autoclose option can start CLI jobs. Changes persist as output history records and metadata pushes, without steering active provider work.',
+		'The existing last-tab closure invariant remains: autoclose cannot close the only open tab. A fresh-home CLI job can therefore leave its final tab open. Both session title rows use ↧ for autoclose on; the browser mark has an accessible label. Rendered browser/device inspection was not available during implementation.',
+		'Loading metadata from before the autoclose property materializes and saves the former default: on for spawn subagent, off otherwise. An explicit boolean always wins, so existing delegated sessions retain their lifecycle without tying later changes to spawn kind.',
+		'Validation: targeted spawn/autoclose tests passed. The full suite reported an unresolved timeout in the first spawn-then-wait test while waiting for the parent to become idle, followed by a missing-result assertion after timeout cleanup. Its cause was not established; do not classify it as unrelated. Full-suite line-limit, e2e HTTP fixture, pulse timing and browser failures also remain. Focused lint passed after removing an obsolete import.'
+	],
 	needs: ['t0', 'nd6'],
 	foldInto: ['t0']
 }

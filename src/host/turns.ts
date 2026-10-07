@@ -34,6 +34,7 @@ import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
+import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
@@ -366,7 +367,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	subagents.report(id)
 	if (end.status === 'completed') {
 		prompts.next(id)
-		subagents.finished(id)
+		autoclose.finished(id)
 	}
 }
 

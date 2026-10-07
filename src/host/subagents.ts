@@ -3,8 +3,7 @@
 // sits in the tab after its parent's and gets its first prompt from the
 // parent, as a message the parent sent (task rj). When a turn the parent
 // asked for ends, the host sends the parent its last text (report, task
-// mt); a `subagent`'s tab then closes after a clean finish unless a
-// human prompted it (promote), or it asks a question (task kar).
+// mt); autoclose owns tab closure and human promotion (task p87).
 // Spawn slots only go down: a
 // parent spends limit + 1 for a child given `limit`.
 
@@ -21,11 +20,9 @@ import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
-import { jobs } from './jobs.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
-import { notify } from './notify.ts'
 import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { auth } from './auth.ts'
@@ -43,7 +40,7 @@ function spawn(parent: string, s: Spawn): string {
 	let left = meta.slots ?? subagents.initialSlots
 	if (s.limit + 1 > left) throw new Error(`limit ${s.limit} needs ${s.limit + 1} spawn slots, but this session has ${left} left`)
 	meta.slots = left - s.limit - 1
-	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name })
+	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name, autoclose: s.kind === 'subagent' })
 	Object.assign(child, { parent, spawn: s.kind, slots: s.limit } satisfies Partial<SessionMeta>)
 	if (s.fork) subagents.fork(parent, child.id)
 	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id)
@@ -161,21 +158,6 @@ function report(id: string): void {
 	ready.then(deliver, (e) => diag.log(`report ${id} to ${parent}: ${e?.message ?? e}`))
 }
 
-// After a completed turn: a subagent with nothing left to do closes its
-// tab. One waiting for subagents of its own, or with messages waiting,
-// is not done.
-function finished(id: string): void {
-	if (sessions.open(id).spawn !== 'subagent' || status.stateOf(id).type !== 'idle') return
-	if (notify.asked(id) || status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
-	if (tabs.close(id) === undefined) tabs.publish()
-}
-
-// A human prompted it: the tab is theirs now and stays open.
-function promote(id: string): void {
-	let meta = sessions.open(id)
-	if (meta.spawn === 'subagent') meta.spawn = 'subagent-leave-open'
-}
-
 export const subagents = {
 	// Slots of a session nobody spawned.
 	initialSlots: 5,
@@ -185,6 +167,4 @@ export const subagents = {
 	running,
 	owed,
 	report,
-	finished,
-	promote,
 }
