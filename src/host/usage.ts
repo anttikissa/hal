@@ -105,13 +105,13 @@ function tightest(provider: string, account: string): { used: number; resets: nu
 	return best
 }
 
-// Where an account stands for rotation (task 3vj). Eligible: 5h under
-// 95% and every other shared window not spent. `need`: the weekly
+// Where an account stands for rotation (task 3vj). Eligible: no shared
+// window spent. `need`: the weekly
 // quota left per hour until the 7d window resets, the pace that spends
 // it all; -1 when the reset is unknown.
 function standing(provider: string, account: string): { eligible: boolean; need: number; used: number } {
 	let all = usage.windows(provider, account)
-	let eligible = Object.entries(all).every(([name, w]) => /^\d+[a-z]+[-_]/.test(name) || w.used < (name === '5h' ? 95 : 100))
+	let eligible = Object.entries(all).every(([name, w]) => /^\d+[a-z]+[-_]/.test(name) || w.used < 100)
 	let week = all['7d']
 	let need = week?.resets ? (100 - week.used) / Math.max(1, (Date.parse(week.resets) - clock.now()) / 3600_000) : -1
 	return { eligible, need, used: usage.tightest(provider, account).used }

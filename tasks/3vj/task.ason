@@ -2,7 +2,7 @@
 	title: 'Rotation spends the quota most at risk of expiring',
 	spec: `The default account choice (pickAccount, task wf) spends weekly quota before it expires unused. Running out is acceptable; wasted quota is not.
 
-Eligible: a subscription whose shared windows (5h, 7d; model-specific windows such as 7d_opus are ignored) are below 95% (5h) and 100% (others) used. Expired windows count as unused (usage.windows).
+Eligible: a subscription whose shared windows (5h, 7d; model-specific windows such as 7d_opus are ignored) are below 100% used; a 429 marks an account limited until its reset. Expired windows count as unused (usage.windows).
 
 Need: the 7d quota left per hour until that window resets, the pace that spends it all.
 
