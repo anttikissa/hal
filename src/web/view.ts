@@ -188,6 +188,26 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
+// Prompts Play sends when an idle turn ended with the assistant's text
+// (task yhn): short, and each asks for action, not another plan.
+const NUDGES = [
+	'Continue.',
+	'Proceed.',
+	'Go on.',
+	'Keep going until the task is done.',
+	'Proceed with the next step; no need to ask.',
+	'Yes, go ahead and do it.',
+	'Carry on and finish what you started.',
+]
+
+// A nudge if the session is idle and its last output is the assistant's text.
+function nudge(st: ViewState, pick = Math.random()): string | undefined {
+	let t = st.transcript
+	if (t?.state.type !== 'idle') return undefined
+	let last = t.items.findLast((i) => i.type !== 'turn-end' && i.type !== 'thinking')
+	return last?.type === 'text' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
+}
+
 // What the model is streaming into the last item, thinking or text:
 // Hal's cursor sits in that item's card (dimmed while thinking).
 function streaming(st: ViewState): 'thinking' | 'text' | undefined {
@@ -361,6 +381,7 @@ export const view = {
 	complete,
 	completed,
 	pause,
+	nudge,
 	streaming,
 	line,
 	hints,
