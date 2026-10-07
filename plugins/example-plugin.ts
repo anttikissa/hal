@@ -41,6 +41,7 @@ import type { Plugin } from '../src/host/plugins.ts'
 // import { diag } from '../src/host/diag.ts'
 // import { colors } from '../src/common/colors.ts'
 // import { terminal } from '../src/client/terminal.ts'
+// import { sendKeys } from '../src/common/send-keys.ts'
 //
 // export const expires = '2026-12-31T23:59:00Z'
 //
@@ -49,6 +50,12 @@ export default (plugin: Plugin) => {
 // 	// A setting: set a plain value, or around one read from config.
 // 	plugin.set(models, 'ttlMs', 600_000)
 // 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
+//
+// 	// Keys, e.g. in plugins/keys.ts (task 8kx): one Enter chord per line,
+// 	// each 'interject', 'interrupt', 'queue' or null. Here Enter
+// 	// force-steers and Cmd-Enter queues.
+// 	plugin.set(sendKeys, 'enter', 'interrupt')
+// 	plugin.set(sendKeys, 'cmd-enter', 'queue')
 //
 // 	// Observing: log every account choice.
 // 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))

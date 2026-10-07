@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'bun:test'
+import { sendKeys } from './send-keys.ts'
 import type { Key } from './forms.ts'
 import { prompt, type PromptState } from './prompt.ts'
 import { promptLayout } from './prompt-layout.ts'
@@ -144,6 +145,17 @@ describe('actions', () => {
 		expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', delivery: 'queue' })
 		expect(show(prompt.step(at('h|i'), { key: 'enter', shift: true }).state)).toBe('h\n|i')
 		expect(prompt.step(at('h|i'), key('escape'))).toEqual({ state: at('h|i'), action: { type: 'cancel' } })
+	})
+	test('Enter chords send as sendKeys binds them (task 8kx)', () => {
+		let saved = { ...sendKeys }
+		try {
+			sendKeys.load('{"enter":"interrupt","cmd-enter":null,"alt-enter":"bogus"}')
+			expect(prompt.step(at('h|i'), key('enter')).action).toEqual({ type: 'submit', text: 'hi', delivery: 'interrupt' })
+			expect(prompt.step(at('h|i'), { key: 'enter', cmd: true }).action).toBeUndefined()
+			expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', delivery: 'queue' })
+		} finally {
+			Object.assign(sendKeys, saved)
+		}
 	})
 })
 

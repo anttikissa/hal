@@ -16,7 +16,7 @@
 // column; past the top or bottom row they go to the text's start or
 // end. Alt-Up/Down go there at once. Ctrl-=/Ctrl-Up grow the
 // terminal's box by a row, Ctrl--/Ctrl-Down shrink it back towards its
-// automatic height; sending resets it. Enter submits, Shift-Enter is a newline, Alt-Enter queues,
+// automatic height; sending resets it. Enter chords submit as sendKeys binds them, Shift-Enter is a newline,
 // Escape cancels, Ctrl-D on empty text quits.
 //
 // Shift with any move extends a selection from `anchor`; Cmd-A selects
@@ -25,7 +25,9 @@
 // and Delete delete it, plain Left/Right collapse it. Tab inserts a
 // tab, or indents the selected lines; Shift-Tab outdents. Ctrl-/, Cmd-Z
 // and Cmd-U undo, with Shift redo (prompt-undo.ts).
+// Tasks: 1x, 9x, h9, 8kx.
 
+import { sendKeys } from './send-keys.ts'
 import type { Delivery } from './protocol.ts'
 import type { Key } from './forms.ts'
 import { promptLayout } from './prompt-layout.ts'
@@ -274,21 +276,15 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 	let cut = sel ? prompt.remove(base, sel.start, sel.end) : base
 	let to = (c: number): PromptResult => ({ state: move({ ...st, cursor: c }) })
 	let del = (from: number, until: number): PromptResult => ({ state: sel ? cut : prompt.remove(base, from, until) })
+	// Enter chords send as sendKeys says (tasks csn, 8kx); Shift-Enter is a newline.
+	if (k.key === 'enter' && k.shift && mod === '') return { state: prompt.insert(cut, '\n') }
+	let delivery = k.key === 'enter' && !k.shift ? sendKeys.delivery(k) : undefined
+	if (delivery) return { state: prompt.cleared(st), action: { type: 'submit', text, delivery } }
 	switch (`${mod}-${k.key}`) {
 		case 'M-up':
 			return to(0)
 		case 'M-down':
 			return to(text.length)
-		case 'M-enter':
-			if (k.shift) break
-			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'queue' } }
-		case '-enter':
-			if (k.shift) return { state: prompt.insert(cut, '\n') }
-			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'interject' } }
-		// Ctrl-Enter: steer at once, stopping the stream and running tools (task csn).
-		case 'C-enter':
-			if (k.shift) break
-			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'interrupt' } }
 		case '-escape':
 			return { state: st, action: { type: 'cancel' } }
 		case 'C-d':

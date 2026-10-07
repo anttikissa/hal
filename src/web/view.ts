@@ -17,6 +17,7 @@ import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
@@ -221,9 +222,12 @@ function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: strin
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let command = view.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
-	let queue: [string, string][] = busy && !command ? [['alt+enter', 'queue']] : []
+	// Send chords as sendKeys binds them (task 8kx), named with '+' here.
+	let web = (h: [string, string][]): [string, string][] => h.map(([k, does]) => [k.replace('-', '+'), does])
+	let queue = busy && !command ? web(sendKeys.hints(true).filter((h) => h[1] === 'queue')) : []
 	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
-	if (busy) return [['enter', enter], ...(command ? [] : [['ctrl+enter', 'interrupt'] as [string, string]]), ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]
+	if (busy && command) return [['enter', enter], ['shift+enter', 'newline'], ['esc', 'pause']]
+	if (busy) return [...web(sendKeys.hints(true)), ['shift+enter', 'newline'], ['esc', 'pause']]
 	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
 }
 

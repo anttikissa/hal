@@ -9,6 +9,7 @@
 
 import { colors } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
@@ -40,10 +41,13 @@ function question(st: FormState): Hint[] {
 // The key hints for the session's state and whether the prompt has text.
 function keys(state: SessionState | undefined, text: boolean): Hint[] {
 	let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
-	if (working && text) return [['enter', 'steer'], ['ctrl-enter', 'interrupt'], ['alt-enter', 'queue'], ['esc', 'pause']]
+	if (working && text) return [...sendKeys.hints(true), ['esc', 'pause']]
 	if (state?.type === 'retrying' && !text) return [['enter', 'retry now'], ['esc', 'pause']]
 	if (working) return [['esc', 'pause']]
-	if (text) return [['enter', 'send'], ['shift-enter', 'newline'], ['alt-enter', 'queue']]
+	if (text) {
+		let h = sendKeys.hints(false)
+		return [...h.filter((x) => x[1] === 'send'), ['shift-enter', 'newline'], ...h.filter((x) => x[1] === 'queue')]
+	}
 	if (state?.type === 'paused') return [['enter', 'continue']]
 	if (state?.type === 'error') return [['enter', 'retry']]
 	return []

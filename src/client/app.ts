@@ -39,6 +39,7 @@ import { appModals } from './app-modals.ts'
 import { titles } from '../common/titles.ts'
 import { notices } from '../common/notices.ts'
 import { find } from './find.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
 
@@ -111,7 +112,9 @@ function onEvent(event: Event): void {
 	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing?.queueEdit) app.setPrompt(drafts.text(mine))
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
-	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.delivery === 'queue', ctrl: resume.delivery === 'interrupt', cmd: false }])
+	// Replayed as the chord bound to its delivery, so remapped keys hold (task 8kx).
+	let chord = resume && sendKeys.key(resume.delivery)
+	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: chord === 'alt-enter', ctrl: chord === 'ctrl-enter', cmd: chord === 'cmd-enter' }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)

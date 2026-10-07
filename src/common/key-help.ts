@@ -5,6 +5,7 @@
 // commands with a key come from the command list (common/commands/).
 
 import { commandList } from './commands/list.ts'
+import { sendKeys } from './send-keys.ts'
 
 export type Binding = { key: string; shift: boolean; alt: boolean; ctrl: boolean; cmd: boolean }
 export type KeyRow = { keys: string; description: string; bindings: Binding[]; command?: string }
@@ -40,9 +41,9 @@ function sections(): KeySection[] {
 			title: 'Prompt',
 			rows: [
 				row('enter', 'send the prompt; on an empty prompt, continue'),
-				row('enter / ctrl-enter', 'while working: steer at the next step / now, stopping the reply and tools; on an empty prompt, send the next queued message so'),
+				row(`${sendKeys.key('interject') ?? 'no key'} / ${sendKeys.key('interrupt') ?? 'no key'}`, 'while working: steer at the next step / now, stopping the reply and tools; on an empty prompt, send the next queued message so'),
 				row('shift-enter', 'new line'),
-				row('alt-enter', 'queue the prompt to run after the turn'),
+				row(sendKeys.key('queue') ?? 'no key', 'queue the prompt to run after the turn'),
 				row('escape', 'pause the turn; leave editing the last prompt'),
 				row('up', 'on an empty prompt while working: edit the last prompt'),
 				row('tab', 'complete a slash command; else insert a tab or indent the selection'),
