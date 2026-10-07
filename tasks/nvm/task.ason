@@ -1,6 +1,6 @@
 {
 	title: 'Host facts use durable notices, never tool output',
-	spec: 'Resource level changes, neighbor edit activity and host restarts reach models as notice history records, delivered as Hal notices at the next request through history.messages and model-notices. Notices never start or resume turns. Bash results contain only tool output and failures. Resources: each level change appends one notice to every open session, after critical pausing so a full disk cannot block the pause. Neighbors: history.messages samples neighbors.notes before each request. Restarts: on becoming host, before turns recover, each open tab gets one notice with the deliberate cause (task 2e) or cause unknown. Client warnings stay as they were.',
+	spec: 'Neighbor edit activity and host restarts reach models as notice history records, delivered as Hal notices at the next request through history.messages and model-notices. Notices never start or resume turns. Bash results contain only tool output and failures. Neighbors: history.messages samples neighbors.notes before each request. Restarts: on becoming host, before turns recover, each open tab gets one notice with the deliberate cause (task 2e) or cause unknown. Client warnings stay as they were.',
 	status: 'done',
 	notes: [
 		'Restored invariant: tool results hold only tool output; Hal facts reach the next model request even when the model never runs bash.',

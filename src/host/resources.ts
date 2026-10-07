@@ -2,17 +2,14 @@
 // disk or an out-of-memory kill never takes Hal and its sessions down
 // unannounced. Every intervalMs the host measures
 // both and grades them ok, low or critical. Entering a worse level warns
-// every client (and each one joining while it lasts) and appends a notice
-// to each open session; entering critical pauses every running turn with
-// the reason, which also kills their commands. The user decides when to
-// resume. Tasks: fwk, nvm.
+// every client (and each one joining while it lasts); recovery tells them
+// too. While critical, every running turn is paused with the reason, which
+// also kills its commands; models learn only through that reason. The user
+// decides when to resume. Task: fwk.
 import { readFileSync, statfsSync } from 'fs'
 import { freemem, totalmem } from 'os'
-import { diag } from './diag.ts'
-import { history } from './history.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
-import { sessions } from './sessions.ts'
 import { turns } from './turns.ts'
 
 export type Level = 'ok' | 'low' | 'critical'
@@ -68,22 +65,21 @@ function warning(): string | undefined {
 	return `${level === 'critical' ? 'Critically low' : 'Low'} resources: ${resources.describe(sample, level)}`
 }
 
-// One check: grades a fresh sample and acts on a change of level.
+// One check: grades a fresh sample, pauses running turns while critical
+// (also those started after it began) and warns clients on a change.
 function check(sample = resources.measure()): void {
 	let st = resources.state
 	let before = st.level
 	st.sample = sample
 	st.level = resources.grade(sample)
-	if (st.level === before) return
-	let text = resources.warning() ?? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
-	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
-	// Stop first: on a full disk, the writes below may fail.
-	if (st.level === 'critical') for (let id of turns.state.running.keys()) {
+	if (st.level === 'critical') for (let [id, running] of turns.state.running) {
+		if (running.controller.signal.aborted) continue
 		try { turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`) }
 		catch (e) { process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
 	}
-	for (let id of sessions.state.open.keys()) history.append(id, { type: 'notice', text })
-	diag.log(`resources: ${before} -> ${st.level} (disk ${gb(sample.disk)}, memory ${gb(sample.memory)})`)
+	if (st.level === before) return
+	let text = resources.warning() ?? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
+	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 }
 
 // Checks now and every intervalMs; clients joining while short get the
@@ -100,8 +96,8 @@ function init(): void {
 	let run = () => {
 		try {
 			resources.check()
-		} catch (e: any) {
-			diag.log(`resources: ${e?.message ?? e}`)
+		} catch (e) {
+			for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resource check failed: ${e instanceof Error ? e.stack : e}` })
 		}
 	}
 	st.timer = setInterval(run, resources.intervalMs)
