@@ -16,6 +16,7 @@ export const tool: Tool<ToolOutput> = {
 	readOnly: true,
 	async run(input, ctx) {
 		if (typeof input.id !== 'string') throw new Error('id must be a string')
+		let reference = input.id.trim()
 		for (let key of ['offset', 'limit', 'charOffset'] as const) if (input[key] !== undefined && (typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)) throw new Error(`${key} must be a positive integer`)
 		let page = (text: string) => {
 			if (input.charOffset === undefined) return tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
@@ -24,8 +25,8 @@ export const tool: Tool<ToolOutput> = {
 			let end = Math.min(text.length, at + Math.max(1, tools.maxChars - 200))
 			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
 		}
-		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(input.id)
-		let block = /^(?:([\w-]+))?#[a-z]?([1-9]\d*)$/.exec(input.id)
+		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(reference)
+		let block = /^(?:([\w-]+))?#[a-z]?([1-9]\d*)$/.exec(reference)
 		if (!ref && !block) throw new Error(`invalid blob or block id: ${JSON.stringify(input.id)}`)
 		if (block) {
 			let n = Number(block[2])

@@ -205,12 +205,12 @@ test('read_blob resolves text and images and rejects unknown or escaping referen
 	try {
 		let text = blobs.storeOutput('s', 'unaltered text')
 		expect((await blobRun(text.blob)).output).toBe('unaltered text')
-		expect((await blobRun(`s/${text.blob}`)).output).toBe('unaltered text')
+		expect((await blobRun(` \ts/${text.blob}   \n`)).output).toBe('unaltered text')
 		let image = blobs.store('s', 'image/png', Buffer.from('89504e470d0a1a0a0000', 'hex').toString('base64'))
 		let r = await blobRun(image.blob)
 		expect(r.image?.mediaType).toBe('image/png')
 		expect(blobs.base64('s', r.image!.blob)).toBe(blobs.base64('s', image.blob))
-		for (let id of ['unknown', '../etc/passwd', 's/../../etc/passwd', 's/missing', 'aaaaaaaaaaaa']) {
+		for (let id of ['unknown', ' ../etc/passwd ', 's/../../etc/passwd', 's/missing', 'aaaaaaaaaaaa', `s/${text.blob}.png`, `s/ ${text.blob}`]) {
 			expect((await blobRun(id)).isError).toBe(true)
 		}
 	} finally { paths.home = originalHome }
