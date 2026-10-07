@@ -17,6 +17,7 @@
 import { connection } from './connection.ts'
 import type { Delivery, Event } from './protocol.ts'
 import type { QueueEditing } from './queue-edit.ts'
+import { sendKeys } from './send-keys.ts'
 
 // `queue`: run after the current turn instead of steering it. `amend`:
 // an edit of the last message (src/common/amend.ts); `edits`: the id of
@@ -70,7 +71,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || ['queue', 'interject', 'interrupt'].includes(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string'))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || !!sendKeys.parse(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string')).map((s) => (s.delivery ? { ...s, delivery: sendKeys.parse(s.delivery)! } : s))
 	let e = l.queueEdit
 	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') && (e.window === undefined || typeof e.window === 'string') ? e : undefined
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
@@ -119,7 +120,7 @@ function flush(id: string): void {
 function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { id?: string } = {}): void {
 	let l = drafts.local(id)
 	let sending: Sending = { id: how.id ?? drafts.nextId(), text, ts: new Date().toISOString() }
-	if (how.delivery && how.delivery !== 'interrupt') sending.delivery = how.delivery
+	if (how.delivery && how.delivery !== 'steer') sending.delivery = how.delivery
 	if (how.amend) sending.amend = true
 	if (how.edits !== undefined) sending.edits = how.edits
 	if (how.rewind !== undefined) sending.rewind = how.rewind

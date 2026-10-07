@@ -63,7 +63,7 @@ function pending(sessionId: string): boolean {
 }
 
 // Enter while `sessionId` uploads: remembered, sent by the last settle.
-function wait(sessionId: string, delivery: Delivery = 'interrupt'): void {
+function wait(sessionId: string, delivery: Delivery = 'steer'): void {
 	uploads.state.waiting.set(sessionId, delivery)
 }
 

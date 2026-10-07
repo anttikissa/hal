@@ -3,6 +3,7 @@
 
 import { protocol, type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import { commands } from './commands.ts'
 import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
@@ -227,7 +228,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
-		let delivery = c.delivery ?? (c.queue ? 'queue' : 'interrupt')
+		let delivery = sendKeys.parse(c.delivery) ?? (c.queue ? 'queue' : 'steer')
 		let amending = c.amend && delivery !== 'queue' && !commands.parse(c.text)
 		if (c.rewind !== undefined && !commands.parse(c.text)) refused = rebasePlans.rewind(c.sessionId, c.rewind, c.text, c.id)
 		else if (c.amend && delivery !== 'queue' && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)

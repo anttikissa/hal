@@ -19,7 +19,7 @@ function target(id: string, key: string): { n: number; item?: { id: string; text
 }
 
 export const command: SlashCommand = {
-	help: () => `/queue <message>: queue a message, like ${sendKeys.name('queue')}. /queue lists queued messages; /queue next sends the oldest at the next round of a running turn (${sendKeys.name('interject')} on an empty prompt), /queue now interrupts with it (${sendKeys.name('interrupt')}), /queue undo queues it again if still waiting (Cmd-Z on an empty prompt); /queue drop <n> drops the nth message in the list; /queue clear drops them all.`,
+	help: () => `/queue <message>: queue a message, like ${sendKeys.name('queue')}. /queue lists queued messages; /queue next soft-steers a running turn with the oldest (${sendKeys.name('soft-steer')} on an empty prompt), /queue now steers with it (${sendKeys.name('steer')}), /queue undo queues it again if still waiting (Cmd-Z on an empty prompt); /queue drop <n> drops the nth message in the list; /queue clear drops them all.`,
 	record(args, id) {
 		let key = args.match(/^drop\s+(\S+)$/)?.[1]
 		let n = key === undefined ? 0 : target(id, key).n

@@ -41,7 +41,8 @@ function sections(): KeySection[] {
 			title: 'Prompt',
 			rows: [
 				row('enter', 'send the prompt; on an empty prompt, continue'),
-				row(`${sendKeys.key('interject') ?? 'no key'} / ${sendKeys.key('interrupt') ?? 'no key'}`, 'while working: steer at the next step / now, stopping the reply and tools; on an empty prompt, send the next queued message so'),
+				row(sendKeys.key('steer') ?? 'no key', 'while working: steer, stopping the reply and tools (not unsafe-to-stop or background ones); on an empty prompt, send the next queued message so'),
+				row(sendKeys.key('soft-steer') ?? 'no key', 'while working: soft-steer, sent at the next step without stopping anything; on an empty prompt, send the next queued message so'),
 				row('shift-enter', 'new line'),
 				row(sendKeys.key('queue') ?? 'no key', 'queue the prompt to run after the turn'),
 				row('escape', 'pause the turn; leave editing the last prompt'),

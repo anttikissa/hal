@@ -238,8 +238,8 @@ function tags(b: UserText): string[] {
 	return [
 		b.from !== undefined ? `message from ${titles.address(b.label ?? b.from)}` : b.origin === 'model' ? 'Hal' : undefined,
 		b.generatingCommand && `/${b.generatingCommand} continuation`,
-		b.steering && 'interrupting',
-		b.interject && 'interjecting',
+		b.steering && 'steering',
+		b.interject && 'soft-steering',
 		b.queuedAt !== undefined && `queued at ${replay.clock(b.queuedAt).slice(-5)}`,
 		b.advisory && 'next round',
 	].filter((t): t is string => !!t)

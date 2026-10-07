@@ -50,10 +50,10 @@ import { turns } from './turns.ts'
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
 //
-// `delivery` (task csn): 'interject' (Enter) leaves the stream and
+// `delivery` (task csn): 'soft-steer' leaves the stream and
 // running tools alone, the turn delivering it before its next request;
-// 'interrupt' (Ctrl-Enter) stops them; 'queue' runs after the turn.
-function submit(id: string, text: string, command?: string, delivery: Delivery = 'interrupt', sender?: Sender): string | undefined {
+// 'steer' stops them; 'queue' runs after the turn.
+function submit(id: string, text: string, command?: string, delivery: Delivery = 'steer', sender?: Sender): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
@@ -68,7 +68,7 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
-		else if (delivery === 'interject') record.interject = true
+		else if (delivery === 'soft-steer') record.interject = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
 		// A steer swaps in a fresh controller and aborts the old one: the
@@ -80,7 +80,7 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
 			// Stopped by Escape: nothing runs on, so an interjection goes at once too.
-			if (delivery !== 'interject' || running.controller.signal.aborted) prompts.force(running)
+			if (delivery !== 'soft-steer' || running.controller.signal.aborted) prompts.force(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return

@@ -54,7 +54,7 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 		slash.output(c.sessionId, report)
 	}
 	for (let [i, text] of queue.entries()) {
-		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'interrupt')
+		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'steer')
 		if (refused) throw new Error(refused)
 	}
 	if (!queue.length && (plan.drop.length || plan.edit.length)) agent.continuePrompt(c.sessionId, c.paused, continuation)

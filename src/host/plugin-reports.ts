@@ -57,7 +57,7 @@ async function report(text: string, path?: string): Promise<void> {
 	let by = editor.call === undefined ? 'A bash call' : `Your bash call #t${editor.call}`
 	let message = `${by} declared and changed ${path} at ${editor.ts}, before this failure; it was the last declared edit.\n${text}`
 	let deliver = () => {
-		let refused = prompts.submit(editor.id, message, undefined, 'interrupt', { from: editor.id, label: 'plugin loader' })
+		let refused = prompts.submit(editor.id, message, undefined, 'steer', { from: editor.id, label: 'plugin loader' })
 		if (refused) { diag.log(`plugin report to ${editor.id}: ${refused}`); everyone(text) }
 	}
 	let ready = host.ready(editor.id)

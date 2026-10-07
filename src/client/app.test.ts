@@ -95,7 +95,7 @@ test('a submit before any session arrives keeps the text', () => {
 	expect(appView.view().notice).toBeTruthy()
 })
 
-test('while a turn runs, Enter steers between rounds, Ctrl-Enter interrupts, Alt-Enter queues, and Escape pauses', () => {
+test('while a turn runs, Enter steers, Ctrl-Enter soft-steers, Alt-Enter queues, and Escape pauses', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
@@ -108,8 +108,8 @@ test('while a turn runs, Enter steers between rounds, Ctrl-Enter interrupts, Alt
 	app.onKeys([{ ...key('enter'), alt: true }])
 	escape()
 	expect(sent).toEqual([
-		{ type: 'submit', sessionId: 's1', text: 'now', delivery: 'interject' },
-		{ type: 'submit', sessionId: 's1', text: 'stop' },
+		{ type: 'submit', sessionId: 's1', text: 'now' },
+		{ type: 'submit', sessionId: 's1', text: 'stop', delivery: 'soft-steer' },
 		{ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' },
 		{ type: 'pause', sessionId: 's1' },
 	])

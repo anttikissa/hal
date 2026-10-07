@@ -1,6 +1,7 @@
 // Validation of commands on the host side; protocol.ts holds the types.
 // Tasks: 6, qt, svt.
 import type { CommandType } from './protocol.ts'
+import { sendKeys } from './send-keys.ts'
 import { rebase } from './rebase.ts'
 import { pluginSyncWire } from './plugin-sync.ts'
 
@@ -57,7 +58,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'tab-resume') return str('sessionId', true)
 	if (c.type === 'history' && !(Number.isInteger(c.before) && (c.before as number) >= 0)) return 'history: before must be an offset'
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
-	if (c.type === 'submit' && c.delivery !== undefined && !['queue', 'interject', 'interrupt'].includes(c.delivery as string)) return 'submit: delivery must be queue, interject or interrupt'
+	if (c.type === 'submit' && c.delivery !== undefined && !sendKeys.parse(c.delivery)) return 'submit: delivery must be steer, soft-steer or queue'
 	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
 	if (c.type === 'answer') {

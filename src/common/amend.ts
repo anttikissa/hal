@@ -77,7 +77,7 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 // they do anywhere: queue a new message, or continue.
 function enter(editing: Editing, t: Transcript | undefined, text: string, queue = false): unknown {
 	if (editing.queueEdit) return undefined
-	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'interrupt').command
+	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
 	if (editing.rewind !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, rewind: editing.rewind }
 	let command = { type: 'submit', sessionId: editing.sessionId, text, amend: true }
 	return editing.inbox === undefined ? command : { ...command, edits: editing.inbox }

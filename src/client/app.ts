@@ -191,7 +191,7 @@ function onState(state: LinkState): void {
 
 // Enter: a prompt (steering a busy turn as `delivery` says, task csn),
 // an edit of the last prompt, or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
-function submit(text: string, delivery: Delivery = 'interrupt'): boolean {
+function submit(text: string, delivery: Delivery = 'steer'): boolean {
 	let st = app.state
 	let id = st.transcript?.meta.id
 	if (id && queueEdit.current(id)?.active) {

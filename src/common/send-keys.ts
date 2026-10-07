@@ -1,6 +1,6 @@
 // Send keys (task 8kx): which delivery (task csn) each Enter chord gives
 // a prompt. Plain values, so a plugin (plugins/keys.ts) rebinds one
-// chord per line with plugin.set(sendKeys, 'enter', 'interrupt'); null
+// chord per line with plugin.set(sendKeys, 'enter', 'soft-steer'); null
 // leaves a chord unbound. Shift-Enter is always a newline. A terminal
 // reads its own process's values; the web page gets the host's in the
 // page (host/web.ts) and sees a change on its next load.
@@ -17,10 +17,10 @@ const chords: Chord[] = ['enter', 'ctrl-enter', 'alt-enter', 'cmd-enter']
 const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
 
 export const sendKeys = {
-	enter: 'interject' as Delivery | null,
-	'ctrl-enter': 'interrupt' as Delivery | null,
+	enter: 'steer' as Delivery | null,
+	'ctrl-enter': 'soft-steer' as Delivery | null,
 	'alt-enter': 'queue' as Delivery | null,
-	'cmd-enter': 'interject' as Delivery | null,
+	'cmd-enter': 'steer' as Delivery | null,
 
 	// The chord an Enter with these modifiers is (one modifier at most).
 	chord(m: Mods): Chord | undefined {
@@ -30,11 +30,20 @@ export const sendKeys = {
 	// What Enter with these modifiers sends; undefined when unbound.
 	delivery(m: Mods): Delivery | undefined {
 		let c = sendKeys.chord(m)
-		return (c && sendKeys[c]) ?? undefined
+		return (c && sendKeys.parse(sendKeys[c])) || undefined
+	},
+	// A delivery from outside (a command, a stored draft, a plugin);
+	// undefined when not one.
+	parse(v: unknown): Delivery | undefined {
+		// LEGACY-DELIVERY (task 760): old clients and drafts send interrupt
+		// and interject. Delete by 2026-10-10 (prompt.test.ts fails then).
+		if (v === 'interrupt') return 'steer'
+		if (v === 'interject') return 'soft-steer'
+		return v === 'steer' || v === 'soft-steer' || v === 'queue' ? v : undefined
 	},
 	// The chord that sends `d`, for help text: plain Enter first.
 	key(d: Delivery): Chord | undefined {
-		return chords.find((c) => sendKeys[c] === d)
+		return chords.find((c) => sendKeys.parse(sendKeys[c]) === d)
 	},
 	// The chord's name in prose, such as 'Alt-Enter'; 'no key' when unbound.
 	name(d: Delivery): string {
@@ -53,7 +62,8 @@ export const sendKeys = {
 		}
 		if (commandDraft(text)) return [['enter', 'run'], ['shift-enter', 'newline'], ...esc]
 		let send = chords.find((c) => sendKeys[c] && sendKeys[c] !== 'queue')
-		let pairs = working ? [[sendKeys.key('interject'), 'steer'], [sendKeys.key('interrupt'), 'interrupt']] : [[send, 'send']]
+		// Busy: each bound chord named by its delivery, Enter's first.
+		let pairs = working ? (['steer', 'soft-steer'] as const).map((d) => [sendKeys.key(d), d]).sort((a, b) => chords.indexOf(a[0] as Chord) - chords.indexOf(b[0] as Chord)) : [[send, 'send']]
 		pairs.push(['shift-enter', 'newline'], [sendKeys.key('queue'), 'queue'], ...esc)
 		return pairs.filter((p): p is [string, string] => !!p[0])
 	},
@@ -72,7 +82,7 @@ export const sendKeys = {
 		if (!raw || typeof raw !== 'object') return
 		for (let c of chords) {
 			let v = (raw as Record<string, unknown>)[c]
-			if (v === null || v === 'queue' || v === 'interject' || v === 'interrupt') sendKeys[c] = v
+			if (v === null || sendKeys.parse(v)) sendKeys[c] = v === null ? null : sendKeys.parse(v)!
 		}
 	},
 }

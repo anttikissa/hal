@@ -94,7 +94,7 @@ describe('graphemes are the unit', () => {
 describe('actions', () => {
 	test('Enter submits the text and clears the prompt', () => {
 		let r = prompt.step(at('hi there', 2), key('enter'))
-		expect(r.action).toEqual({ type: 'submit', text: 'hi there', delivery: 'interject' })
+		expect(r.action).toEqual({ type: 'submit', text: 'hi there', delivery: 'steer' })
 		expect(show(r.state)).toBe('|')
 	})
 	test('Alt-Enter submits to the queue', () => {
