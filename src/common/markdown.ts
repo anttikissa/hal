@@ -29,6 +29,10 @@ const ENTITIES: Record<string, string> = { nbsp: '\u00a0', amp: '&', lt: '<', gt
 const WORD = /[\p{L}\p{N}]/u
 const SEPARATOR = /^\s*\|?(\s*:?-+:?\s*\|)+\s*(:?-+:?\s*)?$/
 
+// A block id, <session>#<block> or a bare session id (tasks d92, b4b).
+const ID = /^(?:(\d+-[a-z]{3})(?:#([umartsq]\d+(?:\.\d+)?))?|#([umartsq]\d+(?:\.\d+)?))(?![\w#])/
+const ID_ALL = new RegExp(`${ID.source}$`)
+
 function same(a: Style, b: Style): boolean {
 	return a.bold === b.bold && a.italic === b.italic && a.code === b.code && a.href === b.href
 }
@@ -76,7 +80,13 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 			let n = /^`+/.exec(s.slice(i))![0].length
 			let j = s.indexOf('`'.repeat(n), i + n)
 			if (j < 0 && !open) add(s.slice(i, i + n), st)
-			else add(s.slice(i + n, j < 0 ? undefined : j), { ...st, code: true })
+			else {
+				// A code span holding just an id links like bare text (task b4b).
+				let text = s.slice(i + n, j < 0 ? undefined : j)
+				let id = j >= 0 && markdown.state.links ? ID_ALL.exec(text) : null
+				let href = id ? markdown.state.links!(id[1], id[2] ?? id[3]) : undefined
+				add(text, { ...st, code: true, ...(href && { href }) })
+			}
 			i = j < 0 ? (open ? s.length : i + n) : j + n
 			continue
 		}
@@ -114,7 +124,7 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 		}
 		// A block id (task d92), #t5 or <session>#t5, or a bare session id
 		// (task b4b), where the resolver knows it: a link. Else text.
-		let id = markdown.state.links && (c === '#' || /\d/.test(c)) && !WORD.test(s[i - 1] ?? '') ? /^(?:(\d+-[a-z]{3})(?:#([umartsq]\d+(?:\.\d+)?))?|#([umartsq]\d+(?:\.\d+)?))(?![\w#])/.exec(s.slice(i)) : null
+		let id = markdown.state.links && (c === '#' || /\d/.test(c)) && !WORD.test(s[i - 1] ?? '') ? ID.exec(s.slice(i)) : null
 		let to = id ? markdown.state.links!(id[1], id[2] ?? id[3]) : undefined
 		if (id && to) {
 			add(id[0], { ...st, href: to })

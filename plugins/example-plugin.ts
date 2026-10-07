@@ -1,4 +1,4 @@
-// Example plugin (tasks an, 90v). Its hooks are commented out: it loads and
+// Example plugin (tasks an, 90v, gev). Its hooks are commented out: it loads and
 // registers nothing.
 // Every plugins/*.ts in the Hal home is a plugin, loaded at startup after
 // local.ts and reloaded whenever it changes (edit, save, done). Copy this
@@ -33,6 +33,12 @@
 // Temporary plugins (agents): name the file after the session, such as
 // 158-lil-trace-render.ts, and set `expires` (a UTC ISO time). Once it
 // passes the hooks are removed; the file stays.
+//
+// Portable plugins (task gev): `export const portable = true` lets a
+// terminal client and its host share the file; without it a plugin stays
+// on its own machine. Sync keeps `expires` as written and never extends
+// it. Every version Hal sees of each plugins/*.ts is kept, privately, in
+// plugins/history.asonl and plugins/history/ (contents by hash).
 
 import type { Plugin } from '../src/host/plugins.ts'
 // import { auth } from '../src/host/auth.ts'
@@ -44,6 +50,7 @@ import type { Plugin } from '../src/host/plugins.ts'
 // import { sendKeys } from '../src/common/send-keys.ts'
 //
 // export const expires = '2026-12-31T23:59:00Z'
+// export const portable = true
 //
 // oxlint-disable-next-line no-unused-vars -- used once uncommented
 export default (plugin: Plugin) => {

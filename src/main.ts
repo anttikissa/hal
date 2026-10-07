@@ -62,6 +62,7 @@ async function loadLocal(): Promise<void> {
 // goes to stderr and, on the host, to every open session and client.
 async function loadPlugins(): Promise<void> {
 	plugins.report = (text, path) => void pluginReports.report(text, path)
+	plugins.changed = pluginReports.changed
 	await plugins.init()
 }
 

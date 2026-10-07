@@ -6,11 +6,15 @@
 // page (host/web.ts) and sees a change on its next load.
 
 import type { Delivery } from './protocol.ts'
+import type { SessionState } from './states.ts'
 
 export type Chord = 'enter' | 'ctrl-enter' | 'alt-enter' | 'cmd-enter'
 type Mods = { ctrl?: boolean; alt?: boolean; cmd?: boolean }
 
 const chords: Chord[] = ['enter', 'ctrl-enter', 'alt-enter', 'cmd-enter']
+
+// A slash command being typed (bare / too), not an absolute file path.
+const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
 
 export const sendKeys = {
 	enter: 'interject' as Delivery | null,
@@ -36,14 +40,24 @@ export const sendKeys = {
 	name(d: Delivery): string {
 		return sendKeys.key(d)?.replace(/(^|-)([a-z])/g, (_, dash: string, c: string) => dash + c.toUpperCase()) ?? 'no key'
 	},
-	// Help-row hints: busy names steer, interrupt and queue; idle, send and queue.
-	hints(busy: boolean): [Chord, string][] {
+	// The help rows' hints for a session's state and prompt text, shared
+	// by the terminal and the web (task h67). Commands never queue (7t).
+	hints(state: SessionState | undefined, text: string): [string, string][] {
+		let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
+		let esc: [string, string][] = working ? [['esc', 'pause']] : []
+		if (!text.trim()) {
+			if (state?.type === 'retrying') return [['enter', 'retry now'], ...esc]
+			if (state?.type === 'paused') return [['enter', 'continue']]
+			if (state?.type === 'error') return [['enter', 'retry']]
+			return esc
+		}
+		if (commandDraft(text)) return [['enter', 'run'], ['shift-enter', 'newline'], ...esc]
 		let send = chords.find((c) => sendKeys[c] && sendKeys[c] !== 'queue')
-		let pairs: [Chord | undefined, string][] = busy
-			? [[sendKeys.key('interject'), 'steer'], [sendKeys.key('interrupt'), 'interrupt'], [sendKeys.key('queue'), 'queue']]
-			: [[send, 'send'], [sendKeys.key('queue'), 'queue']]
-		return pairs.filter((p): p is [Chord, string] => p[0] !== undefined)
+		let pairs = working ? [[sendKeys.key('interject'), 'steer'], [sendKeys.key('interrupt'), 'interrupt']] : [[send, 'send']]
+		pairs.push(['shift-enter', 'newline'], [sendKeys.key('queue'), 'queue'], ...esc)
+		return pairs.filter((p): p is [string, string] => !!p[0])
 	},
+	commandDraft,
 	forPage(): string {
 		return JSON.stringify(Object.fromEntries(chords.map((c) => [c, sendKeys[c]])))
 	},

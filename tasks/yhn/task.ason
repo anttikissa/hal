@@ -1,0 +1,7 @@
+{
+	title: 'Web: Play nudges an idle model; pause/play always shown',
+	spec: "The web composer's pause/play button (task v0g) is always present. Busy, it pauses; paused, it continues. Idle, it shows the play icon named Continue (caption 'Ask the model to keep going.') and is enabled only when the session's last output, after thinking and the turn end, is the assistant's text and the draft is empty; pressing it sends one prompt picked at random from a short list of nudges (src/web/view.ts NUDGES: 'Continue.', 'Proceed.', 'Go on.', 'Keep going until the task is done.', and similar requests to act rather than ask), sent and shown like a typed prompt. With a draft it stays disabled: the host clears a draft its prompt contains, so a nudge could swallow a draft such as 'Go'. Composer action buttons draw their keyboard focus ring inside (outline-offset -2px), so the composer edge and the caption never clip it (user request 2026-10-07). The terminal is unchanged until the user decides.",
+	status: 'planned',
+	needs: ['v0g'],
+	foldInto: ['v0g']
+}

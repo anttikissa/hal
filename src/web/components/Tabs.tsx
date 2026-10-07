@@ -116,11 +116,12 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let end = Math.min(props.tabs.length, Math.floor((track.scrollLeft + track.clientWidth + 1) / cell))
 		setVisible({ start, end })
 	}
-	let center = () => {
+	let center = (smooth: boolean) => {
 		if (!track) return
 		let cell = layout().cell
 		let target = Math.round(((current() + .5) * cell - track.clientWidth / 2) / cell) * cell
-		track.scrollTo({ left: Math.max(0, target), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+		smooth &&= !matchMedia('(prefers-reduced-motion: reduce)').matches
+		track.scrollTo({ left: Math.max(0, target), behavior: smooth ? 'smooth' : 'instant' })
 		measureVisible()
 	}
 	onSettled(() => {
@@ -133,10 +134,13 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	})
 	// Status/mark updates must not reset a manually scrolled strip.
 	let centered = ''
+	// Only a tab switch in an already laid-out strip animates; first paint and resizes jump.
 	createEffect(() => `${props.shown}:${room().width}:${layout().cell}:${props.tabs.length}`, (key) => {
 		if (key === centered) return
+		let [was, ...rest] = centered.split(':')
+		let smooth = !!was && was !== 'undefined' && rest.join(':') === key.slice(key.indexOf(':') + 1)
 		centered = key
-		let frame = requestAnimationFrame(center)
+		let frame = requestAnimationFrame(() => center(smooth))
 		return () => cancelAnimationFrame(frame)
 	})
 	let edge = (left: boolean): Edge => {
@@ -170,7 +174,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 						<For each={props.tabs.map((tab) => tab.id)}>
 							{(id) => {
 								let tab = () => props.tabs.find((t) => t.id === id)!
-								return <Link tab={tab()} n={props.tabs.findIndex((t) => t.id === id) + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(center)} />
+								return <Link tab={tab()} n={props.tabs.findIndex((t) => t.id === id) + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(() => center(true))} />
 							}}
 						</For>
 					</div>

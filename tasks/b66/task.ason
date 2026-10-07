@@ -3,7 +3,10 @@
 	spec: `After the initial plugin scan, the terminal reports a new file loaded, an edited or replaced plugin reloaded, and a deleted or expired plugin whose hooks were removed. Name the plugin path and affected side (client or server) when relevant. A sync replacement produces one notice identifying its source, not separate saved/unloaded/loaded notices; unchanged watcher events are silent. Successful initial startup loads are quiet; failures are never suppressed, even at startup. Preserve full errors and existing plugin failure routing (task njq), and report failed replacements according to the loader's actual outcome rather than claiming successful activation.
 
 Use existing notice plumbing and preserve the result in existing durable session output where available; no new notice-history subsystem. Notices do not change focus or open modals. Terminal feature: no web-specific work or exceptions; shared plumbing may display the same notices without additional web code. Exercise initial silence, subsequent successful load/reload/removal and failed activation without duplicate reporting.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Plugin sync (zh7) calls pluginReports.via(path, source) before writing the file: the next lifecycle notice for that path names the source and says replaced instead of reloaded. A failed load keeps the source pending until the next change, since report() owns failures.'
+	],
 	needs: ['an', '90v', 'njq', 'qm'],
 	foldInto: ['an']
 }
