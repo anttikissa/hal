@@ -60,12 +60,15 @@ function toMessages(req: ProviderRequest): any[] {
 		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
 		// The API rejects empty text blocks and empty messages.
 		let keep = (b: any) => b && (b.type !== 'text' || b.text !== '')
+		// The old input ended at its last block sent: foreign thinking and
+		// empty text drop out, as they did then.
 		if (m.cache) earlier = content.slice(0, m.cache).findLast(keep)
 		content = content.filter(keep)
 		if (content.length) out.push({ role: m.role, content })
 	}
-	// Cache the whole prefix: the next turn starts with it. Also where an
-	// earlier request's input ended, beyond the API's lookback (task g5j).
+	// Cache the whole prefix: the next turn starts with it. A second marker
+	// at an earlier request's input end reaches its cache when it lies past
+	// the API's 20-position lookback (replay.markCache, task g5j).
 	let last = out.at(-1)?.content.at(-1)
 	if (last) last.cache_control = ephemeral
 	if (earlier) earlier.cache_control = ephemeral
