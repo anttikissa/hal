@@ -10,7 +10,7 @@ test('plain symbol glyphs match Ghostty single-cell width', () => {
 })
 
 test('emoji presentation and default emoji glyphs are double-cell', () => {
-	for (let glyph of ['☀️', '☺️', '❤️', '✈️', '⚠️', '➡️', '⬅️', '⬆️', '⬇️', '✅', '❌', '😀', '📁', '👍']) {
+	for (let glyph of ['☀️', '☺️', '❤️', '✈️', '⚠️', '➡️', '⬅️', '⬆️', '⬇️', '✅', '❌', '😀', '📁', '👍', '☰', '⚊']) {
 		expect(visLen(glyph), glyph).toBe(2)
 	}
 })

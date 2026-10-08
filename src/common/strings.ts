@@ -33,36 +33,8 @@ function isZeroWidth(cp: number): boolean {
 	)
 }
 
-const BMP_WIDE_RANGES: Array<[number, number]> = [
-	[0x231a, 0x231b], [0x2329, 0x232a], [0x23e9, 0x23ec], [0x23f0, 0x23f3], [0x25fd, 0x25fe], [0x2614, 0x2615],
-	[0x2648, 0x2653], [0x267f, 0x267f], [0x2693, 0x2693], [0x26a1, 0x26a1], [0x26aa, 0x26ab], [0x26bd, 0x26be],
-	[0x26c4, 0x26c5], [0x26ce, 0x26ce], [0x26d4, 0x26d4], [0x26ea, 0x26ea], [0x26f2, 0x26f3], [0x26f5, 0x26f5],
-	[0x26fa, 0x26fa], [0x26fd, 0x26fd], [0x2705, 0x2705], [0x270a, 0x270b], [0x2728, 0x2728], [0x274c, 0x274e],
-	[0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797], [0x27b0, 0x27b0], [0x27bf, 0x27bf], [0x2b1b, 0x2b1c],
-	[0x2b50, 0x2b50], [0x2b55, 0x2b55],
-]
-
 // Text-presentation symbols that become wide emoji when followed by VS16.
 const VS16_WIDE_BASES = new Set([0x2600, 0x263a, 0x2708, 0x2764, 0x26a0, 0x27a1, 0x2b05, 0x2b06, 0x2b07])
-
-function isWide(cp: number): boolean {
-	for (let [from, to] of BMP_WIDE_RANGES) if (cp >= from && cp <= to) return true
-	return (
-		(cp >= 0x1100 && cp <= 0x115f) ||
-		(cp >= 0x2e80 && cp <= 0x303e) ||
-		(cp >= 0x3041 && cp <= 0x4dbf) ||
-		(cp >= 0x4e00 && cp <= 0x9fff) ||
-		(cp >= 0xa000 && cp <= 0xa4cf) ||
-		(cp >= 0xa960 && cp <= 0xa97c) ||
-		(cp >= 0xac00 && cp <= 0xd7a3) ||
-		(cp >= 0xf900 && cp <= 0xfaff) ||
-		(cp >= 0xfe10 && cp <= 0xfe6b) ||
-		(cp >= 0xff01 && cp <= 0xff60) ||
-		(cp >= 0xffe0 && cp <= 0xffe6) ||
-		(cp >= 0x1f000 && cp <= 0x1fbff) ||
-		(cp >= 0x20000 && cp <= 0x3ffff)
-	)
-}
 
 const isRegional = (cp: number | undefined) => cp !== undefined && cp >= 0x1f1e6 && cp <= 0x1f1ff
 
@@ -71,8 +43,7 @@ function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
 	if (isZeroWidth(cp)) return 0
-	if (isWide(cp)) return 2
-	return 1
+	return Bun.stringWidth(String.fromCodePoint(cp))
 }
 
 /**
@@ -90,7 +61,7 @@ function glyphAt(s: string, i: number, column = 0): { width: number; length: num
 	if (cp === 0x09) return { width: TAB_WIDTH - (column % TAB_WIDTH), length }
 	let width = charWidth(cp)
 	if (isRegional(cp) && isRegional(s.codePointAt(i + length))) return { width: 2, length: length + 2 }
-	if (s.codePointAt(i + length) === 0xfe0f && VS16_WIDE_BASES.has(cp)) {
+	if (s.codePointAt(i + length) === 0xfe0f && (VS16_WIDE_BASES.has(cp) || cp >= 0x1f000)) {
 		width = 2
 		length++
 	}
