@@ -230,7 +230,10 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		t.items = transcriptOrder.order([...items, ...transcript.turnItems(turn, items.length)])
 		t.live.start = Math.min(items.length, ...turn.ns?.map((n) => t.items.findIndex((item) => item.key === String(n))).filter((at) => at >= 0) ?? [])
 	}
-	if (snapshot.toolOutput) t.items = t.items.map((item) => item.type === 'tool' && item.id === snapshot.toolOutput!.id ? { ...item, partial: snapshot.toolOutput!.output } : item)
+	if (snapshot.toolOutput) {
+		let partial = new Map(snapshot.toolOutput.map((p) => [p.id, p.output]))
+		t.items = t.items.map((item) => item.type === 'tool' && partial.has(item.id) ? { ...item, partial: partial.get(item.id)! } : item)
+	}
 	return t
 }
 

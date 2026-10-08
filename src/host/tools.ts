@@ -1,4 +1,5 @@
-// Local tools the model may call. Calls run in order (turns.ts).
+// Local tools the model may call. A round's calls run concurrently
+// (turns.ts).
 // Long results stay in session blobs; the model sees their head and tail.
 //
 // A call is recorded before it runs and its result after, so a host
@@ -6,8 +7,10 @@
 // may or may not have run. That is what makes bash, which mutates,
 // safe to offer.
 //
-// Calls run one after another in call order (turns.ts), never in
-// parallel: a later call may rely on an earlier one (spawn, then wait).
+// A round's calls run concurrently, their results in call order; only
+// wait starts after the others settle, so it sees children spawned in
+// the same round (turns.ts). Calls that must follow one another belong
+// in separate rounds.
 
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
@@ -139,6 +142,10 @@ export const tools = {
 	readOnly: (name: string): boolean => toolDetails.readOnly.has(name) || tools.all().get(name)?.readOnly === true,
 	defs: (): ToolDef[] => [...tools.all().values()].map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
 	killAfterMs: 2000,
+	// Foreground bash streams its output while it runs.
+	streams: (call: ToolCallBlock): boolean => call.name === 'bash' && call.input.background !== true,
+	// A foreground call flagged unsafeToStop (task ker).
+	unsafe: (call: ToolCallBlock): boolean => call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true,
 	page,
 	run,
 	cap,

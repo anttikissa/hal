@@ -103,8 +103,9 @@ order in both clients; it is separate from delivery eligibility.
   shared list in `src/common/commands/` feeds /keys, /help, completion
   and key dispatch (tasks/w4/forms.md, Keys and client-only commands).
 - Model tools are files in `src/host/tools/` the same way (one per
-  tool, exporting `tool`; `src/host/tools.ts` is the registry). Calls
-  run one after another in call order, never in parallel.
+  tool, exporting `tool`; `src/host/tools.ts` is the registry). Calls run
+  concurrently, results in call order; wait starts after the rest
+  (task asp).
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.

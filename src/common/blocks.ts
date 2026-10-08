@@ -31,7 +31,8 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // Delivery records a busy message's scheduling tier, not an idle prompt.
 // `summary`: one line for the user, heading the message folded.
 // queuedAt: original inbox receipt time, retained after queue delivery.
-export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; delivery?: 'now' | 'next-round' | 'after-turn'; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; generatingCommand?: 'clear' }
+// call: the model's tool call that ran a command (rebase keeps it open).
+export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; delivery?: 'now' | 'next-round' | 'after-turn'; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; call?: string; generatingCommand?: 'clear' }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

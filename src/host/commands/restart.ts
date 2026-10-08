@@ -41,13 +41,11 @@ function later(): void {
 // Ctrl-R in the host's terminal asks it too (main.ts).
 function flagged(): FlaggedCall[] {
 	let now = Date.now()
-	return [...turns.state.running].flatMap(([id, running]) => {
-		let unsafe = running.unsafe
-		if (!unsafe) return []
-		let n = history.readSync(id).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === unsafe.call)?.n
+	return [...turns.state.running].flatMap(([id, running]) => [...running.unsafe ?? []].map(([call, unsafe]) => {
+		let n = history.readSync(id).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
 		let key = n === undefined ? undefined : `t${n}`
-		return [{ block: key ? `#${key}` : tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }]
-	})
+		return { block: key ? `#${key}` : tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }
+	}))
 }
 
 export const command: SlashCommand = {
