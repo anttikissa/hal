@@ -108,3 +108,8 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	expect(JSON.stringify(await history.messages(id))).toContain('fresh recovery ')
 	expect(providerBytes(await history.messages(id)).slice(0, providerBytes(fresh).length - 1)).toEqual(providerBytes(fresh).slice(0, -1))
 })
+
+test('one large attachment does not create context pressure: images cost pixels, not bytes', () => {
+	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'image', blob: 'x', mediaType: 'image/png', bytes: 5_000_000 }] }]
+	expect(pruning.estimate(messages)).toBeLessThan(pruning.pressureTokens / 10)
+})
