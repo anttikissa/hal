@@ -46,6 +46,7 @@ Actions:
 - Other actions:
 $tools_summary
 	HELP <command> for more info
+- You can run slash /commands on behalf of the user with the COMMAND action, or SEND them to another session. Useful commands: /cd /clear <next prompt> /compact /go /move /rename /rebase; /help for more.
 
 ::: if user_notes="true"
 ## User notes
