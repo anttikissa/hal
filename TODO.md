@@ -14,3 +14,6 @@ a task and remove it here.
   what. Record a screen video to find which frame it is.
 - make the 400 loc limit, say, 450
 - Review tool descriptions (send, spawn, etc.) and make them minimal
+- Cards need some status: if a background or foreground task is
+  working, if /status is running - needs to be obvious. Maybe even add
+  to bottom area these since those scroll away easily
