@@ -42,7 +42,9 @@ export type UserText = TextBlock & Sender
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
 
-export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }
+// `cache`: an earlier request's input ended after this many of the
+// message's blocks; a provider may mark it for prompt caching (task g5j).
+export type Message = ({ role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }) & { cache?: number }
 
 // Token counts. Cumulative: each usage event overwrites what it carries.
 export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }

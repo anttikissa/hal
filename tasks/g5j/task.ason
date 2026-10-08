@@ -1,9 +1,10 @@
 {
 	title: 'Keep Anthropic cache reachable across model switches',
 	spec: 'Returning to an Anthropic model keeps its previous cached input reachable even after another model adds more than 20 lookup positions. Derive the last successful request input boundary for that model from existing history and add an ephemeral cache marker there if it survives projection, retaining the system and latest-input markers. Mark the old input end, not its answer; deduplicate markers and stay within the API limit. Let Anthropic validate prefix equality: no new persisted cache state, fingerprints, account bookkeeping, keepalive calls or TTL changes. Preserve normal pruning and edits. A focused regression test covers switching away for a long tool exchange and returning.',
-	status: 'planned',
+	status: 'done',
 	notes: [
-		'Anthropic documents 20 lookup positions per breakpoint, including the breakpoint itself; consecutive tool-use or tool-result blocks count as one position on the Claude API. Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching . A marker on the old input boundary avoids that lookup limit; it cannot prevent expiry or genuine prefix invalidation.'
+		'Anthropic documents 20 lookup positions per breakpoint, including the breakpoint itself; consecutive tool-use or tool-result blocks count as one position on the Claude API. Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching . A marker on the old input boundary avoids that lookup limit; it cannot prevent expiry or genuine prefix invalidation.',
+		'The marker is a Message.cache count of neutral blocks, set by replay.markCache only when the latest round is by another model; anthropic.ts marks the last block it sends within that count, since thinking and empty text drop out. Checked on session 08-nah: the return request marks block 62, the end of the 63-block Opus input from 18:39, and that prefix is byte-identical. A one-off script importing anthropic.ts before slash.ts hits an auth/slash import-order ReferenceError; import host.ts first.'
 	],
 	needs: ['ya'],
 	foldInto: ['ya']

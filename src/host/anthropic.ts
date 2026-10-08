@@ -55,15 +55,20 @@ function assistantBlock(b: AssistantBlock): unknown {
 
 function toMessages(req: ProviderRequest): any[] {
 	let out: any[] = []
+	let earlier: any
 	for (let m of req.messages) {
-		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock).filter(Boolean)
+		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
 		// The API rejects empty text blocks and empty messages.
-		content = content.filter((b: any) => b.type !== 'text' || b.text !== '')
+		let keep = (b: any) => b && (b.type !== 'text' || b.text !== '')
+		if (m.cache) earlier = content.slice(0, m.cache).findLast(keep)
+		content = content.filter(keep)
 		if (content.length) out.push({ role: m.role, content })
 	}
-	// Cache the whole prefix: the next turn starts with it.
+	// Cache the whole prefix: the next turn starts with it. Also where an
+	// earlier request's input ended, beyond the API's lookback (task g5j).
 	let last = out.at(-1)?.content.at(-1)
 	if (last) last.cache_control = ephemeral
+	if (earlier) earlier.cache_control = ephemeral
 	return out
 }
 
