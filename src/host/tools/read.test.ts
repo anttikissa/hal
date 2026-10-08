@@ -52,7 +52,7 @@ test('image size cap accepts the boundary and rejects larger images; text and ot
 	expect(large.isError).toBe(true)
 	expect(large.image).toBeUndefined()
 	writeFileSync(`${home}/text.png`, 'one\ntwo\nthree\n')
-	expect((await read('text.png', { offset: 2, limit: 1 })).output).toStartWith('two\n')
+	expect((await read('text.png', { offset: 2, limit: 1 })).output).toEndWith(' ==\n2: two')
 	writeFileSync(`${home}/binary.png`, Buffer.from([0, 1, 2]))
 	expect((await read('binary.png')).isError).toBe(true)
 	expect((await read('limit.png', { offset: 0 })).isError).toBe(true)

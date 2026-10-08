@@ -38,7 +38,7 @@ function argumentsOf(value: unknown, ref: string): unknown {
 
 function omit(id: string, r: HistoryRecord): HistoryRecord {
 	let ref = `${id}#${r.n}`
-	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown> } }
+	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>, ...(r.block.action !== undefined && { action: pruning.argumentsOf(r.block.action, ref) as string }) } }
 	if (r.type !== 'user') return r
 	let blocks: UserBlock[] = r.blocks.map((b) => {
 		if (b.type === 'image') return { type: 'text', text: pruning.marker('image', `${id}/${b.blob}`) }

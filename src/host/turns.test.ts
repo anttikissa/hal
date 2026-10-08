@@ -5,6 +5,7 @@ import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
 import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
+import { lease } from './lease.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
@@ -87,6 +88,8 @@ test('a stream that throws still ends the turn and frees the session', async () 
 	await until(() => calls.length === 1)
 })
 
+const milk = `== READ notes.txt@${lease.hash(Buffer.from('remember the milk\n'))} ==\n1: remember the milk`
+
 test('a tool call runs on the host and the turn continues with its result', async () => {
 	let a = client()
 	let id = toolSession(a)
@@ -94,7 +97,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	b.conn.send({ type: 'open', sessionId: id })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I note?' })
 	await until(() => calls.length === 1)
-	expect(calls[0]!.input.tools.map((t: any) => t.name)).toContain('read')
+	expect(calls[0]!.input.tools.map((t: any) => t.name)).toEqual(['Action'])
 	calls[0]!.push({ type: 'text', text: 'Let me look.' }, readCall(), { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(1)).toEqual([
@@ -102,10 +105,10 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 			role: 'assistant',
 			blocks: [
 				{ type: 'text', text: 'Let me look.' },
-				{ type: 'tool_call', id: 't1', name: 'read', input: { path: 'notes.txt' } },
+				{ type: 'tool_call', id: 't1', name: 'Action', input: { action: "READ { path: 'notes.txt' }" } },
 			],
 		},
-		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'remember the milk\n' }] },
+		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: milk }] },
 	])
 	// Still one turn: nobody has seen it end.
 	expect(a.of('turn-end')).toEqual([])
@@ -119,7 +122,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 		{ type: 'prompt', text: 'what did I note?' },
 		{ type: 'text', text: 'Let me look.' },
 		{ type: 'tool', id: 't1', name: 'read', input: { path: 'notes.txt' } },
-		{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
+		{ type: 'tool-result', id: 't1', output: milk },
 		{ type: 'text', text: 'Milk.' },
 		{ type: 'turn-end', status: 'completed', usage: { input: 30, output: 6 } },
 	])
@@ -168,7 +171,7 @@ test('a restart after a tool ran keeps its result, continues, and does not run i
 		await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
 		let view = await fresh(id)
 		expect(shown(view.items.slice(-3))).toEqual([
-			{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
+			{ type: 'tool-result', id: 't1', output: milk },
 			{ type: 'text', text: 'milk' },
 			{ type: 'turn-end', status: 'completed' },
 		])

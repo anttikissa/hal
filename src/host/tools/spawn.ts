@@ -21,6 +21,7 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 
 export const tool: Tool = {
 	name: 'spawn',
+	action: { summary: 'a child session' },
 	description:
 		'Open a session in the tab after this one. A subagent session’s last message comes back here when it finishes, then ' +
 		'its tab closes; subagent-leave-open reports back and stays open; interactive is a session for the user, blank ' +

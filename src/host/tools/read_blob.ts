@@ -7,6 +7,7 @@ import { type Tool, type ToolOutput, tools } from '../tools.ts'
 
 export const tool: Tool<ToolOutput> = {
 	name: 'read_blob',
+	action: { summary: 'read stored output or history' },
 	description: 'Read an immutable blob or history record. Text is paged with offset (first line, 1-based) and limit. For lossless recovery of long/cut lines or JSON use charOffset (1-based character position) instead. Images return as images.',
 	parameters: {
 		type: 'object',

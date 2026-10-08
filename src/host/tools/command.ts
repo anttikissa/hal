@@ -2,6 +2,7 @@
 // It takes the same host path as a typed command, including history,
 // broadcast, metadata changes and error reporting.
 // Tasks: w9, svt.
+import { action } from '../../common/action.ts'
 import { commands } from '../commands.ts'
 import { slash } from '../slash.ts'
 import type { Tool } from '../tools.ts'
@@ -10,6 +11,17 @@ const prevented = new Set(['login', 'quit', 'suspend', 'budget', 'queue', 'send'
 
 export const tool: Tool = {
 	name: 'command',
+	action: {
+		summary: 'run slash command like "/cd ../other"',
+		usage: ['COMMAND /name args', '/name args', 'COMMAND "/name args"'],
+		// The rest of the line as typed, unless quoted.
+		resolve(raw) {
+			let text = raw.trim()
+			let command = /^["'`]/.test(text) ? action.values(raw).values[0] : text
+			if (typeof command !== 'string' || !command) throw new Error('COMMAND needs a slash command, e.g. COMMAND /cd ../other')
+			return { name: 'command', input: { command } }
+		},
+	},
 	description: 'Run a model-usable slash command in this session, as if typed by the user. Examples: /cd, /rename, /go, /model. All commands are allowed except /login, /quit, /suspend, /budget, /queue and /send. /restart host|both|all restarts Hal itself, interrupting every session: run it only when the user asked for it or agreed to it, never on your own initiative; ask first. Use the send tool for messaging and queuing. /compact takes effect between rounds and continues this turn; /clear [raw prompt] ends this turn safely, clears context and optionally starts an attributed fresh turn. Calls in the same round run concurrently with it. /rebase show, preview <plan> and run [--paused] <plan> support sparse drop/edit plans, applied atomically between rounds. Use /rebase only with explicit user consent; --paused ends this turn, otherwise it continues on rewritten context. Open tails include the executing call/result; no arbitrary insertion.',
 	parameters: { type: 'object', properties: { command: { type: 'string', description: 'Slash command and arguments, e.g. /cd ~/project' } }, required: ['command'] },
 	async run(input, ctx) {

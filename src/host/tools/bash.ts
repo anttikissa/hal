@@ -5,6 +5,7 @@
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
+import { actions } from '../actions.ts'
 import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
@@ -27,11 +28,26 @@ export const tool: Tool = {
 			unsafeToStop: { type: 'boolean', description: 'Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning).' },
 			modifies: { type: 'array', items: { type: 'string' }, description: 'Project paths or globs relative to cwd, without .. components, that this command creates, changes or deletes. Omit /tmp scratch files and .git internals.' },
 		},
-		required: ['command', 'description'],
+		required: ['command'],
+	},
+	// Action timeouts are in seconds; the tool's in ms.
+	action: {
+		summary: false,
+		positional: ['command'],
+		usage: ['BASH [/* purpose */] "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
+		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)', description: 'Set by a /* purpose */ comment' },
+		resolve(raw) {
+			let input = actions.generic(tool, raw)
+			if (input.timeout !== undefined) {
+				if (typeof input.timeout !== 'number' || !(input.timeout > 0)) throw new Error(`BASH timeout is a positive number of seconds, got ${JSON.stringify(input.timeout)}`)
+				input.timeout = Math.round(input.timeout * 1000)
+			}
+			return { name: 'bash', input }
+		},
 	},
 	async run(input, ctx) {
 		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
-		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
+		if (input.description !== undefined && (typeof input.description !== 'string' || !input.description.trim())) throw new Error('description must be a non-empty sentence; the command did not run')
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
 		if (input.unsafeToStop !== undefined && typeof input.unsafeToStop !== 'boolean') throw new Error('unsafeToStop must be a boolean; the command did not run')
 		let patterns = fileChanges.validate(input.modifies)

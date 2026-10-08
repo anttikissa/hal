@@ -140,7 +140,7 @@ const unsafe = (name: string, input: Record<string, unknown>): boolean => name =
 
 // Built-in tools that change nothing (host tools.readOnly): an edit of
 // a prompt before them leaves the world as it was.
-const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'read_url'])
+const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'read_url', 'help'])
 
 // Discovery and history commands open directly to their complete output (18n).
 const fullCommand = (name: string, input: Record<string, unknown>): boolean => name === 'command' && typeof input.command === 'string' && /^\s*\/(?:help|rebase)(?:\s|$)/.test(input.command)

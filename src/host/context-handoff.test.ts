@@ -58,7 +58,7 @@ test('invalid and unchanged settings do not interrupt; changes do not override a
 	expect(history.readSync(id).some((r) => r.type === 'notice' && r.text.includes('Continue your unfinished response'))).toBe(false)
 })
 
-test('model handoff lets unsafe work settle once and cancels undispatched calls', async () => {
+test('model handoff lets the round, unsafe work included, settle once', async () => {
 	let finish!: () => void
 	let settled = new Promise<void>((resolve) => { finish = resolve })
 	let original = tools.run, signal: AbortSignal | undefined, dispatched: string[] = []
@@ -74,10 +74,10 @@ test('model handoff lets unsafe work settle once and cancels undispatched calls'
 		await until(() => calls.length === 1)
 		calls[0]!.push(
 			{ type: 'tool_call', id: 'migration', name: 'bash', input: { command: 'migrate', unsafeToStop: true } },
-			{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'do not run' } },
+			{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'concurrent' } },
 			{ type: 'done', reason: 'tool_use' },
 		)
-		await until(() => dispatched.length)
+		await until(() => dispatched.length === 2)
 		slash.change(id, { model: 'other/m2' })
 		expect(signal!.aborted).toBe(false)
 		expect(calls).toHaveLength(1)
@@ -86,8 +86,8 @@ test('model handoff lets unsafe work settle once and cancels undispatched calls'
 		expect(calls[1]!.model).toBe('other/m2')
 		let blocks = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 		expect(blocks).toContainEqual({ type: 'tool_result', id: 'migration', output: 'Migration finished.' })
-		expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'canceled' })
-		expect(dispatched).toEqual(['migration'])
+		expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: 'Migration finished.' })
+		expect(dispatched).toEqual(['migration', 'pending'])
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length)
 	} finally { finish(); tools.run = original }

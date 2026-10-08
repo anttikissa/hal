@@ -12,6 +12,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
+import { actions } from './actions.ts'
 import { paths } from './paths.ts'
 
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
@@ -84,7 +85,8 @@ function preprocess(file: string, vars: Record<string, string>, sources?: Prompt
 	let lines = text.split('\n'), output: string[] = []
 	let active: boolean | undefined
 	let opened = 0
-	let substitute = (s: string) => s.replace(/\$\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole)
+	// ${name} or $name; an unknown name stays as written.
+	let substitute = (s: string) => s.replace(/\$\{(\w+)\}|\$(\w+)/g, (whole, braced?: string, bare?: string) => vars[(braced ?? bare)!] ?? whole)
 	for (let [index, line] of lines.entries()) {
 		let start = line.match(/^:{3,}\s+if\s+(.+?)\s*$/)
 		if (start) {
@@ -126,6 +128,7 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
 		hal_dir: paths.display(paths.repoRoot()), home: paths.home(),
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
+		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 	}
 	// Missing SYSTEM.md is a broken checkout: throw with the path.
