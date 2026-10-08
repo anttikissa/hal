@@ -113,9 +113,12 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	})
 	let measureVisible = () => {
 		if (!track) return
-		let cell = layout().cell
+		let n = props.tabs.length
+		// Rendered cells round to layout units; layout().cell drifts over many tabs.
+		let cell = track.scrollWidth / n || layout().cell
+		let right = track.scrollLeft + track.clientWidth
 		let start = Math.max(0, Math.ceil((track.scrollLeft - 1) / cell))
-		let end = Math.min(props.tabs.length, Math.floor((track.scrollLeft + track.clientWidth + 1) / cell))
+		let end = right >= track.scrollWidth - 1 ? n : Math.min(n, Math.floor((right + 1) / cell))
 		setVisible({ start, end })
 	}
 	let center = (smooth: boolean) => {
