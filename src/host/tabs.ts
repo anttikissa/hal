@@ -221,8 +221,9 @@ function act(c: TabCommand): Outcome {
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last)
-	// A turn that asked keeps its mark until the user sends something (task nd6).
-	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId)) f.attention = f.attention.filter((id) => id !== c.sessionId)
+	// A turn that asked keeps its mark until the user sends something (task nd6);
+	// a tab marked by /unread keeps it until its client shows another (task wr5).
+	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId) && !tabs.state.kept.has(c.sessionId)) f.attention = f.attention.filter((id) => id !== c.sessionId)
 	else if (c.type === 'tab-move') {
 		let from = f.open.indexOf(c.sessionId)
 		if (from < 0) return { refused: 'not a tab' }
@@ -249,18 +250,37 @@ function observe(id: string, event: Event): void {
 	let wants = event.type === 'question' || (event.type === 'turn-end' && (event.status === 'completed' || event.status === 'error'))
 	if (wants && !f.attention.includes(id)) f.attention.push(id)
 	// The user answered an asking turn: a new turn runs.
-	if (event.type === 'state' && states.busy(event.state) && f.attention.includes(id)) f.attention = f.attention.filter((x) => x !== id)
+	if (event.type === 'state' && states.busy(event.state)) {
+		tabs.state.kept.delete(id)
+		if (f.attention.includes(id)) f.attention = f.attention.filter((x) => x !== id)
+	}
 	tabs.publish()
+}
+
+// Marks tabs unread (/unread). `shown`, the tab the command ran in, keeps
+// its mark while its client still shows it.
+function unread(ids: string[], shown?: string): void {
+	let f = tabs.file()
+	for (let id of ids) if (!f.attention.includes(id)) f.attention.push(id)
+	if (shown !== undefined && ids.includes(shown)) tabs.state.kept.add(shown)
+	tabs.publish()
+}
+
+// A client stopped showing `id`: showing it again clears an /unread mark.
+function left(id: string): void {
+	tabs.state.kept.delete(id)
 }
 
 // Forgets the loaded file, writing pending changes (tests, restart).
 function reset(): void {
 	if (tabs.state.file) liveFiles.close(tabs.state.file)
 	tabs.state.file = null
+	tabs.state.kept.clear()
 }
 
 export const tabs = {
-	state: { file: null as TabsFile | null },
+	// kept: tabs /unread marked while shown, whose tab-seen is ignored.
+	state: { file: null as TabsFile | null, kept: new Set<string>() },
 	// How many recently closed tabs are remembered.
 	closedKept: 50,
 	file,
@@ -278,5 +298,7 @@ export const tabs = {
 	start,
 	act,
 	observe,
+	unread,
+	left,
 	reset,
 }

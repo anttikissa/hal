@@ -205,6 +205,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		// A known tab may still be waiting for its open snapshot.
 		if (!client.open.has(c.sessionId) && !tabs.file().open.includes(c.sessionId)) return { refused: 'visibility: session is not an open tab or followed session' }
 		let previous = client.visible
+		if (client.shown !== undefined && client.shown !== c.sessionId) tabs.left(client.shown)
 		client.visible = c.visible ? c.sessionId : undefined; client.shown = c.sessionId; client.visibleAt = Date.now()
 		recap.visibility(previous, client.visible)
 		return {}

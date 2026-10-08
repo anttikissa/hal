@@ -9,6 +9,7 @@ import { sessions } from './sessions.ts'
 import { subagents } from './subagents.ts'
 import { status } from './status.ts'
 import { history } from './history.ts'
+import { tabs } from './tabs.ts'
 
 useHost()
 
@@ -202,6 +203,20 @@ test('a tab wants attention when its turn ends until a client has seen it', asyn
 	expect(tab().state.type).toBe('idle')
 	send(b, { type: 'tab-seen', sessionId: x })
 	expect(tabsOf(a)!.find((t) => t.id === x)!.attention).toBeUndefined()
+})
+
+test('a tab marked unread while shown keeps its mark until its client shows another', () => {
+	let a = client()
+	let [x, y] = [newTab(a), newTab(a)]
+	let marked = () => tabsOf(a)!.find((t) => t.id === x)!.attention
+	send(a, { type: 'visibility', sessionId: x, visible: true })
+	tabs.unread([x], x)
+	send(a, { type: 'tab-seen', sessionId: x })
+	expect(marked()).toBe(true)
+	send(a, { type: 'visibility', sessionId: y, visible: true })
+	send(a, { type: 'visibility', sessionId: x, visible: true })
+	send(a, { type: 'tab-seen', sessionId: x })
+	expect(marked()).toBeUndefined()
 })
 
 test('tabs, their closed positions and attention survive a host restart', () => {

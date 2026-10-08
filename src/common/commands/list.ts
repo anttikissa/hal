@@ -70,6 +70,7 @@ const list: CommandInfo[] = [
 	{ name: 'theme', description: 'list or switch the color theme', category: 'app' },
 	{ name: 'toggle', description: 'expand or collapse blocks', category: 'session', key: 'ctrl-o' },
 	{ name: 'todo', description: 'file or list project TODO items', category: 'session' },
+	{ name: 'unread', description: 'mark this tab or the named ones unread', category: 'tabs' },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]
 
