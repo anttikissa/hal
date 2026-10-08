@@ -116,7 +116,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	expect(seen[0]!.headers.get('session_id')).toBe('sess-1')
 	expect(seen[0]!.headers.get('content-encoding')).toBe('zstd')
-	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1' })
+	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1', text: { verbosity: 'low' } })
 	expect(seen[0]!.body.max_output_tokens).toBeUndefined()
 
 	rmSync(`${home}/secrets/auth.ason`)

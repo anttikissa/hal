@@ -93,7 +93,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 	}
 	Object.assign(b, effort.wire('openai', req.model, req.effort))
 	if (req.sessionId) b.prompt_cache_key = req.sessionId
-	if (codex) b.text = { verbosity: 'high' }
+	if (codex) b.text = { verbosity: 'low' }
 	// The Codex backend rejects max_output_tokens.
 	else if (req.maxTokens) b.max_output_tokens = req.maxTokens
 	return b
