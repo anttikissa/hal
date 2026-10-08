@@ -6,20 +6,20 @@
 //
 // The recalled entry is only shown: the session's draft (drafts.ts)
 // stays the user's own text until they edit the entry, which then
-// becomes the draft (`typed`). Browsing belongs to the session, so it
-// survives switching between sessions.
+// becomes the draft (`typed`) without losing the browsing position.
+// Browsing belongs to the session and survives switching sessions.
 
 import { promptLayout } from './prompt-layout.ts'
 import type { Transcript } from './transcript.ts'
 
 // While browsing a session: the entry shown and its text.
-export type Browse = { index: number; text: string }
+export type Browse = { index: number; text: string; edited?: true }
 
 export type Shown = { text: string; cursor: number }
 
-// Every prompt sent to the session, oldest first.
+// Human prompts sent to the session, oldest first.
 function entries(t: Transcript): string[] {
-	return t.items.flatMap((i) => (i.type === 'prompt' ? [i.text] : []))
+	return t.items.flatMap((i) => (i.type === 'prompt' && i.from === undefined && i.origin !== 'model' ? [i.text] : []))
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are
@@ -62,11 +62,13 @@ function step(id: string, list: string[], text: string, cursor: number, dir: -1 
 
 // The editor now says `text`: true if that is the user's own (to keep
 // as the draft), false while it still shows a recalled entry untouched.
-// Editing an entry ends browsing.
+// Editing keeps the position, and the edited text becomes the draft.
 function typed(id: string, text: string): boolean {
 	let b = recall.state.get(id)
-	if (b && b.text === text) return false
-	recall.state.delete(id)
+	if (!b) return true
+	if (b.text === text) return !!b.edited
+	b.text = text
+	b.edited = true
 	return true
 }
 

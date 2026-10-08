@@ -499,7 +499,7 @@ test('an edited entry becomes the draft; sending an entry brings the own text ba
 	expect(app.state.text).toBe('first')
 	app.input('first!')
 	expect(stored.get(sessionId)?.text).toBe('first!')
-	expect(press('ArrowDown', message('first!'))).toBe(false)
+	expect(press('ArrowDown', message('first!'))).toBe(true)
 	app.input('')
 	press('ArrowUp', message(''))
 	// A draft received underneath browsing is not replaced by recall.
@@ -644,4 +644,23 @@ test('/go shows a cached destination draft updated by another client without wri
 	expect(sent.filter((c) => c.type === 'draft')).toEqual([])
 	app.input('from terminal!')
 	expect(sent.find((c) => c.type === 'draft')).toMatchObject({ sessionId: '2-bbb', text: 'from terminal!', base: 5 })
+})
+
+for (let restore of ['delete', 'undo']) test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
+	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
+	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('second'), user('third')]))
+	press('ArrowUp', message(''))
+	press('ArrowUp', message('third'))
+	expect(app.state.text).toBe('second')
+	app.input('second!')
+	// Native deletion and native undo both report restored text via input.
+	if (restore === 'undo') expect(press('z', message('second!'), { metaKey: true })).toBe(false)
+	app.input('second')
+	expect(press('ArrowUp', message('second'))).toBe(true)
+	expect(app.state.text).toBe('first')
+	press('ArrowDown', message('first'))
+	press('ArrowDown', message('second'))
+	press('ArrowDown', message('third'))
+	expect(app.state.text).toBe('second')
+	expect(stored.get(sessionId)?.text).toBe('second')
 })

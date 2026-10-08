@@ -9,8 +9,8 @@
 // prompt (src/common/amend.ts; Escape also cancels a card's Edit,
 // edit-prompt.ts), Up on an empty box begins history
 // browsing (src/common/recall.ts). While browsing, first/last logical
-// line arrows recall entries; nonempty drafts keep native movement,
-// including soft wraps. Tab completes a slash command; command keys run theirs,
+// line arrows recall entries, including after edits; other drafts keep
+// native movement, including soft wraps. Tab completes a slash command; command keys run theirs,
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
