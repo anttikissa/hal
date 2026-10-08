@@ -13,7 +13,7 @@ export const tool: Tool = {
 	name: 'command',
 	action: {
 		summary: 'run slash command like "/cd ../other"',
-		usage: ['COMMAND /name args', '/name args', 'COMMAND "/name args"'],
+		usage: ['COMMAND /<name> [<args>]', '/<name> [<args>]  (same as COMMAND)', 'COMMAND "/<name> [<args>]"'],
 		// The rest of the line as typed, unless quoted.
 		resolve(raw) {
 			let text = raw.trim()

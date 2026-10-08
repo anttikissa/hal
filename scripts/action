@@ -4,8 +4,9 @@
 // READ a.ts, HELP...) through the real tool modules and prints what the
 // model would get. An incomplete action continues on the next line; an
 // empty line sends it anyway. A throwaway Hal home with a copy of this
-// home's config keeps real sessions untouched; tools that need a running
-// host (SEND, SPAWN, WAIT, COMMAND, INSPECT) fail here.
+// home's config keeps real sessions untouched. The host runs in-process,
+// so COMMAND, SEND, SPAWN, WAIT and INSPECT act on that throwaway home
+// and its "action" session; SPAWN starts a real, billed model run.
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { createInterface } from 'readline/promises'
