@@ -137,9 +137,10 @@ async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation>
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
 		let log = await fileChanges.headLog(ctx.cwd)
-		let observation = { ctx, patterns, before, commits: log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined, release }
-		if (patterns.length) neighbors.start(ctx.sessionId, ctx.cwd, patterns)
-		return observation
+		let watch = log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined
+		let declared = patterns.length ? neighbors.start(ctx.sessionId, ctx.cwd, patterns) : undefined
+		// Every path out of a call ends here, launched or not, so the declaration ends with it.
+		return { ctx, patterns, before, commits: watch, release: () => { release(); if (declared) neighbors.end(declared) } }
 	} catch (e) { release(); throw e }
 }
 
