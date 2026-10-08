@@ -1,0 +1,13 @@
+{
+	title: 'Expire edit hints and reconcile informed sessions quietly',
+	spec: `Neighbor edit notices are short-lived activity hints, not file ownership. Restored invariant: a reader that was told a session might be editing files receives a correction when that information ceases to be current; a reader that missed the activity receives no stale declaration. A modifies declaration is active for the lifetime of its tool task and expires no later than one minute after that task ends. Foreground and background tasks use the same lifetime rule: a running server writing its declared server.log remains active until that task ends. A question, pause, error or final answer never extends a completed tool task declaration. Concurrent tasks retain their own lifetimes. This replaces the five-minute window and final-answer-only release rule in task 0f.
+
+Before each model request, offer current hints about other sessions in the same cwd through the existing host-notice path. Only sessions making requests while a declaration is current can first hear it. Expired activity that a reader never saw is omitted; pending obsolete transitions coalesce to current state. Notices never start or resume a turn. Repeated declarations or requests with unchanged effective file sets produce no chatter.
+
+Remember what each reader was actually told until it has received the necessary correction, rather than silently forgetting that obligation at expiry. On its next request, an informed reader gets one concise update per changed neighbor, including after an idle interval longer than the expiry window. Prefer the shorter accurate wording: a compact release description or the remaining set, such as session X is editing only foo.ts, src/main.ts, docs/*.txt now. When nothing remains, say session X is no longer editing files, without enumerating a hundred released paths. Include the human-readable tab name alongside its session identifier. Describe activity as possible declared editing, not guaranteed writes or exclusive ownership.
+
+Preserve project-path filtering and declared glob spelling. Keep coordination state and repeated work proportional to live declarations and outstanding reader corrections; clear reconciled state. Deterministic behavioral checks cover unseen expiry producing no notice, informed readers receiving release after long inactivity, partial expiry with a compact remaining-set update, unchanged redeclarations staying quiet, question turns not preserving completed-task hints, and foreground/background task lifetimes.`,
+	status: 'planned',
+	needs: ['0f', 'nvm'],
+	foldInto: ['0f']
+}
