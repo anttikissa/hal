@@ -7,6 +7,7 @@ import { replay } from '../common/replay.ts'
 import { actions } from './actions.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
 import { tools } from './tools.ts'
+import { edit } from './tools/edit.ts'
 
 useHost()
 
@@ -51,23 +52,40 @@ test('READ leases the whole file; ranges clamp; EDIT applies every range to the 
 	expect(statSync(path).mode & 0o777).toBe(0o751)
 	// Context in final numbering: around each start and end, merged.
 	expect(edit.output).toBe(`== EDIT a.txt@${lease(path)} ok: ==\n1: 1\n2: two\n…\n4: three\n5: 4\n6: 5\n7: 6\n8: 7\n9: 9\n10: 10\n…\n12: 12\n13: 13\n14: end`)
-	// Another EDIT of the old lease, as in one round: it overlaps line 8
-	// that the first one deleted, so it fails, showing the current lines.
+	// The old lease is stale even though these lines did not change.
 	let stale = await act(id, `EDIT "a.txt@${h}" { range: "5-8", lines: ["x"] }`)
 	expect(stale.isError).toBe(true)
-	expect(stale.output).toContain(`== EDIT a.txt@${lease(path)}:5-8 failed (lines 5-8 overlap lines 8-8 that an EDIT of @${h} already changed; nothing was written) ==\n3: 2.5\n4: three\n5: 4\n6: 5\n7: 6\n8: 7\n9: 9\n10: 10`)
-	// Ranges that miss earlier changes move with them, across several EDITs.
-	await act(id, `EDIT "a.txt@${h}" { range: 5, lines: ["five"] }`)
-	await act(id, `EDIT "a.txt@${h}" { range: "10-11", lines: ["ten"] }`)
-	expect(readFileSync(path, 'utf8')).toBe('1\ntwo\n2.5\nthree\n4\nfive\n6\n7\n9\nten\n12\n13\nend\n')
-	// A change outside Hal breaks the chain: the old lease is just stale.
-	writeFileSync(path, readFileSync(path, 'utf8') + 'x\n')
-	expect((await act(id, `EDIT "a.txt@${h}" { range: 1, lines: ["y"] }`)).output).toContain(`failed (file has been modified since @${h})`)
+	expect(stale.output).toContain(`== EDIT a.txt@${lease(path)}:5-8 failed (file has been modified since @${h}) ==\n3: 2.5\n4: three\n5: 4\n6: 5\n7: 6\n8: 7\n9: 9\n10: 10`)
 	let before = readFileSync(path, 'utf8')
 	let overlap = await act(id, `EDIT "a.txt@${lease(path)}" { range: "1-2", lines: ["a"] } { range: "2-3", lines: ["b"] }`)
 	expect(overlap.output).toContain('overlap')
 	expect(readFileSync(path, 'utf8')).toBe(before)
 	expect((await act(id, `EDIT "a.txt@${lease(path)}" { range: 1, lines: ["1"] }`)).output).toContain('unchanged')
+})
+
+test("a round's EDITs of one lease run as one write; an overlap fails them all", async () => {
+	let id = created(client(), testHome())
+	let path = `${testHome()}/r.txt`
+	writeFileSync(path, 'a\nb\nc\nd\n')
+	let ctx = { cwd: testHome(), signal: new AbortController().signal, sessionId: id }
+	let round = async (...texts: string[]) => {
+		let calls = texts.map((t, i) => ({ ...actions.arrived({ type: 'tool_call', id: `c${i}`, name: 'Action', input: { action: t } }), id: `c${i}` }))
+		let run = await edit.batch(calls, testHome(), id, (c) => tools.run(c, ctx))
+		return Promise.all(calls.map(run))
+	}
+	let h = lease(path)
+	// Same file through another spelling; the first call grows the file.
+	let done = await round(`EDIT "r.txt@${h}" { range: 1, lines: ["A", "A2"] }`, `EDIT "./r.txt@${h}" { range: 4, lines: ["D"] }`)
+	expect(readFileSync(path, 'utf8')).toBe('A\nA2\nb\nc\nD\n')
+	expect(done.map((r) => r.id)).toEqual(['c0', 'c1'])
+	expect(done[1]!.output).toContain('2 EDITs of r.txt@')
+	expect(done.every((r) => !r.isError)).toBe(true)
+	let before = readFileSync(path, 'utf8')
+	let clash = await round(`EDIT "r.txt@${lease(path)}" { range: "1-2", lines: ["x"] }`, `EDIT "r.txt@${lease(path)}" { range: 2, lines: ["y"] }`)
+	expect(clash.every((r) => r.isError && r.output.includes('overlap'))).toBe(true)
+	expect(readFileSync(path, 'utf8')).toBe(before)
+	// A lease replaced in an earlier round stays stale.
+	expect((await round(`EDIT "r.txt@${h}" { range: 3, lines: ["z"] }`))[0]!.output).toContain('modified since')
 })
 
 test('EDIT keeps CRLF, a BOM and a missing final newline; WRITE creates directories', async () => {

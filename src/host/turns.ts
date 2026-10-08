@@ -37,6 +37,7 @@ import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
 import { actions } from './actions.ts'
+import { edit } from './tools/edit.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
@@ -323,8 +324,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			let early = calls.filter((c) => c.name !== 'wait')
 			let settled = new Map<string, ToolResultBlock>()
-			for (let r of await Promise.all(early.map(runOne))) settled.set(r.id, r)
-			for (let call of calls) if (!settled.has(call.id)) settled.set(call.id, await runOne(call))
+			let run = await edit.batch(calls, cwd, id, runOne)
+			for (let r of await Promise.all(early.map(run))) settled.set(r.id, r)
+			for (let call of calls) if (!settled.has(call.id)) settled.set(call.id, await run(call))
 			let results = calls.map((c) => settled.get(c.id)!)
 			if (turns.state.running.get(id) !== running) return
 			if (contextTransitions.pending(id)?.kind === 'rebase') {

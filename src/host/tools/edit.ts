@@ -1,11 +1,9 @@
 // edit: changes line ranges of one leased version of a text file (task
-// aks). Every range refers to the version READ showed as path@hash; all
+// 3fv). Every range refers to the version READ showed as path@hash; all
 // apply at once, or none. The host-wide file lock (file-changes.ts)
 // serializes Hal's own edits of a file, and the bytes are compared
 // again just before the atomic rename, so an outside change in between
-// fails rather than being overwritten. An EDIT of a version Hal's own
-// EDITs replaced applies when its ranges miss theirs (lease.carry), so
-// a round's EDITs of one READ combine. The change is recorded like a
+// fails rather than being overwritten. The change is recorded like a
 // bash call's declared files.
 
 import { readFile } from 'fs/promises'
@@ -13,6 +11,8 @@ import { resolve } from 'path'
 import { action } from '../../common/action.ts'
 import { fileChanges } from '../file-changes.ts'
 import { type Change, lease } from '../lease.ts'
+import type { ToolCallBlock, ToolResultBlock } from '../../common/blocks.ts'
+import { history } from '../history.ts'
 import { type Tool, tools } from '../tools.ts'
 
 const usage = 'EDIT [/* purpose */] "<path>@<hash>" { range: "<start>-<end>", lines: ["...", ...] } [{ range, lines } ...]'
@@ -76,26 +76,53 @@ export const tool: Tool = {
 			let now = lease.hash(bytes)
 			let current = lease.text(bytes, path)
 			let ranges = wanted.map((c) => (c.start === c.end ? `${c.start}` : `${c.start}-${c.end}`)).join(',')
-			let failed = (why: string) => new Error(`== EDIT ${path}@${now}:${ranges} failed (${why}) ==\n${lease.around(current, wanted)}`)
-			if (now !== input.hash) {
-				let carried: Change[] | undefined
-				try {
-					carried = lease.carry(full, input.hash, now, wanted)
-				} catch (err: any) {
-					throw failed(err.message)
-				}
-				if (!carried) throw failed(`file has been modified since @${input.hash}`)
-				wanted = carried
-			}
-			let { after, shown, lines, applied } = lease.apply(current, wanted)
+			if (now !== input.hash) throw new Error(`== EDIT ${path}@${now}:${ranges} failed (file has been modified since @${input.hash}) ==\n${lease.around(current, wanted)}`)
+			let { after, shown, lines } = lease.apply(current, wanted)
 			let next = Buffer.from(after)
 			if (next.equals(bytes)) return `== EDIT ${path}@${now} unchanged: the lines already read so; nothing written ==`
 			if (ctx.signal.aborted) throw new Error('stopped before writing; nothing was written')
 			await lease.commit(full, next, bytes)
-			lease.remember(full, { from: now, to: lease.hash(next), n: current.lines.length, changes: applied })
 			return `== EDIT ${path}@${lease.hash(next)} ok: ==\n${lease.numbered(lines, shown) || '[Empty file]'}`
 		} finally {
 			await fileChanges.finish(observation)
 		}
 	},
 }
+
+// A round's EDITs of one leased version (same file, same hash) run as one
+// EDIT: their ranges join in call order and apply in one write, or none
+// do (task mcs). The calls of a round are all known before dispatch, so
+// nothing is remembered across rounds: a lease another round or session
+// replaced is stale. The write is recorded under the first call; each
+// member's result names the group.
+async function batch(calls: ToolCallBlock[], cwd: string, sessionId: string, runOne: (call: ToolCallBlock) => Promise<ToolResultBlock>): Promise<(call: ToolCallBlock) => Promise<ToolResultBlock>> {
+	let groups = new Map<string, ToolCallBlock[]>()
+	for (let c of calls) {
+		let { path, hash, edits } = c.input
+		if (c.name !== 'edit' || typeof path !== 'string' || !path || typeof hash !== 'string' || !Array.isArray(edits)) continue
+		let file = await fileChanges.canonical(resolve(cwd, path)).catch(() => undefined)
+		if (!file) continue
+		let key = `${file}@${hash}`
+		groups.set(key, [...groups.get(key) ?? [], c])
+	}
+	let running = history.state.running.get(sessionId)
+	let card = (c: ToolCallBlock) => {
+		let n = running?.ns[running.turn.blocks.findIndex((b) => b.type === 'tool_call' && b.id === c.id)]
+		return n === undefined ? c.id : `#t${n}`
+	}
+	let member = new Map<string, () => Promise<ToolResultBlock>>()
+	for (let group of groups.values()) {
+		if (group.length < 2) continue
+		let [first] = group as [ToolCallBlock]
+		let joined: Promise<ToolResultBlock> | undefined
+		let note = `[${group.length} EDITs of ${first.input.path}@${first.input.hash} in this round (${group.map(card).join(', ')}) ran as one, ranges in call order]\n`
+		let edits = group.flatMap((c) => c.input.edits as unknown[])
+		for (let c of group) member.set(c.id, async () => {
+			let r = await (joined ??= runOne({ ...first, input: { ...first.input, edits } }))
+			return { ...r, id: c.id, output: note + r.output }
+		})
+	}
+	return (call) => member.get(call.id)?.() ?? runOne(call)
+}
+
+export const edit = { batch }
