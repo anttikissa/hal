@@ -6,7 +6,8 @@
 		'The lab prototype ran calls concurrently; Hal ran them sequentially until task asp. ason.parseAt parses one embedded value for the grammar. Old sessions replay native calls as NAME { fields } Action text. turns-retry, e2e and line-limit failures predate this work (fail at HEAD~1).',
 		'SYSTEM.md is now the prompt measured in the lab (user decision 8 Oct): Rules, Actions with examples, $tools_summary. The summary/question endings are commented out for now; User notes sit in ::: if user_notes="true" (q5), off under HAL_NO_USER_NOTES for benchmarks.',
 		'Reminder test in system-prompt.test.ts fails from 2026-10-15: test the question feature, then restore or drop the commented-out summary/question endings.',
-		'Rules gain the lazy ladder with a one-line guard (never cut validation, data-loss handling, security, or explicit requirements), user decision 8 Oct; it also lifts the first request past the 1,024-token cache minimum.'
+		'Rules gain the lazy ladder with a one-line guard (never cut validation, data-loss handling, security, or explicit requirements), user decision 8 Oct; it also lifts the first request past the 1,024-token cache minimum.',
+		'Prompt names the useful slash commands (user decision 8 Oct): COMMAND runs them for the user, SEND passes them to another session; /cd /clear <next prompt> /compact /go /move /rename /rebase, /help for more.'
 	],
 	needs: ['gr', 'asp']
 }
