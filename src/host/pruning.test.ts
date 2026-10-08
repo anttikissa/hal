@@ -109,7 +109,12 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	expect(providerBytes(await history.messages(id)).slice(0, providerBytes(fresh).length - 1)).toEqual(providerBytes(fresh).slice(0, -1))
 })
 
-test('one large attachment does not create context pressure: images cost pixels, not bytes', () => {
-	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'image', blob: 'x', mediaType: 'image/png', bytes: 5_000_000 }] }]
-	expect(pruning.estimate(messages)).toBeLessThan(pruning.pressureTokens / 10)
+test('image estimates follow pixels measured on Opus 5.5, not file bytes', () => {
+	// [width, height, count_tokens result]; the capped screenshot errs high.
+	for (let [w, h, real] of [[1568, 997, 2019], [1000, 636, 831], [1500, 1500, 2919], [2000, 2000, 4764], [8000, 500, 555]]) expect(pruning.imageTokens(w!, h!)).toBe(real!)
+	expect(pruning.imageTokens(3104, 1974)).toBeGreaterThanOrEqual(4733)
+	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'image', blob: 'missing', mediaType: 'image/png', bytes: 5_000_000 }] }]
+	let unreadable = pruning.estimate('none', messages)
+	expect(unreadable).toBeGreaterThan(pruning.maxImageTokens)
+	expect(unreadable).toBeLessThan(pruning.pressureTokens / 10)
 })

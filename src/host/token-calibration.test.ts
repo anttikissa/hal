@@ -37,12 +37,12 @@ test('successful rounds merge cumulative usage, count cached input, and persist 
 	} }
 	provider.fetch = async () => new Response('data: ignored\n\n')
 	let input = { system: 'system', messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'x'.repeat(500) }] }] }
-	let before = pruning.estimate(input.messages, input.system.length + 2, 'fake/a')
+	let before = pruning.estimate('none', input.messages, input.system.length + 2, 'fake/a')
 	for await (let _event of provider.stream('fake/a', input)) { /* drain */ }
 	let chars = tokenEstimates.characters(input.messages, input.system.length + 2)
 	expect(tokenCalibration.ratios()['fake/a']).toBe(chars / 50)
-	expect(pruning.estimate(input.messages, input.system.length + 2, 'fake/a')).toBe(50)
-	expect(pruning.estimate(input.messages, input.system.length + 2, 'fake/b')).toBe(before)
+	expect(pruning.estimate('none', input.messages, input.system.length + 2, 'fake/a')).toBe(50)
+	expect(pruning.estimate('none', input.messages, input.system.length + 2, 'fake/b')).toBe(before)
 	let previous = tokenCalibration.ratios()['fake/a']!
 	tokenCalibration.observe('fake/a', 1e9, 1)
 	expect(tokenCalibration.ratios()['fake/a']).toBeCloseTo(previous * 1.025)
