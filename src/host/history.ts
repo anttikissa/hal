@@ -226,7 +226,7 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r)
 	let due = modelNotices.pending(replay.current(records))
 	if (due.length) records.push(history.append(id, { type: 'user', blocks: [], notices: due }))
-	return replay.toMessages(records)
+	return replay.markCache(records, replay.toMessages(records), budget.model)
 }
 
 // One provider round of a turn. Passes stream events through,

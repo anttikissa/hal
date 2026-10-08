@@ -319,10 +319,29 @@ function missingResult(status: TurnStatus | undefined): string {
 	return `Tool call did not run: the turn ${status ?? 'ended'}.`
 }
 
+// Back on a model after another one ran: its last request's input is
+// still cached, but may lie beyond the provider's lookback from the
+// newest block (task g5j). Mark where that input ended; the provider
+// checks the prefix still matches. Returns `messages`.
+function markCache(records: HistoryRecord[], messages: Message[], model?: string): Message[] {
+	let rounds = records.filter((r) => r.type === 'round')
+	if (!model || !rounds.length || rounds.at(-1)!.model === model) return messages
+	let mine = rounds.findLast((r) => r.model === model && r.block !== undefined)
+	let start = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
+	if (!mine || records.indexOf(mine) < start) return messages
+	let count = replay.toMessages(records.filter((r) => r.n === undefined || r.n < mine.block!)).reduce((sum, m) => sum + m.blocks.length, 0)
+	for (let m of messages) {
+		if (count <= m.blocks.length) { if (count) m.cache = count; break }
+		count -= m.blocks.length
+	}
+	return messages
+}
+
 export const replay = {
 	// Told with a next-round message delivered while the model works.
 	nextRoundNotice: '<meta>Another session sent this while you were working. No need to stop your task for it.</meta>',
 	toMessages,
+	markCache,
 	asAction,
 	framed,
 	letter,

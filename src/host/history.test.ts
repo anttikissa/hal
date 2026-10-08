@@ -9,6 +9,7 @@ import { history } from './history.ts'
 import { pages } from './pages.ts'
 import { liveFiles } from './live-file.ts'
 import { provider } from './provider.ts'
+import { anthropic } from './anthropic.ts'
 import { sessions } from './sessions.ts'
 import { naming } from './naming.ts'
 import { busy } from './busy.ts'
@@ -446,6 +447,26 @@ test('only canceled unfinished text gets display metadata, never provider prose'
 		await drain(history.record(id, 'fake', events({ type: 'text', text: 'next' }, { type: 'done', reason: 'end' })))
 		expect(history.interrupted(id)).toBeUndefined()
 	}
+})
+
+test('returning to a model marks its last input end beyond the lookback', async () => {
+	let id = newSession()
+	let opus = 'anthropic/claude-opus-5-5'
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'first question' }] })
+	let answer = history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
+	history.append(id, { type: 'round', usage: { input: 1 }, model: opus, block: answer.n })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'ask another model' }] })
+	for (let i = 0; i < 15; i++) {
+		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: `c${i}`, name: 'bash', input: { command: 'ls' } } })
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: `c${i}`, output: 'x' }] })
+		history.append(id, { type: 'round', usage: { input: 1 }, model: 'openai/gpt-6-astra' })
+	}
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'back' }] })
+	let marked = (messages: Message[]) => anthropic.toMessages({ model: 'claude-opus-5-5', messages }).flatMap((m) => m.content).filter((b: any) => b.cache_control).map((b: any) => b.text ?? b.type)
+	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('first question'), expect.stringContaining('back')])
+	// Once this model has the latest round, the newest marker reaches it.
+	history.append(id, { type: 'round', usage: { input: 1 }, model: opus })
+	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('back')])
 })
 
 test('retired delivery checks are temporary', () => {
