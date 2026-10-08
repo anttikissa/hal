@@ -1,12 +1,15 @@
-// Sessions in one directory hear who may be editing what (tasks 0f, c4x,
-// khv). A tool call's modifies paths (file-changes.ts, task 8w) are active
+// Sessions in one directory hear what others edit (tasks 0f, c4x, khv).
+// A tool call's modifies paths (file-changes.ts, task 8w) are declared
 // while it runs, background jobs included, and for lingerMs after it ends.
-// Before each model request (history.messages) a reader hears another
-// session's active paths; a reader that was told hears once when that set
-// changes or empties, however long it was idle. Activity nobody saw while
-// active is never told. Paths outside the project (/tmp, absolute) and Git
-// internals are left out. Activity only: files have no owners. In memory
-// only: after a restart the first notes repeat.
+// Before each model request (history.messages) a reader hears which
+// declared files changed within recentMs (Unix mtime; by anyone), and once
+// when the declaration ends, however long it was idle. A declared file
+// nobody changed recently, or activity that ended unseen, is never told.
+// Paths outside the project (/tmp, absolute) and Git internals are left
+// out. Activity only: files have no owners. In memory only: after a
+// restart the first notes repeat.
+import { statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { clock } from './clock.ts'
 import { sessions } from './sessions.ts'
 
@@ -35,19 +38,35 @@ function end(d: Declaration): void {
 	d.ended ??= clock.now()
 }
 
-// What changed for a reader told `was` that should now know `now`.
-function change(was: string[], now: string[]): string | undefined {
-	let added = now.filter((p) => !was.includes(p)), removed = was.filter((p) => !now.includes(p))
-	if (!added.length && !removed.length) return undefined
-	if (!now.length) return 'is no longer editing files'
-	if (!was.length) return `may be editing ${list(now)}`
-	if (!removed.length) return `may also be editing ${list(added)}`
-	let only = `is now editing only ${list(now)}`, stopped = `is no longer editing ${list(removed)}`
-	return !added.length && stopped.length < only.length ? stopped : only
+const glob = (p: string) => /[*?[\]{}]/.test(p)
+
+// Declared files in `cwd` whose mtime is within recentMs of now.
+function recent(cwd: string, patterns: string[], now: number): string[] {
+	let found = new Set<string>()
+	for (let p of patterns) for (let name of glob(p) ? new Bun.Glob(p).scanSync({ cwd, dot: true, onlyFiles: true }) : [p]) {
+		let mtime = statSync(resolve(cwd, name), { throwIfNoEntry: false })?.mtimeMs
+		if (mtime !== undefined && now - mtime < neighbors.recentMs) found.add(name)
+	}
+	return [...found]
 }
 
-// Lines for `reader` about other sessions in `cwd` whose active paths
-// differ from what it was last told.
+// Lines for a reader told `was` about one neighbor that now declares
+// `patterns`, of which `changed` were modified recently.
+function change(was: string[], patterns: string[], changed: string[]): { lines: string[]; told: string[] } {
+	let declared = (p: string) => patterns.some((q) => q === p || (glob(q) && new Bun.Glob(q).match(p)))
+	let kept = was.filter(declared), removed = was.filter((p) => !declared(p)), added = changed.filter((p) => !was.includes(p))
+	let lines: string[] = []
+	if (removed.length && !kept.length && !added.length) lines.push('is no longer editing files')
+	else if (removed.length) {
+		let stopped = `is no longer editing ${list(removed)}`, only = `is still editing only ${list(kept)}`
+		lines.push(kept.length && only.length < stopped.length ? only : stopped)
+	}
+	if (added.length) lines.push(`modified ${list(added)} <1min ago`)
+	return { lines, told: [...kept, ...added] }
+}
+
+// Lines for `reader` about other sessions in `cwd`: declared files changed
+// recently that it was not told, and told files no longer declared.
 function notes(reader: string, cwd: string): string[] {
 	let now = clock.now(), { active, told } = neighbors.state, open = sessions.state.open
 	let current = new Map<string, string[]>()
@@ -60,9 +79,9 @@ function notes(reader: string, cwd: string): string[] {
 	for (let id of told.keys()) if (!open.has(id)) told.delete(id)
 	let mine = told.get(reader) ?? new Map<string, string[]>(), lines: string[] = []
 	for (let id of new Set([...mine.keys(), ...current.keys()])) {
-		let paths = current.get(id) ?? [], text = change(mine.get(id) ?? [], paths)
-		if (text) lines.push(`[${label(id)} ${text}]`)
-		if (paths.length) mine.set(id, paths); else mine.delete(id)
+		let patterns = current.get(id) ?? [], result = change(mine.get(id) ?? [], patterns, recent(cwd, patterns, now))
+		for (let text of result.lines) lines.push(`[${label(id)} ${text}]`)
+		if (result.told.length) mine.set(id, result.told); else mine.delete(id)
 	}
 	if (mine.size) told.set(reader, mine); else told.delete(reader)
 	return lines
@@ -71,9 +90,10 @@ function notes(reader: string, cwd: string): string[] {
 export const neighbors = {
 	state: {
 		active: new Set<Declaration>(),
-		// reader -> neighbor -> active paths it was last told
+		// reader -> neighbor -> declared files it was told changed
 		told: new Map<string, Map<string, string[]>>(),
 	},
 	lingerMs: 60_000,
+	recentMs: 60_000,
 	start, end, notes,
 }
