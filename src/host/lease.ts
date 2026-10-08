@@ -93,7 +93,7 @@ export type Change = Range & { lines: string[] }
 // lines to show around each changed place in the result. Past-EOF starts
 // append; ends past EOF stop there. Overlaps are refused before anything
 // is written.
-function apply(before: Text, changes: Change[]): { after: string; shown: number[]; lines: string[]; applied: Applied['changes'] } {
+function apply(before: Text, changes: Change[]): { after: string; shown: number[]; lines: string[] } {
 	let old = before.lines
 	let n = old.length
 	let clamped = changes.map((c) => ({ ...c, start: Math.min(c.start, n + 1), end: Math.min(c.end, n) })).sort((a, b) => a.start - b.start)
@@ -111,59 +111,14 @@ function apply(before: Text, changes: Change[]): { after: string; shown: number[
 	// Where each change landed: two lines before its start and after its end.
 	let shown = new Set<number>()
 	let shift = 0
-	let applied: Applied['changes'] = []
 	for (let c of clamped) {
 		let count = c.lines.flatMap((l) => l.split(/\r?\n/)).length
 		let s = c.start + shift
 		let windows = count ? [[s - 2, s], [s + count - 1, s + count + 1]] : [[s - 2, s + 1]]
 		for (let [a, b] of windows) for (let k = Math.max(1, a!); k <= Math.min(lines.length, b!); k++) shown.add(k)
 		shift += count - Math.max(0, c.end - c.start + 1)
-		applied.push({ start: c.start, end: c.end, count })
 	}
-	return { after: before.bom + lines.join(''), shown: [...shown].sort((a, b) => a - b), lines, applied }
-}
-
-// EDITs Hal applied, per file: the version before and after and the
-// changed ranges (clamped, in before-coordinates; count = new lines).
-// An EDIT naming a version Hal itself replaced, as concurrent EDITs of
-// one READ do, still applies when its ranges miss every change since:
-// carry() shifts them into the current version (task 2m1). Bounded: the last 32
-// edits of the 256 most recently edited files.
-export type Applied = { from: string; to: string; n: number; changes: { start: number; end: number; count: number }[] }
-const recent = new Map<string, Applied[]>()
-
-function remember(path: string, entry: Applied): void {
-	let list = recent.get(path) ?? []
-	list.push(entry)
-	if (list.length > 32) list.shift()
-	recent.delete(path)
-	recent.set(path, list)
-	if (recent.size > 256) recent.delete(recent.keys().next().value!)
-}
-
-// `wanted` (ranges in version `from`) moved into version `now`, or
-// undefined when Hal's edits do not lead from `from` to `now`. Throws
-// when a range overlaps a change made since.
-function carry(path: string, from: string, now: string, wanted: Change[]): Change[] | undefined {
-	let list = recent.get(path) ?? []
-	let out = wanted
-	for (let at = from, seen = 0; at !== now; seen++) {
-		let e = list.find((x) => x.from === at)
-		if (!e || seen > list.length) return undefined
-		out = out.map((w) => {
-			let start = Math.min(w.start, e.n + 1), end = Math.min(w.end, e.n)
-			let delta = 0
-			for (let c of e.changes) {
-				if (start <= Math.max(c.start, c.end) && c.start <= Math.max(start, end)) {
-					throw new Error(`lines ${start}-${end} overlap lines ${c.start}-${c.end} that an EDIT of @${from} already changed; nothing was written`)
-				}
-				if (c.start < start) delta += c.count - Math.max(0, c.end - c.start + 1)
-			}
-			return { ...w, start: start + delta, end: end + delta }
-		})
-		at = e.to
-	}
-	return out
+	return { after: before.bom + lines.join(''), shown: [...shown].sort((a, b) => a - b), lines }
 }
 
 // Lines around each requested endpoint (±2) of the current file, for a
@@ -200,4 +155,4 @@ async function commit(path: string, bytes: Uint8Array, expected?: Uint8Array): P
 	}
 }
 
-export const lease = { hash, text, numbered, read, range, apply, around, commit, remember, carry }
+export const lease = { hash, text, numbered, read, range, apply, around, commit }
