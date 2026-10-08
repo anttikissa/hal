@@ -1,0 +1,10 @@
+{
+	title: 'Identify delivered tab clicks that fail to select',
+	spec: 'The explicit page-local Touch debug probe (zf4) distinguishes tab-link targets by numeric tab position, and shows numeric tab positions for controller selection, URL selection and rendered highlight before each event and after its handlers settle. It also records uncaught browser error and rejection type and numeric source location, using fixed error-type labels only. Preserve off-by-default activation, bounded memory, listener cleanup, transparent hit testing, and no arbitrary text, session IDs, URLs, storage or transmission. This diagnoses the invariant that a delivered plain tab-link click updates controller selection and rendered highlight together, without assuming a missing-click or keyboard cause. Web only: these are browser route and DOM states, not terminal interactions.',
+	status: 'done',
+	notes: [
+		'The user capture shows two completed pointerup/touchend/click sequences targeting the tab strip while its highlight remains unchanged. Prevented click is expected: the link handler prevents browser navigation before tabs.show. The capture has no keyboard open and establishes delivered-click failure, not its cause. The old probe labels every strip target tabs, so it cannot tell a wrong link target, URL-routing exception or controller/render divergence apart. Added numeric target and controller/URL/DOM tab positions plus fixed browser error types and line/column; no error messages or session IDs. Extended real-Chrome test verifies actual tab switching, before/after state, DOMException and rejection privacy, and repeated toggles. Focused ./test passes; native iOS remains unverified.'
+	],
+	needs: ['zf4'],
+	foldInto: ['zf4']
+}
