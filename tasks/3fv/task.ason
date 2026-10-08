@@ -1,0 +1,9 @@
+{
+	title: 'Providers see one Action tool with leased READ/EDIT/WRITE and HELP',
+	spec: "Providers see one native tool, Action { action: string }. Its text is NAME, an optional /* purpose */ comment, then arguments: JS string literals or ASON objects. Each tools/ module declares its Action form (positional fields, summary, usage) next to its definition; actions.ts resolves Action text to the module call, and SYSTEM.md's $tools_summary lists enabled modules from the registry. HELP <NAME> renders precise help from the module's own definition, never a parallel dictionary. A malformed Action fails as a tool error naming the problem and the raw text; nothing runs. History stores the resolved call plus the original text; replay sends providers the Action text (older native calls as NAME { fields }). READ of a text file returns numbered lines and a whole-file lease path@hash; EDIT takes path@hash and {range, lines} blocks, applied atomically in one write; a stale hash writes nothing and shows the current lines around each range. WRITE creates or replaces a whole file atomically. EDIT and WRITE record file changes like bash modifies. BASH keeps background, unsafeToStop, modifies and approval. SYSTEM.md supports $name and ${name} variables.",
+	status: 'done',
+	notes: [
+		'The lab prototype ran calls concurrently; Hal ran them sequentially until task asp. ason.parseAt parses one embedded value for the grammar. Old sessions replay native calls as NAME { fields } Action text. turns-retry, e2e and line-limit failures predate this work (fail at HEAD~1).'
+	],
+	needs: ['gr', 'asp']
+}

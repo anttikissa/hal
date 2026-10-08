@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import { lease } from './lease.ts'
 import { tools } from './tools.ts'
 
 let dir = ''
@@ -60,22 +61,22 @@ test('only tools that change nothing count as read-only; unknown ones do not', (
 
 test('read returns a file relative to the session cwd, answering the call id', async () => {
 	writeFileSync(`${dir}/a.txt`, 'one\ntwo\n')
-	expect(await read({ path: 'a.txt' })).toEqual({ type: 'tool_result', id: 'c1', output: 'one\ntwo\n' })
-	expect((await read({ path: `${dir}/a.txt` })).output).toBe('one\ntwo\n')
+	let leased = `@${lease.hash(Buffer.from('one\ntwo\n'))} ==\n1: one\n2: two`
+	expect(await read({ path: 'a.txt' })).toEqual({ type: 'tool_result', id: 'c1', output: `== READ a.txt${leased}` })
+	expect((await read({ path: `${dir}/a.txt` })).output).toBe(`== READ ${dir}/a.txt${leased}`)
 })
 
 test('read pages through a long file and says how to continue', async () => {
 	tools.maxLines = 3
 	writeFileSync(`${dir}/long.txt`, Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n'))
 	let first = (await read({ path: 'long.txt' })).output
-	expect(first.startsWith('line 1\nline 2\nline 3\n')).toBe(true)
+	expect(first).toContain('\n1: line 1\n2: line 2\n3: line 3\n')
 	expect(first).not.toContain('line 4')
-	expect(first).toMatch(/offset[^\d]*4/)
+	expect(first).toContain('continue with READ "long.txt:4-"')
 	let middle = (await read({ path: 'long.txt', offset: 4, limit: 2 })).output
-	expect(middle.startsWith('line 4\nline 5\n')).toBe(true)
-	expect(middle).not.toContain('line 6')
+	expect(middle).toEndWith('\n4: line 4\n5: line 5')
 	let last = (await read({ path: 'long.txt', offset: 9 })).output
-	expect(last).toBe('line 9\nline 10')
+	expect(last).toEndWith('==\n9: line 9\n10: line 10')
 })
 
 test('no result exceeds the output bound, however long its lines', async () => {
@@ -118,8 +119,8 @@ test('bash runs in the session cwd and returns exit status with stdout and stder
 	expect((await bash({ command: 'pwd', description: 'Show the cwd' })).output).toContain(realpathSync(dir))
 })
 
-test('bash without a description is an error and does not run the command', async () => {
-	for (let description of [undefined, '', '   ', 7]) {
+test('bash with an invalid description is an error and does not run the command', async () => {
+	for (let description of ['', '   ', 7]) {
 		let r = await bash({ command: 'touch ran', description })
 		expect(r.isError).toBe(true)
 		expect(existsSync(`${dir}/ran`)).toBe(false)

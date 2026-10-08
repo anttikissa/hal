@@ -42,6 +42,7 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 
 export const tool: Tool = {
 	name: 'send',
+	action: { summary: 'message to session', positional: ['to', 'text'] },
 	description:
 		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round; queue waits for the current turn to end; emergency interrupts all but unsafe and background work — only to stop harmful or wasted work, or restart a stuck agent. ' +
 		'When a child asks you a question, use send to answer.',

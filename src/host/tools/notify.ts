@@ -5,6 +5,7 @@ import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
 	name: 'notify',
+	action: { summary: 'user' },
 	description: 'Post a notice to the user during this turn, for example when an approach fails. Use one line under 80 characters. The turn continues.',
 	parameters: { type: 'object', properties: { text: { type: 'string', maxLength: 79, description: 'One line saying what happened' } }, required: ['text'], additionalProperties: false },
 	async run(input, ctx) {

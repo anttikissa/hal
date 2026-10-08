@@ -36,6 +36,7 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
+import { actions } from './actions.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
@@ -182,12 +183,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		let scripted = synthetic.find(model)
 		if (!scripted) {
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
-			let defs = tools.defs()
+			let defs = [actions.def()]
 			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)) {
 				if (signal.aborted) return
-				yield event
+				yield event.type === 'tool_call' ? { ...actions.arrived({ ...event }), type: 'tool_call' } : event
 			}
 			return
 		}

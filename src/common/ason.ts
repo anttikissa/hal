@@ -578,6 +578,14 @@ export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 	return value
 }
 
+/** Parse one ASON value starting exactly at `pos`, ignoring what follows:
+ *  for grammars that embed ASON values (src/common/action.ts). */
+export function parseAt(str: string, pos: number): { value: AsonValue; end: number } {
+	const ctx: Ctx = { buf: str, pos }
+	const value = parseAny(ctx)
+	return { value, end: ctx.pos }
+}
+
 /** Parse multiple ASON values from a single string (like JSONL — one value per line or concatenated). */
 export function parseAll(str: string): AsonValue[] {
 	const ctx: Ctx = { buf: str, pos: 0 }
@@ -623,5 +631,5 @@ export async function* parseStream(stream: ReadableStream<Uint8Array>): AsyncGen
 	}
 }
 
-export const ason = { stringify, parse, parseAll, parseStream, COMMENTS, config }
+export const ason = { stringify, parse, parseAt, parseAll, parseStream, COMMENTS, config }
 export default ason

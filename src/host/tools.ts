@@ -16,6 +16,7 @@ import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolDetails } from '../common/tool-details.ts'
+import { actions } from './actions.ts'
 import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
@@ -33,11 +34,27 @@ export type ToolOutput = string | { text: string; image: { mediaType: string; da
 // (prompts.amend); built-in tools are listed in toolDetails.readOnly
 // instead, so clients know too (task 26q). run returns the output; throwing makes an error
 // result with the message.
+// `action`: how the Action grammar reaches this tool (actions.ts, task
+// aks). `summary` follows the name in $tools_summary (false: the system
+// prompt explains the tool already); `usage` lists exact syntax lines
+// for HELP (default: made from the schema); `positional` names the
+// fields string arguments fill, in order (default: required fields);
+// `fields` words a field for Action where it differs from the schema;
+// `resolve` maps the text after the name to a call when the grammar is
+// special, possibly of another tool.
+export type ActionSpec = {
+	summary?: string | false
+	usage?: string[]
+	positional?: string[]
+	fields?: Record<string, string>
+	resolve?(raw: string): { name: string; input: Record<string, unknown> }
+}
 export type Tool<Output = string> = {
 	name: string
 	description: string
 	parameters: ToolDef['inputSchema']
 	readOnly?: true
+	action?: ActionSpec
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
 
@@ -85,6 +102,13 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
 		// A provider's call whose input was not a JSON object.
 		if (typeof call.input.invalidJson === 'string') throw new Error(`your input for '${call.name}' was not a valid JSON object (cut off or malformed); call it again with valid arguments. Long inputs with many escapes (big heredocs, nested quotes) fail often: send a smaller, simpler call, such as one edit or one short script per call. Input received: ${call.input.invalidJson}`)
+		// A native Action call that did not resolve as it arrived
+		// (actions.arrived): say why. Never run it, since approval saw
+		// only the unresolved call.
+		if (call.name === actions.name) {
+			actions.resolve(call.input.action)
+			throw new Error('the action did not resolve when it arrived; send it again')
+		}
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })

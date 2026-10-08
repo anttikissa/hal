@@ -3,7 +3,8 @@
 // these records alone, never from display state.
 // Tasks: 7, nvm, svt, 6eq, rqq.
 
-import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import type { AssistantBlock, Message, StopReason, ToolCallBlock, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import { ason } from './ason.ts'
 import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
 import { titles } from './titles.ts'
@@ -118,6 +119,14 @@ type Numbered = { n?: number; originSession?: string }
 //
 // Only the records after the latest compact or reset count; a compact's
 // summary is the first user message.
+// Providers see one tool, Action (task 3fv): a call goes back as the
+// text the model wrote, and a call from before Action as the
+// equivalent NAME { fields } text.
+function asAction(b: ToolCallBlock): ToolCallBlock {
+	let text = b.action ?? `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`
+	return { type: 'tool_call', id: b.id, name: 'Action', input: { action: text } }
+}
+
 function toMessages(records: HistoryRecord[]): Message[] {
 	records = replay.current(records)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
@@ -190,7 +199,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
 			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
-			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : { ...b }] })
+			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asAction(b) : { ...b }] })
 		} else {
 			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
@@ -314,6 +323,7 @@ export const replay = {
 	// Told with a next-round message delivered while the model works.
 	nextRoundNotice: '<meta>Another session sent this while you were working. No need to stop your task for it.</meta>',
 	toMessages,
+	asAction,
 	framed,
 	letter,
 	tags,

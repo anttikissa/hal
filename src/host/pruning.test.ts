@@ -61,9 +61,9 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 		// The new completed checkpoint is an allowed boundary.
 		let messages = await history.messages(id)
 		let calls = messages.flatMap((m) => m.blocks as unknown[]).filter((b: any) => b.type === 'tool_call') as any[]
-		expect(calls[0].input.command).toBe("printf '0/0'")
-		expect(calls[0].input.path).toBe('src/file.ts')
-		if (turn >= 7) expect(calls[0].input.long).toContain('read_blob')
+		expect(calls[0].input.action).toContain(`command: "printf '0/0'"`)
+		expect(calls[0].input.action).toContain("path: 'src/file.ts'")
+		if (turn >= 7) expect(calls[0].input.action).toContain('read_blob')
 		frozen = providerBytes(messages).slice(0, -1)
 		history.state.cache.clear()
 		expect(providerBytes(await history.messages(id))).toEqual(providerBytes(messages))

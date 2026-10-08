@@ -19,7 +19,7 @@ test('self-issued clear records results for later undispatched calls, ends old t
 	c.conn.send({ type: 'submit', sessionId: id, text: 'old prompt' })
 	await until(() => calls.length === 1)
 	let tail = '/rename literal, not a command\n  "quoted" @file\n'
-	calls[0]!.push(commandCall(`/clear ${tail}`), commandCall('/rename must not run', 'later'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(commandCall(`/clear ${tail}`), commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	let all = await records(id)
 	let boundary = all.findIndex((r) => r.type === 'reset')
@@ -69,7 +69,7 @@ test('human clear lets foreground work settle; Escape cancels continuation and c
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename undispatched', 'later'), { type: 'done', reason: 'tool_use' })
+		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
 		await until(() => !!resolve)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/clear automatic' })
 		expect(turns.state.running.get(id)!.controller.signal.aborted).toBe(false)
@@ -82,7 +82,7 @@ test('human clear lets foreground work settle; Escape cancels continuation and c
 		expect(calls.length).toBe(1)
 		expect(c.views.get(id)!.state.type).toBe('paused')
 		expect(contextTransitions.pending(id)).toBeUndefined()
-		expect((await records(id)).findLast((r) => r.type === 'user')).toMatchObject({ blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', isError: true }] })
+		expect((await records(id)).findLast((r) => r.type === 'user')).toMatchObject({ blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') }] })
 	} finally { tools.run = original }
 })
 
@@ -174,14 +174,14 @@ test('clear at a parked approval closes the old turn and held calls never resume
 	expect(results).toBeLessThan(end)
 })
 
-test('human clear starts its continuation only after foreground tool settlement, without running later tools', async () => {
+test('human clear starts its continuation only after the round\'s calls settle', async () => {
 	let c = client(), id = created(c), resolve!: () => void
 	let original = tools.run
 	tools.run = async (call, ctx) => call.name === 'held' ? (await new Promise<void>((r) => resolve = r), { type: 'tool_result', id: call.id, output: 'settled' }) : original(call, ctx)
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename must not run', 'later'), { type: 'done', reason: 'tool_use' })
+		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
 		await until(() => !!resolve)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/clear next' })
 		expect(c.of('divider').length).toBe(0)
@@ -191,7 +191,7 @@ test('human clear starts its continuation only after foreground tool settlement,
 		expect(c.of('turn-end').length).toBe(1)
 		expect(c.views.get(id)!.items.find((i) => i.type === 'prompt')).toMatchObject({ text: 'next', generatingCommand: 'clear' })
 		let all = await records(id), end = all.findIndex((r) => r.type === 'turn_end')
-		expect(all[end - 1]).toMatchObject({ type: 'user', blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', isError: true }] })
+		expect(all[end - 1]).toMatchObject({ type: 'user', blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') }] })
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length === 2)
 	} finally { tools.run = original }
