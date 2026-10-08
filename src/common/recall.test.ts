@@ -64,13 +64,14 @@ test('the first Up skips the entry still in the editor', () => {
 	expect(recall.step('t', ['only'], 'only', 0, -1, Infinity, '')).toBeUndefined()
 })
 
-test('a recalled entry is not the user text until edited; editing ends browsing', () => {
+test('editing keeps the browsing position and saves even restored text as the draft', () => {
 	up('mine')
 	expect(recall.typed('s', 'three')).toBe(false)
 	expect(recall.shown('s')).toBe('three')
 	expect(recall.typed('s', 'three!')).toBe(true)
-	expect(recall.shown('s')).toBeUndefined()
-	expect(recall.typed('s', 'anything')).toBe(true)
+	expect(recall.shown('s')).toBe('three!')
+	expect(recall.typed('s', 'three')).toBe(true)
+	expect(up('three')).toEqual({ text: 'two\nlines', cursor: 9 })
 })
 
 test('browsing belongs to its session', () => {
@@ -80,4 +81,15 @@ test('browsing belongs to its session', () => {
 	expect(recall.shown('s')).toBe('three')
 	expect(recall.stop('s')).toBe(true)
 	expect(recall.stop('s')).toBe(false)
+})
+
+test('recall excludes agent and model-generated prompts, not human continuations', () => {
+	let t = transcript.fold(undefined, { type: 'snapshot', sessionId: 's', snapshot: { meta: { id: 's', cwd: '/', model: 'a/b', createdAt: '' }, history: [], state: { type: 'idle' } } } as any)!
+	t.items.push(
+		{ type: 'prompt', key: '1', text: 'human' },
+		{ type: 'prompt', key: '2', text: 'agent', from: 'other' },
+		{ type: 'prompt', key: '3', text: 'generated', origin: 'model' },
+		{ type: 'prompt', key: '4', text: 'human continuation', generatingCommand: 'clear' },
+	)
+	expect(recall.entries(t)).toEqual(['human', 'human continuation'])
 })

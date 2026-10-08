@@ -1287,7 +1287,7 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 			await type('/c')
 			await b.waitFor(`!!document.querySelector('.completions')`)
 		}
-		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
+		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: key === 'Backspace' ? 8 : key === 'ArrowUp' ? 38 : 40 })
 		await open()
 		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
 		await press('Enter')
@@ -2000,3 +2000,35 @@ browserTest('local touch debug is opt-in, observes canceled taps, and never cons
 		await b.close()
 	}
 }, 20000)
+
+browserTest('composer history skips agents and remains navigable after native deletion and undo', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	for (let text of ['first', 'second', 'third']) history.append(id, { type: 'user', blocks: [{ type: 'text', text }] })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'not human', from: 'other' }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelector('textarea') && document.querySelector('.Card')`)
+		await b.evaluate(`document.querySelector('textarea').focus()`)
+		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: key === 'Backspace' ? 8 : key === 'ArrowUp' ? 38 : 40 })
+		let value = () => b.evaluate(`document.querySelector('textarea').value`)
+		for (let restore of ['delete', 'undo']) {
+			await press('ArrowUp')
+			expect(await value()).toBe('third')
+			await press('ArrowUp')
+			expect(await value()).toBe('second')
+			await b.call('Input.insertText', { text: '!' })
+			expect(await value()).toBe('second!')
+			if (restore === 'delete') await press('Backspace')
+			else await b.evaluate(`document.execCommand('undo')`)
+			expect(await value()).toBe('second')
+			await press('ArrowUp')
+			expect(await value()).toBe('first')
+			for (let i = 0; i < 3; i++) await press('ArrowDown')
+			expect(await value()).toBe('second')
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		}
+	} finally { await b.close() }
+}, 15000)

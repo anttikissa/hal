@@ -1,0 +1,11 @@
+{
+	title: 'Keep human recall history navigable after edits',
+	spec: 'Restore human-only recall and consistent browsing in web and terminal. Recall excludes prompts with from or origin model, including agent and generated continuation messages. Editing a recalled entry keeps its session-local history position and displays the edited text while saving it as the draft; inserting then deleting a character or undoing an edit does not strand the user outside history. Edge-row arrows continue from that position, Down past newest restores the current draft, and sending ends browsing. Ordinary nonempty web drafts retain native arrow movement; existing terminal draft edge navigation stays intact. Preserve selections, multiline row movement, queued-edit precedence and per-session state. Cover human-only recall and edit/delete/undo navigation with focused behavioral regressions in shared recall and both clients.',
+	status: 'done',
+	notes: [
+		'Root causes: recall.entries included agent/model prompt items despite human-only ownership in dg/rj/jf; recall.typed deleted the browse index on the first edit. The web nonempty-draft guard then prevented returning to history, while terminal edge recall restarted from the newest entry. Shared Browse now retains its index and current text; edited text is persisted as the draft, including after deletion or undo restores the original. No new persistent state, timer or background work; one optional boolean per actively browsed session. Existing transcript scans are unchanged.',
+		'Verified 107 focused shared/web/terminal tests plus one disposable Chromium regression exercising human-only history, native character insertion, Backspace and execCommand undo followed by Up/Down. CDP Backspace requires windowsVirtualKeyCode 8; Runtime.evaluate fixtures must scope local declarations. Typecheck and changed-file lint pass. Browser coverage uses actual textarea input/undo and no live sessions or drafts.'
+	],
+	needs: ['91', '8d'],
+	foldInto: ['91', '8d']
+}
