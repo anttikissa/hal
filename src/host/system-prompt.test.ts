@@ -194,3 +194,7 @@ test('skills are listed by name: Hal skills always, project skills only along th
 	expect(away).toMatch(/\/skills\/\S*hal-server-install/)
 	expect(away).not.toContain('alpha')
 })
+
+test('the commented-out summary/question endings are temporary', () => {
+	expect(Date.now(), 'test the <question> feature, then restore the summary/question endings in SYSTEM.md (or drop them) and delete this test').toBeLessThan(Date.parse('2026-10-15T00:00:00Z'))
+})
