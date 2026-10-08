@@ -188,16 +188,13 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
-// Prompts Play sends when an idle turn ended with the assistant's text
-// (task yhn): a few words, each asking for action, not another plan.
+// Prompts Play sends when the session is idle (task yhn): a few words,
+// each asking for action, not another plan.
 const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.', 'You can do it.', 'Onward!']
 
-// A nudge if the session is idle and its last output is the assistant's text.
+// A nudge if the session is idle; commands do not change eligibility.
 function nudge(st: ViewState, pick = Math.random()): string | undefined {
-	let t = st.transcript
-	if (t?.state.type !== 'idle') return undefined
-	let last = t.items.findLast((i) => i.type !== 'turn-end' && i.type !== 'thinking')
-	return last?.type === 'text' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
+	return st.transcript?.state.type === 'idle' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
 }
 
 // What the model is streaming into the last item, thinking or text:
