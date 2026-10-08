@@ -3,7 +3,8 @@
 	spec: "scripts/action is a human's model-view REPL: it prints the system prompt Hal would send for the cwd, then runs typed Action text through the real tool modules and prints each result; an incomplete action continues on the next line, an empty line sends it. It uses a throwaway Hal home with a copy of the config, so real sessions stay untouched. Same-round EDITs of one lease combine per task mcs.",
 	status: 'done',
 	notes: [
-		"Batching a round's EDITs by timing was rejected: approval can delay one call past any window, so the chain of Hal's own edits (keyed by resolved path, hash before -> after) carries ranges instead. Importing auth.ts before host.ts trips an existing import cycle (also breaks src/host/turns-retry.test.ts); scripts/action imports host.ts first."
+		"Batching a round's EDITs by timing was rejected: approval can delay one call past any window, so the chain of Hal's own edits (keyed by resolved path, hash before -> after) carries ranges instead. Importing auth.ts before host.ts trips an existing import cycle (also breaks src/host/turns-retry.test.ts); scripts/action imports host.ts first.",
+		'The host runs in-process, so COMMAND, SEND, SPAWN, WAIT and INSPECT work against the throwaway home and its action session (SPAWN starts a real, billed run); an early header claimed they fail.'
 	],
 	needs: ['3fv'],
 	foldInto: ['3fv']
