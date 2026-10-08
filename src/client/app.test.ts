@@ -79,11 +79,24 @@ test('typing and Enter submits to the open session and clears the prompt', () =>
 	expect(appView.view().prompt.text).toBe('')
 })
 
-test('an empty prompt is not submitted; idle Escape sends nothing', () => {
+test('empty idle Enter sends a nudge despite command output; idle Escape sends nothing', () => {
 	app.onEvent(snapshot())
+	app.onEvent({ type: 'output', sessionId: 's1', text: 'Directory changed: /work → /project' })
 	type('  ')
 	enter()
+	expect(sent).toHaveLength(1)
+	expect(sent[0]).toMatchObject({ type: 'submit', sessionId: 's1' })
+	expect(sent[0].text.trim()).not.toBe('')
+	expect(appView.view().prompt.text).toBe('')
 	escape()
+	expect(sent).toHaveLength(1)
+})
+
+test('empty Enter on a busy terminal and modified Enter on idle do not nudge', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+	enter()
+	app.onEvent(snapshot())
+	app.onKeys([{ ...key('enter'), ctrl: true }, { ...key('enter'), alt: true }])
 	expect(sent).toEqual([])
 })
 
