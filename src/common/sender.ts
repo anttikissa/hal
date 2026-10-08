@@ -3,6 +3,7 @@
 function invalid(value: unknown): string | undefined {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return 'sender must be an object'
 	let s = value as Record<string, unknown>
+	// RETIRED-DELIVERY (task rqq): delete by 2026-10-15 (history.test.ts fails then).
 	for (let k of ['steering', 'interject', 'queue', 'queued']) if (k in s) return `retired sender field ${k}`
 	if (s.delivery !== undefined && !['now', 'next-round', 'after-turn'].includes(s.delivery as string)) return 'invalid sender delivery'
 	for (let k of ['from', 'label', 'summary']) if (s[k] !== undefined && typeof s[k] !== 'string') return `invalid sender ${k}`
