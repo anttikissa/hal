@@ -57,8 +57,9 @@ function validate(id: string, level: string): EffortLevel {
 	return level as EffortLevel
 }
 // The supported level nearest `asked` by rank (none 0 … max 6), ties
-// rounding up; a level matching the model's default clears the
-// override. `note` says what changed (task 7vt).
+// rounding up. A chosen level is kept even when it matches the default
+// Hal knows: the backend's real default may differ (Codex gives GPT-6.1
+// Sol low). `note` says what changed (task 7vt).
 function nearest(id: string, asked: string): { level?: EffortLevel; note?: string } {
 	let ultra = asked === 'ultra'
 	let want = (ultra ? 'max' : asked) as EffortLevel
@@ -71,8 +72,7 @@ function nearest(id: string, asked: string): { level?: EffortLevel; note?: strin
 		ultra && 'ultra → max (Hal has no Ultra mode; ask for subagents in the prompt)',
 		level !== want && `${want} → ${level} (closest supported by ${id})`,
 	].filter(Boolean)
-	let fallback = cap.policy ?? cap.default
-	return { ...(level !== fallback && { level }), ...(notes.length && { note: notes.join('; ') }) }
+	return { level, ...(notes.length && { note: notes.join('; ') }) }
 }
 function wire(provider: string, model: string, selected?: string, maxTokens?: number): Record<string, unknown> {
 	let cap = effort.capability(provider, model)

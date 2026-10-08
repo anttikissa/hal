@@ -27,8 +27,8 @@ test('qualifiers preserve exact colon ids, parse only final effort, snap missing
 		expect(models.selection('anthropic/claude-opus-4-6:xhigh')).toMatchObject({ effort: 'max' })
 		expect(models.selection('openai/gpt-6-luna:minimal')).toMatchObject({ effort: 'low' })
 		expect(models.selection('gpt:ultra')).toMatchObject({ effort: 'max', note: expect.stringContaining('no Ultra mode') })
-		// The default's own level is the default: no override.
-		expect(models.selection('openai/gpt-6-sol:medium')).toEqual({ id: 'openai/gpt-6-sol' })
+		// A chosen level matching the known default still reaches the wire.
+		expect(models.selection('openai/gpt-6-sol:medium')).toEqual({ id: 'openai/gpt-6-sol', effort: 'medium' })
 		// A bare model keeps the carried effort, snapped.
 		expect(models.selection('openai/gpt-5.5', 'max')).toMatchObject({ id: 'openai/gpt-5.5', effort: 'xhigh' })
 		expect(models.selection('ollama/qwen3:8b:high')).toEqual({ id: 'ollama/qwen3:8b', note: expect.stringContaining('no effort control') })
