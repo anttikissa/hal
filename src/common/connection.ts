@@ -11,6 +11,7 @@
 // ignores repeats, so it never acts twice.
 
 import { protocol, type Event } from './protocol.ts'
+import { subscriptions } from './subscriptions.ts'
 import { perf } from './perf.ts'
 
 export type Role = 'host' | 'client'
@@ -165,6 +166,8 @@ function receive(event: Event): void {
 		let text = `the host sent a ${type} event this client can't read (${problem}); reload the page or restart Hal`
 		return st.opts?.onEvent({ type: 'warning', text })
 	}
+	if (event.type === 'subscription-usage') subscriptions.apply(event.accounts, event.replace)
+	if (event.type === 'tabs' && event.subscriptions) subscriptions.apply(event.subscriptions, true)
 	if (event.type === 'snapshot') st.followed.add(event.sessionId)
 	if (event.type === 'ack') st.pending.delete(event.id)
 	if (event.type === 'rejected' && event.id !== undefined) {

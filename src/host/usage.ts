@@ -8,6 +8,8 @@
 // (auth.ts) spends the quota that would otherwise expire, and /model
 // or the status line can show the numbers.
 
+import { host } from './host.ts'
+import { subscriptions, type SubscriptionData } from '../common/subscriptions.ts'
 import { clock } from './clock.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
@@ -79,6 +81,7 @@ function observe(provider: string, account: string | undefined, headers: Headers
 	data[provider] ??= {}
 	let observed = new Date(clock.now()).toISOString()
 	data[provider]![account] = { ...data[provider]![account], ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	usage.publish(provider, account)
 }
 
 // The account's windows still running (a window past its reset counts
@@ -142,6 +145,20 @@ function keeps(provider: string, mine: string, best: string): boolean {
 	return m.eligible && !(b.eligible && b.need > 0 && b.need >= 1.25 * Math.max(0, m.need))
 }
 
+// Send account changes once, not a quota copy per session.
+function publish(provider: string, account: string): void {
+	let event = { type: 'subscription-usage' as const, accounts: { [subscriptions.key(provider, account)]: usage.windows(provider, account) } }
+	for (let client of host.state.clients) client.deliver(event)
+}
+
+function snapshot(): SubscriptionData {
+	let out: SubscriptionData = {}
+	for (let [provider, accounts] of Object.entries(usage.store())) {
+		for (let account of Object.keys(accounts)) out[subscriptions.key(provider, account)] = usage.windows(provider, account)
+	}
+	return out
+}
+
 function close(): void {
 	let s = usage.state.store
 	usage.state.store = null
@@ -150,6 +167,8 @@ function close(): void {
 }
 
 export const usage = {
+	publish,
+	snapshot,
 	parse,
 	span,
 	store,

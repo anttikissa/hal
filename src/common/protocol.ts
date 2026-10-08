@@ -24,6 +24,7 @@ import type { EffortCapability } from './effort.ts'
 import type { FlaggedCall } from './modals.ts'
 import type { RebasePlan } from './rebase.ts'
 import type { RebaseRows } from './rebase-rows.ts'
+import type { SubscriptionData } from './subscriptions.ts'
 import { commandCheck } from './command-check.ts'
 import { eventCheck } from './event-check.ts'
 import type { PromptChange } from './prompt-changes.ts'
@@ -87,10 +88,9 @@ export type Snapshot = {
 // input and output tokens of the session's turns since this host
 // started. `plan`: the subscription account the session's next request
 // goes to: its place among the provider's subscription accounts
-// (1-based), each usage window's percent used ("5h": 18) and, when
-// known, when it resets (ISO).
+// (1-based), the key into the client-wide subscription usage store.
 export type Stats = { context?: number; window?: number; files?: number; plan?: Plan; effort?: string }
-export type Plan = { account: number; accounts: number; windows: Record<string, number>; resets?: Record<string, string> }
+export type Plan = { account: number; accounts: number; key: string }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -220,6 +220,7 @@ export type Tab = { id: string; name: string; cwd: string; model: string; state:
 // (HistoryRecord `n`); on `stream`, the number of the block the event
 // went into. Clients key transcript items by it (task w5).
 export type Event =
+	| { type: 'subscription-usage'; accounts: SubscriptionData; replace?: boolean }
 	| FindBatch
 	| { type: 'rebase-result'; sessionId: string; command?: string; ok: boolean; text: string }
 	| { type: 'rebase-plan'; sessionId: string; snapshot: RebaseRows; todo: string }
@@ -312,7 +313,7 @@ export type Event =
 	| { type: 'notice-history'; entries: NoticeEntry[] }
 	// The tabs changed, or the client just connected: every tab, in
 	// order. Sent to every client; which one a client shows is its own business.
-	| { type: 'tabs'; tabs: Tab[]; sessions?: string[] }
+	| { type: 'tabs'; tabs: Tab[]; sessions?: string[]; subscriptions?: SubscriptionData }
 	// /go in this session changes only windows currently showing/following it.
 	| { type: 'go'; sessionId: string; tab: string; block?: string }
 	// The session's draft changed; `command` is the id of the command

@@ -4,7 +4,7 @@
 // `heat`, the whole percent used, which the page colors with the
 // shared curve (.heat-N, colors.heat).
 
-import type { Plan } from '../common/protocol.ts'
+import { subscriptions } from '../common/subscriptions.ts'
 import { titles } from '../common/titles.ts'
 import { usageWindows } from '../common/usage-windows.ts'
 import type { ViewState } from './view.ts'
@@ -19,7 +19,7 @@ export type UsageWindow = { name: string; used: number; resets?: string }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 // Model-specific windows (7d_sonnet) are left out, as in /status.
-const general = (plan: Plan) => Object.keys(plan.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))
+const general = (plan: { windows: Record<string, number> }) => Object.keys(plan.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))
 
 function context(st: ViewState): StatusPart | undefined {
 	let stats = st.transcript?.stats
@@ -45,8 +45,9 @@ function quota(st: ViewState): Quota | undefined {
 function windows(st: ViewState): UsageWindow[] {
 	let plan = st.transcript?.stats?.plan
 	if (!plan) return []
+	let data = subscriptions.plan(plan)
 	let length = (name: string) => usageWindows.minutes(name) ?? Infinity
-	let out: UsageWindow[] = general(plan).sort((a, b) => length(a) - length(b)).map((name) => ({ name, used: clamp(plan.windows[name]!), ...(plan.resets?.[name] && { resets: plan.resets[name] }) }))
+	let out: UsageWindow[] = general(data).sort((a, b) => length(a) - length(b)).map((name) => ({ name, used: clamp(data.windows[name]!), ...(data.resets[name] && { resets: data.resets[name] }) }))
 	let moot = usageWindows.moot(out)
 	return out.filter((w) => !moot.has(w.name))
 }
@@ -69,7 +70,7 @@ function groups(st: ViewState): StatusGroup[] {
 	if (stats?.plan) {
 		let plan = stats.plan
 		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		for (let [name, percent] of Object.entries(plan.windows)) parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: clamp(percent) })
+		for (let [name, percent] of Object.entries(subscriptions.plan(plan).windows)) parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: clamp(percent) })
 		out.push({ parts })
 	}
 	return out

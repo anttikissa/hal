@@ -8,7 +8,7 @@ import { limits } from './limits.ts'
 
 
 
-test('stale usage refreshes only subscriptions and failed auth leaves cached windows with short advice', async () => {
+test('every status read refreshes subscriptions and failed auth leaves cached windows with short advice', async () => {
 	let all = auth.all, refresh = statusUsage.refresh, store = usage.store, windows = usage.windows, now = clock.now
 	let when = Date.now()
 	clock.now = () => when
@@ -29,8 +29,8 @@ test('stale usage refreshes only subscriptions and failed auth leaves cached win
 		expect(result).not.toContain('/private/auth.ason')
 		data.anthropic['a@example.com']['5h'].observed = new Date(when).toISOString()
 		result = await statusUsage.show('s', 'fake/m1')
-		expect(requests).toBe(1)
-		expect(result).not.toContain('login expired')
+		expect(requests).toBe(2)
+		expect(result).toContain('login expired')
 	} finally { auth.all = all; statusUsage.refresh = refresh; usage.store = store; usage.windows = windows; clock.now = now }
 })
 

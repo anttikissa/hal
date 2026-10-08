@@ -10,6 +10,7 @@
 import { mkdirSync } from 'fs'
 import { resolve } from 'path'
 import type { Command, Event, Tab } from '../common/protocol.ts'
+import { usage } from './usage.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
@@ -67,7 +68,7 @@ function list(): Tab[] {
 function greet(client: { deliver: (event: Event) => void }, live: () => boolean): void {
 	try {
 		let openTabs = tabs.list()
-		client.deliver({ type: 'tabs', tabs: openTabs, sessions: sessions.ids() })
+		client.deliver({ type: 'tabs', tabs: openTabs, sessions: sessions.ids(), subscriptions: usage.snapshot() })
 		queueMicrotask(() => {
 			if (!live()) return
 			try {

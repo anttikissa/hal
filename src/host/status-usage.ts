@@ -1,11 +1,13 @@
 // /status: one table shape for the terminal and web (both render Markdown).
-// Usage normally comes from response headers; stale subscriptions can be
-// refreshed from the provider's usage endpoint without sending a model turn.
+// Every read refreshes subscriptions into master data without a model turn.
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
 import { limits } from './limits.ts'
+import { host } from './host.ts'
+import { stats } from './stats.ts'
+import { sessions } from './sessions.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
 import { usageWindows } from '../common/usage-windows.ts'
@@ -108,18 +110,30 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 			if (profile.ok) email = (await profile.json())?.account?.email
 		} catch { /* usage still succeeded */ }
 	}
+	let migrated = false
 	let current = auth.all(kind).list.find((a) => a.name === account.name)?.entry ?? account.entry
 	if (typeof email === 'string' && email.includes('@') && !current.email) {
 		current.email = email
 		if (account.name !== email) {
 			store[kind]![email] = store[kind]![account.name]!
 			delete store[kind]![account.name]
+			migrated = true
 			for (let [key, name] of auth.state.chosen) if (key.startsWith(`${kind} `) && name === account.name) auth.state.chosen.set(key, email)
 		}
 	}
 	let before = current.plan
 	if (kind === 'openai' && typeof raw?.plan_type === 'string' && /^[\w -]{1,32}$/.test(raw.plan_type)) current.plan = raw.plan_type
 	if (current.email || current.plan) liveFiles.save(data)
+	if (migrated) {
+		// A learned email changes the master key and its session references.
+		let accounts = usage.snapshot()
+		let open = new Set<string>()
+		for (let client of host.state.clients) {
+			client.deliver({ type: 'subscription-usage', accounts, replace: true })
+			for (let id of client.open) if (sessions.open(id).model.startsWith(`${kind}/`)) open.add(id)
+		}
+		for (let id of open) host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id) })
+	} else usage.publish(kind, account.name)
 	if (before && current.plan && before !== current.plan) return `${before} → ${current.plan}`
 }
 
@@ -151,10 +165,8 @@ async function show(sessionId: string, model: string): Promise<string> {
 		let selected = model.startsWith(`${kind}/`) ? auth.state.chosen.get(`${kind} ${sessionId}`) ?? auth.pickAccount(kind, list, { session: sessionId })[0]?.name : undefined
 		for (let [i, account] of list.entries()) {
 			let apiKey = !auth.usable(account.entry.accessToken)
-			let data = usage.store()[kind]?.[account.name] ?? {}
-			let recent = Math.max(0, ...Object.values(data).map((w) => Date.parse(w.observed ?? '') || 0))
 			let error: string | undefined
-			if (!apiKey && clock.now() - recent > 60_000) {
+			if (!apiKey) {
 				try {
 					let changed = await statusUsage.refresh(kind, account)
 					if (changed) error = `plan changed: ${changed}`

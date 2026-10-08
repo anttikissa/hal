@@ -7,6 +7,7 @@ import { render } from '@solidjs/web'
 import { settings } from '../common/settings.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { connection } from '../common/connection.ts'
+import { subscriptionStore } from './subscriptions.ts'
 import { app } from './app.ts'
 import { diagnostics } from './diagnostics.ts'
 import { drift } from './drift.ts'
@@ -14,6 +15,7 @@ import { App } from './components/App.tsx'
 
 // The host's settings (config.ason) are read before the first render.
 if (typeof document !== 'undefined') {
+	subscriptionStore.init()
 	settings.load(document.getElementById('settings')?.textContent)
 	sendKeys.load(document.getElementById('send-keys')?.textContent)
 	// Off unless config.ason opts in (webDiagnostics).
