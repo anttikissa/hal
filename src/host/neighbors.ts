@@ -1,14 +1,16 @@
-// Sessions in one directory hear about recent activity (tasks 0f, c4x).
-// Bash calls report the paths they declare in modifies when they start
-// (file-changes.ts, task 8w); before each model request, a session hears
-// which project files another open session in its cwd declared, each path
-// once per window (history.messages). A path not declared again within the
-// window is free. When a turn ends with a final answer, not a question,
-// readers told its paths hear they are free. Paths outside the project
-// (/tmp, absolute) and Git internals are left out. Activity only: files
-// have no owners. In memory only: after a restart the first notes repeat.
+// Sessions in one directory hear who may be editing what (tasks 0f, c4x,
+// khv). A tool call's modifies paths (file-changes.ts, task 8w) are active
+// while it runs, background jobs included, and for lingerMs after it ends.
+// Before each model request (history.messages) a reader hears another
+// session's active paths; a reader that was told hears once when that set
+// changes or empties, however long it was idle. Activity nobody saw while
+// active is never told. Paths outside the project (/tmp, absolute) and Git
+// internals are left out. Activity only: files have no owners. In memory
+// only: after a restart the first notes repeat.
 import { clock } from './clock.ts'
 import { sessions } from './sessions.ts'
+
+type Declaration = { sessionId: string; cwd: string; paths: string[]; ended?: number }
 
 const maxPaths = 5
 
@@ -22,49 +24,56 @@ function label(id: string): string {
 	return `${id}${name ? ` (${name})` : ''}`
 }
 
-function start(sessionId: string, cwd: string, paths: string[]): void {
-	let { seen, freed } = neighbors.state, entry = seen.get(sessionId)
-	if (!entry || entry.cwd !== cwd) seen.set(sessionId, entry = { cwd, paths: new Map() })
-	for (let p of paths.filter(local)) { entry.paths.set(p, clock.now()); freed.get(sessionId)?.paths.delete(p) }
+// A call declared paths; end() the returned declaration when it stops.
+function start(sessionId: string, cwd: string, paths: string[]): Declaration {
+	let d: Declaration = { sessionId, cwd, paths: paths.filter(local) }
+	if (d.paths.length) neighbors.state.active.add(d)
+	return d
 }
 
-// The session's turn ended with a final answer: its paths are free.
-function finished(sessionId: string): void {
-	let entry = neighbors.state.seen.get(sessionId)
-	if (!entry) return
-	neighbors.state.seen.delete(sessionId)
-	neighbors.state.freed.set(sessionId, { at: clock.now(), paths: new Set(entry.paths.keys()) })
+function end(d: Declaration): void {
+	d.ended ??= clock.now()
 }
 
-// Lines for `sessionId` about others: paths not told to it in the window,
-// and told paths since freed. Expired paths and closed sessions go here.
-function notes(sessionId: string, cwd: string): string[] {
-	let now = clock.now(), { seen, sent, freed } = neighbors.state, fresh = (at?: number) => at !== undefined && now - at <= neighbors.windowMs
-	let key = (id: string, p: string) => `${sessionId}|${id}|${p}`
-	for (let [k, at] of sent) if (!fresh(at)) sent.delete(k)
-	let lines: string[] = []
-	for (let [id, entry] of freed) {
-		if (!fresh(entry.at) || !sessions.state.open.has(id)) { freed.delete(id); continue }
-		let told = [...entry.paths].filter((p) => sent.delete(key(id, p)))
-		if (told.length) lines.push(`[${label(id)} finished its turn: ${list(told)}]`)
+// What changed for a reader told `was` that should now know `now`.
+function change(was: string[], now: string[]): string | undefined {
+	let added = now.filter((p) => !was.includes(p)), removed = was.filter((p) => !now.includes(p))
+	if (!added.length && !removed.length) return undefined
+	if (!now.length) return 'is no longer editing files'
+	if (!was.length) return `may be editing ${list(now)}`
+	if (!removed.length) return `may also be editing ${list(added)}`
+	let only = `is now editing only ${list(now)}`, stopped = `is no longer editing ${list(removed)}`
+	return !added.length && stopped.length < only.length ? stopped : only
+}
+
+// Lines for `reader` about other sessions in `cwd` whose active paths
+// differ from what it was last told.
+function notes(reader: string, cwd: string): string[] {
+	let now = clock.now(), { active, told } = neighbors.state, open = sessions.state.open
+	let current = new Map<string, string[]>()
+	for (let d of active) {
+		if ((d.ended !== undefined && now - d.ended > neighbors.lingerMs) || !open.has(d.sessionId)) { active.delete(d); continue }
+		if (d.sessionId === reader || d.cwd !== cwd) continue
+		let paths = current.get(d.sessionId) ?? []
+		current.set(d.sessionId, [...paths, ...d.paths.filter((p) => !paths.includes(p))])
 	}
-	for (let [id, entry] of seen) {
-		for (let [p, at] of entry.paths) if (!fresh(at)) entry.paths.delete(p)
-		if (!entry.paths.size || !sessions.state.open.has(id)) { seen.delete(id); continue }
-		if (id === sessionId || entry.cwd !== cwd) continue
-		let untold = [...entry.paths.keys()].filter((p) => !sent.has(key(id, p)))
-		for (let p of untold) sent.set(key(id, p), now)
-		if (untold.length) lines.push(`[${label(id)} declared edits to ${list(untold)}]`)
+	for (let id of told.keys()) if (!open.has(id)) told.delete(id)
+	let mine = told.get(reader) ?? new Map<string, string[]>(), lines: string[] = []
+	for (let id of new Set([...mine.keys(), ...current.keys()])) {
+		let paths = current.get(id) ?? [], text = change(mine.get(id) ?? [], paths)
+		if (text) lines.push(`[${label(id)} ${text}]`)
+		if (paths.length) mine.set(id, paths); else mine.delete(id)
 	}
+	if (mine.size) told.set(reader, mine); else told.delete(reader)
 	return lines
 }
 
 export const neighbors = {
 	state: {
-		seen: new Map<string, { cwd: string; paths: Map<string, number> }>(),
-		sent: new Map<string, number>(),
-		freed: new Map<string, { at: number; paths: Set<string> }>(),
+		active: new Set<Declaration>(),
+		// reader -> neighbor -> active paths it was last told
+		told: new Map<string, Map<string, string[]>>(),
 	},
-	windowMs: 5 * 60_000,
-	start, finished, notes,
+	lingerMs: 60_000,
+	start, end, notes,
 }

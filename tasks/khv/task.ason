@@ -7,7 +7,11 @@ Before each model request, offer current hints about other sessions in the same 
 Remember what each reader was actually told until it has received the necessary correction, rather than silently forgetting that obligation at expiry. On its next request, an informed reader gets one concise update per changed neighbor, including after an idle interval longer than the expiry window. Prefer the shorter accurate wording: a compact release description or the remaining set, such as session X is editing only foo.ts, src/main.ts, docs/*.txt now. When nothing remains, say session X is no longer editing files, without enumerating a hundred released paths. Include the human-readable tab name alongside its session identifier. Describe activity as possible declared editing, not guaranteed writes or exclusive ownership.
 
 Preserve project-path filtering and declared glob spelling. Keep coordination state and repeated work proportional to live declarations and outstanding reader corrections; clear reconciled state. Deterministic behavioral checks cover unseen expiry producing no notice, informed readers receiving release after long inactivity, partial expiry with a compact remaining-set update, unchanged redeclarations staying quiet, question turns not preserving completed-task hints, and foreground/background task lifetimes.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'src/host/neighbors.ts: state.active holds one declaration per running tool call (fileChanges.begin starts it; the observation release ends it, so unlaunched and background calls end too); state.told maps reader -> neighbor -> paths last told. notes() diffs told against active and words the change: may be editing / may also be editing / is no longer editing X or is now editing only Y (shorter) / is no longer editing files. turns.ts no longer frees paths at turn end.',
+		'Bug 2026-10-08: a 20:51 declared-edits notice made a tab call an idle neighbor editing right now at 21:18, over its own clean git status: the 5-minute expiry was silent and a turn ending in a question freed nothing. bun test src/host/neighbors.test.ts alone fails on an unrelated slash.ts/auth import cycle; it passes in ./test.'
+	],
 	needs: ['0f', 'nvm'],
 	foldInto: ['0f']
 }
