@@ -9,27 +9,9 @@ function key(provider: string, account: string): string {
 	return JSON.stringify([provider, account])
 }
 
-function apply(accounts: SubscriptionData, replace = false): void {
-	subscriptions.write((draft) => {
-		if (replace) for (let name of Object.keys(draft)) if (!(name in accounts)) delete draft[name]
-		for (let [name, windows] of Object.entries(accounts)) {
-			let current = draft[name] ??= {}
-			for (let span of Object.keys(current)) if (!(span in windows)) delete current[span]
-			for (let [span, window] of Object.entries(windows)) {
-				let value = current[span] ??= { used: 0 }
-				value.used = window.used
-				if (window.resets === undefined) delete value.resets
-				else value.resets = window.resets
-				if (window.observed === undefined) delete value.observed
-				else value.observed = window.observed
-			}
-		}
-	})
-}
-
-function install(data: SubscriptionData, write: (update: (draft: SubscriptionData) => void) => void): void {
+function install(data: SubscriptionData, update: (accounts: SubscriptionData, replace?: boolean) => void): void {
 	subscriptions.state = data
-	subscriptions.write = write
+	subscriptions.update = update
 }
 
 function plan(plan: Plan): { windows: Record<string, number>; resets: Record<string, string> } {
@@ -44,6 +26,9 @@ function plan(plan: Plan): { windows: Record<string, number>; resets: Record<str
 
 export const subscriptions = {
 	state: {} as SubscriptionData,
-	write: (update: (draft: SubscriptionData) => void): void => update(subscriptions.state),
-	install, key, apply, plan,
+	apply: (accounts: SubscriptionData, replace = false): void => subscriptions.update(accounts, replace),
+	update: (accounts: SubscriptionData, replace = false): void => {
+		subscriptions.state = replace ? accounts : { ...subscriptions.state, ...accounts }
+	},
+	install, key, plan,
 }
