@@ -6,7 +6,8 @@
 		'Only SYSTEM.md is a template; AGENTS.md/CLAUDE.md and includes remain literal except that HTML comments are stripped from every prompt file (user decision 28 Sep). Include paths resolve variables first (for @?${home}/USER.md), while unknown placeholders remain; session_dir is supplied from turns.ts.',
 		'Included files are inserted raw and only SYSTEM.md itself is preprocessed; substituting after joining would still expand USER.md variables. Includes do not recurse, so a USER.md @ line cannot cause a failed request.',
 		'Bug fix 8 Oct: a broken SYSTEM.md (unknown :::if key) failed every request in every session. Invariant restored: prompt files never fail or stall a turn. Faults (missing SYSTEM.md, unknown key, invalid/nested/unclosed/stray directive, missing @ include) are collected with file:line, the faulty part is dropped, the rest applies; turns.ts shows them once per session as a notice and again when they change. /system inspect returns them too.',
-		'Variable user_notes: true unless HAL_NO_USER_NOTES is set; SYSTEM.md wraps the User notes section and the USER.md include in ::: if user_notes="true", so benchmarks run without the user\'s notes.'
+		'Variable user_notes: true unless HAL_NO_USER_NOTES is set; SYSTEM.md wraps the User notes section and the USER.md include in ::: if user_notes="true", so benchmarks run without the user\'s notes.',
+		'Prompt files support ::: else inside an if block; else without if is reported as a problem.'
 	],
 	needs: ['tm']
 }
