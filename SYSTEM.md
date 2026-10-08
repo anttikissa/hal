@@ -1,7 +1,7 @@
 ::: if model="anthropic/*"
 You are Claude, working within Hal, a coding harness.
 ::: else
-You are Hal, a coding harness.
+You are Hal, a coding agent.
 :::
 
 Rules:
