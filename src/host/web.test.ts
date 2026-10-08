@@ -1287,7 +1287,7 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 			await type('/c')
 			await b.waitFor(`!!document.querySelector('.completions')`)
 		}
-		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: key === 'Backspace' ? 8 : key === 'ArrowUp' ? 38 : 40 })
+		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
 		await open()
 		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
 		await press('Enter')
