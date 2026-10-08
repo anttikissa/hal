@@ -109,10 +109,12 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	expect(providerBytes(await history.messages(id)).slice(0, providerBytes(fresh).length - 1)).toEqual(providerBytes(fresh).slice(0, -1))
 })
 
-test('image estimates follow pixels measured on Opus 5.5, not file bytes', () => {
+test('image estimates follow pixels measured on Opus 5.5 and gpt-6.1, not file bytes', () => {
 	// [width, height, count_tokens result]; the capped screenshot errs high.
 	for (let [w, h, real] of [[1568, 997, 2019], [1000, 636, 831], [1500, 1500, 2919], [2000, 2000, 4764], [8000, 500, 555]]) expect(pruning.imageTokens(w!, h!)).toBe(real!)
 	expect(pruning.imageTokens(3104, 1974)).toBeGreaterThanOrEqual(4733)
+	// [width, height, gpt-6.1-sol usage.input_tokens minus a text-only request]
+	for (let [w, h, real] of [[3104, 1974, 7217], [1000, 636, 769], [500, 318, 193], [768, 1366, 1239], [3000, 1000, 3610], [10000, 1000, 12020]]) expect(pruning.imageTokens(w!, h!, 'openai/gpt-6.1-sol')).toBe(real!)
 	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'image', blob: 'missing', mediaType: 'image/png', bytes: 5_000_000 }] }]
 	let unreadable = pruning.estimate('none', messages)
 	expect(unreadable).toBeGreaterThan(pruning.maxImageTokens)
