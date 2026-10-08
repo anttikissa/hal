@@ -447,3 +447,7 @@ test('only canceled unfinished text gets display metadata, never provider prose'
 		expect(history.interrupted(id)).toBeUndefined()
 	}
 })
+
+test('retired delivery checks are temporary', () => {
+	expect(Date.now(), 'delete the RETIRED-DELIVERY checks in sender.ts and history-check.ts and this test').toBeLessThan(Date.parse('2026-10-15T00:00:00Z'))
+})

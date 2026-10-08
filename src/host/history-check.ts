@@ -10,6 +10,7 @@ const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
 	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	// RETIRED-DELIVERY (task rqq): delete by 2026-10-15 (history.test.ts fails then).
 	if ((r.type === 'user' || r.type === 'inbox') && ('queue' in r || 'queued' in r || (r.type === 'user' && 'delivery' in r))) throw new Error('retired delivery flags')
 	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
 	if ((r.type === 'command' || r.type === 'output') && r.origin !== undefined && r.origin !== 'model') throw new Error(`invalid ${r.type} origin`)
