@@ -1017,7 +1017,8 @@ browserTest('compact status keeps two lines and opens full live details without 
 		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
 		let id = await b.evaluate("location.pathname.slice(1)")
 		let meta = { id, cwd: '/tmp/very-long-parent-directory/project', model: 'fake/a-very-long-model-name', name: 'A long conversation name that must not wrap on a narrow phone', createdAt: new Date().toISOString() }
-		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, windows: { '5h': 17 } } } })
+		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 17 } } } })
+		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, key: 'test' } } })
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
 		await b.waitFor("document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
 		await b.evaluate("let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))")
@@ -1039,6 +1040,21 @@ browserTest('compact status keeps two lines and opens full live details without 
 			expect(geometry.fill).toBe('83%')
 			expect(geometry.duplicated).toBe(false)
 		}
+		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
+		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
+		// A master update alone must repaint quota on this idle view. No
+		// replacement Stats, transcript, status nodes or draft are needed.
+		await b.evaluate("window.quotaNodes = [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')]")
+		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 52 } } } })
+		await b.waitFor("document.querySelector('.windows').textContent.includes('52% used') && getComputedStyle(document.querySelector('.model')).getPropertyValue('--fill') === '48%'")
+		expect(await b.evaluate("window.quotaNodes.every((n, i) => n === [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')][i])")).toBe(true)
+		expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
+		// An unrelated account must not touch this status row.
+		await b.evaluate("window.quotaMutations = 0; window.quotaObserver = new MutationObserver(ms => window.quotaMutations += ms.length); window.quotaObserver.observe(document.querySelector('.StatusRow'), { subtree: true, childList: true, characterData: true, attributes: true })")
+		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { other: { '5h': { used: 99 } } } })
+		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		expect(await b.evaluate('window.quotaMutations')).toBe(0)
+		await b.evaluate('window.quotaObserver.disconnect()')
 		await b.evaluate("document.querySelector('.overview').focus()")
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
 		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
@@ -1047,7 +1063,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 		expect(text).toContain(meta.name)
 		expect(text).toContain(meta.cwd)
 		expect(text).toContain('medium')
-		expect(text).toContain('5h 17%')
+		expect(text).toContain('5h 52%')
 		expect(await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))")).toEqual([`/changes/${id}`, `/context/${id}`])
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
 		await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
@@ -1206,8 +1222,8 @@ browserTest('manual reload notice preserves the draft and command actions stay d
 		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
 		let actions = () => b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => b.getAttribute('aria-label') ?? b.textContent)")
-		// Idle with no assistant text yet: Play shows, disabled (task yhn).
-		expect(await b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])")).toEqual([['Continue', true], ['Send', true]])
+		// Idle with an empty draft: Play is enabled, even before an answer (task yhn).
+		expect(await b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])")).toEqual([['Continue', false], ['Send', true]])
 		await input('start')
 		await b.evaluate("document.querySelector('.Composer .actions .go').click()")
 		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")

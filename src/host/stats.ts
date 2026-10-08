@@ -9,11 +9,10 @@ import type { Plan, Stats } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'
-import { clock } from './clock.ts'
+import { subscriptions } from '../common/subscriptions.ts'
 import { contextPage } from './context-page.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
-import { usage } from './usage.ts'
 
 // The context of the last turn end among `records` that has one, unless
 // a compact or reset came after it: that context is gone.
@@ -37,22 +36,7 @@ function plan(id: string, model: string): Plan | undefined {
 		let subs = list.filter((a) => typeof a.entry.accessToken === 'string' && a.entry.accessToken)
 		let next = auth.pickAccount(kind as Kind, list, { session: id })[0]
 		if (!next || !subs.includes(next)) return undefined
-		let key = `${kind}:${next.name}`
-		let previous = stats.state.windows.get(key)
-		let windows: Record<string, number>
-		let resets: Record<string, string>
-		if (previous && clock.now() - previous.at < 60_000) ({ windows, resets } = previous)
-		else {
-			windows = {}
-			resets = {}
-			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) {
-				if (/^\d+[a-z]+[-_]/.test(name)) continue
-				windows[name] = Math.round(w.used)
-				if (w.resets) resets[name] = w.resets
-			}
-			stats.state.windows.set(key, { at: clock.now(), windows, resets })
-		}
-		return { account: subs.indexOf(next) + 1, accounts: subs.length, windows, ...(Object.keys(resets).length && { resets }) }
+		return { account: subs.indexOf(next) + 1, accounts: subs.length, key: subscriptions.key(kind, next.name) }
 	} catch {
 		// No login yet, or a broken credentials file: a turn says why.
 		return undefined
@@ -94,20 +78,11 @@ function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 	return stats.of(id, [end])
 }
 
-// A failed round (a 429 is recorded at once, usage.observe): the cached
-// windows are stale, so the status row shows the rate limit now rather
-// than up to a minute later (or never, while the turn waits it out).
-function failed(id: string): Stats {
-	stats.state.windows.clear()
-	return stats.of(id)
-}
-
 export const stats = {
 	// Per session, since this host started: the context of its last
-	// round; per account, its cached usage windows.
-	state: { context: new Map<string, number>(), windows: new Map<string, { at: number; windows: Record<string, number>; resets: Record<string, string> }>() },
+	// round. Quota lives only in usage.ts.
+	state: { context: new Map<string, number>() },
 	lastContext,
-	failed,
 	plan,
 	of,
 	round,

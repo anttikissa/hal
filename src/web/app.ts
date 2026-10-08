@@ -90,7 +90,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'restart-ask') delete restart.state.mark
 	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
-	if (event.type === 'redraw' || folds.onEvent(event) || rebaseView.onEvent(event)) return
+	if (event.type === 'subscription-usage' || event.type === 'redraw' || folds.onEvent(event) || rebaseView.onEvent(event)) return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (push.onEvent(event)) return
 	if (tabs.onEvent(event)) return
@@ -139,7 +139,6 @@ function onEvent(event: Event): void {
 		} else app.backgroundStep()
 	}
 }
-
 // The address changed (loaded, a card's link followed, Back): aim at
 // the block it names, if any.
 function aim(): void {

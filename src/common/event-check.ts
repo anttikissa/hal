@@ -9,6 +9,7 @@ import { pluginSyncWire } from './plugin-sync.ts'
 // s: string, i: integer, o: object, a: list, S: list of strings, with
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
+	'subscription-usage': { accounts: 'o', replace: 'b?' },
 	'find-results': { request: 's', tier: 's', results: 'a', done: 'b', scanning: 'i?', error: 's?' },
 	'rebase-result': { sessionId: 's', command: 's?', ok: 'b', text: 's' },
 	'rebase-plan': { sessionId: 's', snapshot: 'o', 'snapshot.base': 'i', 'snapshot.rows': 'a', 'snapshot.records': 'a', 'snapshot.options': 'o', todo: 's' },
@@ -46,7 +47,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	version: { version: 's' },
 	'model-names': { names: 'o', defaults: 'o?' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },
-	tabs: { tabs: 'a' },
+	tabs: { tabs: 'a', subscriptions: 'o?' },
 	go: { sessionId: 's', tab: 's', block: 's?' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
@@ -77,6 +78,12 @@ function invalidEvent(value: unknown): string | undefined {
 		let v = path.split('.').reduce<unknown>((o, key) => (isObject(o) ? o[key] : undefined), value)
 		if (v === undefined && kind.endsWith('?')) continue
 		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
+	}
+	if (value.type === 'subscription-usage' || (value.type === 'tabs' && value.subscriptions !== undefined)) {
+		let unsafe = (key: string) => ['__proto__', 'constructor', 'prototype'].includes(key)
+		for (let [key, windows] of Object.entries((value.type === 'tabs' ? value.subscriptions : value.accounts) as Record<string, unknown>)) {
+			if (unsafe(key) || !isObject(windows) || Object.keys(windows).some(unsafe) || Object.values(windows).some((w) => !isObject(w) || typeof w.used !== 'number' || !Number.isFinite(w.used) || w.used < 0 || w.used > 100 || (w.resets !== undefined && (typeof w.resets !== 'string' || !Number.isFinite(Date.parse(w.resets)))) || (w.observed !== undefined && (typeof w.observed !== 'string' || !Number.isFinite(Date.parse(w.observed)))))) return `${value.type}: invalid windows`
+		}
 	}
 	if (value.type === 'assistant-interrupted') {
 		let r = value.record as Record<string, unknown>

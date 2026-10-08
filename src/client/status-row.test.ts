@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { subscriptions } from '../common/subscriptions.ts'
 import { titles } from '../common/titles.ts'
 import { strings } from '../common/strings.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 
 let originalNames: Record<string, string>
-beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5' } })
+beforeEach(() => { subscriptions.apply({ test: { '5h': { used: 18 }, '7d': { used: 57 } } }); originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5' } })
 afterEach(() => { titles.names = originalNames })
 
 const info: StatusInfo = {
@@ -14,7 +15,7 @@ const info: StatusInfo = {
 	home: '/Users/me',
 	model: 'anthropic/claude-opus-5-5',
 	role: 'host',
-	stats: { effort: 'high', context: 87_000, window: 1_000_000, plan: { account: 1, accounts: 2, windows: { '5h': 18, '7d': 57 } } },
+	stats: { effort: 'high', context: 87_000, window: 1_000_000, plan: { account: 1, accounts: 2, key: 'test' } },
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
