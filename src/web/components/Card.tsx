@@ -102,7 +102,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
-	let long = () => !fullCommand() && (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows
+	let long = () => !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows
 	// The link shows the block's id, #t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -163,6 +163,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let body = () => {
 		let item = props.row.item
 		if (item.type !== 'tool') return lines().join('\n')
+		// An EDIT's diff shows its edits, so it stands alone, in diff colors.
+		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>
 		// The call once (task 8t), then its output: the result, or what
 		// has streamed so far.
 		let call = toolDetails.lines(item.name, item.input)

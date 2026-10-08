@@ -13,7 +13,7 @@ import { fileChanges } from '../file-changes.ts'
 import { type Change, lease } from '../lease.ts'
 import type { ToolCallBlock, ToolResultBlock } from '../../common/blocks.ts'
 import { history } from '../history.ts'
-import { type Tool, tools } from '../tools.ts'
+import { type Tool, type ToolOutput, tools } from '../tools.ts'
 
 const usage = 'EDIT [/* purpose */] "<path>@<hash>" { range: "<start>-<end>", lines: ["...", ...] } [{ range, lines } ...]'
 
@@ -33,7 +33,7 @@ function changes(value: unknown): Change[] {
 	})
 }
 
-export const tool: Tool = {
+export const tool: Tool<ToolOutput> = {
 	name: 'edit',
 	description:
 		'Replace line ranges of a text file, all at once. Name the lease path@hash from READ; when the file has changed since, nothing is written and the lines now around each range are shown. ' +
@@ -81,8 +81,10 @@ export const tool: Tool = {
 			let next = Buffer.from(after)
 			if (next.equals(bytes)) return `== EDIT ${path}@${now} unchanged: the lines already read so; nothing written ==`
 			if (ctx.signal.aborted) throw new Error('stopped before writing; nothing was written')
+			// Before the write, so a diff failure cannot follow a written edit (task k8y).
+			let diff = (require('../text-diff.ts') as typeof import('../text-diff.ts')).textDiff.text(bytes.toString(), after, Infinity, true)
 			await lease.commit(full, next, bytes)
-			return `== EDIT ${path}@${lease.hash(next)} ok: ==\n${lease.numbered(lines, shown) || '[Empty file]'}`
+			return { text: `== EDIT ${path}@${lease.hash(next)} ok: ==\n${lease.numbered(lines, shown) || '[Empty file]'}`, diff }
 		} finally {
 			await fileChanges.finish(observation)
 		}
