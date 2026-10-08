@@ -150,6 +150,12 @@ function enter(sessionId: string, state: SessionState, text: string, delivery: D
 	return { command: delivery === 'queue' || (delivery === 'soft-steer' && busy) ? { type: 'submit', sessionId, text, delivery } : { type: 'submit', sessionId, text } }
 }
 
+// Shared idle nudges for web Continue and terminal Enter (task yhn).
+const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.', 'You can do it.', 'Onward!']
+function nudge(state: SessionState, pick = Math.random()): string | undefined {
+	return state.type === 'idle' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
+}
+
 // Whether undo on an empty prompt may take back a message sent early
 // from the queue (task csn): one of the user's waits to interject.
 function promoted(items: InboxItem[]): boolean {
@@ -207,4 +213,4 @@ function doing(phase: Phase, items: readonly Shown[]): string {
 	return names.length ? `running ${names.join(', ')}` : 'running tools'
 }
 
-export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, promoted, escape, describe, doing }
+export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, nudge, promoted, escape, describe, doing }

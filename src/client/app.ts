@@ -212,6 +212,7 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 		st.notice = 'sending once the upload is done'
 		return false
 	}
+	if (!st.editing && !text.trim() && delivery === 'steer') text = states.nudge(st.transcript.state) ?? text
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
 		? { command: amend.enter(st.editing, st.transcript, text, delivery === 'queue'), refused: undefined }

@@ -188,13 +188,9 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
-// Prompts Play sends when the session is idle (task yhn): a few words,
-// each asking for action, not another plan.
-const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.', 'You can do it.', 'Onward!']
-
 // A nudge if the session is idle; commands do not change eligibility.
 function nudge(st: ViewState, pick = Math.random()): string | undefined {
-	return st.transcript?.state.type === 'idle' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
+	return st.transcript && states.nudge(st.transcript.state, pick)
 }
 
 // What the model is streaming into the last item, thinking or text:
