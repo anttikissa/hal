@@ -1,0 +1,16 @@
+{
+	title: 'Combine same-round EDITs without cross-round edit memory',
+	spec: `A completed model response supplies the full set of tool calls before dispatch. After the existing approval checks, EDIT calls in that round targeting the same canonical file and lease hash form one atomic operation. Combine their range lists and reuse existing EDIT validation, bottom-to-top application, lease checking and atomic writing. Reject the whole group without writing if any member is invalid or any ranges overlap, including after EOF clamping; do not introduce partial success. Calls against different files remain concurrent. Calls against different hashes, WRITE and BASH are not combined and retain their existing locking and execution behavior.
+
+The invariant is that only EDITs in one session and one model round share a leased version for a combined write. There is no recent-edit cache, range rebasing across rounds, or implicit acceptance of stale leases after another session changes the file. Replace the edit-memory behavior from task 2m1; scripts/action remains unchanged.
+
+Each group passes through existing file tracking once: canonical file lock, snapshots, sibling declaration notice and change recording. Check the lease while holding the lock and preserve cancellation and final write-time change detection. Record the combined diff under the first participating call, and identify that shared operation in every member result using user-visible history identifiers. Preserve original calls in history and return a result for every original call in call order; all group members report a group failure. Sibling sessions retain normal lock waiting, notifications and stale-lease failures. Do not infer arbitrary shell writes beyond declared modifies paths.
+
+Verify same-round disjoint edits with line-count changes, atomic rejection of overlapping or invalid members, canonical path aliases, and stale leases across rounds or sibling sessions. Check shared change attribution and per-call results without adding a new scheduling or tracking subsystem.`,
+	status: 'planned',
+	notes: [
+		'Fact-check: turns.ts collects calls after the provider stream finishes and checks approvals before concurrent dispatch. The timing/approval rationale in task 2m1 is incorrect; no collection window is needed. lease.apply already detects overlapping clamped ranges and splices bottom-to-top. fileChanges.begin/finish provide canonical locking, snapshots and neighbors.start. Sibling notices are advisory and are not suppressed by the old cache; its flaw is accepting stale leases across sessions. At task creation, local uncommitted removals of the cache remain in lease.ts, tools/edit.ts and actions.test.ts; these are not a completed implementation.'
+	],
+	needs: ['2m1'],
+	foldInto: ['2m1']
+}
