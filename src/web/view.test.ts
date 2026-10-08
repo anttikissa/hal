@@ -78,6 +78,27 @@ test('Enter and Escape follow the session state', () => {
 	expect(view.submit(paused, '')).toEqual({ command: { type: 'continue', sessionId }, keep: false })
 })
 
+test('idle Continue still nudges after a directory command following the final answer', () => {
+	let st = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
+		{ type: 'turn-start', sessionId, prompt: 'fix it', provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'May I inspect the project directory?' } },
+		{ type: 'turn-end', sessionId, status: 'completed' },
+		{ type: 'command', sessionId, text: '/cd' },
+		{ type: 'output', sessionId, text: 'Directory changed: /work → /project' },
+	])
+	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
+	expect(view.nudge(empty, 0)).toBeTruthy()
+	let greeting = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'output', text: 'Hello.', synthetic: true, ts }], state: { type: 'idle' } } }])
+	expect(view.nudge(greeting, 0)).toBeTruthy()
+	let text = view.nudge(st, 0)!
+	expect(text).toBeTruthy()
+	expect(view.submit(st, text)).toEqual({ command: { type: 'submit', sessionId, text }, keep: false })
+	for (let state of [{ type: 'running', phase: 'streaming' }, { type: 'paused' }, { type: 'blocked', reason: 'question' }] as const) {
+		expect(view.nudge(view.onEvent(st, { type: 'state', sessionId, state }), 0)).toBeUndefined()
+	}
+})
+
 test('a tool gets a class for its name that no name can break out of', () => {
 	let kind = view.show({ type: 'tool', id: 't', name: 'My Tool"><x', input: {} })!.kind
 	expect(kind.split(' ')[0]).toBe('tool')
