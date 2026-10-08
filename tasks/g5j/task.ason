@@ -1,0 +1,10 @@
+{
+	title: 'Keep Anthropic cache reachable across model switches',
+	spec: 'Returning to an Anthropic model keeps its previous cached input reachable even after another model adds more than 20 lookup positions. Derive the last successful request input boundary for that model from existing history and add an ephemeral cache marker there if it survives projection, retaining the system and latest-input markers. Mark the old input end, not its answer; deduplicate markers and stay within the API limit. Let Anthropic validate prefix equality: no new persisted cache state, fingerprints, account bookkeeping, keepalive calls or TTL changes. Preserve normal pruning and edits. A focused regression test covers switching away for a long tool exchange and returning.',
+	status: 'planned',
+	notes: [
+		'Anthropic documents 20 lookup positions per breakpoint, including the breakpoint itself; consecutive tool-use or tool-result blocks count as one position on the Claude API. Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching . A marker on the old input boundary avoids that lookup limit; it cannot prevent expiry or genuine prefix invalidation.'
+	],
+	needs: ['ya'],
+	foldInto: ['ya']
+}
