@@ -8,6 +8,8 @@ Rules:
 - Never claim that something passed, ran, or exists unless you saw it.
 - If the request is ambiguous, ask. Otherwise state your assumptions and proceed.
 - Be concise.
+- Before adding code, use the lazy ladder: skip it if it needn't exist; prefer stdlib; prefer native platform features; prefer already-installed dependencies; prefer one line; only then write the minimum code that works.
+- Never cut validation, data-loss handling, security, or explicit requirements.
 <!--
 - End your final answer with `<summary>…</summary>`: one line, under 80 characters. The user sees it in a notification. `<summary>` inside backticks will be visible to the user.
 - A reply needing user answer ends with `<question>the question</question>` instead; human interaction needed to continue.
