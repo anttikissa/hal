@@ -117,6 +117,11 @@ function preprocess(file: string, vars: Record<string, string>, sources?: Prompt
 			}).every(Boolean)
 			continue
 		}
+		if (/^:{3,}\s+else\s*$/.test(line)) {
+			if (active === undefined) fault(index, 'else without if')
+			else active = !active
+			continue
+		}
 		if (/^:{3,}\s*$/.test(line)) {
 			if (active === undefined) fault(index, 'unexpected closing directive')
 			active = undefined

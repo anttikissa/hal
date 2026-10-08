@@ -8,7 +8,8 @@
 		'Reminder test in system-prompt.test.ts fails from 2026-10-15: test the question feature, then restore or drop the commented-out summary/question endings.',
 		'Rules gain the lazy ladder with a one-line guard (never cut validation, data-loss handling, security, or explicit requirements), user decision 8 Oct; it also lifts the first request past the 1,024-token cache minimum.',
 		'Prompt names the useful slash commands (user decision 8 Oct): COMMAND runs them for the user, SEND passes them to another session; /cd /clear <next prompt> /compact /go /move /rename /rebase, /help for more.',
-		'The "You are Claude." line sits in ::: if model="anthropic/*"; other models only read "You are working within Hal, a coding harness." (user decision 8 Oct).'
+		'The "You are Claude." line sits in ::: if model="anthropic/*"; other models only read "You are working within Hal, a coding harness." (user decision 8 Oct).',
+		'Intro is one line (user decision 8 Oct): Anthropic models read "You are Claude, working within Hal, a coding harness.", others "You are Hal, a coding harness."'
 	],
 	needs: ['gr', 'asp']
 }
