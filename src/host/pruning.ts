@@ -56,10 +56,12 @@ function heavy(r: HistoryRecord): boolean {
 		(r.type === 'assistant' && r.block.type === 'tool_call')
 }
 
-// Conservative character estimate, including image payloads and system/tools.
+// Conservative estimate including images and system/tools. Providers bill
+// images by downscaled pixels, not file bytes: Anthropic caps one near 1,600
+// tokens, and OpenAI and Gemini cost less.
 function estimate(messages: Message[], overhead = 0, model?: string): number {
-	let images = messages.reduce((sum, m) => sum + m.blocks.reduce((n, b) => n + (b.type === 'image' ? b.bytes ?? 0 : b.type === 'tool_result' ? b.image?.bytes ?? 0 : 0), 0), 0)
-	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + tokenEstimates.estimate(images)
+	let images = messages.reduce((sum, m) => sum + m.blocks.filter((b) => b.type === 'image' || (b.type === 'tool_result' && b.image)).length, 0)
+	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images * pruning.imageTokens
 }
 
 function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r): HistoryRecord[] {
@@ -129,4 +131,5 @@ export const pruning = {
 	retainTurns: 4,
 	maxArgumentChars: 1000,
 	pressureTokens: 180_000,
+	imageTokens: 1_600,
 }
