@@ -319,10 +319,15 @@ function missingResult(status: TurnStatus | undefined): string {
 	return `Tool call did not run: the turn ${status ?? 'ended'}.`
 }
 
-// Back on a model after another one ran: its last request's input is
-// still cached, but may lie beyond the provider's lookback from the
-// newest block (task g5j). Mark where that input ended; the provider
-// checks the prefix still matches. Returns `messages`.
+// Back on a model after another one ran (task g5j). Anthropic finds a
+// cached prefix only within 20 positions back from a cache marker. With
+// one model that is enough: each round caches its own input, a few
+// blocks behind the next. Another model's tool exchange can add more, so
+// the newest marker no longer reaches the old cache and it is written
+// again in full (session 08-nah: ~13k tokens). Marking where this
+// model's last input ended finds it; Anthropic checks the prefix still
+// matches (pruning or an edit can change it), so nothing is stored.
+// Returns `messages`.
 function markCache(records: HistoryRecord[], messages: Message[], model?: string): Message[] {
 	let rounds = records.filter((r) => r.type === 'round')
 	if (!model || !rounds.length || rounds.at(-1)!.model === model) return messages
