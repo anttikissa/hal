@@ -7,6 +7,7 @@ import { paths } from './paths.ts'
 import { diag } from './diag.ts'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { tokenCalibration } from './token-calibration.ts'
+import { blobs } from './blobs.ts'
 
 type Saved = { boundary: number; checkpoint: number; pressure: number; omitted: number[]; consumed: number[] }
 type Budget = { overhead?: number; window?: number; model?: string }
@@ -56,12 +57,44 @@ function heavy(r: HistoryRecord): boolean {
 		(r.type === 'assistant' && r.block.type === 'tool_call')
 }
 
+// Opus 5.5 image tokens, measured with count_tokens: downscale to a 2576 px
+// long edge and at most 4,761 patches of 28 px, then one token per patch plus
+// 3. Older Claude models cost less. Unreadable headers count the cap.
+function imageTokens(width: number, height: number): number {
+	let scale = Math.min(1, 2576 / Math.max(width, height))
+	let patches = Math.ceil(width * scale / 28) * Math.ceil(height * scale / 28)
+	if (patches > 4761) {
+		scale *= Math.sqrt(4761 / patches)
+		patches = Math.ceil(width * scale / 28) * Math.ceil(height * scale / 28)
+	}
+	return patches + 3
+}
+
+// Blobs are immutable, so a header is parsed once per host process. The parser
+// loads only when an image is estimated, keeping it off host startup.
+const imageCosts = new Map<string, number>()
+function imageCost(id: string, blob: string): number {
+	let key = `${id}/${blob}`
+	let cost = imageCosts.get(key)
+	if (cost === undefined) {
+		let found = blobs.read(id, blob)
+		let { imageDimensions } = require('../common/image-dimensions.ts') as typeof import('../common/image-dimensions.ts')
+		let size = found && imageDimensions.read(found.bytes, found.mediaType)
+		cost = size ? pruning.imageTokens(size.width, size.height) : pruning.maxImageTokens
+		imageCosts.set(key, cost)
+	}
+	return cost
+}
+
 // Conservative estimate including images and system/tools. Providers bill
-// images by downscaled pixels (Anthropic: width*height/750), not file bytes.
-// Measured caps: Sonnet 4.5 ~1,600 tokens, Opus 5.5 ~4,800 (2576 px edge).
-function estimate(messages: Message[], overhead = 0, model?: string): number {
-	let images = messages.reduce((sum, m) => sum + m.blocks.filter((b) => b.type === 'image' || (b.type === 'tool_result' && b.image)).length, 0)
-	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images * pruning.imageTokens
+// images by downscaled pixels, not file bytes.
+function estimate(id: string, messages: Message[], overhead = 0, model?: string): number {
+	let images = 0
+	for (let m of messages) for (let b of m.blocks) {
+		let blob = b.type === 'image' ? b.blob : b.type === 'tool_result' ? b.image?.blob : undefined
+		if (blob) images += pruning.imageCost(id, blob)
+	}
+	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }
 
 function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r): HistoryRecord[] {
@@ -104,7 +137,7 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}, material
 		}
 		let projected = apply(omitted)
 		let limit = Math.min(pruning.pressureTokens, (budget.window ?? Infinity) * .75)
-		if (state.pressure !== checkpoint && pruning.estimate(replay.toMessages(projected), budget.overhead, budget.model) > limit && add(candidates(false))) {
+		if (state.pressure !== checkpoint && pruning.estimate(id, replay.toMessages(projected), budget.overhead, budget.model) > limit && add(candidates(false))) {
 			state.pressure = checkpoint
 			diag.log(`pruning ${id}: pressure boundary at checkpoint ${checkpoint}; omitted ${omitted.size} records`)
 			projected = apply(omitted)
@@ -126,10 +159,10 @@ function consumed(id: string, records: HistoryRecord[]): void {
 }
 
 export const pruning = {
-	saved, marker, copied, argumentsOf, omit, heavy, estimate, project, consumed,
+	saved, marker, copied, argumentsOf, omit, heavy, imageTokens, imageCost, estimate, project, consumed,
 	batchTurns: 8,
 	retainTurns: 4,
 	maxArgumentChars: 1000,
 	pressureTokens: 180_000,
-	imageTokens: 4_800,
+	maxImageTokens: 4_800,
 }
