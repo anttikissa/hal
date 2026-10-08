@@ -5,7 +5,8 @@
 	notes: [
 		'No migration convention existed. history-migration.ts runs under the exclusive host lock before socket clients can open sessions; state/migrations.ason marks completion. Each affected history is replaced by atomic rename. Parse failures include path and raw input; a torn final write remains for normal history repair. Call IDs may be reused, so ask association follows the latest call. Mixed user records retain other results and prompts; command, approval and synthetic questions remain.',
 		'Rewritten histories materialize legacy byte-offset record numbers and retain the original numbering high-water mark in rebuilt marks. Context-surgery plans drop references to removed records. Byte-offset projections and the disposable search database must be invalidated before rewrite because numbered legacy histories can grow. tabs.test.ts used ask to park a turn; it now uses a dangerous bash approval that never executes.',
-		"Orchestrator 04-jug: the migration skips histories without the text 'ask' (sessions/ held 1.6 GB; parsing all took seconds) and hard-links each rewritten original to history.asonl.before-cs. Dry run on copies of the six live histories mentioning ask: four rewritten, 4–9 records removed each, all reopen idle with numbering kept."
+		"Orchestrator 04-jug: the migration skips histories without the text 'ask' (sessions/ held 1.6 GB; parsing all took seconds) and hard-links each rewritten original to history.asonl.before-cs. Dry run on copies of the six live histories mentioning ask: four rewritten, 4–9 records removed each, all reopen idle with numbering kept.",
+		'The ask-removal conversion (history-migration.ts, its server hook and tests) was removed after both hosts recorded askRemoved: true in their migration marker; the marker file is deleted by hand.'
 	],
 	needs: ['hc']
 }
