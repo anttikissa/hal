@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Root causes: recall.entries included agent/model prompt items despite human-only ownership in dg/rj/jf; recall.typed deleted the browse index on the first edit. The web nonempty-draft guard then prevented returning to history, while terminal edge recall restarted from the newest entry. Shared Browse now retains its index and current text; edited text is persisted as the draft, including after deletion or undo restores the original. No new persistent state, timer or background work; one optional boolean per actively browsed session. Existing transcript scans are unchanged.',
-		'Verified 107 focused shared/web/terminal tests plus one disposable Chromium regression exercising human-only history, native character insertion, Backspace and execCommand undo followed by Up/Down. CDP Backspace requires windowsVirtualKeyCode 8; Runtime.evaluate fixtures must scope local declarations. Typecheck and changed-file lint pass. Browser coverage uses actual textarea input/undo and no live sessions or drafts.'
+		'Verified 107 focused shared/web/terminal tests plus one disposable Chromium regression exercising human-only history, native character insertion, Backspace and execCommand undo followed by Up/Down. CDP Backspace requires windowsVirtualKeyCode 8; Runtime.evaluate fixtures must scope local declarations. Typecheck and changed-file lint pass. Browser coverage uses actual textarea input/undo and no live sessions or drafts.',
+		'Keep explicit CDP keycodes confined to the new native deletion regression; existing completion tests retain their original keyboard dispatch.'
 	],
 	needs: ['91', '8d'],
 	foldInto: ['91', '8d']
