@@ -172,6 +172,9 @@ function target(running: Running, model: string, selected?: string): string | un
 	return effort
 }
 
+// The last prompt-file fault reported per session, so it shows once.
+const promptFaults = new Map<string, string>()
+
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
@@ -183,7 +186,14 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
-			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
+			let problems: string[] = []
+			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id }, problems)
+			// A broken prompt file never stops a turn: say so once per distinct fault.
+			let fault = problems.join('\n')
+			if (fault !== (promptFaults.get(id) ?? '')) {
+				promptFaults.set(id, fault)
+				if (fault) history.append(id, { type: 'notice', text: `System prompt problems (the rest still applies):\n${fault}` })
+			}
 			let defs = [actions.def()]
 			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return

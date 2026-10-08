@@ -75,34 +75,50 @@ function read(path: string): string | undefined {
 const uncomment = (text: string) => text.replace(/<!--[\s\S]*?-->/g, '')
 
 // SYSTEM.md alone is a template (if blocks, variables, includes); the
-// files it includes and AGENTS.md only lose their comments.
+// files it includes and AGENTS.md only lose their comments. A broken
+// template never fails a request: each fault goes to problems (file and
+// line) and preprocessing carries on with the rest of the text.
 export type PromptSource = { path: string; bytes: number }
-function preprocess(file: string, vars: Record<string, string>, sources?: PromptSource[]): string {
+function preprocess(file: string, vars: Record<string, string>, sources?: PromptSource[], problems: string[] = []): string {
 	let path = resolve(file)
-	let raw = readFileSync(path, 'utf8')
+	let raw: string
+	try {
+		raw = readFileSync(path, 'utf8')
+	} catch (e: any) {
+		problems.push(`${path}: ${e?.message ?? e}`)
+		return ''
+	}
 	sources?.push({ path, bytes: Buffer.byteLength(raw) })
 	let text = uncomment(raw)
 	let lines = text.split('\n'), output: string[] = []
 	let active: boolean | undefined
 	let opened = 0
+	let fault = (index: number, what: string) => problems.push(`${path}:${index + 1}: ${what}`)
 	// ${name} or $name; an unknown name stays as written.
 	let substitute = (s: string) => s.replace(/\$\{(\w+)\}|\$(\w+)/g, (whole, braced?: string, bare?: string) => vars[(braced ?? bare)!] ?? whole)
 	for (let [index, line] of lines.entries()) {
 		let start = line.match(/^:{3,}\s+if\s+(.+?)\s*$/)
 		if (start) {
-			if (active !== undefined) throw new Error(`${path}:${index + 1}: nested if block`)
+			if (active !== undefined) fault(index, 'nested if block')
 			let pairs = [...start[1]!.matchAll(/(\w+)="([^"]*)"/g)]
-			if (!pairs.length || start[1]!.replace(/(\w+)="[^"]*"/g, '').trim()) throw new Error(`${path}:${index + 1}: invalid if directive`)
+			opened = index + 1
+			if (!pairs.length || start[1]!.replace(/(\w+)="[^"]*"/g, '').trim()) {
+				fault(index, 'invalid if directive')
+				active = false
+				continue
+			}
 			active = pairs.map(([, key, pattern]) => {
-				if (!Object.hasOwn(vars, key!)) throw new Error(`${path}:${index + 1}: unknown key ${key}`)
+				if (!Object.hasOwn(vars, key!)) {
+					fault(index, `unknown key ${key}`)
+					return false
+				}
 				let regex = new RegExp(`^${pattern!.replace(/[\\^$+.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
 				return regex.test(vars[key!]!)
 			}).every(Boolean)
-			opened = index + 1
 			continue
 		}
 		if (/^:{3,}\s*$/.test(line)) {
-			if (active === undefined) throw new Error(`${path}:${index + 1}: unexpected closing directive`)
+			if (active === undefined) fault(index, 'unexpected closing directive')
 			active = undefined
 			continue
 		}
@@ -113,16 +129,20 @@ function preprocess(file: string, vars: Record<string, string>, sources?: Prompt
 			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
 			let target = resolve(dirname(path), name)
 			if (include[1] && !existsSync(target)) continue
-			let raw = readFileSync(target, 'utf8')
-			sources?.push({ path: target, bytes: Buffer.byteLength(raw) })
-			output.push(uncomment(raw))
+			try {
+				let raw = readFileSync(target, 'utf8')
+				sources?.push({ path: target, bytes: Buffer.byteLength(raw) })
+				output.push(uncomment(raw))
+			} catch (e: any) {
+				fault(index, `include: ${e?.message ?? e}`)
+			}
 		} else output.push(substitute(line))
 	}
-	if (active !== undefined) throw new Error(`${path}:${opened}: unclosed if block`)
+	if (active !== undefined) problems.push(`${path}:${opened}: unclosed if block`)
 	return output.join('\n')
 }
 
-function assemble(input: { cwd: string; model: string; now: number; sessionId?: string }, sources?: PromptSource[]): string {
+function assemble(input: { cwd: string; model: string; now: number; sessionId?: string }, sources?: PromptSource[], problems?: string[]): string {
 	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
 	let vars = {
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
@@ -131,8 +151,8 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 	}
-	// Missing SYSTEM.md is a broken checkout: throw with the path.
-	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
+	// A missing or broken SYSTEM.md is reported in problems, never thrown.
+	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
 	let skillList = skills(input.cwd)
 	if (skillList) parts.push(skillList)
 	for (let dir of systemPrompt.candidates(input.cwd)) {
@@ -152,12 +172,12 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 // One assembly path for /system and actual provider requests, so the
 // displayed text cannot diverge from what the next request would send.
 export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string }
-function build(input: PromptInput): string {
-	return systemPrompt.assemble(input)
+function build(input: PromptInput, problems?: string[]): string {
+	return systemPrompt.assemble(input, undefined, problems)
 }
-function inspect(input: PromptInput): { sources: PromptSource[]; text: string } {
-	let sources: PromptSource[] = []
-	return { sources, text: systemPrompt.assemble(input, sources) }
+function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[] } {
+	let sources: PromptSource[] = [], problems: string[] = []
+	return { sources, text: systemPrompt.assemble(input, sources, problems), problems }
 }
 
 export const systemPrompt = {

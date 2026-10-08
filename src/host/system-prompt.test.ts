@@ -90,7 +90,9 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 		expect(second).toContain('SECOND RULE')
 		expect(second).not.toContain('FIRST RULE')
 		rmSync(`${root}/SYSTEM.md`)
-		expect(() => systemPrompt.build(input)).toThrow(`${root}/SYSTEM.md`)
+		let problems: string[] = []
+		expect(systemPrompt.build(input, problems)).toContain('<cwd>')
+		expect(problems.join()).toContain(`${root}/SYSTEM.md`)
 	} finally {
 		systemPrompt.file = orig
 	}
@@ -114,14 +116,22 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 	} finally { systemPrompt.file = old }
 })
 
-test('bad SYSTEM directives fail with the line number, even for unknown conditions in a dropped block', () => {
+test('bad SYSTEM directives never throw: each is reported with its line and the rest of the prompt applies', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
-		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n::: if model="wrong/*" unknown="*"\ntext\n:::')
-		expect(() => systemPrompt.build({ cwd: root, model: 'other/x', now: at })).toThrow(/SYSTEM.md:2: unknown key unknown/)
-		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n::: if model="*"\ntext')
-		expect(() => systemPrompt.build({ cwd: root, model: 'other/x', now: at })).toThrow(/SYSTEM.md:2: unclosed/)
+		let build = (body: string) => {
+			writeFileSync(`${root}/SYSTEM.md`, body)
+			let problems: string[] = []
+			return { text: systemPrompt.build({ cwd: root, model: 'other/x', now: at }, problems), problems: problems.join('\n') }
+		}
+		let unknown = build('Hello\n::: if unknown="true"\nDROPPED\n:::\nAfter')
+		expect(unknown.problems).toMatch(/SYSTEM.md:2: unknown key unknown/)
+		expect(unknown.text).toContain('Hello\nAfter')
+		expect(unknown.text).not.toContain('DROPPED')
+		let unclosed = build('Hello\n::: if model="*"\ntext')
+		expect(unclosed.problems).toMatch(/SYSTEM.md:2: unclosed/)
+		expect(unclosed.text).toContain('Hello\ntext')
 	} finally { systemPrompt.file = old }
 })
 
@@ -137,8 +147,10 @@ test('SYSTEM includes lose comments but keep directives, nested includes and var
 		expect(text).toContain(raw)
 		expect(text).not.toContain('for me')
 		expect(text).not.toContain('@?absent.md')
-		writeFileSync(`${root}/SYSTEM.md`, '@missing.md')
-		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/missing.md/)
+		writeFileSync(`${root}/SYSTEM.md`, 'Before\n@missing.md\nAfter')
+		let problems: string[] = []
+		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: at }, problems)).toContain('Before\nAfter')
+		expect(problems.join()).toMatch(/SYSTEM.md:2: include: .*missing.md/)
 	} finally { systemPrompt.file = old }
 })
 
