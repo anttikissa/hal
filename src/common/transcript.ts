@@ -26,7 +26,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'text'; text: string; naming?: true; interrupted?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
-	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string }
+	| { type: 'tool-result'; id: string; output: string; isError?: boolean; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
 	// `canceled`: dismissed (Escape, or a newer question replaced it).
@@ -132,6 +132,7 @@ function imageItem(b: ImageBlock, ts?: string): Shown {
 function resultItem(b: ToolResultBlock, ts?: string): Shown {
 	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
+	if (b.diff !== undefined) item.diff = b.diff
 	if (b.ms !== undefined) item.ms = b.ms
 	if (b.interrupted !== undefined) item.interrupted = b.interrupted
 	if (ts !== undefined) item.ts = ts

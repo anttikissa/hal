@@ -25,7 +25,8 @@ import { pruning } from './pruning.ts'
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
 export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
-export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } }
+// `diff`: what the call changed, for display only; providers never see it.
+export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } } | { text: string; diff: string }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.
@@ -113,6 +114,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
+		else if ('diff' in out) result = { type: 'tool_result', id: call.id, output: out.text, diff: out.diff }
 		else {
 			let image = blobs.store(ctx.sessionId, out.image.mediaType, out.image.data)
 			result = { type: 'tool_result', id: call.id, output: out.text, image: { type: 'image', blob: image.blob, mediaType: image.mediaType, bytes: image.bytes } }

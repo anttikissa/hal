@@ -192,10 +192,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// its header row (task ghs): attached results draw nothing.
 			if (tool && (fold === 'closed' || (!out && !item.isError))) return []
 			let wide = width, max = fold === 'open' ? look.full ? Infinity : itemView.openRows : itemView.resultRows
-			let lines = out.split('\n')
-			let rows: string[] = []
-			let used = 0
-			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide, false))
+			// An attached EDIT result shows its diff in diff colors.
+			let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
+			let rows: string[] = [], used = 0
+			while (used < lines.length && rows.length <= max) {
+				let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * wide * 4), wide, false)
+				rows.push(...wrapped)
+				tones.push(...wrapped.map(() => diff.tone(line)))
+			}
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
 			let status = tool ? '' : itemView.resultStatus(item, !!call, style)
@@ -206,7 +210,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
 				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
 				let text = strings.clipVisual(prefix + l, width)
-				let line = tool ? text : ansi.quiet(text, style)
+				let line = painted ? diffView.paint(text, tones[i]!, style) : tool ? text : ansi.quiet(text, style)
 				return !i && status ? itemView.right(line, status, width) : line
 			})
 			if (more) {
@@ -323,9 +327,10 @@ function status(exit: string | undefined, time: string | undefined, style: Style
 
 // A finished call's status from its result; `bash`: a bash call's.
 // Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: { output: string; ms?: number; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
+function resultStatus(item: { output: string; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)
+	if (item.diff) return diffView.status(item.diff, style, bashResult.duration(item.ms))
 	return itemView.status(bash ? bashResult.status(item.output) : undefined, bashResult.duration(item.ms), style)
 }
 

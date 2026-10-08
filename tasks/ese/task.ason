@@ -1,0 +1,7 @@
+{
+	title: 'EDIT cards show what changed: diff open, counts and lines closed',
+	spec: 'An EDIT tool result carries a display-only diff (ToolResultBlock.diff) that providers never receive. The host generates it with the shared textDiff engine before writing (a diff failure writes nothing), numbered per row: sign, then the old file line number for removals and the new file one otherwise. An EDIT card title reads "Edit <path>: <purpose>". Closed, its status after the title shows colored +added and −removed counts and the changed lines of the new file ("lines 25–27, 37"; a removal alone marks the line now in its place), plus the time when shown. Open (and as a glimpse), the attached result shows the diff in diff colors instead of the model-facing numbered output, in the terminal and on the web; on the web it replaces the call arguments, which the diff repeats. Failed edits show their error output as before.',
+	status: 'done',
+	needs: ['3fv', 'k8y'],
+	foldInto: ['3fv']
+}

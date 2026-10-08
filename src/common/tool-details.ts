@@ -75,6 +75,10 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 		case 'notify':
 			if (str('text')) return { text: `Notify "${str('text')}"`, key: 'text' }
 			break
+		// The file, then the purpose; the diff opens below (task ese).
+		case 'edit':
+			if (str('path')) return { text: `Edit ${str('path')}${str('description') ? `: ${str('description')}` : ''}`, keys: ['path', 'hash', 'description'] }
+			break
 		case 'inspect': {
 			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
 			let what = (input.what as string | undefined) ?? 'sessions'
