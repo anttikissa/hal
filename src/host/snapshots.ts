@@ -27,8 +27,8 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	}
 	let hold = queueEdits.state.get(id)
 	if (hold) snap.queueHold = hold.message
-	let output = toolOutput.state.get(id)
-	if (output?.output) snap.toolOutput = { ...output }
+	let outputs = toolOutput.of(id)
+	if (outputs.length) snap.toolOutput = outputs.map((p) => ({ ...p }))
 	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })
 	try {
 		let draft = drafts.get(id)

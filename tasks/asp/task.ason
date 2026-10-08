@@ -1,0 +1,9 @@
+{
+	title: "A round's tool calls run concurrently",
+	spec: "All tool calls of one model round start at once and run concurrently; their results return to the model in call order. The one exception is wait, which starts after the round's other calls settle so it sees children spawned in the same round; calls that must follow one another belong in separate rounds. Per-call state is per call, never per session: foreground bash output streams per call (snapshots carry every running call's partial output), every running call flagged unsafeToStop is tracked, a deferred steer interrupts once none of them still runs, and a restart lists them all. A model-run command names its own executing call (Sender.call) instead of relying on the session status, which names only the latest started call. Approval questions, steering cancellation, /clear before dispatch and declined calls keep their per-call results.",
+	status: 'done',
+	notes: [
+		'turns.ts runOne() per call; Running.unsafe is a Map by call id; toolOutput.state is session -> call id -> partial, Snapshot.toolOutput an array. Test: two bash calls where the first polls for a file the second creates.'
+	],
+	needs: ['gr']
+}

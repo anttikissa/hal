@@ -10,7 +10,7 @@ const prevented = new Set(['login', 'quit', 'suspend', 'budget', 'queue', 'send'
 
 export const tool: Tool = {
 	name: 'command',
-	description: 'Run a model-usable slash command in this session, as if typed by the user. Examples: /cd, /rename, /go, /model. All commands are allowed except /login, /quit, /suspend, /budget, /queue and /send. /restart host|both|all restarts Hal itself, interrupting every session: run it only when the user asked for it or agreed to it, never on your own initiative; ask first. Use the send tool for messaging and queuing. /compact takes effect between rounds and continues this turn; /clear [raw prompt] ends this turn safely, clears context and optionally starts an attributed fresh turn. Later calls in this round do not run after /clear. /rebase show, preview <plan> and run [--paused] <plan> support sparse drop/edit plans, applied atomically between rounds. Use /rebase only with explicit user consent; --paused ends this turn, otherwise it continues on rewritten context. Open tails include the executing call/result; no arbitrary insertion.',
+	description: 'Run a model-usable slash command in this session, as if typed by the user. Examples: /cd, /rename, /go, /model. All commands are allowed except /login, /quit, /suspend, /budget, /queue and /send. /restart host|both|all restarts Hal itself, interrupting every session: run it only when the user asked for it or agreed to it, never on your own initiative; ask first. Use the send tool for messaging and queuing. /compact takes effect between rounds and continues this turn; /clear [raw prompt] ends this turn safely, clears context and optionally starts an attributed fresh turn. Calls in the same round run concurrently with it. /rebase show, preview <plan> and run [--paused] <plan> support sparse drop/edit plans, applied atomically between rounds. Use /rebase only with explicit user consent; --paused ends this turn, otherwise it continues on rewritten context. Open tails include the executing call/result; no arbitrary insertion.',
 	parameters: { type: 'object', properties: { command: { type: 'string', description: 'Slash command and arguments, e.g. /cd ~/project' } }, required: ['command'] },
 	async run(input, ctx) {
 		if (typeof input.command !== 'string') throw new Error('command must be a slash command string')
@@ -24,7 +24,7 @@ export const tool: Tool = {
 				let refused = slash.command(ctx.sessionId, text, call, undefined, undefined, (reply) => {
 					if (reply.error) reject(new Error(reply.error))
 					else resolve(reply.result ?? reply.say ?? (reply.ask ? `/${call.name} needs an answer from the user` : `/${call.name} done`))
-				}, 'model')
+				}, 'model', ctx.callId === undefined ? undefined : { call: ctx.callId })
 				if (refused) reject(new Error(refused))
 			} catch (error) { reject(error) }
 		})

@@ -38,10 +38,10 @@ import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
-// `unsafe`: a call flagged unsafeToStop runs (its id, since when), so a
-// steer waits for it to end (`steered`, prompts.submit) and a restart
-// asks first (commands/restart.ts; task ker).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: { call: string; input: Record<string, unknown>; at: number }; steered?: true }
+// `unsafe`: calls flagged unsafeToStop that run (by id: input, since
+// when), so a steer waits for them all to end (`steered`, prompts.submit)
+// and a restart asks first (commands/restart.ts; task ker).
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: Map<string, { input: Record<string, unknown>; at: number }>; steered?: true }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -299,27 +299,32 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			let cwd = sessions.open(id).cwd
 			status.transition(id, { type: 'tools' })
-			let results: ToolResultBlock[] = []
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
-			for (let call of calls) {
-				if (signal.aborted && signal.reason === jobs.steered) { results.push(turnPolicy.canceled(call.id)); continue }
-				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') {
-					results.push({ type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true })
-					continue
-				}
-				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
+			// The round's calls run concurrently; results keep call order.
+			// wait starts once the others settle, so it sees children
+			// spawned in the same round.
+			let runOne = async (call: ToolCallBlock): Promise<ToolResultBlock> => {
+				if (signal.aborted && signal.reason === jobs.steered) return turnPolicy.canceled(call.id)
+				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') return { type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true }
+				if (decided.get(call.id) === false) return approval.declined(call)
 				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
-				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
-				if (call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true) running.unsafe = { call: call.id, input: call.input, at: Date.now() }
-				try { results.push(turnPolicy.stoppedBy(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx), signal)) }
+				let stream = tools.streams(call) ? toolOutput.start(id, call.id) : undefined
+				if (tools.unsafe(call)) (running.unsafe ??= new Map()).set(call.id, { input: call.input, at: Date.now() })
+				try { return turnPolicy.stoppedBy(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx), signal) }
 				finally {
 					stream?.stop()
-					delete running.unsafe
-					// A steer that waited for the flagged call: later calls never start.
-					if (running.steered) { delete running.steered; prompts.interrupt(running) }
+					running.unsafe?.delete(call.id)
+					if (!running.unsafe?.size) delete running.unsafe
+					// A steer that waited for the flagged calls interrupts once none runs.
+					if (running.steered && !running.unsafe) { delete running.steered; prompts.interrupt(running) }
 				}
 			}
+			let early = calls.filter((c) => c.name !== 'wait')
+			let settled = new Map<string, ToolResultBlock>()
+			for (let r of await Promise.all(early.map(runOne))) settled.set(r.id, r)
+			for (let call of calls) if (!settled.has(call.id)) settled.set(call.id, await runOne(call))
+			let results = calls.map((c) => settled.get(c.id)!)
 			if (turns.state.running.get(id) !== running) return
 			if (contextTransitions.pending(id)?.kind === 'rebase') {
 				let settled = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)

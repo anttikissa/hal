@@ -72,8 +72,9 @@ export type Snapshot = {
 	inbox?: InboxItem[]
 	queueHold?: string
 	turn?: LiveTurn
-	// Foreground bash output still in flight: not history or provider input.
-	toolOutput?: { id: string; output: string }
+	// Foreground bash output still in flight, one per running call: not
+	// history or provider input.
+	toolOutput?: { id: string; output: string }[]
 	draft?: Draft
 	older?: number
 	earlier?: HistoryRecord[]

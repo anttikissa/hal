@@ -244,7 +244,7 @@ function next(id: string): void {
 }
 
 // Steers turn `running` at once. A running call flagged unsafeToStop
-// defers it until the call ends (task ker).
+// defers it until every such call ends (task ker).
 function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>): void {
 	if (running.unsafe && !running.controller.signal.aborted) running.steered = true
 	else prompts.interrupt(running)

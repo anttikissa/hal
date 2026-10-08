@@ -61,7 +61,8 @@ function prepare(id: string, intent: RebaseIntent, raw = history.readSync(id)) {
 
 function request(id: string, text: string, preview: boolean, paused: boolean, sender: Sender = {}): string {
 	let sparse = rebaseSparse.parse(text, rebaseAgent.shown(id))
-	let state = status.stateOf(id), call = state.type === 'running' && state.phase === 'tools' ? state.call : undefined
+	// Calls run concurrently: the command tool names its own call.
+	let state = status.stateOf(id), call = sender.call ?? (state.type === 'running' && state.phase === 'tools' ? state.call : undefined)
 	let intent: RebaseIntent = { sparse, ...(turns.state.running.has(id) && { resume: true }), ...(paused && { paused: true }), ...(sender.origin === 'model' && call && { call }) }
 	let prepared = rebaseAgent.prepare(id, intent)
 	if (preview) return prepared.report.replace(/^Rebase applied(?:\.)?/, 'Rebase preview; no changes.') + (sparse.tails.length ? '\nOpen tails resolve again through application time, including the executing rebase call/result and intervening entries.' : '')

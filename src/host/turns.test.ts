@@ -129,6 +129,22 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	expect((await records(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
 })
 
+test("a round's calls run concurrently, results in call order", async () => {
+	let a = client()
+	let id = toolSession(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	let bash = (callId: string, command: string): StreamEvent => ({ type: 'tool_call', id: callId, name: 'bash', input: { command, description: 'x', timeout: 5000 } })
+	// The first waits for what the second does: run in order, it times out.
+	calls[0]!.push(bash('t1', 'until [ -f ready ]; do sleep 0.01; done; echo saw it'), bash('t2', 'touch ready'), { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	let results = calls[1]!.input.messages.at(-1).blocks
+	expect(results.map((b: any) => [b.id, b.isError ?? false])).toEqual([['t1', false], ['t2', false]])
+	expect(results[0].output).toContain('saw it')
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+})
+
 test('a restart after a tool ran keeps its result, continues, and does not run it again', async () => {
 	let ran = 0
 	let origRun = tools.run
