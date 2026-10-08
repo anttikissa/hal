@@ -56,20 +56,22 @@ test('without TODO.md an idle session files the item itself, and bare todo never
 	expect(JSON.stringify(calls[0]!.input.messages)).toContain('Add a TODO item to this project: write docs')
 })
 
-test('without TODO.md a busy session gets a slot-free fork, not a steering prompt', async () => {
+test('without TODO.md a busy session delegates to a subagent for one slot, and refuses with none', async () => {
 	let c = client(), parent = toolSession(c)
 	tabs.insert(parent, 0)
-	sessions.open(parent).slots = 0
+	sessions.open(parent).slots = 1
 	c.conn.send({ type: 'submit', sessionId: parent, text: 'keep working' })
 	await until(() => calls.length === 1)
-	await command.run('write docs', undefined, slash.context(parent))
+	expect((await command.run('write docs', undefined, slash.context(parent))).error).toBeUndefined()
 	await until(() => calls.length === 2)
 	let child = tabs.file().open[1]!
 	expect(status.stateOf(parent).type).toBe('running')
 	expect(status.inboxOf(parent)).toEqual([])
 	expect(sessions.open(parent).slots).toBe(0)
-	expect(sessions.open(child).parent).toBeUndefined()
-	expect(JSON.stringify(calls[1]!.input.messages)).toContain('keep working')
+	expect(sessions.open(child)).toMatchObject({ parent, spawn: 'subagent', slots: 0 })
+	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('keep working')
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Add a TODO item to this project: write docs')
 	expect(JSON.stringify(history.readSync(parent))).not.toContain('Add a TODO item')
+	expect((await command.run('again', undefined, slash.context(parent))).error).toContain('0 left')
+	expect(tabs.file().open).toHaveLength(2)
 })

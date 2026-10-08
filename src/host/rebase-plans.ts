@@ -42,7 +42,7 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 	if (c.paused && queue.length) throw new Error('--paused cannot be combined with queue lines; remove the queue lines or --paused before applying.')
 	if (plan.base !== c.base) throw new Error('Rebase plan base does not match the requested base.')
 	// Queue entries must be prompts, not a second channel for slash commands.
-	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/.test(text))) throw new Error('Rebase queue lines must be prompts, not slash commands.')
+	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/i.test(text))) throw new Error('Rebase queue lines must be prompts, not slash commands.')
 	plan = { ...plan, edit: plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text) }
 	let sums = rebaseRows.totals(snapshot, plan)
 	let continuation = agent.continuation(history.readSync(c.sessionId), plan, c.paused)

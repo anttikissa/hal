@@ -48,7 +48,7 @@ function key(k: KeyEvent): boolean {
 // ran, the draft emptied first so a restart does not bring it back).
 function typed(text: string): boolean {
 	if (folds.typed(text)) return true
-	let t = text.trim()
+	let t = text.trim().toLowerCase()
 	// /restart both goes on to the host, marking this client to follow.
 	if (/^\/restart\s+both$/.test(t)) restart.withHost()
 	// Bare /restart means all and goes to the host; only `local` is ours.

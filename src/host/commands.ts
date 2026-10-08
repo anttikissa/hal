@@ -68,8 +68,9 @@ function all(): Map<string, SlashCommand> {
 // "/name args" as its parts; undefined for anything else, such as a
 // prompt that starts with a path ("/tmp/x is broken").
 function parse(text: string): { name: string; args: string } | undefined {
-	let m = /^\/([a-z][a-z0-9-]*)(?:\s([\s\S]*))?$/.exec(text.trimStart())
-	return m ? { name: m[1]!, args: m[1] === 'clear' ? m[2] ?? '' : (m[2] ?? '').trim() } : undefined
+	let m = /^\/([a-z][a-z0-9-]*)(?:\s([\s\S]*))?$/i.exec(text.trimStart())
+	let name = m?.[1]!.toLowerCase()
+	return m ? { name: name!, args: name === 'clear' ? m[2] ?? '' : (m[2] ?? '').trim() } : undefined
 }
 
 // Every full text `text` may complete to: a command name, or what the
