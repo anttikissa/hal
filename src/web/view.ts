@@ -142,6 +142,7 @@ function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { co
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
+	if (!text.trim() && delivery === 'steer') text = states.nudge(st.transcript.state) ?? text
 	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.delivery === 'after-turn'))
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
