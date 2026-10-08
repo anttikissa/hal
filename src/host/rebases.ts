@@ -5,6 +5,7 @@ import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { history } from './history.ts'
+import { slash } from './slash.ts'
 import { status } from './status.ts'
 
 function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: { boundary?: boolean; transition?: string } = {}): HistoryRecord {
@@ -24,11 +25,17 @@ function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: 
 	if (pausing) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
 	if (!history.state.running.has(id)) status.state.states.delete(id)
 	status.state.derived.delete(id)
-	try { return history.append(id, { type: 'rebase', ...plan, ...(options.transition && { transition: options.transition }) }) }
+	let record: HistoryRecord
+	try { record = history.append(id, { type: 'rebase', ...plan, ...(options.transition && { transition: options.transition }) }) }
 	catch (error) {
 		if (pausing) throw new Error(`Rebase was not applied; the session is paused.\n${error instanceof Error ? error.message : String(error)}`)
 		throw error
 	}
+	// The model follows the projected history: its last /model, or the one before the first dropped.
+	let changes = (records: HistoryRecord[]) => records.flatMap((r) => r.type === 'change' && r.model ? [r] : [])
+	let model = changes(current).at(-1)?.model ?? changes(raw)[0]?.previous?.model
+	if (model) slash.change(id, { model })
+	return record
 }
 
 export const rebases = { apply }
