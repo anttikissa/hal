@@ -1,0 +1,11 @@
+{
+	title: 'Local touch crosshair probe for intermittent composer taps',
+	spec: 'The web tab menu offers an explicit Touch debug toggle, off on each page load. While enabled, a pointer-events:none overlay marks the latest touchstart coordinates and shows a bounded recent sequence of touchstart/end/cancel, pointerdown/up/cancel, click, focusin/out and visual viewport resize/scroll events, fixed structural target labels, canceled-default state, composer focus, viewport geometry and Send button bounds. Event capture must not prevent default, move focus, submit, or change layout. The overlay captures no input text, names, identifiers or arbitrary attributes and sends/stores nothing. Turning it off removes listeners and overlay; repeated activation does not accumulate them. This diagnoses the invariant that an enabled composer action submits on one deliberate tap without treating an unconfirmed cause as fixed. Web only: the terminal has no browser touch coordinates or software-keyboard viewport.',
+	status: 'done',
+	notes: [
+		'Composer Action already prevents pointerdown default (f63), so blur-before-click is not a confirmed cause of this intermittent iOS report. The probe is opt-in via the tab menu and independent of webDiagnostics; all captured data stays in the page. It snapshots fixed target labels, focus, disabled state and geometry during the event, then observes defaultPrevented with a zero-delay timer: native dispatch can run microtasks between listeners, and Send may detach its target before the deferred observation.',
+		'Validation: new real-Chrome touch test passes, checking default cancellation, canceled touches preserving the draft, completed tap running the action, no captured draft text, overlay hit-test transparency and repeated toggle cleanup. Phone-width screenshot inspected at 390x800; native iOS keyboard remains unverified. Web and viewport file run: 43 pass, 2 failures in existing completion-layout and streaming-command tests; not retried or suppressed. Typecheck, targeted lint and diff whitespace checks pass.'
+	],
+	needs: ['3k'],
+	foldInto: ['3k']
+}

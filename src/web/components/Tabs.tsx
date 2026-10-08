@@ -15,6 +15,7 @@ import { Notifications } from './Notifications.tsx'
 import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
 import { diagnostics } from '../diagnostics.ts'
+import { touchDebug } from '../touch-debug.ts'
 import { Icon } from './Icon.tsx'
 
 // Characters a name gets in a cell.
@@ -74,6 +75,7 @@ function EdgeButton(props: { edge: Edge; left: boolean; active: boolean; onClick
 }
 
 export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
+	let [touchProbe, setTouchProbe] = createSignal(false)
 	let [requested, setRequested] = createSignal(false)
 	let enable = () => void push.enable().then(() => setRequested(true)).catch((e) => alert(`Notifications: ${e.message}`))
 	let [open, setOpen] = createSignal(false)
@@ -215,6 +217,11 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<Show when={settings.webDiagnostics()}>
 					<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}><Icon name="bug" />Send diagnostics</button>
 				</Show>
+				<button type="button" aria-pressed={touchProbe() ? 'true' : 'false'} onClick={() => {
+					if (touchProbe()) touchDebug.stop(); else touchDebug.start()
+					setTouchProbe(!touchProbe())
+					setOpen(false)
+				}}><Icon name="bug" />Touch debug {touchProbe() ? 'on' : 'off'}</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
 					<Icon name="reload" />Reload page
 				</button>
