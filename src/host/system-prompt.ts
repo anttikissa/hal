@@ -150,6 +150,8 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
+		// HAL_NO_USER_NOTES=1 leaves the user's notes out, e.g. for benchmarks.
+		user_notes: process.env.HAL_NO_USER_NOTES ? 'false' : 'true',
 	}
 	// A missing or broken SYSTEM.md is reported in problems, never thrown.
 	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
