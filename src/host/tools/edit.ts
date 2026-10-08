@@ -3,7 +3,9 @@
 // apply at once, or none. The host-wide file lock (file-changes.ts)
 // serializes Hal's own edits of a file, and the bytes are compared
 // again just before the atomic rename, so an outside change in between
-// fails rather than being overwritten. The change is recorded like a
+// fails rather than being overwritten. An EDIT of a version Hal's own
+// EDITs replaced applies when its ranges miss theirs (lease.carry), so
+// a round's EDITs of one READ combine. The change is recorded like a
 // bash call's declared files.
 
 import { readFile } from 'fs/promises'
@@ -74,12 +76,23 @@ export const tool: Tool = {
 			let now = lease.hash(bytes)
 			let current = lease.text(bytes, path)
 			let ranges = wanted.map((c) => (c.start === c.end ? `${c.start}` : `${c.start}-${c.end}`)).join(',')
-			if (now !== input.hash) throw new Error(`== EDIT ${path}@${now}:${ranges} failed (file has been modified since @${input.hash}) ==\n${lease.around(current, wanted)}`)
-			let { after, shown, lines } = lease.apply(current, wanted)
+			let failed = (why: string) => new Error(`== EDIT ${path}@${now}:${ranges} failed (${why}) ==\n${lease.around(current, wanted)}`)
+			if (now !== input.hash) {
+				let carried: Change[] | undefined
+				try {
+					carried = lease.carry(full, input.hash, now, wanted)
+				} catch (err: any) {
+					throw failed(err.message)
+				}
+				if (!carried) throw failed(`file has been modified since @${input.hash}`)
+				wanted = carried
+			}
+			let { after, shown, lines, applied } = lease.apply(current, wanted)
 			let next = Buffer.from(after)
 			if (next.equals(bytes)) return `== EDIT ${path}@${now} unchanged: the lines already read so; nothing written ==`
 			if (ctx.signal.aborted) throw new Error('stopped before writing; nothing was written')
 			await lease.commit(full, next, bytes)
+			lease.remember(full, { from: now, to: lease.hash(next), n: current.lines.length, changes: applied })
 			return `== EDIT ${path}@${lease.hash(next)} ok: ==\n${lease.numbered(lines, shown) || '[Empty file]'}`
 		} finally {
 			await fileChanges.finish(observation)

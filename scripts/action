@@ -1,0 +1,68 @@
+#!/usr/bin/env bun
+// The model's view for a human (task 2m1): prints the system prompt Hal
+// would send for this directory, then runs typed Action text (BASH "ls",
+// READ a.ts, HELP...) through the real tool modules and prints what the
+// model would get. An incomplete action continues on the next line; an
+// empty line sends it anyway. A throwaway Hal home with a copy of this
+// home's config keeps real sessions untouched; tools that need a running
+// host (SEND, SPAWN, WAIT, COMMAND, INSPECT) fail here.
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { createInterface } from 'readline/promises'
+import { paths } from '../src/host/paths.ts'
+
+const config = paths.configFile()
+process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-action-`)
+if (existsSync(config)) copyFileSync(config, paths.configFile())
+process.on('exit', () => rmSync(process.env.HAL_HOME!, { recursive: true, force: true }))
+
+// host.ts first: loading auth.ts first trips the host's import cycle.
+await import('../src/host/host.ts')
+const { actions } = await import('../src/host/actions.ts')
+const { models } = await import('../src/host/models.ts')
+const { systemPrompt } = await import('../src/host/system-prompt.ts')
+const { tools } = await import('../src/host/tools.ts')
+
+const cwd = process.cwd()
+const { ason } = await import('../src/common/ason.ts')
+// Tools record file changes with their session.
+mkdirSync(paths.sessionDir('action'), { recursive: true })
+writeFileSync(`${paths.sessionDir('action')}/session.ason`, ason.stringify({ id: 'action', cwd, model: models.defaultModel(), createdAt: new Date().toISOString() }) + '\n')
+const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY)
+console.log(systemPrompt.build({ cwd, model: models.defaultModel(), now: Date.now(), sessionId: 'action' }))
+console.log(`\n-- Tool: ${actions.name} { action: string }. Type an action; Ctrl-D exits. --`)
+
+// Incomplete: the parse error points at or past the end of the last line.
+function incomplete(text: string, message: string): boolean {
+	let [source, caret] = message.split('\n').slice(-2)
+	let last = text.split('\n').at(-1)!.trim()
+	return caret?.trim() === '^' && !!last && !!source?.trim() && last.endsWith(source.trim()) && caret.indexOf('^') >= source!.trimEnd().length
+}
+
+const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: tty })
+rl.setPrompt('> ')
+if (tty) rl.prompt()
+let pending = ''
+let n = 0
+for await (const line of rl) {
+	pending += (pending ? '\n' : '') + line
+	if (pending.trim()) {
+		let error = ''
+		try {
+			actions.resolve(pending)
+		} catch (e: any) {
+			error = e.message
+		}
+		if (line.trim() && error && incomplete(pending, error)) {
+			rl.setPrompt('… ')
+			if (tty) rl.prompt()
+			continue
+		}
+		let call = actions.arrived({ type: 'tool_call', id: `cli${++n}`, name: actions.name, input: { action: pending } })
+		let result = await tools.run(call, { cwd, signal: new AbortController().signal, sessionId: 'action' })
+		console.log(result.isError ? `[error] ${result.output}` : result.output)
+	}
+	pending = ''
+	rl.setPrompt('> ')
+	if (tty) rl.prompt()
+}
