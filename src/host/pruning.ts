@@ -57,8 +57,8 @@ function heavy(r: HistoryRecord): boolean {
 }
 
 // Conservative estimate including images and system/tools. Providers bill
-// images by downscaled pixels, not file bytes: Anthropic caps one near 1,600
-// tokens, and OpenAI and Gemini cost less.
+// images by downscaled pixels (Anthropic: width*height/750), not file bytes.
+// Measured caps: Sonnet 4.5 ~1,600 tokens, Opus 5.5 ~4,800 (2576 px edge).
 function estimate(messages: Message[], overhead = 0, model?: string): number {
 	let images = messages.reduce((sum, m) => sum + m.blocks.filter((b) => b.type === 'image' || (b.type === 'tool_result' && b.image)).length, 0)
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images * pruning.imageTokens
@@ -131,5 +131,5 @@ export const pruning = {
 	retainTurns: 4,
 	maxArgumentChars: 1000,
 	pressureTokens: 180_000,
-	imageTokens: 1_600,
+	imageTokens: 4_800,
 }
