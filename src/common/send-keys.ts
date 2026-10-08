@@ -14,7 +14,7 @@ type Mods = { ctrl?: boolean; alt?: boolean; cmd?: boolean }
 const chords: Chord[] = ['enter', 'ctrl-enter', 'alt-enter', 'cmd-enter']
 
 // A slash command being typed (bare / too), not an absolute file path.
-const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
+const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/i.test(text.trim())
 
 export const sendKeys = {
 	enter: 'steer' as Delivery | null,

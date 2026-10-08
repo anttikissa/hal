@@ -56,10 +56,10 @@ function run(id: string, args: string, mode: Mode = 'toggle'): string | undefine
 
 // Typed /toggle, /expand or /collapse: true if `text` was one (and it ran).
 function typed(text: string): boolean {
-	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/s.exec(text.trim())
+	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/is.exec(text.trim())
 	let id = app.state.transcript?.meta.id
 	if (!m || id === undefined) return false
-	let error = folds.run(id, m[2] ?? '', m[1] as Mode)
+	let error = folds.run(id, m[2] ?? '', m[1]!.toLowerCase() as Mode)
 	if (error) app.state.notice = error
 	app.show()
 	return true

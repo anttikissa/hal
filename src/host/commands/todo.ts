@@ -3,12 +3,12 @@ import { appendFileSync, existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import { states } from '../../common/states.ts'
 import type { SlashCommand } from '../commands.ts'
-import { forks } from '../forks.ts'
 import { prompts } from '../prompts.ts'
 import { status } from '../status.ts'
+import { subagents } from '../subagents.ts'
 
 export const command: SlashCommand = {
-	help: () => '/todo <item>: append and commit an item in this directory’s TODO.md, or ask the model to file it. A busy session forks instead of being interrupted. Bare /todo lists open items.',
+	help: () => '/todo <item>: append and commit an item in this directory’s TODO.md, or ask the model to file it. A busy session delegates to a subagent, spending one spawn slot. Bare /todo lists open items.',
 	async run(args, _answers, ctx) {
 		let item = args.trim()
 		let path = resolve(ctx.cwd, 'TODO.md')
@@ -29,8 +29,13 @@ export const command: SlashCommand = {
 			return { say: `Added to ${path} and committed.` }
 		}
 		if (!item) return { error: 'No TODO.md in this directory. Usage: /todo <item>' }
-		let target = states.busy(status.stateOf(ctx.sessionId)) ? forks.create(ctx.sessionId) : ctx.sessionId
-		let error = prompts.submit(target, `Add a TODO item to this project: ${item}`)
-		return error ? { error } : {}
+		let task = `Add a TODO item to this project: ${item}`
+		if (!states.busy(status.stateOf(ctx.sessionId))) {
+			let error = prompts.submit(ctx.sessionId, task)
+			return error ? { error } : {}
+		}
+		try { subagents.spawn(ctx.sessionId, { kind: 'subagent', task, fork: false, cwd: ctx.cwd, limit: 0 }) }
+		catch (e) { return { error: `No TODO.md in ${ctx.cwd}, and this session is busy, so /todo needs a subagent: ${e instanceof Error ? e.message : String(e)}` } }
+		return {}
 	},
 }

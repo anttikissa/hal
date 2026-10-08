@@ -243,6 +243,7 @@ test('commands are the files in the commands directory', () => {
 	commands.dir = () => dir
 	expect([...commands.all().keys()]).toEqual(['hello-there'])
 	expect(commands.parse('/hello-there  a b')).toEqual({ name: 'hello-there', args: 'a b' })
+	expect(commands.parse('/Hello-THERE A')).toEqual({ name: 'hello-there', args: 'A' })
 })
 
 test('each listed command is run by exactly one side: a host file unless client-only', () => {
