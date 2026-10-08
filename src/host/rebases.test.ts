@@ -78,6 +78,15 @@ test('a rebase marks the next graph point even when context grows', () => {
 	expect(context.points(history.readSync(id)).at(-1)?.cause).toBe('rebase')
 })
 
+test('dropping a /model restores the model the kept history last chose', () => {
+	seed()
+	history.append(id, { type: 'command', text: '/model fake/b' })
+	history.append(id, { type: 'change', model: 'fake/b', previous: { model: 'fake/m' } })
+	sessions.open(id).model = 'fake/b'
+	rebases.apply(id, { base: 6, drop: [5], edit: [] })
+	expect(sessions.open(id).model).toBe('fake/m')
+})
+
 test('dropped signed blocks are never expanded', async () => {
 	history.submit(id, 'go')
 	history.append(id, { type: 'assistant', block: { type: 'thinking', text: 'reason', signatureBlob: 'abcdef123456', provider: 'anthropic' } })

@@ -46,7 +46,7 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 			}
 			if (r.blocks.some((b) => b.type === 'text')) { calls.clear(); command = undefined }
 		} else if (r.type === 'command') command = r.n
-		else if (r.type === 'output' && command !== undefined && r.n !== undefined) join([command, r.n])
+		else if ((r.type === 'output' || r.type === 'change') && command !== undefined && r.n !== undefined) join([command, r.n])
 		else if (r.type === 'round' || r.type === 'turn_end' || r.type === 'compact' || r.type === 'reset') flush()
 	}
 	flush()
