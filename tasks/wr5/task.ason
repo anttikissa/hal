@@ -1,0 +1,6 @@
+{
+	title: '/unread marks tabs unread',
+	spec: '/unread [tab number|session id ...] adds the attention mark to this tab, or to the open tabs named; an unknown name is refused with the names. The tab the command ran in keeps its mark while its client still shows it: clients send tab-seen whenever tabs change, so the host ignores tab-seen for that tab until a client reports showing another tab (visibility) or a new turn starts there. Kept tabs are host memory only; the mark itself lives in tabs.ason. Invariant: /unread on the shown tab is not cleared by that same view. Requested by the user in session 08-lug on 2026-10-08 after accidentally clearing marks while scrolling tabs.',
+	status: 'done',
+	needs: ['0a']
+}
