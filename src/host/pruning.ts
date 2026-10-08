@@ -57,10 +57,13 @@ function heavy(r: HistoryRecord): boolean {
 		(r.type === 'assistant' && r.block.type === 'tool_call')
 }
 
-// Opus 5.5 image tokens, measured with count_tokens: downscale to a 2576 px
-// long edge and at most 4,761 patches of 28 px, then one token per patch plus
-// 3. Older Claude models cost less. Unreadable headers count the cap.
-function imageTokens(width: number, height: number): number {
+// Image tokens, measured from real usage. Opus 5.5 (count_tokens): downscale
+// to a 2576 px long edge and at most 4,761 patches of 28 px, then one token
+// per patch plus 3; older Claude models cost less. OpenAI gpt-6.1 (detail
+// auto): no downscaling, floor(1.2 per 32 px patch) + 1, rejecting images
+// over 30,000 patches. Unreadable headers count maxImageTokens.
+function imageTokens(width: number, height: number, model?: string): number {
+	if (model?.startsWith('openai/')) return Math.floor(Math.ceil(width / 32) * Math.ceil(height / 32) * 1.2) + 1
 	let scale = Math.min(1, 2576 / Math.max(width, height))
 	let patches = Math.ceil(width * scale / 28) * Math.ceil(height * scale / 28)
 	if (patches > 4761) {
@@ -72,27 +75,26 @@ function imageTokens(width: number, height: number): number {
 
 // Blobs are immutable, so a header is parsed once per host process. The parser
 // loads only when an image is estimated, keeping it off host startup.
-const imageCosts = new Map<string, number>()
-function imageCost(id: string, blob: string): number {
+const imageSizes = new Map<string, { width: number; height: number } | null>()
+function imageCost(id: string, blob: string, model?: string): number {
 	let key = `${id}/${blob}`
-	let cost = imageCosts.get(key)
-	if (cost === undefined) {
+	let size = imageSizes.get(key)
+	if (size === undefined) {
 		let found = blobs.read(id, blob)
 		let { imageDimensions } = require('../common/image-dimensions.ts') as typeof import('../common/image-dimensions.ts')
-		let size = found && imageDimensions.read(found.bytes, found.mediaType)
-		cost = size ? pruning.imageTokens(size.width, size.height) : pruning.maxImageTokens
-		imageCosts.set(key, cost)
+		size = (found && imageDimensions.read(found.bytes, found.mediaType)) || null
+		imageSizes.set(key, size)
 	}
-	return cost
+	return size ? pruning.imageTokens(size.width, size.height, model) : pruning.maxImageTokens
 }
 
 // Conservative estimate including images and system/tools. Providers bill
-// images by downscaled pixels, not file bytes.
+// images by pixels, not file bytes.
 function estimate(id: string, messages: Message[], overhead = 0, model?: string): number {
 	let images = 0
 	for (let m of messages) for (let b of m.blocks) {
 		let blob = b.type === 'image' ? b.blob : b.type === 'tool_result' ? b.image?.blob : undefined
-		if (blob) images += pruning.imageCost(id, blob)
+		if (blob) images += pruning.imageCost(id, blob, model)
 	}
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }
