@@ -1,0 +1,10 @@
+{
+	title: 'Verify with project-declared tools and complete failures',
+	spec: 'SYSTEM.md requires inspecting project scripts and installed tools before choosing verification commands. Verification uses declared scripts or installed tools instead of guessed npx validators that may download packages, preserves failure exit status and complete output, runs meaningful tests, typechecks or the program, fixes failures, and reports when verification is unavailable. This restores the invariant that a successful shell pipeline is not mistaken for successful validation.',
+	status: 'done',
+	notes: [
+		'Observed validators taking 34.277s and 32.889s while tsc errors were piped through tail, hiding most output and returning exit 0. The fixture declares both TypeScript and native-preview; no package download was established. Its check script selects tsgo. Prompt-wording assertions would only repeat this rule, so existing prompt-builder tests provide the focused structural check.'
+	],
+	needs: ['3fv'],
+	foldInto: ['3fv']
+}
