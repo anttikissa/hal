@@ -45,13 +45,29 @@ async function canonical(path: string): Promise<string> {
 	}
 }
 
+async function tracked(cwd: string, names: string[]): Promise<string[]> {
+	if (!names.length) return []
+	let project = await fileChanges.canonical(cwd), scratch = await fileChanges.canonical('/tmp')
+	let inside = (path: string, root: string) => {
+		let name = relative(root, path)
+		return name !== '..' && !name.startsWith('../') && !isAbsolute(name)
+	}
+	let allowed = (path: string, root: string, tmp: string) => !path.split('/').includes('.git') && (inside(path, root) || path !== tmp && inside(path, tmp))
+	let found: string[] = []
+	for (let name of names) {
+		let absolute = resolve(cwd, name)
+		if (allowed(absolute, resolve(cwd), '/tmp') && allowed(await fileChanges.canonical(absolute), project, scratch)) found.push(name)
+	}
+	return found
+}
+
 async function expand(cwd: string, patterns: string[], literal = false): Promise<string[]> {
 	let found = new Set<string>()
-	for (let p of patterns) {
+	for (let p of await fileChanges.tracked(cwd, patterns)) {
 		if (literal || !/[*?[\]{}]/.test(p)) found.add(p)
 		else for await (let name of new Bun.Glob(isAbsolute(p) ? relative(cwd, p) : p).scan({ cwd, dot: true, onlyFiles: true })) found.add(isAbsolute(p) ? resolve(cwd, name) : name)
 	}
-	return [...found].sort()
+	return fileChanges.tracked(cwd, [...found].sort())
 }
 
 async function acquire(ctx: ToolContext, patterns: string[], literal = false): Promise<() => void> {
@@ -138,7 +154,9 @@ async function headLog(cwd: string): Promise<string | undefined> {
 }
 
 async function begin(ctx: ToolContext, patterns: string[], literal = false): Promise<Observation> {
-	let release = await fileChanges.acquire(ctx, patterns, literal)
+	let eligible = await fileChanges.tracked(ctx.cwd, patterns)
+	let release = await fileChanges.acquire(ctx, literal ? patterns : eligible, literal)
+	patterns = eligible
 	try {
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns, literal)) before.set(path, await fileChanges.snapshot(ctx, path))
@@ -154,7 +172,7 @@ async function finish(observation: Observation): Promise<void> {
 	let { ctx, patterns, literal, before, release } = observation
 	try {
 		let files: FileChange[] = []
-		let declared = new Set([...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns, literal)])
+		let declared = new Set(await fileChanges.tracked(ctx.cwd, [...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns, literal)]))
 		for (let path of declared) {
 			let a = before.get(path) ?? null, b = await fileChanges.snapshot(ctx, path)
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
@@ -176,5 +194,5 @@ async function finish(observation: Observation): Promise<void> {
 export const fileChanges = {
 	state: { locks: [] as Lock[] },
 	maxBytes: 1_000_000,
-	validate, validateFile, canonical, expand, acquire, blobPath, snapshot, git, headLog, begin, finish,
+	validate, validateFile, canonical, tracked, expand, acquire, blobPath, snapshot, git, headLog, begin, finish,
 }

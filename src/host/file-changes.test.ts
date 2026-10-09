@@ -113,20 +113,34 @@ test('invalid declarations never execute; failed commands still retain changes',
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('changed')
 })
 
-test('absolute and parent-relative literals and globs snapshot files outside cwd', async () => {
-	let literal = `${home}/scratch.log`, pattern = '../*.txt'
-	let result = await bash(`printf log > '${literal}'; printf glob > '../new.txt'`, [literal, pattern])
-	expect(result.isError).toBeUndefined()
-	let files = changes()[0]!.files
-	expect(files.map((f) => f.path).sort()).toEqual(['../new.txt', literal].sort())
-	for (let f of files) {
-		expect(f.before).toBeNull()
-		expect(bytes(f.after).toString()).toBe(f.path === literal ? 'log' : 'glob')
-	}
-	let bad = await bash('touch ran', ['bad\0path'])
-	expect(bad.output).toContain('modifies[0]')
-	expect(bad.output).toContain('contains NUL')
-	expect(bad.output).toContain('command did not run')
+test('absolute scratch declarations are tracked; outside and Git paths are accepted but ignored', async () => {
+	let scratch = mkdtempSync('/tmp/hal-tracked-')
+	try {
+		let literal = `${scratch}/scratch.log`, pattern = `${scratch}/*.txt`
+		let result = await bash(`printf log > '${literal}'; printf glob > '${scratch}/new.txt'`, [literal, pattern])
+		expect(result.isError).toBeUndefined()
+		let files = changes()[0]!.files
+		expect(files.map((f) => f.path).sort()).toEqual([`${scratch}/new.txt`, literal].sort())
+		for (let f of files) {
+			expect(f.before).toBeNull()
+			expect(bytes(f.after).toString()).toBe(f.path === literal ? 'log' : 'glob')
+		}
+		let release = await fileChanges.acquire(context(), ['.git/private', '../outside.txt'])
+		try {
+			let ignored = await bash('printf git > .git/private; printf outside > ../outside.txt', ['.git/private', '../outside.txt', `${home}/outside.txt`], { ...context(), onOutput: () => { throw new Error('excluded declarations waited for a lock') } })
+			expect(ignored.isError).toBeUndefined()
+			expect(changes()).toHaveLength(1)
+		} finally { release() }
+		symlinkSync('../outside.txt', `${cwd}/alias`)
+		symlinkSync('.git/private', `${cwd}/git-alias`)
+		writeFileSync(`${cwd}/keep.txt`, 'old')
+		symlinkSync('keep.txt', `${cwd}/moved-alias`)
+		let broad = await bash('printf tracked > keep.txt; printf outside-new > alias; printf git-new > git-alias; ln -sf ../outside.txt moved-alias', ['**/*'])
+		expect(broad.isError).toBeUndefined()
+		expect(changes()[1]!.files.map((f) => f.path)).toEqual(['keep.txt'])
+		expect(readFileSync(`${home}/outside.txt`, 'utf8')).toBe('outside-new')
+		expect(readFileSync(`${cwd}/.git/private`, 'utf8')).toBe('git-new')
+	} finally { rmSync(scratch, { recursive: true, force: true }) }
 })
 
 // Task hy: a commit a bash call makes is announced once, except to

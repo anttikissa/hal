@@ -101,7 +101,7 @@ test('EDIT keeps CRLF, a BOM and a missing final newline; WRITE creates director
 	expect(written.output).toBe(`== WRITE deep/new.txt@${lease(`${testHome()}/deep/new.txt`)} ok: 2 lines, 4 bytes ==`)
 })
 
-test('file Actions accept absolute and parent-relative paths outside /tmp and snapshot literal filenames', async () => {
+test('file Actions work outside tracking scope and snapshot eligible literal filenames', async () => {
 	let id = created(client(), testHome())
 	let dir = mkdtempSync(`${process.cwd()}/.hal-actions-`)
 	let path = `${dir}/deep/file[1].txt`
@@ -117,18 +117,19 @@ test('file Actions accept absolute and parent-relative paths outside /tmp and sn
 		let stale = await act(id, `EDIT ${JSON.stringify(`${path}@${leaseOf(read.output)}`)} { range: 1, lines: ['bad'] }`)
 		expect(stale.isError).toBe(true)
 		expect(readFileSync(path, 'utf8')).toBe('new\n')
-		let records = history.readSync(id).filter((r) => r.type === 'file_changes')
-		expect(records[0]!.files).toMatchObject([{ path, before: null }])
-		let changed = records[1]!.files[0]!
-		expect(changed.path).toBe(parent)
-		expect(readFileSync(fileChanges.blobPath(id, changed.before as string), 'utf8')).toBe('old\n')
-		expect(readFileSync(fileChanges.blobPath(id, changed.after as string), 'utf8')).toBe('new\n')
+		expect(history.readSync(id).filter((r) => r.type === 'file_changes')).toHaveLength(0)
+		let literal = `${testHome()}/file[1].txt`
+		expect((await act(id, `WRITE ${JSON.stringify(literal)} 'tracked'`)).isError).toBeUndefined()
+		let recorded = history.readSync(id).findLast((r) => r.type === 'file_changes')!
+		if (recorded.type !== 'file_changes') throw new Error('missing file changes')
+		expect(recorded.files).toMatchObject([{ path: literal, before: null }])
+		expect(readFileSync(fileChanges.blobPath(id, recorded.files[0]!.after as string), 'utf8')).toBe('tracked')
 		for (let name of ['WRITE', 'EDIT']) {
 			let bad = await act(id, name === 'WRITE' ? `WRITE ${JSON.stringify('bad\0path')} 'x'` : `EDIT ${JSON.stringify('bad\0path@abcde')} { range: 1, lines: [] }`)
 			expect(bad.isError).toBe(true)
 			expect(bad.output).toContain('NUL')
 		}
-		let secret = `${dir}/.env`
+		let secret = `${testHome()}/.env`
 		expect((await act(id, `WRITE ${JSON.stringify(secret)} 'private'`)).isError).toBeUndefined()
 		let sensitive = history.readSync(id).findLast((r) => r.type === 'file_changes')!
 		if (sensitive.type !== 'file_changes') throw new Error('missing file changes')
