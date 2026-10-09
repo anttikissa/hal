@@ -107,3 +107,11 @@ test('a modal never makes a row wider than the terminal, however small', () => {
 	}
 })
 
+
+test('a multi-line hint or error never breaks a frame row', () => {
+	let v = modalView({ title: 'Find', hint: '39 | }\n40 |\nerror: no such session', form: search })
+	v.modal = { ...v.modal!, error: 'first line\nsecond line' }
+	let lines = frame.build(v, 60, 30).lines
+	for (let line of lines) expect(line).not.toMatch(/[\r\n]/)
+	expect(lines.map(strip).join('\n')).toContain('second line')
+})

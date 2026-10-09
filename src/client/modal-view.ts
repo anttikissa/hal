@@ -31,7 +31,7 @@ function modalBox(rows: number, cols: number): { height: number; width: number; 
 function border(l: string, r: string, text: string, right: string, width: number): string {
 	let inner = width - 2
 	right = right && right.length + 2 <= inner - 2 ? ` ${right} ` : ''
-	text = strings.clipVisual(text ? ` ${ansi.clean(text)} ` : '', Math.max(0, inner - 2 - strings.visLen(right)))
+	text = strings.clipVisual(text ? ` ${ansi.clean(text).replace(/\s+/g, ' ')} ` : '', Math.max(0, inner - 2 - strings.visLen(right)))
 	let fill = Math.max(0, inner - 2 - strings.visLen(text) - strings.visLen(right))
 	return l + (inner > 0 ? '─' : '') + text + '─'.repeat(fill) + right + (inner > 1 ? '─' : '') + r
 }
@@ -170,7 +170,7 @@ function footer(m: ModalState, width: number): string[] {
 	let detail = m.details?.[m.selected]
 	let rows: string[] = []
 	if (detail) rows.push('', ...strings.wordWrap(ansi.clean(detail), width))
-	if (m.error) rows.push(ansi.sgr({ fg: colors.error().fg! }) + strings.clipVisual(ansi.clean(m.error), width) + UNCOLOR)
+	if (m.error) rows.push(...strings.wordWrap(ansi.clean(m.error), width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + UNCOLOR))
 	return rows
 }
 
