@@ -19,14 +19,12 @@ import { pulse } from './pulse.ts'
 import type { StatusInfo } from './status-row.ts'
 import { tabBar } from './tab-bar.ts'
 import { versions } from './versions.ts'
-import { find } from './find.ts'
 import { folds } from './folds.ts'
 
 function view(): View {
 	let st = app.state
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
-	if (find.target && find.target.sessionId === st.transcript?.meta.id) v.target = find.target.blockId
 	let pending = st.transcript ? drafts.pending(st.transcript.meta.id).map((s) => s.text) : []
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form

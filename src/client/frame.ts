@@ -43,7 +43,6 @@ import { toolDetails } from '../common/tool-details.ts'
 
 export interface View {
 	transcript?: Transcript
-	target?: string
 	/** Where replayed history ends: a line there says it is old. */
 	prompt: PromptState
 	/** Prompts sent but not yet acknowledged by the host. */
@@ -170,7 +169,7 @@ function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number,
 
 // `items`/`ends`: the items laid out and the row each ends at, so a
 // row can be traced to its block (render.clear's reasons, task e4c).
-export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
+export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCursor?: Frame['cursor']; tick?: { row: number; labeled: string; plain: string } }
 
 // Lays out the transcript's items. The rows of items drawn last time
 // and unchanged since are reused as they are: a frame costs what
@@ -299,10 +298,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		ends.push(lines.length)
 	}
 	keep()
-	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
-	// An image drawn in its prompt's card is found at that card.
-	while (at > 0 && items[at]!.type === 'image' && ['prompt', 'image'].includes(items[at - 1]!.type)) at--
-	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }
+	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(tick ? { tick } : {}) }
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`. `full`: full
@@ -320,7 +316,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		if (lines.length || above) lines.push('')
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
-	let formCursor = view.form && past.target === undefined ? past.formCursor : undefined
+	let formCursor = view.form ? past.formCursor : undefined
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.
 	// It is the work now, so it comes before waiting messages (the future).
@@ -376,8 +372,6 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
 	lines.push(...helpRow.rows(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
-	// Keep the matched block's first row in the visible transcript area.
-	if (past.target !== undefined) history = history.slice(0, past.target + Math.max(1, rows - lines.length))
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)
