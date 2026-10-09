@@ -1,6 +1,6 @@
 {
 	title: '/go goes to blocks; one described completion row each',
-	spec: `/go also goes to a block: it shows the session as before and reveals the block as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the block is ("Hal can't scroll the terminal: #a123 is about 29% down the scrollback", or that it is on screen or not in the session). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the block, and the router keeps the hash on that switch.
+	spec: `/go also goes to a block: it shows the session as before and reveals the block as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the block is ("Hal can't scroll the terminal, but #123 is about 29% down the scrollback"). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the block, and the router keeps the hash on that switch.
 
 Targets:
 - n: tab n. A bare number is always a tab, never a block.
