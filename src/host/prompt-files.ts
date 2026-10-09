@@ -10,6 +10,7 @@ import { basename, dirname } from 'path'
 import type { NoticeEvent } from '../common/notices.ts'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
+import { plugins } from './plugins.ts'
 import { promptTrail } from './prompt-trail.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt } from './system-prompt.ts'
@@ -51,7 +52,10 @@ function check(clients: Iterable<Watcher>): void {
 	let seen = promptFiles.state.seen
 	let all = new Set([...applies.values()].flatMap((s) => [...s]))
 	promptFiles.watchDirs(new Set([...all].map((p) => dirname(p))))
-	let changed = false
+	// A plugin hooking or unhooking the prompt changes it like a file.
+	let hooks = plugins.state.patches.get(systemPrompt)?.get('assemble')?.run
+	let changed = hooks !== promptFiles.state.hooks
+	promptFiles.state.hooks = hooks
 	for (let path of all) {
 		let text = read(path)
 		if (!seen.has(path)) { seen.set(path, text); continue }
@@ -120,11 +124,11 @@ function stop(): void {
 	clearInterval(promptFiles.state.timer)
 	clearTimeout(promptFiles.state.soon)
 	for (let w of promptFiles.state.watchers.values()) w.close()
-	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map(), seq: 0 }
+	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map(), seq: 0, hooks: undefined }
 }
 
 export const promptFiles = {
-	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0 },
+	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0, hooks: undefined as unknown },
 	intervalMs: 1000,
 	sliceMs: 4,
 	files, check, watchDirs, start, catchUp, stop,
