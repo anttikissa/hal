@@ -23,8 +23,9 @@ import { resolve } from 'path'
 
 // How a block is drawn (frame.look): its fold state when toggled (task
 // ghs), the paste texts a prompt shown inline needs (client/folds.ts),
-// a call's result, and whether it is padded and has a blank row above.
-export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; pad?: boolean; gap?: boolean }
+// a call's result, whether it is padded and has a blank row above, its
+// status, style, and rows a plugin draws itself.
+export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 
