@@ -1,4 +1,4 @@
-// /budget is deliberately only a human command, not a model tool.
+// /budget: models may only read it (bare /budget, tools/command.ts); only a human changes it.
 import type { SlashCommand } from '../commands.ts'
 import { sessions } from '../sessions.ts'
 import { subagents } from '../subagents.ts'
