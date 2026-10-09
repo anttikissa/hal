@@ -20,8 +20,8 @@ test('the page follows the visual viewport as the keyboard opens, until stopped;
 	source.offsetTop = 120
 	listeners.get('scroll')!()
 	expect(css).toEqual({ '--app-width': '390px', '--app-height': '450px', '--app-left': '0px', '--app-top': '120px' })
-	// Pinching/panning changes width too: the app must reflow into the
-	// visible rectangle instead of leaving the menu off its left edge.
+	// Pinching/panning while typing changes width too: the app follows the
+	// visible rectangle so the composer stays on screen.
 	source.width = 195
 	source.height = 225
 	source.offsetLeft = 90
