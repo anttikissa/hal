@@ -21,9 +21,10 @@ import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
 import { resolve } from 'path'
 
-// A block's fold state when toggled (task ghs), and the paste texts a
-// prompt shown inline needs (client/folds.ts).
-export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
+// How a block is drawn (frame.look): its fold state when toggled (task
+// ghs), the paste texts a prompt shown inline needs (client/folds.ts),
+// a call's result, and whether it is padded and has a blank row above.
+export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; pad?: boolean; gap?: boolean }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -162,24 +163,17 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fold !== 'open') return [strings.clipVisual(prefix + ansi.clean(String(command)), width)]
 				return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
 			}
-			let row: string
-			if (typeof command === 'string' && typeof description === 'string') {
-				let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width), item, width)
-				if (fold === 'closed') return [head]
-				let mark = item.input.background === true ? '&' : '$'
-				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
-				// Running output is laid out as its result glimpse will be
-				// (a blank row, then resultRows rows), so the card does not
-				// shrink when the call finishes (task 4y4).
-				let n = itemView.resultRows
-				let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
-				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(live.length ? ['', ...live] : [])]
-			} else {
-				row = strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width)
-			}
-			if (!item.partial) return [row]
-			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)
-			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5)]
+			let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input, look.result?.output).text)}`, width), item, width)
+			let bash = typeof command === 'string' && typeof description === 'string'
+			if (bash && fold === 'closed') return [head]
+			// Running bash output is laid out as its result glimpse will be
+			// (a blank row, then resultRows rows), so the card does not
+			// shrink when the call finishes (task 4y4).
+			let n = bash ? itemView.resultRows : 5
+			let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
+			if (!bash) return [head, ...live]
+			let commandLine = strings.clipVisual(`${item.input.background === true ? '&' : '$'} ${ansi.clean(command as string).replace(/\s+/g, ' ')}`, width)
+			return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(live.length ? ['', ...live] : [])]
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.

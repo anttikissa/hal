@@ -1,0 +1,7 @@
+{
+	title: 'Terminal plugins reshape tool rows through frame.look',
+	spec: "A terminal plugin can make any transcript look, such as one row per tool call with result-aware titles, in about 40 lines. frame.look(item, look) is the hook: the layout calls it for each block before drawing and uses what it returns. Look carries fold, result (a call's attached tool-result item), pad (false drops a block's padding rows; default: padded when it has a background) and gap (false drops the blank row above it). The row cache key includes pad and the result's key, so a changed look or arriving result repaints. An attached result removes its call's bottom padding only when the call was padded. The terminal passes a call's result output to toolDetails.headline, as the web does, so a title can show what only the result knows (a read range, a failing line). plugins/example-plugin.ts shows both hooks.",
+	status: 'done',
+	needs: ['an', 'wm0', 'ghs'],
+	foldInto: ['an']
+}
