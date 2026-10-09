@@ -269,6 +269,8 @@ function lastPrompt(records: HistoryRecord[]): number {
 // of the prompt it replaces and everything after that. Inbox, answer
 // and change records are kept: the inbox is read from every record, an
 // answer may be to a question asked before, and a change still holds.
+// Inbox messages a dropped prompt delivered leave with it: the edit
+// replaced them, so they never wait again.
 function current(records: HistoryRecord[]): HistoryRecord[] {
 	records = rebase.latest(records)
 	if (!records.some((r) => r.type === 'rebase' || (r.type === 'user' && r.replaces))) return records
@@ -277,7 +279,11 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
-			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
+			if (at >= 0) {
+				let delivered = new Set(out.slice(at).flatMap((x) => (x.type === 'user' ? (x.inbox ?? []) : [])))
+				out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
+				if (delivered.size) out = out.filter((x) => x.type !== 'inbox' || !delivered.has(x.id))
+			}
 			let { replaces: _replaces, ...projected } = r
 			r = projected
 		}

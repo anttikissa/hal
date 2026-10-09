@@ -2,13 +2,14 @@
 	title: 'Up edits the last message the user sent',
 	spec: "Up on an empty prompt recalls the last message the user (a human) sent in this session, whatever became of it: a prompt that started a turn, a steering message already delivered, or a message still waiting in the inbox (steering or queued). Sending the edit makes the edited text take effect instead of the old one: a waiting message is replaced in place in the inbox (no pause, the model never saw it); a delivered one follows the rule of tasks/j1/states.md (replace if nothing or only read-only tools happened since, else sent on top). Messages another session sent are never recalled: Up skips any message with a sender session (`from`). An edit that turns into a slash command (typed '-status', Up, fixed to '/status') runs as that command, as the old Hal did. A resent edit acts once: the host recognizes a command id it is still carrying out (an amend deferred while the paused turn unwinds) as well as one already in history, so a reconnect during that window can't apply the edit twice. Tests: edit a queued message before it runs and see only the edited one run; edit a delivered steering message; a resend of a deferred amend acks without a second prompt.",
 	status: 'done',
-	needs: ['wb'],
-	foldInto: ['wb', '2r'],
 	notes: [
 		"Waiting messages: a later `inbox` record with the same id is the edit (inbox.pending's Map keeps the first position); `withdrawn: true` removes it (edit became a slash command, which is recorded and run first, so an unknown command refuses without touching the message). `command` on the edit record is the edit's id, which host.submitted checks for resends.",
 		'pages.ts marks keep every offset of an inbox id (a list; a plain number from older marks files still reads), so essentials, sorted by offset, keep an edited message in its first place. Without that a snapshot after restart reorders it.',
 		'Protocol: submit {amend: true, edits: <inbox id>}; drafts.Sending carries `edits` so a resend stays an edit. amend.begin prefers the newest waiting inbox item without `from` in any state and sends no pause; resume then sends nothing. If the message was delivered before the edit arrives, the host treats it as an amend of the last prompt (on top if the turn is busy, since nothing paused it).',
 		'The deferred-amend dedup needed no new state: the deferred command re-enters host.handle() when the paused turn settles, so a resend deferred behind it on the same promise finds the id in host.state.done. The test covers a resend from a second connection.',
-		"`from` is now kept on inbox records and InboxItem (prompts.submit), and prompt Items may carry `from`, but delivered prompt records don't yet say which text came from whom: task rj must add that, and make prompts.amend edit the user's last text rather than the record's last text."
-	]
+		"`from` is now kept on inbox records and InboxItem (prompts.submit), and prompt Items may carry `from`, but delivered prompt records don't yet say which text came from whom: task rj must add that, and make prompts.amend edit the user's last text rather than the record's last text.",
+		'Restored invariant: replacing a prompt also retires the inbox messages it delivered. replay.current dropped the replaced user record but kept the earlier inbox records it delivered, so for sessions with a rebase mark (pages.essentials reads replay.current) inbox.pending resurrected them and the amend turn delivered the old steering text again on top of the edit. Test: replay.test.ts editing a prompt that delivered a waiting message.'
+	],
+	needs: ['wb'],
+	foldInto: ['wb', '2r']
 }
