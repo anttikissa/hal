@@ -16,6 +16,7 @@ const hal = [
 	"Make the tab bar show each session's model",
 	'Which module is closest to the 400-line limit?',
 	'Add a /uptime command that shows when the host process started',
+	'Implement a plugin that uses Jev to decide the best model for subagent based on its initial prompt',
 	'What tools do you have available?',
 	'Explain the git history of the last week',
 ]
