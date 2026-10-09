@@ -1,0 +1,7 @@
+{
+	title: 'Configurable spawn budget, shown as bN',
+	spec: 'Spawn slots for a new top-level session come from the config.ason setting subagentSlots (integer, min 0, default 3), replacing the fixed 5; sessions with a stored count keep it. The terminal and the web show the session’s slots left as bN (b for /budget, e.g. b3) next to the model name; on the web it links to an explanation of the spawn budget and /budget. Whether mobile shows it is undecided. Models may run /fork: a fork spends no slots, which is accepted because a fork shares its parent’s context and gives no unbounded working space.',
+	status: 'planned',
+	needs: ['t0', 'pc'],
+	foldInto: ['t0']
+}
