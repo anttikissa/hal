@@ -1,7 +1,6 @@
 // The Action grammar (task 3fv): the text of one native Action call.
 //
 //   NAME [/* purpose */] [arguments...]
-//   /slash-command args          (same as COMMAND /slash-command args)
 //
 // Names are case-insensitive. Arguments are JS string literals, ASON
 // objects or arrays (parsed, never evaluated), or bare words on the
@@ -40,11 +39,6 @@ function parse(text: unknown): Parsed {
 	if (text.length > maxChars) throw new Error(`action is ${text.length} characters; the most is ${maxChars}`)
 	let i = blank(text, 0)
 	if (i >= text.length) throw new Error('empty action; e.g. READ "src/main.ts" or BASH "ls -l"')
-	if (/^\/[\w-]/.test(text.slice(i, i + 2))) {
-		let end = lineEnd(text, i)
-		if (blank(text, end) < text.length) throw new Error(`a slash command is one line: ${one}`)
-		return { name: 'command', raw: text.slice(i, end).trim() }
-	}
 	let name = /^[A-Za-z_]+/.exec(text.slice(i, i + 64))?.[0]
 	if (!name) throw new Error(`expected an action name such as READ or BASH, found ${JSON.stringify(text.slice(i, i + 40))}`)
 	let end = i + name.length

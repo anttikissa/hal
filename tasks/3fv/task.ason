@@ -13,7 +13,8 @@
 		'Non-Anthropic intro reads "You are Hal, a coding agent." (user decision 8 Oct); Claude keeps "working within Hal, a coding harness."',
 		'Usage placeholders use angle brackets everywhere (COMMAND /<name> [<args>]); a bare /name args was mistaken for literal text, and the bare slash form is labeled as COMMAND shorthand.',
 		'SYSTEM.md has a # Plugins section: disable with /plugins disable <name>, not by renaming or deleting the file (user decision 9 Oct; the model once renamed show-keys.ts to disable it).',
-		'The Plugins section states only the positive rule (user decision 9 Oct): the "Don\'t rename or delete the file" warning was dropped.'
+		'The Plugins section states only the positive rule (user decision 9 Oct): the "Don\'t rename or delete the file" warning was dropped.',
+		'Slash commands go through COMMAND only (user decision 9 Oct): the bare /name shorthand confused humans reading HELP, and models never used it (0 of 2,361 Action calls; 100 used COMMAND).'
 	],
 	needs: ['gr', 'asp']
 }
