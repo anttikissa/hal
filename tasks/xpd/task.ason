@@ -1,0 +1,10 @@
+{
+	title: 'Retain opt-in touch logs for later inspection',
+	spec: 'Replace the touch probe no-storage rule: explicitly enabling Touch debug retains the latest 300 timestamped structural events in browser-local storage, with event-time and after-handler selection, focus, Send bounds and viewport geometry. Recording remains off on page load and never captures arbitrary text or sends telemetry. The web menu offers Touch debug logs, usable after stopping recording and after reload, with selectable complete retained history and an explicit clear control. Persist in bounded batches, flush on stop, pagehide and hiding the page; cancel or drain pending event observations when stopping so recorded taps are not lost. Display storage failures with the full error and retain unsaved entries in memory; reject malformed stored history instead of silently erasing it. Preserve the eight-event pass-through overlay and all existing privacy filtering. The invariant restored is that later taps, toggling debug off and page reload do not erase a captured failure before the user can inspect it. Browser-only touch logging has no terminal equivalent.',
+	status: 'done',
+	notes: [
+		'The old eight-event overlay discarded failed taps when later taps succeeded. History now keeps 300 timestamped structural events, including full before/after Send bounds, without message text. Browser storage writes are batched at 250 ms and flushed on stop, pagehide and hidden visibility; queued observations drain before flushing. Browser test verifies overlay eviction does not evict the longer archive, reload access while recording is off, bounded retention, clear, privacy and full quota failure reporting with memory retention. Inspected Chrome screenshots at 390px and 1200px: wrapped selectable history scrolls beneath reachable Clear logs and Close controls. Native iPhone keyboard behavior remains unverified; no Send or crosshair behavior changes.'
+	],
+	needs: ['q24'],
+	foldInto: ['zf4']
+}
