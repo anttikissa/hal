@@ -60,7 +60,7 @@ html.typing .App { position: absolute; }
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
+.Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
 .Transcript > * { margin: 0 0 0.5lh; }
 /* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
    it shares the cards' left edge; a 52px target from the screen edge
