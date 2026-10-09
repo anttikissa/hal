@@ -230,6 +230,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					setTouchProbe(!touchProbe())
 					setOpen(false)
 				}}><Icon name="bug" />Touch debug {touchProbe() ? 'on' : 'off'}</button>
+				<button type="button" onClick={() => { setOpen(false); touchDebug.inspect() }}><Icon name="bug" />Touch debug logs</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
 					<Icon name="reload" />Reload page
 				</button>
