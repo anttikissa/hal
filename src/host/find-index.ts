@@ -1,7 +1,7 @@
 // Rebuildable SQLite projection. Used only in the find worker: parsing a
 // giant ASON line or SQLite call must never hold up the host event loop.
 import { Database } from 'bun:sqlite'
-import { createReadStream, existsSync, readdirSync, statSync } from 'fs'
+import { createReadStream, existsSync, statSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { attachments } from '../common/attachments.ts'
 import type { FindKind } from '../common/find.ts'
@@ -36,11 +36,9 @@ function init(): void {
 }
 
 async function catalog(): Promise<void> {
-	if (!existsSync(paths.sessionsDir())) return
-	for (let entry of readdirSync(paths.sessionsDir(), { withFileTypes: true })) {
-		if (!entry.isDirectory()) continue
-		let meta = sessions.load(entry.name, false)
-		findIndex.state.meta.set(entry.name, { ...meta })
+	for (let id of sessions.ids()) {
+		let meta = sessions.load(id, false)
+		findIndex.state.meta.set(id, { ...meta })
 		liveFiles.close(meta)
 		await Bun.sleep(0)
 	}
