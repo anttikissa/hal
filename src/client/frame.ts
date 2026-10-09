@@ -145,6 +145,7 @@ function ref(item: Item, cols: number, session: string | undefined, style: Style
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
+	if (item.type === 'tool' && item.name === 'edit') status = strings.clipVisual(status, Math.floor(inner / 3))
 	let mark = (lines: string[], at: number) => {
 		if ((!ref && !status) || lines.length <= at) return
 		let link = ref ? ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
