@@ -1,0 +1,12 @@
+{
+	title: 'Separate accepted file paths from tracking scope',
+	spec: 'Invariant: accepting a path does not enroll it in file-change tracking. File tools and Bash modifies accept valid absolute and relative paths in every directory, including parent-relative paths. Track declared project files beneath cwd and files beneath /tmp only; exclude .git metadata and other outside-cwd files, including symlink aliases whose canonical target is excluded. Excluded Bash declarations produce no copies, changed-file entries, declaration locks or neighbor notices and never prevent the command from running. Broad globs filter excluded matches. WRITE and EDIT still take canonical file locks everywhere for atomic lease-safe operations, while their change tracking follows the same scope. Sensitive eligible files retain metadata only. Preserve independent commit notices. Tool help distinguishes accepted inputs from tracked files. Tests cover accepted untracked writes, .git and symlink exclusions, eligible project and /tmp files, globs and lock behavior. User clarification on 9 Oct 2026 corrects den: all directories are accessible, not all directories are tracked.',
+	status: 'done',
+	notes: [
+		'The first fix incorrectly expanded observation scope along with accepted paths. Scope filtering now runs before Bash declaration locks and before glob scans, then again on expanded matches; lexical and canonical checks exclude Git metadata, outside targets and their symlink aliases. WRITE/EDIT retain canonical locks outside tracking scope. Commit detection remains independent. Scratch regression fixtures are explicitly under /tmp, while outside-scope fixtures live beneath process.cwd.',
+		'Finish rechecks the union of before-snapshot paths and new glob matches, so a symlink retargeted outside scope during the command is not copied afterward. The existing broad-glob regression covers a project alias retargeted outside cwd. Focused Action, file-changes and neighbors tests: 15 pass. Changed-file lint and git diff --check pass.',
+		'Full ./test completed with 1602 passing, 13 failing and one skipped test. Failures were outside changed files (line limits, e2e, server/session/turn/web/system tests); tsc reported errors in replay.test.ts and web.test.ts, and full lint reported the existing unused client/find.test.ts import. Focused tests and changed-file lint remained green after the final symlink-retarget check.'
+	],
+	needs: ['den'],
+	foldInto: ['den']
+}
