@@ -1,6 +1,12 @@
-// Read-only view of this host, its open tabs and models (tasks ed, jm),
-// without session histories or client addresses/credentials. A bare
-// call describes only the caller; scope and fields widen or narrow it.
+// Read-only view of this host, its open tabs and models (tasks ed, jm,
+// qzh), without session histories or client addresses/credentials. A
+// bare call describes only the caller; scope and fields widen or narrow
+// it. As an action, plain words (quoted or bare, any order, any case)
+// land by value: a view (sessions, host, models, clients) sets what; a
+// scope (self, project, all) sets scope; aliases: tabs = sessions with
+// scope all, tab/session = sessions, model = models, client = clients;
+// other words, comma- or space-separated, are fields. A trailing
+// { what, scope, fields } object wins over words; other keys are errors.
 import { action } from '../../common/action.ts'
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'
