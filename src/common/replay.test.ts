@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { AssistantBlock, Message, UserBlock } from './blocks.ts'
+import { inbox } from './inbox.ts'
 import { replay, type HistoryRecord, type TurnStatus } from './replay.ts'
 
 const ts = '2026-01-01T00:00:00.000Z'
@@ -194,6 +195,11 @@ test('an edited prompt supersedes the prompt it replaces and that turn, as if wr
 	// The prompt before it is not touched; a second edit replaces the first.
 	let again: HistoryRecord = { ...replaced, blocks: [{ type: 'text', text: 'fix it now' }] }
 	expect(replay.toMessages([...before, say('fix ti'), end('paused'), replaced, end('paused'), again])).toEqual(replay.toMessages([...before, say('fix it now')]))
+})
+
+test('editing a prompt that delivered a waiting message never makes it wait again', () => {
+	let raw: HistoryRecord[] = [say('go'), { type: 'inbox', id: 'm1', text: 'typo', ts }, { ...say('typo'), inbox: ['m1'] }, end('paused'), { ...say('fixed'), replaces: true }]
+	expect(inbox.pending(replay.current(raw))).toEqual([])
 })
 
 test('changes reach the next request without a prompt, preserving each transition and its time', () => {
