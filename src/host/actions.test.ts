@@ -20,11 +20,11 @@ async function act(id: string, text: string): Promise<{ output: string; isError?
 }
 const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 
-test('arguments: strings, objects, comments as purpose, bare words, slash commands', () => {
+test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {
 	expect(actions.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2000, modifies: ['a.ts'], description: 'Check it' } })
 	expect(actions.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
 	expect(actions.resolve('READ https://example.com/x:80')).toEqual({ name: 'read_url', input: { url: 'https://example.com/x:80' } })
-	expect(actions.resolve('/rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
+	expect(actions.resolve('COMMAND /rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
 	expect(actions.resolve('HELP edit')).toEqual({ name: 'help', input: { name: 'edit' } })
 	// An unclosed comment ends at its line, but never stands in for arguments.
 	expect(actions.resolve('BASH "ls" /* list')).toEqual({ name: 'bash', input: { command: 'ls', description: 'list' } })
