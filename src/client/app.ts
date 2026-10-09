@@ -129,7 +129,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text') return clientCommands.event(event)
 	if (event.type === 'go') {
 		if (st.focus.tab !== event.sessionId || !st.tabs.some((tab) => tab.id === event.tab)) return
-		if (event.block) find.aim({ sessionId: event.tab, blockId: event.block.replace(/^[a-z]/, '') })
+		if (event.block) find.target = { sessionId: event.tab, blockId: event.block.replace(/^[a-z]/, '') }
 		app.focusOn({ tab: event.tab })
 		find.seek()
 		return app.show()
