@@ -1,0 +1,7 @@
+{
+	title: 'SYSTEM.md deferred blocks, session variables and blank lines',
+	spec: 'SYSTEM.md expansion leaves exactly one blank line between paragraphs: removed if blocks, comments and deferred blocks leave no gaps. Variables subagent (true/false), parent_session, fork (true/false) and fork_of describe the session; a fork records the session it was forked from. Text in <deferred>…</deferred> is left out of the system prompt so its changes never invalidate the prompt cache; the host renders it before each request and, when it differs from what the model last saw (or on the first request), appends it to the session history as a note the model reads in front of its next prompt and the transcript shows.',
+	status: 'planned',
+	needs: ['q5', 'ar'],
+	foldInto: ['q5']
+}

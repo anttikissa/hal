@@ -1,0 +1,7 @@
+{
+	title: 'Subagent and fork guidance lives in SYSTEM.md',
+	spec: 'Spawn and fork guidance is in an editable SYSTEM.md section, not hidden in code: top-level sessions read "Spawn subagents according to user preferences. You have a /budget of $subagent_slots - ask user for more if task demands it." and how to spawn (moved from the spawn tool description, which keeps only argument mechanics); subagents read their parent, budget and handoff rules (moved from the first subagent message, which keeps only the task); a fork reads "This is a fork of session $fork_of and shares its history." Values that change sit in <deferred> blocks. Text moved from code carries an HTML comment naming its source file and "TODO: human should review this". A comment at the top of SYSTEM.md documents comments, if/else blocks, includes and every variable, also marked "TODO: human should review this".',
+	status: 'planned',
+	needs: ['r92', 'q5g'],
+	foldInto: ['t0']
+}
