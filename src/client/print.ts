@@ -7,7 +7,7 @@ import { connection } from '../common/connection.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { summary } from '../common/summary.ts'
 
-type Job = { prompt: string; cwd: string; model?: string; session?: string; keep?: true; delivery?: Delivery }
+type Job = { prompt: string; cwd: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
 type Out = { out(text: string): void; err(text: string): void }
 
 // begin() once connected; tabs may arrive asynchronously afterward.
@@ -43,7 +43,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		begun = true
 		if (job.session) return target()
 		id = connection.nextId()
-		connection.send({ type: 'tab-new', cwd: job.cwd, autoclose: !job.keep, id })
+		connection.send({ type: 'tab-new', cwd: job.cwd, autoclose: !job.keep, ...(job.noUser && { noUser: true }), id })
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return

@@ -57,7 +57,7 @@ function check(id: string): void {
 	try {
 		let meta = sessions.open(id)
 		let file = `${paths.sessionDir(id)}/prompt-files.json`
-		let input = { cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id }
+		let input = { cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id, noUser: meta.noUser }
 		let prompt = systemPrompt.inspect(input)
 		let now: Seen = { cwd: meta.cwd, files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])) }
 		Object.assign(now.files, pluginTexts(input))

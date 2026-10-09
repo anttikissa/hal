@@ -163,6 +163,8 @@ test('the home USER.md appears in the real SYSTEM prompt when present, with no r
 		writeFileSync(`${root}/USER.md`, '# User\n\nName: Rowan\n\nPrefers concise answers.\n')
 		let withUser = systemPrompt.build(input)
 		expect(withUser).toContain('Name: Rowan')
+		let noUser = true
+		expect(systemPrompt.build({ ...input, noUser })).not.toContain('Name: Rowan')
 		expect(withUser).toContain('Prefers concise answers.')
 		// The only addition is the optional file, not a printed include path.
 		expect(withUser).not.toContain('@?')

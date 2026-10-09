@@ -43,6 +43,7 @@ function invalid(value: unknown): string | undefined {
 	}
 	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if ((c.type === 'create' || c.type === 'tab-new') && c.autoclose !== undefined && typeof c.autoclose !== 'boolean') return `${c.type}: autoclose must be a boolean`
+	if (c.type === 'tab-new' && c.noUser !== undefined && typeof c.noUser !== 'boolean') return 'tab-new: noUser must be a boolean'
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)

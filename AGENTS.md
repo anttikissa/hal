@@ -97,6 +97,9 @@ requirements.
 
 ## Design checks
 
+- Configure with command-line flags (e.g. `hal -p --no-user`), not
+  environment variables: env vars are hard to discover and cumbersome
+  to use.
 - The user is king. Hal's rules (UI, look, layout, tasks/) describe
   Hal's defaults, not limits on what the user may want. Never answer a
   wish with what Hal "won't" do: build it. Make hooks able to change

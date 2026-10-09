@@ -1,0 +1,7 @@
+{
+	title: 'hal -p --no-user leaves USER.md out of the new tab',
+	spec: 'hal -p --no-user creates its new tab with noUser: the session meta records noUser: true and its system prompt sets user_notes false, so the User notes section and USER.md are left out (for benchmarks). Rejected with --session. No environment variable controls this. Tests: args parse --no-user and reject it with --session; the assembled prompt omits USER.md when noUser is set.',
+	status: 'done',
+	needs: ['q5'],
+	foldInto: ['q5']
+}

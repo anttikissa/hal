@@ -34,7 +34,7 @@ function files(id: string): Set<string> {
 	let meta = sessions.open(id)
 	let local = systemPrompt.candidates(meta.cwd).flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
 	let used: string[] = [systemPrompt.file()]
-	try { used = systemPrompt.inspect({ cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id }).sources.map((s) => s.path) } catch {}
+	try { used = systemPrompt.inspect({ cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id, noUser: meta.noUser }).sources.map((s) => s.path) } catch {}
 	return new Set([...used, ...local])
 }
 

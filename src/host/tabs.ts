@@ -142,7 +142,7 @@ function insert(id: string, index: number): void {
 	open.splice(Math.max(0, Math.min(open.length, index)), 0, id)
 }
 
-function create(cwd: string, after?: string, autoclose = false): string {
+function create(cwd: string, after?: string, autoclose = false, noUser = false): string {
 	// The very first tab of a fresh home is the offline welcome guide.
 	let first = tabs.file().open.length === 0 && !sessions.newest()
 	let open = tabs.file().open
@@ -151,6 +151,7 @@ function create(cwd: string, after?: string, autoclose = false): string {
 	let id = sessions.create({
 		cwd: parent?.cwd ?? cwd,
 		autoclose,
+		noUser,
 		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
 	}).id
 	greetings.open(id)
@@ -217,7 +218,7 @@ function act(c: TabCommand): Outcome {
 	let f = tabs.file()
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
-	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose) }
+	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.noUser) }
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last)

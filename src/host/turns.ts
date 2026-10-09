@@ -185,7 +185,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		let scripted = synthetic.find(model)
 		if (!scripted) {
 			let problems: string[] = []
-			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id }, problems)
+			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, noUser: sessions.open(id).noUser, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id }, problems)
 			// A broken prompt file never stops a turn: say so once per distinct fault.
 			let fault = problems.join('\n')
 			if (fault !== (promptFaults.get(id) ?? '')) {
