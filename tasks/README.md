@@ -13,6 +13,12 @@ where possible, and it leaves behind a set of tasks with implementation
 notes from which Hal can be rewritten again and again by more capable
 models. The tasks are the product as much as the code.
 
+The user is king: everything below describes Hal's defaults, not
+limits. A user's wish overrides any of it, and hooks must be able to
+change every default. Plugins may do anything the user wants, even
+what these rules forbid, such as unreadable text (AGENTS.md, Design
+checks).
+
 ## Terms
 
 - **host**: the one process that owns a home (sessions, provider

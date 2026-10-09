@@ -97,11 +97,16 @@ requirements.
 
 ## Design checks
 
-- A convention never overrides the user's request. If they conflict,
-  explain the conflict and ask.
+- The user is king. Hal's rules (UI, look, layout, tasks/) describe
+  Hal's defaults, not limits on what the user may want. Never answer a
+  wish with what Hal "won't" do: build it. Make hooks able to change
+  any default. When a request changes a tracked default, name the rule
+  it replaces once, then do it and update that rule. Plugins may do
+  anything the user wants, even what Hal's rules forbid (unreadable
+  text, dim, fades): the rules bind Hal's defaults, not the user.
 - Do not invent requirements. Trace each requirement and its rationale
   to the user's request or a concrete constraint; distinguish design
-  choices from requirements.
+  choices from requirements. Current behavior is not a requirement.
 - Before finishing, ask: "What does this cost after a day? With 10×
   the data?" Check repeated work, elapsed-time loops and growing state.
 
