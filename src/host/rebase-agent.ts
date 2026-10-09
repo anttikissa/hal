@@ -74,15 +74,15 @@ function request(id: string, text: string, preview: boolean, paused: boolean, se
 }
 
 // Completion belongs to the original final assistant entry of that turn.
-// A retained turn_end cannot finish commentary exposed by dropping its reply.
+// A retained turn_end cannot finish commentary exposed by dropping its reply,
+// and a running turn that drops itself back to a completed reply stays done.
 function continuation(raw: HistoryRecord[], plan?: RebasePlan, paused = false, resume = false): 'prompt' | 'unfinished' | undefined {
 	if (paused) return
 	let before = replay.current(raw), after = plan ? rebase.apply(before, plan) : before
 	let conversational = (r: HistoryRecord) => r.type === 'assistant' || (r.type === 'user' && r.blocks.some((b) => b.type === 'text' || b.type === 'image'))
 	let last = after.findLast(conversational)
 	if (last?.type === 'user') return 'prompt'
-	if (resume) return 'unfinished'
-	if (!last) return
+	if (!last) return resume ? 'unfinished' : undefined
 	let at = before.findIndex((r) => r.n === last.n)
 	let tail = before.slice(at + 1), end = tail.findIndex((r) => r.type === 'turn_end')
 	let completed = end >= 0 && tail[end]!.type === 'turn_end' && tail[end]!.status === 'completed'
@@ -96,11 +96,12 @@ function continuePrompt(id: string, paused = false, reason = rebaseAgent.continu
 	if (refused) throw new Error(refused)
 }
 
-function apply(id: string, transition: ContextTransition, prepared?: ReturnType<typeof prepare>): boolean {
+// 'done': the running turn rewound itself to a completed reply and ends.
+function apply(id: string, transition: ContextTransition, prepared?: ReturnType<typeof prepare>): 'paused' | 'done' | undefined {
 	let intent = transition.rebase!
 	if (transition.canceled) {
 		contextTransitions.output(id, '/rebase canceled; history unchanged.', { transitionDone: transition.id })
-		return false
+		return
 	}
 	let raw = history.readSync(id)
 	let applied = raw.some((r) => r.type === 'rebase' && r.transition === transition.id)
@@ -118,7 +119,7 @@ function apply(id: string, transition: ContextTransition, prepared?: ReturnType<
 		if (start) history.append(id, { type: 'continue' })
 		contextTransitions.output(id, text, { transitionDone: transition.id })
 		if (start) { status.transition(id, { type: 'submit' }); turns.start(id) }
-		return false
+		return
 	}
 	// The commit is durable. Later presentation/storage failures must not
 	// claim the rewrite failed or replay it; recovery recognizes its intent.
@@ -127,23 +128,25 @@ function apply(id: string, transition: ContextTransition, prepared?: ReturnType<
 		rebasePlans.broadcast(id, result.from)
 		slash.output(id, result.report)
 	}
-	let start = !turns.state.running.has(id) && !intent.paused && (result?.continuation ?? rebaseAgent.continuation(history.readSync(id), undefined, false, intent.resume))
+	let running = turns.state.running.has(id)
+	let reason = result?.continuation ?? rebaseAgent.continuation(history.readSync(id), undefined, false, intent.resume)
+	let start = !running && !intent.paused && reason
 	if (start) history.append(id, { type: 'continue' })
-	else if (!turns.state.running.has(id) && history.unfinished(id)) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+	else if (!running && history.unfinished(id)) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
 	contextTransitions.output(id, '/rebase applied.', { transitionDone: transition.id })
 	if (start) { status.transition(id, { type: 'submit' }); turns.start(id) }
-	return !!intent.paused
+	return intent.paused ? 'paused' : running && !reason ? 'done' : undefined
 }
 
 // The virtual result gets a real reserved number. Preflight can therefore
 // include its linkage in exactly the plan applied synchronously after writing
 // it. Failures become the calling tool's error before its first durable write.
-function results(id: string, results: ToolResultBlock[]): { record?: HistoryRecord; paused: boolean } {
+function results(id: string, results: ToolResultBlock[]): { record?: HistoryRecord; stop?: 'paused' | 'done' } {
 	let transition = contextTransitions.pending(id)
 	if (transition?.kind !== 'rebase' || transition.canceled) {
 		let record = history.results(id, results)
 		host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: record?.n, ts: record?.ts })
-		return { record, paused: false }
+		return { record }
 	}
 	let record: HistoryRecord = { type: 'user', blocks: results, n: history.number(id), ts: new Date().toISOString() }
 	let prepared: ReturnType<typeof prepare> | undefined, failure: string | undefined
@@ -163,7 +166,7 @@ function results(id: string, results: ToolResultBlock[]): { record?: HistoryReco
 		contextTransitions.output(id, failure, { transitionDone: transition.id })
 	}
 	host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: written.n, ts: written.ts })
-	return { record: written, paused: prepared ? rebaseAgent.apply(id, transition, prepared) : false }
+	return { record: written, ...(prepared && { stop: rebaseAgent.apply(id, transition, prepared) }) }
 }
 
 export const rebaseAgent = { state: { shown: new WeakMap<object, RebaseRows>() }, snapshot, fresh, show, shown, prepare, request, continuation, continuePrompt, apply, results }
