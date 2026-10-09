@@ -1,0 +1,7 @@
+{
+	title: 'Bash results cut at 100 lines; READ without a range shows 200 lines',
+	spec: 'Model-facing bash results (foreground and background) are cut past tools.bashMaxLines (100) lines or tools.bashMaxChars (8000) characters, keeping head and tail, an omitted-lines marker, and a note naming the blob holding the whole output with how to page it: READ_BLOB "<blob>" { offset: 1, limit: 100 }, or grep -n / sed -n on its path. Other tools keep tools.maxChars. A READ of a text file without a range shows the first tools.readLines (200) lines and, when more remain, says READ "path:201-…" for more and "path:1-" for the whole file; any explicit range, including "path:1-", reads as before. Rationale: on the pi-multiedit eval tasks Hal read about twice the tool output pi did (unscoped searches hitting the 50k cap, whole-file reads), the main cause of its +61% cost. Tests: a 300-line bash result keeps both ends and its blob pages by offset; a 300-line file reads 200 lines by default with the continuation hint, and offset 1 alone reads all.',
+	status: 'done',
+	needs: ['bz', '3fv'],
+	foldInto: ['bz', '3fv']
+}

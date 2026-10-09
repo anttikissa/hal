@@ -51,8 +51,9 @@ function numbered(lines: string[], shown: number[]): string {
 }
 
 // READ of lines offset..offset+limit-1 (1-based; no limit: to the end),
-// clamped to the file, within tools.maxLines and tools.maxChars.
-function read(path: string, bytes: Uint8Array, offset = 1, limit?: number): string {
+// clamped to the file, within tools.maxLines and tools.maxChars. `hint`:
+// the range was a default, so say how to read more when lines remain.
+function read(path: string, bytes: Uint8Array, offset = 1, limit?: number, hint = false): string {
 	let { lines } = lease.text(bytes, path)
 	let header = `== READ ${path}@${lease.hash(bytes)} ==`
 	if (!lines.length) return `${header}\n[Empty file]`
@@ -68,7 +69,9 @@ function read(path: string, bytes: Uint8Array, offset = 1, limit?: number): stri
 		out.push(line)
 		size += line.length + 1
 	}
-	let more = n <= end ? `\n[lines ${start}-${n - 1} of ${lines.length}; continue with READ "${path}:${n}-${end === lines.length ? '' : end}"]` : ''
+	let more = n <= end ? `\n[lines ${start}-${n - 1} of ${lines.length}; continue with READ "${path}:${n}-${end === lines.length ? '' : end}"]`
+		: hint && end < lines.length ? `\n[lines ${start}-${end} of ${lines.length}; READ "${path}:${end + 1}-${Math.min(lines.length, end + limit!)}" for more, "${path}:1-" for the whole file]`
+		: ''
 	return `${header}\n${out.join('\n')}${more}`
 }
 

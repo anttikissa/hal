@@ -57,3 +57,14 @@ test('image size cap accepts the boundary and rejects larger images; text and ot
 	expect((await read('binary.png')).isError).toBe(true)
 	expect((await read('limit.png', { offset: 0 })).isError).toBe(true)
 })
+
+test('a READ without a range shows the first 200 lines and how to get more; offset 1 alone reads all', async () => {
+	writeFileSync(`${home}/long.txt`, Array.from({ length: 300 }, (_, i) => `line ${i + 1}\n`).join(''))
+	let first = (await read('long.txt')).output
+	expect(first).toContain('line 200')
+	expect(first).not.toContain('line 201')
+	expect(first).toContain('READ "long.txt:201-300" for more, "long.txt:1-" for the whole file')
+	let whole = (await read('long.txt', { offset: 1 })).output
+	expect(whole).toContain('line 300')
+	expect(whole).not.toContain('for more')
+})

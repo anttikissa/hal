@@ -17,8 +17,8 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 	return v
 }
 
-// READ "path", READ "path:10" (line 10), "path:10-20", "path:10-" (to
-// the end); an http(s) URL reads through read_url.
+// READ "path" (the first tools.readLines lines), "path:10" (line 10),
+// "path:10-20", "path:1-" (to the end); an http(s) URL reads through read_url.
 function resolveAction(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = action.values(raw)
 	let [path] = values
@@ -36,7 +36,7 @@ export const tool: Tool<ToolOutput> = {
 	description:
 		'Read a text file or image, or list a directory. Images are attached directly. Relative paths start from the working directory. ' +
 		'A text file comes as numbered lines under its editing lease, == READ <path>@<hash> ==; the hash covers the whole file, even when a range is shown, and EDIT needs it. ' +
-		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Long output stops with how to continue.',
+		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue.',
 	action: {
 		summary: false,
 		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
@@ -73,6 +73,7 @@ export const tool: Tool<ToolOutput> = {
 			return { text: `Image from ${path} (${mediaType}, ${bytes.length} bytes)`, image: { mediaType, data: Buffer.from(bytes).toString('base64') } }
 		}
 		if (bytes.subarray(0, 8192).includes(0)) throw new Error(`${input.path} looks like a binary file`)
-		return lease.read(input.path, bytes, offset, limit)
+		let capped = offset === undefined && limit === undefined
+		return lease.read(input.path, bytes, offset, capped ? tools.readLines : limit, capped)
 	},
 }

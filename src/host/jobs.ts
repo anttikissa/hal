@@ -111,7 +111,7 @@ function finish(id: string, out: string): void {
 	if (!job) return
 	jobs.state.running.delete(id)
 	jobs.forget(job.sessionId, id)
-	jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId))
+	jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId, tools.bashMaxChars, tools.bashMaxLines))
 }
 
 // Sends `text` to the session as an advisory message from 'bash <id>'.
