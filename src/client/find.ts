@@ -5,6 +5,7 @@ import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
 import type { FindBatch, FindResult } from '../common/find.ts'
 import { app } from './app.ts'
+import { folds } from './folds.ts'
 
 const hooks = {
 	get: () => app.state.modal,
@@ -23,10 +24,16 @@ function open(): void {
 	})
 }
 function go(r: FindResult): void {
-	find.target = r
+	find.aim(r)
 	if (app.state.tabs.some((t) => t.id === r.sessionId)) app.focusOn({ tab: r.sessionId })
 	else app.send({ type: 'tab-resume', sessionId: r.sessionId })
 	find.seek()
+}
+// Targets block `r` and opens it, as the web opens a linked card.
+function aim(r: NonNullable<typeof find.target>): void {
+	find.target = r
+	let states = folds.of(r.sessionId)
+	if (states.get(r.blockId) !== 'inline') states.set(r.blockId, 'open')
 }
 function seek(): void {
 	let r = find.target, t = app.state.transcript
@@ -37,7 +44,7 @@ function seek(): void {
 }
 export const find = {
 	state: findController.create(), target: undefined as (Pick<FindResult, 'sessionId' | 'blockId'> & Partial<FindResult>) | undefined,
-	open, go, seek,
+	open, go, aim, seek,
 	close: (): void => findController.close(find.state, hooks),
 	event: (b: FindBatch): void => findController.event(hooks, b),
 }
