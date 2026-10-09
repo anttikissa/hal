@@ -173,7 +173,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
-		if ((!folding() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit, .discard, .undo') || !getSelection()?.isCollapsed) return
+		let hit = e.target as Element
+		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .discard, .undo')) return
+		let selection = getSelection()
+		if (!hit.closest('.mark') && selection && !selection.isCollapsed && root) {
+			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
+		}
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
