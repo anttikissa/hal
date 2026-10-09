@@ -115,15 +115,15 @@ function promptWidth(cols: number): number {
 // `status`: a tool call's, after its title (task wm0).
 // `look`: its fold state and inline pastes (task ghs).
 function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
-	let style = itemView.itemStyle(item, tool)
+	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (item.type === 'prompt' && bashResult.background(item)) status = itemView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style, status)
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: status ? Math.max(1, inner - strings.visLen(status) - 2) : inner })
+	let lines = look.lines?.(inner) ?? itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: status ? Math.max(1, inner - strings.visLen(status) - 2) : inner })
 	if (hal) lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
@@ -157,7 +157,9 @@ function ref(item: Item, cols: number, session: string | undefined, style: Style
 
 // How `item` is drawn (plugin hook): `look` as the layout made it.
 // A plugin may fold it, give it a result-aware headline (look.result),
-// drop its padding (pad: false) or the blank row above it (gap: false).
+// drop its padding (pad: false) or the blank row above it (gap: false),
+// replace its status after the title, its style, or draw its rows itself
+// (lines(width), painted in look.style).
 function look(_item: Item, look: Look): Look {
 	return look
 }
@@ -278,15 +280,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			// A call shows its attached result's status, or while it
 			// runs, its elapsed time (task wm0).
 			let ticks = item.type === 'tool' && item.id === view.tick?.call
-			let status = ''
 			if (item.type === 'tool') {
 				let style = itemView.itemStyle(item), next = items[i + 1]
 				if (next?.type === 'tool-result' && next.id === item.id) look.result = next
-				if (ticks) status = itemView.status(undefined, view.tick!.label, style)
-				else if (look.result) status = itemView.resultStatus(look.result, item.name === 'bash', style)
+				if (ticks) look.status = itemView.status(undefined, view.tick!.label, style)
+				else if (look.result) look.status = itemView.resultStatus(look.result, item.name === 'bash', style)
 			}
 			look = frame.look(item, look)
-			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status, look)
+			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)
 			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
 			// An attached result's padding row replaces its call's bottom one.
 			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
