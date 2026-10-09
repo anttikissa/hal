@@ -56,7 +56,7 @@ export const tool: Tool<ToolOutput> = {
 	parameters: {
 		type: 'object',
 		properties: {
-			path: { type: 'string', description: 'File path, relative to the working directory or under /tmp' },
+			path: { type: 'string', description: 'File path, absolute or relative to the working directory' },
 			hash: { type: 'string', description: 'The lease hash READ showed after @' },
 			edits: { type: 'array', items: { type: 'object' }, description: 'Changes: { range: "start-end", lines: [...] }' },
 			description: { type: 'string', description: 'What the edit does, for the user' },
@@ -68,7 +68,7 @@ export const tool: Tool<ToolOutput> = {
 		if (typeof input.hash !== 'string') throw new Error(`hash must be the lease hash from READ. Usage: ${usage}`)
 		let wanted = changes(input.edits)
 		let path = input.path
-		let observation = await fileChanges.begin(ctx, fileChanges.validate([path]))
+		let observation = await fileChanges.begin(ctx, fileChanges.validateFile(path), true)
 		try {
 			let full = resolve(ctx.cwd, path)
 			let bytes = await readFile(full)

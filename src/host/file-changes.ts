@@ -3,7 +3,7 @@
 // status is never read, so another session's edits or commits during a
 // call never count as this session's. Not enforcement or a sandbox.
 import { realpath, stat, mkdir, writeFile } from 'fs/promises'
-import { dirname, basename, resolve, relative, isAbsolute } from 'path'
+import { dirname, basename, resolve, relative, isAbsolute, normalize } from 'path'
 import { createHash } from 'crypto'
 import type { FileChange, FileSnapshot } from '../common/replay.ts'
 import { approval } from './approval.ts'
@@ -18,17 +18,23 @@ import { tabs } from './tabs.ts'
 import { jobs } from './jobs.ts'
 
 type Lock = { sessionId: string; callId?: string; paths: Set<string>; done: Promise<void>; release: () => void }
-type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
+type Observation = { ctx: ToolContext; patterns: string[]; literal: boolean; before: Map<string, FileSnapshot>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
 
 function validate(input: unknown): string[] {
 	if (input === undefined) return []
-	let help = 'Use a list of relative paths/globs or absolute paths/globs beneath /tmp, without ..; the command did not run'
+	let help = 'Use a list of relative or absolute paths/globs; the command did not run'
 	if (!Array.isArray(input)) throw new Error(`modifies must be a list, received ${JSON.stringify(input)}. ${help}`)
 	for (let [i, p] of input.entries()) {
-		let reason = typeof p !== 'string' ? 'not a string' : !p ? 'empty path' : p.includes('\0') ? 'contains NUL' : p.split('/').includes('..') ? 'contains parent traversal' : isAbsolute(p) && (!p.startsWith('/tmp/') || resolve(p) === '/tmp') ? 'absolute path outside /tmp' : undefined
+		let reason = typeof p !== 'string' ? 'not a string' : !p ? 'empty path' : p.includes('\0') ? 'contains NUL' : undefined
 		if (reason) throw new Error(`modifies[${i}] (${JSON.stringify(p)}): ${reason}. ${help}`)
 	}
-	return input.map((p) => isAbsolute(p) ? resolve(p) : relative('/cwd', resolve('/cwd', p)) || '.')
+	return input.map((p) => normalize(p))
+}
+
+function validateFile(path: unknown): string[] {
+	if (typeof path !== 'string' || !path) throw new Error('path must be a non-empty string')
+	if (path.includes('\0')) throw new Error('path contains NUL; nothing was written')
+	return [normalize(path)]
 }
 
 // Canonicalize missing files through their nearest existing ancestor too.
@@ -39,20 +45,20 @@ async function canonical(path: string): Promise<string> {
 	}
 }
 
-async function expand(cwd: string, patterns: string[]): Promise<string[]> {
+async function expand(cwd: string, patterns: string[], literal = false): Promise<string[]> {
 	let found = new Set<string>()
 	for (let p of patterns) {
-		if (!/[*?[\]{}]/.test(p)) found.add(p)
+		if (literal || !/[*?[\]{}]/.test(p)) found.add(p)
 		else for await (let name of new Bun.Glob(isAbsolute(p) ? relative(cwd, p) : p).scan({ cwd, dot: true, onlyFiles: true })) found.add(isAbsolute(p) ? resolve(cwd, name) : name)
 	}
 	return [...found].sort()
 }
 
-async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void> {
+async function acquire(ctx: ToolContext, patterns: string[], literal = false): Promise<() => void> {
 	if (!patterns.length) return () => {}
 	for (;;) {
 		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
-		let names = await fileChanges.expand(ctx.cwd, patterns)
+		let names = await fileChanges.expand(ctx.cwd, patterns, literal)
 		let keys = new Set(await Promise.all(names.map((p) => fileChanges.canonical(resolve(ctx.cwd, p)))))
 		// Reserve glob expressions too: identical globs with no current matches
 		// must not both create their first file at the same time.
@@ -131,24 +137,24 @@ async function headLog(cwd: string): Promise<string | undefined> {
 	return fileChanges.canonical(resolve(cwd, root.text.trimEnd()))
 }
 
-async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation> {
-	let release = await fileChanges.acquire(ctx, patterns)
+async function begin(ctx: ToolContext, patterns: string[], literal = false): Promise<Observation> {
+	let release = await fileChanges.acquire(ctx, patterns, literal)
 	try {
 		let before = new Map<string, FileSnapshot>()
-		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
+		for (let path of await fileChanges.expand(ctx.cwd, patterns, literal)) before.set(path, await fileChanges.snapshot(ctx, path))
 		let log = await fileChanges.headLog(ctx.cwd)
 		let watch = log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined
 		let declared = patterns.length ? neighbors.start(ctx.sessionId, ctx.cwd, patterns) : undefined
 		// Every path out of a call ends here, launched or not, so the declaration ends with it.
-		return { ctx, patterns, before, commits: watch, release: () => { release(); if (declared) neighbors.end(declared) } }
+		return { ctx, patterns, literal, before, commits: watch, release: () => { release(); if (declared) neighbors.end(declared) } }
 	} catch (e) { release(); throw e }
 }
 
 async function finish(observation: Observation): Promise<void> {
-	let { ctx, patterns, before, release } = observation
+	let { ctx, patterns, literal, before, release } = observation
 	try {
 		let files: FileChange[] = []
-		let declared = new Set([...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns)])
+		let declared = new Set([...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns, literal)])
 		for (let path of declared) {
 			let a = before.get(path) ?? null, b = await fileChanges.snapshot(ctx, path)
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
@@ -170,5 +176,5 @@ async function finish(observation: Observation): Promise<void> {
 export const fileChanges = {
 	state: { locks: [] as Lock[] },
 	maxBytes: 1_000_000,
-	validate, canonical, expand, acquire, blobPath, snapshot, git, headLog, begin, finish,
+	validate, validateFile, canonical, expand, acquire, blobPath, snapshot, git, headLog, begin, finish,
 }

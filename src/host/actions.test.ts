@@ -2,7 +2,10 @@
 // the real tool modules.
 
 import { expect, test } from 'bun:test'
-import { readFileSync, statSync, writeFileSync, chmodSync } from 'fs'
+import { readFileSync, statSync, writeFileSync, chmodSync, mkdtempSync, rmSync } from 'fs'
+import { relative } from 'path'
+import { fileChanges } from './file-changes.ts'
+import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
 import { actions } from './actions.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
@@ -96,6 +99,41 @@ test('EDIT keeps CRLF, a BOM and a missing final newline; WRITE creates director
 	expect(readFileSync(path, 'utf8')).toBe('\uFEFFa\r\nB\r\nB2\r\nc\r\nd')
 	let written = await act(id, 'WRITE "deep/new.txt" "x\\ny\\n"')
 	expect(written.output).toBe(`== WRITE deep/new.txt@${lease(`${testHome()}/deep/new.txt`)} ok: 2 lines, 4 bytes ==`)
+})
+
+test('file Actions accept absolute and parent-relative paths outside /tmp and snapshot literal filenames', async () => {
+	let id = created(client(), testHome())
+	let dir = mkdtempSync(`${process.cwd()}/.hal-actions-`)
+	let path = `${dir}/deep/file[1].txt`
+	try {
+		let written = await act(id, `WRITE ${JSON.stringify(path)} ${JSON.stringify('old\n')}`)
+		expect(written.isError).toBeUndefined()
+		let read = await act(id, `READ ${JSON.stringify(path)}`)
+		expect(read.output).toContain('1: old')
+		let parent = relative(testHome(), path)
+		let edited = await act(id, `EDIT ${JSON.stringify(`${parent}@${leaseOf(read.output)}`)} { range: 1, lines: ['new'] }`)
+		expect(edited.isError).toBeUndefined()
+		expect(readFileSync(path, 'utf8')).toBe('new\n')
+		let stale = await act(id, `EDIT ${JSON.stringify(`${path}@${leaseOf(read.output)}`)} { range: 1, lines: ['bad'] }`)
+		expect(stale.isError).toBe(true)
+		expect(readFileSync(path, 'utf8')).toBe('new\n')
+		let records = history.readSync(id).filter((r) => r.type === 'file_changes')
+		expect(records[0]!.files).toMatchObject([{ path, before: null }])
+		let changed = records[1]!.files[0]!
+		expect(changed.path).toBe(parent)
+		expect(readFileSync(fileChanges.blobPath(id, changed.before as string), 'utf8')).toBe('old\n')
+		expect(readFileSync(fileChanges.blobPath(id, changed.after as string), 'utf8')).toBe('new\n')
+		for (let name of ['WRITE', 'EDIT']) {
+			let bad = await act(id, name === 'WRITE' ? `WRITE ${JSON.stringify('bad\0path')} 'x'` : `EDIT ${JSON.stringify('bad\0path@abcde')} { range: 1, lines: [] }`)
+			expect(bad.isError).toBe(true)
+			expect(bad.output).toContain('NUL')
+		}
+		let secret = `${dir}/.env`
+		expect((await act(id, `WRITE ${JSON.stringify(secret)} 'private'`)).isError).toBeUndefined()
+		let sensitive = history.readSync(id).findLast((r) => r.type === 'file_changes')!
+		if (sensitive.type !== 'file_changes') throw new Error('missing file changes')
+		expect(sensitive.files[0]).toMatchObject({ path: secret, before: null, after: { size: 7 } })
+	} finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('HELP comes from the tool modules; $tools_summary lists only tools the prompt does not explain', async () => {

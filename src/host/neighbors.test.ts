@@ -1,7 +1,8 @@
+import './host.ts'
 import { expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { clock } from './clock.ts'
 import { neighbors } from './neighbors.ts'
 import { sessions } from './sessions.ts'
@@ -16,7 +17,7 @@ test('readers hear declared files modified within a minute, then once when the d
 		sessions.state.open = new Map(['neighbor', 'reader', 'late'].map((id) => [id, { cwd: dir, name: id === 'neighbor' ? 'Neighbor' : undefined } as any]))
 		neighbors.state = { active: new Set(), told: new Map() }
 		touch('server.log', 5); touch('old.ts', 3600)
-		let server = neighbors.start('neighbor', dir, ['server.log', 'old.ts', 'missing.ts', '.git/**', '/tmp/x.log'])
+		let server = neighbors.start('neighbor', dir, ['server.log', 'old.ts', 'missing.ts', '.git/**', '/tmp/x.log', '..', `../${basename(dir)}/server.log`])
 		expect(neighbors.notes('reader', dir)).toEqual(['[neighbor (Neighbor) modified server.log <1min ago]'])
 		expect(neighbors.notes('reader', dir)).toEqual([])
 		expect(neighbors.notes('other', '/q')).toEqual([])
