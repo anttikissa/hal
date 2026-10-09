@@ -48,6 +48,19 @@ function boxOf(f: Frame): { top: number; bottom: number; rows: string[] } {
 	return { top, bottom, rows: lines.slice(top + 1, bottom) }
 }
 
+test('EDIT line lists cannot consume the title or block reference', () => {
+	let item = { type: 'tool', id: 'edit', name: 'edit', input: { path: 'src/host/file-changes.ts' }, key: '62', ts: new Date().toISOString() } as const
+	let status = '(+5 −6, lines 6, 25, 28, 31, 37, 42, 59, 71, 100, 120)'
+	for (let cols of [40, 60, 100]) {
+		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
+		let header = rows.find(r => r.includes('Edit'))!
+		expect(header).toContain('Edit src/')
+		expect(header).toContain('#t62')
+		expect(header).toContain('…')
+		expect(strings.visLen(header)).toBeLessThanOrEqual(cols)
+	}
+})
+
 test('shows every item, however long the history', () => {
 	let items: Item[] = []
 	for (let i = 0; i < 300; i++) items.push({ type: 'prompt', text: `question ${i}` }, { type: 'text', text: `answer ${i}` })

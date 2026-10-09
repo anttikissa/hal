@@ -1365,6 +1365,40 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 }, 15000)
 
 
+browserTest('EDIT statistics preserve readable closed titles and full-width open titles', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let ts = new Date().toISOString()
+	for (let [name, path, marks] of [['short', 'a.ts', [29]], ['long', 'src/host/file-changes.ts', [6, 25, 28, 31, 37, 42, 59, 71, 100, 120]]] as const) {
+		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name, name: 'edit', input: { path } }, ts })
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name, output: 'Edited', diff: marks.map(n => `-${n} old\n+${n} new`).join('\n') }], ts })
+	}
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {}, ts })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.Card.tool .status.diff').length === 2`)
+		for (let [width, height] of [[320, 760], [390, 800], [844, 390], [1200, 800]]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width! < 900 })
+			for (let open of [false, true]) {
+				if (open) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+				await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+				let rows = await b.evaluate(`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector('.status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector('.status').textContent, title: h.querySelector('.title').textContent }; })`)
+				for (let row of rows) {
+					expect(row.fits).toBe(true)
+					expect(row.stampFits).toBe(true)
+					expect(row.linkClear).toBe(true)
+					expect(row.title).toMatch(/^Edit /)
+					if (open) { expect(row.separated).toBe(true); expect(row.flowWidth).toBeGreaterThan(width! / 2) }
+					else { expect(row.flowWidth).toBeGreaterThan(row.statusWidth); expect(row.rowHeight).toBe(44) }
+				}
+				expect(rows[1].stats).toContain('120')
+			}
+			await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+		}
+	} finally { await b.close() }
+}, 15000)
+
 browserTest('transcript card variants share first-line geometry in open and closed states', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = new Date().toISOString()

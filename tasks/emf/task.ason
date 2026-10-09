@@ -1,0 +1,10 @@
+{
+	title: 'Preserve EDIT titles ahead of diff statistics',
+	spec: 'Restore the invariant that EDIT header statistics never crowd out the timestamp, Edit verb and file path. Closed web headers stay one row, clipping secondary diff statistics before sacrificing readable title space; references remain visible. Open web headers give title/path usable wrapping width and place complete diff statistics on a separate row without overlap or character-per-line collapse. Preserve counts, changed lines, duration, full diff, links and folding. Terminal EDIT headers also bound secondary diff statistics so long changed-line lists cannot consume their titles; complete diffs remain available when opened. Check short/long and open/closed web cards at narrow, phone, landscape and desktop widths.',
+	status: 'done',
+	notes: [
+		'Root cause: an auto-sized nowrap diff-status grid column reserved the entire changed-line list, shrinking the title to zero when closed and one character when open. Closed stats are capped at 30vw with ellipsis; open stats occupy a full second grid row. Terminal ref placement clips EDIT stats to one-third of the available inner width. Focused checks: 37 frame tests and two real Chrome layout tests passed; short/long open/closed cards checked at 320, 390, 844 and 1200 pixels, with 390px screenshots inspected. Targeted lint passed. Full ./test failed with 12 tests, existing module-size violations (frame.ts already 410 lines at HEAD), and unrelated type/lint failures; the new fixture TurnStatus error was fixed to completed and focused tests rerun. No physical iOS device check.'
+	],
+	needs: ['ese'],
+	foldInto: ['ese']
+}
