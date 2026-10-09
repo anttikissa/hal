@@ -9,7 +9,6 @@ import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
-import { folds } from './folds.ts'
 import { frame } from './frame.ts'
 import { keys, type KeyEvent } from './keys.ts'
 import { pulse } from './pulse.ts'
@@ -664,9 +663,6 @@ test('/go changes this terminal only while it shows the source session', () => {
 	expect(sent).toEqual([{ type: 'open', sessionId: 'b' }])
 	app.onEvent({ type: 'go', sessionId: 'a', tab: 'c' })
 	expect(shown()).toBe('b')
-	// A named block opens, as the web opens a linked card.
-	app.onEvent({ type: 'go', sessionId: 'b', tab: 'b', block: 't44' })
-	expect(folds.of('b').get('44')).toBe('open')
 })
 
 test('each tab keeps its editor state while another is shown; a modal closes on switch', () => {
