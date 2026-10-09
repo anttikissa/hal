@@ -7,6 +7,11 @@
 // scope all, tab/session = sessions, model = models, client = clients;
 // other words, comma- or space-separated, are fields. A trailing
 // { what, scope, fields } object wins over words; other keys are errors.
+// Seen from real models (session histories, 9 Oct): INSPECT "tabs"
+// (claude-opus-5-5), the sole plain-word call and the reason words
+// exist; otherwise only objects, e.g. { what: "sessions", scope: "all",
+// fields: "tab,id,name,state" } (claude-opus-5-5, gpt-6-astra). The
+// other words and aliases are guesses, not observed.
 import { action } from '../../common/action.ts'
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'

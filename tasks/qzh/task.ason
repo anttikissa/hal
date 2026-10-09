@@ -2,6 +2,9 @@
 	title: 'INSPECT resolves plain words by value',
 	spec: 'The INSPECT action accepts plain words, quoted or bare, in any order, case-insensitive: a view name (sessions, host, models, clients) sets what, a scope name (self, project, all) sets scope, aliases map to what a model plausibly means (tabs: sessions with scope all; tab, session: sessions; model: models; client: clients), and any other words, comma- or space-separated, are fields. A { what, scope, fields } object may follow and wins over words; an unknown key in it is an error naming the valid ones. Invariant restored: INSPECT "tabs" lists the open tabs instead of failing with "takes 0 plain arguments".',
 	status: 'done',
+	notes: [
+		'Provenance (session histories, 9 Oct): the only plain-word INSPECT a real model sent was INSPECT "tabs" (claude-opus-5-5); all other calls used objects (claude-opus-5-5, gpt-6-astra). Other words and aliases are guesses.'
+	],
 	needs: ['jm'],
 	foldInto: ['jm']
 }
