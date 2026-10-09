@@ -11,7 +11,8 @@
 		'The "You are Claude." line sits in ::: if model="anthropic/*"; other models only read "You are working within Hal, a coding harness." (user decision 8 Oct).',
 		'Intro is one line (user decision 8 Oct): Anthropic models read "You are Claude, working within Hal, a coding harness.", others "You are Hal, a coding harness."',
 		'Non-Anthropic intro reads "You are Hal, a coding agent." (user decision 8 Oct); Claude keeps "working within Hal, a coding harness."',
-		'Usage placeholders use angle brackets everywhere (COMMAND /<name> [<args>]); a bare /name args was mistaken for literal text, and the bare slash form is labeled as COMMAND shorthand.'
+		'Usage placeholders use angle brackets everywhere (COMMAND /<name> [<args>]); a bare /name args was mistaken for literal text, and the bare slash form is labeled as COMMAND shorthand.',
+		'SYSTEM.md has a # Plugins section: disable with /plugins disable <name>, not by renaming or deleting the file (user decision 9 Oct; the model once renamed show-keys.ts to disable it).'
 	],
 	needs: ['gr', 'asp']
 }
