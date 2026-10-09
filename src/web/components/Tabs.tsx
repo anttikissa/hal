@@ -95,7 +95,8 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	let track!: HTMLElement
 	let probe!: HTMLElement
 	let [room, setRoom] = createSignal({ width: 0, ch: 8 })
-	let [visible, setVisible] = createSignal({ start: 0, end: 0 })
+	// start..end-1 are fully visible; edge marks come only from tabs under 10% visible.
+	let [visible, setVisible] = createSignal({ start: 0, end: 0, markStart: 0, markEnd: 0 })
 	let current = () => props.tabs.findIndex((t) => t.id === props.shown)
 	let layout = createMemo(() => {
 		let { width, ch } = room()
@@ -119,7 +120,9 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let right = track.scrollLeft + track.clientWidth
 		let start = Math.max(0, Math.ceil((track.scrollLeft - 1) / cell))
 		let end = right >= track.scrollWidth - 1 ? n : Math.min(n, Math.floor((right + 1) / cell))
-		setVisible({ start, end })
+		let markStart = Math.max(0, Math.ceil(track.scrollLeft / cell - .9))
+		let markEnd = Math.max(end, Math.min(n, Math.floor(right / cell - .1) + 1))
+		setVisible({ start, end, markStart: Math.min(start, markStart), markEnd })
 	}
 	let center = (smooth: boolean) => {
 		if (!track) return
@@ -149,8 +152,10 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		return () => cancelAnimationFrame(frame)
 	})
 	let edge = (left: boolean): Edge => {
-		let hidden = left ? props.tabs.slice(0, visible().start) : props.tabs.slice(visible().end)
-		return { count: hidden.length, mark: tabPages.urgent(hidden) }
+		let { start, end, markStart, markEnd } = visible()
+		let hidden = left ? props.tabs.slice(0, start) : props.tabs.slice(end)
+		let unseen = left ? props.tabs.slice(0, markStart) : props.tabs.slice(markEnd)
+		return { count: hidden.length, mark: tabPages.urgent(unseen) }
 	}
 	let page = (left: boolean) => {
 		let { start, end } = visible()
