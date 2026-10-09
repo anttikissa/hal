@@ -29,6 +29,7 @@ import { toggle, type Fold } from '../common/toggle.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
 import type { Folded } from '../common/notices.ts'
+import type { Shown } from '../common/placeholders.ts'
 import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
@@ -53,8 +54,8 @@ export interface View {
 	notice?: string
 	/** The open question being answered here: keys and cursor go to it. */
 	form?: FormState
-	/** A dim example request shown while the prompt is empty. */
-	placeholder?: string
+	/** A dim example request over the prompt (placeholders.follow). */
+	placeholder?: Shown
 	/** A modal drawn over everything: keys and cursor go to it. */
 	modal?: ModalState
 	/** The host's tabs and the one shown: a tab bar row above the prompt;

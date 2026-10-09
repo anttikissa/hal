@@ -81,8 +81,8 @@ function createState(): AppState {
 }
 
 // Paints the view; the pulse beats while something in it blinks.
-// A rotating placeholder in an empty field repaints when its text
-// next changes.
+// A rotating example (the prompt's, or a form field's) repaints when
+// its text next changes, on the pulse's frame grid.
 function show(): void {
 	let v = appView.view()
 	pulse.keep(appView.blinks(v) ? app.beat : null)
@@ -90,10 +90,10 @@ function show(): void {
 	let st = app.state
 	clearTimeout(st.typing)
 	let f = st.form ?? st.modal?.form
-	let now = Date.now()
-	let next = Math.min(...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
+	let now = pulse.now()
+	let next = Math.min(v.placeholder?.next ?? Infinity, ...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
 	if (next === Infinity) return
-	st.typing = setTimeout(app.show, next)
+	st.typing = setTimeout(app.show, pulse.until(next))
 	;(st.typing as { unref?: () => void }).unref?.()
 }
 

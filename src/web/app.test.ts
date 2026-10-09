@@ -305,12 +305,12 @@ const alt = (digit: number) => press(String(digit), message(app.state.text), { a
 test('the empty box shows an example request, from the Hal list in a tab the host marks hal', () => {
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { hal: true })))
 	expect(app.state.shown).toBe('1-aaa')
-	expect(app.placeholder()).toBeUndefined()
+	expect(app.placeholder('', 0)).toBeUndefined()
 	app.onEvent(snapOf('1-aaa'))
-	expect(app.placeholder()).toBe(placeholders.general[0])
+	expect(app.placeholder('', 0)?.text).toBe(placeholders.general[0])
 	tabs.show('2-bbb', false)
 	app.onEvent(snapOf('2-bbb'))
-	expect(app.placeholder()).toBe(placeholders.hal[0])
+	expect(app.placeholder('', 0)?.text).toBe(placeholders.hal[0])
 })
 
 test('a block address resumes even a closed session, retaining its hash and history entry', () => {

@@ -27,7 +27,7 @@ import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 import { Icon } from './Icon.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -129,7 +129,7 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, menu, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
+	let [tabs, shown, view, text, menu, notice, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('connected'), field('target'), field('pushReady')]
 	let stack = field('notices')
 	let updateAvailable = field('updateAvailable')
 	let pending = createMemo(() => state().pending, { equals: same })
@@ -193,7 +193,7 @@ export function Chat() {
 			<Notices entries={stack()} />
 			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} />
 			<EditBar view={view()} />
-			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
+			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 			<Rebase />
 		</div>

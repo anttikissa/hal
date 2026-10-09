@@ -7,7 +7,7 @@
 // (state, key) → state, so keys mean the same in terminal and web.
 
 import type { HistoryRecord } from './replay.ts'
-import { placeholders } from './placeholders.ts'
+import { placeholders, type Shown } from './placeholders.ts'
 
 export type Field = { help?: string } & (
 	// One line of text; may be left empty, or prefilled by the host.
@@ -141,10 +141,10 @@ function start(id: string, form: Form): FormState {
 
 // The placeholder field `index` shows `now` (Date.now()); `next`: ms
 // until it changes (Infinity: never, as for a plain string).
-function example(st: FormState, index: number, now: number): { text: string; next: number } {
+function example(st: FormState, index: number, now: number): Shown {
 	let f = st.form.fields[index]
 	let p = f?.type === 'text' ? f.placeholder : undefined
-	return Array.isArray(p) ? placeholders.rotate(p, now - (st.opened ?? now)) : { text: p ?? '', next: Infinity }
+	return Array.isArray(p) ? placeholders.rotate(p, now - (st.opened ?? now)) : { cut: '', text: p ?? '', next: Infinity }
 }
 
 // The form state for question `open` (the transcript's open one): the

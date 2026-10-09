@@ -110,6 +110,11 @@ export const ansi = {
 	// there the terminal is monochrome: no color escapes at all, only
 	// bold and reverse video. Read on every call.
 	mono: (): boolean => !!process.env.STY || (process.env.TERM ?? '').startsWith('screen'),
+	// Text fading toward its background, a color per glyph: only where
+	// truecolor is known to work (COLORTERM), or a TERM only such
+	// terminals set (it passes over SSH; COLORTERM often does not).
+	// Elsewhere (xterm, screen) examples just erase.
+	fades: (): boolean => !ansi.mono() && (/^(truecolor|24bit)$/.test(process.env.COLORTERM ?? '') || /^(xterm-ghostty|xterm-kitty|wezterm)$/.test(process.env.TERM ?? '')),
 	sgr,
 	quiet,
 	paint,

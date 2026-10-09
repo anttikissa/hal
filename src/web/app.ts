@@ -10,7 +10,7 @@ import { backfill, type Backfill } from '../common/backfill.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Sending } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
-import { placeholders } from '../common/placeholders.ts'
+import { placeholders, type PromptExample, type Shown } from '../common/placeholders.ts'
 import type { Delivery, Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
@@ -54,12 +54,12 @@ function notice(): string | undefined {
 	return view.notice(app.state.view)
 }
 
-// A dim example request for the box, another each turn; the textarea
-// shows it only while empty. The Hal repo has its own (Tab `hal`).
-function placeholder(): string | undefined {
+// The example over the box (placeholders.follow); Tab `hal`: Hal list.
+const example: PromptExample = {}
+function placeholder(text: string, now: number): Shown | undefined {
 	let t = app.state.view.transcript
 	let hal = !!app.state.tabs.find((tab) => tab.id === app.state.shown)?.hal
-	return t && placeholders.pick(hal, t.items.filter((i) => i.type === 'prompt').length)
+	return placeholders.follow(example, t?.meta.id ?? '', t && (hal ? placeholders.hal : placeholders.general), text, now)
 }
 
 function setView(v: ViewState): void {
