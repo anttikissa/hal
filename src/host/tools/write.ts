@@ -15,7 +15,7 @@ export const tool: Tool = {
 	parameters: {
 		type: 'object',
 		properties: {
-			path: { type: 'string', description: 'File path, relative to the working directory or under /tmp' },
+			path: { type: 'string', description: 'File path, absolute or relative to the working directory' },
 			content: { type: 'string', description: 'The whole new content' },
 		},
 		required: ['path', 'content'],
@@ -23,7 +23,7 @@ export const tool: Tool = {
 	async run(input, ctx) {
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		if (typeof input.content !== 'string') throw new Error('content must be a string')
-		let observation = await fileChanges.begin(ctx, fileChanges.validate([input.path]))
+		let observation = await fileChanges.begin(ctx, fileChanges.validateFile(input.path), true)
 		try {
 			let full = resolve(ctx.cwd, input.path)
 			if (ctx.signal.aborted) throw new Error('stopped before writing; nothing was written')

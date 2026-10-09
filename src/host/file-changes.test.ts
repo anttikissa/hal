@@ -12,7 +12,7 @@ import type { ToolContext } from './tools.ts'
 let home = '', cwd = '', id = ''
 const savedHome = process.env.HAL_HOME
 beforeEach(async () => {
-	home = mkdtempSync('/tmp/hal-file-changes-')
+	home = mkdtempSync(`${process.cwd()}/.hal-file-changes-`)
 	process.env.HAL_HOME = home
 	cwd = `${home}/repo`
 	mkdirSync(cwd)
@@ -97,14 +97,14 @@ test('background calls hold overlapping locks until exit and record final bytes'
 	expect(result.output).toContain('started in background')
 	// Its own session waits too, and the wait names the job, not the session.
 	let seen = ''
-	await bash('printf foreground >> file', ['file'], { ...context(), onOutput: (c) => { seen += c } })
+	await bash('printf foreground >> file', [`${cwd}/file`], { ...context(), onOutput: (c) => { seen += c } })
 	expect(seen).toMatch(/^Waiting for background job #t\d+ \(this session\) to exit; it declared file\n/)
 	expect(readFileSync(`${cwd}/file`, 'utf8')).toBe('backgroundforeground')
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('background')
 })
 
 test('invalid declarations never execute; failed commands still retain changes', async () => {
-	for (let modifies of ['file', [null], ['/outside/file'], ['../file']]) {
+	for (let modifies of ['file', [null], [''], ['bad\0path']]) {
 		expect((await bash('touch ran', modifies)).isError).toBe(true)
 	}
 	expect(changes()).toHaveLength(0)
@@ -113,19 +113,19 @@ test('invalid declarations never execute; failed commands still retain changes',
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('changed')
 })
 
-test('absolute scratch literals and globs snapshot files outside cwd', async () => {
-	let literal = `${cwd}/scratch.log`, pattern = `${home}/*.txt`
-	let result = await bash(`printf log > '${literal}'; printf glob > '${home}/new.txt'`, [literal, pattern])
+test('absolute and parent-relative literals and globs snapshot files outside cwd', async () => {
+	let literal = `${home}/scratch.log`, pattern = '../*.txt'
+	let result = await bash(`printf log > '${literal}'; printf glob > '../new.txt'`, [literal, pattern])
 	expect(result.isError).toBeUndefined()
 	let files = changes()[0]!.files
-	expect(files.map((f) => f.path).sort()).toEqual([`${home}/new.txt`, literal].sort())
+	expect(files.map((f) => f.path).sort()).toEqual(['../new.txt', literal].sort())
 	for (let f of files) {
 		expect(f.before).toBeNull()
 		expect(bytes(f.after).toString()).toBe(f.path === literal ? 'log' : 'glob')
 	}
-	let bad = await bash('touch ran', ['/tmp/../outside'])
+	let bad = await bash('touch ran', ['bad\0path'])
 	expect(bad.output).toContain('modifies[0]')
-	expect(bad.output).toContain('parent traversal')
+	expect(bad.output).toContain('contains NUL')
 	expect(bad.output).toContain('command did not run')
 })
 

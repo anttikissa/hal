@@ -1,0 +1,13 @@
+{
+	title: 'File tools allow paths in every directory',
+	spec: 'Invariant: file tools allow every directory accessible to the host, including absolute paths outside /tmp and parent-relative paths. This replaces the Bash modifies directory restrictions in x1 and 8w at the user request on 9 Oct 2026. WRITE and EDIT observe explicit literal paths rather than interpreting filename punctuation as globs. Bash modifies accepts relative or absolute paths/globs in any directory. Reject non-string, empty and NUL paths before execution. Retain canonical overlap locks, snapshots, lexical and canonical sensitive-file handling, atomic writes, editing leases and stale-lease rejection. Neighbor notices exclude parent-traversal declarations, preserving their project-only privacy boundary. Tool help describes the allowed paths. READ already accepts absolute and parent-relative paths and retains its behavior. Regression coverage exercises absolute and parent-relative operations, literal glob punctuation, snapshots, sensitive paths and malformed input.',
+	status: 'done',
+	notes: [
+		'WRITE and EDIT previously reused the Bash declaration validator, so absolute leases from READ failed outside /tmp. The user broadened the fix to every directory, replacing the Bash /tmp and parent-traversal restrictions too. path.normalize preserves parent-relative depth; resolving against a synthetic /cwd would truncate traversal above that fake root. Literal observation mode keeps glob punctuation in explicit filenames from dropping snapshots. Tests create and remove fixtures under process.cwd to exercise paths outside /tmp without host-specific configuration.',
+		'Neighbor declarations previously relied on the validator rejecting parent traversal. Now neighbors.local explicitly excludes parent components so outside-project names are not disclosed to other sessions. Existing neighbor regression coverage includes parent declarations.',
+		'Focused neighbors tests exposed an existing auth/slash import cycle when loaded first. The test imports host.ts first, as other host integration tests do; production module initialization is unchanged.',
+		'Verification: 15 focused Action, file-changes and neighbors tests pass; lint on all eight changed source/test files and git diff --check pass. Full ./test reports failures outside these files, including line-limit/e2e/history/web/system tests, type errors in replay.test.ts and web.test.ts, and an unused import in client/find.test.ts. No unrelated production changes are included.'
+	],
+	needs: ['3fv', 'x1', '0f'],
+	foldInto: ['3fv', 'x1', '0f']
+}

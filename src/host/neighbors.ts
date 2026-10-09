@@ -18,7 +18,7 @@ type Declaration = { sessionId: string; cwd: string; paths: string[]; ended?: nu
 const maxPaths = 5
 
 // A path worth telling a neighbor: relative, in the project, not Git's own.
-const local = (p: string) => !p.startsWith('/') && !p.startsWith('~') && !/^(\.\/)?\.git(\/|$)/.test(p)
+const local = (p: string) => !p.startsWith('/') && !p.startsWith('~') && !p.split('/').includes('..') && !/^(\.\/)?\.git(\/|$)/.test(p)
 
 const list = (paths: string[]) => [...paths.slice(0, maxPaths), ...paths.length > maxPaths ? [`${paths.length - maxPaths} more`] : []].join(', ')
 
