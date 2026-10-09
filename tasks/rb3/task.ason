@@ -1,0 +1,7 @@
+{
+	title: 'Scope directory instructions before working',
+	spec: 'SYSTEM.md instructs: Before working in a directory, /cd into it to bring its AGENTS.md and skills to scope.',
+	status: 'done',
+	needs: ['15', '074'],
+	foldInto: ['15']
+}
