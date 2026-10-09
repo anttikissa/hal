@@ -206,3 +206,21 @@ test('dropping a final reply continues the exposed unfinished turn; a completed 
 		}
 	}
 })
+
+test('a running turn that drops itself back to a completed reply ends without another request', async () => {
+	let c = client(), id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'first' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'final reply' }, { type: 'done', reason: 'end' })
+	await until(() => !turns.state.running.has(id))
+	let tail = history.readSync(id).at(-1)!.n! + 1
+	c.conn.send({ type: 'submit', sessionId: id, text: 'drop everything after the reply' })
+	await until(() => calls.length === 2)
+	calls[1]!.push(command(`/rebase run drop ${tail}-`), { type: 'done', reason: 'tool_use' })
+	await until(() => !turns.state.running.has(id))
+	expect(calls).toHaveLength(2)
+	let current = replay.current(history.readSync(id))
+	expect(current.findLast((r) => r.type === 'assistant')).toMatchObject({ block: { text: 'final reply' } })
+	expect(current.findLast((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))).toMatchObject({ text: expect.not.stringContaining('continuing') })
+	expect(history.unfinished(id)).toBe(false)
+})

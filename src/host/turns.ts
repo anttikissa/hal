@@ -222,8 +222,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				break
 			}
 			if (transition?.kind === 'rebase') {
-				let paused = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.apply(id, transition)
-				if (paused) { last = undefined; break }
+				let stop = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.apply(id, transition)
+				if (stop) { last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined; break }
 			}
 			if (transition?.kind === 'compact') contextTransitions.apply(id)
 			// Aborted work has settled. A steer left a fresh controller
@@ -338,8 +338,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let results = calls.map((c) => settled.get(c.id)!)
 			if (turns.state.running.get(id) !== running) return
 			if (contextTransitions.pending(id)?.kind === 'rebase') {
-				let settled = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)
-				if (settled.paused) { last = undefined; break }
+				let { stop } = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)
+				if (stop) { last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined; break }
 			} else {
 				let r = history.results(id, results)
 				host.broadcast(id, r?.n === undefined ? { type: 'tool-results', sessionId: id, results, ts: r?.ts } : { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
