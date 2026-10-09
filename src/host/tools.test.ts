@@ -201,6 +201,19 @@ test('large bash output is bounded, keeps both ends and the whole result in a se
 	} finally { paths.home = originalHome }
 })
 
+test('bash output past 100 lines keeps both ends and says how to page the blob', async () => {
+	paths.home = () => dir
+	try {
+		let result = await bash({ command: 'seq 1 300', description: 'Print 300 lines' })
+		expect(result.output).toContain('\n1\n')
+		expect(result.output).toContain('\n300\n')
+		expect(result.output).not.toContain('\n150\n')
+		let id = result.output.match(/READ_BLOB "([0-9a-f]{12})" \{ offset: 1, limit: 100 \}/)?.[1]
+		expect(id).toBeDefined()
+		expect((await blobRun(id!, { offset: 151, limit: 1 })).output).toStartWith('150\n')
+	} finally { paths.home = originalHome }
+})
+
 test('read_blob resolves text and images and rejects unknown or escaping references', async () => {
 	paths.home = () => dir
 	try {
