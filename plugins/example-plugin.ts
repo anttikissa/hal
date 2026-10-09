@@ -54,6 +54,8 @@ import type { Plugin } from '../src/host/plugins.ts'
 // import { colors } from '../src/common/colors.ts'
 // import { terminal } from '../src/client/terminal.ts'
 // import { sendKeys } from '../src/common/send-keys.ts'
+// import { frame } from '../src/client/frame.ts'
+// import { toolDetails } from '../src/common/tool-details.ts'
 //
 // export const expires = '2026-12-31T23:59:00Z'
 // export const portable = true
@@ -69,6 +71,13 @@ export default (plugin: Plugin) => {
 // 	// soft-steers and Cmd-Enter queues.
 // 	plugin.set(sendKeys, 'enter', 'soft-steer')
 // 	plugin.set(sendKeys, 'cmd-enter', 'queue')
+//
+// 	// Terminal transcript: frame.look decides how each block draws (fold,
+// 	// pad: false drops its padding rows, gap: false the blank row above;
+// 	// look.result is a call's result). toolDetails.headline(name, input,
+// 	// output) is a call's title. Here every call is one row until opened.
+// 	plugin.around(frame, 'look', (next, item, look) => (item.type === 'tool' || item.type === 'tool-result') && look.fold !== 'open' ? { ...next(item, look), fold: 'closed', pad: false, gap: false } : next(item, look))
+// 	plugin.around(toolDetails, 'headline', (next, name, input, output) => name === 'bash' ? { text: `run ${input.command}` } : next(name, input, output))
 //
 // 	// Observing: log every account choice.
 // 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))

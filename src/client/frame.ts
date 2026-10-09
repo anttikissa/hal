@@ -119,7 +119,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	if (item.type === 'prompt' && bashResult.background(item)) status = itemView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style, status)
@@ -127,8 +127,8 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	if (hal) lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
-	// Closed blocks too: a card without them looks broken.
-	let padded = !!style?.bg && lines.length > 0
+	// Closed blocks too: a card without them looks broken. look.pad decides.
+	let padded = (look.pad ?? !!style?.bg) && lines.length > 0
 	if (padded) lines = ['', ...lines, '']
 	mark(lines, padded ? 1 : 0)
 	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))
@@ -153,6 +153,13 @@ function ref(item: Item, cols: number, session: string | undefined, style: Style
 		else lines[at] += ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref!.text))) + link
 	}
 	return { inner, mark }
+}
+
+// How `item` is drawn (plugin hook): `look` as the layout made it.
+// A plugin may fold it, give it a result-aware headline (look.result),
+// drop its padding (pad: false) or the blank row above it (gap: false).
+function look(_item: Item, look: Look): Look {
+	return look
 }
 
 // A queued message's compact row (task 16): `note`, then its text, no
@@ -206,6 +213,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let tick: Past['tick']
 	// The call whose card is being laid out: its first row and fold key.
 	let card: { id: string; key: string; start: number } | undefined
+	// The look of the last item that drew rows.
+	let drawn: Look | undefined
 	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url} ${view.folds?.sig ?? ''}`
 	let kept = frame.state.history
 	let start = 0
@@ -272,13 +281,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			let status = ''
 			if (item.type === 'tool') {
 				let style = itemView.itemStyle(item), next = items[i + 1]
+				if (next?.type === 'tool-result' && next.id === item.id) look.result = next
 				if (ticks) status = itemView.status(undefined, view.tick!.label, style)
-				else if (next?.type === 'tool-result' && next.id === item.id) status = itemView.resultStatus(next, item.name === 'bash', style)
+				else if (look.result) status = itemView.resultStatus(look.result, item.name === 'bash', style)
 			}
+			look = frame.look(item, look)
 			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status, look)
 			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
-			if (tool && rows.length && lines.length) lines.pop()
-			else if (rows.length && lines.length) lines.push('')
+			// An attached result's padding row replaces its call's bottom one.
+			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
+			else if (rows.length && lines.length && look.gap !== false) lines.push('')
+			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)
 			if (item.type === 'tool') card = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
@@ -393,4 +406,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, ref, queuedRows, order: batchOrder.order, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, ref, queuedRows, order: batchOrder.order, promptWidth }
