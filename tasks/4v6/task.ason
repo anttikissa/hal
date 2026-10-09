@@ -1,0 +1,7 @@
+{
+	title: 'Lock waits show as waiting, not running',
+	spec: "While a tool call waits for a file lock, Hal reports the wait, never 'running'. The status line names the tool and the blocker briefly: 'write waits for #t6079' for a background job (a call ID), 'write waits for tab 114' for another tab's edit. A notice-stack entry, keyed to the call and marked stays, gives the full p8 sentence with the overlapping path and, when the blocker is the same session's own background job, says so ('this session'); the host removes it the moment the wait ends, and it never displaces other notices such as the resource warning. Host notice events can therefore set stays and be removed by key. The waiting state is per call: other calls in the same round still show as running. Both clients show the same.",
+	status: 'planned',
+	needs: ['p8', 'qm'],
+	foldInto: ['p8']
+}
