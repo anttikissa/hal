@@ -12,7 +12,9 @@
 // height (e.g. 485 of 793 px, offset 0) for minutes after the keyboard
 // is gone, across resumes and even from page load, while innerHeight is
 // right (task m7). A keyboard needs a focused text field, so with none
-// and no pinch zoom the app fills the layout viewport (`full`) instead.
+// the app fills the layout viewport (`full`) instead. Pinch zoom then
+// only magnifies: the app keeps its unzoomed box (innerWidth shrinks
+// with zoom on iOS) and does not reflow.
 
 export type Box = { width: number; height: number; offsetLeft: number; offsetTop: number }
 
@@ -46,16 +48,21 @@ function sync(source: Source | undefined, style: Pick<CSSStyleDeclaration, 'setP
 	}
 }
 
-// The page's wiring: the layout viewport while no text field has focus
-// and nothing is zoomed; re-read when focus moves, the window resizes
-// and the app resumes, since a stale visual viewport fires no event.
+// The page's wiring: the layout viewport while no text field has focus;
+// re-read when focus moves, the window resizes and the app resumes,
+// since a stale visual viewport fires no event.
 function page(): () => void {
 	let vv = visualViewport ?? undefined
 	let typing = () => {
 		let e = document.activeElement
 		return e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'file', 'submit', 'reset', 'range', 'color'].includes(e.type)) || (e instanceof HTMLElement && e.isContentEditable)
 	}
-	let full = () => (!vv || vv.scale > 1.01 || typing() ? undefined : { width: innerWidth, height: innerHeight, offsetLeft: 0, offsetTop: 0 })
+	let unzoomed: Box | undefined
+	let full = () => {
+		if (!vv || typing()) return undefined
+		if (vv.scale <= 1.01) unzoomed = { width: innerWidth, height: innerHeight, offsetLeft: 0, offsetTop: 0 }
+		return unzoomed
+	}
 	let root = document.documentElement
 	// The app follows an opening keyboard at once, so the composer is
 	// never hidden; when it closes, html.easing lets the composer glide
