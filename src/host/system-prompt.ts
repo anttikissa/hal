@@ -147,7 +147,7 @@ function preprocess(file: string, vars: Record<string, string>, sources?: Prompt
 	return output.join('\n')
 }
 
-function assemble(input: { cwd: string; model: string; now: number; sessionId?: string }, sources?: PromptSource[], problems?: string[]): string {
+function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
 	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
 	let vars = {
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
@@ -155,8 +155,8 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
-		// HAL_NO_USER_NOTES=1 leaves the user's notes out, e.g. for benchmarks.
-		user_notes: process.env.HAL_NO_USER_NOTES ? 'false' : 'true',
+		// hal -p --no-user leaves the user's notes out, e.g. for benchmarks.
+		user_notes: input.noUser ? 'false' : 'true',
 	}
 	// A missing or broken SYSTEM.md is reported in problems, never thrown.
 	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
@@ -178,7 +178,7 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 
 // One assembly path for /system and actual provider requests, so the
 // displayed text cannot diverge from what the next request would send.
-export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string }
+export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean }
 function build(input: PromptInput, problems?: string[]): string {
 	return systemPrompt.assemble(input, undefined, problems)
 }

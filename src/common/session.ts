@@ -20,6 +20,8 @@ export interface SessionMeta {
 	nameTurns?: number
 	// Close after a successful final turn once no work remains (task p87).
 	autoclose?: boolean
+	// Leave the user's notes (USER.md) out of the system prompt: hal -p --no-user.
+	noUser?: boolean
 	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
 	parent?: string
 	spawn?: SpawnKind
