@@ -28,16 +28,26 @@ function diff(before: string, after: string, limit = maxLines): string {
 	return (require('./text-diff.ts') as typeof import('./text-diff.ts')).textDiff.text(before, after, limit)
 }
 
-// What plugins put into the prompt (and take out, marked), as a file
-// named plugins/; undefined when they change nothing.
-const PLUGINS = 'plugins/'
-function pluginText(input: Parameters<typeof systemPrompt.inspect>[0], text: string): string | undefined {
-	let original = plugins.state.patches.get(systemPrompt)?.get('assemble')?.original
-	if (!original) return undefined
-	let base: string[] = original.call(systemPrompt, input, []).split('\n'), mine = text.split('\n')
-	let had = new Set(base), has = new Set(mine)
-	let out = [...mine.filter((l) => !had.has(l)), ...base.filter((l) => !has.has(l)).map((l) => `removed: ${l}`)].join('\n')
-	return out ? `${out}\n` : undefined
+// What each plugin puts into the prompt (and takes out, marked), keyed
+// plugins/<file>. The prompt is built with the innermost plugin's
+// hooks, then the next ones out: each step's change is that plugin's.
+function pluginTexts(input: Parameters<typeof systemPrompt.inspect>[0]): Record<string, string> {
+	let patch = plugins.state.patches.get(systemPrompt)?.get('assemble'), out: Record<string, string> = {}
+	if (!patch) return out
+	let hooks = patch.hooks.filter((h) => h.kind === 'around')
+	let build = (hs: typeof hooks): string => {
+		let call = (i: number, a: unknown[]): string => (i < hs.length ? hs[i]!.fn((...x: unknown[]) => call(i + 1, x), ...a) : patch.original.apply(systemPrompt, a))
+		return call(0, [input, []])
+	}
+	let files = [...new Set(hooks.map((h) => h.file))].reverse(), prev = build([])
+	for (let k = 1; k <= files.length; k++) {
+		let text = build(hooks.filter((h) => files.slice(0, k).includes(h.file)))
+		let base = prev.split('\n'), mine = text.split('\n'), had = new Set(base), has = new Set(mine)
+		let lines = [...mine.filter((l) => !had.has(l)), ...base.filter((l) => !has.has(l)).map((l) => `removed: ${l}`)]
+		if (lines.length) out[`plugins/${files[k - 1]}`] = `${lines.join('\n')}\n`
+		prev = text
+	}
+	return out
 }
 
 // Compares the session's prompt files with what it last saw; records
@@ -50,8 +60,7 @@ function check(id: string): void {
 		let input = { cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id }
 		let prompt = systemPrompt.inspect(input)
 		let now: Seen = { cwd: meta.cwd, files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])) }
-		let extra = pluginText(input, prompt.text)
-		if (extra) now.files[PLUGINS] = extra
+		Object.assign(now.files, pluginTexts(input))
 		let seen: Seen | undefined = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined
 		if (seen && JSON.stringify(seen) === JSON.stringify(now)) return
 		let notes: { text: string; change: PromptChange }[] = []
@@ -60,7 +69,7 @@ function check(id: string): void {
 			for (let path of new Set([...Object.keys(seen.files), ...Object.keys(now.files)])) {
 				let a = seen.files[path], b = now.files[path]
 				if (a === b || ((a === undefined || b === undefined) && !sameCwd)) continue
-				let rel = path === PLUGINS ? path : relative(meta.cwd, path)
+				let rel = path.startsWith('plugins/') ? path : relative(meta.cwd, path)
 				let change: PromptChange = { name: rel.startsWith('..') ? paths.display(path) : rel, what: a === undefined ? 'added' : b === undefined ? 'removed' : 'changed', diff: diff(a ?? '', b ?? '') }
 				notes.push({ change, text: `${paths.display(path)} ${change.what === 'changed' ? 'changed' : change.what === 'added' ? 'is now part of the system prompt' : 'is no longer part of the system prompt'}:\n${change.diff}` })
 			}
