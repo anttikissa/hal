@@ -3,12 +3,10 @@ import { backfill } from '../common/backfill.ts'
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
-import type { FindBatch, FindResult } from '../common/find.ts'
-import { titles } from '../common/titles.ts'
+import type { FindBatch } from '../common/find.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
-import { render } from './render.ts'
 
 const hooks = {
 	get: () => app.state.modal,
@@ -26,8 +24,6 @@ function open(): void {
 		return r
 	})
 }
-// Goes to the block's tab. Hal can't scroll the terminal, so once the
-// tab's history is all in, a notice says where the block is.
 function go(r: NonNullable<typeof find.target>): void {
 	find.target = r
 	if (app.state.tabs.some((t) => t.id === r.sessionId)) app.focusOn({ tab: r.sessionId })
@@ -36,14 +32,10 @@ function go(r: NonNullable<typeof find.target>): void {
 }
 function report(): void {
 	let r = find.target
-	if (!r || app.state.transcript?.meta.id !== r.sessionId || !backfill.complete(app.state.older, r.sessionId)) return
+	if (!r?.blockId || app.state.transcript?.meta.id !== r.sessionId || !backfill.complete(app.state.older, r.sessionId)) return
 	find.target = undefined
-	if (!r.blockId) return
-	let { rows, cols } = render.state.out?.size() ?? { rows: 24, cols: 80 }
-	let f = frame.build(appView.view(), cols, rows, true)
-	let at = f.items!.findIndex((i) => i.key === r.blockId)
-	let row = at > 0 ? f.ends![at - 1]! : 0, top = f.lines.length - rows, label = at < 0 ? `#${r.blockId}` : `#${titles.blockId(f.items![at]!)}`
-	app.state.notice = at < 0 ? `${label} is not in this session` : row >= top ? `${label} is on screen` : `Hal can't scroll the terminal: ${label} is about ${Math.round((100 * row) / top)}% down the scrollback`
+	let f = frame.build(appView.view(), app.cols(), 24, true), at = f.items!.findIndex((i) => i.key === r.blockId)
+	app.state.notice = `Hal can't scroll the terminal, but #${r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback`
 }
 export const find = {
 	state: findController.create(), target: undefined as { sessionId: string; blockId?: string } | undefined,
