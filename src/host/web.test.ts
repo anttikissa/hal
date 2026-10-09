@@ -2110,3 +2110,47 @@ browserTest('composer history skips agents and remains navigable after native de
 		}
 	} finally { await b.close() }
 }, 15000)
+
+browserTest('long tool cards collapse despite unrelated selection and explicit controls preserve selection access', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Other selectable message' }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'read', name: 'read', input: { path: '/tmp/example.txt' } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'read', output: 'long wrapped output '.repeat(600) }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.Card.tool .mark')`)
+		for (let width of [390, 1200]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
+			await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+			await b.waitFor(`document.querySelector('.Card.tool').classList.contains('open')`)
+			let select = (selector: string) => b.evaluate(`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector(${JSON.stringify(selector)})); getSelection().removeAllRanges(); getSelection().addRange(range); })()`)
+			await select('.Card.tool .result-text')
+			await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.tool').classList.contains('open') && !getSelection().isCollapsed`)).toBe(true)
+			await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.tool').classList.contains('open')`)).toBe(false)
+			await b.evaluate(`getSelection().removeAllRanges(); document.querySelector('.Card.tool .mark').click()`)
+			await select('.Card.user .content')
+			await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.tool').classList.contains('open')`)).toBe(false)
+			await b.evaluate(`(() => { let original = window.getSelection; window.getSelection = () => null; try { document.querySelector('.Card.tool .mark').click(); } finally { window.getSelection = original; } })()`)
+			expect(await b.evaluate(`document.querySelector('.Card.tool').classList.contains('open')`)).toBe(true)
+			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+			await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 100, y: 200, deltaX: 0, deltaY: -100 })
+			await b.evaluate(`getSelection().removeAllRanges(); document.querySelector('.Card.tool .mark').scrollIntoView({ block: 'center' })`)
+			let point = await b.evaluate(`(() => { let r = document.querySelector('.Card.tool .mark').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`)
+			if (width === 390) {
+				await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+				await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+			} else {
+				await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+			}
+			await b.waitFor(`!document.querySelector('.Card.tool').classList.contains('open')`)
+		}
+	} finally { await b.close() }
+})

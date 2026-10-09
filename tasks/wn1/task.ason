@@ -1,0 +1,10 @@
+{
+	title: 'Reliable card collapse with native selection',
+	spec: 'Restore the web invariant that a deliberate expansion-button activation always toggles its card, including long tool output, even with a selection or no document Selection object. Body clicks preserve a nonempty selection intersecting that card but are not blocked by selection elsewhere. Links and other card controls retain their actions without toggling. Preserve identity, per-session fold state and complete output. This repairs browser selection gating only; terminal fold behavior is unchanged.',
+	status: 'done',
+	notes: [
+		'The global !getSelection()?.isCollapsed guard rejected all clicks when Selection was null and when text was selected anywhere, including native timestamp-button activation. Guard only body clicks with ranges intersecting that card; native mark buttons bypass it. Chrome regression covers long single-line wrapped Read output, selected card text, unrelated selection, null Selection and a trusted touch tap at 390px plus desktop clicks. Inspected open desktop and closed phone screenshots. Initial browser probe tried to tap an offscreen pinned header; use reader wheel input before scrolling to the header. Removed screenshot/keyboard work from the lasting regression rather than raising its timeout. Final file run: 43 pass, 3 unrelated failures (submit meta event, completion geometry, streaming command). Targeted lint and diff check pass. Typecheck remains blocked by existing common/replay.test.ts obsolete inbox/replaces fields and web.test.ts missing argument at2042. Physical iPhone Safari remains unverified.'
+	],
+	needs: ['8s'],
+	foldInto: ['8s']
+}
