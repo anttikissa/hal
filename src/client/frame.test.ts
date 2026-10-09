@@ -278,7 +278,7 @@ describe('prompt box', () => {
 	})
 
 	test('an empty prompt shows a readable example distinguishable from typed text', () => {
-		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: 'Try this' }, 40)
+		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: { cut: '', text: 'Try this', next: Infinity } }, 40)
 		expect(boxOf(f).rows).toEqual(['Try this'])
 		let rgb = /38;2;(\d+);(\d+);(\d+)mTry this/.exec(f.lines[1]!)!.slice(1).map(Number)
 		let fg = oklch.toRgb(colors.input().fg!), bg = oklch.toRgb(colors.input().bg!)
@@ -287,8 +287,9 @@ describe('prompt box', () => {
 		expect(dist(rgb, bg)).toBeGreaterThan(100)
 		expect(dist(rgb, bg)).toBeLessThan(dist(fg, bg) * 0.7)
 		expect(f.cursor).toEqual({ row: 1, col: 1 })
-		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
-		expect(boxOf(typed).rows).toEqual(['x'])
+		// Erasing from its left as typing starts: what is left keeps its columns.
+		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: { cut: 'Tr', text: 'y this', fade: 'left', next: 5 } }, 40)
+		expect(boxOf(typed).rows).toEqual(['x y this'])
 		expect(typed.cursor).toEqual({ row: 1, col: 2 })
 	})
 

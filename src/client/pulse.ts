@@ -48,6 +48,16 @@ export const pulse = {
 	state: { onBeat: null as ((beat: number) => void) | null, timer: null as ReturnType<typeof setTimeout> | null },
 	/** One beat's length. */
 	ms: 250,
+	// Animations (rotating examples) repaint on finer wall-clock frames:
+	// 50 ms (20 Hz) is 3 refreshes of a 60 Hz display (6 at 120 Hz) and a
+	// fifth of a beat, so frames and blinks fall together. 30 Hz would
+	// not divide a beat.
+	frame: 50,
+	/** Ms from now to the first frame at least `ms` away. */
+	until: (ms: number): number => {
+		let now = pulse.now()
+		return Math.max(1, Math.ceil((now + ms) / pulse.frame) * pulse.frame - now)
+	},
 	now: () => Date.now(),
 	beat,
 	fast,

@@ -60,11 +60,8 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		let p = promptView.layoutPrompt(shown, at, Math.max(1, width - indent))
 		// The example stays well below typed text, like the prompt's
 		// (oklch.faint): dimmer than the readable-text minimum on purpose.
-		let placeholder = value ? '' : forms.example(st, i, now).text
-		if (placeholder) {
-			let example = strings.clipVisual(ansi.clean(placeholder), width - indent)
-			p.rows[0] = ansi.mono() || !style.fg ? example : ansi.sgr({ fg: oklch.faint(style.fg, style.bg ?? colors.screen) }) + example + ansi.sgr({ fg: style.fg })
-		}
+		let ex = value ? undefined : forms.example(st, i, now)
+		if (ex?.text) p.rows[0] = ansi.mono() || !style.fg ? strings.clipVisual(ansi.clean(ex.text), width - indent) : promptView.example(ex, oklch.faint(style.fg, style.bg ?? colors.screen), style.bg ?? colors.screen, width - indent, style.fg)
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
 	})

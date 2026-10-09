@@ -12,6 +12,7 @@ import { appView } from './app-view.ts'
 import { folds } from './folds.ts'
 import { frame } from './frame.ts'
 import { keys, type KeyEvent } from './keys.ts'
+import { pulse } from './pulse.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { titles } from '../common/titles.ts'
@@ -490,16 +491,23 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 	}
 })
 
-test('an empty prompt shows an example that changes each turn, with its own list for the Hal repo', () => {
-	app.onEvent(snapshot())
-	let first = appView.view().placeholder
-	expect(first).toBeTruthy()
-	type('hi')
-	expect(appView.view().placeholder).toBeUndefined()
-	enter()
-	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['hi'] })
-	expect(appView.view().placeholder).not.toBe(first)
-	expect(appView.view().placeholder).toBe(placeholders.general[1])
+test('typing erases the example from its left, right of the typed text, then it is gone', () => {
+	let now = 1_000_000, saved = pulse.now
+	pulse.now = () => now
+	try {
+		app.onEvent(snapshot())
+		let first = placeholders.general[0]!
+		expect(appView.view().placeholder?.text).toBe(first)
+		type('hi')
+		let ex = appView.view().placeholder!
+		expect(ex.fade).toBe('left')
+		expect(ex.cut + ex.text).toBe(first)
+		expect(strings.visLen(ex.cut)).toBeGreaterThan(2)
+		now += 5 * first.length
+		expect(appView.view().placeholder).toBeUndefined()
+	} finally {
+		pulse.now = saved
+	}
 })
 
 // ── Tabs ──
@@ -539,9 +547,9 @@ test('after the focused paint, nearby tabs load in slices and switching uses the
 
 test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {
 	startOn(['a', 'b'])
-	expect(appView.view().placeholder).toBe(placeholders.general[0])
+	expect(appView.view().placeholder?.text).toBe(placeholders.general[0])
 	app.onEvent(tabsEvent(tabOf('a', { hal: true }), 'b'))
-	expect(appView.view().placeholder).toBe(placeholders.hal[0])
+	expect(appView.view().placeholder?.text).toBe(placeholders.hal[0])
 })
 
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {

@@ -9,7 +9,7 @@ import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import { notices } from '../common/notices.ts'
-import { placeholders } from '../common/placeholders.ts'
+import { placeholders, type PromptExample } from '../common/placeholders.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
@@ -32,10 +32,12 @@ function view(): View {
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal
 	if (st.choices) v.choices = st.choices
-	// An example request for an empty prompt, another each turn; none
-	// for the intro, which can't take requests.
+	// An example request over the prompt (placeholders.follow); none for
+	// the intro, which can't take requests.
 	let t = st.transcript
-	if (t && !st.prompt.text && t.meta.model !== 'hal/intro') v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
+	let list = t && t.meta.model !== 'hal/intro' ? (app.focusedTab()?.hal ? placeholders.hal : placeholders.general) : undefined
+	let example = placeholders.follow(appView.state.example, t?.meta.id ?? '', list, st.prompt.text, pulse.now())
+	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
 	let stopped = t && appView.why(t), notice = st.notice ?? (t && queueEdit.notice(t)) ?? versions.notice()
@@ -114,7 +116,8 @@ export const appView = {
 	// `remote`: the host's name when following a remote one (task tr),
 	// shown where the role would be.
 	// `plugins`: the plugin sync indicator of a remote terminal (b81).
-	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined },
+	// `example`: the prompt example's clock (placeholders.follow).
+	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined, example: {} as PromptExample },
 	view,
 	status,
 	activity,
