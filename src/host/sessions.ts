@@ -6,7 +6,7 @@
 // Tasks: gj, p87.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
-import type { SessionMeta } from '../common/session.ts'
+import { session, type SessionMeta } from '../common/session.ts'
 import { names } from '../common/names.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
@@ -145,20 +145,18 @@ function openIds(): string[] {
 	return [...sessions.state.open.keys()]
 }
 
-// Every session id on disk, names only (task b4b).
+// Every session id on disk, names only (task b4b). Only directories
+// named like a session id are sessions.
 function ids(): string[] {
 	if (!existsSync(paths.sessionsDir())) return []
-	return readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+	return readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory() && session.isId(e.name)).map((e) => e.name)
 }
 
 // Every session directory on disk, open or not. Read-only: a broken one
 // is listed with its error rather than skipped or repaired.
 function list(): SessionListing[] {
-	if (!existsSync(paths.sessionsDir())) return []
 	let out: SessionListing[] = []
-	for (let entry of readdirSync(paths.sessionsDir(), { withFileTypes: true })) {
-		if (!entry.isDirectory()) continue
-		let id = entry.name
+	for (let id of sessions.ids()) {
 		let open = sessions.state.open.get(id)
 		if (open) {
 			out.push({ id, meta: { ...open } })
