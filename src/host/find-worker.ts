@@ -142,7 +142,7 @@ if (!isMainThread) {
 		else if (c.type === 'dirty') {
 			if (c.meta) findIndex.state.meta.set(c.meta.id, c.meta)
 			findWorker.state.dirty.add(c.sessionId)
-			void findWorker.state.ready.then(() => findWorker.drain())
+			void findWorker.state.ready.then(() => findWorker.drain(), () => {})
 		}
 	}
 }
