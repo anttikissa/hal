@@ -1,6 +1,7 @@
 // Read-only view of this host, its open tabs and models (tasks ed, jm),
 // without session histories or client addresses/credentials. A bare
 // call describes only the caller; scope and fields widen or narrow it.
+import { action } from '../../common/action.ts'
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { auth } from '../auth.ts'
@@ -21,6 +22,34 @@ function withLimit(id: string): string {
 
 const WHATS = ['sessions', 'host', 'models', 'clients']
 const SCOPES = ['self', 'project', 'all']
+// Words a model plausibly means; 'tabs' asks for every open tab.
+const ALIASES: Record<string, Record<string, string>> = {
+	tabs: { what: 'sessions', scope: 'all' }, tab: { what: 'sessions' }, session: { what: 'sessions' },
+	model: { what: 'models' }, client: { what: 'clients' },
+}
+
+// Plain words land by value: a view, a scope or an alias; anything else
+// is fields. Named fields in an object win.
+function resolve(raw: string): { name: string; input: Record<string, unknown> } {
+	let words: Record<string, string> = {}
+	let named: Record<string, unknown> = {}
+	let fields: string[] = []
+	for (let value of action.values(raw).values) {
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			let bad = Object.keys(value).filter((k) => !['what', 'scope', 'fields'].includes(k))
+			if (bad.length) throw new Error(`INSPECT has no field ${bad.join(', ')}; fields: what, scope, fields`)
+			Object.assign(named, value)
+			continue
+		}
+		for (let word of String(value).toLowerCase().split(/[\s,]+/).filter(Boolean)) {
+			if (WHATS.includes(word)) words.what = word
+			else if (SCOPES.includes(word)) words.scope = word
+			else if (ALIASES[word]) words = { ...ALIASES[word], ...words }
+			else fields.push(word)
+		}
+	}
+	return { name: 'inspect', input: { ...words, ...(fields.length && { fields: fields.join(',') }), ...named } }
+}
 
 // Compact token counts as on the status row: 950, 87k, 1000k.
 const kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 1000)}k`
@@ -81,7 +110,7 @@ function table(fields: string[], rows: string[][]): string {
 
 export const tool: Tool = {
 	name: 'inspect',
-	action: { summary: 'agent internals' },
+	action: { summary: 'agent internals', usage: ['INSPECT [<view>] [<scope>] [<fields>] [{ what, scope, fields }]', 'e.g. INSPECT tabs, INSPECT all "id,name,state", INSPECT models'], resolve },
 	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the caller\'s session). scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
