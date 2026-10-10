@@ -30,4 +30,6 @@ Paid runs require explicit authorization, including the model and effort.
 Before a full run, pilot one or two tasks per arm and inspect each arm's
 transcript: its complete system prompt, tools, model, effort and errors.
 Keep fixtures outside any project directory so no arm inherits stray
-AGENTS.md or other context files.
+AGENTS.md or other context files. When arms differ by more than 30% either
+way in time, requests or errors, a setup fault is likely: find it in
+their transcripts before reporting the result.
