@@ -199,3 +199,5 @@ export const slash = {
 
 // A session falling back to a paid API key says so where the user reads.
 auth.fallback = (id, text) => slash.output(id, text)
+// So does a broken login, as an error.
+auth.broke = (id, text) => slash.output(id, text, true)

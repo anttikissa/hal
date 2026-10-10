@@ -87,6 +87,7 @@ function store(): Entry {
 	if (auth.state.memoPath !== path) {
 		auth.state.memoPath = path
 		auth.state.broken.clear()
+		auth.state.told.clear()
 		auth.state.stale.clear()
 		auth.state.retried.clear()
 		auth.state.chosen.clear()
@@ -185,6 +186,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 		if (why) {
 			problems.push(why)
 			if (subscription(account)) skipped.push(`${account.name}: ${why}`)
+			auth.tellBroken(kind, account, why, who)
 			continue
 		}
 		let until = model ? limits.on(`${kind}/${model}`, account.name) : 0
@@ -209,12 +211,24 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 			if (e?.failure !== 'auth') throw e
 			auth.state.broken.set(fingerprint(account.entry), e.message)
 			problems.push(e.message)
+			auth.tellBroken(kind, account, e.message, who)
 		}
 	}
 	if (limitedUntil < Infinity) {
 		throw Object.assign(fail(`every usable ${kind} account is rate limited for ${model}`, 'limited'), { retryAt: limitedUntil })
 	}
 	throw Object.assign(new Error(problems.join('; ')), { failure: 'auth' })
+}
+
+// A broken login is never skipped silently: each session that passes it
+// over is told once per broken credential, with the provider's error.
+function tellBroken(kind: Kind, account: Account, why: string, who: For): void {
+	if (!who.session) return
+	let key = `${who.session} ${fingerprint(account.entry)}`
+	if (auth.state.told.has(key)) return
+	auth.state.told.add(key)
+	// A notice that cannot be written must not cost the request.
+	try { auth.broke(who.session, `${kind} login ${account.name} is not working, so requests skip it: ${why}`) } catch {}
 }
 
 // Until when (epoch ms) every account that could run `modelId` is rate
@@ -318,8 +332,10 @@ async function refresh(data: Entry, entry: Entry, replace: (next: Entry) => void
 	}
 	let body: any = await res.json().catch(() => null)
 	if (!res.ok) {
-		// Only the error code: descriptions may echo the refresh token.
+		// The provider's code and description, with anything token-like
+		// redacted: descriptions may echo the refresh token.
 		let code = typeof body?.error === 'string' && /^[\w.-]{1,64}$/.test(body.error) ? ` ${body.error}` : ''
+		if (typeof body?.error_description === 'string') code += ` (${body.error_description.split(entry.refreshToken).join('<redacted>').slice(0, 300).replace(/[\w.~+/=-]{24,}/g, '<redacted>')})`
 		// 4xx (invalid_grant): the refresh token is spent; only a new
 		// login fixes it. Anything else may pass.
 		let failure: Failure = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 ? 'auth' : 'temporary'
@@ -384,6 +400,9 @@ export const auth = {
 	// Tells session `id` it now runs on a paid key; slash.ts writes it
 	// into the transcript.
 	fallback: (_id: string, _text: string): void => {},
+	// Tells session `id` a login is broken; slash.ts writes it as an error.
+	broke: (_id: string, _text: string): void => {},
+	tellBroken,
 	changed,
 	refresh,
 	close,
@@ -396,6 +415,8 @@ export const auth = {
 		memoPath: '',
 		// Fingerprints of broken logins, with why; of rejected tokens to refresh.
 		broken: new Map<string, string>(),
+		// "<session> <fingerprint>": broken logins each session was told of.
+		told: new Set<string>(),
 		stale: new Set<string>(),
 		// When each account's rejected token was last refreshed.
 		retried: new Map<string, number>(),

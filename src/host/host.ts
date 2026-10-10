@@ -39,6 +39,7 @@ import { recap } from './recap.ts'
 import { models } from './models.ts'
 import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
+import { usage } from './usage.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -354,6 +355,8 @@ function reset(): void {
 	clients.reset()
 	host.state.pauseOnExit = false
 }
+usage.clients = () => host.state.clients
+
 export const host = {
 	state: {
 		clients: new Set<Client>(),

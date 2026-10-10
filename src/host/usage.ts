@@ -8,7 +8,6 @@
 // (auth.ts) spends the quota that would otherwise expire, and /model
 // or the status line can show the numbers.
 
-import { host } from './host.ts'
 import { subscriptions, type SubscriptionData } from '../common/subscriptions.ts'
 import { clock } from './clock.ts'
 import { liveFiles } from './live-file.ts'
@@ -148,7 +147,7 @@ function keeps(provider: string, mine: string, best: string): boolean {
 // Send account changes once, not a quota copy per session.
 function publish(provider: string, account: string): void {
 	let event = { type: 'subscription-usage' as const, accounts: { [subscriptions.key(provider, account)]: usage.windows(provider, account) } }
-	for (let client of host.state.clients) client.deliver(event)
+	for (let client of usage.clients()) client.deliver(event)
 }
 
 function snapshot(): SubscriptionData {
@@ -179,5 +178,8 @@ export const usage = {
 	order,
 	keeps,
 	close,
+	// The connected clients; host.ts sets it (importing host here would
+	// make auth.ts, which imports usage, load before itself).
+	clients: (): Iterable<{ deliver: (event: any) => void }> => [],
 	state: { store: null as Record<string, Record<string, Windows>> | null, path: '' },
 }
