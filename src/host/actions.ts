@@ -102,10 +102,9 @@ function help(tool: Tool<unknown>): string {
 	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...actions.usage(tool).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
-// One line per tool the system prompt does not explain, for $tools_summary,
-// except the tools named in `omit`.
-function summary(omit: string[] = []): string {
-	return [...tools.all().values()].filter((t) => t.action?.summary !== false && !omit.includes(t.name)).map((t) => `\t${t.name.toUpperCase()}${t.action?.summary ? ` ${t.action.summary}` : ''}`).join('\n')
+// One line per tool the system prompt does not explain, for $tools_summary.
+function summary(): string {
+	return [...tools.all().values()].filter((t) => t.action?.summary !== false).map((t) => `\t${t.name.toUpperCase()}${t.action?.summary ? ` ${t.action.summary}` : ''}`).join('\n')
 }
 
 export const actions = { name, def, find, generic, resolve, arrived, usage, help, summary }

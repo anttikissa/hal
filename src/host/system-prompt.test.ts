@@ -26,14 +26,6 @@ test('purpose guidance follows interaction mode, not subagent kind or autoclose'
 	expect(unattended.text).toContain('path')
 })
 
-test('with no spawn slots the prompt never mentions spawning', () => {
-	let input = { cwd: root, model: 'm/x', now: at, noUser: true }
-	expect(systemPrompt.build({ ...input, slots: 2 })).toContain('SPAWN')
-	let none = systemPrompt.inspect({ ...input, slots: 0 })
-	expect(none.problems).toEqual([])
-	expect(none.text).not.toMatch(/spawn|subagent|budget|WAIT/i)
-})
-
 test('says who, when and where: date, cwd and model', () => {
 	mkdirSync(`${root}/work`)
 	let text = systemPrompt.build({ cwd: `${root}/work`, model: 'anthropic/claude-x', now: at })

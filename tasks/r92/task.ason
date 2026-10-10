@@ -5,7 +5,7 @@
 	notes: [
 		'Each noninteractive spawn validates the full owner chain before creation, then decrements each count by one and pushes metadata. The child limit is not prepaid; interactive spawns have no owner and use the configured count. Session metadata validates stored slots; snapshots supply the configured fallback without writing old records. Both status rows keep bN beside the model and link /budget; narrow terminal rows prioritize model and count. Web uses a sibling native budget link over the existing details target rather than invalid nested interactive elements. Focused feature tests and rendered compact-status checks cover live updates at 320, 390, 1024 and 1600px.',
 		'The shared host.broadcast boundary supplies effective configured slots on every metadata event, keeping legacy sessions without a stored count consistent across local terminal, remote terminal and web without persisting a compatibility migration.',
-		'With 0 spawn slots the prompt never mentions spawning: Session role and Spawn budget bodies are empty (so no headings), SPAWN and WAIT are left out of the action list, and the question rule says owner, not spawner. Benchmark and other no-delegation sessions get no spawn guidance. Tested in system-prompt.test.ts.'
+		'With 0 spawn slots SYSTEM.md renders no Session role or Spawn budget section (empty bodies drop their headings); the question rule says owner, not spawner. SPAWN and WAIT stay in the action list: hiding them is not worth the code, and changing that list would bust the prompt cache when /budget raises or spending exhausts the slots.'
 	],
 	needs: ['t0', 'pc'],
 	foldInto: ['t0']

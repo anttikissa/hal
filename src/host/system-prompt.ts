@@ -81,18 +81,16 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
 	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
-	let slots = input.slots ?? settings.subagentSlots()
 	let vars = {
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
 		hal_dir: paths.display(paths.repoRoot()), home: paths.home(),
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
-		// With no spawn slots the agent is not told spawning exists.
-		tools_summary: actions.summary(slots === 0 ? ['spawn', 'wait'] : []),
+		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 		user_notes: input.noUser ? 'false' : 'true', web_url: settings.webUrl(), interactive: String(input.interactive ?? true),
 		kind: input.kind ?? 'interactive', subagent: input.owner ? 'true' : 'false',
 		owner: input.owner ?? '', parent: input.parent ?? '', fork: input.parent ? 'true' : 'false',
-		subagent_slots: String(slots), autoclose: String(input.autoclose ?? false),
+		subagent_slots: String(input.slots ?? settings.subagentSlots()), autoclose: String(input.autoclose ?? false),
 		agents: systemPrompt.agents(input.cwd, sources),
 	}
 	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
