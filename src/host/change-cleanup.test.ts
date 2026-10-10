@@ -103,6 +103,23 @@ test('cleanup uses native Git ignore behavior but keeps tracked ignored files', 
 	expect(record.type === 'file_changes' && record.files.map((f) => f.path)).toEqual(['tracked.generated', 'new.ts'])
 })
 
+test('cleanup checks symlink ancestors without passing descendant pathspecs to Git', async () => {
+	let result = Bun.spawnSync(['git', '-C', home, 'init', '-q'])
+	if (result.exitCode) throw new Error(result.stderr.toString())
+	let outside = mkdtempSync(`${tmpdir()}/hal-cleanup-target-`)
+	try {
+		mkdirSync(`${outside}/nested`)
+		symlinkSync(outside, `${home}/alias`)
+		writeFileSync(`${home}/.gitignore`, 'ignored-alias\n')
+		symlinkSync(outside, `${home}/ignored-alias`)
+		writeFileSync(path(), lines.encode({ type: 'file_changes', cwd: home, toolId: 'tool', ts, files: [file('alias/nested/output.txt'), file('ignored-alias/nested/output.txt'), file('node_modules/x')] }))
+		let cleaned = await changeCleanup.run(id, true)
+		expect(cleaned.removed).toBe(2)
+		let record = (await read(path()))[0]!.record
+		expect(record.type === 'file_changes' && record.files.map((f) => f.path)).toEqual(['alias/nested/output.txt'])
+	} finally { rmSync(outside, { recursive: true, force: true }) }
+})
+
 test('malformed first and torn last records abort without replacing history or marks', async () => {
 	for (let text of ['invalid\n' + fixture(), fixture() + '{ type:']) {
 		writeFileSync(path(), text)
