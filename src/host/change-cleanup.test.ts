@@ -87,6 +87,18 @@ test('cleanup preview does not write; apply preserves records, legacy numbers, u
 	expect(server.state.lockFd).toBeNull()
 })
 
+test('live cleanup keeps the host lock and lets the host drop caches just before replacement', async () => {
+	let original = fixture()
+	writeFileSync(path(), original)
+	expect(server.tryLock()).toBe(true)
+	let lock = server.state.lockFd, seen: string[] = []
+	let result = await changeCleanup.run(id, true, () => seen.push(readFileSync(path(), 'utf8')))
+	expect(seen).toEqual([original])
+	expect(result.removed).toBe(2)
+	expect(server.state.lockFd).toBe(lock)
+	await expect(changeCleanup.run(id, true)).rejects.toThrow('/changes cleanup')
+})
+
 test('cleanup uses native Git ignore behavior but keeps tracked ignored files', async () => {
 	let git = (...args: string[]) => {
 		let result = Bun.spawnSync(['git', '-C', home, ...args], { env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
