@@ -102,7 +102,7 @@ html.typing .App { position: absolute; }
 .ToolPresentation .add { color: var(--add-fg); }
 .ToolPresentation .del { color: var(--remove-fg); }
 .ToolPresentation .dim { color: var(--quiet); }
-.raw-tool button { cursor: pointer; padding: 0.5lh 0; min-height: 44px; }
+.raw-tool button { background: none; color: inherit; padding: 0.5lh 1ch; min-height: 44px; text-decoration: underline; }
 /* An opened diff keeps whole lines and scrolls sideways as one box, its
    right edge fading while more is off screen, like a wide table. */
 .Card .change .lines, .Card .edit-diff { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
