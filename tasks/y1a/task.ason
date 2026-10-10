@@ -1,0 +1,12 @@
+{
+	title: 'Trace intermittent composer Send failures',
+	spec: 'Opt-in browser diagnostics distinguish each fixed composer action (Send, Steer, Queue, Run, Save, Pause, Continue and attach), disabled controls and pointer cancellation. Record entry into the shared send controller and fixed outcomes for queue-edit saving, pending upload, client-only command, submission, command, refusal or no command. Preserve the invariant that diagnostics never change delivery, focus, touch cancellation, drafts or layout and never collect message text or arbitrary attributes. Keep existing off-by-default collection, bounded reporting, auth/origin validation and privacy filtering. This web-only tracing diagnoses browser taps; terminal behavior is unchanged. An intermittent iOS Send failure remains unresolved until captured evidence establishes its cause and a device verifies the repair.',
+	status: 'done',
+	notes: [
+		'Send failures are not fixed by this instrumentation. Existing Action prevents pointerdown default; historical reports identify only composer, so neither lost click nor controller failure is established. Tracing correlates every breadcrumb with its numeric tab at capture time. Verification: 59 focused controller/view/host-diagnostic tests passed; changed-file lint passed; a one-off Bun event-target check passed opt-in gating, exact Send labels, disabled/canceled pointers, controller/outcome labels, host acceptance and private-attribute filtering without preventing events. Repository typecheck remains blocked by pre-existing inbox and replaces fields in src/common/replay.test.ts:201. No Chrome or iOS device was run. New labels require the host to reload code and the browser to reload the page; an old host skips unknown labels.',
+		'Cost guard: high-frequency host event breadcrumbs do not read diagnostic context per event; other breadcrumbs capture their tab, avoiding DOM/viewport reads on streamed deltas. State stays capped at 32 breadcrumbs and two rotating log files.',
+		'Evidence 2026-10-10 14:05:13 Helsinki, iPhone, composer focused: pointerdown and pointerup reached Send, no click followed, send() never ran; a second tap 1.1 s later clicked and submitted. The lost tap is iOS withholding click after a completed touch on Send, not a controller or submission failure.'
+	],
+	needs: ['s0'],
+	foldInto: ['s0']
+}

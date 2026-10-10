@@ -9,7 +9,7 @@ let lag = 0
 let page = '', timer: ReturnType<typeof setTimeout> | undefined, busy = false, last = 0
 function record(kind: DiagnosticKind, detail: string = 'other', line?: number, column?: number): void {
 	if (!read) return
-	let e: Breadcrumb = { at: Date.now(), kind, detail: diagnosticDetails.includes(detail as any) ? detail as Breadcrumb['detail'] : 'other' }
+	let e: Breadcrumb = { at: Date.now(), kind, detail: diagnosticDetails.includes(detail as any) ? detail as Breadcrumb['detail'] : 'other', tab: kind === 'event' ? undefined : read().tab }
 	if (Number.isFinite(line) && line! >= 0) e.line = line
 	if (Number.isFinite(column) && column! >= 0) e.column = column
 	let prev = entries.at(-1)
@@ -51,13 +51,16 @@ function init(context: () => DiagnosticContext): void {
 	window.addEventListener('unhandledrejection', (e) => failure('rejection', e.reason))
 	let area = (e: Event): string => {
 		let el = e.target instanceof Element ? e.target : undefined
-		return el?.closest('.Tabs') ? 'tabs' : el?.closest('.Composer') ? 'composer' : el?.closest('.Card') ? 'card' : 'other'
+		let action = el?.closest<HTMLButtonElement>('.Composer button[data-diagnostic-action]')?.dataset.diagnosticAction
+		return action && diagnosticDetails.includes(action as DiagnosticDetail) ? action : el?.closest('.Tabs') ? 'tabs' : el?.closest('.Composer') ? 'composer' : el?.closest('.Card') ? 'card' : 'other'
 	}
-	for (let name of ['pointerdown', 'click'] as const) document.addEventListener(name, (e) => {
+	for (let name of ['pointerdown', 'pointerup', 'pointercancel', 'click'] as const) document.addEventListener(name, (e) => {
 		let detail = area(e)
 		if (detail === 'other') return
-		record(name === 'click' ? 'click' : 'pointer', detail)
+		if (e.target instanceof Element && e.target.closest('button:disabled')) record('disabled', detail)
+		record(name === 'pointerdown' ? 'pointer' : name, detail)
 		if (name === 'click') { let start = performance.now(); setTimeout(() => { lag = Math.max(0, Math.round(performance.now() - start)); record('settled', detail); report() }, 0) }
+		else report()
 	}, { capture: true, passive: true })
 	// A character typed while focus is anywhere but the message box:
 	// where focus was, then whether the key reached the box. Capture on
