@@ -13,6 +13,7 @@
 import { protocol, type Event } from './protocol.ts'
 import { subscriptions } from './subscriptions.ts'
 import { perf } from './perf.ts'
+import { home } from './home.ts'
 
 export type Role = 'host' | 'client'
 export type Conn = { send(command: object): void; close(): void }
@@ -169,6 +170,7 @@ function receive(event: Event): void {
 	if (event.type === 'subscription-usage') subscriptions.apply(event.accounts, event.replace)
 	if (event.type === 'tabs' && event.subscriptions) subscriptions.apply(event.subscriptions, true)
 	if (event.type === 'snapshot') st.followed.add(event.sessionId)
+	if (event.type === 'home') home.state.path = event.path
 	if (event.type === 'ack') st.pending.delete(event.id)
 	if (event.type === 'rejected' && event.id !== undefined) {
 		let command = st.pending.get(event.id)

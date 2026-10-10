@@ -331,6 +331,8 @@ export type Event =
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }
+	// The host user's home directory, for showing paths from ~.
+	| { type: 'home'; path: string }
 	| { type: 'restart' } // /restart all: terminals exit; web waits for host return.
 	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
 	// Repaint terminals following this session; no reload on the web.

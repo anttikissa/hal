@@ -3,6 +3,7 @@
 // The full cwd truncates from the start; wide layouts also show the session
 // id and usage windows. The model name doubles as quota left (task 5f).
 import { For } from 'solid-js'
+import { home } from '../../common/home.ts'
 import { names } from '../../common/names.ts'
 import { titles } from '../../common/titles.ts'
 import { view, type ViewState } from '../view.ts'
@@ -28,7 +29,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 	let win = (name: string) => windows().find((w) => w.name === name)
 	// Which subscription the windows belong to, as /status numbers its slots.
 	let slot = () => { let p = props.view.transcript?.stats?.plan; return p && p.accounts > 1 ? `${p.account}/${p.accounts} ` : '' }
-	let cwd = () => meta()?.cwd.replace(/(.)\/+$/, '$1') ?? ''
+	let cwd = () => home.short(meta()?.cwd.replace(/(.)\/+$/, '$1') ?? '')
 	let outside = (e: MouseEvent) => {
 		let r = details.getBoundingClientRect()
 		if (e.target === details && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) details.close()
