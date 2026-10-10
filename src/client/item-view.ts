@@ -325,11 +325,11 @@ function status(exit: string | undefined, time: string | undefined, style: Style
 
 // A finished call's status from its result; `bash`: a bash call's.
 // Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: { output: string; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
+function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)
-	if (item.diff) return diffView.status(item.diff, style, bashResult.duration(item.ms))
-	return itemView.status(bash ? bashResult.status(item.output) : undefined, bashResult.duration(item.ms), style)
+	if (item.diff && !item.isError) return diffView.status(item.diff, style, bashResult.duration(item.ms))
+	return itemView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style)
 }
 
 // `row` with `end` at the right of `width` columns, two spaces apart

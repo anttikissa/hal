@@ -25,6 +25,16 @@ test('answers with only hidden controls or whitespace have no terminal card', ()
 	expect(itemView.itemLines({ type: 'text', text: '`<summary>Stopped.</summary>`' }, 60).length).toBeGreaterThan(0)
 })
 
+test('tool errors without exit codes or timings remain visible in the title status', () => {
+	let error = { output: 'Error: malformed arguments', isError: true }
+	let status = (item: typeof error & { interrupted?: 'canceled' | 'stopped' }, bash = false) => Bun.stripANSI(itemView.resultStatus(item, bash, undefined))
+	expect(status(error)).toBe('(failed)')
+	expect(status(error, true)).toBe('(failed)')
+	expect(status({ ...error, output: '[exit 2]\ncommand failed' }, true)).toBe('(exit 2)')
+	expect(status({ ...error, interrupted: 'canceled' })).toBe('(canceled)')
+	expect(status({ output: 'Success', isError: false })).toBe('')
+})
+
 test('interrupted text decorates its end, preserving trailing spaces and line breaks', () => {
 	for (let [text, end] of [['partial', 'partial --'], ['partial ', 'partial --'], ['partial\n', 'partial\n--'], ['', '--']] as const) {
 		let item = { type: 'text' as const, text: text!, interrupted: true as const }
