@@ -42,8 +42,8 @@ Actions:
 
 - Use WRITE for new files or complete rewrites.
 	WRITE src/main.ts "one\ntwo\nthree\n"
-- Only for actions BASH and EDIT: for complex changes, summarize the change in a comment: BASH /* Check transfers and report failures */ "./check-transfers"; EDIT /* rename check() -> verify() */ "main.ts" { ... }
-- Use relative paths to files under cwd.
+- Give every BASH a /* purpose */ comment for the user, and EDIT one for complex changes: BASH /* Check transfers and report failures */ "./check-transfers"; EDIT /* rename check() -> verify() */ "main.ts" { ... }
+- Commands run in cwd; don't cd into it. Use relative paths to files under cwd.
 - Strings are JS string literals.
 
 - Other actions:
