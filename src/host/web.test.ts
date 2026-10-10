@@ -2021,6 +2021,39 @@ browserTest('foreground and background Bash share header status without losing o
 })
 
 
+browserTest('a touch on Send sends once, even when iOS withholds the click', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		let draft = (text: string) => b.evaluate(`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '${text}'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`)
+		let prompts = async () => history.readSync(await b.evaluate(`location.pathname.slice(1)`)).filter((r) => r.type === 'user').length
+		await draft('first')
+		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+		let point = await b.evaluate(`(() => { let r = document.querySelector('.Composer .go').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+		await b.waitFor(`document.querySelector('textarea').value === ''`)
+		await Bun.sleep(300)
+		expect(await prompts()).toBe(1)
+		// iOS: pointerdown and pointerup inside Send, then no click.
+		await draft('second')
+		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+		await b.evaluate(`(() => { let go = document.querySelector('.Composer .go'), init = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: ${point.x}, clientY: ${point.y} }; go.dispatchEvent(new PointerEvent('pointerdown', init)); go.dispatchEvent(new PointerEvent('pointerup', init)) })()`)
+		await b.waitFor(`document.querySelector('textarea').value === ''`)
+		await Bun.sleep(300)
+		expect(await prompts()).toBe(2)
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 15000)
+
 browserTest('local touch debug is opt-in, observes canceled taps, and never consumes Send', async () => {
 	providerHome()
 	let b = await browser()
@@ -2057,9 +2090,8 @@ browserTest('local touch debug is opt-in, observes canceled taps, and never cons
 		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
 		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
 		await b.waitFor(`document.querySelector('textarea').value === ''`)
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('click Run')`)
+		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('pointerup Run')`)
 		let output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
-		expect(output).toContain('click Run')
 		expect(output).not.toContain('/help')
 		expect(output).not.toContain('send:absent')
 		await b.evaluate(`(() => { let box = document.querySelector('textarea'); box.value = 'private caret text'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); box.setSelectionRange(3, 7); box.dispatchEvent(new Event('selectionchange', { bubbles: true })); })()`)
@@ -2080,11 +2112,11 @@ browserTest('local touch debug is opt-in, observes canceled taps, and never cons
 		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('rejection TypeError')
 		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('private rejection text')
 		await b.evaluate(`for (let i = 0; i < 20; i++) window.dispatchEvent(new ErrorEvent('error', { error: new RangeError('not captured'), lineno: i }))`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('click Run')
+		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('pointerup Run')
 		await toggle()
 		expect(await b.evaluate(`!!document.querySelector('.TouchDebug') || !!document.querySelector('.TouchCrosshair')`)).toBe(false)
 		let saved = await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)
-		expect(saved).toContain('click Run')
+		expect(saved).toContain('pointerup Run')
 		expect(saved).toContain('touchcancel')
 		expect(saved).not.toContain('/help')
 		expect(saved).not.toContain('private error text')
