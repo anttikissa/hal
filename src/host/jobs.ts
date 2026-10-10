@@ -31,9 +31,7 @@ type Job = { sessionId: string; stop: () => void }
 function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: string) => void): Run {
 	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], { cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
 	let kill = () => child.pid !== undefined && tools.killGroup(child.pid)
-	let stopped: string | undefined
-	let timedOut = false
-	let timer = ms === undefined ? undefined : setTimeout(() => ((timedOut = true), kill()), ms)
+	let timer = ms === undefined ? undefined : setTimeout(() => end(`timed out after ${ms / 1000}s`), ms)
 	// Keep the whole result so the cap can retain it in a blob, up to
 	// jobs.keepChars: past that only both ends stay (an endless command
 	// must not exhaust the host), the middle counted in a note.
@@ -55,20 +53,28 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 			tail = tail.slice(-half)
 		}
 	})
-	let done = new Promise<string>((resolve, reject) => {
-		child.on('error', (e) => (clearTimeout(timer), reject(e)))
-		child.on('close', (code, sig) => {
-			clearTimeout(timer)
-			let status = stopped ?? (timedOut ? `timed out after ${ms! / 1000}s` : sig ? `killed by ${sig}` : `exit ${code}`)
-			if (tail.length > half) {
-				dropped += tail.length - half
-				tail = tail.slice(-half)
-			}
-			let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars} kept in memory]\n` : ''
-			resolve(`[${status}]\n${head}${gap}${tail}`)
-		})
-	})
-	return { done, stop: (why = 'stopped by the user') => ((stopped = why), kill()) }
+	let { promise: done, resolve, reject } = Promise.withResolvers<string>()
+	let settled = false
+	// A stop or timeout settles at once: a process that left the group
+	// (setsid, a daemon) may hold the output pipe open indefinitely.
+	let end = (status: string, stop = true) => {
+		if (settled) return
+		settled = true
+		clearTimeout(timer)
+		if (stop) {
+			kill()
+			child.stdout!.destroy()
+		}
+		if (tail.length > half) {
+			dropped += tail.length - half
+			tail = tail.slice(-half)
+		}
+		let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars} kept in memory]\n` : ''
+		resolve(`[${status}]\n${head}${gap}${tail}`)
+	}
+	child.on('error', (e) => (clearTimeout(timer), (settled = true), reject(e)))
+	child.on('close', (code, sig) => end(sig ? `killed by ${sig}` : `exit ${code}`, false))
+	return { done, stop: (why = 'stopped by the user') => end(why) }
 }
 
 // Runs `command` for session `sessionId` in the background. One that
