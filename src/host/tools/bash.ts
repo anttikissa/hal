@@ -74,7 +74,7 @@ export const tool: Tool = {
 		try {
 			// Escape does not stop a background job. Its snapshot and lock
 			// last until actual exit, not until the early tool result.
-			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch)
+			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch, input.unsafeToStop === true ? input : undefined)
 			let run = launch()
 			let stop = () => run.stop(jobs.why(ctx.signal, 'stopped'))
 			ctx.signal.addEventListener('abort', stop, { once: true })
