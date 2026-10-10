@@ -8,7 +8,8 @@
 		'User 2026-10-06: the 3px raise looked too high once centered; the icon now sits 1.5px above center (padding-top 7px), between the old raised and unraised positions.',
 		'The user asked twice to lower the action icons from 3px above center; at exact center (padding-top equal to name height plus gap) they match attach.',
 		'User 2026-10-10: lower only the labeled right-side composer icons by 1 CSS px for optical alignment, preserving label positions, hit areas and multiline layout. index.html applies translateY(1px) to those SVGs; attach and terminal remain unchanged. This supersedes exact geometric centering for these icons.',
-		'User 2026-10-10: add 2 CSS px of visible separation between labeled composer icons and their names, including Send. Translate the small labels down 2px to preserve the approved icon positions and button geometry.'
+		'User 2026-10-10: add 2 CSS px of visible separation between labeled composer icons and their names, including Send. Translate the small labels down 2px to preserve the approved icon positions and button geometry.',
+		'User follow-up 2026-10-10: lower both icons and names another 1 CSS px, retaining their new separation. Final transforms are translateY(2px) for labeled action icons and translateY(3px) for their small labels; hit areas remain unchanged.'
 	],
 	needs: ['v0g', 'nzv']
 }
