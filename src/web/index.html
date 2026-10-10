@@ -402,6 +402,9 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .entry textarea { max-height: min(80px, calc(var(--app-height, 100dvh) * .25)); overflow-y: auto; }
 }
 @media (pointer: coarse) {
+  /* iOS drops taps in the band just above the keyboard's bar (task s37):
+     with the keyboard up, the buttons keep 28px clear of it. */
+  .Composer { padding-bottom: max(28px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))); }
   .entry .actions.nudge-actions { position: relative; isolation: isolate; flex: none; width: 88px; min-height: 44px; background-color: inherit; }
   .entry .actions.nudge-actions button { position: absolute; top: 0; bottom: 0; width: 44px; }
   .entry .actions.nudge-actions .go { right: 0; z-index: 1; background-color: inherit; }
