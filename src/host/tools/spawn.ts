@@ -23,10 +23,7 @@ export const tool: Tool = {
 	name: 'spawn',
 	action: { summary: 'a child session' },
 	description:
-		'Open a session in the tab after this one. A subagent session’s last message comes back here when it finishes, then ' +
-		'its tab closes; subagent-leave-open reports back and stays open; interactive is a session for the user, blank ' +
-		'without a task. Give the goal and necessary context, not a procedure. A child can ask with <question> and stay open; ' +
-		'answer through ordinary send, or ask your user/parent if the decision is not yours.',
+		'Open a session in the tab after this one.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -36,7 +33,7 @@ export const tool: Tool = {
 			model: { type: 'string', description: 'Model for the session; default this session’s.' },
 			cwd: { type: 'string', description: 'Working directory; default this session’s.' },
 			name: { type: 'string', description: 'Brief, descriptive session name, e.g. "Review rendering regression".' },
-			limit: { type: 'integer', minimum: 0, description: 'Spawn slots passed on for its own sessions; default 0. This session spends limit + 1.' },
+			limit: { type: 'integer', minimum: 0, description: 'Child spawn budget; default 0, at most this session’s slots left minus 1. Each subagent spawn costs one slot from this session and every owner ancestor. Interactive sessions are free and use the configured budget.' },
 		},
 	},
 	async run(input, ctx) {
@@ -45,7 +42,7 @@ export const tool: Tool = {
 		let mode = input.mode ?? 'fresh'
 		if (mode !== 'fork' && mode !== 'fresh') throw new Error('mode must be fork or fresh')
 		let limit = input.limit ?? 0
-		if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) throw new Error('limit must be a non-negative integer')
+		if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0) throw new Error('limit must be a non-negative integer')
 		let task = text(input, 'task') ?? ''
 		if (!task && kind !== 'interactive') throw new Error('task is required unless kind is interactive')
 		let model = text(input, 'model')

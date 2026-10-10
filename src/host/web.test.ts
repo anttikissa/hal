@@ -1039,7 +1039,11 @@ browserTest('compact status keeps two lines and opens full live details without 
 			expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
 			expect(geometry.fill).toBe('83%')
 			expect(geometry.duplicated).toBe(false)
+			expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('b3')
+			expect(await b.evaluate("document.querySelector('.budget').getAttribute('href')")).toBe('/budget')
 		}
+		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
+		await b.waitFor("document.querySelector('.budget').textContent === 'b0'")
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
 		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 		// A master update alone must repaint quota on this idle view. No
@@ -1055,7 +1059,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
 		expect(await b.evaluate('window.quotaMutations')).toBe(0)
 		await b.evaluate('window.quotaObserver.disconnect()')
-		await b.evaluate("document.querySelector('.overview').focus()")
+		await b.evaluate("document.querySelector('.details-target').focus()")
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
 		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
 		await b.waitFor("document.querySelector('.StatusDetails').open")
@@ -1070,7 +1074,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
 		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
 		await b.waitFor("!document.querySelector('.StatusDetails').open")
-		expect(await b.evaluate("document.activeElement === document.querySelector('.overview')")).toBe(true)
+		expect(await b.evaluate("document.activeElement === document.querySelector('.details-target')")).toBe(true)
 		expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
 	} finally {
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })

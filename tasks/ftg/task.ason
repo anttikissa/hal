@@ -2,6 +2,9 @@
 	title: 'Subagent and fork guidance lives in SYSTEM.md',
 	spec: 'Implement tasks/ftg/guidance.md: editable subagent/fork guidance and documented template syntax in SYSTEM.md, role and changing-state sections, parent for fork origin and owner for subagent ownership, and source-marked human-review comments. Use q5g sections and r92 budget semantics; no compatibility migrations.',
 	status: 'planned',
+	notes: [
+		'Subagent ownership uses SessionMeta.owner for reports, waits, question answers, greeting eligibility and owned-work stopping. SessionMeta.parent records only fork origin. The first spawned prompt contains only its task; the spawn tool retains argument mechanics. subagents.fork inherits promptCache through its explicit inherit API; session closure closes cache live files.'
+	],
 	needs: ['r92', 'q5g'],
 	foldInto: ['t0']
 }

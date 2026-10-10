@@ -6,8 +6,24 @@ import { subagents } from './subagents.ts'
 import { history } from './history.ts'
 import { useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
+import { rebases } from './rebases.ts'
 
 useHost()
+
+test('fork rebase restores the inherited starting state while retaining explicit fork overrides', () => {
+	let source = sessions.create({ cwd: '/tmp', model: 'fake/m1' })
+	history.submit(source.id, 'work')
+	let change = history.append(source.id, { type: 'change', cwd: '/changed', previous: { cwd: source.cwd } })
+	source.cwd = '/changed'
+	history.append(source.id, { type: 'turn_end', status: 'completed', usage: {} })
+	for (let cwd of ['/changed', '/override']) {
+		let child = sessions.create({ cwd, model: source.model })
+		subagents.fork(source.id, child.id)
+		let base = history.readSync(child.id).at(-1)!.n!
+		rebases.apply(child.id, { base, drop: [change.n!], edit: [] })
+		expect(child.cwd).toBe(cwd === '/override' ? '/override' : '/tmp')
+	}
+})
 
 test('nested forks retain message origins without changing provider replay or marking new messages', () => {
 	let parent = sessions.create({ cwd: '/tmp', model: 'fake/m1' }).id

@@ -6,6 +6,7 @@
 // portable plugins (task b81). When the row is too narrow
 // the right parts go from the end, then the left is clipped. Pure.
 
+import { settings } from '../common/settings.ts'
 import { titles } from '../common/titles.ts'
 import { subscriptions } from '../common/subscriptions.ts'
 import { usageWindows } from '../common/usage-windows.ts'
@@ -18,7 +19,7 @@ import { ansi } from './ansi.ts'
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
 // `color`: the tab's project color (task 22).
 // `plugins`: the plugin sync indicator of a remote terminal (task b81).
-export type StatusInfo = { id: string; name?: string; autoclose?: boolean; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
+export type StatusInfo = { id: string; name?: string; autoclose?: boolean; slots?: number; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
 
 type Part = { text: string; fg?: Oklch; href?: string }
 
@@ -39,7 +40,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])
-	out.push([{ text: ansi.clean(titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }])
+	out.push([{ text: ansi.clean(titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: ` b${info.slots ?? settings.subagentSlots()}`, href: '/budget' }])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])
 	let pct = statusRow.percent(s)
@@ -90,7 +91,14 @@ function fit(info: StatusInfo, cols: number): Part[] {
 	let l = join(statusRow.left(info))
 	if (width(l) + 1 + width(join(groups)) > cols) l = join(statusRow.left(info, false))
 	while (groups.length && width(l) + 1 + width(join(groups)) > cols) groups = groups.slice(0, -1)
-	if (!groups.length) return clip(l, cols)
+	if (!groups.length) {
+		if (width(l) <= cols) return l
+		let model = statusRow.left(info, false)[2]!
+		let budget = model.at(-1)!
+		let head = join([[{ text: info.id }], model])
+		if (width(head) <= cols) return head
+		return [...clip([model[0]!], Math.max(0, cols - width([budget]))), ...clip([budget], cols)]
+	}
 	let r = join(groups)
 	return [...l, { text: ' '.repeat(cols - width(l) - width(r)) }, ...r]
 }

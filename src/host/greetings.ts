@@ -98,7 +98,7 @@ function choose(text: string, previous?: string): string {
 
 function open(id: string): void {
 	let meta = sessions.open(id)
-	if (meta.model.startsWith('hal/') || (meta.parent && meta.spawn !== 'interactive') || history.readSync(id).length) return
+	if (meta.model.startsWith('hal/') || (meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
 	mkdirSync(paths.stateDir(), { recursive: true })
 	let previous = liveFiles.liveFile<{ last?: string }>(`${paths.stateDir()}/greetings.ason`, {}, { watch: false, mode: 0o600 })
 	try {

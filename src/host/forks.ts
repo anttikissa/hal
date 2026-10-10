@@ -1,4 +1,5 @@
 // Ordinary interactive forks (task px), independent of spawn ownership.
+import { settings } from '../common/settings.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
@@ -13,6 +14,7 @@ function create(parent: string): string {
 	let meta = sessions.open(parent)
 	let child = sessions.create({ cwd: meta.cwd, model: models.qualified(meta.model, meta.effort) })
 	// Automatic, so the fork can name itself; fits the 60-character limit.
+	child.slots = meta.slots ?? settings.subagentSlots()
 	child.name = `${Array.from(meta.name ?? parent).slice(0, 53).join('').trimEnd()} (fork)`
 	liveFiles.save(child)
 	subagents.fork(parent, child.id)

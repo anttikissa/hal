@@ -2,6 +2,7 @@
 // of its history (pages.snapshot, or one read in slices and caught up
 // with pages.since) and its live state now.
 
+import { settings } from '../common/settings.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
 import { replay } from '../common/replay.ts'
 import type { Snapshot } from '../common/protocol.ts'
@@ -18,7 +19,7 @@ import { turns } from './turns.ts'
 
 function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let records = [...tail.earlier, ...tail.history]
-	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
+	let snap: Snapshot = { meta: { ...sessions.open(id), slots: sessions.open(id).slots ?? settings.subagentSlots() }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
 	if (pages.marks(id).rebase !== undefined) {
 		let c = pages.rebased(id)
 		c.display ??= { rewrites: rebaseDisplay.dividers(c.records), dropped: replay.current(c.records.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !c.current.has(r.n) ? [r.n] : []) }

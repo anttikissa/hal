@@ -7,9 +7,11 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
 import { session, type SessionMeta } from '../common/session.ts'
+import { settings } from '../common/settings.ts'
 import { names } from '../common/names.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
+import { promptCache } from './prompt-cache.ts'
 import { paths } from './paths.ts'
 
 export type { SessionMeta } from '../common/session.ts'
@@ -31,10 +33,13 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
 	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
 	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
+	if (data.slots !== undefined && (!Number.isSafeInteger(data.slots) || data.slots < 0)) throw new Error(`${path}: invalid slots`)
+	for (let key of ['owner', 'parent']) if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key]))) throw new Error(`${path}: invalid ${key}`)
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
 	if (data.noUser !== undefined && typeof data.noUser !== 'boolean') throw new Error(`${path}: invalid noUser`)
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
+	if (data.startingState !== undefined && (!data.startingState || typeof data.startingState.cwd !== 'string' || typeof data.startingState.model !== 'string' || typeof data.startingState.autoclose !== 'boolean')) throw new Error(`${path}: invalid startingState`)
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
 }
@@ -105,7 +110,9 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		model: selection.id,
 		...(selection.effort !== undefined && { effort: selection.effort }),
 		createdAt: new Date().toISOString(),
+		startingState: { cwd: init.cwd, model: models.qualified(selection.id, selection.effort), autoclose: init.autoclose ?? false },
 		autoclose: init.autoclose ?? false,
+		slots: settings.subagentSlots(),
 		...(init.noUser && { noUser: true }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
@@ -132,6 +139,7 @@ function open(id: string): SessionMeta {
 
 // Writes pending changes and forgets the session; it stays on disk.
 function close(id: string): void {
+	promptCache.close(id)
 	let meta = sessions.state.open.get(id)
 	if (!meta) return
 	sessions.state.open.delete(id)
@@ -140,6 +148,7 @@ function close(id: string): void {
 
 function closeAll(): void {
 	for (let id of sessions.state.open.keys()) sessions.close(id)
+	promptCache.closeAll()
 }
 
 // Open ids in the order they were opened.
