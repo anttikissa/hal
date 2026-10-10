@@ -16,6 +16,7 @@
 
 import { closeSync, existsSync, openSync, readSync as readFd, statSync } from 'fs'
 import { ason } from '../common/ason.ts'
+import type { Snapshot } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { changedFiles } from './changed-files.ts'
 import { history } from './history.ts'
@@ -32,6 +33,9 @@ export type Page = { records: HistoryRecord[]; start: number; end: number }
 // `earlier`: records from before it that the session's state needs.
 export type Tail = { history: HistoryRecord[]; earlier: HistoryRecord[]; older?: number; end: number }
 type Steps<T> = Generator<number, T, void>
+// `scanned`: bytes whose line offsets are known; `size`: what `list` covers.
+// `display`: snapshots.build's rewrites and dropped, for the same size.
+type Rebased = { scanned: number; offsets: number[]; size: number; records: HistoryRecord[]; list: HistoryRecord[]; current: Map<number | undefined, HistoryRecord>; display?: { rewrites: Snapshot['rewrites']; dropped: number[] } }
 
 const NL = 10
 
@@ -263,8 +267,32 @@ function* markedSteps(id: string): Steps<Line[]> {
 // alone, states.fromHistory, inbox.pending and forms.open answer as
 // they would from the whole history.
 function essentials(id: string): HistoryRecord[] {
-	if (pages.marks(id).rebase !== undefined) return replay.current(history.readSync(id))
+	if (pages.marks(id).rebase !== undefined) return pages.rebased(id).list
 	return pages.marked(id).map((l) => l.record)
+}
+
+// A rebased session's records (history.readSync, cached while open), the
+// offset of each record line and the current projection, computed once
+// per history size instead of reparsing the whole file per page.
+function rebased(id: string): Rebased {
+	let path = history.file(id)
+	let size = existsSync(path) ? statSync(path).size : 0
+	let records = history.readSync(id)
+	for (let key of pages.state.rebased.keys()) if (!history.state.cache.has(key)) pages.state.rebased.delete(key)
+	let c = pages.state.rebased.get(id)
+	if (!c || c.scanned > size) c = { scanned: 0, offsets: [], size: -1, records: [], list: [], current: new Map() }
+	let buf = pages.readBytes(path, c.scanned, size), at = 0
+	for (let nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1) if (buf.subarray(at, nl).some((b) => b > 32)) c.offsets.push(c.scanned + at)
+	c.scanned += at
+	if (c.size !== c.scanned) {
+		c.records = records.slice(0, c.offsets.length)
+		c.list = replay.current(c.records)
+		c.current = new Map(c.list.map((r) => [r.n, r]))
+		c.size = c.scanned
+		c.display = undefined
+	}
+	if (history.state.cache.has(id)) pages.state.rebased.set(id, c)
+	return c
 }
 
 // Whether a (non-replacing) prompt starts a turn here.
@@ -285,9 +313,8 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL)) throw new Error(`${path}: ${before} is not a record boundary`)
 	// Rebase undo and cross-page groups need the audit trail.
 	if (pages.marks(id).rebase !== undefined) {
-		let all = pages.lines(path, pages.readBytes(path, 0, size), 0)
-		let current = new Map(replay.current(all.map((l) => l.record)).map((r) => [r.n, r]))
-		let found = all.filter((l) => l.offset < end && current.has(l.record.n))
+		let { records, offsets, current } = pages.rebased(id)
+		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && current.has(l.record.n))
 		let at = found.findIndex((l) => l.offset >= end - budget)
 		if (at < 0) at = Math.max(0, found.length - 1)
 		while (at > 0 && !turnStart(found[at]!.record)) at--
@@ -323,7 +350,7 @@ function* snapshotSteps(id: string, budget = pages.budget): Steps<Tail> {
 	let read = pages.state.bytesRead
 	let earlier = yield* pages.markedSteps(id)
 	if (pages.marks(id).rebase !== undefined) {
-		let current = new Map(replay.current(history.readSync(id)).map((r) => [r.n, r]))
+		let { current } = pages.rebased(id)
 		earlier = earlier.filter((l) => current.has(l.record.n)).map((l) => ({ ...l, record: current.get(l.record.n)! }))
 	}
 	let used = pages.state.bytesRead - read
@@ -354,12 +381,13 @@ function reset(): void {
 		} catch {}
 	}
 	pages.state.marks.clear()
+	pages.state.rebased.clear()
 }
 
 export const pages = {
 	// `bytesRead`: history bytes read lazily so far. `marks`: by path.
 	// `until`: when this turn's slice of sliced work ends.
-	state: { bytesRead: 0, marks: new Map<string, Marks>(), until: undefined as number | undefined },
+	state: { bytesRead: 0, marks: new Map<string, Marks>(), rebased: new Map<string, Rebased>(), until: undefined as number | undefined },
 	// About how many bytes of history a snapshot or a page reads.
 	budget: 256 * 1024,
 	// The longest stretch sliced reading runs without yielding.
@@ -387,6 +415,7 @@ export const pages = {
 	marked,
 	markedSteps,
 	essentials,
+	rebased,
 	page,
 	pageSteps,
 	snapshot,
