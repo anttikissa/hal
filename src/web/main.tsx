@@ -12,6 +12,7 @@ import { subscriptions, type SubscriptionData } from '../common/subscriptions.ts
 import { app } from './app.ts'
 import { diagnostics } from './diagnostics.ts'
 import { drift } from './drift.ts'
+import { composerDebug } from './composer-debug.ts'
 import { App } from './components/App.tsx'
 
 // The host's settings (config.ason) are read before the first render.
@@ -39,4 +40,5 @@ if (typeof document !== 'undefined') {
 	})
 	if (settings.webDiagnostics()) drift.init()
 	render(() => <App />, document.body)
+	if (settings.composerDebug()) composerDebug.init()
 }
