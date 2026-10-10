@@ -1,0 +1,10 @@
+{
+	title: 'Paste retained touch logs into the conversation',
+	spec: 'Touch debug logs provides a Paste logs button that appends the complete retained structural log to the current conversation draft, preserves existing draft text, closes the log dialog, and does not submit automatically. Empty history cannot be pasted. Recording remains explicitly opt-in, off on page load, browser-local and bounded to 300 events with the existing storage failure handling. Capture numeric composer selection start/end and internal scroll position before events and after handlers, and observe native selection changes so intermittent tap-to-caret failures can be investigated without collecting message text. Preserve native touch handling and privacy filtering. Sharing occurs only through the explicit paste action and normal Send. This replaces no-transmission only for user-requested sharing through a draft; no automatic host upload. Browser-only logs have no terminal equivalent.',
+	status: 'done',
+	notes: [
+		'Paste logs appends the retained history to the current draft without submitting; capture stays local until the user sends it. Added selection start/end and textarea scroll position before and after handlers plus native selectionchange observations. A separate Chromium check verified off-by-default recording, text exclusion, retained caret positions, existing-draft preservation and paste delivery at 390px and 1200px. The added control initially split Close mid-word at phone width; the dialog now puts its title above wrapping controls with unbroken labels. Native iOS and the original cursor bug remain unverified. Focused browser test was blocked by its Chrome startup timeout; no retry or timeout change. Source-only typecheck and targeted lint pass; the source-plus-tests typecheck fails in unchanged replay.test.ts on obsolete inbox and replaces fields. Default typecheck and name-only test selection traversed local benchmark copies and were interrupted; use an explicit test file path.'
+	],
+	needs: ['xpd'],
+	foldInto: ['xpd']
+}

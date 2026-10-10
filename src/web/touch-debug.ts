@@ -47,17 +47,26 @@ function inspect(): void {
 	top.className = 'top'
 	title.textContent = 'Touch debug logs'
 	text.textContent = `${storageError ? `${storageError}\n\n` : ''}Stored only in this browser. Latest 300 events; recording is opt-in.\n\n${rows.join('\n\n') || 'No recorded events.'}`
-	let clear = document.createElement('button'), close = document.createElement('button')
+	let paste = document.createElement('button'), clear = document.createElement('button'), close = document.createElement('button')
+	paste.textContent = 'Paste logs'
+	paste.disabled = !rows.length
+	paste.onclick = () => {
+		let logs = load().join('\n\n')
+		if (!logs) return
+		app.input(`${app.state.text}${app.state.text ? '\n\n' : ''}Touch debug logs:\n${logs}`)
+		dialog.close()
+	}
 	clear.textContent = 'Clear logs'
 	clear.onclick = () => {
 		try { localStorage.removeItem(KEY) } catch (error) { alert(`${KEY}: ${String(error)}`); return }
 		clearTimeout(saving); saving = undefined
 		history = []; storageError = ''
+		paste.disabled = true
 		text.textContent = 'No recorded events.'
 	}
 	close.textContent = 'Close'
 	close.onclick = () => dialog.close()
-	top.append(title, clear, close)
+	top.append(title, paste, clear, close)
 	dialog.append(top, text)
 	dialog.addEventListener('close', () => dialog.remove(), { once: true })
 	document.body.append(dialog)
@@ -88,12 +97,16 @@ function start(): void {
 		let rendered = Number(document.querySelector('.Tabs .strip [aria-current] .n')?.textContent) || 0
 		return `tab:${number(app.state.shown)} url:${number(router.parse(location.href))} dom:${rendered}`
 	}
+	let caret = () => {
+		let box = document.querySelector<HTMLTextAreaElement>('.Composer textarea')
+		return box ? `caret:${box.selectionStart},${box.selectionEnd} draftScroll:${Math.round(box.scrollTop)}` : 'caret:absent'
+	}
 	let record = (name: string, target: string, canceled: boolean, point?: { clientX: number; clientY: number; pageX: number; pageY: number }, state = '', geometry = '') => {
 		let vv = visualViewport, box = document.querySelector('.Composer .go')?.getBoundingClientRect()
 		let xy = point ? ` c${Math.round(point.clientX)},${Math.round(point.clientY)} p${Math.round(point.pageX)},${Math.round(point.pageY)}` : ''
 		rows.push(`${++serial} ${name} ${target}${xy}${canceled ? ' prevented' : ''}${state}`)
 		if (rows.length > 8) rows.shift()
-		let after = `${selection()} focus:${label(document.activeElement)} vv:${Math.round(vv?.height ?? innerHeight)} top:${Math.round(vv?.offsetTop ?? 0)} scroll:${Math.round(scrollY)} send:${box ? [box.left, box.top, box.right, box.bottom].map(Math.round).join(',') : 'absent'}`
+		let after = `${selection()} ${caret()} focus:${label(document.activeElement)} vv:${Math.round(vv?.height ?? innerHeight)} top:${Math.round(vv?.offsetTop ?? 0)} scroll:${Math.round(scrollY)} send:${box ? [box.left, box.top, box.right, box.bottom].map(Math.round).join(',') : 'absent'}`
 		retain(`${rows.at(-1)}${geometry}\nafter ${after}`)
 		panel.textContent = `TOUCH DEBUG — menu to stop\n${after}\n${rows.join('\n')}`
 	}
@@ -117,7 +130,7 @@ function start(): void {
 		let target = label(e.target)
 		let button = document.querySelector<HTMLButtonElement>('.Composer .go')
 		let rect = button?.getBoundingClientRect()
-		let state = ` @${Math.round(e.timeStamp)} ${selection()} f:${label(document.activeElement)} d:${Number(!!button?.disabled)} y:${Math.round(rect?.top ?? 0)} v:${Math.round(visualViewport?.height ?? innerHeight)}`
+		let state = ` @${Math.round(e.timeStamp)} ${selection()} ${caret()} f:${label(document.activeElement)} d:${Number(!!button?.disabled)} y:${Math.round(rect?.top ?? 0)} v:${Math.round(visualViewport?.height ?? innerHeight)}`
 		let geometry = ` send:${rect ? [rect.left, rect.top, rect.right, rect.bottom].map(Math.round).join(',') : 'absent'} top:${Math.round(visualViewport?.offsetTop ?? 0)} scroll:${Math.round(scrollY)}`
 		let xy = point && { clientX: point.clientX, clientY: point.clientY, pageX: point.pageX, pageY: point.pageY }
 		let observe = () => record(e.type, target, e.defaultPrevented, xy, state, geometry)
@@ -133,7 +146,7 @@ function start(): void {
 	let rejection = (e: PromiseRejectionEvent) => failure('rejection', e.reason)
 	window.addEventListener('error', error)
 	window.addEventListener('unhandledrejection', rejection)
-	let names = ['touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel', 'click', 'focusin', 'focusout']
+	let names = ['touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel', 'click', 'focusin', 'focusout', 'selectionchange']
 	for (let name of names) window.addEventListener(name, event, { capture: true, passive: true })
 	let resized = () => record('vv-resize', 'viewport', false)
 	let scrolled = () => record('vv-scroll', 'viewport', false)
