@@ -21,7 +21,8 @@ A streaming block never shrinks, only grows (the user saw the web scroll positio
 		'Fence markers were once drawn verbatim in the terminal, so users saw ``` around code. Invariant: rendered Markdown never shows fence markers. Their rows stay (blank, or the quiet language) so a streaming fence never loses a row.',
 		'Code once looked like prose: both clients are monospace and neither used the theme code color, so fences were the only cue. Invariant: code text is drawn in style.code.',
 		"Reply items once passed only fg to markdownView (itemView.itemStyle), so code in the terminal stayed the text color. Invariant: the style given to markdownView carries the item style's code color.",
-		'Keeping blank rows for both fences doubled the gap around code blocks. Invariant: a code block adds no blank line beyond what surrounds it. While streaming, an empty or partial-fence last line is held back so no row appears and vanishes.'
+		'Keeping blank rows for both fences doubled the gap around code blocks. Invariant: a code block adds no blank line beyond what surrounds it. While streaming, an empty or partial-fence last line is held back so no row appears and vanishes.',
+		'Host-relative link addresses may have several path segments (/blob/<session>/<blob>, /changes/<id>), not only /<session id>#<block id>. Invariant restored: a [label](/a/b/c) link renders as its label linking to the path; before, the regex accepted one segment, so the user saw the raw brackets and parentheses.'
 	],
 	needs: [],
 	foldInto: ['cc', '1b']
