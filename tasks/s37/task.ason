@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Bug fix (iOS dictation): dictated text reaches the textarea without input events, so app.state.text lagged the box: the example drew under dictated text, Send/Steer stayed disabled (taps did nothing) or sent stale text. Invariant: before drawing the example or sending, app.state.text equals the box value. Composer syncs on native input, compositionend, keyup, blur, selectionchange while focused, and document-capture pointerdown/touchstart (a disabled button swallows its own pointer events) and before send. The probe also logs every touch/pointer/click/focus event with its target and errors with stacks.',
-		'Bug fix (iOS Send taps lost): the probe showed 12 s of Send taps producing no touch, pointer or click event at all while the 44px Send sat on the visual viewport bottom edge, just above the iOS keyboard form bar (iOS 26 Safari, keyboard up). Every tap that reached Send landed 34px or more above that edge. Invariant: on touch screens the composer buttons keep 28px clear of the visual viewport bottom (Composer padding-bottom min 28px). Unconfirmed on device; the probe still logs every touch.'
+		'Bug fix (iOS Send taps lost): the probe showed 12 s of Send taps producing no touch, pointer or click event at all while the 44px Send sat on the visual viewport bottom edge, just above the iOS keyboard form bar (iOS 26 Safari, keyboard up). Every tap that reached Send landed 34px or more above that edge. Invariant: on touch screens the composer buttons keep 28px clear of the visual viewport bottom (Composer padding-bottom min 28px). Unconfirmed on device; the probe still logs every touch.',
+		'Review 2026-10-15: if no lost taps or example-over-text reports since 510a7fbe, delete src/web/composer-debug.ts, the composerDebug setting and /composer-debug endpoint; keep the sync and the 28px gap.'
 	],
 	needs: ['43b']
 }
