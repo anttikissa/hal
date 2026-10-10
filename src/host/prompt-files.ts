@@ -12,6 +12,7 @@ import { diag } from './diag.ts'
 import { paths } from './paths.ts'
 import { plugins } from './plugins.ts'
 import { promptTrail } from './prompt-trail.ts'
+import { promptCache } from './prompt-cache.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tabs } from './tabs.ts'
@@ -34,7 +35,7 @@ function files(id: string): Set<string> {
 	let meta = sessions.open(id)
 	let local = systemPrompt.candidates(meta.cwd).flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
 	let used: string[] = [systemPrompt.file()]
-	try { used = systemPrompt.inspect({ cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id, noUser: meta.noUser }).sources.map((s) => s.path) } catch {}
+	try { used = systemPrompt.inspect(promptCache.input(id)).sources.map((s) => s.path) } catch {}
 	return new Set([...used, ...local])
 }
 

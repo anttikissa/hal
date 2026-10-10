@@ -14,8 +14,9 @@ import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { plugins } from './plugins.ts'
 import { systemPrompt } from './system-prompt.ts'
+import { promptCache } from './prompt-cache.ts'
 
-type Seen = { cwd: string; files: Record<string, string> }
+type Seen = { cwd: string; files: Record<string, string>; outside?: string }
 
 const maxLines = 40
 
@@ -57,9 +58,9 @@ function check(id: string): void {
 	try {
 		let meta = sessions.open(id)
 		let file = `${paths.sessionDir(id)}/prompt-files.json`
-		let input = { cwd: meta.cwd, model: meta.model ?? '', now: Date.now(), sessionId: id, noUser: meta.noUser }
+		let input = promptCache.input(id)
 		let prompt = systemPrompt.inspect(input)
-		let now: Seen = { cwd: meta.cwd, files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])) }
+		let now: Seen = { cwd: meta.cwd, files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])), outside: promptCache.outside(prompt) }
 		Object.assign(now.files, pluginTexts(input))
 		let seen: Seen | undefined = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined
 		if (seen && JSON.stringify(seen) === JSON.stringify(now)) return
@@ -70,7 +71,7 @@ function check(id: string): void {
 				let a = seen.files[path], b = now.files[path]
 				if (a === b || ((a === undefined || b === undefined) && !sameCwd)) continue
 				let rel = path.startsWith('plugins/') ? path : relative(meta.cwd, path)
-				let change: PromptChange = { name: rel.startsWith('..') ? paths.display(path) : rel, what: a === undefined ? 'added' : b === undefined ? 'removed' : 'changed', diff: diff(a ?? '', b ?? '') }
+				let change: PromptChange = { name: rel.startsWith('..') ? paths.display(path) : rel, what: a === undefined ? 'added' : b === undefined ? 'removed' : 'changed', diff: diff(a ?? '', b ?? ''), ...(seen.outside === now.outside && { sectionOnly: true as const }) }
 				notes.push({ change, text: `${paths.display(path)} ${change.what === 'changed' ? 'changed' : change.what === 'added' ? 'is now part of the system prompt' : 'is no longer part of the system prompt'}:\n${change.diff}` })
 			}
 		}

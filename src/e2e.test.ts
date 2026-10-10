@@ -53,9 +53,9 @@ const toolAnswer = (result: any) => [
 	...finish,
 ]
 
-// A prompt's own text, without the [HH:MM] line and <meta> notes that
+// A prompt's own text, without the [HH:MM] line and host notes that
 // replay puts in front of it.
-const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d[^\]\n]*\]\n(<meta>[^]*?<\/meta>\n)*/, '').replace(/\n<meta>Current session name: [^]*?<\/meta>$/, '')
+const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d[^\]\n]*\]\n/, '')
 
 // Answers "<prompt>" with "ECHO(<prompt>)". A prompt starting with
 // "hold" streams PART1, then waits for release() to send PART2 and
@@ -63,7 +63,7 @@ const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d[^\]\n]*\]\n(<meta>[
 function reply(req: Request, body: any): Response {
 	let messages = body.messages
 	requests.push(messages)
-	let lastBlock = messages.at(-1).content.at(-1)
+	let lastBlock = messages.flatMap((m: any) => m.role === 'user' ? m.content : []).findLast((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>'))
 	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
 	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
@@ -311,7 +311,7 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	// The model got the cut-off text back, was told, and nothing was sent twice.
 	expect(requests).toHaveLength(4)
 	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text && bare(b.text)))
-	expect(texts.filter((t: string) => !t.startsWith('<meta>') && !t.startsWith('ECHO(<meta>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
+	expect(texts.filter((t: string) => !t.startsWith('<hal-note>') && !t.startsWith('ECHO(<hal-note>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)

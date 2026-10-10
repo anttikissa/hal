@@ -23,7 +23,7 @@ import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic, type Reply } from './synthetic.ts'
-import { systemPrompt } from './system-prompt.ts'
+import { promptCache } from './prompt-cache.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
@@ -171,9 +171,6 @@ function target(running: Running, model: string, selected?: string): string | un
 	return effort
 }
 
-// The last prompt-file fault reported per session, so it shows once.
-const promptFaults = new Map<string, string>()
-
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
@@ -185,18 +182,11 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
-			let problems: string[] = []
-			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, noUser: sessions.open(id).noUser, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id }, problems)
-			// A broken prompt file never stops a turn: say so once per distinct fault.
-			let fault = problems.join('\n')
-			if (fault !== (promptFaults.get(id) ?? '')) {
-				promptFaults.set(id, fault)
-				if (fault) history.append(id, { type: 'notice', text: `System prompt problems (the rest still applies):\n${fault}` })
-			}
+			let { system, cacheId } = promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
 			let defs = [actions.def()]
 			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return
-			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)) {
+			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id, cacheId }, signal)) {
 				if (signal.aborted) return
 				if (event.type !== 'tool_call') { yield event; continue }
 				let call = actions.arrived({ ...event })

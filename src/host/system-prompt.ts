@@ -1,21 +1,12 @@
-// The system prompt, built by the host for every provider request from
-// its inputs alone: SYSTEM.md at the checkout root (who Hal is and its
-// rules, edited by the user, read per request so an edit applies on the
-// next one), the local date and UTC offset, the
-// session's cwd and model, and the AGENTS.md files from the nearest Git
-// root down to the cwd (only the cwd's outside Git), most specific
-// last. The
-// same inputs give the same text, byte for byte, so prompt caching keeps
-// working; changes during a session also reach the model as <meta>
-// notes on the next prompt (replay.ts).
+// Hookable prompt assembly from one input snapshot (tasks ar, q5g, ftg).
 
 import { existsSync, readdirSync, readFileSync } from 'fs'
-import { homedir } from 'os'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { settings } from '../common/settings.ts'
 import { actions } from './actions.ts'
 import { paths } from './paths.ts'
-
+import { promptTemplate, type PromptRender, type PromptSource } from './prompt-template.ts'
+export type { PromptSource } from './prompt-template.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
 // Local YYYY-MM-DD, weekday, UTC offset: the clock the [HH:MM] prompt
@@ -72,80 +63,20 @@ function read(path: string): string | undefined {
 	}
 }
 
-// HTML comments are notes for humans: stripped from every prompt file.
-const uncomment = (text: string) => text.replace(/<!--[\s\S]*?-->/g, '')
-
-// SYSTEM.md alone is a template (if blocks, variables, includes); the
-// files it includes and AGENTS.md only lose their comments. A broken
-// template never fails a request: each fault goes to problems (file and
-// line) and preprocessing carries on with the rest of the text.
-export type PromptSource = { path: string; bytes: number }
-function preprocess(file: string, vars: Record<string, string>, sources?: PromptSource[], problems: string[] = []): string {
-	let path = resolve(file)
-	let raw: string
-	try {
-		raw = readFileSync(path, 'utf8')
-	} catch (e: any) {
-		problems.push(`${path}: ${e?.message ?? e}`)
-		return ''
+function agents(cwd: string, sources?: PromptSource[]): string {
+	let parts: string[] = []
+	let skillList = skills(cwd)
+	if (skillList) parts.push(skillList)
+	for (let dir of systemPrompt.candidates(cwd)) {
+		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
+			let path = `${dir === '/' ? '' : dir}/${name}`, text = read(path)
+			if (text === undefined) continue
+			sources?.push({ path, bytes: Buffer.byteLength(text) })
+			parts.push(`<file path="${path}">\n${promptTemplate.uncomment(text).trim()}\n</file>`)
+			break
+		}
 	}
-	sources?.push({ path, bytes: Buffer.byteLength(raw) })
-	let text = uncomment(raw)
-	let lines = text.split('\n'), output: string[] = []
-	let active: boolean | undefined
-	let opened = 0
-	let fault = (index: number, what: string) => problems.push(`${path}:${index + 1}: ${what}`)
-	// ${name} or $name; an unknown name stays as written.
-	let substitute = (s: string) => s.replace(/\$\{(\w+)\}|\$(\w+)/g, (whole, braced?: string, bare?: string) => vars[(braced ?? bare)!] ?? whole)
-	for (let [index, line] of lines.entries()) {
-		let start = line.match(/^:{3,}\s+if\s+(.+?)\s*$/)
-		if (start) {
-			if (active !== undefined) fault(index, 'nested if block')
-			let pairs = [...start[1]!.matchAll(/(\w+)="([^"]*)"/g)]
-			opened = index + 1
-			if (!pairs.length || start[1]!.replace(/(\w+)="[^"]*"/g, '').trim()) {
-				fault(index, 'invalid if directive')
-				active = false
-				continue
-			}
-			active = pairs.map(([, key, pattern]) => {
-				if (!Object.hasOwn(vars, key!)) {
-					fault(index, `unknown key ${key}`)
-					return false
-				}
-				let regex = new RegExp(`^${pattern!.replace(/[\\^$+.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
-				return regex.test(vars[key!]!)
-			}).every(Boolean)
-			continue
-		}
-		if (/^:{3,}\s+else\s*$/.test(line)) {
-			if (active === undefined) fault(index, 'else without if')
-			else active = !active
-			continue
-		}
-		if (/^:{3,}\s*$/.test(line)) {
-			if (active === undefined) fault(index, 'unexpected closing directive')
-			active = undefined
-			continue
-		}
-		if (active === false) continue
-		let include = line.match(/^@(\??)(\S+)\s*$/)
-		if (include) {
-			let name = substitute(include[2]!)
-			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
-			let target = resolve(dirname(path), name)
-			if (include[1] && !existsSync(target)) continue
-			try {
-				let raw = readFileSync(target, 'utf8')
-				sources?.push({ path: target, bytes: Buffer.byteLength(raw) })
-				output.push(uncomment(raw))
-			} catch (e: any) {
-				fault(index, `include: ${e?.message ?? e}`)
-			}
-		} else output.push(substitute(line))
-	}
-	if (active !== undefined) problems.push(`${path}:${opened}: unclosed if block`)
-	return output.join('\n')
+	return parts.join('\n\n')
 }
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
@@ -156,42 +87,35 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
-		// hal -p --no-user leaves the user's notes out, e.g. for benchmarks.
-		user_notes: input.noUser ? 'false' : 'true',
-		web_url: settings.webUrl(),
+		user_notes: input.noUser ? 'false' : 'true', web_url: settings.webUrl(),
+		kind: input.kind ?? 'interactive', subagent: input.owner ? 'true' : 'false',
+		owner: input.owner ?? '', parent: input.parent ?? '', fork: input.parent ? 'true' : 'false',
+		subagent_slots: String(input.slots ?? settings.subagentSlots()), autoclose: String(input.autoclose ?? false),
+		agents: systemPrompt.agents(input.cwd, sources),
 	}
-	// A missing or broken SYSTEM.md is reported in problems, never thrown.
-	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
-	let skillList = skills(input.cwd)
-	if (skillList) parts.push(skillList)
-	for (let dir of systemPrompt.candidates(input.cwd)) {
-		// One file per directory: AGENTS.md, else CLAUDE.md.
-		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
-			let path = `${dir === '/' ? '' : dir}/${name}`
-			let text = read(path)
-			if (text === undefined) continue
-			sources?.push({ path, bytes: Buffer.byteLength(text) })
-			parts.push(`<file path="${path}">\n${uncomment(text).trim()}\n</file>`)
-			break
-		}
-	}
-	return parts.join('\n\n')
+	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
 }
 
-// One assembly path for /system and actual provider requests, so the
-// displayed text cannot diverge from what the next request would send.
-export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean }
+export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean; owner?: string; parent?: string; kind?: string; slots?: number; autoclose?: boolean; rendered?: PromptRender }
 function build(input: PromptInput, problems?: string[]): string {
 	return systemPrompt.assemble(input, undefined, problems)
 }
-function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[] } {
-	let sources: PromptSource[] = [], problems: string[] = []
-	return { sources, text: systemPrompt.assemble(input, sources, problems), problems }
+function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[]; sections: PromptRender['sections'] } {
+	let sources: PromptSource[] = [], problems: string[] = [], rendered: PromptRender = { sections: [] }
+	let text = systemPrompt.assemble({ ...input, rendered }, sources, problems)
+	let shift = text.indexOf(rendered.text ?? text)
+	let sections = rendered.sections.flatMap((s) => {
+		if (!s.body.trim()) return [s]
+		let start = shift >= 0 ? s.start + shift : text.indexOf(`# ${s.title}\n${s.body}`)
+		return start < 0 ? [] : [{ ...s, start, end: start + s.end - s.start }]
+	})
+	return { sources, text, problems, sections }
 }
 
 export const systemPrompt = {
 	file: () => systemFile,
-	preprocess,
+	preprocess: (...args: Parameters<typeof promptTemplate.render>) => promptTemplate.render(...args),
+	agents,
 	candidates,
 	assemble,
 	inspect,

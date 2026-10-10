@@ -1,9 +1,11 @@
 {
 	title: 'Subagent and fork guidance lives in SYSTEM.md',
 	spec: 'Implement tasks/ftg/guidance.md: editable subagent/fork guidance and documented template syntax in SYSTEM.md, role and changing-state sections, parent for fork origin and owner for subagent ownership, and source-marked human-review comments. Use q5g sections and r92 budget semantics; no compatibility migrations.',
-	status: 'planned',
+	status: 'done',
 	notes: [
-		'Subagent ownership uses SessionMeta.owner for reports, waits, question answers, greeting eligibility and owned-work stopping. SessionMeta.parent records only fork origin. The first spawned prompt contains only its task; the spawn tool retains argument mechanics. subagents.fork inherits promptCache through its explicit inherit API; session closure closes cache live files.'
+		'Subagent ownership uses SessionMeta.owner for reports, waits, question answers, greeting eligibility and owned-work stopping. SessionMeta.parent records only fork origin. The first spawned prompt contains only its task; the spawn tool retains argument mechanics. subagents.fork inherits promptCache through its explicit inherit API; session closure closes cache live files.',
+		'SYSTEM.md documents template syntax and uses role, budget, date, cwd, model and local-instruction sections. Role guidance moved from spawn.ts/subagents.ts has source-marked human-review TODOs; subagent first messages now carry only tasks. Model effort is part of the rendered identity, not a forced cache rebuild.',
+		'Sections are rendered from a single hookable SYSTEM.md template. Project and included file contents lose comments but remain literal, preserve internal whitespace, and are not recursively parsed as template directives. Prompt-file UI watches and /system use the same session variables. /system reports full malformed-template diagnostics; normal requests retain the last good prompt and a standing error, or raw recovery input if none exists.'
 	],
 	needs: ['r92', 'q5g'],
 	foldInto: ['t0']

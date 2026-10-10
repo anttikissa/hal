@@ -41,9 +41,9 @@ function run(id: string, protect = false, transition?: string): number | undefin
 		if (r.status === 'completed' || !records.slice(i + 1, edge).some((next) => next.type === 'continue')) { start = i + 1; break }
 		edge = i
 	}
-	let due = modelNotices.pending(records)
+	let due = modelNotices.pending(records).filter((n) => !n.sectionUpdate)
 	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && (r.notices?.length || r.blocks.some((b) => b.type === 'text'))).map((r) => r.n!) : []
-	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!)), history.file(id))
+	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!) && !(r.type === 'notice' && r.sectionUpdate)), history.file(id))
 	if (!made) return undefined
 	compact.boundary(id, { type: 'compact', ...made, ...(transition && { transition }), ...(keep.length && { keep }) })
 	if (due.length) history.append(id, { type: 'user', blocks: [], notices: due })

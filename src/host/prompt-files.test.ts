@@ -6,6 +6,7 @@ import { promptTrail } from './prompt-trail.ts'
 import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
 import { systemPrompt } from './system-prompt.ts'
+import { promptCache } from './prompt-cache.ts'
 
 useHost()
 
@@ -49,11 +50,13 @@ test('an AGENTS.md edit leaves one trail record the model reads on its next requ
 	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\n')
 	let id = created(client(), root)
 	promptTrail.check(id) // first sight: remembered
+	promptCache.prepare(id)
 	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\nSay HOLA first.\n')
 	promptTrail.check(id)
 	promptTrail.check(id) // unchanged since: nothing more
 	let records = history.readSync(id).filter((r) => r.type === 'output')
-	expect(records.map((r) => r.type === 'output' && r.change)).toEqual([{ name: 'AGENTS.md', what: 'changed', diff: ' Be terse.\n+Say HOLA first.' }])
+	expect(records.map((r) => r.type === 'output' && r.change)).toEqual([{ name: 'AGENTS.md', what: 'changed', diff: ' Be terse.\n+Say HOLA first.', sectionOnly: true }])
+	promptCache.prepare(id)
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'hello' }] })
 	let text = JSON.stringify(replay.toMessages(history.readSync(id)))
 	expect(text).toContain('+Say HOLA first.')

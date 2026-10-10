@@ -300,6 +300,7 @@ function follow(client: Client, id: string, tail?: Tail): void {
 }
 
 function broadcast(id: string, event: Event): void {
+	if (event.type === 'meta') event = { ...event, meta: { ...event.meta, slots: event.meta.slots ?? settings.subagentSlots() } }
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
 	if (event.type === 'turn-end') void recap.prepare(id)

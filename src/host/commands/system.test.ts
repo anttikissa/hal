@@ -15,7 +15,7 @@ test('/system names included source files and prints the same assembled prompt a
 	let now = clock.now
 	try {
 		systemPrompt.file = () => `${testHome()}/SYSTEM.md`
-		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if model="fake/*"\nSelected.\n:::')
+		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if model="fake/*"\nSelected.\n:::\n$agents')
 		clock.now = () => Date.UTC(2026, 8, 28, 20)
 		let id = created(c, `${testHome()}/repo`)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })

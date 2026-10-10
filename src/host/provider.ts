@@ -28,6 +28,7 @@ export type ProviderRequest = {
 	image?: (blob: string) => string | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
+	cacheId?: string
 }
 
 // `account` names the credentials used, for providers with several
@@ -376,7 +377,7 @@ function register(name: string, p: Provider): void {
 
 export const provider = {
 	// Told to the model in place of an image a request cannot carry.
-	imageNote: (why: string): string => `<meta>An image was attached here, but ${why}.</meta>`,
+	imageNote: (why: string): string => `<hal-note>An image was attached here, but ${why}.</hal-note>`,
 	state: { providers: {} as Record<string, Provider> },
 	// Longest silence tolerated mid-stream; chunks normally arrive every ~100ms.
 	streamTimeoutMs: 120_000,
