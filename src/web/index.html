@@ -286,7 +286,9 @@ html.typing .App { position: absolute; }
 .TouchCrosshair::after { height: 24px; width: 2px; left: 11px; }
 .TouchHistory { width: min(60rem, calc(var(--app-width, 100vw) - 1rem)); }
 .TouchHistory[open] { display: flex; flex-direction: column; }
-.TouchHistory h2 { margin: 0; font: inherit; }
+.TouchHistory .top { flex-wrap: wrap; }
+.TouchHistory h2 { flex-basis: 100%; margin: 0; font: inherit; }
+.TouchHistory button { flex: none; white-space: nowrap; }
 .TouchHistory pre { min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
