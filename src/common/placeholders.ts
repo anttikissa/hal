@@ -36,6 +36,8 @@ export type Shown = { cut: string; text: string; fade?: 'left' | 'right'; next: 
 const HOLD = 3000
 const LONG_HOLD = 4500
 const ERASE = 5
+// The prompt's example erasing as typing starts: twice as fast.
+const GONE = ERASE / 2
 const TYPE = 35 / 3
 // Each list's graphemes and cycle length, computed once: rotate runs on
 // every repaint (every few ms while typing), so its cost must not grow
@@ -74,7 +76,7 @@ function rotate(list: string[], ms: number): Shown {
 // The main prompt's example. `key`: whose prompt (a session); `since`:
 // when its box was first seen empty, the rotation's clock; `gone`: the
 // example shown when typing started, and when, now erasing from its
-// left at the erase speed (a prototype).
+// left at twice the erase speed (a prototype).
 export type PromptExample = { key?: string; since?: number; gone?: { items: string[]; at: number } }
 
 // The example over prompt `key` holding `typed` at `now`, from `list`
@@ -97,14 +99,14 @@ function follow(st: PromptExample, key: string, list: string[] | undefined, type
 	}
 	let g = st.gone
 	if (!g || typed.includes('\n')) return undefined
-	let n = Math.floor((now - g.at) / ERASE) + 1
+	let n = Math.floor((now - g.at) / GONE) + 1
 	let covered = strings.visLen(typed)
 	while (n < g.items.length && strings.visLen(g.items.slice(0, n).join('')) <= covered) n++
 	if (n >= g.items.length) {
 		st.gone = undefined
 		return undefined
 	}
-	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: ERASE - ((now - g.at) % ERASE) }
+	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: GONE - ((now - g.at) % GONE) }
 }
 
 export const placeholders = { general, hal, graphemes, rotate, follow }
