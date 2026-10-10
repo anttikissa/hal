@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -12,6 +12,10 @@ import { status } from './status.ts'
 import { findIndex } from './find-index.ts'
 import { context } from './context.ts'
 import { tool as readBlob } from './tools/read_blob.ts'
+import { promptCache } from './prompt-cache.ts'
+import { systemPrompt } from './system-prompt.ts'
+import { slash } from './slash.ts'
+import { liveFiles } from './live-file.ts'
 
 let savedHome = process.env.HAL_HOME, home = '', id = ''
 beforeEach(() => {
@@ -78,13 +82,110 @@ test('a rebase marks the next graph point even when context grows', () => {
 	expect(context.points(history.readSync(id)).at(-1)?.cause).toBe('rebase')
 })
 
-test('dropping a /model restores the model the kept history last chose', () => {
+test('dropping a model state transition independently restores the starting model', () => {
 	seed()
 	history.append(id, { type: 'command', text: '/model fake/b' })
 	history.append(id, { type: 'change', model: 'fake/b', previous: { model: 'fake/m' } })
 	sessions.open(id).model = 'fake/b'
-	rebases.apply(id, { base: 6, drop: [5], edit: [] })
+	rebases.apply(id, { base: 6, drop: [6], edit: [] })
 	expect(sessions.open(id).model).toBe('fake/m')
+})
+
+test('rebase restores cwd, qualified model and autoclose without replaying commands; undo restores edited settings', async () => {
+	seed()
+	history.append(id, { type: 'notice', text: 'Old project instructions', sectionUpdate: true })
+	let transition = history.append(id, { type: 'change', cwd: '/new', model: 'openai/gpt-6-sol:max', autoclose: true, previous: { cwd: '/', model: 'fake/m', autoclose: false } })
+	let note = history.append(id, { type: 'notice', text: 'New project instructions', sectionUpdate: true })
+	Object.assign(sessions.open(id), { cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
+	await history.messages(id)
+	let base = history.readSync(id).at(-1)!.n!
+	let bytes = readFileSync(history.file(id))
+	rebases.apply(id, { base, drop: [transition.n!, note.n!], edit: [] })
+	expect(sessions.open(id)).toMatchObject({ cwd: '/', model: 'fake/m', autoclose: false })
+	expect(sessions.open(id).effort).toBeUndefined()
+	expect(readFileSync(history.file(id)).subarray(0, bytes.length)).toEqual(bytes)
+	let text = JSON.stringify(await history.messages(id))
+	expect(text).toContain('Old project instructions')
+	expect(text).not.toContain('New project instructions')
+	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(1)
+	rebases.apply(id, { base, drop: [], edit: [] }, history.readSync(id).at(-1)!.n)
+	expect(sessions.open(id)).toMatchObject({ cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
+})
+
+test('dropping a cwd transition and its update restores historical project instructions even after disk edits', async () => {
+	let a = `${home}/a`, b = `${home}/b`, file = `${home}/SYSTEM.md`
+	mkdirSync(a); mkdirSync(b)
+	writeFileSync(`${a}/AGENTS.md`, 'Original project A rules')
+	writeFileSync(`${b}/AGENTS.md`, 'Project B rules')
+	writeFileSync(file, 'Static instructions\n:: section "Cwd" update="diff"\n$cwd\n::\n:: section "Local instructions" update="diff"\n$agents\n::')
+	let original = systemPrompt.file
+	systemPrompt.file = () => file
+	try {
+		id = sessions.create({ cwd: a, model: 'fake/m' }).id
+		seed()
+		let frozen = promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 1000 }).system
+		expect(frozen).toContain('Original project A rules')
+		slash.change(id, { cwd: b })
+		promptCache.prepare(id, { cwd: b, model: 'fake/m', now: 2000 })
+		await history.messages(id)
+		let raw = history.readSync(id)
+		let transition = raw.findLast((r) => r.type === 'change')!, note = raw.findLast((r) => r.type === 'notice' && r.sectionUpdate)!
+		expect(note.type === 'notice' && note.text).toContain('Project B rules')
+		writeFileSync(`${a}/AGENTS.md`, 'A disk change after the transition')
+		rebases.apply(id, { base: raw.at(-1)!.n!, drop: [transition.n!, note.n!], edit: [] })
+		expect(sessions.open(id).cwd).toBe(a)
+		expect(promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 3000 }).system).toBe(frozen)
+		let input = frozen + JSON.stringify(await history.messages(id))
+		expect(input).toContain('Original project A rules')
+		expect(input).not.toContain('Project B rules')
+		expect(input).not.toContain('A disk change after the transition')
+		expect(history.readSync(id).filter((r) => r.type === 'notice' && r.sectionUpdate)).toHaveLength(1)
+		writeFileSync(`${a}/AGENTS.md`, 'Genuine later source edit')
+		promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 4000 })
+		expect(JSON.stringify(await history.messages(id))).toContain('Genuine later source edit')
+	} finally { systemPrompt.file = original }
+})
+
+test('invalid setting edits fail before pausing or writing; a note-only edit leaves host settings intact', async () => {
+	seed()
+	let change = history.append(id, { type: 'change', cwd: '/new', previous: { cwd: '/' } })
+	let note = history.append(id, { type: 'notice', text: 'Original rules', sectionUpdate: true })
+	sessions.open(id).cwd = '/new'
+	let base = note.n!, bytes = readFileSync(history.file(id))
+	expect(() => rebases.apply(id, { base, drop: [], edit: [{ n: change.n!, text: '{cwd: 42}' }] })).toThrow('invalid session setting')
+	expect(readFileSync(history.file(id))).toEqual(bytes)
+	rebases.apply(id, { base, drop: [], edit: [{ n: note.n!, text: 'User injected instructions' }] })
+	expect(sessions.open(id).cwd).toBe('/new')
+	expect(JSON.stringify(await history.messages(id))).toContain('User injected instructions')
+})
+
+test('committed settings recover after metadata synchronization fails without replaying commands', () => {
+	seed()
+	let transition = history.append(id, { type: 'change', cwd: '/new', previous: { cwd: '/' } })
+	sessions.open(id).cwd = '/new'
+	liveFiles.save(sessions.open(id))
+	let save = liveFiles.save
+	liveFiles.save = () => { throw new Error('metadata disk full at session.ason') }
+	try {
+		expect(() => rebases.apply(id, { base: transition.n!, drop: [transition.n!], edit: [] })).toThrow(/Rebase applied as #\d+; settings synchronization failed[\s\S]*metadata disk full at session.ason/)
+	} finally { liveFiles.save = save }
+	expect(history.readSync(id).at(-1)).toMatchObject({ type: 'rebase', contextChanged: true })
+	Object.assign(sessions.open(id), { cwd: '/new' })
+	liveFiles.save(sessions.open(id))
+	sessions.close(id)
+	expect(sessions.open(id).cwd).toBe('/')
+	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(1)
+})
+
+test('missing starting state refuses setting surgery without migration but permits notice edits', () => {
+	seed()
+	delete sessions.open(id).startingState
+	let transition = history.append(id, { type: 'change', cwd: '/new', previous: { cwd: '/' } })
+	let note = history.append(id, { type: 'notice', text: 'Original note' })
+	expect(() => rebases.apply(id, { base: note.n!, drop: [transition.n!], edit: [] })).toThrow('no starting state')
+	expect(history.readSync(id).at(-1)?.n).toBe(note.n)
+	rebases.apply(id, { base: note.n!, drop: [], edit: [{ n: note.n!, text: 'Edited note' }] })
+	expect(sessions.open(id).startingState).toBeUndefined()
 })
 
 test('dropped signed blocks are never expanded', async () => {

@@ -9,7 +9,7 @@ import { titles } from './titles.ts'
 // `name`: the file as the user knows it (relative to the session's cwd
 // when inside it); `what`: changed, added or removed; `diff`: changed
 // lines, capped by the host.
-export type PromptChange = { name: string; what: 'changed' | 'added' | 'removed'; diff: string }
+export type PromptChange = { name: string; what: 'changed' | 'added' | 'removed'; diff: string; sectionOnly?: true }
 
 type Output = Item & { type: 'output' }
 

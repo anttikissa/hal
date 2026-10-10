@@ -5,7 +5,7 @@
 // sent before Apply.
 import { connection } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
-import type { RebasePlan } from '../common/rebase.ts'
+import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRow, type RebaseRows } from '../common/rebase-rows.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { app } from './app.ts'
@@ -182,6 +182,7 @@ function parts(st: RebaseState, row: RebaseRow): Part[] {
 			if (b.type === 'tool_call') text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))
 			else text('', b.text)
 		} else if (r.type === 'command' || r.type === 'output') text(r.type === 'output' ? 'output' : '', r.text)
+		else if (r.type === 'notice' || r.type === 'change') text(r.type === 'change' ? 'settings' : 'internal note', rebase.text(r)!)
 		else if (r.type === 'compact') text('summary', r.summary)
 	}
 	for (let c of row.carries) {

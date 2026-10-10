@@ -1,5 +1,7 @@
 // Append-only context surgery. Numbers refer to records, never positions.
 import type { HistoryRecord } from './replay.ts'
+import { ason } from './ason.ts'
+import { modelNotices } from './model-notices.ts'
 
 export type RebasePlan = { base: number; drop: number[]; edit: { n: number; text: string }[] }
 
@@ -46,7 +48,7 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 			}
 			if (r.blocks.some((b) => b.type === 'text')) { calls.clear(); command = undefined }
 		} else if (r.type === 'command') command = r.n
-		else if ((r.type === 'output' || r.type === 'change') && command !== undefined && r.n !== undefined) join([command, r.n])
+		else if (r.type === 'output' && !r.change && command !== undefined && r.n !== undefined) join([command, r.n])
 		else if (r.type === 'round' || r.type === 'turn_end' || r.type === 'compact' || r.type === 'reset') flush()
 	}
 	flush()
@@ -54,7 +56,8 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 }
 
 function text(r: HistoryRecord): string | undefined {
-	if (r.type === 'inbox') return r.text
+	if (r.type === 'inbox' || r.type === 'notice' || (r.type === 'output' && r.change)) return r.text
+	if (r.type === 'change') return ason.stringify(Object.fromEntries(['cwd', 'model', 'autoclose'].filter((k) => Object.hasOwn(r, k)).map((k) => [k, r[k as 'cwd' | 'model' | 'autoclose']])), 'short')
 	if (r.type === 'assistant' && r.block.type === 'text') return r.block.text
 	if (r.type !== 'user') return undefined
 	let texts = r.blocks.filter((b) => b.type === 'text')
@@ -63,7 +66,13 @@ function text(r: HistoryRecord): string | undefined {
 }
 
 function edited(r: HistoryRecord, text: string): HistoryRecord {
-	if (r.type === 'inbox') return { ...r, text }
+	if (r.type === 'inbox' || r.type === 'notice' || (r.type === 'output' && r.change)) return { ...r, text }
+	if (r.type === 'change') {
+		let value = ason.parse(text) as Record<string, unknown>
+		if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.keys(value).length || Object.entries(value).some(([key, v]) => !['cwd', 'model', 'autoclose'].includes(key) || typeof v !== (key === 'autoclose' ? 'boolean' : 'string') || (typeof v === 'string' && !v.trim()))) throw new Error(`record #${r.n}: invalid session setting change`)
+		let { cwd: _cwd, model: _model, autoclose: _autoclose, ...rest } = r
+		return { ...rest, ...value } as HistoryRecord
+	}
 	if (r.type === 'assistant' && r.block.type === 'text') return { ...r, block: { ...r.block, text } }
 	if (r.type === 'user') {
 		if (r.blocks.some((b) => b.type === 'text')) {
@@ -104,7 +113,7 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 		let batch = results.get(target) ?? new Map<string, string>()
 		batch.set(id, text); results.set(target, batch); edits.delete(n)
 	}
-	return records.filter((r) => !dropped.has(r.n!)).map((r) => {
+	let projected = records.filter((r) => !dropped.has(r.n!)).map((r) => {
 		if (edits.has(r.n!)) return rebase.edited(r, edits.get(r.n!)!)
 		let batch = results.get(r.n!)
 		if (r.type !== 'user' || !batch) return r
@@ -113,6 +122,17 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 			let { image: _image, ...rest } = b
 			return { ...rest, output: batch.get(b.id)! }
 		}) }
+	})
+	let sources = new Map(projected.map((r) => [r.n, r]))
+	return projected.map((r) => {
+		if (r.type !== 'user' || !r.notices) return r
+		let notices = r.notices.flatMap((notice) => {
+			if (dropped.has(notice.source)) return []
+			let source = sources.get(notice.source)
+			if (source?.type !== 'notice' || !edits.has(notice.source)) return [notice]
+			return [{ ...notice, text: modelNotices.text(source, {}) ?? '' }]
+		})
+		return notices.length === r.notices.length && notices.every((n, i) => n === r.notices![i]) ? r : { ...r, notices }
 	})
 }
 

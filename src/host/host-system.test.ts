@@ -68,7 +68,7 @@ function start() {
 }
 
 const lastPrompt = (messages: Message[]) => {
-	let m = messages.at(-1)!
+	let m = messages.findLast((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.startsWith('[')))!
 	return m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')
 }
 
@@ -84,30 +84,31 @@ test('every request carries the system prompt, unchanged between requests while 
 	expect(b).toBe(a)
 })
 
-test('/cd changes the system prompt and tells the model on its next prompt', async () => {
+test('/cd preserves the frozen system and delivers rendered sections on the next prompt', async () => {
 	let s = start()
 	await s.prompt('one')
 	await s.command('/cd sub')
 	await s.prompt('two')
 	let system = requests[1]!.system!
-	expect(system).not.toBe(requests[0]!.system)
-	expect(system).toContain(`${work}/sub`)
-	expect(system).toContain('SUB RULE')
+	expect(system).toBe(requests[0]!.system!)
+	let input = JSON.stringify(requests[1]!.messages)
+	expect(input).toContain(`${work}/sub`)
+	expect(input).toContain('SUB RULE')
 	expect(lastPrompt(requests[1]!.messages)).toContain('two')
-	expect(JSON.stringify(requests[1]!.messages.at(-2))).toContain(`The working directory changed from ${work} to ${work}/sub.`)
+	expect(input).not.toContain('The working directory changed from')
 	await s.prompt('three')
 	expect(lastPrompt(requests[2]!.messages)).not.toContain('The working directory is now')
 	expect(requests[2]!.system).toBe(system)
 })
 
-test('a model switch reaches the model as a note and in the system prompt', async () => {
+test('a provider-model switch rebuilds current system without a duplicate dedicated notice', async () => {
 	let s = start()
 	await s.prompt('one')
 	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('two')
 	expect(requests[1]!.system).toContain('openai/gpt-test')
 	expect(lastPrompt(requests[1]!.messages)).toContain('two')
-	expect(JSON.stringify(requests[1]!.messages.at(-2))).toContain('openai/gpt-test')
+	expect(JSON.stringify(requests[1]!.messages)).not.toContain('The model changed from')
 	// Setting what it already is changes nothing.
 	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('three')

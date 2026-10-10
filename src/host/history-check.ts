@@ -29,7 +29,11 @@ function check(value: unknown): HistoryRecord {
 	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
 	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string') throw new Error('invalid boundary transition')
-	if (r.type === 'change' && r.previous !== undefined && (!r.previous || typeof r.previous !== 'object' || Object.values(r.previous).some((v) => typeof v !== 'string'))) throw new Error('invalid previous setting')
+	if (r.type === 'change') {
+		for (let value of [r, r.previous]) if (value) for (let key of ['cwd', 'model', 'autoclose'] as const) if (value[key] !== undefined && typeof value[key] !== (key === 'autoclose' ? 'boolean' : 'string')) throw new Error(`invalid ${key} setting`)
+		if (r.previous !== undefined && (!r.previous || typeof r.previous !== 'object')) throw new Error('invalid previous setting')
+	}
+	if (r.type === 'notice' && ((r.rendered !== undefined && r.rendered !== true) || (r.sectionUpdate !== undefined && r.sectionUpdate !== true) || (r.source !== undefined && (!Number.isSafeInteger(r.source) || r.source < 1)))) throw new Error('invalid notice metadata')
 	if (r.type === 'notice' && (typeof r.text !== 'string' || !r.text.trim() || typeof r.ts !== 'string' || !Number.isFinite(Date.parse(r.ts)))) throw new Error('invalid host notice')
 	if (r.type === 'continue' && r.reason !== undefined && typeof r.reason !== 'string') throw new Error('invalid continuation reason')
 	if (r.type === 'user' && r.notices !== undefined && (!Array.isArray(r.notices) || r.notices.some((n) => !n || !Number.isSafeInteger(n.source) || n.source < 1 || typeof n.text !== 'string'))) throw new Error('invalid notices')
@@ -38,6 +42,7 @@ function check(value: unknown): HistoryRecord {
 		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
 	}
 	if (r.type === 'rate_limit' && (typeof r.provider !== 'string' || typeof r.model !== 'string' || typeof r.text !== 'string' || typeof r.until !== 'string' || !Number.isFinite(Date.parse(r.until)))) throw new Error('invalid rate limit wait')
+	if (r.type === 'rebase' && r.contextChanged !== undefined && r.contextChanged !== true) throw new Error('invalid rebase setting flag')
 	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
 	for (let b of r.type === 'assistant' ? [r.block] : r.type === 'user' ? r.blocks : []) {
 		if (b.type !== 'tool_call' && b.type !== 'tool_result') continue

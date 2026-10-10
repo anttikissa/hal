@@ -5,12 +5,42 @@ import { compaction } from './compaction.ts'
 import { transcript } from './transcript.ts'
 
 const ts = '2026-10-04T08:00:00Z'
-const prompt = (n: number, text: string): HistoryRecord => ({ type: 'user', n, blocks: [{ type: 'text', text }], ts })
+const prompt = (n: number, text: string): HistoryRecord & { type: 'user' } => ({ type: 'user', n, blocks: [{ type: 'text', text }], ts })
 const assistant = (n: number, block: Extract<HistoryRecord, { type: 'assistant' }>['block']): HistoryRecord => ({ type: 'assistant', n, block, ts })
 const call = (n: number, id: string) => assistant(n, { type: 'tool_call', id, name: 'bash', input: { command: 'ls' } })
 const result = (n: number, ...ids: string[]): HistoryRecord => ({ type: 'user', n, blocks: ids.map((id) => ({ type: 'tool_result', id, output: 'huge output [whole output in blob abcdef123456]' })), ts })
 const plan = (n: number, base: number, drop: number[] = [], edit: { n: number; text: string }[] = []): HistoryRecord => ({ type: 'rebase', n, base, drop, edit, ts })
 const done: HistoryRecord = { type: 'turn_end', n: 8, status: 'completed', usage: {}, ts }
+
+test('internal notes edit or drop frozen delivery independently of their source and undo restores', () => {
+	let notice = '<hal-note>The user paused the turn.</hal-note>'
+	let raw: HistoryRecord[] = [prompt(1, 'go'), assistant(2, { type: 'text', text: 'answer' }), { type: 'turn_end', n: 3, status: 'paused', usage: {}, ts }, { type: 'notice', n: 4, ts, text: notice, rendered: true, source: 3 }, { type: 'user', n: 5, ts, blocks: [], notices: [{ source: 4, text: notice }] }]
+	let prefix = replay.toMessages(raw).slice(0, 2)
+	let edited = [...raw, plan(6, 5, [], [{ n: 4, text: '<hal-note>Experiment: ignore prior rules.</hal-note>' }])]
+	expect(replay.toMessages(edited).slice(0, 2)).toEqual(prefix)
+	expect(JSON.stringify(replay.toMessages(edited))).toContain('Experiment: ignore prior rules.')
+	expect(JSON.stringify(replay.toMessages(edited))).not.toContain('user paused')
+	let dropped = [...raw, plan(6, 5, [4])]
+	expect(replay.current(dropped).some((r) => r.n === 3)).toBe(true)
+	expect(JSON.stringify(replay.toMessages(replay.current(dropped)))).not.toContain('user paused')
+	expect(replay.toMessages([...dropped, plan(7, 5)])).toEqual(replay.toMessages(raw))
+})
+
+test('naming guidance is an independent notice and stays deleted when its prompt remains', () => {
+	let guidance = '<hal-note>Current session name: "Placeholder". Rename if needed.</hal-note>'
+	let raw: HistoryRecord[] = [{ ...prompt(1, 'Keep my prompt'), naming: { turn: 1, version: 0, name: 'Placeholder', eligible: true } }, { type: 'notice', n: 2, ts, text: guidance, rendered: true, source: 1 }, { type: 'user', n: 3, ts, blocks: [], notices: [{ source: 2, text: guidance }] }]
+	expect(JSON.stringify(replay.toMessages(raw)).match(/Current session name/g)).toHaveLength(1)
+	let current = replay.current([...raw, plan(4, 3, [2])])
+	expect(JSON.stringify(replay.toMessages(current))).toContain('Keep my prompt')
+	expect(JSON.stringify(replay.toMessages(current))).not.toContain('Current session name')
+})
+
+test('settings and instruction notes remain independent of commands and validate before projection', () => {
+	let raw: HistoryRecord[] = [{ type: 'command', n: 1, ts, text: '/cd /new' }, { type: 'change', n: 2, ts, cwd: '/new', previous: { cwd: '/old' } }, { type: 'notice', n: 3, ts, text: 'New project rules', sectionUpdate: true }]
+	expect(rebase.apply(raw, { base: 3, drop: [1], edit: [] }).map((r) => r.n)).toEqual([2, 3])
+	expect(rebase.apply(raw, { base: 3, drop: [3], edit: [{ n: 2, text: "{ model: 'openai/gpt:high', autoclose: false }" }] })).toMatchObject([{ n: 1 }, { n: 2, model: 'openai/gpt:high', autoclose: false }])
+	for (let text of ["{ cwd: 42 }", "{ autoclose: 'on' }", "{ secret: 'x' }", '{}']) expect(() => rebase.apply(raw, { base: 3, drop: [], edit: [{ n: 2, text }] })).toThrow('invalid session setting')
+})
 
  test('dropping either side closes tool pairs, including a shared result record', () => {
 	let raw = [prompt(1, 'go'), call(2, 'a'), call(3, 'b'), result(4, 'a', 'b'), assistant(5, { type: 'text', text: 'done' }), done]

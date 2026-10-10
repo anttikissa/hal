@@ -9,6 +9,16 @@ const say = (n: number, text: string): HistoryRecord => ({ type: 'assistant', n,
 const call: HistoryRecord = { type: 'assistant', n: 3, ts, block: { type: 'tool_call', id: 'a', name: 'bash', input: { command: './test' } } }
 const result: HistoryRecord = { type: 'user', n: 5, ts, blocks: [{ type: 'tool_result', id: 'a', output: 'output cut; whole output in blob abcdef123456', image: { type: 'image', blob: '123456abcdef', mediaType: 'image/png', bytes: 500 } }] }
 
+test('internal notes and settings are independently editable rows in terminal and model plans', () => {
+	let raw: HistoryRecord[] = [{ type: 'command', n: 1, ts, text: '/cd /new' }, { type: 'change', n: 2, ts, cwd: '/new', autoclose: true }, { type: 'notice', n: 3, ts, text: 'Project rules\nfull content', sectionUpdate: true }, { type: 'notice', n: 4, ts, text: 'Host fact' }]
+	let snapshot = rebaseRows.build(raw)
+	expect(snapshot.rows.map((r) => [r.n, r.kind, r.editable, r.group])).toEqual([[1, 'command', false, [1]], [2, 'settings', true, [2]], [3, 'instructions', true, [3]], [4, 'note', true, [4]]])
+	let todo = rebaseRows.render('example', snapshot).replace(/^keep\s+#3/m, 'edit  #3')
+	let parsed = rebaseRows.parse(todo, snapshot, { 3: 'Injected instructions' })
+	expect(parsed.plan.edit).toEqual([{ n: 3, text: 'Injected instructions' }])
+	expect(rebaseRows.parse(todo.replace(/^keep\s+#2.*\n/m, ''), snapshot, { 3: 'Injected instructions' }).plan.drop).toEqual([2])
+})
+
 test('rows pair calls across interleaved records, group commands with outputs and show attachment metadata', () => {
 	let raw: HistoryRecord[] = [prompt(1, 'First line\nsecond'), { type: 'assistant', n: 2, ts, block: { type: 'thinking', text: 'Considering options', signature: 'sig' } }, call, { type: 'round', n: 4, ts, usage: {} }, result, say(6, 'Answer'), { type: 'command', n: 7, ts, text: '/example' }, { type: 'output', n: 8, ts, text: 'command output' }, { type: 'compact', n: 9, ts, summary: 'summary', prompts: 1 }, { type: 'reset', n: 10, ts }]
 	let snapshot = rebaseRows.build(raw, { blobSizes: { abcdef123456: 1_400_000 }, pruned: [3] })
@@ -56,14 +66,14 @@ test('a changed summary edits the first line in place; changed columns or tool r
 	expect(rebaseRows.parse(tail, snapshot).plan).toEqual({ base: 5, drop: [2, 3, 5], edit: [{ n: 1, text: 'Fixed $& line\nsecond $&' }] })
 	let opened = rebaseRows.parse(tail.replace(/^keep/m, 'edit'), snapshot)
 	expect([opened.edits, opened.inline]).toEqual([[1], { 1: 'Fixed $& line\nsecond $&' }])
-	expect(() => rebaseRows.parse(text.replace('$ ./test', '$ ./test -v'), snapshot)).toThrow('Rebase line 6: #3 changed')
-	expect(() => rebaseRows.parse(text.replace(/prompt(\s+)/, 'answer$1'), snapshot)).toThrow('Rebase line 4: #1 changed')
+	expect(() => rebaseRows.parse(text.replace('$ ./test', '$ ./test -v'), snapshot)).toThrow('Rebase line 7: #3 changed')
+	expect(() => rebaseRows.parse(text.replace(/prompt(\s+)/, 'answer$1'), snapshot)).toThrow('Rebase line 5: #1 changed')
 })
 
 test('todo format header reports planned savings and preserves deterministic row layout', () => {
 	let snapshot = rebaseRows.build([prompt(12, 'First line\nrest'), say(13, 'answer')])
 	let text = rebaseRows.render('157-gut', snapshot, { base: 13, drop: [13], edit: [] })
-	expect(text).toBe("# Rebase 157-gut · 2 rows · 7 tokens → 5 after · cache rebuilds from #13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  #12  2026-10-04 09:00  prompt     5  First line\ndrop  #13  09:00             assistant  2  answer\n")
+	expect(text).toBe("# Changing or deleting a message invalidates the cache from that point onward.\n# Rebase 157-gut · 2 rows · 7 tokens → 5 after · cache rebuilds from #13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  #12  2026-10-04 09:00  prompt     5  First line\ndrop  #13  09:00             assistant  2  answer\n")
 })
 
 test('todo rejects duplicate/unknown/reordered rows, queue placement and uneditable text with line numbers', () => {

@@ -21,7 +21,7 @@ const oneLine = (text: string) => text.split(/\r?\n/, 1)[0]!.replace(/[\t\x00-\x
 const size = (n: number) => n < 1000 ? `${n} B` : n < 1e6 ? `${Math.round(n / 100) / 10} kB` : `${Math.round(n / 1e5) / 10} MB`
 const kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`
 // Rows whose summary is their editable text's first line, maybe after a sender label.
-const inlineKinds = new Set(['prompt', 'assistant', 'queued', 'advisory', 'interjecting', 'steering'])
+const inlineKinds = new Set(['prompt', 'assistant', 'queued', 'advisory', 'interjecting', 'steering', 'note', 'instructions', 'settings'])
 const columns = (row: RebaseRow) => [`#${row.n}`, row.time, row.kind, kilo(row.tokens)]
 const carried = (row: RebaseRow) => row.carries.length ? `(${row.carries.join('; ')})` : ''
 const words = (text: string) => text.trim().split(/\s+/).join(' ')
@@ -98,6 +98,11 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 			row.ns = revisions.get(r.id)!
 			row.editable = true; row.editN = row.ns.at(-1); row.text = item.text
 			carry(row, item.text)
+		} else if (r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change)) {
+			let text = rebase.text(r)!
+			let row = add(r, r.type === 'change' ? 'settings' : r.type === 'notice' && r.sectionUpdate ? 'instructions' : 'note', text, text.length)
+			row.editable = true; row.editN = r.n; row.text = text
+			carry(row, text)
 		} else if (r.type === 'command') command = add(r, 'command', r.text, r.text.length)
 		else if (r.type === 'output') {
 			if (!command) { let row = add(r, 'output', r.text, r.text.length); carry(row, r.text) }
@@ -134,7 +139,7 @@ function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { ba
 	let edits = new Set(plan.edit.map((e) => e.n)), drops = new Set(plan.drop)
 	let widths = [4, ...['n', 'time', 'kind'].map((key) => Math.max(...snapshot.rows.map((row) => String(row[key as 'n' | 'time' | 'kind']).length + (key === 'n' ? 1 : 0)), 0)), Math.max(...snapshot.rows.map((row) => kilo(row.tokens).length), 0)]
 	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} rows · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from #${sums.cacheFrom}`}`
-	return [header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
+	return ['# Changing or deleting a message invalidates the cache from that point onward.', header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
 		let action = row.ns.some((n) => drops.has(n)) ? 'drop' : row.ns.some((n) => edits.has(n)) ? 'edit' : 'keep'
 		return [action, ...columns(row)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  ${carried(row)}` : ''}`
 	})].join('\n') + '\n'
@@ -150,7 +155,7 @@ function inline(row: RebaseRow, rest: string): string | undefined {
 	let head = new RegExp(`^${columns(row).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')).join('\\s+')}(?:\\s+|$)`).exec(rest)
 	let summary = head && rest.slice(head[0].length).trim()
 	if (summary !== null && carried(row) && summary.endsWith(carried(row))) summary = summary.slice(0, -carried(row).length).trim()
-	if (!row.editable || !inlineKinds.has(row.kind) || row.text === undefined || !row.summary.endsWith(first) || summary === null || !summary.startsWith(label)) throw new Error(`#${row.n} changed, but only the text after the kind and token columns of a prompt, assistant or inbox row can be edited inline; use edit for the rest`)
+	if (!row.editable || !inlineKinds.has(row.kind) || row.text === undefined || !row.summary.endsWith(first) || summary === null || !summary.startsWith(label)) throw new Error(`#${row.n} changed, but only the text after the kind and token columns of an editable text row can be edited inline; use edit for the rest`)
 	let text = summary.slice(label.length).trim()
 	return text === first ? undefined : row.text.replace(/^[^\n]*/, () => text)
 }

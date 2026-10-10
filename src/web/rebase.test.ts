@@ -31,6 +31,17 @@ function start() {
 	return rebaseView.state!
 }
 
+test('internal notes open, edit and drop independently of session setting rows', () => {
+	let snapshot = rebaseRows.build([{ type: 'change', n: 1, ts, cwd: '/new' }, { type: 'notice', n: 2, ts, text: 'New rules\nfull instructions', sectionUpdate: true }])
+	rebaseView.open(plan(snapshot))
+	let st = rebaseView.state!
+	expect(rebaseView.parts(st, snapshot.rows[1]!)).toEqual([{ kind: 'text', label: 'internal note', text: 'New rules\nfull instructions' }])
+	rebaseView.act(2, 'edit')
+	rebaseView.edit(2, 'Injected rules')
+	rebaseView.act(1, 'drop')
+	expect(rebaseView.plan(rebaseView.state!)).toEqual({ base: 2, drop: [1], edit: [{ n: 2, text: 'Injected rules' }] })
+})
+
 test('a drop takes its whole group, and keeping a member keeps the group', () => {
 	start()
 	rebaseView.act(3, 'drop')
