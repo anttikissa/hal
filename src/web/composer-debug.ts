@@ -59,7 +59,7 @@ function anomaly(s: Row): string[] {
 	let box = s.box as { font: { size: string; family: string; letter: string; pad: string } | null; ch: number | null } | null
 	if (s.value !== undefined && s.value !== s.stateText) out.push('box value differs from app.state.text')
 	if (hint && value && !hint.class.split(' ').includes('gone') && hint.text && !value.includes('\n') && strings.visLen(hint.cut ?? '') < strings.visLen(value)) out.push('example drawn under typed text')
-	if (hint?.font && box?.font && (hint.font.size !== box.font.size || hint.font.family !== box.font.family || hint.font.letter !== box.font.letter || hint.font.pad !== box.font.pad)) out.push('example and box fonts differ')
+	if (hint?.font && box?.font && (hint.font.size !== box.font.size || hint.font.family !== box.font.family || hint.font.letter !== box.font.letter)) out.push('example and box fonts differ')
 	if (hint?.ch && box?.ch && Math.abs(hint.ch - box.ch) > 0.01) out.push('example and box column widths differ')
 	return out
 }
@@ -132,7 +132,7 @@ function init(): void {
 	let hintAt = 0
 	let hintChanges = new MutationObserver(() => {
 		let now = performance.now()
-		if (now - hintAt < 250 && !anomaly(snapshot()).length) return
+		if (now - hintAt < 250 && anomaly(snapshot()).join('|') === lastAnomaly) return
 		hintAt = now
 		record('hint-mutation')
 	})
