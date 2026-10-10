@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
 // Best-effort HTTP diagnostics still work when the WebSocket does not.
 // Only fixed labels and numeric/boolean state; no text or persistent storage.
-import { diagnosticDetails, type Breadcrumb, type DiagnosticContext, type DiagnosticKind } from '../common/web-diagnostics.ts'
+import type { Event as HostEvent } from '../common/protocol.ts'
+import { diagnosticDetails, type DiagnosticDetail, type Breadcrumb, type DiagnosticContext, type DiagnosticKind } from '../common/web-diagnostics.ts'
 
 let entries: Breadcrumb[] = [], read: (() => DiagnosticContext) | undefined
 let lag = 0
@@ -76,4 +77,20 @@ function init(context: () => DiagnosticContext): void {
 	record('start'); report()
 }
 
-export const diagnostics = { init: (context: () => DiagnosticContext) => { try { init(context) } catch { read = undefined } }, record, report }
+function load(detail: DiagnosticDetail, start = performance.now(), tab = read?.().tab ?? 0, bytes?: number): void {
+	if (!read) return
+	record('load', detail)
+	Object.assign(entries.at(-1)!, { tab, ms: Math.max(0, performance.now() - start), ...(bytes !== undefined && { bytes }) })
+	report()
+}
+
+function apply(event: HostEvent, update: () => void, tab: number, shown: boolean): void {
+	diagnostics.record('event', event.type)
+	let start = read && event.type === 'snapshot' ? performance.now() : undefined
+	update()
+	if (start === undefined) return
+	diagnostics.load('applied', start, tab)
+	if (shown) requestAnimationFrame(() => diagnostics.load('frame', start, tab))
+}
+
+export const diagnostics = { enabled: () => !!read, apply, load, init: (context: () => DiagnosticContext) => { try { init(context) } catch { read = undefined } }, record, report }

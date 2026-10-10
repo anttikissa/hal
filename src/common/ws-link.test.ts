@@ -45,6 +45,24 @@ function setup(authorized?: () => Promise<boolean>) {
 	return { sockets, timers, events, states }
 }
 
+test('optional snapshot parsing diagnostics report UTF-8 size before delivery', async () => {
+	let socket = new FakeSocket(), order: string[] = [], bytes = 0
+	let connected = link.transport(() => socket, undefined, undefined, (ms, size, event) => {
+		expect(ms).toBeGreaterThanOrEqual(0)
+		expect(event.type).toBe('snapshot')
+		bytes = size
+		order.push('parsed')
+	}).connect({ event: () => order.push('delivered'), dropped: () => {} })
+	socket.onopen!()
+	await connected
+	let data = ason.stringify({ type: 'snapshot', sessionId: '1-abc', snapshot: { text: 'ä' } }, 'short')
+	socket.onmessage!({ data })
+	expect(bytes).toBe(Buffer.byteLength(data))
+	expect(order).toEqual(['parsed', 'delivered'])
+	socket.onmessage!({ data: ason.stringify({ type: 'ack', id: 'x' }) })
+	expect(order).toEqual(['parsed', 'delivered', 'delivered'])
+})
+
 test('commands go out as ASON once open; events arrive parsed, junk is dropped', async () => {
 	let { sockets, events } = setup()
 	connection.send({ type: 'open-newest' })

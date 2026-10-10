@@ -32,9 +32,10 @@ export type LinkOptions = {
 	authorized?: () => Promise<boolean>
 	onEvent: (event: Event) => void
 	onState?: (state: LinkState) => void
+	onMessage?: (ms: number, bytes: number, event: Event) => void
 }
 
-function transport(dial: () => Socket, reload: () => void = () => {}, authorized?: () => Promise<boolean>): Transport {
+function transport(dial: () => Socket, reload: () => void = () => {}, authorized?: () => Promise<boolean>, onMessage?: LinkOptions['onMessage']): Transport {
 	return {
 		connect: (on) =>
 			new Promise((resolve) => {
@@ -46,12 +47,14 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 					resolve({ conn, role: 'client' })
 				}
 				socket.onmessage = (m) => {
+					let start = onMessage ? performance.now() : 0
 					let event: Event
 					try {
 						event = ason.parse(String(m.data)) as Event
 					} catch {
 						return
 					}
+					if (event.type === 'snapshot') onMessage?.(performance.now() - start, new TextEncoder().encode(String(m.data)).byteLength, event)
 					on.event(event)
 				}
 				socket.onclose = (ev) => {
@@ -71,7 +74,7 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 // Connects, and reconnects with backoff whenever the socket drops.
 function start(opts: LinkOptions): void {
 	let startOpts: Parameters<typeof connection.start>[0] = {
-		transport: wsLink.transport(opts.dial, opts.reload, opts.authorized),
+		transport: wsLink.transport(opts.dial, opts.reload, opts.authorized, opts.onMessage),
 		onEvent: opts.onEvent,
 		baseMs: wsLink.baseMs,
 		maxMs: wsLink.maxDelayMs,

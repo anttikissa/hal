@@ -311,9 +311,7 @@ function send(delivery: Delivery = 'steer'): void {
 	app.setNotice(notice)
 }
 
-// Connects to the host (reconnecting with backoff; each connection
-// brings the tabs and a fresh snapshot of the shown one) and follows
-// Back and Forward.
+// Connects with backoff, refreshing tabs and the shown snapshot; follows Back/Forward.
 function start(): void {
 	drafts.store = app.store
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -321,7 +319,8 @@ function start(): void {
 		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}&updates=manual`),
 		reload: () => location.reload(),
 		authorized: () => app.authorized(),
-		onEvent: (e) => { diagnostics.record('event', e.type); app.onEvent(e) },
+		onEvent: (e) => diagnostics.apply(e, () => app.onEvent(e), e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0, e.type === 'snapshot' && app.state.shown === e.sessionId),
+		onMessage: diagnostics.enabled() ? (ms, bytes, e) => diagnostics.load('parsed', performance.now() - ms, e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0, bytes) : undefined,
 		onState: (s) => { diagnostics.record('connection', s.type); diagnostics.report(); app.onState(s) },
 	})
 	addEventListener('popstate', () => tabs.onPopState())

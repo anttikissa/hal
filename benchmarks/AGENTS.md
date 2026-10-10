@@ -8,7 +8,21 @@ Keep benchmark dependencies out of Hal's runtime and package manifest.
 Preserve existing records and compatibility paths when consolidating caches.
 Keep credentials, account identities and host-specific paths out of tracked files.
 
-Agree the record schema with the user before implementing it. Keep full failures
-and failed tool calls; distinguish API-equivalent cost, actual spend and quota.
-Use descriptive task names and report missing measurements as unknown.
+Record every run locally with complete available transcripts and receipts for
+all tool calls. Preserve originals; retention changes require user agreement.
+Import identifiable failed and aborted attempts, deduplicate stable source
+identities, and mark missing historical data unknown.
+
+Record suite/task identity, start and elapsed time, harness/model/effort,
+versions, enabled plugins, settings and transport, verification, tokens and
+cache usage, and incident notes. Distinguish API-equivalent cost with dated
+pricing provenance, actual spend, and subscription quota. New runs capture
+quota before/after and check concurrent subscription use before starting.
+Qualify quota inference when usage overlaps or reset boundaries change.
+
+Compare matched model/effort configurations separately from practical model
+trade-offs. Show sample sizes and uncertainty; do not invent confidence
+intervals from single samples or infer causation from version correlations.
+Keep graphable chronology, recurring failures, and slow-call evidence.
+Use descriptive task names and accurate feature labels for historical runs.
 Paid runs require explicit authorization, including the model and effort.

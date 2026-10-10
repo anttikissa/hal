@@ -3,6 +3,7 @@
 import { appendFileSync, chmodSync, existsSync, renameSync, statSync } from 'fs'
 import { diagnosticBooleans, diagnosticDetails, diagnosticKinds, diagnosticNumbers, type BrowserReport } from '../common/web-diagnostics.ts'
 import { paths } from './paths.ts'
+import { settings } from '../common/settings.ts'
 
 const limit = 1024 * 1024
 const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER
@@ -18,7 +19,12 @@ function clean(v: unknown): BrowserReport | undefined {
 		if (!object(e) || !number(e.at) || (e.line !== undefined && !number(e.line)) || (e.column !== undefined && !number(e.column))) return
 		// A page newer than this host may know labels it does not: skip them.
 		if (!diagnosticKinds.includes(e.kind) || !diagnosticDetails.includes(e.detail)) continue
-		entries.push({ at: e.at, kind: e.kind, detail: e.detail, ...(e.line !== undefined && { line: e.line }), ...(e.column !== undefined && { column: e.column }) })
+		let entry = { at: e.at, kind: e.kind, detail: e.detail } as BrowserReport['entries'][number]
+		for (let key of ['line', 'column', 'ms', 'bytes', 'tab'] as const) {
+			if (e[key] !== undefined && !number(e[key])) return
+			if (e[key] !== undefined) entry[key] = e[key]
+		}
+		entries.push(entry)
 	}
 	return { page: v.page, version: v.version, at: v.at, context, entries }
 }
@@ -42,12 +48,22 @@ async function receive(req: Request): Promise<Response> {
 		}
 		let report = clean(JSON.parse(Buffer.concat(chunks).toString('utf8')))
 		if (!report) return new Response(null, { status: 400 })
-		let file = `${paths.stateDir()}/web-diag.log`, line = `${new Date().toISOString()} ${JSON.stringify(report)}\n`
-		if (existsSync(file) && statSync(file).size + Buffer.byteLength(line) > limit) renameSync(file, `${file}.1`)
-		appendFileSync(file, line, { mode: 0o600 })
-		chmodSync(file, 0o600)
+		webDiagnostics.write(report)
 		return new Response(null, { status: 204 })
 	} catch { return new Response(null, { status: 400 }) }
 }
 
-export const webDiagnostics = { clean, receive, reset: () => { windowAt = 0; received = 0 } }
+function write(report: BrowserReport): void {
+	let file = `${paths.stateDir()}/web-diag.log`, line = `${new Date().toISOString()} ${JSON.stringify(report)}\n`
+	if (existsSync(file) && statSync(file).size + Buffer.byteLength(line) > limit) renameSync(file, `${file}.1`)
+	appendFileSync(file, line, { mode: 0o600 })
+	chmodSync(file, 0o600)
+}
+
+function load(tab: number, detail: 'requested' | 'ready' | 'tail' | 'built' | 'encoded', start: number, bytes?: number): void {
+	if (!settings.webDiagnostics()) return
+	let at = Date.now()
+	webDiagnostics.write({ page: 'host0000', version: 'host', at, context: {}, entries: [{ at, kind: 'load', detail, tab, ms: Math.max(0, performance.now() - start), ...(bytes !== undefined && { bytes }) }] })
+}
+
+export const webDiagnostics = { clean, receive, write, load, reset: () => { windowAt = 0; received = 0 } }

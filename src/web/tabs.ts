@@ -21,6 +21,7 @@ import type { KeyInput } from './keys.ts'
 import { router } from './router.ts'
 import { push } from './push.ts'
 import { scroll } from './scroll.ts'
+import { diagnostics } from './diagnostics.ts'
 import { view } from './view.ts'
 
 // A hidden tab receives live updates but must not change the visible DOM.
@@ -151,6 +152,7 @@ function show(id: string, replace: boolean, block?: string): void {
 		delete st.target
 	}
 	st.shown = id
+	diagnostics.load('selected', performance.now(), st.tabs.findIndex((t) => t.id === id) + 1)
 	st.view = st.cached.get(id) ?? {}
 	st.cached.delete(id)
 	st.text = queueEdit.editing(id) ? queueEdit.text(id) : recall.shown(id) ?? drafts.text(id)
@@ -158,6 +160,7 @@ function show(id: string, replace: boolean, block?: string): void {
 	router.store.save(id)
 	if (!st.background.has(id)) {
 		st.background.add(id)
+		diagnostics.load('requested')
 		connection.send({ type: 'open', sessionId: id })
 	}
 	push.visibility(id)
