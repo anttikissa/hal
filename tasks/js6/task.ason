@@ -1,0 +1,10 @@
+{
+	title: 'Distinguish pause causes from current resource health',
+	spec: 'Restore invariant: a saved pause reason describes why the turn stopped, not a live resource measurement. Both clients label reason-bearing pauses as paused after the recorded cause, preserving the full reason and existing continuation hint, including for histories written before this fix. Resource recovery warnings retain current disk and memory figures and explicitly say paused sessions remain paused until the user chooses Continue or presses Enter. Recovery never resumes work automatically. Implement in src/common/states.ts and src/host/resources.ts.',
+	status: 'done',
+	notes: [
+		'Resource recovery leaves the durable pause reason intact; wording treats it as historical even for existing histories. The background-card checkmark is a delivered/read receipt, not a success marker; existing Bash headers display nonzero exit codes. Focused state, terminal, web-view and item-view tests passed (135 tests), changed-file lint passed, and an injected critical-to-ok resource check confirmed warning clearing, historical status, no automatic resume and explicit continuation. Global typecheck is blocked by two existing excess-property errors in src/common/replay.test.ts:201 (inbox and replaces); no changed module errors were reported. Browser rendering was not exercised; this change only changes shared text.'
+	],
+	needs: ['fwk', 'j1'],
+	foldInto: ['fwk', 'j1']
+}

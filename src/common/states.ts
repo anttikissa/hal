@@ -196,7 +196,7 @@ function describe(state: SessionState, now?: number, items: readonly Shown[] = [
 			// Any other reason is already the words the user acts on.
 			return state.reason === 'question' ? undefined : state.reason
 		case 'paused':
-			return (state.reason ? `paused: ${state.reason}` : 'paused') + ' (Enter continues)'
+			return (state.reason ? `paused after: ${state.reason}` : 'paused') + ' (Enter continues)'
 		case 'error':
 			return `error: ${state.message} (Enter retries)`
 	}
