@@ -4,7 +4,7 @@
 // Provider input comes from host history; items omit provider-only fields.
 // Tasks: ca, nvm, 6eq, rqq.
 
-import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
+import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type ToolDisplay, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
@@ -25,8 +25,8 @@ export type Shown = { originSession?: string } & (
 	// (task hp). Records from before hp have none of them.
 	| { type: 'text'; text: string; naming?: true; interrupted?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
-	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
-	| { type: 'tool-result'; id: string; output: string; isError?: boolean; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string }
+	| (ToolDisplay & { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string })
+	| (ToolDisplay & { type: 'tool-result'; id: string; output: string; isError?: boolean; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string })
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
 	// `canceled`: dismissed (Escape, or a newer question replaced it).
@@ -74,7 +74,7 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	let out: Item[] = []
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
-		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
+		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, ...(b.presentation !== undefined && { presentation: b.presentation }), ...(b.presentationError !== undefined && { presentationError: b.presentationError }), key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
 		else if (b.text || (b.type === 'text' && by.interrupted)) {
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
 			if (b.type === 'text' && b.naming) (item as Item & { type: 'text' }).naming = true
@@ -133,6 +133,8 @@ function resultItem(b: ToolResultBlock, ts?: string): Shown {
 	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
 	if (b.diff !== undefined) item.diff = b.diff
+	if (b.presentation !== undefined) item.presentation = b.presentation
+	if (b.presentationError !== undefined) item.presentationError = b.presentationError
 	if (b.ms !== undefined) item.ms = b.ms
 	if (b.interrupted !== undefined) item.interrupted = b.interrupted
 	if (ts !== undefined) item.ts = ts

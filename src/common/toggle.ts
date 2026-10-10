@@ -100,7 +100,7 @@ function noun(items: Item[]): string {
 // `next` is a stepped block's next state.
 function describe(p: Plan, next: (item: Item) => Fold): string {
 	let state = p.open === undefined ? next(p.items[0]!) : p.open ? 'open' : 'closed'
-	let verb = state === 'closed' ? 'Collapses' : state === 'inline' ? 'Shows pastes inline in' : 'Expands'
+	let verb = state === 'closed' ? 'Collapses' : state === 'inline' ? p.items[0]?.type === 'tool' ? 'Shows raw call and result in' : 'Shows pastes inline in' : 'Expands'
 	let ids = p.items.map((i) => titles.blockId(i))
 	return `${verb} ${toggle.noun(p.items)}${ids.length > 1 ? ':' : ''} ${ids.length > 6 ? `${ids[0]}-${ids.at(-1)}` : ids.join(', ')}`
 }
@@ -121,7 +121,7 @@ function pastes(item: Item): string[] {
 // The state after `now`: closed, open, then (with pastes) inline.
 function next(item: Item, now: Fold): Fold {
 	if (now === 'closed') return 'open'
-	return now === 'open' && toggle.pastes(item).length ? 'inline' : 'closed'
+	return now === 'open' && (toggle.pastes(item).length || (item.type === 'tool' && item.presentation)) ? 'inline' : 'closed'
 }
 
 // Applies `mode` with `args` to `states` (key → state). Returns the

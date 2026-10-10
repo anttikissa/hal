@@ -166,8 +166,11 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	// <origin>" suffix: a fork replays byte-identical to its parent, so
 	// the prompt cache still hits.
 	let ref = (r: HistoryRecord, letter: string, i = 0) => r.n === undefined ? '' : `#${letter}${r.n}${i ? `.${i}` : ''}`
-	let result = (b: ToolResultBlock): ToolResultBlock => {
+	let result = (block: ToolResultBlock): ToolResultBlock => {
+		let { presentation: _presentation, presentationError, ...b } = block
 		let call = calls.get(b.id)
+		let error = presentationError ?? (call?.type === 'assistant' && call.block.type === 'tool_call' ? call.block.presentationError : undefined)
+		if (error) b.output += `\nDisplay error (execution outcome unchanged): ${error}`
 		if (call?.n === undefined) return b
 		let time = b.ms !== undefined && b.ms >= 5000 ? bashResult.duration(b.ms) : undefined
 		return { ...b, output: `${header(call.ts, ref(call, 't'), [time])}\n${b.output}` }
@@ -199,7 +202,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
 			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
-			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asAction(b) : { ...b }] })
+			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asAction({ type: 'tool_call', id: b.id, name: b.name, input: b.input, ...(b.action !== undefined && { action: b.action }) }) : { ...b }] })
 		} else {
 			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
