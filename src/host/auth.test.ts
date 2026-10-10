@@ -201,6 +201,9 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 	let { limits } = await import('./limits.ts')
 	let { paths } = await import('./paths.ts')
 	paths.init()
+	let told: string[] = []
+	let original = auth.broke
+	auth.broke = (id, text) => told.push(`${id} ${text}`)
 	try {
 		write({
 			anthropic: [
@@ -210,9 +213,13 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 			],
 		})
 		// The two-homes case: another copy already rotated a's refresh token.
-		reply = () => Response.json({ error: 'invalid_grant' }, { status: 400 })
-		expect(await auth.anthropic('m')).toMatchObject({ value: 'b-token', account: 'b@x' })
+		reply = () => Response.json({ error: 'invalid_grant', error_description: 'Refresh token not found or invalid' }, { status: 400 })
+		expect(await auth.anthropic('m', { session: 's' })).toMatchObject({ value: 'b-token', account: 'b@x' })
 		expect(requests).toHaveLength(1)
+		// Skipping a broken login is never silent: the session hears the
+		// provider's error, once.
+		expect(await auth.anthropic('m', { session: 's' })).toMatchObject({ value: 'b-token' })
+		expect(told).toEqual([expect.stringMatching(/^s anthropic login a@x is not working.*invalid_grant \(Refresh token not found or invalid\)/)])
 		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
 		expect(await auth.anthropic('m')).toMatchObject({ value: 'c-key', account: 'account 3' })
 		// Another model is not limited on b.
@@ -224,6 +231,7 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 		expect(Math.abs(e.retryAt - (now() + 600_000))).toBeLessThan(1000)
 		expect(requests).toHaveLength(1)
 	} finally {
+		auth.broke = original
 		limits.close()
 	}
 })
