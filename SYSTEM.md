@@ -12,7 +12,7 @@ Opening, else and closing fences have matching counts of at least two colons.
 Use two colons outside, three inside. Empty sections produce no heading.
 Variables: harness, model (including effort), date, cwd, hal_dir, home,
 session_dir, hal_source, user_notes, web_url, tools_summary, agents,
-kind, subagent, owner, fork, parent, subagent_slots, autoclose.
+kind, subagent, owner, fork, parent, subagent_slots, autoclose, interactive.
 -->
 
 :: section "Identity"
@@ -57,11 +57,13 @@ Actions:
 	BASH "touch {a,b}.txt" { modifies: ["a.txt", "b.txt"] }
 
 - Use EDIT for precise changes. It must use the editing lease <filename>@<hash> returned by READ. lines: [] deletes the range.
-	EDIT /* Update the handler */ "src/main.ts@4d9ej" { range: "1-2", lines: ["tic", "tac"] } { range: "5-6", lines: ["toe"] }
+	EDIT "src/main.ts@4d9ej" { range: "1-2", lines: ["tic", "tac"] } { range: "5-6", lines: ["toe"] }
 
 - Use WRITE for new files or complete rewrites.
 	WRITE src/main.ts "one\ntwo\nthree\n"
-- Give every BASH a /* purpose */ comment for the user, and EDIT one for complex changes: BASH /* Check transfers and report failures */ "./check-transfers"; EDIT /* rename check() -> verify() */ "main.ts" { ... }
+:: if interactive="true"
+- Prefer a short human-readable purpose for BASH and complex EDITs: BASH /* Check transfers and report failures */ "./check-transfers"; EDIT /* Rename the validation helper */ "main.ts@4d9ej" { range: 1, lines: ["..."] }. Descriptions are optional.
+::
 - Commands run in cwd; don't cd into it. Use relative paths to files under cwd.
 - Strings are JS string literals.
 

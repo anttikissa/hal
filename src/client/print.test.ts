@@ -18,7 +18,7 @@ const tabs: Event = { type: 'tabs', tabs: [{ id: '07-bah', name: 'target', cwd: 
 test('print creates an autoclosing tab and returns a question with exit 3', async () => {
 	await harness({ prompt: 'task', cwd: '/tmp' }, async ({ run, sent, event, out }) => {
 		run.begin()
-		expect(sent[0].autoclose).toBe(true)
+		expect(sent[0]).toMatchObject({ autoclose: true, interactive: false })
 		event({ type: 'ack', id: sent[0].id, tab: '07-bah' })
 		let prompt = sent.find((s) => s.type === 'submit')
 		event({ type: 'turn-start', sessionId: '07-bah', provider: 'test', command: prompt.id })
@@ -36,7 +36,7 @@ test('print queues a user prompt and ignores the preceding turn', async () => {
 		expect(sent[0]).toMatchObject({ type: 'open', sessionId: '07-bah' })
 		event({ type: 'snapshot', sessionId: '07-bah', snapshot: {} as any })
 		let prompt = sent[1]
-		expect(prompt).toMatchObject({ type: 'submit', text: 'answer', delivery: 'queue' })
+		expect(prompt).toMatchObject({ type: 'submit', text: 'answer', delivery: 'queue', interactive: false })
 		expect(prompt.from).toBeUndefined()
 		event({ type: 'inbox', sessionId: '07-bah', inbox: [{ id: prompt.id, text: 'answer' }] })
 		event({ type: 'stream', sessionId: '07-bah', event: { type: 'text', text: 'unrelated' } })

@@ -48,7 +48,7 @@ function spawn(owner: string, s: Spawn): string {
 			charged.push(at)
 		}
 	}
-	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name, autoclose: s.kind === 'subagent' })
+	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name, autoclose: s.kind === 'subagent', interactive: promptCache.interactive(owner) })
 	Object.assign(child, { ...(s.kind !== 'interactive' && { owner, slots: s.limit }), spawn: s.kind } satisfies Partial<SessionMeta>)
 	if (s.fork) subagents.fork(owner, child.id)
 	liveFiles.save(child)
@@ -77,6 +77,7 @@ function fork(parent: string, child: string): void {
 	writeFileSync(history.file(child), records.map((r) => lines.encode(r)).join(''))
 	let source = sessions.open(parent), target = sessions.open(child)
 	target.parent = parent
+	target.interactive = promptCache.interactive(parent)
 	if (source.startingState) target.startingState = { ...source.startingState }
 	liveFiles.save(target)
 	promptCache.inherit(parent, child)
