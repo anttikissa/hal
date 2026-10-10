@@ -1,0 +1,10 @@
+{
+	title: 'Record touch diagnostics without obstructing Hal',
+	spec: 'Explicit Touch debug activation records the existing bounded browser-local structural history silently: neither debug text nor the touch crosshair is rendered over Hal. The user can use the conversation normally during recording and inspect or paste retained logs through Touch debug logs. Recording remains off on page load, preserves native events, text privacy, bounded storage and complete storage-error reporting. This replaces the visible overlay and crosshair default of zf4; terminal behavior is unaffected because this is browser touch instrumentation.',
+	status: 'done',
+	notes: [
+		'The probe is hidden with display:none for both overlay elements; this preserves existing bounded capture, lifecycle and retained-history tests without rendering obstruction or changing native events. Separate Chromium check confirms both are hidden while enabled and caret logs persist and paste into the existing draft; targeted lint and whitespace check pass. No claim that the iOS cursor bug is fixed.'
+	],
+	needs: ['yxy'],
+	foldInto: ['zf4']
+}
