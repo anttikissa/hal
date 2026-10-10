@@ -1078,6 +1078,51 @@ browserTest('compact status keeps two lines and opens full live details without 
 	}
 }, 20_000)
 
+browserTest('mobile disabled Nudge slides below Send without replacing the editor', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor("document.querySelector('[aria-label=\"Nudge\"]') && !document.querySelector('[aria-label=\"Nudge\"]').disabled")
+		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(1, 1); t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
+		let geometry = () => b.evaluate(`(() => {
+			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect().toJSON();
+			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled };
+		})()`)
+		for (let [width, height, touch] of [[390, 760, true], [844, 390, true], [1280, 800, false]] as const) {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+			await input('')
+			await b.waitFor("document.querySelector('.toggle').getBoundingClientRect().right <= document.querySelector('.go').getBoundingClientRect().left + 1")
+			await b.evaluate("window.oldEditor = document.querySelector('textarea')")
+			let before = await geometry()
+			await input('draft')
+			if (touch) await b.waitFor("document.querySelector('.toggle').getBoundingClientRect().top >= document.querySelector('.go').getBoundingClientRect().bottom - 1")
+			let after = await geometry()
+			expect(after).toMatchObject({ same: true, focused: true, cursor: 1, disabled: true })
+			if (touch) {
+				expect(after.field.width - before.field.width).toBeCloseTo(44, 0)
+				expect(after.nudge.left).toBeCloseTo(after.send.left, 0)
+				expect(after.nudge.bottom).toBeLessThanOrEqual(after.entry.bottom + 1)
+			} else expect(after.field.width).toBe(before.field.width)
+			await input('first line\nsecond line\nthird line')
+			expect((await geometry()).same).toBe(true)
+			if (touch) {
+				let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
+				writeFileSync(`/tmp/hal-nudge-${width}.png`, Buffer.from(screenshot.result.data, 'base64'))
+			}
+		}
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		expect(await b.evaluate("getComputedStyle(document.querySelector('.toggle')).transitionDuration")).toBe('0s')
+	} finally {
+		await b.call('Emulation.setEmulatedMedia', { features: [] })
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20_000)
+
 browserTest('phone landscape shrinks chrome and bounds long drafts as the visible viewport changes', async () => {
 	providerHome()
 	let b = await browser()
@@ -1223,7 +1268,7 @@ browserTest('manual reload notice preserves the draft and command actions stay d
 		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
 		let actions = () => b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => b.getAttribute('aria-label') ?? b.textContent)")
 		// Idle with an empty draft: Play is enabled, even before an answer (task yhn).
-		expect(await b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])")).toEqual([['Continue', false], ['Send', true]])
+		expect(await b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])")).toEqual([['Nudge', false], ['Send', true]])
 		await input('start')
 		await b.evaluate("document.querySelector('.Composer .actions .go').click()")
 		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
@@ -1258,7 +1303,7 @@ browserTest('manual reload notice preserves the draft and command actions stay d
 		finish()
 		await b.waitFor("document.querySelector('.activity').textContent.includes('idle')")
 		await input('/help')
-		expect(await actions()).toEqual(['Continue', 'Run'])
+		expect(await actions()).toEqual(['Nudge', 'Run'])
 		await input('draft stays put')
 		await b.evaluate("document.querySelector('.source-update button').click()")
 		await b.waitFor("!window.__beforeUpdate && document.querySelector('textarea')?.value === 'draft stays put'")

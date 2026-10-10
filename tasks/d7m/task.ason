@@ -1,0 +1,10 @@
+{
+	title: 'Mobile disabled nudge below Send',
+	spec: 'The idle web composer action is named Nudge in its visible label, accessible name and hover caption title, replacing idle Continue. Paused turns still use Continue; busy turns still use Pause. On coarse-pointer mobile web, an unavailable idle Nudge slides directly below Send (or the current main send action), reclaiming its horizontal slot for the prompt. Motion is quick (120ms), interruptible and disabled under prefers-reduced-motion. The retained button stays visible and disabled; typed text, focus, selection and draft safety are preserved. Enabled Nudge and busy/paused controls retain the horizontal layout. Desktop web only adopts the idle Nudge name; terminal behavior is unchanged, as confirmed by the user. Layout remains usable with short and multiline drafts, portrait and landscape, and software-keyboard-constrained viewports.',
+	status: 'done',
+	notes: [
+		'Composer keeps the same editor and action nodes; CSS reserves one 44px action column when disabled and places Nudge beneath the main action, with a 120ms transform and reduced-motion override. Touch-debug recognizes the renamed Nudge action. Draft/key/edit tests pass (29 cases), and changed-file lint passes. Browser verification failed in the existing Chrome launch helper before any test ran (DevToolsActivePort startup timeout); no retry or timeout change was made. Full typecheck is blocked by unrelated inbox/replaces fields in src/common/replay.test.ts:201. Rendered layout and real software-keyboard behavior remain unverified.'
+	],
+	needs: ['yhn'],
+	foldInto: ['yhn']
+}

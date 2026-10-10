@@ -236,7 +236,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				/>
 				<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
 				</div>
-				<div class="actions">
+				<div class={['actions', { 'nudge-actions': !busy() && !paused(), tucked: !busy() && !paused() && !nudgeable() }]}>
 					{/* Pause and continue without Escape (task v0g); the tap keeps the
 					    keyboard. Idle, Play nudges the model on (task yhn). */}
 					<Action kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'} class="toggle" disabled={!busy() && !paused() && !nudgeable()} onClick={toggle} />
@@ -276,7 +276,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 const BUTTONS = {
 	pause: { icon: 'pause', name: 'Pause', label: 'Pause (Esc)', caption: 'Stop the turn for now. Continue resumes it.' },
 	continue: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Resume the paused turn.' },
-	nudge: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Ask the model to keep going.' },
+	nudge: { icon: 'play', name: 'Nudge', label: 'Nudge', caption: 'Ask the model to keep going.' },
 	queue: { icon: 'queue', name: 'Queue', label: 'Queue', caption: 'Sent after this turn ends.' },
 	steer: { icon: 'steer', name: 'Steer', label: 'Steer', caption: 'Send message immediately. Interrupts ongoing work.' },
 	send: { icon: 'send', name: 'Send', label: 'Send', caption: 'Send message to start a turn.' },
