@@ -20,11 +20,11 @@ function target(id: string, key: string): { n: number; item?: { id: string; text
 }
 
 export const command: SlashCommand = {
-	help: () => `/queue <message>: queue a message, like ${sendKeys.name('queue')}. /queue lists queued messages; /queue next soft-steers a running turn with the oldest (${sendKeys.name('soft-steer')} on an empty prompt), /queue now steers with it (${sendKeys.name('steer')}), /queue undo queues it again if still waiting (Cmd-Z on an empty prompt); /queue drop <n> drops the nth message in the list; /queue clear drops them all.`,
+	help: () => `/queue <message>: queue a message, like ${sendKeys.name('queue')}. /queue lists queued messages; /queue next [n] soft-steers a running turn with the oldest or nth message, or runs it when idle (${sendKeys.name('soft-steer')} on an empty prompt), /queue now [n] steers with it (${sendKeys.name('steer')}), /queue undo queues it again if still waiting (Cmd-Z on an empty prompt); /queue drop <n> drops the nth message in the list; /queue clear drops them all.`,
 	record(args, id) {
-		let key = args.match(/^drop\s+(\S+)$/)?.[1]
-		let n = key === undefined ? 0 : target(id, key).n
-		return n > 0 ? `/queue drop ${n}` : undefined
+		let m = args.match(/^(drop|next|now)\s+(\S+)$/)
+		let n = m ? target(id, m[2]!).n : 0
+		return n > 0 ? `/queue ${m![1]} ${n}` : undefined
 	},
 	run(args, _answers, ctx) {
 		let id = ctx.sessionId
@@ -46,7 +46,12 @@ export const command: SlashCommand = {
 			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 			return { say: `dropped queued message ${n}: ${item.text}` }
 		}
-		if (args === 'next' || args === 'now') return prompts.queueNext(id, args === 'now')
+		let early = args.match(/^(next|now)(?:\s+(\S+))?$/)
+		if (early) {
+			let item = early[2] === undefined ? undefined : target(id, early[2]).item
+			if (early[2] !== undefined && !item) return { error: 'That message is no longer queued: it was already delivered or dropped.' }
+			return prompts.queueNext(id, early[1] === 'now', item?.id)
+		}
 		if (args === 'undo') return prompts.unqueueUndo(id)
 		let refused = prompts.submit(id, args, undefined, 'queue')
 		return refused ? { error: refused } : { say: 'queued' }
