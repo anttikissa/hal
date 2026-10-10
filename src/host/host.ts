@@ -60,6 +60,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	host.state.clients.add(client)
 	warnings.send(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
+	if (process.env.HOME) client.deliver({ type: 'home', path: process.env.HOME })
 	// The tabs come with the first events, so no client has to ask; their
 	// states need the open tabs' marks, caught up in slices first. Held
 	// commands run a turn of the event loop after the tabs (task 7j).

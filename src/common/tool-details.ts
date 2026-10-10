@@ -16,6 +16,7 @@
 // Example: plugin.around(toolDetails, 'headline', (next, name, input) =>
 //   name === 'bash' ? { text: `$ ${input.command}`, key: 'command' } : next(name, input))
 
+import { home } from './home.ts'
 import { titles } from './titles.ts'
 
 // A value in readable text rather than wire syntax.
@@ -44,6 +45,11 @@ let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 // knew (the tab and id spawn opened, whom wait waits for). `key` and
 // `keys` name the arguments shown, which lines() then leaves out.
 function headline(name: string, input: Record<string, unknown>, output?: string): { text: string; key?: string; keys?: string[] } {
+	let head = titled(name, input, output)
+	return { ...head, text: home.short(head.text) }
+}
+
+function titled(name: string, input: Record<string, unknown>, output?: string): { text: string; key?: string; keys?: string[] } {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
 	// [tab, id] of each session the result names (tabs.label).
 	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)

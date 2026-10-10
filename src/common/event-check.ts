@@ -45,6 +45,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'push-devices': { devices: 'a', result: 's?' },
 	'notice-history': { entries: 'a' },
 	version: { version: 's' },
+	home: { path: 's' },
 	'model-names': { names: 'o', defaults: 'o?' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },
 	tabs: { tabs: 'a', subscriptions: 'o?' },

@@ -1,0 +1,6 @@
+{
+	title: 'Shown paths start from ~',
+	spec: 'Clients show paths under the host user home from ~ (~/hal/x.ts, not /root/hal/x.ts) to save space: every tool call title (toolDetails.headline, web and terminal), the web status row cwd and the web tab dir. The host sends its HOME in a home event on connect; src/common/home.ts shortens at path boundaries only (/rooted stays). Display only: tool inputs, history and open call details keep the exact path (user request 10 Oct).',
+	status: 'done',
+	needs: ['3fv']
+}

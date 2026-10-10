@@ -5,6 +5,7 @@
 // Tab links retain native Cmd- and middle-click behavior.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
+import { home } from '../../common/home.ts'
 import { settings } from '../../common/settings.ts'
 import type { Tab } from '../../common/protocol.ts'
 import type { Edge } from '../../common/tab-pages.ts'
@@ -53,7 +54,7 @@ function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; dir?:
 			<span class="n">{props.n}</span>
 			<Marker mark={tabMark.mark(props.tab)} />
 			{props.name && <span class="name">{props.tab.name}</span>}
-			{props.dir && <span class="dir">{props.tab.cwd}</span>}
+			{props.dir && <span class="dir">{home.short(props.tab.cwd)}</span>}
 		</a>
 	)
 }
