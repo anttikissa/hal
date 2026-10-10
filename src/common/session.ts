@@ -12,6 +12,7 @@ export interface SessionMeta {
 	effort?: string
 	// ISO timestamp.
 	createdAt: string
+	startingState?: { cwd: string; model: string; autoclose: boolean }
 	// Last tab closure, retained after reopening.
 	closedAt?: string
 	name?: string
@@ -22,10 +23,11 @@ export interface SessionMeta {
 	autoclose?: boolean
 	// Leave the user's notes (USER.md) out of the system prompt: hal -p --no-user.
 	noUser?: boolean
-	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
+	owner?: string
 	parent?: string
+	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
 	spawn?: SpawnKind
-	// Spawn slots left; none yet means the first session's allowance.
+	// Spawn slots left; omitted uses the configured allowance.
 	slots?: number
 	// Ids of background bash commands still running (task v0).
 	background?: string[]

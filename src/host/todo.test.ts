@@ -68,7 +68,7 @@ test('without TODO.md a busy session delegates to a subagent for one slot, and r
 	expect(status.stateOf(parent).type).toBe('running')
 	expect(status.inboxOf(parent)).toEqual([])
 	expect(sessions.open(parent).slots).toBe(0)
-	expect(sessions.open(child)).toMatchObject({ parent, spawn: 'subagent', slots: 0 })
+	expect(sessions.open(child)).toMatchObject({ owner: parent, spawn: 'subagent', slots: 0 })
 	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('keep working')
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Add a TODO item to this project: write docs')
 	expect(JSON.stringify(history.readSync(parent))).not.toContain('Add a TODO item')

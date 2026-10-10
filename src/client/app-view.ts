@@ -60,7 +60,7 @@ function view(): View {
 // once connected, this process's role, or the remote host's name.
 function status(t: Transcript): StatusInfo {
 	let { id, name, cwd, model } = t.meta
-	let s: StatusInfo = { id, cwd, model, autoclose: t.meta.autoclose }
+	let s: StatusInfo = { id, cwd, model, autoclose: t.meta.autoclose, slots: t.meta.slots }
 	if (name) s.name = name
 	if (app.focusedTab()?.hal) s.hal = true
 	let color = app.focusedTab()?.color

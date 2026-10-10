@@ -2,6 +2,9 @@
 	title: 'Rebase internal notes and session setting changes',
 	spec: 'Rebase exposes host-generated internal notes as independently selectable, editable and droppable rows in both clients and model rebase plans, so users can inspect Hal internals and experiment with instruction history, including prompt injection. State-change records for cwd, model including effort as one identity (for example gpt:high), and autoclose are independently editable and replayable; the mechanism can admit future session parameters without implementing unspecified ones. Rebase restores settings without rerunning commands, tools or side effects. Retain a starting state and sufficient historical rendered instructions: deleting a cwd transition and its associated cwd/local-instruction updates restores the state before that transition, including prior project instructions without rereading changed files. Partial edits and resulting inconsistencies are allowed and are not silently repaired. Deleting only a prompt-update note leaves the old instructions visible without necessarily changing actual host settings. Preserve frozen prompt and unchanged history prefixes rather than rebuilding automatically. The editor opening comment says: Changing or deleting a message invalidates the cache from that point onward. Validate edits before applying and preserve existing atomic apply/undo guarantees. Existing no-migration policy applies; this task adds no history-retention mechanism.',
 	status: 'planned',
+	notes: [
+		'Session creation stores optional startingState with cwd, qualified model including effort and autoclose; metadata validates it without historical migration. Forks copy the origin startingState and append an independent change for explicit fork setting differences after copied-tail completion, so dropping inherited changes restores the correct baseline while retaining fork overrides.'
+	],
 	needs: ['q5g', 'z71', 'qb1'],
 	foldInto: ['z71']
 }

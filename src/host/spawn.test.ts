@@ -15,8 +15,10 @@ useHost()
 
 type C = ReturnType<typeof client>
 const text = (n: number) => JSON.stringify(calls[n]!.input.messages)
-const lastText = (n: number) => JSON.stringify(calls[n]!.input.messages.at(-1))
-const resultOf = (n: number, id: string) => calls[n]!.input.messages.at(-1).blocks.find((b: any) => b.type === 'tool_result' && b.id === id)
+const conversation = (n: number) => calls[n]!.input.messages.filter((m: any) => m.blocks.some((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>')))
+const lastMessage = (n: number) => conversation(n).at(-1)
+const lastText = (n: number) => JSON.stringify(lastMessage(n))
+const resultOf = (n: number, id: string) => lastMessage(n).blocks.find((b: any) => b.type === 'tool_result' && b.id === id)
 const call = (id: string, name: string, input: Record<string, unknown> = {}): StreamEvent => ({ type: 'tool_call', id, name, input })
 // The index of the first call whose last message mentions `s`, once
 // it exists.
@@ -41,7 +43,7 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	calls[0]!.push(call('s1', 'spawn', { task: 'fix the bug', mode: 'fresh', name: 'fixer' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
 	let k = await callWith('fix the bug')
 	let child = tabs.file().open[1]!
-	expect(sessions.open(child)).toMatchObject({ parent: p, spawn: 'subagent', name: 'fixer', slots: 0 })
+	expect(sessions.open(child)).toMatchObject({ owner: p, spawn: 'subagent', name: 'fixer', slots: 0 })
 	// Its first prompt comes from the parent and names it.
 	let first = calls[k]!.input.messages
 	expect(first).toHaveLength(1)
@@ -59,7 +61,7 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	let after = await callWith('"r1"', k + 1)
 	calls[after]!.push({ type: 'text', text: 'fixed it' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('fixed it')
-	let got = calls[woke]!.input.messages.at(-1).blocks[0].text
+	let got = lastMessage(woke).blocks[0].text
 	expect(got).toContain(`message from tab 2 (${child}), fixer`)
 	expect(got).not.toContain('looking')
 	await until(() => !tabs.file().open.includes(child))
@@ -87,19 +89,19 @@ test('ordinary steering prevents pending spawn and wait calls from running', asy
 	expect(status.stateOf(p).type).toBe('running')
 })
 
-test('slots: a parent spends limit + 1 and never gets them back; too few refuse and spend nothing', async () => {
+test('slots: a spawn spends one slot, not its child limit; oversized limits refuse without spending', async () => {
 	let c = client()
 	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'big job', mode: 'fresh', limit: 3 }), call('s2', 'spawn', { task: 'another', mode: 'fresh', limit: 1 }), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(call('s1', 'spawn', { task: 'big job', mode: 'fresh', limit: 2 }), call('s2', 'spawn', { task: 'another', mode: 'fresh', limit: 2 }), { type: 'done', reason: 'tool_use' })
 	let next = await callWith('"s2"', 1)
 	await until(() => resultOf(next, 's2'))
 	expect(resultOf(next, 's2').isError).toBe(true)
-	expect(sessions.open(p).slots).toBe(1)
+	expect(sessions.open(p).slots).toBe(2)
 	let child = tabs.file().open[1]!
-	expect(sessions.open(child).slots).toBe(3)
+	expect(sessions.open(child).slots).toBe(2)
 	expect(tabs.file().open).toHaveLength(2)
-	let k = await callWith('big job')
-	expect(calls[k]!.input.messages[0].blocks[0].text).toMatch(/at most 3 sessions/)
+	let first = history.readSync(child).find((r) => r.type === 'user')
+	expect(first?.type === 'user' && first.blocks[0]).toMatchObject({ type: 'text', text: 'big job' })
 })
 
 test('fork gives the child the history so far; fresh does not', async () => {
@@ -111,7 +113,7 @@ test('fork gives the child the history so far; fresh does not', async () => {
 	expect(text(forked)).toContain('plum')
 	expect(text(fresh)).not.toContain('plum')
 	// A valid conversation: the copied round's calls are answered.
-	let messages = calls[forked]!.input.messages
+	let messages = conversation(forked)
 	expect(messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user', 'user'])
 	expect(messages[2].blocks.map((b: any) => b.id)).toEqual(['s1', 's2'])
 })
@@ -171,7 +173,7 @@ async function reportOf(end: (c: C, child: string, k: number) => void): Promise<
 	let child = tabs.file().open[1]!
 	end(c, child, k)
 	let woke = await callWith(`message from ${heard(tabs.label(child))}`, k + 1)
-	return calls[woke]!.input.messages.at(-1).blocks[0].text
+	return lastMessage(woke).blocks[0].text
 }
 
 test('a failed subagent reports why, so its parent never waits for nothing', async () => {
@@ -188,7 +190,9 @@ test('a blank interactive session opens next to its parent and does nothing', as
 	calls[0]!.push(call('s1', 'spawn', { kind: 'interactive', mode: 'fresh' }), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	let child = tabs.file().open[1]!
-	expect(sessions.open(child)).toMatchObject({ parent: p, spawn: 'interactive' })
+	expect(sessions.open(child)).toMatchObject({ spawn: 'interactive', slots: 3 })
+	expect(sessions.open(child).owner).toBeUndefined()
+	expect(sessions.open(p).slots).toBe(3)
 	expect(status.stateOf(child).type).toBe('idle')
 	expect(history.readSync(child)).toEqual([])
 })
@@ -214,12 +218,12 @@ test('a child question wakes its waiting parent, stays open, and ordinary send r
 	let woke = await callWith('JSON or text?', k + 1)
 	expect(tabs.file().open).toContain(child)
 	expect(status.stateOf(child).type).toBe('idle')
-	expect(calls[woke]!.input.messages.at(-1).blocks[0].text).toContain(`message from ${heard(tabs.label(child))}`)
+	expect(lastMessage(woke).blocks[0].text).toContain(`message from ${heard(tabs.label(child))}`)
 	calls[woke]!.push(call('answer', 'send', { to: child, text: 'Use JSON', description: 'Answer the format question' }), call('w2', 'wait'), { type: 'done', reason: 'tool_use' })
 	let resumed = await callWith('Use JSON', woke + 1)
 	expect(calls[resumed]!.input.sessionId).toBe(child)
-	expect(calls[resumed]!.input.messages.at(-1).blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
-	expect(sessions.open(p).slots).toBe(4)
+	expect(lastMessage(resumed).blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
+	expect(sessions.open(p).slots).toBe(2)
 	await until(() => status.stateOf(p).type === 'idle')
 	calls[resumed]!.push({ type: 'text', text: 'JSON ready' }, { type: 'done', reason: 'end' })
 	let done = await callWith('JSON ready', resumed + 1)

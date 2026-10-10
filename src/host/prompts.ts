@@ -60,7 +60,7 @@ import { turns } from './turns.ts'
 // 'steer' stops them; 'queue' runs after the turn.
 function submit(id: string, text: string, command?: string, delivery: Delivery = 'steer', sender?: Sender): string | undefined {
 	let call = commands.parse(text)
-	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
+	// A command (/model, /pause) is not a prompt: the tab stays the owner's.
 	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
@@ -69,9 +69,9 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	let agent = sender?.from !== undefined || sender?.origin === 'model'
 	let emergency = agent && delivery === 'steer' && sender?.advisory !== true
 	let asked = notify.asked(id)
-	let parentAnswer = asked && delivery === 'soft-steer' && sender?.from !== undefined && sender.from === sessions.open(id).parent
+	let ownerAnswer = asked && delivery === 'soft-steer' && sender?.from !== undefined && sender.from === sessions.open(id).owner
 		&& sessions.open(id).spawn !== 'interactive' && subagents.owed(id, history.readSync(id))
-	let queue = delivery === 'queue' || (agent && !emergency && !parentAnswer && asked)
+	let queue = delivery === 'queue' || (agent && !emergency && !ownerAnswer && asked)
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.delivery === 'after-turn')

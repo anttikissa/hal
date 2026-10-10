@@ -19,9 +19,7 @@ const info: StatusInfo = {
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
-const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high · 87k/1000k (9%)'
-// Where the whole row does not fit, the short model name (task r7r).
-const SHORT = LEFT.replace('Claude ', '')
+const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high b3 · 87k/1000k (9%)'
 
 test('a wide row shows every part, the right side flush right', () => {
 	let row = text(info, 140)
@@ -30,17 +28,15 @@ test('a wide row shows every part, the right side flush right', () => {
 	expect(strings.visLen(row)).toBe(140)
 })
 
-test('narrowing drops the plan, then the role, then clips the left', () => {
-	let seen: string[] = []
+test('narrowing drops secondary facts but preserves the linked budget beside the model', () => {
 	for (let cols = 140; cols > 10; cols--) {
-		let row = text(info, cols)
+		let parts = statusRow.fit({ ...info, slots: 12 }, cols)
+		let row = parts.map((p) => p.text).join('')
 		expect(strings.visLen(row)).toBeLessThanOrEqual(cols)
-		let kind = row.includes('Sub') ? 'all' : row.endsWith('host') ? 'role' : SHORT.startsWith(row.replace(/…$/, '')) ? 'left' : row
-		if (seen.at(-1) !== kind) seen.push(kind)
-		if (kind !== 'all') expect(row).not.toContain('Claude')
+		expect(row).toContain(' b12')
+		expect(parts.find((p) => p.text === ' b12')?.href).toBe('/budget')
 	}
-	expect(seen).toEqual(['all', 'role', 'left'])
-	expect(text(info, 20)).toBe(`${SHORT.slice(0, 19)}…`)
+	expect(text(info, 20)).not.toContain('host')
 })
 
 test('the context is a heat-colored percentage of the window', () => {

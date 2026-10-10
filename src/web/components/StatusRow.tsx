@@ -3,6 +3,7 @@
 // The full cwd truncates from the start; wide layouts also show the session
 // id and usage windows. The model name doubles as quota left (task 5f).
 import { For } from 'solid-js'
+import { settings } from '../../common/settings.ts'
 import { home } from '../../common/home.ts'
 import { names } from '../../common/names.ts'
 import { titles } from '../../common/titles.ts'
@@ -36,7 +37,8 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 	}
 	return (
 		<div class="StatusRow status" aria-label="Session status">
-			<button type="button" class="overview" aria-label="Session details" aria-describedby="status-quota" aria-haspopup="dialog" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }} onClick={() => details.showModal()}>
+			<div class="overview">
+				<button type="button" class="details-target" aria-label="Session details" aria-describedby="status-quota" aria-haspopup="dialog" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }} onClick={() => details.showModal()} />
 				<span class="primary">
 					<span class="name"><span class="id">{meta() ? `${meta()!.id}: ` : ''}</span>{meta()?.name ?? (meta() ? names.fallback(meta()!.id) : 'Connecting')}{meta()?.autoclose && <span title="Autoclose on" aria-label="Autoclose on"> ↧</span>}</span>
 					<span class={['activity', tone()]} aria-live="polite"><span class={['dot', tone()]} aria-hidden="true">●</span> {line().text}</span>
@@ -46,6 +48,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				<span class="secondary">
 					<span class="cwd" style={props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? <><span class="full">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort, true)}</span><span class="short">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort)}</span></> : ''}</span>
+					<a class="budget" href="/budget" aria-label={`Spawn budget: ${meta()?.slots ?? settings.subagentSlots()} slots left`}>b{meta()?.slots ?? settings.subagentSlots()}</a>
 					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
 						<span class={['window', heat(win(name)?.used)]}>
 							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
@@ -53,7 +56,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 					)}</For></span>
 				</span>
 				<span id="status-quota" class="hidden-text">{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}</span>
-			</button>
+			</div>
 			<dialog ref={(e) => (details = e)} class="StatusDetails" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
 				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
 				<p class={tone()}>{line().text}</p>
