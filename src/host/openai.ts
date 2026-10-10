@@ -92,7 +92,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 		b.include = ['reasoning.encrypted_content']
 	}
 	Object.assign(b, effort.wire('openai', req.model, req.effort))
-	if (req.sessionId) b.prompt_cache_key = req.sessionId
+	if (req.cacheId ?? req.sessionId) b.prompt_cache_key = req.cacheId ?? req.sessionId
 	if (codex) b.text = { verbosity: 'low' }
 	// The Codex backend rejects max_output_tokens.
 	else if (req.maxTokens) b.max_output_tokens = req.maxTokens
@@ -111,7 +111,7 @@ async function request(req: ProviderRequest) {
 		if (codex) Object.assign(headers, { originator: 'hal', 'chatgpt-account-id': accountId })
 		// The Codex backend routes its prompt cache by this header, as the
 		// Codex CLI sends it; prompt_cache_key alone gets no cache hits.
-		if (codex && req.sessionId) headers.session_id = req.sessionId
+		if (codex && (req.cacheId ?? req.sessionId)) headers.session_id = (req.cacheId ?? req.sessionId)!
 	}
 	// The Codex backend takes zstd bodies, as the Codex CLI sends them.
 	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account, ...(codex && { encoding: 'zstd' as const }) }

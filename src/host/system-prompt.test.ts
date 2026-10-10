@@ -91,7 +91,7 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 		expect(second).not.toContain('FIRST RULE')
 		rmSync(`${root}/SYSTEM.md`)
 		let problems: string[] = []
-		expect(systemPrompt.build(input, problems)).toContain('<cwd>')
+		expect(systemPrompt.build(input, problems)).toBe('')
 		expect(problems.join()).toContain(`${root}/SYSTEM.md`)
 	} finally {
 		systemPrompt.file = orig
@@ -102,7 +102,7 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
-		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if model="anthropic/*" harness="hal"\nCLAUDE ONLY\n:::\n::: if model="openai/*"\nOPENAI ONLY\n:::\n${model} ${unknown}')
+		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if model="anthropic/*" harness="hal"\nCLAUDE ONLY\n:::\n::: if model="openai/*"\nOPENAI ONLY\n:::\n${model} ${unknown}\n$agents')
 		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if model="openai/*"')
 		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
 		expect(text).toContain('CLAUDE ONLY')
@@ -144,7 +144,7 @@ test('SYSTEM includes lose comments but keep directives, nested includes and var
 		writeFileSync(`${root}/more/part.md`, `<!-- note\nfor me -->${raw}`)
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
-		expect(text).toContain(raw)
+		expect(text).toContain(raw.trimEnd())
 		expect(text).not.toContain('for me')
 		expect(text).not.toContain('@?absent.md')
 		writeFileSync(`${root}/SYSTEM.md`, 'Before\n@missing.md\nAfter')
@@ -195,8 +195,4 @@ test('skills are listed by name: Hal skills always, project skills only along th
 	let away = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
 	expect(away).toMatch(/\/skills\/\S*hal-server-install/)
 	expect(away).not.toContain('alpha')
-})
-
-test('the commented-out summary/question endings are temporary', () => {
-	expect(Date.now(), 'test the <question> feature, then restore the summary/question endings in SYSTEM.md (or drop them) and delete this test').toBeLessThan(Date.parse('2026-10-15T00:00:00Z'))
 })

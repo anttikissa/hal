@@ -62,7 +62,11 @@ budgets and permissions remains independent. Compare against the latest
 applicable section state, not any matching older note (3 -> 2 -> 3 needs two
 updates). A deliberate rebase edit or removal is authoritative: do not silently
 repair it merely because it disagrees with current template output. Genuine
-later source changes and prompt rebuilds may supersede those edits.
+later source changes and prompt rebuilds may supersede those edits. After
+rebase, a genuine source change in a diff section includes the diff and an
+authoritative full replacement: edited or removed notes may have invalidated
+the diff's old side. This reconciliation ends at the next prompt rebuild;
+it never emits an update solely because rebase disagrees with the source.
 
 Ordinary changes outside sections keep existing behavior: the system prompt
 changes and the existing instruction-change explanation is sent. Do not add a

@@ -131,6 +131,13 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[1]!.body.max_output_tokens).toBe(1000)
 })
 
+test('fork cache routing uses inherited identity while credentials use the actual session', async () => {
+	writeAuth({ openai: { accessToken: subscriptionToken } })
+	await run(hi, { sessionId: 'actual-child', cacheId: 'original-family' })
+	expect(seen[0]!.headers.get('session_id')).toBe('original-family')
+	expect(seen[0]!.body.prompt_cache_key).toBe('original-family')
+})
+
 test('a token with the Responses scope goes to api.openai.com; one naming no account blocks on login', async () => {
 	let scoped = jwt({ scp: ['openid', 'api.responses.write'] })
 	writeAuth({ openai: { accessToken: scoped } })

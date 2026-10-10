@@ -99,11 +99,11 @@ function estimate(id: string, messages: Message[], overhead = 0, model?: string)
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }
 
-function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r): HistoryRecord[] {
+function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r, projectCurrent: (records: HistoryRecord[]) => HistoryRecord[] = (records) => records): HistoryRecord[] {
 	let original = new Map(all.map((r) => [r.n, r]))
 	let records = replay.current(all)
 	let edited = new Set(records.filter((r) => JSON.stringify(r) !== JSON.stringify(original.get(r.n))).map((r) => r.n))
-	all = records = records.map(materialize)
+	all = records = projectCurrent(records).map(materialize)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let active = records.slice(at + 1)
 	let boundary = records[at]?.n ?? 0

@@ -6,8 +6,6 @@
 // (the host died mid-write) is cut off. Any other malformed record is
 // reported and the file is left untouched. A turn with no end record is
 // unfinished, not broken: the host continues it (turns.recover).
-// Tasks: 7, nvm, 6eq.
-
 import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
@@ -26,6 +24,7 @@ import { models } from './models.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { naming } from './naming.ts'
 import { neighbors } from './neighbors.ts'
+import { promptCache } from './prompt-cache.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
@@ -39,7 +38,6 @@ type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit
 type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[]; starts: string[]; by: By; context?: number; interrupted?: true }
 export type By = { model?: string; effort?: string }
 
-// The tokens a round took in: input, cache read and cache write.
 function taken(u: Usage): number {
 	return (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
 }
@@ -136,7 +134,6 @@ async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: s
 	return { records, partial }
 }
 
-// Every complete record. Read-only: a partial last record is skipped.
 async function read(id: string): Promise<HistoryRecord[]> {
 	return (await history.load(id)).records
 }
@@ -223,8 +220,11 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
 	let records = pruning.project(id, history.readSync(id), budget, (r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
-		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r)
+		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r, (current) => promptCache.project(id, current))
 	let due = modelNotices.pending(replay.current(records))
+	let byNumber = new Map(records.map((r) => [r.n, r]))
+	for (let notice of due) if (byNumber.get(notice.source)?.type !== 'notice') records.push(history.append(id, { type: 'notice', text: notice.text, rendered: true, source: notice.source }))
+	due = modelNotices.pending(replay.current(records))
 	if (due.length) records.push(history.append(id, { type: 'user', blocks: [], notices: due }))
 	return replay.markCache(records, replay.toMessages(records), budget.model)
 }
@@ -361,7 +361,6 @@ function live(id: string): (Turn & { ns: number[]; ts: string[] }) | undefined {
 	return { provider: turn.provider, blocks: turn.blocks.slice(written), usage: { ...turn.usage }, ns: running.ns.slice(written), ts: running.starts.slice(written) }
 }
 
-// The number of the block the running turn streams into, if any.
 function streaming(id: string): number | undefined {
 	return history.state.running.get(id)?.ns.at(-1)
 }
