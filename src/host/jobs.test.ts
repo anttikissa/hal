@@ -106,3 +106,12 @@ test('an endless command keeps only both ends of its output in memory, counting 
 		jobs.keepChars = keep
 	}
 })
+
+test('a stopped command settles at once though a process that left its group holds the output', async () => {
+	let run = jobs.exec('setsid sleep 5 & sleep 5', '/tmp')
+	await Bun.sleep(100)
+	let at = Date.now()
+	run.stop()
+	expect(await run.done).toStartWith('[stopped by the user]')
+	expect(Date.now() - at).toBeLessThan(1000)
+})
