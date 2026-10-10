@@ -143,6 +143,41 @@ test('absolute scratch declarations are tracked; outside and Git paths are accep
 	} finally { rmSync(scratch, { recursive: true, force: true }) }
 })
 
+test('generated trees and ignored files are not captured; tracked ignored files and new source files are', async () => {
+	mkdirSync(`${cwd}/node_modules/pkg`, { recursive: true })
+	mkdirSync(`${cwd}/runs`, { recursive: true })
+	writeFileSync(`${cwd}/node_modules/pkg/index.js`, 'dependency')
+	writeFileSync(`${cwd}/runs/tracked.txt`, 'source')
+	await fileChanges.git(cwd, ['add', 'runs/tracked.txt'])
+	writeFileSync(`${cwd}/.gitignore`, 'runs/\nignored.txt\n')
+	writeFileSync(`${cwd}/runs/output.txt`, 'generated')
+	writeFileSync(`${cwd}/ignored.txt`, 'ignored')
+	symlinkSync('runs/output.txt', `${cwd}/alias`)
+	symlinkSync('node_modules/pkg/index.js', `${cwd}/dependency-alias`)
+	let result = await bash('printf new > node_modules/pkg/index.js; printf new > runs/output.txt; printf new > ignored.txt; printf new > runs/tracked.txt; printf source > new.ts', ['**/*'])
+	expect(result.isError).toBeUndefined()
+	expect(changes()[0]!.files.map((f) => f.path).sort()).toEqual(['new.ts', 'runs/tracked.txt'])
+	expect(bytes(changes()[0]!.files.find((f) => f.path === 'runs/tracked.txt')!.before).toString()).toBe('source')
+	let previous = changes().length
+	await bash('printf again > ignored.txt; printf again > node_modules/pkg/index.js', ['ignored.txt', 'node_modules/pkg/index.js'])
+	expect(changes()).toHaveLength(previous)
+	let write = await tools.run({ type: 'tool_call', id: 'write-ignored', name: 'write', input: { path: 'ignored.txt', content: 'written' } }, context())
+	expect(write.isError).toBeUndefined()
+	expect(readFileSync(`${cwd}/ignored.txt`, 'utf8')).toBe('written')
+	expect(changes()).toHaveLength(previous)
+})
+
+test('non-Git glob expansion prunes dependency trees and still tracks ordinary scratch files', async () => {
+	let scratch = mkdtempSync('/tmp/hal-tracking-glob-')
+	try {
+		mkdirSync(`${scratch}/node_modules/pkg`, { recursive: true })
+		mkdirSync(`${scratch}/src`)
+		writeFileSync(`${scratch}/node_modules/pkg/x.ts`, 'dependency')
+		writeFileSync(`${scratch}/src/x.ts`, 'source')
+		expect(await fileChanges.expand(scratch, ['**/*.ts'])).toEqual(['src/x.ts'])
+	} finally { rmSync(scratch, { recursive: true, force: true }) }
+})
+
 // Task hy: a commit a bash call makes is announced once, except to
 // clients watching the session its Session trailer names (task pdw:
 // without one, no session); moving HEAD back is no commit; an amend

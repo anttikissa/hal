@@ -16,6 +16,7 @@ import { stats } from './stats.ts'
 import { commits } from './commits.ts'
 import { tabs } from './tabs.ts'
 import { jobs } from './jobs.ts'
+import { fileTracking } from './file-tracking.ts'
 
 type Lock = { sessionId: string; callId?: string; paths: Set<string>; done: Promise<void>; release: () => void }
 type Observation = { ctx: ToolContext; patterns: string[]; literal: boolean; before: Map<string, FileSnapshot>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
@@ -45,7 +46,7 @@ async function canonical(path: string): Promise<string> {
 	}
 }
 
-async function tracked(cwd: string, names: string[]): Promise<string[]> {
+async function tracked(cwd: string, names: string[], patterns = false): Promise<string[]> {
 	if (!names.length) return []
 	let project = await fileChanges.canonical(cwd), scratch = await fileChanges.canonical('/tmp')
 	let inside = (path: string, root: string) => {
@@ -56,16 +57,17 @@ async function tracked(cwd: string, names: string[]): Promise<string[]> {
 	let found: string[] = []
 	for (let name of names) {
 		let absolute = resolve(cwd, name)
+		if (fileTracking.excluded(absolute)) continue
 		if (allowed(absolute, resolve(cwd), '/tmp') && allowed(await fileChanges.canonical(absolute), project, scratch)) found.push(name)
 	}
-	return found
+	return fileTracking.filter(cwd, found, patterns)
 }
 
 async function expand(cwd: string, patterns: string[], literal = false): Promise<string[]> {
 	let found = new Set<string>()
-	for (let p of await fileChanges.tracked(cwd, patterns)) {
+	for (let p of await fileChanges.tracked(cwd, patterns, !literal)) {
 		if (literal || !/[*?[\]{}]/.test(p)) found.add(p)
-		else for await (let name of new Bun.Glob(isAbsolute(p) ? relative(cwd, p) : p).scan({ cwd, dot: true, onlyFiles: true })) found.add(isAbsolute(p) ? resolve(cwd, name) : name)
+		else for (let name of await fileTracking.glob(cwd, p)) found.add(name)
 	}
 	return fileChanges.tracked(cwd, [...found].sort())
 }
@@ -136,8 +138,8 @@ async function snapshot(ctx: ToolContext, path: string): Promise<FileSnapshot> {
 	return hash
 }
 
-async function git(cwd: string, args: string[]): Promise<{ code: number; text: string; error: string }> {
-	let child = Bun.spawn(['git', '-C', cwd, ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
+async function git(cwd: string, args: string[], input?: string): Promise<{ code: number; text: string; error: string }> {
+	let child = Bun.spawn(['git', '-C', cwd, ...args], { stdin: input === undefined ? 'ignore' : Buffer.from(input), stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
 	let [code, text, error] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
 	return { code, text, error }
 }
@@ -154,7 +156,7 @@ async function headLog(cwd: string): Promise<string | undefined> {
 }
 
 async function begin(ctx: ToolContext, patterns: string[], literal = false): Promise<Observation> {
-	let eligible = await fileChanges.tracked(ctx.cwd, patterns)
+	let eligible = await fileChanges.tracked(ctx.cwd, patterns, !literal)
 	let release = await fileChanges.acquire(ctx, literal ? patterns : eligible, literal)
 	patterns = eligible
 	try {
