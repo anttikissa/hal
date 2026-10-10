@@ -184,7 +184,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
 		let hit = e.target as Element
-		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .discard, .undo, .raw-tool')) return
+		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		let selection = getSelection()
 		if (!hit.closest('.mark') && selection && !selection.isCollapsed && root) {
 			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
@@ -239,6 +239,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let editButton = () => <Show when={props.edit}><button type="button" class="edit" aria-label={props.row.waiting ? 'Edit queued message' : 'Edit prompt'} title={props.row.waiting ? 'Edit in the queue without changing its position' : 'Edit this prompt and send it again from here'} onClick={edit}><Icon name="edit" /></button></Show>
 	// Drops this queued message by its inbox id (task gr4); the host refuses with a visible reason.
+	let sendButton = () => <Show when={props.discard}><button type="button" class="send" aria-label="Send queued message now" title="Send now; it keeps its sender and arrival time" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue next ${props.row.key}` })}><Icon name="send" /></button></Show>
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
 	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
@@ -277,14 +278,14 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		</>
 	)
 	// A queued message's compact row (task 16): its note and text, no
-	// header, at most 3 lines until a click (or its link) opens it.
+	// header, one line until a click (or its link) opens it.
 	let queued = () => {
-		let all = `${props.row.note} ${text()}`.split('\n')
-		return expanded() || all.length <= 3 ? all.join('\n') : [...all.slice(0, 3), `… ${all.length - 3} more lines`].join('\n')
+		let all = `${props.row.note} ${text()}`
+		return expanded() ? all : all.split('\n')[0]
 	}
 	let compact = () => (
 		<>
-			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{discardButton()}<div class="content">{queued()}</div></>}>
+			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{sendButton()}{discardButton()}<div class={['content', expanded() ? '' : 'line']}>{queued()}</div></>}>
 				{heading()}
 				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
 			</Show>

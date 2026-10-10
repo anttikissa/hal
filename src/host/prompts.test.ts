@@ -182,13 +182,13 @@ test('an empty Enter sends the next queued message early, undo queues it again, 
 	await until(() => queued() === 1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue next' })
 	await until(() => queued() === 0)
-	expect(a.views.get(id)!.inbox).toMatchObject([{ text: 'later', delivery: 'next-round' }])
+	expect(a.views.get(id)!.inbox).toMatchObject([{ text: 'later', delivery: 'next-round', queuedAt: expect.any(String) }])
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue undo' })
 	await until(() => queued() === 1)
 	expect(calls.length).toBe(1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue now' })
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('later')])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringMatching(/queued at [^\n]*\n<meta>Message was queued at [^<]+<\/meta>\nlater$/)])
 })
 
 test('the inbox survives a pause and a restart, and runs when the user continues', async () => {

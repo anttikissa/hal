@@ -254,13 +254,14 @@ function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>)
 // interjects at the next round (`now`: interrupts, task csn); otherwise
 // it runs as a fresh turn, even if paused. One being edited goes when
 // the edit ends.
-function queueNext(id: string, now = false): { say?: string; error?: string } {
-	let item = status.inboxOf(id).find((m) => m.delivery === 'after-turn')
+function queueNext(id: string, now = false, pick?: string): { say?: string; error?: string } {
+	let item = status.inboxOf(id).find((m) => m.delivery === 'after-turn' && (pick === undefined || m.id === pick))
 	if (!item) return { say: 'queue is empty' }
-	if (queueEdits.deferNext(id)) return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
+	if (pick !== undefined && pick === queueEdits.held(id)) return { error: 'That message is being edited; save or cancel the edit first.' }
+	if (pick === undefined && queueEdits.deferNext(id)) return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
 	if (states.busy(status.stateOf(id))) {
 		// Editing this inbox id preserves its place, sender and provenance.
-		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...inbox.sender(item), delivery: now ? 'now' : 'next-round' })
+		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...inbox.provenance(item), delivery: now ? 'now' : 'next-round' })
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		let running = turns.state.running.get(id)
 		if (!now) prompts.promoted.set(id, item.id)

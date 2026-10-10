@@ -170,10 +170,12 @@ html.typing .App { position: absolute; }
 /* Queue edits share the existing pencil and discard is an ×, each a real
    44px target beside the reference; reserve all controls so long
    previews never overlap. A card with the pencil always has the ×. */
-.Card.queued > :is(.edit, .discard) { position: absolute; top: 0; right: calc(1ch + 44px + var(--receipt-space, 0ch)); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
-.Card.queued:has(> .discard) > .edit { right: calc(1ch + 88px + var(--receipt-space, 0ch)); }
-.Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 44px + var(--receipt-space, 0ch)); }
-.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 88px + var(--receipt-space, 0ch)); }
+.Card.queued > :is(.edit, .send, .discard) { position: absolute; top: 0; right: calc(1ch + 44px + var(--receipt-space, 0ch)); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
+.Card.queued:has(> .discard) > .send { right: calc(1ch + 88px + var(--receipt-space, 0ch)); }
+.Card.queued:has(> .discard) > .edit { right: calc(1ch + 132px + var(--receipt-space, 0ch)); }
+.Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 88px + var(--receipt-space, 0ch)); }
+.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 132px + var(--receipt-space, 0ch)); }
+.Card.queued > .content.line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }
