@@ -166,13 +166,12 @@ function look(_item: Item, look: Look): Look {
 }
 
 // A queued message's compact row (task 16): `note`, then its text, no
-// header; at most 3 rows, then how many more. Its id links to the web,
-// where it opens in full.
+// header; one row, cut with an ellipsis. Its id links to the web, where
+// it opens in full.
 function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number, session?: string): string[] {
 	let style = itemView.itemStyle(item)
 	let { inner, mark } = frame.ref(item, cols, session, style)
-	let lines = ansi.wrap(`${note} ${item.text}`, inner)
-	if (lines.length > 3) lines = [...lines.slice(0, 3), `… ${lines.length - 3} more lines`]
+	let lines = [strings.clipVisual(ansi.clean(`${note} ${item.text}`.replace(/\s+/g, ' ')), inner)]
 	mark(lines, 0)
 	return lines.flatMap((r) => ansi.paintRows(r, style, cols))
 }
