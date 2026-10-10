@@ -158,9 +158,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 		// hal -p --no-user leaves the user's notes out, e.g. for benchmarks.
 		user_notes: input.noUser ? 'false' : 'true',
-		// The configured web address only; empty without one.
-		web_url: String(settings.value('webUrl') ?? '').replace(/\/+$/, ''),
-		web_port: String(settings.state.listeningPort ?? settings.webPort()),
+		web_url: settings.webUrl(),
 	}
 	// A missing or broken SYSTEM.md is reported in problems, never thrown.
 	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]

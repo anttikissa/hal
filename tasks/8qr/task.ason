@@ -1,9 +1,10 @@
 {
 	title: 'System prompt: how to link the user to an image',
-	spec: 'SYSTEM.md tells the model, in one sentence, to link an image as a plain URL. With webUrl configured (${web_url}, from settings) it is ${web_url}/image/<name>; otherwise http://localhost:${web_port}/image/<name>. The address comes from template variables, so the tracked file holds no private host name and the model never asks the user for it or writes Markdown bracket links.',
+	spec: 'SYSTEM.md tells the model, in one sentence, to link an image as a plain URL: ${web_url}/image/<name>. web_url is settings.webUrl(): the configured webUrl, else http://localhost:<port>. The address comes from a template variable, so the tracked file holds no private host name and the model never asks the user for it or writes Markdown bracket links.',
 	status: 'done',
 	notes: [
-		'system-prompt.ts adds web_url (configured webUrl only, trailing slashes stripped, empty when unset) and web_port (listening or configured port). Verified: the assembled prompt gives the localhost line when webUrl is unset; the system-prompt tests pass. The /system command test times out at HEAD and before this task, so the timeout is not caused by this change.'
+		'system-prompt.ts adds web_url (configured webUrl only, trailing slashes stripped, empty when unset) and web_port (listening or configured port). Verified: the assembled prompt gives the localhost line when webUrl is unset; the system-prompt tests pass. The /system command test times out at HEAD and before this task, so the timeout is not caused by this change.',
+		'One variable without an if/else, at the user request: web_url reuses settings.webUrl(), which already falls back to http://localhost:<listening or configured port>. Verified: with no webUrl the assembled line reads http://localhost:9001/image/<name>.'
 	],
 	needs: [],
 	foldInto: ['tm']
