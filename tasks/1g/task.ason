@@ -8,7 +8,8 @@
 		"Tokens this run are host memory (stats.state.tokens), counted from each recorded turn_end's usage (input and output only, as the old Hal's default showTokenInOut); a parked turn's usage is counted once, at its end. A new host starts at 0.",
 		'Plan: the account auth.order would try first for the session (its sticky one, task wg, else least used); only accounts with an accessToken count as subscriptions, indexed in file order. usage.windows already drops expired windows. Any auth error hides the plan.',
 		"Display: status-row.ts modelName turns claude-<family>-<maj>[-<min>][-date] into 'Opus 5.5', other ids show without the provider; clipVisual ends a clipped left side with '…'. The row is always drawn (blank before the first snapshot) so the chrome height stays steady (p0). Role is connection.state.link.role: 'client' shows as 'peer'.",
-		"Not done: live context/usage updates mid-turn (only at turn end, snapshot or /model), the old ≠host version badge, and the web's layout."
+		"Not done: live context/usage updates mid-turn (only at turn end, snapshot or /model), the old ≠host version badge, and the web's layout.",
+		'Bug fixed: the web model-name gauge showed an account whose login was broken (refresh failing), because stats.plan took pickAccount()[0] while pick() passes broken and rate-limited accounts over. Invariant: the plan is the account the next request actually uses (auth.skipped mirrors pick()).'
 	],
 	needs: ['p0'],
 	foldInto: ['7w']

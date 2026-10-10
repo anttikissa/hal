@@ -86,6 +86,10 @@ test('the plan is the subscription account the next request takes, with its wind
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({ account: 2, accounts: 2, key: subscriptions.key('anthropic', 'two') })
 		usage.observe('anthropic', 'two', h('0.3', '0.4'))
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.key).toBe(subscriptions.key('anthropic', 'two'))
+		// The plan is the account requests use: a broken login is passed over.
+		auth.state.broken.set(String(Bun.hash('\nb\n')), 'refresh failed')
+		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.key).toBe(subscriptions.key('anthropic', 'one'))
+		auth.state.broken.clear()
 		expect(c.of('subscription-usage').at(-1).accounts[subscriptions.key('anthropic', 'two')]['5h'].used).toBe(30)
 		// An idle client receives updates without another round or snapshot.
 		let other = client()
