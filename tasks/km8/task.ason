@@ -1,0 +1,7 @@
+{
+	title: 'Bash calls drop a redundant cd into cwd',
+	spec: 'When a bash call arrives, a leading `cd <dir> &&` whose dir (bare, single- or simply double-quoted, trailing slashes ignored) equals the session cwd is removed from the recorded command, so the call title shows the real command and nothing changes in effect. Other cd forms (; or ||, variables, other dirs) stay. SYSTEM.md tells models that commands run in cwd and not to cd into it, and to give every BASH a /* purpose */ comment for the user (user request 10 Oct).',
+	status: 'done',
+	needs: ['gr', '3fv'],
+	foldInto: ['3fv']
+}

@@ -8,6 +8,16 @@ import { fileChanges } from '../file-changes.ts'
 import { actions } from '../actions.ts'
 import type { Tool } from '../tools.ts'
 
+// The command without a leading `cd <cwd> &&`: it runs in cwd anyway,
+// and the repeat crowds the call's one-line title.
+function withoutCd(command: string, cwd: string): string {
+	let m = command.match(/^\s*cd\s+(?:'([^']*)'|"([^"$`\\]*)"|([^\s'"$`\\;&|]+))\s*&&\s*/)
+	let dir = m && (m[1] ?? m[2] ?? m[3])!.replace(/(.)\/+$/, '$1')
+	return m && dir === cwd.replace(/(.)\/+$/, '$1') ? command.slice(m[0].length) : command
+}
+
+export const bash = { withoutCd }
+
 export const tool: Tool = {
 	name: 'bash',
 	description:

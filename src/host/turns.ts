@@ -36,6 +36,7 @@ import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
 import { actions } from './actions.ts'
 import { edit } from './tools/edit.ts'
+import { bash } from './tools/bash.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
@@ -197,7 +198,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			if (signal.aborted) return
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)) {
 				if (signal.aborted) return
-				yield event.type === 'tool_call' ? { ...actions.arrived({ ...event }), type: 'tool_call' } : event
+				if (event.type !== 'tool_call') { yield event; continue }
+				let call = actions.arrived({ ...event })
+				if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
+				yield { ...call, type: 'tool_call' }
 			}
 			return
 		}
