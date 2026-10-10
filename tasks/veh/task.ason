@@ -1,0 +1,9 @@
+{
+	title: 'Keep benchmark assets isolated and lazy',
+	spec: 'benchmarks/ is the canonical workspace for benchmark runners, records and cached inputs. Its AGENTS.md and README.md describe the workflow. Only small generic instructions and acquisition helpers are tracked; results, logs, fixtures, dependencies, cloned projects and host-specific configuration are gitignored. Benchmark dependencies never enter Hal runtime dependencies. A command-line acquisition helper checks out an explicitly requested pinned Git revision only when that named cache is absent, validates cache identity on reuse, and preserves existing data on mismatch or failure. Account details, credentials and local paths stay in ignored records. Existing benchmark records remain preserved; compatibility locations may point to the canonical ignored workspace. The record schema is agreed with the user separately, not invented during consolidation.',
+	status: 'done',
+	notes: [
+		'Acquisition uses Git partial clones and an explicit full commit. Existing dirty or mismatched caches are rejected; failed acquisition removes only its own temporary directory. Local-fixture acquisition/reuse and mismatch/failure checks passed. Cached historical records were preserved with checksum verification; compatibility links remain local and ignored. Record-capture policy is still under user discussion.'
+	],
+	needs: []
+}

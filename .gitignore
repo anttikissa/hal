@@ -9,3 +9,7 @@ secrets/
 # Pre-secrets/ credential location; a copy can remain after migration.
 /auth.ason
 .DS_Store
+/benchmarks/*
+!/benchmarks/AGENTS.md
+!/benchmarks/README.md
+!/benchmarks/fetch
