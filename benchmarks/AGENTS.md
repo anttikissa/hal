@@ -26,3 +26,8 @@ intervals from single samples or infer causation from version correlations.
 Keep graphable chronology, recurring failures, and slow-call evidence.
 Use descriptive task names and accurate feature labels for historical runs.
 Paid runs require explicit authorization, including the model and effort.
+
+Before a full run, pilot one or two tasks per arm and inspect each arm's
+transcript: its complete system prompt, tools, model, effort and errors.
+Keep fixtures outside any project directory so no arm inherits stray
+AGENTS.md or other context files.
