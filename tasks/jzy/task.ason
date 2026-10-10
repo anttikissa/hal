@@ -1,0 +1,7 @@
+{
+	title: '/account switches the session to another login',
+	spec: "/account asks, as a choice question with the session's current account chosen, which login of the session model's provider (anthropic or openai) the session uses; /account <name|number> (number as in /status slots) switches without asking, and completes names. The choice takes effect from the session's next request and outranks usage ranking and API-key ordering (auth.state.picked, set by auth.choose; in memory per session, like auth.state.chosen). It is a move, not a pin: once the account is rate limited for the model or its login is broken, rotation moves on as usual and the pick is forgotten. Picking an account already limited or broken is refused with the reason. Other providers' models get an error naming the session's model. Requested by the user: manual account switching.",
+	status: 'done',
+	needs: ['wf'],
+	foldInto: ['wf']
+}
