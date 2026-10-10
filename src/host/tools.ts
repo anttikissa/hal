@@ -16,6 +16,7 @@ import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolDetails } from '../common/tool-details.ts'
+import { toolPresentations } from './tool-presentation.ts'
 import { actions } from './actions.ts'
 import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
@@ -126,7 +127,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	// Only a time worth showing (1 s or more, task wm0) is kept.
 	let ms = Math.round(performance.now() - start)
 	if (ms >= 1000) result.ms = ms
-	return result
+	return toolPresentations.attach(call, result)
 }
 
 // Retain the whole result when cut, and show both ends: a bash failure

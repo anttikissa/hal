@@ -2,6 +2,7 @@
 // the style it wears. Pure.
 // Tasks: fn, hp, hr, hse, a1k, 6eq, kx0.
 
+import { presentationView } from './tool-presentation.ts'
 import { interruption } from '../common/interruption.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
@@ -164,7 +165,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fold !== 'open') return [strings.clipVisual(prefix + ansi.clean(String(command)), width)]
 				return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
 			}
-			let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input, look.result?.output).text)}`, width), item, width)
+			let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)}`, width), item, width)
+			if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) return presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
 			let bash = typeof command === 'string' && typeof description === 'string'
 			if (bash && fold === 'closed') return [head]
 			// Running bash output is laid out as its result glimpse will be
@@ -185,7 +187,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// Attached, nothing to show draws nothing; apart, the header
 			// row stays, for its time, link and status. A closed call is
 			// its header row (task ghs): attached results draw nothing.
-			if (tool && (fold === 'closed' || (!out && !item.isError))) return []
+			if (tool && ((fold ?? (item.presentation ? 'closed' : undefined)) === 'closed' || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
+			if (tool && (item.presentation || item.presentationError) && (fold === 'open' || fold === 'inline')) return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(fold === 'inline' || item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
 			let wide = width, max = fold === 'open' ? look.full ? Infinity : itemView.openRows : itemView.resultRows
 			// An attached EDIT result shows its diff in diff colors.
 			let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []

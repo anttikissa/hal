@@ -92,6 +92,17 @@ html.typing .App { position: absolute; }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 .Card .change > div:not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.ToolPresentation { white-space: normal; }
+.ToolPresentation section + section, .raw-tool { margin-top: 1lh; }
+.ToolPresentation .path { overflow-wrap: anywhere; margin-bottom: 0.25lh; }
+.ToolPresentation pre, .raw-tool pre { margin: 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ToolPresentation code { font: inherit; }
+.ToolPresentation .diff { overflow-x: auto; }
+.ToolPresentation .diff > div { white-space: pre; width: max-content; min-width: 100%; }
+.ToolPresentation .add { color: var(--add-fg); }
+.ToolPresentation .del { color: var(--remove-fg); }
+.ToolPresentation .dim { color: var(--quiet); }
+.raw-tool button { cursor: pointer; padding: 0.5lh 0; min-height: 44px; }
 /* An opened diff keeps whole lines and scrolls sideways as one box, its
    right edge fading while more is off screen, like a wide table. */
 .Card .change .lines, .Card .edit-diff { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }

@@ -1,5 +1,6 @@
 // Validate durable conversation records; corruption fails loudly.
 // Tasks: jf, nvm, svt, 6eq, rqq.
+import { toolPresentation } from '../common/tool-presentation.ts'
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
@@ -38,6 +39,11 @@ function check(value: unknown): HistoryRecord {
 	}
 	if (r.type === 'rate_limit' && (typeof r.provider !== 'string' || typeof r.model !== 'string' || typeof r.text !== 'string' || typeof r.until !== 'string' || !Number.isFinite(Date.parse(r.until)))) throw new Error('invalid rate limit wait')
 	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
+	for (let b of r.type === 'assistant' ? [r.block] : r.type === 'user' ? r.blocks : []) {
+		if (b.type !== 'tool_call' && b.type !== 'tool_result') continue
+		if (b.presentation !== undefined) toolPresentation.check(b.presentation, b.type === 'tool_result' ? b.output : '')
+		if (b.presentationError !== undefined && typeof b.presentationError !== 'string') throw new Error('invalid tool presentation error')
+	}
 	return r
 }
 export const historyCheck = { check }

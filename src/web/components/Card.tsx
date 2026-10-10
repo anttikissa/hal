@@ -15,6 +15,7 @@
 // result and can show all of it; the transcript holds all of it
 // (host tools cap what they keep), so nothing is fetched.
 
+import { ToolPresentation } from './ToolPresentation.tsx'
 import { interruption } from '../../common/interruption.ts'
 import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
@@ -102,7 +103,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
-	let long = () => !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows
+	let long = () => !presentation() && !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows
 	// The link shows the block's id, #t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -136,6 +137,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
+	let presentation = () => props.row.result?.presentationError ? undefined : props.row.result?.presentation ?? (props.row.item.type === 'tool' ? props.row.item.presentation : undefined)
+	let presentationError = () => props.row.result?.presentationError ?? (props.row.item.type === 'tool' ? props.row.item.presentationError : undefined)
 	let head = () => {
 		let item = props.row.item
 		// Closed thinking spends its width on the preview, not a label.
@@ -146,7 +149,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		}
 		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
-		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
+		return item.type === 'tool' ? presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
 	// Folded cards name their kind with an icon: thinking, another
 	// session's message or command (the send tool's bubble, which
@@ -163,6 +166,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let body = () => {
 		let item = props.row.item
 		if (item.type !== 'tool') return lines().join('\n')
+		if (presentation() || presentationError()) return <>
+			<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
+			<Show when={presentation()}>{(p) => <Show when={!props.row.result?.isError} fallback={<div class="error">{props.row.result?.output}</div>}><ToolPresentation presentation={p()} output={props.row.result?.output} /></Show>}</Show>
+			<Show when={!presentation()}><div>{toolDetails.lines(item.name, item.input).join('\n')}{'\n'}{props.row.result?.output}</div></Show>
+			<Show when={!props.row.result && item.partial}>{(output) => <div>{output()}</div>}</Show>
+			<div class="raw-tool"><button type="button" aria-expanded={folds.raw().has(id()) ? 'true' : 'false'} onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}>Raw call and result</button><Show when={folds.raw().has(id())}><pre>{toolDetails.value(item.input).join('\n')}{'\n\n'}{props.row.result?.output ?? item.partial ?? ''}</pre></Show></div>
+		</>
 		// An EDIT's diff shows its edits, so it stands alone, in diff colors.
 		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>
 		// The call once (task 8t), then its output: the result, or what
@@ -171,10 +181,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
 		return <>{[...call, ...(out && call.length ? [''] : [])].map((l) => l + '\n').join('')}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
-	let failed = () => !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
+	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
 		let hit = e.target as Element
-		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .discard, .undo')) return
+		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .discard, .undo, .raw-tool')) return
 		let selection = getSelection()
 		if (!hit.closest('.mark') && selection && !selection.isCollapsed && root) {
 			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
@@ -298,7 +308,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<div class="contents">
 									<div class="content">
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
-										{md() ? markdown() : body()}
+										{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
 										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'show less' : 'show all'}</button></Show>
 									</div>

@@ -6,6 +6,7 @@
 // Action call itself never runs: resolution happens as the call arrives
 // (turns.ts) and a call that fails to resolve becomes an error result.
 
+import { toolPresentations } from './tool-presentation.ts'
 import { action } from '../common/action.ts'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
@@ -72,13 +73,11 @@ function resolve(text: unknown): { name: string; input: Record<string, unknown> 
 // plus the text, or unchanged when it does not resolve (tools.run then
 // reports why).
 function arrived(call: ToolCallBlock): ToolCallBlock {
-	if (call.name !== name || call.action !== undefined) return call
-	try {
+	if (call.name === name && call.action === undefined) try {
 		let { name: tool, input } = actions.resolve(call.input.action)
-		return { type: 'tool_call', id: call.id, name: tool, input, action: call.input.action as string }
-	} catch {
-		return call
-	}
+		call = { type: 'tool_call', id: call.id, name: tool, input, action: call.input.action as string }
+	} catch {}
+	return toolPresentations.attach(call, call)
 }
 
 // Exact syntax lines, from the module or its schema.

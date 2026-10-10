@@ -18,6 +18,7 @@ import { app } from './app.ts'
 import { scroll } from './scroll.ts'
 
 const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
+const [raw, setRaw] = createSignal<ReadonlySet<string>>(new Set())
 const [closed, setClosed] = createSignal<ReadonlySet<string>>(new Set())
 
 function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
@@ -53,7 +54,7 @@ function set(id: string, item: Item, on: boolean, keys: string[] = [item.key], c
 
 // Card `item`'s state in session `sid`, as the shared rules see it.
 function fold(sid: string, item: Item): Fold {
-	return folds.isOpen(`${sid}#${item.key}`, item) ? 'open' : 'closed'
+	return folds.isOpen(`${sid}#${item.key}`, item) ? raw().has(`${sid}#${item.key}`) ? 'inline' : 'open' : 'closed'
 }
 
 // Applies `mode` with `args` to the cards of the session shown, as
@@ -67,7 +68,9 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	scroll.follow(() => {
 		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			folds.set(`${t.meta.id}#${item.key}`, item, p.open ?? at(item) === 'closed', result ? [item.key, result] : [item.key])
+			let next = p.open === undefined ? item.type === 'tool' && item.presentation ? toggle.next(item, at(item)) : at(item) === 'closed' ? 'open' : 'closed' : p.open ? 'open' : 'closed'
+			setRaw((s) => toggled(s, `${t.meta.id}#${item.key}`, next === 'inline'))
+			folds.set(`${t.meta.id}#${item.key}`, item, next !== 'closed', result ? [item.key, result] : [item.key])
 		}
 		flush()
 	})
@@ -128,4 +131,4 @@ function key(k: Key, cursor?: number): void {
 	if (error) app.setNotice(error)
 }
 
-export const folds = { opened, setOpened, closed, toggled, closable, isOpen, set, fold, run, typed, onEvent, hinted, open, input, key }
+export const folds = { raw, setRaw, opened, setOpened, closed, toggled, closable, isOpen, set, fold, run, typed, onEvent, hinted, open, input, key }
