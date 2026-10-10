@@ -92,9 +92,11 @@ async function validate(path: string, expected: string, count: number) {
 	return marks
 }
 
-async function run(id: string, apply = false): Promise<Result> {
+// `live`: run inside the host holding the home lock; called synchronously
+// just before replacement so the host drops caches of the old file.
+async function run(id: string, apply = false, live?: () => void): Promise<Result> {
 	let path = `${paths.sessionDir(id)}/history.asonl`
-	if (server.state.lockFd !== null || !server.tryLock()) throw new Error(`${server.lockPath()}: host is running; stop the host and its supervisor before cleanup`)
+	if (live ? server.state.lockFd === null : server.state.lockFd !== null || !server.tryLock()) throw new Error(live ? 'live cleanup must run inside the host' : `${server.lockPath()}: host is running; use /changes cleanup in Hal instead`)
 	let fd = server.state.lockFd!
 	let token = randomUUID(), temp = `${path}.cleanup-${token}`, marksTemp = `${pages.marksPath(id)}.cleanup-${token}`
 	let backup: string | undefined, backupReady = false
@@ -130,6 +132,9 @@ async function run(id: string, apply = false): Promise<Result> {
 		backupReady = true
 		let latest = lstatSync(path)
 		if (!latest.isFile() || latest.ino !== original.ino || latest.size !== original.size || latest.mtimeMs !== original.mtimeMs || await changeCleanup.digest(backup) !== originalDigest || await changeCleanup.digest(path) !== originalDigest) throw new Error(`${path}: history changed during cleanup; original was not replaced`)
+		let final = lstatSync(path)
+		if (final.size !== original.size || final.mtimeMs !== original.mtimeMs) throw new Error(`${path}: history changed during cleanup; original was not replaced`)
+		live?.()
 		rmSync(pages.marksPath(id), { force: true })
 		changeCleanup.sync(paths.sessionDir(id))
 		renameSync(temp, path)
@@ -144,15 +149,17 @@ async function run(id: string, apply = false): Promise<Result> {
 			rmSync(temp, { force: true })
 			rmSync(marksTemp, { force: true })
 		} finally {
-			closeSync(fd)
-			server.state.lockFd = null
+			if (!live) {
+				closeSync(fd)
+				server.state.lockFd = null
+			}
 		}
 	}
 }
 
 async function main(args: string[]): Promise<void> {
 	if (args.length === 1 && args[0] === '--help') {
-		console.log(`Usage: bun src/host/change-cleanup.ts [--apply] <session-id>\n\nPreview excluded file-change metadata by default; --apply approves replacement.\nHome: ${paths.home()}\nStop the host, clients that can take over, and its supervisor first. The home\nlock excludes active turns, background tools, commands, and a restarting host.\nMemory is bounded by one history record, not the whole conversation.\nOnly excluded per-file audit metadata is removed. Cleanup preserves all\nconversation records and numbers, useful entries, and snapshot blobs.\nIt retains history.asonl.before-cleanup-<id>, validates before atomic replacement,\nand rebuilds byte-offset marks. Restart the host to load fresh caches.\nTo recover: stop the host, copy the reported backup over history.asonl, remove\nthat session's marks.ason, then restart. No blob garbage collection is performed.`)
+		console.log(`Usage: bun src/host/change-cleanup.ts [--apply] <session-id>\n\nPreview excluded file-change metadata by default; --apply approves replacement.\nHome: ${paths.home()}\nWith Hal running, use /changes cleanup [apply] <session-id> instead; never stop\nor suspend the host for this. Offline, the home lock excludes a running host.\nMemory is bounded by one history record, not the whole conversation.\nOnly excluded per-file audit metadata is removed. Cleanup preserves all\nconversation records and numbers, useful entries, and snapshot blobs.\nIt retains history.asonl.before-cleanup-<id>, validates before atomic replacement,\nand rebuilds byte-offset marks.\nTo recover: stop the host, copy the reported backup over history.asonl, remove\nthat session's marks.ason, then restart. No blob garbage collection is performed.`)
 		return
 	}
 	let apply = args[0] === '--apply'
