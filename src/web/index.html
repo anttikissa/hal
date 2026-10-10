@@ -393,7 +393,17 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .Composer { padding-top: 4px; gap: 4px; }
   .entry textarea { max-height: min(80px, calc(var(--app-height, 100dvh) * .25)); overflow-y: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+@media (pointer: coarse) {
+  .entry .actions.nudge-actions { position: relative; flex: none; width: 88px; min-height: 44px; }
+  .entry .actions.nudge-actions button { position: absolute; top: 0; width: 44px; height: 44px; }
+  .entry .actions.nudge-actions .go { right: 0; }
+  .entry .actions.nudge-actions .toggle { right: 44px; transition: transform 120ms var(--ease-out); }
+  .entry .actions.nudge-actions.tucked { width: 44px; min-height: 88px; }
+  .entry .actions.nudge-actions.tucked .toggle { transform: translate(44px, 44px); }
+  .entry:has(.nudge-actions.tucked) { align-items: flex-start; }
+  .entry:has(.nudge-actions.tucked) > .attach { height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry .actions.nudge-actions .toggle, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
 .Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
 /* Options: a hairline in the card's color; the chosen one solid in it,

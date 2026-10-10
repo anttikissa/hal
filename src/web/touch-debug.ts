@@ -87,7 +87,7 @@ function start(): void {
 	let label = (target: EventTarget | null) => {
 		let el = target instanceof Element ? target : null
 		let action = el?.closest('.Composer button')?.getAttribute('aria-label')
-		if (action && ['Send', 'Steer', 'Queue', 'Run', 'Pause (Esc)', 'Continue', 'Attach file', 'Save queued message'].includes(action)) return action
+		if (action && ['Send', 'Steer', 'Queue', 'Run', 'Pause (Esc)', 'Continue', 'Nudge', 'Attach file', 'Save queued message'].includes(action)) return action
 		let n = el?.closest('.Tabs a.tab')?.querySelector('.n')?.textContent
 		if (n && /^\d+$/.test(n)) return `tab:${Number(n)}`
 		return el?.closest('.Composer textarea') ? 'draft' : el?.closest('.Composer') ? 'composer' : el?.closest('.Tabs') ? 'tabs' : el?.closest('.Transcript') ? 'transcript' : 'other'
