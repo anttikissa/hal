@@ -9,17 +9,16 @@
 //   pulled it back, so something other than the reader moved it.
 // - 'drift': pinning failed: still pinned, above the bottom
 //   for two checks in a row (a bug in scroll.ts).
-// Each logs a breadcrumb (detail: page visibility; line: gap px) and
-// shows a notice.
+// Each logs a breadcrumb (detail: page visibility; line: gap px).
+// Only failed pinning shows a notice.
 import { notices } from '../common/notices.ts'
 import { diagnostics } from './diagnostics.ts'
 import { scroll } from './scroll.ts'
 
 function init(): void {
-	scroll.onPull = (gap, why) => {
+	scroll.onPull = (gap) => {
 		diagnostics.record('pulled', document.visibilityState, gap)
 		diagnostics.report()
-		notices.add({ key: 'scroll-drift', kind: 'attention', title: `Scroll pulled back to the bottom: ${gap}px`, line: `Something other than you moved it (trigger: ${why}, tab ${document.visibilityState}).` })
 	}
 	let stuck = 0
 	setInterval(() => {
