@@ -1,0 +1,10 @@
+{
+	title: 'Composer actions act on a completed touch',
+	spec: 'Invariant: one deliberate tap on an enabled composer action (Send, Steer, Queue, Run, Save, Pause, Continue) runs it once on iOS. A touch or pen press that lifts inside the button runs the action at pointerup, since iOS can complete a touch on the button without dispatching click; a click arriving within one second afterwards is ignored, so the action never runs twice. A press that ends outside the button, is canceled by scrolling, or hits a disabled button does nothing. Mouse and keyboard activation keep using click. Pointerdown default stays prevented so the draft keeps focus (f63). Web only; the terminal has no touch buttons.',
+	status: 'done',
+	notes: [
+		'Evidence (y1a): on an iPhone with the draft focused, pointerdown and pointerup reached Send but iOS dispatched no click, so send() never ran; a second tap worked. Acting at pointerup restores one-tap sending; a click within 1 s after is ignored to prevent double sends, and after a send the emptied draft disables the button so Chrome sends no click at all. Touch-debug test now expects pointerup Run instead of click Run. Verification: new browser test (real CDP touch tap sends exactly one prompt; synthetic pointerdown/pointerup with no click sends) passes; full src/host/web.test.ts has the same 5 failures at HEAD without this change (stale page reload, submit streaming, completion layout, command below streaming block, touch debug load-order timeout); web unit tests, typecheck apart from the existing replay.test.ts:201 error, and lint pass. Not yet verified on an iOS device.'
+	],
+	needs: ['y1a', 'qn'],
+	foldInto: ['qn']
+}

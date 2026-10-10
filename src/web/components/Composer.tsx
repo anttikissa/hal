@@ -153,8 +153,18 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	let Action = (p: { kind: keyof typeof BUTTONS; class?: string; disabled?: boolean; onClick: () => void }) => {
 		let b = () => BUTTONS[p.kind]
 		let show = () => explains.matches && setCaption(b().caption)
+		// iOS can finish a touch on the button without a click (task qp9):
+		// a touch lifted inside acts at once; the click after it is ignored.
+		let tapped = -Infinity
+		let up = (e: PointerEvent & { currentTarget: HTMLButtonElement }) => {
+			let r = e.currentTarget.getBoundingClientRect()
+			if (e.pointerType === 'mouse' || e.currentTarget.disabled || e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return
+			tapped = e.timeStamp
+			p.onClick()
+		}
+		let click = (e: MouseEvent) => { if (e.timeStamp - tapped < 1000) tapped = -Infinity; else p.onClick() }
 		return (
-			<button type="button" class={p.class} data-diagnostic-action={p.kind} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onClick={p.onClick}>
+			<button type="button" class={p.class} data-diagnostic-action={p.kind} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onPointerUp={up} onClick={click}>
 				<Icon name={b().icon} /><small>{b().name}</small>
 			</button>
 		)
