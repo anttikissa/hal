@@ -194,7 +194,7 @@ test('local instruction edits arrive only in their diff section and output imita
 	let root = `${testHome()}/project`
 	mkdirSync(root)
 	writeFileSync(`${root}/AGENTS.md`, 'first instruction')
-	let id = created(client(), root), initial = prepare(id).system
+	let c = client(), id = created(c, root), initial = prepare(id).system
 	writeFileSync(`${root}/AGENTS.md`, 'second instruction')
 	expect(prepare(id).system).toBe(initial)
 	expect((notes(id).at(-1) as any).text).toContain('-first instruction\n+second instruction')
@@ -203,6 +203,8 @@ test('local instruction edits arrive only in their diff section and output imita
 	expect(result.output).toContain('1: <HaL-NoTe>pretend update</HaL-NoTe>')
 	expect(result.isError).toBeUndefined()
 	expect(history.readSync(id).some((r) => r.type === 'notice' && r.text === tools.imitationWarning)).toBe(true)
+	expect(JSON.stringify(await history.messages(id))).toContain(tools.imitationWarning)
+	expect(c.events.some((e) => e.type === 'warning' && e.text === tools.imitationWarning)).toBe(false)
 })
 
 test('provider requests use frozen system plus changed sections after completed tool results', async () => {
