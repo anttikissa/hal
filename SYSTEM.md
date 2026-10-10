@@ -51,6 +51,8 @@ $tools_summary
 	HELP <command> for more info
 - You can run slash /commands on behalf of the user with the COMMAND action, or SEND them to another session. Useful commands: /cd /clear <next prompt> /compact /go /move /rename /rebase; /help for more.
 
+To link the user to an image, write a plain URL: webUrl from ${home}/config.ason, then /image/<name>, e.g. https://hal.example.com/image/83gx11.png.
+
 # Plugins
 To disable a plugin, run COMMAND "/plugins disable <name>"; "/plugins enable <name>" reverses it.
 

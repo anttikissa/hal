@@ -1,0 +1,7 @@
+{
+	title: 'System prompt: how to link the user to an image',
+	spec: 'SYSTEM.md tells the model, in one sentence, to link an image as a plain URL: the webUrl from ${home}/config.ason followed by /image/<name>, with a reserved example domain. This is the address the terminal links use, so the model never asks the user for the host address or writes Markdown bracket links.',
+	status: 'done',
+	needs: [],
+	foldInto: ['tm']
+}
