@@ -1,0 +1,31 @@
+#!/usr/bin/env bun
+import { execFileSync } from 'node:child_process'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, renameSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
+
+const { values: { name, source, ref } } = parseArgs({ options: { name: { type: 'string' }, source: { type: 'string' }, ref: { type: 'string' } } })
+if (!name || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name) || !source || !ref || !/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(ref)) throw Error('Use --name NAME --source REPOSITORY --ref FULL_COMMIT')
+const cache = join(dirname(fileURLToPath(import.meta.url)), '.cache')
+const target = join(cache, name)
+const git = (args) => execFileSync('git', args, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }).trim()
+let temporary
+try {
+	if (existsSync(target)) {
+		if (lstatSync(target).isSymbolicLink() || git(['-C', target, 'rev-parse', 'HEAD']).toLowerCase() !== ref.toLowerCase() || git(['-C', target, 'status', '--porcelain'])) throw Error('Cache identity mismatch or local edits; existing data preserved')
+	} else {
+		mkdirSync(cache, { recursive: true })
+		temporary = mkdtempSync(join(cache, '.fetch-'))
+		git(['clone', '--filter=blob:none', '--no-checkout', '--', source, temporary])
+		git(['-C', temporary, 'checkout', '--detach', ref])
+		renameSync(temporary, target)
+		temporary = undefined
+	}
+	console.log(target)
+} catch (error) {
+	console.error(error.message)
+	process.exitCode = error.status || 1
+} finally {
+	if (temporary) rmSync(temporary, { recursive: true, force: true })
+}
