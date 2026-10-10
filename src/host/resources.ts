@@ -79,7 +79,7 @@ function check(sample = resources.measure()): void {
 	}
 	if (st.level === before) return
 	warnings.set('resources', resources.warning())
-	if (st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available` })
+	if (st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available. Paused sessions remain paused; choose Continue or press Enter to resume.` })
 }
 
 // Checks now and every intervalMs; clients joining while short get the
