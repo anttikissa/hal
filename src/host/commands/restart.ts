@@ -6,9 +6,10 @@
 // told first, and restarts (web: reloads) once the host has gone.
 //
 // While a call flagged unsafeToStop runs in any session here (task
-// ker), a restart asks first: the session's followers get the restart
-// dialog, and its Restart anyway sends /restart <scope> anyway. Only a
-// human may skip the question; a model's `anyway` asks too.
+// ker), foreground or background, a restart asks first: the session's
+// followers get the restart dialog, and its Restart anyway sends
+// /restart <scope> anyway. A model's restart is refused with "ask the
+// user first" twice; its third goes through.
 // Tasks: cf, 18n.
 
 import { toolDetails } from '../../common/tool-details.ts'
@@ -18,6 +19,7 @@ import { settings } from '../../common/settings.ts'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { host } from '../host.ts'
+import { jobs } from '../jobs.ts'
 import { restartNote } from '../restart-note.ts'
 import { tabs } from '../tabs.ts'
 import { turns } from '../turns.ts'
@@ -28,7 +30,10 @@ const scopes = ['all', 'host', 'both', 'local']
 // terminal leave raw mode first.
 export const restartProcess = { run: (): void => process.exit(100) }
 
-export const restartGuard = { flagged }
+// Session id → its model's refused restarts while flagged calls run.
+const refused = new Map<string, number>()
+
+export const restartGuard = { flagged, refused }
 
 // Long enough for the reply and the clients' restart events to leave.
 const flushMs = 200
@@ -45,6 +50,10 @@ function flagged(): FlaggedCall[] {
 		let n = history.readSync(id).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
 		let key = n === undefined ? undefined : `t${n}`
 		return { block: key ? `#${key}` : tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }
+	})).concat([...jobs.state.running].flatMap(([id, job]) => {
+		if (!job.unsafe) return []
+		let key = `t${id.slice(job.sessionId.length + 1)}`
+		return [{ block: `#${key}`, href: transcript.href(job.sessionId, key), title: toolDetails.headline('bash', job.unsafe.input).text, ms: now - job.unsafe.at }]
 	}))
 }
 
@@ -67,9 +76,22 @@ export const command: SlashCommand = {
 		let [scope = 'all', anyway] = args.trim().split(/\s+/).filter(Boolean)
 		if (anyway !== undefined && anyway !== 'anyway') return { error: `unknown argument ${anyway}; use /restart [scope] anyway` }
 		let calls = restartGuard.flagged()
-		if (calls.length && (anyway === undefined || ctx.sender?.origin === 'model') && ['all', 'host', 'both'].includes(scope)) {
-			host.broadcast(ctx.sessionId, { type: 'restart-ask', sessionId: ctx.sessionId, scope, calls })
-			return { say: `not restarted yet: asking the user, since ${calls.map((c) => c.block).join(', ')} ${calls.length === 1 ? 'is' : 'are'} unsafe to stop` }
+		if (!calls.length) refused.clear()
+		let model = ctx.sender?.origin === 'model'
+		if (calls.length && ['all', 'host', 'both'].includes(scope)) {
+			let list = `${calls.map((c) => `${c.block} (${c.title})`).join(', ')} ${calls.length === 1 ? 'is' : 'are'} unsafe to stop`
+			if (model) {
+				let n = (refused.get(ctx.sessionId) ?? 0) + 1
+				refused.set(ctx.sessionId, n)
+				if (n < 3) {
+					host.broadcast(ctx.sessionId, { type: 'restart-ask', sessionId: ctx.sessionId, scope, calls })
+					return { error: `not restarted: THIS IS UNSAFE. ${list}. Ask the user first.` }
+				}
+				refused.clear()
+			} else if (anyway === undefined) {
+				host.broadcast(ctx.sessionId, { type: 'restart-ask', sessionId: ctx.sessionId, scope, calls })
+				return { say: `not restarted yet: asking the user, since ${list}` }
+			}
 		}
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })
 		else if (scope !== 'host' && scope !== 'both') return { error: scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }

@@ -22,7 +22,8 @@ import { tools } from './tools.ts'
 import { busy } from './busy.ts'
 
 export type Run = { done: Promise<string>; stop: (why?: string) => void }
-type Job = { sessionId: string; stop: () => void }
+// `unsafe`: the call was flagged unsafeToStop, so a restart asks first.
+type Job = { sessionId: string; stop: () => void; unsafe?: { input: Record<string, unknown>; at: number } }
 
 // Starts `command` with bash -c in `cwd`, stdout and stderr merged.
 // `done` is the status line (`[exit N]`, `[timed out after Ns]`, …)
@@ -80,14 +81,14 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 // Runs `command` for session `sessionId` in the background. One that
 // ends within jobs.graceMs (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
-async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run): Promise<string> {
+async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run, unsafe?: Record<string, unknown>): Promise<string> {
 	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
 	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
 	if (early !== undefined) return early
-	jobs.state.running.set(id, { sessionId, stop: run.stop })
+	jobs.state.running.set(id, { sessionId, stop: run.stop, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
 	run.done.then(
