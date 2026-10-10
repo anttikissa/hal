@@ -18,6 +18,24 @@ mismatched cache without overwriting it. Dependencies are installed inside the
 ignored benchmark workspace, not Hal's runtime. Paid model calls are separate
 from acquisition and need explicit authorization.
 
+## Sources and credits
+
+- **Repository-edit tasks:** adapted from [pi-multiedit](https://github.com/jkeskikangas/pi-multiedit)
+  by **Jarno Keskikangas**, specifically its `research/search-read` research
+  harness. The selected tasks cover exploration and call-site refactoring;
+  four replay real commits from [pi](https://github.com/earendil-works/pi),
+  credited to its authors and contributors. This is not an official pi suite.
+- **Stockroom eleven-task suite:** fixture, tasks and original harness from
+  [pi-claude-subscription](https://github.com/jkeskikangas/pi-claude-subscription)
+  by **Jarno Keskikangas**, under its `bench/` directory.
+- **Compared plugins:** pi-multiedit and pi-claude-subscription are Jarno
+  Keskikangas's MIT-licensed projects. Preserve their license notices with
+  cached copies.
+
+Hal's local adaptations include runners, additional verification, recording,
+comparison queries and the minimal Hal multiedit implementation. These do not
+replace credit for the upstream tasks, fixtures, source code or plugin design.
+
 ## Historical records
 
 Local records retain original artifacts and reference available full transcripts
