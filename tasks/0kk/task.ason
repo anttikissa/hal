@@ -1,0 +1,10 @@
+{
+	title: 'Credit benchmark task and plugin sources',
+	spec: 'benchmarks/README.md credits Jarno Keskikangas and links pi-multiedit for the research/search-read task harness and pi-claude-subscription for the original Stockroom eleven-task fixture and harness. It links Earendil Works pi as the source repository and history for the repository-edit tasks. It distinguishes upstream sources from Hal runner, verification and storage adaptations, and distinguishes the research task set from an official pi suite. Cached upstream copies retain their original license notices.',
+	status: 'done',
+	notes: [
+		'Attribution checked against installed package author/repository/license metadata and the upstream Stockroom fixture Git history (initial release e12c792 by Jarno Keskikangas). No benchmark runs or dependency changes were needed.'
+	],
+	needs: ['dj1'],
+	foldInto: ['dj1']
+}
