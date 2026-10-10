@@ -100,7 +100,7 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 		if (c === '[' && s[i - 1] !== '!' && /\S/.test(s[i + 1] ?? ' ')) {
 			let label = scan(s, i + 1, { ...st, bold: true }, ']', open)
 			let rest = label ? s.slice(label.end) : ''
-			let url = /^\((https?:\/\/[^\s)]+|\/[\w-]+(?:#[a-z]?\d+(?:\.\d+)?)?)\)/.exec(rest)
+			let url = /^\((https?:\/\/[^\s)]+|\/[\w-]+(?:\/[\w.-]+)*(?:#[a-z]?\d+(?:\.\d+)?)?)\)/.exec(rest)
 			// While the text may grow, "](" and a partial http(s) address
 			// may still come.
 			let maybe = open && (!label?.closed || rest === '' || /^\((h(t(t(p(s?(:(\/(\/[^\s)]*)?)?)?)?)?)?)?)?$/.test(rest))
