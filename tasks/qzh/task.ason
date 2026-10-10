@@ -1,9 +1,10 @@
 {
-	title: 'INSPECT resolves plain words by value',
-	spec: 'The INSPECT action accepts plain words, quoted or bare, in any order, case-insensitive: a view name (sessions, host, models, clients) sets what, a scope name (self, project, all) sets scope, aliases map to what a model plausibly means (tabs: sessions with scope all; tab, session: sessions; model: models; client: clients), and any other words, comma- or space-separated, are fields. A { what, scope, fields } object may follow and wins over words; an unknown key in it is an error naming the valid ones. Invariant restored: INSPECT "tabs" lists the open tabs instead of failing with "takes 0 plain arguments".',
+	title: 'Action leniency only for observed frequent misuse',
+	spec: 'An action accepts an alternative argument form only when real models (session histories) send it by mistake often; one-off or guessed forms stay errors with usage, from which models recover. INSPECT therefore takes only { what, scope, fields }: plain words such as INSPECT "tabs" (seen once, claude-opus-5-5, 9 Oct) are errors.',
 	status: 'done',
 	notes: [
-		'Provenance (session histories, 9 Oct): the only plain-word INSPECT a real model sent was INSPECT "tabs" (claude-opus-5-5); all other calls used objects (claude-opus-5-5, gpt-6-astra). Other words and aliases are guesses.'
+		'Provenance (session histories, 9 Oct): the only plain-word INSPECT a real model sent was INSPECT "tabs" (claude-opus-5-5); all other calls used objects (claude-opus-5-5, gpt-6-astra). Other words and aliases are guesses.',
+		'A plain-word INSPECT grammar (words by value, aliases) was added and reverted: after its usage line advertised INSPECT sessions all "..." and INSPECT project "...", models used those; that was the docs prompting them, not accidental misuse.'
 	],
 	needs: ['jm'],
 	foldInto: ['jm']
