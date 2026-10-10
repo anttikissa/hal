@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Benchmark caches must remain outside default TypeScript and test discovery. The test runner resolves existing relative paths explicitly so Bun does not substring-match copied source trees. Invariant: normal Hal verification considers Hal sources, not benchmark fixture sources.',
-		'Historical importer preserves source artifacts, deduplicates mirrored attempts, appends metadata revisions and resolves them in read-only queries. Reimport added zero records; source checksums were verified. Dated standard API rates price known cache classes exactly and unknown cache-write TTL with explicit lower/upper bounds, never as actual spend or quota. Normal verification excludes ignored benchmark trees; scoped tests and TypeScript file-discovery checks passed.'
+		'Historical importer preserves source artifacts, deduplicates mirrored attempts, appends metadata revisions and resolves them in read-only queries. Reimport added zero records; source checksums were verified. Dated standard API rates price known cache classes exactly and unknown cache-write TTL with explicit lower/upper bounds, never as actual spend or quota. Normal verification excludes ignored benchmark trees; scoped tests and TypeScript file-discovery checks passed.',
+		'benchmarks/AGENTS.md: pilot one or two tasks per arm before a full run and inspect each arm transcript (system prompt, tools, model, effort, errors); keep fixtures outside project directories. Stockroom fixtures under /root/hal/benchmarks gave pi Hal AGENTS.md files (10.9k of its 11k-char system prompt) in every run on 10 Oct; pi then tried to commit in every attempt.'
 	],
 	needs: ['veh']
 }
