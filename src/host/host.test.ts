@@ -1,17 +1,44 @@
-import { statSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
 // The protocol end of the host: connections, snapshots, commands and
 // their ids (host.ts).
 
 import { expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
+import type { Event } from '../common/protocol.ts'
 import { config } from './config.ts'
 import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { warnings } from './warnings.ts'
 import { models } from './models.ts'
 import { sessions } from './sessions.ts'
+import { host } from './host.ts'
+import { paths } from './paths.ts'
 
 useHost()
+
+test('web snapshot load diagnostics are opt-in, numeric and content-free', async () => {
+	let id = created(client())
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'private content' }] })
+	let messages: string[] = []
+	let web = host.adapt((message) => messages.push(message), { kind: 'web' })
+	let file = `${paths.stateDir()}/web-diag.log`
+	try {
+		web.receive(ason.stringify({ type: 'open', sessionId: id }))
+		await until(() => messages.some((m) => (ason.parse(m) as Event).type === 'snapshot'))
+		expect(existsSync(file)).toBe(false)
+		config.update({ webDiagnostics: true })
+		messages.length = 0
+		web.receive(ason.stringify({ type: 'open', sessionId: id }))
+		await until(() => messages.some((m) => (ason.parse(m) as Event).type === 'snapshot'))
+		let logged = readFileSync(file, 'utf8')
+		expect(logged).not.toContain(id)
+		expect(logged).not.toContain('private content')
+		let entries = logged.trim().split('\n').flatMap((line) => JSON.parse(line.slice(line.indexOf(' ') + 1)).entries)
+		expect(entries.map((e) => e.detail)).toEqual(['requested', 'ready', 'tail', 'built', 'encoded'])
+		expect(entries.every((e) => Number.isFinite(e.ms) && e.ms >= 0)).toBe(true)
+		expect(entries.at(-1).bytes).toBeGreaterThan(0)
+	} finally { web.close() }
+})
 
 test('create makes a session and sends its snapshot', () => {
 	let a = client()

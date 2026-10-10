@@ -13,12 +13,19 @@ if [[ $TERM == screen* ]]; then export TERM=xterm-256color; fi
 # existing path runs that file or directory; any other text runs tests
 # whose name contains it.
 if [ $# -gt 0 ]; then
-	if [ -e "$1" ]; then exec bun test "$@"; fi
-	exec bun test src -t "$(printf '%s' "$*" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+	if [ -e "$1" ]; then
+		paths=()
+		for path in "$@"; do
+			if [ -e "$path" ] && [[ $path != /* && $path != ./* ]]; then path="./$path"; fi
+			paths+=("$path")
+		done
+		exec bun test "${paths[@]}"
+	fi
+	exec bun test ./src -t "$(printf '%s' "$*" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
 fi
 lock="$(git rev-parse --git-path index.lock 2>/dev/null)"
 had_lock=$([ -e "$lock" ] && echo 1)
-bun test src || status=1
+bun test ./src || status=1
 if [ -z "$had_lock" ] && [ -e "$lock" ]; then
 	echo "./test: the tests left $lock behind (a host git call takes a lock)" >&2
 	status=1

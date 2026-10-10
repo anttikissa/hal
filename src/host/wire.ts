@@ -9,6 +9,9 @@ import { ason } from '../common/ason.ts'
 import type { Event } from '../common/protocol.ts'
 import type { ClientInfo } from './clients.ts'
 import { host } from './host.ts'
+import { settings } from '../common/settings.ts'
+import { tabs } from './tabs.ts'
+import { webDiagnostics } from './web-diagnostics.ts'
 
 function copy<T>(value: T): T {
 	return ason.parse(ason.stringify(value, 'short')) as T
@@ -27,7 +30,13 @@ function event(e: Event): Event {
 // goes to `write` as one short ASON message. Unreadable messages are
 // answered with `rejected`, never thrown.
 function adapt(write: (message: string) => void, info?: ClientInfo): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
-	let send = (event: Event) => write(ason.stringify(event, 'short'))
+	let send = (event: Event) => {
+		let measured = info?.kind === 'web' && settings.webDiagnostics() && event.type === 'snapshot'
+		let start = measured ? performance.now() : 0
+		let message = ason.stringify(event, 'short')
+		if (measured && event.type === 'snapshot') webDiagnostics.load(tabs.file().open.indexOf(event.sessionId) + 1, 'encoded', start, Buffer.byteLength(message))
+		write(message)
+	}
 	let conn = host.connect(send, info)
 	let unreadable = (reason: string) => send({ type: 'rejected', command: '', reason: `unreadable message: ${reason}` })
 	return {

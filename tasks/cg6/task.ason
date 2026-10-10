@@ -1,0 +1,10 @@
+{
+	title: 'Diagnose slow web session snapshots',
+	spec: 'Opt-in webDiagnostics records bounded numeric timings for web tab selection and open requests, host history readiness and tail loading, snapshot construction and wire serialization, browser wire parsing, snapshot application and next visible animation frame. Correlate phases by numeric tab position and timestamps without session identifiers, content, URLs or device identity. Preserve cookie/origin validation, numeric validation, bounded owner-only log rotation and off-by-default collection. No Chrome is needed for verification. Web-only instrumentation does not change terminal behavior.',
+	status: 'done',
+	notes: [
+		'The status label connecting means a connected link without a transcript. Host requested/ready/tail times are cumulative from open; built and encoded are phase durations. Browser parsed/applied are phase durations; frame is time since snapshot application began to the next animation-frame callback, not proof of pixels painted. Numeric tab positions and timestamps correlate concurrent reports without recording session IDs. Logs retain the existing two 1 MiB files; collection adds no polling. Verification: 54 focused tests pass and changed-file lint is clean; repository typecheck is blocked by existing inbox/replaces excess properties in src/common/replay.test.ts:201. No Chrome was run.'
+	],
+	needs: ['s0'],
+	foldInto: ['s0']
+}

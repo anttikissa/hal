@@ -37,6 +37,8 @@ import { rebasePlans } from './rebase-plans.ts'
 import { queueEdits } from './queue-edits.ts'
 import { recap } from './recap.ts'
 import { models } from './models.ts'
+import { settings } from '../common/settings.ts'
+import { webDiagnostics } from './web-diagnostics.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -184,16 +186,25 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (c.type === 'open') {
 		let id = c.sessionId
+		let measured = client.record.kind === 'web' && settings.webDiagnostics()
+		let start = measured ? performance.now() : 0
+		let tab = measured ? tabs.file().open.indexOf(id) + 1 : 0
+		if (measured) webDiagnostics.load(tab, 'requested', start)
 		let ready = host.ready(id)
+		if (measured && !ready) webDiagnostics.load(tab, 'ready', start)
 		let tail = ready ? undefined : pages.slices(pages.snapshotSteps(id))
 		if (tail && !(tail instanceof Promise)) {
+			if (measured) webDiagnostics.load(tab, 'tail', start)
 			host.follow(client, id, tail)
 			return {}
 		}
 		client.held.set(id, [])
 		return (async () => {
 			await ready
-			host.follow(client, id, await (tail ?? pages.slices(pages.snapshotSteps(id))))
+			if (measured && ready) webDiagnostics.load(tab, 'ready', start)
+			let loaded = await (tail ?? pages.slices(pages.snapshotSteps(id)))
+			if (measured) webDiagnostics.load(tab, 'tail', start)
+			host.follow(client, id, loaded)
 			return {}
 		})()
 	}
@@ -279,7 +290,11 @@ function ready(id: string): Promise<void> | undefined {
 function follow(client: Client, id: string, tail?: Tail): void {
 	if (!host.state.clients.has(client)) return
 	client.open.add(id)
-	client.deliver({ type: 'snapshot', sessionId: id, snapshot: snapshots.build(id, tail && pages.since(id, tail)) })
+	let measured = client.record.kind === 'web' && settings.webDiagnostics()
+	let start = measured ? performance.now() : 0
+	let snapshot = snapshots.build(id, tail && pages.since(id, tail))
+	if (measured) webDiagnostics.load(tabs.file().open.indexOf(id) + 1, 'built', start)
+	client.deliver({ type: 'snapshot', sessionId: id, snapshot })
 }
 
 function broadcast(id: string, event: Event): void {

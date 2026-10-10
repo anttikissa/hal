@@ -57,5 +57,10 @@ test('browser diagnostics enforce auth/origin, filter private data and rotate bo
 test('diagnostic validation rejects malformed collections and numeric state', () => {
 	expect(webDiagnostics.clean({ ...report(), page: [report().page] })).toBeUndefined()
 	expect(webDiagnostics.clean({ ...report(), context: { width: Infinity } })).toBeUndefined()
+	for (let key of ['ms', 'bytes', 'tab']) {
+		expect(webDiagnostics.clean({ ...report(), entries: [{ at: 1, kind: 'load', detail: 'parsed', [key]: -1 }] })).toBeUndefined()
+	}
+	let cleaned = webDiagnostics.clean({ ...report(), entries: [{ at: 1, kind: 'load', detail: 'parsed', ms: 2.5, bytes: 10, tab: 3, text: 'private' }] })
+	expect(cleaned?.entries).toEqual([{ at: 1, kind: 'load', detail: 'parsed', ms: 2.5, bytes: 10, tab: 3 }])
 	expect(webDiagnostics.clean({ ...report(), entries: Array(33).fill(report().entries[0]) })).toBeUndefined()
 })

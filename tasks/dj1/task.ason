@@ -1,0 +1,10 @@
+{
+	title: 'Preserve and query benchmark history',
+	spec: 'The benchmark workspace supports local append-only historical run records with referenced full transcripts and receipts for every available tool call. Import preserves originals, deduplicates stable source identities, includes identifiable failed and aborted attempts, and marks unavailable measurements unknown. Records distinguish suite and task identity, harness and enabled features, model and effort, settings and transport, code and plugin versions, start and elapsed time, verification outcomes, tokens and cache classes, incident notes, pricing provenance and API-equivalent cost, actual spend, and quota snapshots with reset boundaries and concurrent-use caveats. Queries compare genuinely comparable configurations, show sample sizes and uncertainty without inventing confidence intervals from single samples, identify recurring failures and slow calls, and retain graphable chronology and version associations without claiming causation. Historical runs without a feature are not labeled as using it. The local ledger and source artifacts remain gitignored; tracked documentation describes generic commands and data limitations. Historical import and queries make no model calls. Preservation remains the default until the user agrees a retention policy.',
+	status: 'done',
+	notes: [
+		'Benchmark caches must remain outside default TypeScript and test discovery. The test runner resolves existing relative paths explicitly so Bun does not substring-match copied source trees. Invariant: normal Hal verification considers Hal sources, not benchmark fixture sources.',
+		'Historical importer preserves source artifacts, deduplicates mirrored attempts, appends metadata revisions and resolves them in read-only queries. Reimport added zero records; source checksums were verified. Dated standard API rates price known cache classes exactly and unknown cache-write TTL with explicit lower/upper bounds, never as actual spend or quota. Normal verification excludes ignored benchmark trees; scoped tests and TypeScript file-discovery checks passed.'
+	],
+	needs: ['veh']
+}
