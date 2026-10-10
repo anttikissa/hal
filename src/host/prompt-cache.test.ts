@@ -20,6 +20,42 @@ const source = (value: string, full = 'unchanged') => `Static rules\n\n:: sectio
 const notes = (id: string) => history.readSync(id).filter((r) => r.type === 'notice' && r.sectionUpdate)
 const prepare = (id: string, now = 1000) => promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: sessions.open(id).model, now })
 
+test('delivered print prompts rebuild interactive guidance; queued prompts wait and UI prompts restore it', async () => {
+	writeFileSync(file, ':: if interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	let c = client(), id = created(c, testHome())
+	c.conn.send({ type: 'submit', sessionId: id, text: 'watched' })
+	await until(() => calls.length === 1)
+	expect(calls[0]!.input.system).toContain('/* Explain */')
+	c.conn.send({ type: 'submit', sessionId: id, text: 'unattended', interactive: false, delivery: 'queue' })
+	expect(promptCache.input(id).interactive).toBe(true)
+	calls[0]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.system).not.toContain('/*')
+	expect(promptCache.input(id).interactive).toBe(false)
+	let child = sessions.create({ cwd: testHome(), model: 'fake/m1' }).id
+	subagents.fork(id, child)
+	expect(promptCache.input(child).interactive).toBe(false)
+	calls[1]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
+	c.conn.send({ type: 'submit', sessionId: id, text: 'watched again' })
+	await until(() => calls.length === 3)
+	expect(calls[2]!.input.system).toContain('/* Explain */')
+})
+
+test('unattended child task and compaction preserve inherited interaction mode', async () => {
+	writeFileSync(file, ':: if interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	let parent = sessions.create({ cwd: testHome(), model: 'fake/m1', interactive: false }).id
+	let child = subagents.spawn(parent, { kind: 'subagent', task: 'check unattended behavior', fork: false, cwd: testHome(), limit: 0 })
+	await until(() => calls.length === 1)
+	expect(calls[0]!.input.system).not.toContain('/*')
+	expect(promptCache.input(child).interactive).toBe(false)
+	calls[0]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => history.readSync(child).at(-1)?.type === 'turn_end')
+	compact.run(child)
+	expect(promptCache.input(child).interactive).toBe(false)
+	expect(prepare(child).system).not.toContain('/*')
+})
+
 test('section changes freeze the system and combine whole/diff updates, removals and additions', async () => {
 	writeFileSync(file, source('three'))
 	let id = created(client(), testHome()), initial = prepare(id).system

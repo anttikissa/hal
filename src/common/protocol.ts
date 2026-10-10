@@ -134,7 +134,7 @@ export type Command = (
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -160,7 +160,7 @@ export type Command = (
 	// command that creates, reopens or picks a tab names it in its ack.
 	// After an open tab: inherit its cwd, model and effort; otherwise use
 	// cwd and the default model, appending the new tab.
-	| { type: 'tab-new'; cwd: string; after?: string; autoclose?: boolean; noUser?: boolean }
+	| { type: 'tab-new'; cwd: string; after?: string; autoclose?: boolean; noUser?: boolean; interactive?: boolean }
 	// Out of the tabs, remembering its position; the session and any
 	// running turn carry on. Closing the last tab is refused.
 	| { type: 'tab-close'; sessionId: string }

@@ -5,6 +5,7 @@ function invalid(value: unknown): string | undefined {
 	let s = value as Record<string, unknown>
 	// RETIRED-DELIVERY (task rqq): delete by 2026-10-15 (history.test.ts fails then).
 	for (let k of ['steering', 'interject', 'queue', 'queued']) if (k in s) return `retired sender field ${k}`
+	if (s.interactive !== undefined && typeof s.interactive !== 'boolean') return 'invalid sender interactive'
 	if (s.delivery !== undefined && !['now', 'next-round', 'after-turn'].includes(s.delivery as string)) return 'invalid sender delivery'
 	for (let k of ['from', 'label', 'summary']) if (s[k] !== undefined && typeof s[k] !== 'string') return `invalid sender ${k}`
 	if (s.report !== undefined && s.report !== 'question' && s.report !== 'summary') return 'invalid sender report'

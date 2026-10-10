@@ -44,8 +44,8 @@ export const tool: Tool = {
 	action: {
 		summary: false,
 		positional: ['command'],
-		usage: ['BASH [/* purpose */] "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
-		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)', description: 'Set by a /* purpose */ comment' },
+		usage: ['BASH "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
+		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)' },
 		resolve(raw) {
 			let input = actions.generic(tool, raw)
 			if (input.timeout !== undefined) {

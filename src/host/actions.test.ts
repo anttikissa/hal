@@ -20,6 +20,16 @@ async function act(id: string, text: string): Promise<{ output: string; isError?
 }
 const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 
+test('shared help and ordinary validation do not teach purpose comments', async () => {
+	let id = created(client(), testHome())
+	for (let text of ['HELP', 'HELP BASH', 'HELP EDIT', 'BASH', 'EDIT', 'BASH "true" { unknown: 1 }']) {
+		let result = await act(id, text)
+		expect(result.output).not.toContain('/*')
+		expect(result.output).toContain(text.startsWith('HELP') ? text.slice(5) || 'BASH' : 'Usage:')
+	}
+	expect(JSON.stringify(actions.def())).not.toContain('/*')
+})
+
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {
 	expect(actions.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2000, modifies: ['a.ts'], description: 'Check it' } })
 	expect(actions.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
@@ -140,9 +150,9 @@ test('file Actions work outside tracking scope and snapshot eligible literal fil
 test('HELP comes from the tool modules; $tools_summary lists only tools the prompt does not explain', async () => {
 	let id = created(client(), testHome())
 	let help = (await act(id, 'HELP bash')).output
-	expect(help).toContain('BASH [/* purpose */] "<command>"')
+	expect(help).toContain('BASH "<command>"')
 	expect(help).toContain('timeout (integer): Seconds')
-	expect((await act(id, 'HELP')).output).toContain('EDIT [/* purpose */]')
+	expect((await act(id, 'HELP')).output).toContain('EDIT "<path>@<hash>"')
 	let summary = actions.summary()
 	expect(summary).toContain('\tWAIT for a child report')
 	expect(summary).not.toContain('BASH')

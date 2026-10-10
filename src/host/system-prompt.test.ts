@@ -15,6 +15,17 @@ afterEach(() => {
 
 const at = new Date(2026, 8, 26, 1, 52).getTime()
 
+test('purpose guidance follows interaction mode, not subagent kind or autoclose', () => {
+	let input = { cwd: root, model: 'm/x', now: at, noUser: true, owner: '01-abc', kind: 'subagent', autoclose: true }
+	expect(systemPrompt.build(input)).toContain('BASH /*')
+	let unattended = systemPrompt.inspect({ ...input, interactive: false })
+	expect(unattended.problems).toEqual([])
+	expect(unattended.text).not.toContain('/*')
+	expect(unattended.text).toContain('unsafeToStop')
+	expect(unattended.text).toContain('modifies')
+	expect(unattended.text).toContain('path')
+})
+
 test('says who, when and where: date, cwd and model', () => {
 	mkdirSync(`${root}/work`)
 	let text = systemPrompt.build({ cwd: `${root}/work`, model: 'anthropic/claude-x', now: at })

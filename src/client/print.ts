@@ -23,7 +23,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 	let fail = (why: string, code = 1) => { io.err(`hal: ${why}\n`); end(code) }
 	let submit = () => {
 		promptId = connection.nextId()
-		connection.send({ type: 'submit', sessionId: session, text: job.prompt, id: promptId, delivery: job.delivery ?? 'soft-steer' })
+		connection.send({ type: 'submit', sessionId: session, text: job.prompt, id: promptId, interactive: false, delivery: job.delivery ?? 'soft-steer' })
 	}
 	let opened = () => {
 		if (!job.model) return submit()
@@ -43,7 +43,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		begun = true
 		if (job.session) return target()
 		id = connection.nextId()
-		connection.send({ type: 'tab-new', cwd: job.cwd, autoclose: !job.keep, ...(job.noUser && { noUser: true }), id })
+		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, ...(job.noUser && { noUser: true }), id })
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return

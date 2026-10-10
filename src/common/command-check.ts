@@ -43,6 +43,7 @@ function invalid(value: unknown): string | undefined {
 	}
 	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if ((c.type === 'create' || c.type === 'tab-new') && c.autoclose !== undefined && typeof c.autoclose !== 'boolean') return `${c.type}: autoclose must be a boolean`
+	if (c.type === 'tab-new' && c.interactive !== undefined && typeof c.interactive !== 'boolean') return 'tab-new: interactive must be a boolean'
 	if (c.type === 'tab-new' && c.noUser !== undefined && typeof c.noUser !== 'boolean') return 'tab-new: noUser must be a boolean'
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
@@ -61,7 +62,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'history' && !(Number.isInteger(c.before) && (c.before as number) >= 0)) return 'history: before must be an offset'
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
 	if (c.type === 'submit' && c.delivery !== undefined && !sendKeys.parse(c.delivery)) return 'submit: delivery must be steer, soft-steer or queue'
-	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
+	for (let flag of ['queue', 'amend', 'interactive']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
 	if (c.type === 'answer') {
 		let a = c.answers

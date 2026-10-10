@@ -87,7 +87,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		tools_summary: actions.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
-		user_notes: input.noUser ? 'false' : 'true', web_url: settings.webUrl(),
+		user_notes: input.noUser ? 'false' : 'true', web_url: settings.webUrl(), interactive: String(input.interactive ?? true),
 		kind: input.kind ?? 'interactive', subagent: input.owner ? 'true' : 'false',
 		owner: input.owner ?? '', parent: input.parent ?? '', fork: input.parent ? 'true' : 'false',
 		subagent_slots: String(input.slots ?? settings.subagentSlots()), autoclose: String(input.autoclose ?? false),
@@ -96,7 +96,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
 }
 
-export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean; owner?: string; parent?: string; kind?: string; slots?: number; autoclose?: boolean; rendered?: PromptRender }
+export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean; interactive?: boolean; owner?: string; parent?: string; kind?: string; slots?: number; autoclose?: boolean; rendered?: PromptRender }
 function build(input: PromptInput, problems?: string[]): string {
 	return systemPrompt.assemble(input, undefined, problems)
 }

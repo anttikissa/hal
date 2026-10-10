@@ -37,6 +37,7 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.slots !== undefined && (!Number.isSafeInteger(data.slots) || data.slots < 0)) throw new Error(`${path}: invalid slots`)
 	for (let key of ['owner', 'parent']) if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key]))) throw new Error(`${path}: invalid ${key}`)
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
+	if (data.interactive !== undefined && typeof data.interactive !== 'boolean') throw new Error(`${path}: invalid interactive`)
 	if (data.noUser !== undefined && typeof data.noUser !== 'boolean') throw new Error(`${path}: invalid noUser`)
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
@@ -102,7 +103,7 @@ function claimId(now = new Date()): string {
 	}
 }
 
-function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean; noUser?: boolean }): SessionMeta {
+function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean; noUser?: boolean; interactive?: boolean }): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
 	let meta: SessionMeta = {
@@ -115,6 +116,7 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
 		...(init.noUser && { noUser: true }),
+		...(init.interactive !== undefined && { interactive: init.interactive }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
 	meta.nameVersion = 0

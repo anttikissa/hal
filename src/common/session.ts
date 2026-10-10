@@ -23,6 +23,7 @@ export interface SessionMeta {
 	autoclose?: boolean
 	// Leave the user's notes (USER.md) out of the system prompt: hal -p --no-user.
 	noUser?: boolean
+	interactive?: boolean
 	owner?: string
 	parent?: string
 	// Spawn kinds differ in their initial autoclose value; interactive is the user's.

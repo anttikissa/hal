@@ -17,7 +17,7 @@ export const tool: Tool = {
 		return [
 			'One action per Action call; make independent calls in parallel. Names are case-insensitive.',
 			'Arguments are JS string literals, { objects } or [ arrays ] (never evaluated), or bare words on the action line.',
-			'A /* comment */ after the name says the purpose (BASH, EDIT). HELP <NAME> explains one action.',
+			'HELP <NAME> explains one action.',
 			'',
 			...lines,
 		].join('\n')

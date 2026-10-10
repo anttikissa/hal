@@ -15,7 +15,7 @@ import type { ToolCallBlock, ToolResultBlock } from '../../common/blocks.ts'
 import { history } from '../history.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
 
-const usage = 'EDIT [/* purpose */] "<path>@<hash>" { range: "<start>-<end>", lines: ["...", ...] } [{ range, lines } ...]'
+const usage = 'EDIT "<path>@<hash>" { range: "<start>-<end>", lines: ["...", ...] } [{ range, lines } ...]'
 
 function changes(value: unknown): Change[] {
 	if (!Array.isArray(value) || !value.length) throw new Error(`edits must be a non-empty list of { range, lines }. Usage: ${usage}`)
@@ -42,7 +42,7 @@ export const tool: Tool<ToolOutput> = {
 	action: {
 		summary: false,
 		usage: [usage],
-		fields: { lease: 'path@hash from READ', edits: 'The { range, lines } objects after the lease', description: 'Set by a /* purpose */ comment' },
+		fields: { lease: 'path@hash from READ', edits: 'The { range, lines } objects after the lease' },
 		resolve(raw) {
 			let { values, purpose, unclosed } = action.values(raw)
 			let [named, ...edits] = values
