@@ -66,4 +66,22 @@ function load(tab: number, detail: 'requested' | 'ready' | 'tail' | 'built' | 'e
 	webDiagnostics.write({ page: 'host0000', version: 'host', at, context: {}, entries: [{ at, kind: 'load', detail, tab, ms: Math.max(0, performance.now() - start), ...(bytes !== undefined && { bytes }) }] })
 }
 
-export const webDiagnostics = { clean, receive, write, load, reset: () => { windowAt = 0; received = 0 } }
+// Opt-in composer probe (web/composer-debug.ts): the user's own logged-in
+// page, so rows (draft text included) are kept as sent, one JSON line each,
+// bounded per request and by file rotation.
+async function composer(req: Request): Promise<Response> {
+	if (!req.headers.get('content-type')?.startsWith('application/json')) return new Response('expected JSON\n', { status: 415 })
+	if (Number(req.headers.get('content-length')) > 4 * 1024 * 1024) return new Response('too large\n', { status: 413 })
+	let text = await req.text()
+	if (text.length > 4 * 1024 * 1024) return new Response('too large\n', { status: 413 })
+	let body: unknown
+	try { body = JSON.parse(text) } catch (error) { return new Response(`bad JSON: ${String(error)}\n`, { status: 400 }) }
+	if (!object(body) || !Array.isArray(body.rows) || body.rows.length > 100) return new Response('expected { rows: [...] } with at most 100 rows\n', { status: 400 })
+	let file = `${paths.stateDir()}/composer-debug.log`
+	let lines = body.rows.map((row) => `${JSON.stringify({ page: body.page, ua: body.ua, ...(object(row) ? row : { row }) })}\n`).join('')
+	if (existsSync(file) && statSync(file).size + Buffer.byteLength(lines) > 16 * limit) renameSync(file, `${file}.1`)
+	appendFileSync(file, lines, { mode: 0o600 })
+	return new Response(null, { status: 204 })
+}
+
+export const webDiagnostics = { clean, receive, write, load, composer, reset: () => { windowAt = 0; received = 0 } }

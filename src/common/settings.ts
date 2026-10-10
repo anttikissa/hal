@@ -72,6 +72,14 @@ const table: Setting[] = [
 		description: "Web pages report structural diagnostics (no text) to this host's state/web-diag.log.",
 		browser: true,
 	},
+	{
+		name: 'composerDebug',
+		label: 'Composer debug',
+		type: { kind: 'boolean' },
+		default: false,
+		description: "Web pages record every message box event with its full state, draft text included, to this host's state/composer-debug.log, and show a debug badge.",
+		browser: true,
+	},
 ]
 
 // Why `value` doesn't fit `type`, or undefined if it does.
@@ -168,4 +176,5 @@ export const settings = {
 	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
+	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
 }

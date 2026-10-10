@@ -242,7 +242,8 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	}
 	let check = pathname === '/login' && get
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
-	if (!check && !blob && pathname !== '/ws' && !diagnostic) return new Response('not found\n', { status: 404 })
+	let composerDebug = pathname === '/composer-debug' && req.method === 'POST' && settings.composerDebug()
+	if (!check && !blob && pathname !== '/ws' && !diagnostic && !composerDebug) return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
@@ -251,6 +252,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 	if (diagnostic) return webDiagnostics.receive(req)
+	if (composerDebug) return webDiagnostics.composer(req)
 	return web.upgrade(req, srv)
 }
 

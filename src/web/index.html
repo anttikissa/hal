@@ -294,6 +294,8 @@ html.typing .App { position: absolute; }
 @media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
 @media (max-width: 40rem) { .Chat { --gutter: 1ch; } }
 .TouchDebug, .TouchCrosshair { display: none; }
+.ComposerDebug { position: fixed; top: env(safe-area-inset-top); left: 0; z-index: 10; max-width: 100vw; padding: 0 4px; font-size: 10px; background: var(--canvas); color: var(--quiet); pointer-events: none; }
+.ComposerDebug[data-bad="true"] { color: var(--error-fg); }
 .TouchHistory { width: min(60rem, calc(var(--app-width, 100vw) - 1rem)); }
 .TouchHistory[open] { display: flex; flex-direction: column; }
 .TouchHistory .top { flex-wrap: wrap; }
