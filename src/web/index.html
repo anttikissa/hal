@@ -399,7 +399,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .entry .actions.nudge-actions .go { right: 0; z-index: 1; background-color: inherit; }
   /* Each direction uses the transition of the state it enters: tucking
      slides behind Send, then hides; returning jumps back and fades in. */
-  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity 200ms var(--ease-out); }
+  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity 500ms ease-in-out; }
   .entry .actions.nudge-actions.tucked { width: 44px; }
   .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform 250ms var(--ease-out), opacity 0s 250ms; }
 }
