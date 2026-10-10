@@ -1,4 +1,4 @@
-import { readdir, stat } from 'fs/promises'
+import { lstat, readdir, stat } from 'fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'path'
 import { fileChanges } from './file-changes.ts'
 
@@ -19,6 +19,15 @@ async function repo(cwd: string): Promise<string | undefined> {
 	throw new Error(result.error)
 }
 
+async function gitPath(root: string, path: string): Promise<string> {
+	let at = root
+	for (let part of relative(root, path).split('/')) {
+		at = resolve(at, part)
+		try { if ((await lstat(at)).isSymbolicLink()) return at } catch (e: any) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return path; throw e }
+	}
+	return path
+}
+
 async function filter(cwd: string, names: string[], patterns = false): Promise<string[]> {
 	let candidates: { name: string; paths: string[] }[] = []
 	for (let name of names) {
@@ -30,7 +39,11 @@ async function filter(cwd: string, names: string[], patterns = false): Promise<s
 	if (!candidates.length) return []
 	let root = await fileTracking.repo(cwd)
 	if (!root) return candidates.map((c) => c.name)
-	let paths = [...new Set(candidates.flatMap((c) => patterns && /[*?[\]{}]/.test(c.name) ? [] : c.paths.filter((p) => fileTracking.inside(p, root))))]
+	for (let candidate of candidates) {
+		if (patterns && /[*?[\]{}]/.test(candidate.name)) { candidate.paths = []; continue }
+		candidate.paths = await Promise.all(candidate.paths.filter((p) => fileTracking.inside(p, root)).map((p) => candidate.paths.length > 1 ? fileTracking.gitPath(root, p) : p))
+	}
+	let paths = [...new Set(candidates.flatMap((c) => c.paths))]
 	let ignored = new Set<string>()
 	for (let at = 0; at < paths.length; at += 1024) {
 		let result = await fileChanges.git(root, ['check-ignore', '-z', '--stdin'], paths.slice(at, at + 1024).join('\0') + '\0')
@@ -75,4 +88,4 @@ async function glob(cwd: string, pattern: string): Promise<string[]> {
 	return found
 }
 
-export const fileTracking = { generatedDirs: ['node_modules'], excluded, inside, repo, filter, file, walk, glob }
+export const fileTracking = { generatedDirs: ['node_modules'], excluded, inside, repo, gitPath, filter, file, walk, glob }
