@@ -1,0 +1,7 @@
+{
+	title: 'Make rejected Action cards descriptive and visibly failed',
+	spec: 'Rejected native Action calls preserve their original raw input and complete error, but their tool-card headline identifies the intended action or leading purpose comment even when argument parsing fails. Readable fields may be recovered for display only from syntactically valid arguments, including a mistaken singleton object array; this never repairs or executes a rejected call. Both renderers share headline recovery and an explicit failure status for tool errors, including errors without an exit code or duration. Existing nonzero exit and interruption status retain precedence. Restored invariant: a collapsed failed tool card is visibly failed and does not hide rejected raw input when expanded.',
+	status: 'done',
+	needs: ['3fv', '18n'],
+	foldInto: ['18n']
+}

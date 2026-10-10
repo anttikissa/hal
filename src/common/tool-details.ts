@@ -16,6 +16,7 @@
 // Example: plugin.around(toolDetails, 'headline', (next, name, input) =>
 //   name === 'bash' ? { text: `$ ${input.command}`, key: 'command' } : next(name, input))
 
+import { action } from './action.ts'
 import { home } from './home.ts'
 import { titles } from './titles.ts'
 
@@ -54,6 +55,21 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 	// [tab, id] of each session the result names (tabs.label).
 	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)
 	switch (name) {
+		case 'Action': {
+			try {
+				let parsed = action.parse(input.action)
+				let purpose = /^\s*\/\*([\s\S]*?)\*\//.exec(parsed.raw)?.[1]?.trim()
+				let fields: Record<string, unknown> = {}
+				try {
+					let args = action.values(parsed.raw)
+					purpose = args.purpose ?? purpose
+					let first = args.values[0]
+					if (Array.isArray(first) && first.length === 1) first = first[0]
+					if (first && typeof first === 'object' && !Array.isArray(first)) fields = first as Record<string, unknown>
+				} catch {}
+				return { text: purpose ? oneLine(purpose) : titled(parsed.name, fields).text }
+			} catch { break }
+		}
 		case 'bash': {
 			let text = (str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)) || 'bash'
 			return { text: input.background === true ? `${text} (background)` : text, key: str('description') ? 'description' : undefined }

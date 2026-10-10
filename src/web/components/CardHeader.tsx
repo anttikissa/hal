@@ -10,11 +10,11 @@ import type { JSX } from '@solidjs/web'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
-	let exit = () => props.result && props.bash && !props.result.interrupted ? bashResult.status(props.result.output) : undefined
+export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
+	let exit = () => props.result ? bashResult.failure(props.result, props.bash) : undefined
 	let rest = () => props.result && (bashResult.interrupted(props.result) ?? bashResult.duration(props.result.ms))
 	// An EDIT's counts and changed lines, as in the terminal.
-	let stats = () => props.result?.diff ? diff.stats(props.result.diff) : undefined
+	let stats = () => props.result?.diff && !props.result.isError ? diff.stats(props.result.diff) : undefined
 	return (
 		<header class={['CardHeader', props.name === undefined ? 'who' : 'head']}>
 			<span class="flow">

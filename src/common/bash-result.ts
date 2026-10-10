@@ -22,6 +22,11 @@ function status(output: string): string | undefined {
 	return code && code !== '0' ? `exit ${code}` : undefined
 }
 
+function failure(result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash = false): string | undefined {
+	if (result.interrupted) return undefined
+	return (bash ? bashResult.status(result.output) : undefined) ?? (result.isError ? 'failed' : undefined)
+}
+
 // A call's wall time, when it is 1 s or more: 3.2s, 50.2s, 1m 05s;
 // `ticking` (a call still running) counts whole seconds: 3s.
 function duration(ms: number | undefined, ticking = false): string | undefined {
@@ -39,4 +44,4 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 }
 
 // Stored job labels identify literal Bash output and its original call.
-export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash (#t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, duration, interrupted }
+export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash (#t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, failure, duration, interrupted }
