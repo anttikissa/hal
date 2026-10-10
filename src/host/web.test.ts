@@ -1110,7 +1110,9 @@ browserTest('mobile disabled Nudge slides behind Send without replacing the edit
 				expect(after).toMatchObject({ front: true, opaque: true })
 			} else expect(after.field.width).toBe(before.field.width)
 			await input('first line\nsecond line\nthird line')
-			expect((await geometry()).same).toBe(true)
+			let tall = await geometry()
+			expect(tall.same).toBe(true)
+			if (touch) expect([tall.send.top, tall.send.bottom]).toEqual([tall.entry.top, tall.entry.bottom])
 			if (touch) {
 				let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
 				writeFileSync(`/tmp/hal-nudge-${width}.png`, Buffer.from(screenshot.result.data, 'base64'))
