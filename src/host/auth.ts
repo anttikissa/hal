@@ -91,6 +91,7 @@ function store(): Entry {
 		auth.state.stale.clear()
 		auth.state.retried.clear()
 		auth.state.chosen.clear()
+		auth.state.picked.clear()
 	}
 	if (!existsSync(path)) throw fail(`missing; ${LOG_IN}`)
 	// liveFile's own errors name the file and never quote its content.
@@ -162,7 +163,19 @@ function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 	let mine = who.session ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
 	let i = out.findIndex((a) => a.name === mine)
 	if (i > 0 && usage.keeps(kind, mine!, out[0]!.name)) out.unshift(...out.splice(i, 1))
-	return [...out, ...list.filter((a) => !subscription(a))]
+	out.push(...list.filter((a) => !subscription(a)))
+	// An account picked with /account goes first, whatever its usage.
+	let picked = who.session ? auth.state.picked.get(`${kind} ${who.session}`) : undefined
+	let j = out.findIndex((a) => a.name === picked)
+	if (j > 0) out.unshift(...out.splice(j, 1))
+	return out
+}
+
+// /account: session `session` uses account `name` from its next request
+// until it is limited or broken; then rotation moves on and forgets it.
+function choose(kind: Kind, session: string, name: string): void {
+	auth.state.picked.set(`${kind} ${session}`, name)
+	auth.state.chosen.set(`${kind} ${session}`, name)
 }
 
 // Whether pick() passes `account` over: its login is broken, or it is
@@ -201,6 +214,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 				let key = `${kind} ${who.session}`
 				let before = auth.state.chosen.get(key)
 				auth.state.chosen.set(key, account.name)
+				if (auth.state.picked.get(key) !== account.name) auth.state.picked.delete(key)
 				if (cred.type === 'api-key' && before !== account.name && skipped.length) {
 					// A notice that cannot be written must not cost the request.
 					try { auth.fallback(who.session, `using ${account.name}, a paid API key: no ${kind} subscription is usable (${skipped.join('; ')})`) } catch {}
@@ -389,6 +403,7 @@ export const auth = {
 	all,
 	accounts,
 	pickAccount,
+	choose,
 	skipped,
 	limitedUntil,
 	pick,
@@ -422,6 +437,8 @@ export const auth = {
 		retried: new Map<string, number>(),
 		// "kind session" -> the account the session's turn is on.
 		chosen: new Map<string, string>(),
+		// "kind session" -> the account /account picked, until rotation leaves it.
+		picked: new Map<string, string>(),
 		// Counts ended /login attempts, so blocked sessions look again.
 		logins: 0,
 	},

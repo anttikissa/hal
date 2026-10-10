@@ -388,6 +388,35 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 	}
 })
 
+test('an account picked with /account goes first until rotation leaves it', async () => {
+	let { limits } = await import('./limits.ts')
+	let { usage } = await import('./usage.ts')
+	let { paths } = await import('./paths.ts')
+	paths.init()
+	let used = (account: string, fraction: number) =>
+		usage.observe('anthropic', account, new Headers({ 'anthropic-ratelimit-unified-5h-utilization': String(fraction), 'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)) }))
+	try {
+		write({ anthropic: [{ accessToken: 'a-token', expires: later(), email: 'a@x' }, { accessToken: 'b-token', expires: later(), email: 'b@x' }, { apiKey: 'k-key' }] })
+		used('a@x', 0.9)
+		used('b@x', 0.1)
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('b@x')
+		// Picked, a busier account or a key wins over usage ranking.
+		auth.choose('anthropic', 's', 'a@x')
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
+		auth.choose('anthropic', 's', 'account 3')
+		expect((await auth.anthropic('m', { session: 's' })).value).toBe('k-key')
+		// Limited, it is left and the pick forgotten.
+		auth.choose('anthropic', 's', 'a@x')
+		limits.set(limits.key('anthropic/m', 'a@x'), now() + 3600_000)
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('b@x')
+		expect(auth.state.picked.has('anthropic s')).toBe(false)
+	} finally {
+		limits.close()
+		usage.close()
+	}
+})
+
 test('a model counts as limited while every account has spent a window all models share', async () => {
 	let { paths } = await import('./paths.ts')
 	let { usage } = await import('./usage.ts')
