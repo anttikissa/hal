@@ -25,16 +25,17 @@ function lastContext(records: HistoryRecord[]): number | undefined {
 	return undefined
 }
 
-// The session's subscription account for its next request (the one
-// auth would try first) and its windows; none for an API key or a
-// provider without logins.
+// The session's subscription account for its next request (the first
+// auth.pick would use, past broken and rate-limited ones) and its
+// windows; none for an API key or a provider without logins.
 function plan(id: string, model: string): Plan | undefined {
-	let kind = blocks.parseModelId(model)?.provider
+	let parsed = blocks.parseModelId(model)
+	let kind = parsed?.provider
 	if (kind !== 'anthropic' && kind !== 'openai') return undefined
 	try {
 		let { list } = auth.all(kind as Kind)
 		let subs = list.filter((a) => typeof a.entry.accessToken === 'string' && a.entry.accessToken)
-		let next = auth.pickAccount(kind as Kind, list, { session: id })[0]
+		let next = auth.pickAccount(kind as Kind, list, { session: id }).find((a) => !auth.skipped(kind as Kind, a, parsed!.model))
 		if (!next || !subs.includes(next)) return undefined
 		return { account: subs.indexOf(next) + 1, accounts: subs.length, key: subscriptions.key(kind, next.name) }
 	} catch {

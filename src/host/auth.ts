@@ -164,6 +164,12 @@ function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 	return [...out, ...list.filter((a) => !subscription(a))]
 }
 
+// Whether pick() passes `account` over: its login is broken, or it is
+// rate limited for `model`.
+function skipped(kind: Kind, account: Account, model?: string): boolean {
+	return auth.state.broken.has(fingerprint(account.entry)) || (!!model && limits.on(`${kind}/${model}`, account.name) > 0)
+}
+
 // A valid credential of `kind`, refreshing an expired token first, from
 // the first account (in order()) neither broken nor limited for
 // `model`. Concurrent callers share one refresh.
@@ -367,6 +373,7 @@ export const auth = {
 	all,
 	accounts,
 	pickAccount,
+	skipped,
 	limitedUntil,
 	pick,
 	anthropic: (model?: string, who?: For) => auth.pick('anthropic', model, who),
