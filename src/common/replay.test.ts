@@ -5,7 +5,7 @@ import { replay, type HistoryRecord, type TurnStatus } from './replay.ts'
 
 const ts = '2026-01-01T00:00:00.000Z'
 const user = (...blocks: UserBlock[]): HistoryRecord => ({ type: 'user', blocks, ts })
-const say = (text: string, at = ts): HistoryRecord => ({ type: 'user', blocks: [{ type: 'text', text }], ts: at })
+const say = (text: string, at = ts): HistoryRecord & { type: 'user' } => ({ type: 'user', blocks: [{ type: 'text', text }], ts: at })
 const block = (b: AssistantBlock): HistoryRecord => ({ type: 'assistant', block: b, ts })
 const end = (status: TurnStatus, more: { error?: string; pauseReason?: string } = {}): HistoryRecord => ({ type: 'turn_end', status, usage: {}, ts, ...more })
 const call = (id: string): AssistantBlock => ({ type: 'tool_call', id, name: 'bash', input: { cmd: 'ls' } })
@@ -93,9 +93,9 @@ test('notices appear once at their delivery point, not on later prompts', () => 
 		say('four'),
 	])
 	let texts = prompts(msgs)
-	expect(texts.filter((t) => t.includes('<meta>'))).toHaveLength(2)
+	expect(texts.filter((t) => t.includes('<hal-note>'))).toHaveLength(2)
 	expect(texts[1]).toContain('boom')
-	expect(texts.at(-1)).not.toContain('<meta>')
+	expect(texts.at(-1)).not.toContain('<hal-note>')
 })
 
 test('partial text of a canceled turn is kept; unsigned thinking is not replayed', () => {
@@ -202,18 +202,13 @@ test('editing a prompt that delivered a waiting message never makes it wait agai
 	expect(inbox.pending(replay.current(raw))).toEqual([])
 })
 
-test('changes reach the next request without a prompt, preserving each transition and its time', () => {
-	let change = (c: { cwd?: string; model?: string }): HistoryRecord => ({ type: 'change', ...c, ts })
+test('setting transitions do not duplicate rendered instruction update notices', () => {
 	let before = [say('hi'), { ...block({ type: 'text', text: 'hello' }), model: 'hal/intro' }]
-	let msgs = replay.toMessages([...before, change({ cwd: '/a' }), change({ model: 'anthropic/opus' }), change({ cwd: '/b' })])
-	let notice = prompts(msgs).at(-1)!
-	expect(msgs.at(-1)?.role).toBe('user')
-	expect(notice).toContain('model changed from hal/intro to anthropic/opus')
-	expect(notice).toContain('working directory is now /a')
-	expect(notice).toContain('working directory changed from /a to /b')
-	expect(notice).toContain(ts)
-	expect(notice.indexOf('/a')).toBeLessThan(notice.indexOf('anthropic/opus'))
-	expect(notice).not.toContain('interrupted')
+	let records: HistoryRecord[] = [...before, { type: 'change', cwd: '/a', model: 'anthropic/opus', ts }]
+	expect(replay.toMessages(records)).toEqual(replay.toMessages(before))
+	let messages = replay.toMessages([...records, { type: 'notice', text: 'New instructions for /a', sectionUpdate: true, ts }])
+	expect(prompts(messages).at(-1)).toContain('New instructions for /a')
+	expect(prompts(messages).at(-1)).not.toContain('changed from')
 })
 
 test('a change is not a turn: withoutCommands drops it', () => {
@@ -233,7 +228,7 @@ test('queued texts retain exact receipt timestamps independently of delivery and
 		],
 	}])
 	expect(prompts(msgs)).toEqual([
-		`[${day(deliveredAt)} ${hhmm(deliveredAt)}; queued at ${hhmm(queuedAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nThat was the situation then.\n\n[${hhmm(deliveredAt)}]\nA fresh message.\n\n[${hhmm(deliveredAt)}; message from reviewer; queued at ${hhmm(queuedAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nA queued agent message.`,
+		`[${day(deliveredAt)} ${hhmm(deliveredAt)}; queued at ${hhmm(queuedAt)}]\n<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nThat was the situation then.\n\n[${hhmm(deliveredAt)}]\nA fresh message.\n\n[${hhmm(deliveredAt)}; message from reviewer; queued at ${hhmm(queuedAt)}]\n<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nA queued agent message.`,
 	])
 })
 

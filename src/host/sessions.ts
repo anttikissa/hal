@@ -13,6 +13,7 @@ import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { promptCache } from './prompt-cache.ts'
 import { paths } from './paths.ts'
+import { sessionSettings } from './session-settings.ts'
 
 export type { SessionMeta } from '../common/session.ts'
 
@@ -131,6 +132,8 @@ function open(id: string): SessionMeta {
 	let existing = sessions.state.open.get(id)
 	if (existing) return existing
 	let meta = sessions.load(id, false)
+	try { if (sessionSettings.recover(meta)) liveFiles.save(meta) }
+	catch (error) { liveFiles.close(meta); throw error }
 	sessions.state.open.set(id, meta)
 	if (!meta.name?.trim() || meta.name === id) meta.name = names.fallback(id)
 	liveFiles.save(meta)

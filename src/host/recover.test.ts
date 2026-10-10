@@ -27,7 +27,7 @@ test('a queued message written 1 MB before the end of history runs after a host 
 	restartHost()
 	await turns.recover()
 	await until(() => calls.length === 1)
-	expect(texts(calls[0]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)])
+	expect(texts(calls[0]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`)])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => !turns.state.running.has(id))
 	// Nothing is left: the next host runs nothing and drops it as busy.

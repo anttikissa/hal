@@ -12,7 +12,7 @@ function letter(row: RebaseRow): string {
 	if (row.kind === 'assistant') return 'a'
 	if (row.kind === 'thinking') return 'r'
 	if (['queued', 'advisory', 'interjecting', 'steering'].includes(row.kind)) return 'm'
-	if (['command', 'output', 'compact', 'reset'].includes(row.kind)) return 's'
+	if (['command', 'output', 'compact', 'reset', 'note', 'instructions', 'settings'].includes(row.kind)) return 's'
 	return 't'
 }
 

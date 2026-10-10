@@ -104,7 +104,8 @@ test('/cd changes the session cwd for every follower; a relative path resolves f
 	expect(a.of('turn-start')).toEqual([])
 	// Commands and what they said are shown, not sent to the model.
 	expect(b.views.get(id)!.items.filter((i) => i.type === 'command').map((i: any) => i.text)).toEqual(['/cd projects/a', '/cd ~/projection'])
-	expect(JSON.stringify(await history.messages(id))).toContain(`The working directory changed from ${work}`)
+	expect(JSON.stringify(await history.messages(id))).not.toContain('The working directory changed from')
+	expect(history.readSync(id).filter((r) => r.type === 'change').map((r) => r.cwd)).toEqual([`${work}/projects/a`, `${work}/projection`])
 	expect((await opened(id)).views.get(id)).toEqual(b.views.get(id))
 })
 

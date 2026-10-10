@@ -88,9 +88,9 @@ export type HistoryRecord = Numbered &
 	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told as a notice on its next request.
-	| { type: 'change'; cwd?: string; model?: string; previous?: { cwd?: string; model?: string }; ts: string }
+	| { type: 'change'; cwd?: string; model?: string; autoclose?: boolean; previous?: { cwd?: string; model?: string; autoclose?: boolean }; ts: string }
 	// Host facts, delivered only at a frozen request boundary (nvm).
-	| { type: 'notice'; text: string; ts: string }
+	| { type: 'notice'; text: string; rendered?: true; source?: number; sectionUpdate?: true; ts: string }
 	// Observed changes during bash, not proof of authorship; not provider input.
 	| { type: 'file_changes'; toolId: string; call?: number; cwd: string; files: FileChange[]; ts: string }
 	// One provider round's own usage (task c4), after its blocks: the
@@ -102,12 +102,12 @@ export type HistoryRecord = Numbered &
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
-	| ({ type: 'rebase'; transition?: string; ts: string } & import('./rebase.ts').RebasePlan)
+	| ({ type: 'rebase'; transition?: string; contextChanged?: true; ts: string } & import('./rebase.ts').RebasePlan)
 	| { type: 'reset'; transition?: string; ts: string }
 	)
 
 // Copied records retain their original session through repeated forks (v6).
-type Numbered = { n?: number; originSession?: string }
+type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
@@ -128,6 +128,7 @@ function asAction(b: ToolCallBlock): ToolCallBlock {
 }
 
 function toMessages(records: HistoryRecord[]): Message[] {
+	let materialized = new Set(records.flatMap((r) => r.type === 'notice' && r.source !== undefined ? [r.source] : []))
 	records = replay.current(records)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let boundary = records[at]
@@ -182,7 +183,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		let text = modelNotices.text(r, known)
-		if (text && !delivered.has(r.n ?? i + 1)) facts.push({ source: r.n ?? i + 1, text })
+		if (text && !materialized.has(r.n ?? i + 1) && !delivered.has(r.n ?? i + 1)) facts.push({ source: r.n ?? i + 1, text })
 		if (r.type === 'notice' || r.type === 'change' || r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) continue
@@ -221,9 +222,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			// texts (several when it delivers the inbox) are one block, each
 			// under its own header. Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
-			let nudge = r.naming ? `\n<meta>Current session name: ${JSON.stringify(r.naming.name)}.${r.naming.eligible ? ' If this is a placeholder or no longer describes the main task, use the command tool to run /rename with a specific 3–7-word human-readable description, at most 60 Unicode characters, in the user language. Do not copy the user request or rename merely to polish wording. Never emit XML rename tags. Do not answer this metadata.' : ''}</meta>` : ''
 			let text = texts.map((b) => `${header(r.ts, ref(r, replay.letter(b), r.blocks.indexOf(b)), replay.tags(b))}\n${replay.framed(b)}`).join('\n\n')
-			out.push({ role: 'user', blocks: [{ type: 'text', text: `${text}${nudge}` }, ...images.map((b) => ({ ...b }))] })
+			out.push({ role: 'user', blocks: [{ type: 'text', text }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
 	if (!pending.length) flush()
@@ -236,7 +236,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 // A prompt text as the model reads it, below its header: a next-round
 // message also says it needn't drop its work for it.
 function framed(b: UserText): string {
-	let text = b.queuedAt === undefined ? b.text : `<meta>Message was queued at ${b.queuedAt}, take that into account when reading it.</meta>\n${b.text}`
+	let text = b.queuedAt === undefined ? b.text : `<hal-note>Message was queued at ${b.queuedAt}, take that into account when reading it.</hal-note>\n${b.text}`
 	return b.advisory ? `${replay.nextRoundNotice}\n${text}` : text
 }
 
@@ -275,6 +275,8 @@ function lastPrompt(records: HistoryRecord[]): number {
 // Inbox messages a dropped prompt delivered leave with it: the edit
 // replaced them, so they never wait again.
 function current(records: HistoryRecord[]): HistoryRecord[] {
+	let materialized = new Set(records.flatMap((r) => r.type === 'notice' && r.source !== undefined ? [r.source] : []))
+	if (materialized.size) records = records.map((r) => materialized.has(r.n!) && !r.noticeSuppressed ? { ...r, noticeSuppressed: true } : r)
 	records = rebase.latest(records)
 	if (!records.some((r) => r.type === 'rebase' || (r.type === 'user' && r.replaces))) return records
 	let out: HistoryRecord[] = []
@@ -353,7 +355,7 @@ function markCache(records: HistoryRecord[], messages: Message[], model?: string
 
 export const replay = {
 	// Told with a next-round message delivered while the model works.
-	nextRoundNotice: '<meta>Another session sent this while you were working. No need to stop your task for it.</meta>',
+	nextRoundNotice: '<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
 	toMessages,
 	markCache,
 	asAction,

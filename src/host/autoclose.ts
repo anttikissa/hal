@@ -17,6 +17,7 @@ function set(id: string, value: boolean): void {
 	if (previous === value) return
 	meta.autoclose = value
 	liveFiles.save(meta)
+	history.append(id, { type: 'change', autoclose: value, previous: { autoclose: previous } })
 	let text = `Autoclose: ${previous ? 'on' : 'off'} → ${value ? 'on' : 'off'}`
 	let { n, ts } = history.append(id, { type: 'output', text })
 	host.broadcast(id, { type: 'output', sessionId: id, text, n, ts })

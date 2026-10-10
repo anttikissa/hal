@@ -53,7 +53,7 @@ test('an advisory message reaches a working session with its next request, frame
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)
-	expect(text).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<meta>[^\\n]+</meta>\\ncheck the tests$`))
+	expect(text).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<hal-note>[^\\n]+</hal-note>\\ncheck the tests$`))
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go' },
@@ -99,7 +99,7 @@ test('emergency is read like the user steering; queue waits for the turn to end'
 	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
 	await until(() => queued() >= 0)
 	expect(lastText(queued())).toMatch(`message from ${heard(by)}`)
-	expect(lastText(queued())).toContain(`]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)
+	expect(lastText(queued())).toContain(`]\n<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`)
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {
@@ -135,7 +135,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === next + 2)
 	let delivered = lastText(next + 1)
-	expect(delivered).toMatch(/\[[^\]\n]*message from [^\n]+\]\n<meta>[^\n]+<\/meta>\nfyi\n\n\[[^\]\n]*\]\nand hury$/)
+	expect(delivered).toMatch(/\[[^\]\n]*message from [^\n]+\]\n<hal-note>[^\n]+<\/hal-note>\nfyi\n\n\[[^\]\n]*\]\nand hury$/)
 	// Up edits the human's text, not the later one from the other session.
 	expect(amend.begin(c.views.get(a)!, '')?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
