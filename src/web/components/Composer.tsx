@@ -154,7 +154,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		let b = () => BUTTONS[p.kind]
 		let show = () => explains.matches && setCaption(b().caption)
 		return (
-			<button type="button" class={p.class} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onClick={p.onClick}>
+			<button type="button" class={p.class} data-diagnostic-action={p.kind} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onClick={p.onClick}>
 				<Icon name={b().icon} /><small>{b().name}</small>
 			</button>
 		)
@@ -219,7 +219,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				/>
 				{/* Keep the keyboard: the tap leaves the draft focused, and the
 				    draft takes the focus back when the picker closes. */}
-				<button type="button" class="attach" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
+				<button type="button" class="attach" data-diagnostic-action="attach" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
 					<Icon name="plus" />
 				</button>
 				{/* Our own placeholder, so it can erase and fade at its edges. */}

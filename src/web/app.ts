@@ -288,20 +288,21 @@ function modalPick(index: number): void {
 // Sends what the box holds (Enter, or the Send button) as `delivery`
 // says (task csn); a command runs at once.
 function send(delivery: Delivery = 'steer'): void {
-	let st = app.state
-	let id = app.sessionId()
-	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { queuedPrompt.save(); return }
+	diagnostics.record('send', delivery); diagnostics.report()
+	let st = app.state, id = app.sessionId()
+	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { diagnostics.record('outcome', 'queue-edit'); queuedPrompt.save(); return }
 	if (view.commandDraft(st.text) && delivery === 'queue') delivery = 'steer'
 	if (id && uploads.pending(id)) {
-		uploads.wait(id, delivery)
+		diagnostics.record('outcome', 'upload'); uploads.wait(id, delivery)
 		return app.setNotice('sending once the upload is done')
 	}
-	if (restart.typed(st.text) || folds.typed(st.text)) return app.input('')
+	if (restart.typed(st.text) || folds.typed(st.text)) { diagnostics.record('outcome', 'client-command'); return app.input('') }
 	let { command, notice, keep } = view.submit(st.view, st.text, delivery)
 	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string; rewind?: number } | undefined
 	// A prompt shows at once and waits, pending, for the host.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
 	else if (c) connection.send(c)
+	diagnostics.record('outcome', c?.type === 'submit' ? 'submitted' : c ? 'command' : keep ? 'refused' : 'empty')
 	if (!keep) {
 		// A recalled entry was sent, or an edit set the draft aside: the user's own text comes back.
 		let back = (c?.type === 'submit' && recall.stop(c.sessionId)) || st.view.editing?.aside
