@@ -28,6 +28,7 @@ async function cleanup(args: string[], current: string) {
 			pages.state.marks.delete(pages.marksPath(id))
 		}
 		history.state.cache.delete(id)
+		pages.state.rebased.delete(id)
 		changes.state.cache.delete(id)
 		findIndex.state.db?.query('DELETE FROM marks WHERE sessionId=?').run(id)
 	})

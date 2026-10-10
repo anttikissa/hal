@@ -20,10 +20,10 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let records = [...tail.earlier, ...tail.history]
 	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
 	if (pages.marks(id).rebase !== undefined) {
-		let raw = history.readSync(id)
-		snap.rewrites = rebaseDisplay.dividers(raw)
-		let kept = new Set(replay.current(raw).map((r) => r.n))
-		snap.dropped = replay.current(raw.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !kept.has(r.n) ? [r.n] : [])
+		let c = pages.rebased(id)
+		c.display ??= { rewrites: rebaseDisplay.dividers(c.records), dropped: replay.current(c.records.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !c.current.has(r.n) ? [r.n] : []) }
+		snap.rewrites = c.display.rewrites
+		snap.dropped = c.display.dropped
 	}
 	let hold = queueEdits.state.get(id)
 	if (hold) snap.queueHold = hold.message
