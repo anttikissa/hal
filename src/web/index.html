@@ -395,13 +395,15 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 }
 @media (pointer: coarse) {
   .entry .actions.nudge-actions { position: relative; isolation: isolate; flex: none; width: 88px; min-height: 44px; background-color: inherit; }
-  .entry .actions.nudge-actions button { position: absolute; top: 0; width: 44px; height: 44px; }
+  .entry .actions.nudge-actions button { position: absolute; top: 0; bottom: 0; width: 44px; }
   .entry .actions.nudge-actions .go { right: 0; z-index: 1; background-color: inherit; }
-  .entry .actions.nudge-actions .toggle { right: 44px; transition: transform 120ms var(--ease-out); }
+  /* Each direction uses the transition of the state it enters: tucking
+     slides behind Send, then hides; returning jumps back and fades in. */
+  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity 200ms var(--ease-out); }
   .entry .actions.nudge-actions.tucked { width: 44px; }
-  .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); }
+  .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform 250ms var(--ease-out), opacity 0s 250ms; }
 }
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry .actions.nudge-actions .toggle, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry .actions.nudge-actions .toggle, .entry .actions.nudge-actions.tucked .toggle, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
 .Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
 /* Options: a hairline in the card's color; the chosen one solid in it,
