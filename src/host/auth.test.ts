@@ -401,13 +401,13 @@ test('an account picked with /account goes first until rotation leaves it', asyn
 		used('b@x', 0.1)
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('b@x')
 		// Picked, a busier account or a key wins over usage ranking.
-		auth.choose('anthropic', 's', 'a@x')
+		auth.state.picked.set('anthropic s', 'a@x')
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
-		auth.choose('anthropic', 's', 'account 3')
+		auth.state.picked.set('anthropic s', 'account 3')
 		expect((await auth.anthropic('m', { session: 's' })).value).toBe('k-key')
 		// Limited, it is left and the pick forgotten.
-		auth.choose('anthropic', 's', 'a@x')
+		auth.state.picked.set('anthropic s', 'a@x')
 		limits.set(limits.key('anthropic/m', 'a@x'), now() + 3600_000)
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('b@x')
 		expect(auth.state.picked.has('anthropic s')).toBe(false)

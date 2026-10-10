@@ -171,13 +171,6 @@ function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 	return out
 }
 
-// /account: session `session` uses account `name` from its next request
-// until it is limited or broken; then rotation moves on and forgets it.
-function choose(kind: Kind, session: string, name: string): void {
-	auth.state.picked.set(`${kind} ${session}`, name)
-	auth.state.chosen.set(`${kind} ${session}`, name)
-}
-
 // Whether pick() passes `account` over: its login is broken, or it is
 // rate limited for `model`.
 function skipped(kind: Kind, account: Account, model?: string): boolean {
@@ -403,7 +396,6 @@ export const auth = {
 	all,
 	accounts,
 	pickAccount,
-	choose,
 	skipped,
 	limitedUntil,
 	pick,
