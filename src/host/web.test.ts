@@ -1078,7 +1078,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 	}
 }, 20_000)
 
-browserTest('mobile disabled Nudge slides below Send without replacing the editor', async () => {
+browserTest('mobile disabled Nudge slides behind Send without replacing the editor', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1088,23 +1088,26 @@ browserTest('mobile disabled Nudge slides below Send without replacing the edito
 		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(1, 1); t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
 		let geometry = () => b.evaluate(`(() => {
 			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect().toJSON();
-			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled };
+			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled, front: document.elementFromPoint(rect('.go').x + 22, rect('.go').y + 22)?.closest('button') === q('.go'), opaque: getComputedStyle(q('.go')).backgroundColor === getComputedStyle(q('.entry')).backgroundColor };
 		})()`)
 		for (let [width, height, touch] of [[390, 760, true], [844, 390, true], [1280, 800, false]] as const) {
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+			await b.waitFor(`Math.abs(document.querySelector('.App').getBoundingClientRect().height - ${height}) < 2`)
 			await input('')
 			await b.waitFor("document.querySelector('.toggle').getBoundingClientRect().right <= document.querySelector('.go').getBoundingClientRect().left + 1")
 			await b.evaluate("window.oldEditor = document.querySelector('textarea')")
 			let before = await geometry()
 			await input('draft')
-			if (touch) await b.waitFor("document.querySelector('.toggle').getBoundingClientRect().top >= document.querySelector('.go').getBoundingClientRect().bottom - 1")
+			if (touch) await b.waitFor("document.querySelector('.actions').classList.contains('tucked') && document.querySelector('.toggle').getAnimations().length === 0")
 			let after = await geometry()
 			expect(after).toMatchObject({ same: true, focused: true, cursor: 1, disabled: true })
 			if (touch) {
 				expect(after.field.width - before.field.width).toBeCloseTo(44, 0)
 				expect(after.nudge.left).toBeCloseTo(after.send.left, 0)
-				expect(after.nudge.bottom).toBeLessThanOrEqual(after.entry.bottom + 1)
+				expect(after.nudge.top).toBe(after.send.top)
+				expect(after.entry.height).toBe(before.entry.height)
+				expect(after).toMatchObject({ front: true, opaque: true })
 			} else expect(after.field.width).toBe(before.field.width)
 			await input('first line\nsecond line\nthird line')
 			expect((await geometry()).same).toBe(true)
