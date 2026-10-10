@@ -65,8 +65,12 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	// the caret stays where the user is typing.
 	let picker!: HTMLInputElement
 	let typing = false
+	// The box can hold text no handled input event reported (keys.ts does
+	// the same on keydown): the example and Send must use what it shows.
+	let sync = () => { if (input && input.value !== app.state.text) app.input(input.value) }
 	let box = (e: HTMLTextAreaElement) => {
 		input = e
+		for (let name of ['input', 'compositionend', 'keyup', 'blur']) e.addEventListener(name, sync)
 		keys.insert = insert
 		app.rewrite = (change) => {
 			if (document.activeElement !== e) return app.input(change({ text: e.value, cursor: e.value.length }).text)
@@ -99,6 +103,13 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		// vanish (task 6cm). Refocusing restores the caret.
 		let closed = () => { if (document.activeElement === input) { input.blur(); input.focus() } }
 		document.addEventListener('close', closed, true)
+		// iOS dictation writes the box without input events; its caret moves.
+		let moved = () => { if (document.activeElement === input) sync() }
+		document.addEventListener('selectionchange', moved)
+		// A disabled button swallows its own pointer events; capture on the
+		// document syncs first, so Send is enabled before the tap ends.
+		document.addEventListener('pointerdown', sync, true)
+		document.addEventListener('touchstart', sync, { capture: true, passive: true })
 		// A new width can change how the text wraps.
 		let width = 0
 		let resized = new ResizeObserver(() => { if (input.clientWidth !== width) { width = input.clientWidth; fit() } })
@@ -107,6 +118,9 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		return () => {
 			resized.disconnect()
 			document.removeEventListener('close', closed, true)
+			document.removeEventListener('selectionchange', moved)
+			document.removeEventListener('pointerdown', sync, true)
+			document.removeEventListener('touchstart', sync, true)
 			document.removeEventListener('pointerdown', outside, true)
 			document.removeEventListener('focusin', outside)
 			document.removeEventListener('focusout', leaving)
@@ -176,6 +190,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	let action = (): keyof typeof BUTTONS => queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
 	let send = (queue = false) => {
 		let steer = busy() && !queue
+		sync()
 		app.send(queue ? 'queue' : 'steer')
 		if (steer || !matchMedia('(pointer: coarse)').matches) input.focus()
 		else input.blur()

@@ -113,6 +113,17 @@ function init(): void {
 			if (name === 'input' || name === 'compositionend' || name === 'keyup') later(name)
 		}, { capture: true, passive: true })
 	}
+	// Every touch, pointer, click and focus change on the page, with its target.
+	let label = (t: EventTarget | null) => t instanceof Element ? `${t.tagName.toLowerCase()}${t.className && typeof t.className === 'string' ? `.${t.className.trim().split(/\s+/).join('.')}` : ''}${t.getAttribute('aria-label') ? `[${t.getAttribute('aria-label')}]` : ''}${(t as HTMLButtonElement).disabled ? ':disabled' : ''}` : String(t)
+	for (let name of ['touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel', 'click', 'focusin', 'focusout', 'contextmenu']) {
+		document.addEventListener(name, (e) => {
+			let p = e instanceof PointerEvent || e instanceof MouseEvent ? e : typeof TouchEvent !== 'undefined' && e instanceof TouchEvent ? e.changedTouches[0] : undefined
+			record(name, { target: label(e.target), path: e.composedPath().slice(0, 4).map(label), xy: p && [Math.round(p.clientX), Math.round(p.clientY)], pointerType: e instanceof PointerEvent ? e.pointerType : undefined, prevented: e.defaultPrevented })
+			setTimeout(() => record(`${name}+task`, { prevented: e.defaultPrevented }), 0)
+		}, { capture: true, passive: true })
+	}
+	addEventListener('error', (e: ErrorEvent) => record('error', { message: e.message, file: e.filename, line: e.lineno, col: e.colno, stack: e.error?.stack }))
+	addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => record('rejection', { reason: String(e.reason), stack: e.reason?.stack }))
 	document.addEventListener('selectionchange', () => { if (document.activeElement?.closest('.Composer .field')) record('selectionchange') }, { passive: true })
 	// Example and layout changes the events above don't cause (timers, host events, resizes).
 	let watched = new WeakSet<Element>()
