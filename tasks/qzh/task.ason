@@ -1,6 +1,6 @@
 {
 	title: 'Action leniency only for observed frequent misuse',
-	spec: 'An action accepts an alternative argument form only when real models (session histories) send it by mistake often; one-off or guessed forms stay errors with usage, from which models recover. INSPECT therefore takes only { what, scope, fields }: plain words such as INSPECT "tabs" (seen once, claude-opus-5-5, 9 Oct) are errors.',
+	spec: 'An action accepts an alternative argument form only when real models (session histories) send it by mistake, as approved by the user; guessed forms stay errors with usage. INSPECT accepts the lone word tabs (quoted or bare), meaning { what: sessions, scope: all }: claude-opus-5-5 sent INSPECT "tabs" on 9 Oct. Any other plain word is an error.',
 	status: 'done',
 	notes: [
 		'Provenance (session histories, 9 Oct): the only plain-word INSPECT a real model sent was INSPECT "tabs" (claude-opus-5-5); all other calls used objects (claude-opus-5-5, gpt-6-astra). Other words and aliases are guesses.',

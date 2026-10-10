@@ -1,8 +1,11 @@
 // Read-only view of this host, its open tabs and models (tasks ed, jm),
 // without session histories or client addresses/credentials. A bare
 // call describes only the caller; scope and fields widen or narrow it.
+// INSPECT "tabs" lists every tab: models sent it by mistake (task qzh).
+import { action } from '../../common/action.ts'
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'
+import { actions } from '../actions.ts'
 import { auth } from '../auth.ts'
 import { clients, type ClientRecord } from '../clients.ts'
 import { host } from '../host.ts'
@@ -81,7 +84,14 @@ function table(fields: string[], rows: string[][]): string {
 
 export const tool: Tool = {
 	name: 'inspect',
-	action: { summary: 'agent internals' },
+	action: {
+		summary: 'agent internals',
+		resolve: (raw) => {
+			let { values } = action.values(raw)
+			if (values.length === 1 && values[0] === 'tabs') return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
+			return { name: 'inspect', input: actions.generic(tool, raw) }
+		},
+	},
 	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the caller\'s session). scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
