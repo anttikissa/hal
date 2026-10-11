@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto'
 import { dirname, resolve } from 'path'
 import type { Plugin } from '../src/host/plugins.ts'
 import { tools, type Tool, type ToolContext } from '../src/host/tools.ts'
-import { actions } from '../src/host/actions.ts'
+import { nativeTool } from '../src/host/native-tool.ts'
 import { approval } from '../src/host/approval.ts'
 import { fileChanges } from '../src/host/file-changes.ts'
 import { lease, type Change } from '../src/host/lease.ts'
@@ -60,7 +60,7 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
  while (i < lines.length) {
   const line = lines[i]!.trim(), at = i + 1
   if (!line) { i++; continue }
-  // Actions after the last block run, in order, once the edit succeeds.
+  // Calls after the last block run, in order, once the edit succeeds.
   if (edits.length && known(lines[i]!)) {
    let chunk: string[] = []
    for (const l of lines.slice(i)) {
@@ -131,14 +131,14 @@ export const io = {
 const fields: Record<string, unknown> = { path: { type: 'string' }, old: { type: 'string', minLength: 1 }, count: { type: 'integer', minimum: 1 }, new: { type: 'string' }, hash: { type: 'string', minLength: 1 }, lines: { type: 'array', items: { type: 'string' } }, insert: { type: 'integer', minimum: 1 }, create: { const: true }, range: { anyOf: [{ type: 'string' }, { type: 'integer' }, { type: 'array', items: { type: 'integer' }, minItems: 1, maxItems: 2 }] } }
 export const multiedit: Tool = {
 	name: 'edit', description: help,
-  action: { summary: 'Change, insert, delete, create or rewrite files in one atomic batch; HELP EDIT for the block format', usage: ['EDIT /* purpose */', '<path>@<version> replace A-B', '!!NEW', '...', '!!END'], resolve(raw, ctx) {
+  syntax: { summary: 'Change, insert, delete, create or rewrite files in one atomic batch; HELP EDIT for the block format', usage: ['EDIT /* purpose */', '<path>@<version> replace A-B', '!!NEW', '...', '!!END'], resolve(raw, ctx) {
   const { edits, then, purpose } = parseBlocks(raw)
-  // Validate trailing actions before anything is written; one that needs
+  // Validate trailing calls before anything is written; one that needs
   // approval must come as its own call, so approval still sees it.
   for (const text of then ?? []) {
    let r: { name: string; input: Record<string, unknown> }
-    try { r = actions.resolve(text, ctx) } catch (e: any) { throw new Error(`EDIT: the action after the last !!END is invalid; nothing written: ${e.message}`) }
-   if (approval.form({ type: 'tool_call', id: 'then', name: r.name, input: r.input } as any)) throw new Error(`EDIT: the ${r.name.toUpperCase()} after the last !!END needs approval; nothing written. Send it as its own Action call.`)
+    try { r = nativeTool.resolve(text, ctx) } catch (e: any) { throw new Error(`EDIT: the tool call after the last !!END is invalid; nothing written: ${e.message}`) }
+   if (approval.form({ type: 'tool_call', id: 'then', name: r.name, input: r.input } as any)) throw new Error(`EDIT: the ${r.name.toUpperCase()} after the last !!END needs approval; nothing written. Send it as its own call.`)
   }
   return { name: multiedit.name, input: { edits, ...(then?.length && { then }), ...(purpose && { description: purpose }) } }
  } },
@@ -257,10 +257,10 @@ ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recove
 		let out = result!
 		const then = Array.isArray(input.then) ? input.then as string[] : []
 		for (const [k, text] of then.entries()) {
-			const r = actions.resolve(text, ctx)
+			const r = nativeTool.resolve(text, ctx)
 			const res = await tools.run({ type: 'tool_call', id: `${ctx.callId ?? 'edit'}-then${k + 1}`, name: r.name, input: r.input } as any, ctx)
 			out += `${N}== then ${text.trim().split(N)[0]!.slice(0, 160)} ==${N}${res.output}`
-			if (res.isError && k + 1 < then.length) { out += `${N}The ${then.length - k - 1} action(s) after it did not run.`; break }
+			if (res.isError && k + 1 < then.length) { out += `${N}The ${then.length - k - 1} call(s) after it did not run.`; break }
 		}
 		return out
 	},
@@ -287,7 +287,7 @@ export default function (plugin: Plugin) {
 	})
 	plugin.after(tools, 'all', (found) => { found.delete('write'); found.set('edit', multiedit); const read = found.get('read'); if (read) found.set('read', { ...read, description: read.description + ' READ takes one path; make independent reads as parallel calls.' }) })
  plugin.around(systemPrompt, 'assemble', (next, input, ...args) => {
-  const example = ['Example action text (markers start their lines):', 'EDIT' + (input.interactive !== false ? ' /* Rename handler */' : ''), 'src/main.ts@4d9ej replace 3-4', '!!NEW', 'function process(x) {', '\treturn x + 1', '!!END', 'src/main.ts@4d9ej delete 9-9'].join('\n')
+  const example = ['Example call text (markers start their lines):', 'EDIT' + (input.interactive !== false ? ' /* Rename handler */' : ''), 'src/main.ts@4d9ej replace 3-4', '!!NEW', 'function process(x) {', '\treturn x + 1', '!!END', 'src/main.ts@4d9ej delete 9-9'].join('\n')
   const editGuide = `- Use EDIT for all file changes. ${help.split(N).join(N + '  ')}\n${example}\n` + (input.interactive !== false ? '- Give interactive EDIT batches a brief purpose comment.\n' : '')
   return next(input, ...args).replace(/(# EDIT\n)[\s\S]*?(?=\n\n# |$)/, (_, head) => head + editGuide.trimEnd()).replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# |$)/, '')
  })

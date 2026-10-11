@@ -5,7 +5,7 @@
 // the log shows no use, and this file once none is left.
 // Enable with plugins/edit-quirks.ts: export { default } from '../extras/edit-quirks.ts'
 import type { Plugin } from '../src/host/plugins.ts'
-import { actions } from '../src/host/actions.ts'
+import { nativeTool } from '../src/host/native-tool.ts'
 import { tools, type CallContext } from '../src/host/tools.ts'
 import { diag } from '../src/host/diag.ts'
 
@@ -13,9 +13,9 @@ import { diag } from '../src/host/diag.ts'
 const sonnet = ['anthropic/claude-sonnet-5-5*']
 export const quirks = {
 	shell: sonnet, // "$ command" lines after the last block run as BASH
-	markup: [...sonnet, 'anthropic/claude-opus-5-5*'], // <invoke> call markup after the last block runs its actions
+	markup: [...sonnet, 'anthropic/claude-opus-5-5*'], // <invoke> call markup after the last block runs its calls
 	stray: sonnet, // a lone stray word, or a doubled !!END, after the last block is dropped
-	emptyAction: sonnet, // a bare action name, or a trailing EDIT with no operations, is dropped
+	emptyCall: sonnet, // a bare tool name, or a trailing EDIT with no operations, is dropped
 	emptyReplace: sonnet, // a replace with empty !!OLD and !!NEW is dropped
 	barePath: sonnet, // "path@" with no version means "path"
 }
@@ -56,7 +56,7 @@ export function fix(text: string, error: string): [string, Quirk] | undefined {
 		}
 		if (/^<\/?(invoke|parameter|function_calls|antml:)/.test(line)) {
 			const rest = raw.slice(k).join(N), held: string[] = []
-			for (const m of rest.matchAll(/<(?:antml:)?parameter name="action">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g)) if (m[1]!.trim()) held.push(m[1]!.trim())
+			for (const m of rest.matchAll(/<(?:antml:)?parameter name="(?:action|cmd)">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g)) if (m[1]!.trim()) held.push(m[1]!.trim())
 			return [[...raw.slice(0, k), ...held].join(N), 'markup']
 		}
 		if (/^\S+$/.test(line) && !/[@/.]/.test(line)) {
@@ -69,18 +69,18 @@ export function fix(text: string, error: string): [string, Quirk] | undefined {
 		const h = headers.find((i) => / replace\s*$/.test(lines[i]!) && lines[i + 1] === '!!OLD' && lines[i + 2] === '!!NEW' && lines[i + 3] === '!!END')
 		return h === undefined ? undefined : [raw.filter((_, j) => j < h || j > h + 3).join(N), 'emptyReplace']
 	}
-	if (error.startsWith('EDIT: the action after the last !!END is invalid')) {
+	if (error.startsWith('EDIT: the tool call after the last !!END is invalid')) {
 		const last = headers.at(-1) ?? -1, alone = (i: number) => { const n = lines.slice(i + 1).find((l) => l.trim()); return n === undefined || known(n) }
 		const bare = out.find((i) => i > last && /^[A-Z][A-Z_]*$/.test(lines[i]!.trim()) && lines[i]!.trim() !== 'EDIT' && known(lines[i]!.trim()) && alone(i))
-		if (bare !== undefined) return [raw.filter((_, j) => j !== bare).join(N), 'emptyAction']
+		if (bare !== undefined) return [raw.filter((_, j) => j !== bare).join(N), 'emptyCall']
 		// An EDIT after the last operation header takes the rest of the text.
 		const edit = out.find((i) => i > last && /^EDIT\b/.test(lines[i]!))
-		if (edit !== undefined) return [raw.slice(0, edit).join(N), 'emptyAction']
+		if (edit !== undefined) return [raw.slice(0, edit).join(N), 'emptyCall']
 	}
 }
 
 export default function (plugin: Plugin) {
-	plugin.around(actions, 'resolve', (next, text, ctx) => {
+	plugin.around(nativeTool, 'resolve', (next, text, ctx) => {
 		if (typeof text !== 'string' || !/^\s*EDIT(?=\s|\/\*|$)/.test(text) || !(Object.keys(quirks) as Quirk[]).some((q) => applies(q, ctx))) return next(text, ctx)
 		const fired: Quirk[] = []
 		let current = text, first: unknown

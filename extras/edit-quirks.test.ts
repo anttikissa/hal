@@ -5,7 +5,7 @@ import { dirname } from 'path'
 import multiedit from './multiedit.ts'
 import quirks from './edit-quirks.ts'
 import { plugins, type Loaded } from '../src/host/plugins.ts'
-import { actions } from '../src/host/actions.ts'
+import { nativeTool } from '../src/host/native-tool.ts'
 import { diag } from '../src/host/diag.ts'
 import { testHome, useHost } from '../src/host/host-fixture.test.ts'
 
@@ -18,7 +18,7 @@ afterEach(() => { for (const e of entries.reverse()) plugins.deactivate(e) })
 
 const head = ['EDIT', 'a replace', '!!OLD', 'x', '!!NEW', 'y', '!!END']
 const at = (model?: string) => (model ? { cwd: testHome(), sessionId: 's1', model } : undefined)
-const resolve = (lines: string[], model?: string) => actions.resolve(lines.join('\n'), at(model)).input
+const resolve = (lines: string[], model?: string) => nativeTool.resolve(lines.join('\n'), at(model)).input
 const sonnet = 'anthropic/claude-sonnet-5-5'
 const edits = [{ path: 'a', old: 'x', new: 'y' }]
 
@@ -26,7 +26,7 @@ test('each quirk rescues Sonnet; other models and unknown sessions get the stric
 	mkdirSync(dirname(diag.file()), { recursive: true })
 	const cases: [string[], unknown][] = [
 		[['$ npm test 2>&1 | tail -15', '$ echo "ok"'], { edits, then: ['BASH "npm test 2>&1 | tail -15"', 'BASH "echo \\"ok\\""'] }],
-		[['<invoke name="Action">', '<parameter name="action">BASH "npm test"</parameter>', '</invoke>'], { edits, then: ['BASH "npm test"'] }],
+		[['<invoke name="tool">', '<parameter name="cmd">BASH "npm test"</parameter>', '</invoke>'], { edits, then: ['BASH "npm test"'] }],
 		[['approve', 'BASH "npm test"'], { edits, then: ['BASH "npm test"'] }],
 		[['That', '!!END'], { edits }],
 		[['EDIT', '<br>', '!!END'], { edits }],

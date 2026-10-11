@@ -579,7 +579,7 @@ export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 }
 
 /** Parse one ASON value starting exactly at `pos`, ignoring what follows:
- *  for grammars that embed ASON values (src/common/action.ts). */
+ *  for grammars that embed ASON values (src/common/call-text.ts). */
 export function parseAt(str: string, pos: number): { value: AsonValue; end: number } {
 	const ctx: Ctx = { buf: str, pos }
 	const value = parseAny(ctx)

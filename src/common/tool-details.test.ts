@@ -9,15 +9,15 @@ test('bash reads like the terminal; odd arguments show once, plumbing never', ()
 	expect(toolDetails.lines('notify', { text: 'Done' })).toEqual([])
 })
 
-test('rejected Actions recover display-only purpose and task names without hiding raw input', () => {
-	let malformed = { action: 'BASH /* Diagnose tool failures */ "rg "unreadable" fixture.ts"' }
-	expect(toolDetails.headline('Action', malformed).text).toBe('Diagnose tool failures')
-	expect(toolDetails.lines('Action', malformed).join('\n')).toContain(malformed.action)
-	let spawn = { action: 'SPAWN [{ name: "Clean oversized histories", task: "Work" }]' }
-	expect(toolDetails.headline('Action', spawn).text).toBe('Spawn "Clean oversized histories"')
-	expect(toolDetails.lines('Action', spawn).join('\n')).toContain(spawn.action)
-	expect(toolDetails.headline('Action', { action: 'SPAWN [{ name:' }).text).toBe('Spawn subagent')
-	expect(toolDetails.headline('Action', { action: {} }).text).toBe('Action')
+test('rejected tool calls recover display-only purpose and task names without hiding raw input', () => {
+	let malformed = { cmd: 'BASH /* Diagnose tool failures */ "rg "unreadable" fixture.ts"' }
+	expect(toolDetails.headline('tool', malformed).text).toBe('Diagnose tool failures')
+	expect(toolDetails.lines('tool', malformed).join('\n')).toContain(malformed.cmd)
+	let spawn = { cmd: 'SPAWN [{ name: "Clean oversized histories", task: "Work" }]' }
+	expect(toolDetails.headline('tool', spawn).text).toBe('Spawn "Clean oversized histories"')
+	expect(toolDetails.lines('tool', spawn).join('\n')).toContain(spawn.cmd)
+	expect(toolDetails.headline('tool', { cmd: 'SPAWN [{ name:' }).text).toBe('Spawn subagent')
+	expect(toolDetails.headline('tool', { cmd: {} }).text).toBe('Tool')
 })
 
 test('inspect heads with every argument once; unknown ones still show', () => {

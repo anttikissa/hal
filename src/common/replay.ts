@@ -119,12 +119,12 @@ type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
 //
 // Only the records after the latest compact or reset count; a compact's
 // summary is the first user message.
-// Providers see one tool, Action (task 3fv): a call goes back as the
-// text the model wrote, and a call from before Action as the
-// equivalent NAME { fields } text.
-function asAction(b: ToolCallBlock): ToolCallBlock {
-	let text = b.action ?? `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`
-	return { type: 'tool_call', id: b.id, name: 'Action', input: { action: text } }
+// Providers see one tool, `tool` (task 3fv): a call goes back as the
+// text the model wrote (an unresolved one as its cmd), and a call from
+// before the one native tool as the equivalent NAME { fields } text.
+function asNative(b: ToolCallBlock): ToolCallBlock {
+	let text = b.cmd ?? (b.name === 'tool' && typeof b.input.cmd === 'string' ? b.input.cmd : `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
+	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
 }
 
 function toMessages(records: HistoryRecord[]): Message[] {
@@ -203,7 +203,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
 			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
-			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asAction({ type: 'tool_call', id: b.id, name: b.name, input: b.input, ...(b.action !== undefined && { action: b.action }) }) : { ...b }] })
+			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asNative({ type: 'tool_call', id: b.id, name: b.name, input: b.input, ...(b.cmd !== undefined && { cmd: b.cmd }) }) : { ...b }] })
 		} else {
 			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
@@ -358,7 +358,7 @@ export const replay = {
 	nextRoundNotice: '<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
 	toMessages,
 	markCache,
-	asAction,
+	asNative,
 	framed,
 	letter,
 	tags,

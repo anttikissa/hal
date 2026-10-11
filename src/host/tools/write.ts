@@ -11,7 +11,7 @@ import type { Tool } from '../tools.ts'
 export const tool: Tool = {
 	name: 'write',
 	description: 'Create a file or replace its whole content, creating missing directories. Returns the new editing lease. For changes to part of a file, use EDIT.',
-	action: { summary: false, usage: ['WRITE "<path>" "<content>"'] },
+	syntax: { summary: false, usage: ['WRITE "<path>" "<content>"'] },
 	parameters: {
 		type: 'object',
 		properties: {

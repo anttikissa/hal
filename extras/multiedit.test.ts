@@ -78,7 +78,7 @@ test('removing whole lines by text, even with !!OLD alone, leaves no blank line;
  expect(readFileSync(a, 'utf8')).toBe(['1', '3', 'x'].join(nl) + nl)
 })
 
-test('an action after the last block runs once the edit is written; a failed edit runs none', async () => {
+test('a call after the last block runs once the edit is written; a failed edit runs none', async () => {
  const a = file('a', 'old' + nl)
  const { edits, then } = parseBlocks(['', 'a replace', '!!OLD', 'old', '!!NEW', 'new', '!!END', 'BASH "cat a"'].join(nl))
  expect(then).toEqual(['BASH "cat a"'])
@@ -96,7 +96,7 @@ test('a file takes line operations and text replaces together; text applies afte
 
 test('the parser is strict: stray text after the last block is an error naming its line', () => {
  const head = ['', 'a replace', '!!OLD', 'x', '!!NEW', 'y', '!!END']
- for (const tail of [['<invoke name="Action">'], ['$ npm test'], ['approve', 'BASH "npm test"'], ['!!END'], ['some prose here']]) expect(() => parseBlocks([...head, ...tail].join(nl))).toThrow('EDIT line 8')
+ for (const tail of [['<invoke name="tool">'], ['$ npm test'], ['approve', 'BASH "npm test"'], ['!!END'], ['some prose here']]) expect(() => parseBlocks([...head, ...tail].join(nl))).toThrow('EDIT line 8')
  expect(() => parseBlocks([...head, 'f.ts replace', '!!OLD', '!!NEW', '!!END'].join(nl))).toThrow('needs nonempty old text')
  expect(parseBlocks([...head, 'BASH "ls"'].join(nl)).then).toEqual(['BASH "ls"'])
 })

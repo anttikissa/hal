@@ -1,4 +1,4 @@
-// Action (task 3fv): the grammar, leases and multi-range EDIT through
+// The native tool (task 3fv): the grammar, leases and multi-range EDIT through
 // the real tool modules.
 
 import { expect, test } from 'bun:test'
@@ -7,7 +7,7 @@ import { relative } from 'path'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
 import { tools } from './tools.ts'
 import { edit } from './tools/edit.ts'
@@ -15,7 +15,7 @@ import { edit } from './tools/edit.ts'
 useHost()
 
 async function act(id: string, text: string): Promise<{ output: string; isError?: boolean }> {
-	let call = actions.arrived({ type: 'tool_call', id: 'c', name: 'Action', input: { action: text } })
+	let call = nativeTool.arrived({ type: 'tool_call', id: 'c', name: 'tool', input: { cmd: text } })
 	return tools.run(call, { cwd: testHome(), signal: new AbortController().signal, sessionId: id })
 }
 const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
@@ -27,38 +27,54 @@ test('shared help and ordinary validation do not teach purpose comments', async 
 		expect(result.output).not.toContain('/*')
 		expect(result.output).toContain(text.startsWith('HELP') ? text.slice(5) || 'BASH' : 'Usage:')
 	}
-	expect(JSON.stringify(actions.def())).not.toContain('/*')
+	expect(JSON.stringify(nativeTool.def())).not.toContain('/*')
 })
 
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {
-	expect(actions.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2000, modifies: ['a.ts'], description: 'Check it' } })
-	expect(actions.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
-	expect(actions.resolve('READ https://example.com/x:80')).toEqual({ name: 'read_url', input: { url: 'https://example.com/x:80' } })
-	expect(actions.resolve('COMMAND /rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
-	expect(actions.resolve('HELP edit')).toEqual({ name: 'help', input: { name: 'edit' } })
+	expect(nativeTool.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2000, modifies: ['a.ts'], description: 'Check it' } })
+	expect(nativeTool.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
+	expect(nativeTool.resolve('READ https://example.com/x:80')).toEqual({ name: 'read_url', input: { url: 'https://example.com/x:80' } })
+	expect(nativeTool.resolve('COMMAND /rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
+	expect(nativeTool.resolve('HELP edit')).toEqual({ name: 'help', input: { name: 'edit' } })
 	// An unclosed comment ends at its line, but never stands in for arguments.
-	expect(actions.resolve('BASH "ls" /* list')).toEqual({ name: 'bash', input: { command: 'ls', description: 'list' } })
-	expect(() => actions.resolve('EDIT /* fix "a.ts@abcde" { range: 1, lines: [] }')).toThrow(/unclosed/)
-	expect(() => actions.resolve('ls -l')).toThrow(/unknown action LS/)
-	expect(() => actions.resolve('READ a.ts\nREAD b.ts')).toThrow(/one action per call/)
-	expect(() => actions.resolve('BASH "ls" { evil: 1 }')).toThrow(/no field 'evil'/)
-	// Every action takes an optional purpose: a comment or a description field, even where the tool keeps none.
-	expect(actions.resolve('SEND "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
-	expect(actions.resolve('SEND /* Ask */ "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi', description: 'Ask' } })
-	expect(actions.resolve('NOTIFY /* Ping */ "done" { description: "Ping" }')).toEqual({ name: 'notify', input: { text: 'done' } })
+	expect(nativeTool.resolve('BASH "ls" /* list')).toEqual({ name: 'bash', input: { command: 'ls', description: 'list' } })
+	expect(() => nativeTool.resolve('EDIT /* fix "a.ts@abcde" { range: 1, lines: [] }')).toThrow(/unclosed/)
+	expect(() => nativeTool.resolve('ls -l')).toThrow(/unknown tool LS/)
+	expect(() => nativeTool.resolve('READ a.ts\nREAD b.ts')).toThrow(/one tool per call/)
+	expect(() => nativeTool.resolve('BASH "ls" { evil: 1 }')).toThrow(/no field 'evil'/)
+	// Every tool takes an optional purpose: a comment or a description field, even where the tool keeps none.
+	expect(nativeTool.resolve('SEND "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
+	expect(nativeTool.resolve('SEND /* Ask */ "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi', description: 'Ask' } })
+	expect(nativeTool.resolve('NOTIFY /* Ping */ "done" { description: "Ping" }')).toEqual({ name: 'notify', input: { text: 'done' } })
 	// Field names and forms models were seen to send, accepted silently.
-	expect(actions.resolve('SPAWN [{ title: "x", goal: "y" }]')).toEqual({ name: 'spawn', input: { name: 'x', task: 'y' } })
-	expect(actions.resolve('SEND { session: "2", text: "hi" }')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
-	expect(actions.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
-	expect(actions.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({ name: 'wait', input: {} })
-	expect(actions.resolve('INSPECT sessions all "tab,id"')).toEqual({ name: 'inspect', input: { what: 'sessions', scope: 'all', fields: 'tab,id' } })
-	expect(actions.resolve('READ "a.ts" "b.ts:3-4"')).toEqual({ name: 'read', input: { paths: [{ path: 'a.ts' }, { path: 'b.ts', offset: 3, limit: 2 }] } })
-	expect(() => actions.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
+	expect(nativeTool.resolve('SPAWN [{ title: "x", goal: "y" }]')).toEqual({ name: 'spawn', input: { name: 'x', task: 'y' } })
+	expect(nativeTool.resolve('SEND { session: "2", text: "hi" }')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
+	expect(nativeTool.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
+	expect(nativeTool.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({ name: 'wait', input: {} })
+	expect(nativeTool.resolve('INSPECT sessions all "tab,id"')).toEqual({ name: 'inspect', input: { what: 'sessions', scope: 'all', fields: 'tab,id' } })
+	expect(nativeTool.resolve('READ "a.ts" "b.ts:3-4"')).toEqual({ name: 'read', input: { paths: [{ path: 'a.ts' }, { path: 'b.ts', offset: 3, limit: 2 }] } })
+	expect(() => nativeTool.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
 })
 
-test('replay sends calls back as Action text, old calls as their equivalent', () => {
-	expect(replay.asAction({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, action: 'BASH "ls"' }).input).toEqual({ action: 'BASH "ls"' })
-	expect(replay.asAction({ type: 'tool_call', id: 'a', name: 'read', input: { path: 'x' } }).input).toEqual({ action: "READ { path: 'x' }" })
+test('replay sends calls back as their cmd text, old calls as their equivalent', () => {
+	expect(replay.asNative({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' }).input).toEqual({ cmd: 'BASH "ls"' })
+	expect(replay.asNative({ type: 'tool_call', id: 'a', name: 'read', input: { path: 'x' } }).input).toEqual({ cmd: "READ { path: 'x' }" })
+})
+
+test('histories from before the rename replay as tool calls the current tool accepts (task wev)', () => {
+	let ts = '2026-10-01T12:00:00.000Z'
+	let records = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'go' }], ts, n: 1 },
+		{ type: 'assistant', block: { type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, action: 'BASH "ls"' }, ts, n: 2 },
+		{ type: 'assistant', block: { type: 'tool_call', id: 'b', name: 'Action', input: { action: 'NOPE 1' } }, ts, n: 3 },
+		{ type: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'x' }, { type: 'tool_result', id: 'b', output: 'err', isError: true }], ts, n: 4 },
+	].map((r) => history.check(r))
+	expect(records[1]!.type === 'assistant' && records[1]!.block).toEqual({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' })
+	let blocks = replay.toMessages(records).flatMap((m): any[] => m.blocks)
+	expect(blocks.filter((b) => b.type === 'tool_call')).toEqual([
+		{ type: 'tool_call', id: 'a', name: 'tool', input: { cmd: 'BASH "ls"' } },
+		{ type: 'tool_call', id: 'b', name: 'tool', input: { cmd: 'NOPE 1' } },
+	])
 })
 
 test('READ leases the whole file; ranges clamp; EDIT applies every range to the leased version at once', async () => {
@@ -93,7 +109,7 @@ test("a round's EDITs of one lease run as one write; an overlap fails them all",
 	writeFileSync(path, 'a\nb\nc\nd\n')
 	let ctx = { cwd: testHome(), signal: new AbortController().signal, sessionId: id }
 	let round = async (...texts: string[]) => {
-		let calls = texts.map((t, i) => ({ ...actions.arrived({ type: 'tool_call', id: `c${i}`, name: 'Action', input: { action: t } }), id: `c${i}` }))
+		let calls = texts.map((t, i) => ({ ...nativeTool.arrived({ type: 'tool_call', id: `c${i}`, name: 'tool', input: { cmd: t } }), id: `c${i}` }))
 		let run = await edit.batch(calls, testHome(), id, (c) => tools.run(c, ctx))
 		return Promise.all(calls.map(run))
 	}
@@ -122,9 +138,9 @@ test('EDIT keeps CRLF, a BOM and a missing final newline; WRITE creates director
 	expect(written.output).toBe(`== WRITE deep/new.txt@${lease(`${testHome()}/deep/new.txt`)} ok: 2 lines, 4 bytes ==`)
 })
 
-test('file Actions work outside tracking scope and snapshot eligible literal filenames', async () => {
+test('file tools work outside tracking scope and snapshot eligible literal filenames', async () => {
 	let id = created(client(), testHome())
-	let dir = mkdtempSync(`${process.cwd()}/.hal-actions-`)
+	let dir = mkdtempSync(`${process.cwd()}/.hal-tools-`)
 	let path = `${dir}/deep/file[1].txt`
 	try {
 		let written = await act(id, `WRITE ${JSON.stringify(path)} ${JSON.stringify('old\n')}`)
@@ -164,7 +180,7 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	expect(help).toContain('BASH "<command>"')
 	expect(help).toContain('timeout (integer): Seconds')
 	expect((await act(id, 'HELP')).output).toContain('EDIT "<path>@<hash>"')
-	let summary = actions.summary()
+	let summary = nativeTool.summary()
 	expect(summary).toContain('\tWAIT for a child report')
 	expect(summary).not.toContain('BASH')
 })

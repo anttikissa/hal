@@ -16,7 +16,7 @@
 // Example: plugin.around(toolDetails, 'headline', (next, name, input) =>
 //   name === 'bash' ? { text: `$ ${input.command}`, key: 'command' } : next(name, input))
 
-import { action } from './action.ts'
+import { callText } from './call-text.ts'
 import { home } from './home.ts'
 import { titles } from './titles.ts'
 
@@ -55,13 +55,13 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 	// [tab, id] of each session the result names (tabs.label).
 	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)
 	switch (name) {
-		case 'Action': {
+		case 'tool': {
 			try {
-				let parsed = action.parse(input.action)
+				let parsed = callText.parse(input.cmd)
 				let purpose = /^\s*\/\*([\s\S]*?)\*\//.exec(parsed.raw)?.[1]?.trim()
 				let fields: Record<string, unknown> = {}
 				try {
-					let args = action.values(parsed.raw)
+					let args = callText.values(parsed.raw)
 					purpose = args.purpose ?? purpose
 					let first = args.values[0]
 					if (Array.isArray(first) && first.length === 1) first = first[0]

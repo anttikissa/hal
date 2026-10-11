@@ -34,7 +34,7 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 import { edit } from './tools/edit.ts'
 import { bash } from './tools/bash.ts'
 // A running turn settles when runTurn returns (task hp).
@@ -183,13 +183,13 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		let scripted = synthetic.find(model)
 		if (!scripted) {
 			let { system, cacheId } = promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
-			let defs = [actions.def()]
+			let defs = [nativeTool.def()]
 			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id, cacheId }, signal)) {
 				if (signal.aborted) return
 				if (event.type !== 'tool_call') { yield event; continue }
-				let call = actions.arrived({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })
+				let call = nativeTool.arrived({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })
 				if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
 				yield { ...call, type: 'tool_call' }
 			}

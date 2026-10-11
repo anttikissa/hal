@@ -17,7 +17,7 @@ import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { toolPresentations } from './tool-presentation.ts'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
@@ -40,17 +40,17 @@ export type ToolOutput = string | { text: string; image: { mediaType: string; da
 // (prompts.amend); built-in tools are listed in toolDetails.readOnly
 // instead, so clients know too (task 26q). run returns the output; throwing makes an error
 // result with the message.
-// `action`: how the Action grammar reaches this tool (actions.ts, task
+// `syntax`: how call text reaches this tool (native-tool.ts, task
 // aks). `summary` follows the name in $tools_summary (false: the system
 // prompt explains the tool already); `usage` lists exact syntax lines
 // for HELP (default: made from the schema); `positional` names the
 // fields string arguments fill, in order (default: required fields);
-// `fields` words a field for Action where it differs from the schema;
+// `fields` words a field for HELP where it differs from the schema;
 // `resolve` maps the text after the name to a call when the grammar is
 // special, possibly of another tool. `aliases` silently accepts field
 // names models were seen to send: each maps to the real field, or null
 // to drop it; HELP never shows them.
-export type ActionSpec = {
+export type SyntaxSpec = {
 	summary?: string | false
 	usage?: string[]
 	positional?: string[]
@@ -63,7 +63,7 @@ export type Tool<Output = string> = {
 	description: string
 	parameters: ToolDef['inputSchema']
 	readOnly?: true
-	action?: ActionSpec
+	syntax?: SyntaxSpec
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
 
@@ -111,12 +111,12 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
 		// A provider's call whose input was not a JSON object.
 		if (typeof call.input.invalidJson === 'string') throw new Error(`your input for '${call.name}' was not a valid JSON object (cut off or malformed); call it again with valid arguments. Long inputs with many escapes (big heredocs, nested quotes) fail often: send a smaller, simpler call, such as one edit or one short script per call. Input received: ${call.input.invalidJson}`)
-		// A native Action call that did not resolve as it arrived
-		// (actions.arrived): say why. Never run it, since approval saw
+		// A native call that did not resolve as it arrived
+		// (nativeTool.arrived): say why. Never run it, since approval saw
 		// only the unresolved call.
-		if (call.name === actions.name) {
-			actions.resolve(call.input.action, ctx)
-			throw new Error('the action did not resolve when it arrived; send it again')
+		if (call.name === nativeTool.name) {
+			nativeTool.resolve(call.input.cmd, ctx)
+			throw new Error('the tool call did not resolve when it arrived; send it again')
 		}
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)

@@ -112,6 +112,19 @@ order in both clients; it is separate from delivery eligibility.
   tool, exporting `tool`; `src/host/tools.ts` is the registry). Calls run
   concurrently, results in call order; wait starts after the rest
   (task asp).
+- Providers see one native tool, `tool` { cmd: string } (task 3fv,
+  `src/host/native-tool.ts`); `cmd` is a command string such as
+  `READ "a.ts"` in the grammar of `src/common/call-text.ts`, and each
+  tool module declares its own `syntax`. Everything is called a tool:
+  there is no second concept for the native one. Why, in short: a
+  format more compact than JSON schemas; tool changes (plugins, HELP,
+  per-session) never touch the native tool list, so the prompt cache
+  survives; one concept for users and plugin writers; HELP discloses
+  syntax on demand; calls read like terminal lines in the UI and
+  history; Hal's own parser accepts clear misuse a provider schema
+  would reject; one tool works across providers (README.md, Tools).
+  Histories from before the rename (native `Action` { action }, block
+  field `action`) are read as the current form (task wev).
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.

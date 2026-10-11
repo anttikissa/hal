@@ -5,7 +5,7 @@ import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../../common/attachments.ts'
-import { action } from '../../common/action.ts'
+import { callText } from '../../common/call-text.ts'
 import { blobs } from '../blobs.ts'
 import { lease } from '../lease.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
@@ -20,8 +20,8 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 // READ "path" (the first tools.readLines lines), "path:10" (line 10),
 // "path:10-20", "path:1-" (to the end); an http(s) URL reads through read_url.
 // Undocumented: several local paths read each, as paths.
-function resolveAction(raw: string): { name: string; input: Record<string, unknown> } {
-	let { values } = action.values(raw)
+function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
+	let { values } = callText.values(raw)
 	if (values.length > 1 && values.every((v) => typeof v === 'string' && v && !/^https?:\/\//i.test(v))) return { name: 'read', input: { paths: values.map((v) => one(v as string).input) } }
 	let [path] = values
 	if (values.length !== 1 || typeof path !== 'string' || !path) throw new Error(`READ takes one path, e.g. READ "src/main.ts:1-100"; got ${values.length} arguments`)
@@ -43,11 +43,11 @@ export const tool: Tool<ToolOutput> = {
 		'Read a text file or image, or list a directory. Images are attached directly. Relative paths start from the working directory. ' +
 		'A text file comes as numbered lines under its editing lease, == READ <path>@<hash> ==; the hash covers the whole file, even when a range is shown, and EDIT needs it. ' +
 		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue.',
-	action: {
+	syntax: {
 		summary: false,
 		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
 		fields: { offset: 'First line, 1-based: the :start of READ "path:start-end"', limit: 'Number of lines: from :start-end' },
-		resolve: resolveAction,
+		resolve: resolveCall,
 	},
 	parameters: {
 		type: 'object',

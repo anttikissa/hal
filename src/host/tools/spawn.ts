@@ -21,7 +21,7 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 
 export const tool: Tool = {
 	name: 'spawn',
-	action: { summary: 'a child session', aliases: { title: 'name', goal: 'task' } },
+	syntax: { summary: 'a child session', aliases: { title: 'name', goal: 'task' } },
 	description:
 		'Open a session in the tab after this one.',
 	parameters: {

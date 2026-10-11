@@ -2,7 +2,7 @@
 // recovering unfinished turns on the next host.
 
 import { expect, spyOn, test } from 'bun:test'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
 import { calls, client, created, fakeStream, testHome, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
@@ -12,13 +12,13 @@ import { turns } from './turns.ts'
 
 useHost()
 
-test('action resolution hears the session and model when a call arrives and when it runs', async () => {
-	let seen: unknown[] = [], spy = spyOn(actions, 'resolve').mockImplementation(((text: unknown, ctx: unknown) => { seen.push(ctx); throw new Error('nope') }) as any)
+test('call resolution hears the session and model when a call arrives and when it runs', async () => {
+	let seen: unknown[] = [], spy = spyOn(nativeTool, 'resolve').mockImplementation(((text: unknown, ctx: unknown) => { seen.push(ctx); throw new Error('nope') }) as any)
 	try {
 		let c = client(), id = created(c, testHome())
 		c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'x', name: 'Action', input: { action: 'NOPE' } }, { type: 'done', reason: 'tool_use' })
+		calls[0]!.push({ type: 'tool_call', id: 'x', name: 'tool', input: { cmd: 'NOPE' } }, { type: 'done', reason: 'tool_use' })
 		await until(() => calls.length === 2)
 		expect(seen).toEqual([{ cwd: testHome(), sessionId: id, model: 'fake/m1' }, expect.objectContaining({ cwd: testHome(), sessionId: id, model: 'fake/m1' })])
 	} finally { spy.mockRestore() }
@@ -110,7 +110,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	b.conn.send({ type: 'open', sessionId: id })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I note?' })
 	await until(() => calls.length === 1)
-	expect(calls[0]!.input.tools.map((t: any) => t.name)).toEqual(['Action'])
+	expect(calls[0]!.input.tools.map((t: any) => t.name)).toEqual(['tool'])
 	calls[0]!.push({ type: 'text', text: 'Let me look.' }, readCall(), { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(1)).toEqual([
@@ -118,7 +118,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 			role: 'assistant',
 			blocks: [
 				{ type: 'text', text: 'Let me look.' },
-				{ type: 'tool_call', id: 't1', name: 'Action', input: { action: "READ { path: 'notes.txt' }" } },
+				{ type: 'tool_call', id: 't1', name: 'tool', input: { cmd: "READ { path: 'notes.txt' }" } },
 			],
 		},
 		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: milk }] },

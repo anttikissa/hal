@@ -8,7 +8,7 @@
 
 import { readFile } from 'fs/promises'
 import { resolve } from 'path'
-import { action } from '../../common/action.ts'
+import { callText } from '../../common/call-text.ts'
 import { fileChanges } from '../file-changes.ts'
 import { type Change, lease } from '../lease.ts'
 import type { ToolCallBlock, ToolResultBlock } from '../../common/blocks.ts'
@@ -39,12 +39,12 @@ export const tool: Tool<ToolOutput> = {
 		'Replace line ranges of a text file, all at once. Name the lease path@hash from READ; when the file has changed since, nothing is written and the lines now around each range are shown. ' +
 		'Ranges are 1-based, inclusive, and all refer to the leased version; they may not overlap. lines replaces the range, one string per line; lines: [] deletes it. ' +
 		'A start past the end appends. The result is the new lease and the lines around each change, numbered as in the new file.',
-	action: {
+	syntax: {
 		summary: false,
 		usage: [usage],
 		fields: { lease: 'path@hash from READ', edits: 'The { range, lines } objects after the lease' },
 		resolve(raw) {
-			let { values, purpose, unclosed } = action.values(raw)
+			let { values, purpose, unclosed } = callText.values(raw)
 			let [named, ...edits] = values
 			let cut = unclosed ? ' (an unclosed /* comment ran to its line end; close it with */)' : ''
 			if (typeof named !== 'string' || !named.includes('@')) throw new Error(`EDIT starts with the lease from READ, "path@hash"${cut}. Usage: ${usage}`)

@@ -101,9 +101,9 @@ requirements.
 
 ## Design checks
 
-- Add capabilities only as actions behind the one Action tool, never
+- Add capabilities only as tools behind the one native `tool`, never
   as new native tool descriptions, including in plugins and benchmark
-  builds. Actions disclose detail progressively (HELP) and let the tool
+  builds. Tools disclose detail progressively (HELP) and let the tool
   set change without busting the prompt cache.
 - Configure with command-line flags (e.g. `hal -p --no-user`), not
   environment variables: env vars are hard to discover and cumbersome

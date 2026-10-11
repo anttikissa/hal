@@ -2,7 +2,7 @@
 // It takes the same host path as a typed command, including history,
 // broadcast, metadata changes and error reporting.
 // Tasks: w9, svt.
-import { action } from '../../common/action.ts'
+import { callText } from '../../common/call-text.ts'
 import { commands } from '../commands.ts'
 import { slash } from '../slash.ts'
 import type { Tool } from '../tools.ts'
@@ -11,13 +11,13 @@ const prevented = new Set(['login', 'quit', 'suspend', 'queue', 'send'])
 
 export const tool: Tool = {
 	name: 'command',
-	action: {
+	syntax: {
 		summary: 'run slash command like "/cd ../other"',
 		usage: ['COMMAND /<name> [<args>]', 'COMMAND "/<name> [<args>]"'],
 		// The rest of the line as typed, unless quoted.
 		resolve(raw) {
 			let text = raw.trim()
-			let command = /^["'`]/.test(text) ? action.values(raw).values[0] : text
+			let command = /^["'`]/.test(text) ? callText.values(raw).values[0] : text
 			if (typeof command !== 'string' || !command) throw new Error('COMMAND needs a slash command, e.g. COMMAND /cd ../other')
 			return { name: 'command', input: { command } }
 		},

@@ -1,6 +1,6 @@
 {
-	title: 'Every action takes an optional purpose',
-	spec: 'Every action takes an optional purpose, in the one form all actions share: a leading /* purpose */ comment. A tool with a description field stores it there (BASH and SEND head their cards with it; SEND carries it as Sender.summary); elsewhere it is dropped. No action requires one, and usage lines leave the description field to the comment form. A description field sent in an object argument is accepted silently for every action, even one with no description field. Invariant restored: SEND without a purpose sends (it required description, the cause of most failed SENDs).',
+	title: 'Every tool takes an optional purpose',
+	spec: 'Every tool takes an optional purpose, in the one form all tools share: a leading /* purpose */ comment. A tool with a description field stores it there (BASH and SEND head their cards with it; SEND carries it as Sender.summary); elsewhere it is dropped. No tool requires one, and usage lines leave the description field to the comment form. A description field sent in an object argument is accepted silently for every tool, even one with no description field. Invariant restored: SEND without a purpose sends (it required description, the cause of most failed SENDs).',
 	status: 'done',
 	needs: ['rj'],
 	foldInto: ['rj']

@@ -61,6 +61,33 @@ For a supervised, headless host running from an editable checkout, see
 [Linux server setup](SERVER.md), including the systemd user-service
 installer and a declarative NixOS example.
 
+# Tools
+
+Hal describes tools a little differently from a typical harness. The
+model sees one native tool, `tool`, whose only input is a command
+string: `{ cmd: 'READ "src/main.ts:1-80"' }` or `{ cmd: 'BASH "ls -l"' }`.
+Hal parses the string and runs the named tool from `src/host/tools/`.
+Why:
+
+1. Tools are described in a format more compact than JSON schemas.
+2. Tool descriptions can change (plugins, HELP, per-session changes)
+   without breaking the prompt cache, because the native tool list
+   stays fixed.
+3. Users and plugin writers deal with one concept, tools, instead of
+   two.
+4. Progressive disclosure: `HELP <NAME>` gives the full syntax on
+   demand, which keeps prompt tokens low.
+5. Calls are short, terminal-like strings that read well in the UI
+   and in history.
+6. Hal parses the string itself, so it can accept clear misuse
+   (aliases, lenient forms) instead of the provider rejecting the call
+   against a schema.
+7. The same native tool works across providers (Anthropic, OpenAI,
+   ...).
+
+`scripts/tool` shows the system prompt and lets you type calls as the
+model would.
+
 # Plugins
 
 Hal has no plugin API in the usual sense. Each module exports one

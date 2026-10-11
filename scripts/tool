@@ -1,25 +1,25 @@
 #!/usr/bin/env bun
 // The model's view for a human (task 2m1): prints the system prompt Hal
-// would send for this directory, then runs typed Action text (BASH "ls",
+// would send for this directory, then runs typed tool calls (BASH "ls",
 // READ a.ts, HELP...) through the real tool modules and prints what the
-// model would get. An incomplete action continues on the next line; an
+// model would get. An incomplete call continues on the next line; an
 // empty line sends it anyway. A throwaway Hal home with a copy of this
 // home's config keeps real sessions untouched. The host runs in-process,
 // so COMMAND, SEND, SPAWN, WAIT and INSPECT act on that throwaway home
-// and its "action" session; SPAWN starts a real, billed model run.
+// and its "tool" session; SPAWN starts a real, billed model run.
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { createInterface } from 'readline/promises'
 import { paths } from '../src/host/paths.ts'
 
 const config = paths.configFile()
-process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-action-`)
+process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-tool-`)
 if (existsSync(config)) copyFileSync(config, paths.configFile())
 process.on('exit', () => rmSync(process.env.HAL_HOME!, { recursive: true, force: true }))
 
 // host.ts first: loading auth.ts first trips the host's import cycle.
 await import('../src/host/host.ts')
-const { actions } = await import('../src/host/actions.ts')
+const { nativeTool } = await import('../src/host/native-tool.ts')
 const { models } = await import('../src/host/models.ts')
 const { systemPrompt } = await import('../src/host/system-prompt.ts')
 const { tools } = await import('../src/host/tools.ts')
@@ -27,11 +27,11 @@ const { tools } = await import('../src/host/tools.ts')
 const cwd = process.cwd()
 const { ason } = await import('../src/common/ason.ts')
 // Tools record file changes with their session.
-mkdirSync(paths.sessionDir('action'), { recursive: true })
-writeFileSync(`${paths.sessionDir('action')}/session.ason`, ason.stringify({ id: 'action', cwd, model: models.defaultModel(), createdAt: new Date().toISOString() }) + '\n')
+mkdirSync(paths.sessionDir('tool'), { recursive: true })
+writeFileSync(`${paths.sessionDir('tool')}/session.ason`, ason.stringify({ id: 'tool', cwd, model: models.defaultModel(), createdAt: new Date().toISOString() }) + '\n')
 const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY)
-console.log(systemPrompt.build({ cwd, model: models.defaultModel(), now: Date.now(), sessionId: 'action' }))
-console.log(`\n-- Tool: ${actions.name} { action: string }. Type an action; Ctrl-D exits. --`)
+console.log(systemPrompt.build({ cwd, model: models.defaultModel(), now: Date.now(), sessionId: 'tool' }))
+console.log(`\n-- Tool: ${nativeTool.name} { cmd: string }. Type a call; Ctrl-D exits. --`)
 
 // Incomplete: the parse error points at or past the end of the last line.
 function incomplete(text: string, message: string): boolean {
@@ -50,7 +50,7 @@ for await (const line of rl) {
 	if (pending.trim()) {
 		let error = ''
 		try {
-			actions.resolve(pending)
+			nativeTool.resolve(pending)
 		} catch (e: any) {
 			error = e.message
 		}
@@ -59,8 +59,8 @@ for await (const line of rl) {
 			if (tty) rl.prompt()
 			continue
 		}
-		let call = actions.arrived({ type: 'tool_call', id: `cli${++n}`, name: actions.name, input: { action: pending } })
-		let result = await tools.run(call, { cwd, signal: new AbortController().signal, sessionId: 'action' })
+		let call = nativeTool.arrived({ type: 'tool_call', id: `cli${++n}`, name: nativeTool.name, input: { cmd: pending } })
+		let result = await tools.run(call, { cwd, signal: new AbortController().signal, sessionId: 'tool' })
 		console.log(result.isError ? `[error] ${result.output}` : result.output)
 	}
 	pending = ''

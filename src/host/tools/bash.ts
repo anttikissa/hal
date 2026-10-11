@@ -5,7 +5,7 @@
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
-import { actions } from '../actions.ts'
+import { nativeTool } from '../native-tool.ts'
 import type { Tool } from '../tools.ts'
 
 // The command without a leading `cd <cwd> &&`: it runs in cwd anyway,
@@ -40,15 +40,15 @@ export const tool: Tool = {
 		},
 		required: ['command'],
 	},
-	// Action timeouts are in seconds; the tool's in ms.
-	action: {
+	// Call-text timeouts are in seconds; the tool's in ms.
+	syntax: {
 		summary: false,
 		positional: ['command'],
 		aliases: { cmd: 'command' },
 		usage: ['BASH "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
 		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)' },
 		resolve(raw) {
-			let input = actions.generic(tool, raw)
+			let input = nativeTool.generic(tool, raw)
 			if (input.timeout !== undefined) {
 				if (typeof input.timeout !== 'number' || !(input.timeout > 0)) throw new Error(`BASH timeout is a positive number of seconds, got ${JSON.stringify(input.timeout)}`)
 				input.timeout = Math.round(input.timeout * 1000)

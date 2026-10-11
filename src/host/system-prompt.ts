@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { settings } from '../common/settings.ts'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
 import { promptTemplate, type PromptRender, type PromptSource } from './prompt-template.ts'
 export type { PromptSource } from './prompt-template.ts'
@@ -85,7 +85,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
 		hal_dir: paths.display(paths.repoRoot()), home: paths.home(),
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
-		tools_summary: actions.summary(),
+		tools_summary: nativeTool.summary(),
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 		user_notes: input.noUser ? 'false' : 'true', web_url: settings.webUrl(), interactive: String(input.interactive ?? true),
 		kind: input.kind ?? 'interactive', subagent: input.owner ? 'true' : 'false',

@@ -6,7 +6,7 @@ import { toolPresentation } from '../common/tool-presentation.ts'
 import { toolPresentations } from './tool-presentation.ts'
 import { historyCheck } from './history-check.ts'
 import { tools } from './tools.ts'
-import { actions } from './actions.ts'
+import { nativeTool } from './native-tool.ts'
 
 const original = toolPresentations.present
 const call: ToolCallBlock = { type: 'tool_call', id: 'edit-1', name: 'example-edit', input: { files: ['a.ts', 'b.ts'] } }
@@ -14,7 +14,7 @@ afterEach(() => { toolPresentations.present = original })
 
 test('presentation survives live and persisted replay but never enters provider messages', () => {
 	toolPresentations.present = (_call, result) => ({ title: result ? 'Edited a.ts, b.ts' : 'Edit a.ts, b.ts', blocks: result ? [{ kind: 'diff', path: 'a.ts', text: { from: 0, to: result.output.length } }] : [] })
-	let start = actions.arrived(call)
+	let start = nativeTool.arrived(call)
 	let end = toolPresentations.attach(call, { type: 'tool_result', id: call.id, output: '-1 before\n+1 after\n' } as ToolResultBlock)
 	let records: HistoryRecord[] = [{ type: 'assistant', block: start, ts: '2026-10-10T00:00:00Z', n: 1 }, { type: 'user', blocks: [end], ts: '2026-10-10T00:00:01Z', n: 2 }]
 	let loaded = JSON.parse(JSON.stringify(records)).map(historyCheck.check)
