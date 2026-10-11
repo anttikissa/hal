@@ -1,6 +1,6 @@
 {
 	title: 'Mark agent-initiated prompt guidance for human review',
-	spec: 'When changing SYSTEM.md or this project’s AGENTS.md on its own initiative, the agent marks each change with an adjacent HTML comment containing `TODO - to be reviewed by a human -$session_id`, using its current session ID. User-requested changes do not require this marker. AGENTS.md states this directive under spec and prompt writing without a separate placeholder replacement instruction.',
+	spec: 'When changing SYSTEM.md or this project’s AGENTS.md on its own initiative, the agent marks each change with an adjacent HTML comment containing `TODO - to be reviewed by a human -<session_id>`, using its current session ID. User-requested changes do not require this marker. AGENTS.md states this directive under spec and prompt writing; the angle-bracket placeholder stays literal because AGENTS.md has no variable expansion.',
 	status: 'done',
 	notes: [
 		'Literal HTML comments are stripped from included guidance. The directive therefore specifies the HTML comment body rather than embedding a complete comment; a one-off uncomment check confirms the directive stays visible.'

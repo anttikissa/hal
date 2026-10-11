@@ -56,7 +56,7 @@ alone would be misread.
 
 When changing SYSTEM.md or this project's AGENTS.md on your own
 initiative, mark each change with an adjacent HTML comment containing
-`TODO - to be reviewed by a human -$session_id`.
+`TODO - to be reviewed by a human -<session_id>`.
 
 # Privacy
 
