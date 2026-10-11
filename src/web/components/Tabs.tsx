@@ -208,15 +208,20 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				onClick={(e) => e.target === e.currentTarget && setOpen(false)}
 			>
 				<ul tabindex={-1} autofocus>
-					<For each={props.tabs}>
-						{(tab, i) => (
-							<li>
-								<Link tab={tab} n={i() + 1} shown={tab.id === props.shown} name dir onPick={() => setOpen(false)} />
-								<button type="button" class="close" aria-label={`Close ${tab.name}`} onClick={() => tabs.closeTab(tab.id)}>
-									<Icon name="close" />
-								</button>
-							</li>
-						)}
+					{/* Keyed by id: each tabs event brings new objects, and a row
+					    replaced between touch down and up loses its click. */}
+					<For each={props.tabs.map((tab) => tab.id)}>
+						{(id, i) => {
+							let tab = () => props.tabs.find((t) => t.id === id)!
+							return (
+								<li>
+									<Link tab={tab()} n={i() + 1} shown={id === props.shown} name dir onPick={() => setOpen(false)} />
+									<button type="button" class="close" aria-label={`Close ${tab().name}`} onClick={() => tabs.closeTab(id)}>
+										<Icon name="close" />
+									</button>
+								</li>
+							)
+						}}
 					</For>
 				</ul>
 				<button type="button" class="new" onClick={newTab}>
