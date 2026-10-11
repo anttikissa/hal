@@ -49,3 +49,10 @@ test('command labels remain literal for discovery, sparse plans and other comman
 		expect(toolDetails.lines('command', { command })).toEqual([])
 	}
 })
+
+test('stored-output reads are distinguishable from file reads without repeating their reference', () => {
+	let input = { id: '10-zap#1969', offset: 2, limit: 10 }
+	expect(toolDetails.headline('read_blob', input).text).toBe('Read blob 10-zap#1969')
+	expect(toolDetails.lines('read_blob', input)).toEqual(['offset: 2', 'limit: 10'])
+	expect(toolDetails.headline('read', { path: 'example.txt' }).text).toBe('Read example.txt')
+})

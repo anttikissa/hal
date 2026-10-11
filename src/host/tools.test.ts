@@ -260,7 +260,9 @@ test('read_blob fetches a numbered tool call and its result from history', async
 		mkdirSync(paths.sessionDir('s'), { recursive: true })
 		let call = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } } })
 		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
-		expect((await blobRun(`#${call.n}`)).output).toContain('example.txt')
+		expect((await blobRun(`#${call.n}`)).output).toBe('Read example.txt')
+		let spawn = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'internal-provider-call-id', name: 'spawn', input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } } } })
+		expect((await blobRun(`s#t${spawn.n}`)).output).toBe('Spawn "Benchmark search"\ntask: Find tasks\n  Preserve results\nextra: enabled:\n    true')
 		expect((await blobRun(`s#${result.n}`)).output).toContain('file contents')
 		expect((await blobRun('#999999')).isError).toBe(true)
 	} finally { paths.home = originalHome }

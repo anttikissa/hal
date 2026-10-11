@@ -1,0 +1,10 @@
+{
+	title: 'Readable stored-history tool calls',
+	spec: 'Restore visible-plumbing invariant: READ_BLOB is distinguishable from READ in shared terminal and web headlines, labeled Read blob followed by its blob or history reference. This replaces vwh shared Read verb for read_blob. History recovery renders a stored tool call through toolDetails.headline and toolDetails.lines, showing its action and complete arguments once, not a JSON envelope or internal provider call ID. Other non-image, non-result history records use readable value formatting rather than JSON; stored text outputs and image recovery stay unchanged, including paging, character offsets, validation and dropped-block handling. Raw session records remain lossless and unchanged.',
+	status: 'done',
+	notes: [
+		'READ_BLOB produced JSON itself in src/host/tools/read_blob.ts; the web card merely displayed that stored output. Shared toolDetails rendered read_blob with the file-read verb. Recovery now reuses shared argument formatting; existing saved outputs remain immutable.'
+	],
+	needs: ['vwh', 'bz'],
+	foldInto: ['vwh', 'bz']
+}

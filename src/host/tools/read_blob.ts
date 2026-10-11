@@ -1,6 +1,7 @@
 // Recover a whole stored tool result, attachment image, or history block.
 import { replay } from '../../common/replay.ts'
 import { attachments } from '../../common/attachments.ts'
+import { toolDetails } from '../../common/tool-details.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
@@ -49,7 +50,9 @@ export const tool: Tool<ToolOutput> = {
 				if (!image) throw new Error(`image blob ${value.blob} not found`)
 				return { text: `Image block ${input.id}`, image: { mediaType: image.mediaType, data: image.bytes.toString('base64') } }
 			}
-			let text = JSON.stringify(value, null, 2)
+			let text = value?.type === 'tool_call'
+				? [toolDetails.headline(value.name, value.input).text, ...toolDetails.lines(value.name, value.input)].join('\n')
+				: toolDetails.value(value).join('\n')
 			return page(text)
 		}
 		let id = ref![1] ?? ctx.sessionId
