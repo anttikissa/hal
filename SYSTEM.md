@@ -20,9 +20,9 @@ two: two at the top level, three inside a block.
 An empty section renders nothing, not even its heading.
 
 Why sections: to keep the provider's prompt cache valid, the system prompt
-never changes during a session. When a section's content changes (a new cwd,
-an edited AGENTS.md), Hal leaves the system prompt as it is and appends the
-change to the transcript as a <hal-note>.
+never changes during a session. When a section's content changes (e.g. a new
+cwd, a new skill, an edited AGENTS.md), Hal leaves the system prompt as it is
+and appends the change to the transcript as a <hal-note>.
 
 By default, the note carries the whole new section:
 
@@ -43,9 +43,9 @@ sections:
     -old line
     +new line
 
-A change outside every section cannot be sent this way: Hal rebuilds the
-system prompt, losing the cache, and notes that earlier replies followed the
-old text.
+A change outside every section (e.g. a new tool, since $tools_summary sits
+outside them) cannot be sent this way: Hal rebuilds the system prompt, losing
+the cache, and notes that earlier replies followed the old text.
 
 Variables: harness, model (including effort), date, cwd, hal_dir, home,
 session_dir, hal_source, user_notes, web_url, tools_summary, agents, kind,
