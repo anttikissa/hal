@@ -7,6 +7,10 @@ Results, logs, fixtures, dependencies, cloned projects and local configuration
 stay gitignored. Fetch missing inputs only when a requested run needs them.
 Keep benchmark dependencies out of Hal's runtime and package manifest.
 
+Pi runs using Claude subscription auth load the Claude subscription plugin
+in both the plain pi and pi-multiedit arms. Verify it loaded before paid
+calls; built-in OAuth is not a substitute.
+
 Preserve existing records and compatibility paths when consolidating caches.
 Keep credentials, account identities and host-specific paths out of tracked files.
 
