@@ -110,7 +110,7 @@ Rules:
 ::
 
 :: section "EDIT"
-<!-- TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one official, hard-to-misuse form per job; keep the guide short even if slightly inconsistent (e.g. create shown without @version). Tolerate other plausible forms silently, without spending prompt tokens on them (extras/multiedit.ts: !!OLD closed by !!END removes the text; an empty text replace of whole lines also removes their newline). delete A-B stays the documented way to remove lines. -->
+<!-- TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one official, hard-to-misuse form per job; keep the guide short even if slightly inconsistent (e.g. create shown without @version). Tolerate other plausible forms silently, without spending prompt tokens on them (extras/multiedit.ts: !!OLD closed by !!END removes the text; an empty text replace of whole lines also removes their newline). delete A-B stays the documented way to remove lines. Also review the patched multiedit system prompt (the EDIT guide extras/multiedit.ts installs in place of this section). -->
 - Use EDIT for precise changes. It must use the editing lease <filename>@<hash> returned by READ. lines: [] deletes the range.
 	EDIT "src/main.ts@4d9ej" { range: "1-2", lines: ["tic", "tac"] } { range: "5-6", lines: ["toe"] }
 ::: if interactive="true"
