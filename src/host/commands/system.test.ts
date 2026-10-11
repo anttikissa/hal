@@ -10,12 +10,12 @@ test('/system names included source files and prints the same assembled prompt a
 	let c = client()
 	mkdirSync(`${testHome()}/repo/.git`, { recursive: true })
 	writeFileSync(`${testHome()}/repo/AGENTS.md`, 'Stay in scope. <!-- hidden -->')
-	writeFileSync(`${testHome()}/extra.md`, 'Included text: ${model}')
+	writeFileSync(`${testHome()}/extra.md`, 'Included text: ${session_model}')
 	let orig = systemPrompt.file
 	let now = clock.now
 	try {
 		systemPrompt.file = () => `${testHome()}/SYSTEM.md`
-		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if model="fake/*"\nSelected.\n:::\n$agents')
+		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if session_model="fake/*"\nSelected.\n:::\n$agents')
 		clock.now = () => Date.UTC(2026, 8, 28, 20)
 		let id = created(c, `${testHome()}/repo`)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
@@ -24,10 +24,10 @@ test('/system names included source files and prints the same assembled prompt a
 		for (let file of ['SYSTEM.md', 'extra.md', 'AGENTS.md']) expect(output).toMatch(new RegExp(`\\d+ bytes +[^\\n]*${file}`))
 		let expected = systemPrompt.build({ cwd: `${testHome()}/repo`, model: 'fake/m1', now: clock.now(), sessionId: id })
 		expect(output.slice(output.indexOf('\n\n') + 2)).toBe(expected)
-		expect(output).toContain('Included text: ${model}')
+		expect(output).toContain('Included text: ${session_model}')
 		expect(output).toContain('Stay in scope.')
 		expect(output).not.toContain('hidden')
-		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if model="fake/*"\nUnclosed')
+		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if session_model="fake/*"\nUnclosed')
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
 		await until(() => c.of('output').at(-1)?.error)
 		expect(c.of('output').at(-1).text).toMatch(/SYSTEM.md:1: unclosed/)

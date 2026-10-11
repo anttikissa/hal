@@ -21,7 +21,7 @@ const notes = (id: string) => history.readSync(id).filter((r) => r.type === 'not
 const prepare = (id: string, now = 1000) => promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: sessions.open(id).model, now })
 
 test('delivered print prompts rebuild interactive guidance; queued prompts wait and UI prompts restore it', async () => {
-	writeFileSync(file, ':: if interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	writeFileSync(file, ':: if session_interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
 	let c = client(), id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: 'watched' })
 	await until(() => calls.length === 1)
@@ -43,7 +43,7 @@ test('delivered print prompts rebuild interactive guidance; queued prompts wait 
 })
 
 test('unattended child task and compaction preserve inherited interaction mode', async () => {
-	writeFileSync(file, ':: if interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	writeFileSync(file, ':: if session_interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
 	let parent = sessions.create({ cwd: testHome(), model: 'fake/m1', interactive: false }).id
 	let child = subagents.spawn(parent, { kind: 'subagent', task: 'check unattended behavior', fork: false, cwd: testHome(), limit: 0 })
 	await until(() => calls.length === 1)
@@ -78,7 +78,7 @@ test('section changes freeze the system and combine whole/diff updates, removals
 })
 
 test('forks inherit the frozen prefix and cache identity while role and effort updates follow it', async () => {
-	writeFileSync(file, ':: section "Role"\n$owner $parent\n::\n:: section "Model" update="diff"\n$model\n::')
+	writeFileSync(file, ':: section "Role"\n$subagent_owner $fork_parent\n::\n:: section "Model" update="diff"\n$session_model\n::')
 	let parent = created(client(), testHome())
 	history.submit(parent, 'original prompt')
 	let initial = prepare(parent)
@@ -160,7 +160,7 @@ test('every family member rebuilds after inactivity without filtering rebase tar
 })
 
 test('a real source edit between setting rebase and first request is delivered without restoring disk instructions', async () => {
-	writeFileSync(file, ':: section "Role" update="diff"\n$autoclose\nliteral old\n::')
+	writeFileSync(file, ':: section "Role" update="diff"\n$session_autoclose\nliteral old\n::')
 	let id = created(client(), testHome()), initial = prepare(id).system
 	history.append(id, { type: 'change', autoclose: true, previous: { autoclose: false } })
 	sessions.open(id).autoclose = true
@@ -168,7 +168,7 @@ test('a real source edit between setting rebase and first request is delivered w
 	await history.messages(id)
 	let raw = history.readSync(id), transition = raw.findLast((r) => r.type === 'change')!
 	rebases.apply(id, { base: raw.at(-1)!.n!, drop: [transition.n!, notes(id).at(-1)!.n!], edit: [] })
-	writeFileSync(file, ':: section "Role" update="diff"\n$autoclose\nliteral later\n::')
+	writeFileSync(file, ':: section "Role" update="diff"\n$session_autoclose\nliteral later\n::')
 	expect(prepare(id, 3000).system).toBe(initial)
 	let text = JSON.stringify(await history.messages(id))
 	expect(text).toContain('-literal old')

@@ -127,15 +127,15 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
-		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if model="anthropic/*" harness="hal"\nCLAUDE ONLY\n:::\n::: if model="openai/*"\nOPENAI ONLY\n:::\n${model} ${unknown}\n$agents')
-		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if model="openai/*"')
+		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if session_model="anthropic/*"\nCLAUDE ONLY\n:::\n::: if session_model="openai/*"\nOPENAI ONLY\n:::\n${session_model} ${unknown}\n$agents')
+		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if session_model="openai/*"')
 		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
 		expect(text).toContain('CLAUDE ONLY')
 		expect(text).not.toContain('OPENAI ONLY')
 		expect(text).not.toContain('secret')
 		expect(text).toContain('anthropic/claude-x ${unknown}')
 		expect(text).toContain('<!-- gone -->kept')
-		expect(text).toContain('::: if model="openai/*"')
+		expect(text).toContain('::: if session_model="openai/*"')
 		expect(systemPrompt.build({ cwd: root, model: 'openai/gpt', now: at })).toContain('OPENAI ONLY')
 	} finally { systemPrompt.file = old }
 })
@@ -153,7 +153,7 @@ test('bad SYSTEM directives never throw: each is reported with its line and the 
 		expect(unknown.problems).toMatch(/SYSTEM.md:2: unknown key unknown/)
 		expect(unknown.text).toContain('Hello\nAfter')
 		expect(unknown.text).not.toContain('DROPPED')
-		let unclosed = build('Hello\n::: if model="*"\ntext')
+		let unclosed = build('Hello\n::: if session_model="*"\ntext')
 		expect(unclosed.problems).toMatch(/SYSTEM.md:2: unclosed/)
 		expect(unclosed.text).toContain('Hello\ntext')
 	} finally { systemPrompt.file = old }
@@ -164,8 +164,8 @@ test('SYSTEM includes are templates resolved relative to their file', () => {
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		mkdirSync(`${root}/more`)
-		writeFileSync(`${root}/more/inner.md`, 'inner ${model}')
-		writeFileSync(`${root}/more/part.md`, '<!-- note\nfor me -->::: if model="wrong/*"\nhidden\n:::\n@inner.md\n@?missing.md\n')
+		writeFileSync(`${root}/more/inner.md`, 'inner ${session_model}')
+		writeFileSync(`${root}/more/part.md`, '<!-- note\nfor me -->::: if session_model="wrong/*"\nhidden\n:::\n@inner.md\n@?missing.md\n')
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
 		expect(text).toContain('Hello\ninner m/x')

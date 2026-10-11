@@ -42,7 +42,7 @@ function interactive(id: string): boolean {
 
 function input(id: string, selected?: PromptInput): PromptInput {
 	let meta = sessions.open(id)
-	return { cwd: meta.cwd, model: models.qualified(meta.model, meta.effort), now: Date.now(), sessionId: id, noUser: meta.noUser, interactive: promptCache.interactive(id), owner: meta.owner, parent: meta.parent, kind: meta.spawn, slots: meta.slots, autoclose: meta.autoclose, ...selected }
+	return { cwd: meta.cwd, model: models.qualified(meta.model, meta.effort), now: Date.now(), sessionId: id, noUser: meta.noUser, interactive: promptCache.interactive(id), owner: meta.owner, parent: meta.parent, slots: meta.slots, autoclose: meta.autoclose, ...selected }
 }
 
 function outside(rendered: Rendering): string {
@@ -116,7 +116,7 @@ function prepare(id: string, selected?: PromptInput): { system: string; cacheId:
 		if (data.rebased && old) {
 			let changed = ['cwd', 'model', 'autoclose'] as const
 			let keys = changed.filter((k) => data.input?.[k] !== snapshot[k])
-			let baseline = old.sections.map((s) => s.variables.some((v) => keys.includes(v as typeof keys[number]) || (v === 'agents' && keys.includes('cwd'))) ? rendered.sections.find((n) => n.title === s.title) ?? { ...s, body: '' } : s)
+			let baseline = old.sections.map((s) => s.variables.some((v) => keys.some((k) => v === `session_${k}`) || (v === 'agents' && keys.includes('cwd'))) ? rendered.sections.find((n) => n.title === s.title) ?? { ...s, body: '' } : s)
 			old = { ...old, sections: baseline }
 			delete data.rebased
 		}

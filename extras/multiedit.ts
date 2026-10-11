@@ -289,7 +289,7 @@ export default function (plugin: Plugin) {
 	plugin.after(tools, 'all', (found) => { found.delete('write'); found.set('edit', multiedit); const read = found.get('read'); if (read) found.set('read', { ...read, description: read.description + ' READ takes one path; make independent reads as parallel calls.' }) })
  plugin.around(systemPrompt, 'assemble', (next, input, ...args) => {
   const example = ['Example call text (markers start their lines):', 'EDIT' + (input.interactive !== false ? ' /* Rename handler */' : ''), 'src/main.ts@4d9ej replace 3-4', '!!NEW', 'function process(x) {', '\treturn x + 1', '!!END', 'src/main.ts@4d9ej delete 9-9'].join('\n')
-  const editGuide = `- Use EDIT for all file changes. ${help.split(N).join(N + '  ')}\n${example}\n` + (input.interactive !== false ? '- Give interactive EDIT batches a brief purpose comment.\n' : '')
+  const editGuide = `- Use EDIT for all file changes. ${help.split(N).join(N + '  ')}\n${example}\n` + (input.interactive !== false ? '- Start every EDIT with a /* purpose */ comment: EDIT /* Rename helper */\n' : '')
   return next(input, ...args).replace(/(# EDIT\n)[\s\S]*?(?=\n\n# |$)/, (_, head) => head + editGuide.trimEnd()).replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# |$)/, '')
  })
 }

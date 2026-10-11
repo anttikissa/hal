@@ -21,7 +21,7 @@ function def(): ToolDef {
 	return {
 		name,
 		description: 'Call one tool. Make independent calls in parallel.',
-		inputSchema: { type: 'object', properties: { cmd: { type: 'string', description: 'NAME followed by its arguments, e.g. READ "src/main.ts:1-80" or BASH "ls -l". HELP <NAME> gives the exact syntax of one.' } }, required: ['cmd'], additionalProperties: false },
+		inputSchema: { type: 'object', properties: { cmd: { type: 'string', description: 'TOOL followed by its arguments, e.g. READ "src/main.ts:1-80" or BASH "ls -l". HELP <TOOL> gives the exact syntax of one.' } }, required: ['cmd'], additionalProperties: false },
 	}
 }
 
