@@ -1040,7 +1040,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 			expect(geometry.fill).toBe('83%')
 			expect(geometry.duplicated).toBe(false)
 			expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('b3')
-			expect(await b.evaluate("document.querySelector('.budget').getAttribute('href')")).toBe('/budget')
+			expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
 		}
 		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
 		await b.waitFor("document.querySelector('.budget').textContent === 'b0'")
