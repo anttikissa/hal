@@ -214,8 +214,9 @@ function line(st: ViewState, connected: boolean): Line {
 	if (!t) return { text: 'connecting', tone: 'busy' }
 	let s = t.state
 	if (queueEdit.waiting(t)) return { text: 'waiting for queue edit', tone: 'warn' }
-	if (s.type === 'idle') return { text: 'idle', tone: 'idle' }
-	let text = states.describe(s, undefined, t.items) ?? ''
+	let jobs = t.meta.background?.length ?? 0
+	if (s.type === 'idle') return jobs ? { text: states.withJobs(undefined, jobs)!, tone: 'busy' } : { text: 'idle', tone: 'idle' }
+	let text = states.withJobs(states.describe(s, undefined, t.items), s.type === 'running' ? jobs : 0) ?? ''
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 

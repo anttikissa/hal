@@ -2,8 +2,9 @@
 // blinks right after the text Hal is streaming (in the thinking color
 // while it thinks), and otherwise on its own row below the transcript.
 // That idle cursor is bright while the session works and, once it has
-// finished, fades to gray over fadeMs. Only the shown session's current
-// stream has one. Beats come from the shared pulse (pulse.ts).
+// finished, fades to gray over fadeMs. Background jobs make it bash's
+// magenta (see `of`). Only the shown session's current stream has one.
+// Beats come from the shared pulse (pulse.ts).
 
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
@@ -48,16 +49,21 @@ function mix(a: Oklch, b: Oklch, t: number): Oklch {
 }
 
 // The cursor for transcript `t` at `beat`; none without a session.
+// While background jobs run, a streaming cursor alternates between its
+// color and bash's magenta on every other blink; otherwise the idle
+// cursor is magenta and does not fade.
 function of(t: Transcript | undefined, beat: number, now = pulse.now()): HalCursor | undefined {
 	if (!t) return undefined
 	let hal = colors.assistant()
+	let bash = hal.cursorBash ?? hal.cursor ?? hal.fg!
+	let jobs = !!t.meta.background?.length
 	if (halCursor.streaming(t)) {
 		let thinking = t.items.at(-1)!.type === 'thinking' ? colors.thinking() : undefined
 		let color = thinking ? (thinking.cursor ?? thinking.fg!) : (hal.cursor ?? hal.fg!)
-		return { at: 'stream', lit: pulse.fast(beat), color }
+		return { at: 'stream', lit: pulse.fast(beat), color: jobs && Math.floor(beat / 2) % 2 ? bash : color }
 	}
-	let t0 = halCursor.fade(t.meta.id, states.busy(t.state), now)
-	let color = mix(hal.cursor ?? hal.fg!, hal.cursorIdle ?? hal.cursor ?? hal.fg!, t0)
+	let t0 = halCursor.fade(t.meta.id, states.busy(t.state) || jobs, now)
+	let color = jobs ? bash : mix(hal.cursor ?? hal.fg!, hal.cursorIdle ?? hal.cursor ?? hal.fg!, t0)
 	return { at: 'idle', lit: pulse.slow(beat), color }
 }
 

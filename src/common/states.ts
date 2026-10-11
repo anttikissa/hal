@@ -213,4 +213,11 @@ function doing(phase: Phase, items: readonly Shown[]): string {
 	return names.length ? `running ${names.join(', ')}` : 'running tools'
 }
 
-export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, nudge, promoted, escape, describe, doing }
+// The activity words with `jobs` background commands still running:
+// alone when nothing else happens, else after it.
+function withJobs(text: string | undefined, jobs: number): string | undefined {
+	if (!jobs) return text
+	return text ? `${text} · ${jobs} ${jobs === 1 ? 'job' : 'jobs'}` : `${jobs} background ${jobs === 1 ? 'job' : 'jobs'}`
+}
+
+export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, nudge, promoted, escape, describe, doing, withJobs }

@@ -230,6 +230,11 @@ html.typing .App { position: absolute; }
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
+/* Background jobs: the idle cursor is bash's magenta; a streaming one
+   alternates with it on every other blink. */
+.Transcript.jobs .cursor-line { color: var(--cursor-bash); }
+.Transcript.jobs .Card .cursor { animation: blink 1s steps(1, end) infinite, cursor-jobs 2s steps(1, end) infinite; }
+@keyframes cursor-jobs { 50% { background: var(--cursor-bash); } }
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
 .Notices { --gl: max(2ch, env(safe-area-inset-left)); --gr: max(2ch, env(safe-area-inset-right)); }

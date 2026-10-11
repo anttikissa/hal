@@ -99,7 +99,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	createEffect(shown, () => void requestAnimationFrame(check))
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
-		<main class="Transcript" role="log" ref={(e) => (el = e)}>
+		<main class={['Transcript', { jobs: !!props.view.transcript?.meta.background?.length }]} role="log" ref={(e) => (el = e)}>
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>

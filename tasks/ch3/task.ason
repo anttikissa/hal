@@ -1,0 +1,7 @@
+{
+	title: 'Background jobs show in the activity words and the Hal cursor',
+	spec: 'While background Bash jobs run, the activity words in the terminal prompt rule and the web status line name them: "2 background jobs" when nothing else happens, else after the activity ("writing · 2 jobs"). The Hal cursor shows them in bash magenta (colors.assistant cursorBash, CSS --cursor-bash): a streaming cursor alternates between its color and magenta on every other blink; the idle cursor is magenta and does not fade while jobs run. Terminal and web match. The host broadcasts session meta whenever meta.background changes, and both UIs read that list.',
+	status: 'done',
+	needs: ['5p', 'v0'],
+	foldInto: ['5p']
+}

@@ -82,7 +82,7 @@ function activity(t: Transcript): string | undefined {
 	if (s.type === 'paused') return 'paused'
 	if (s.type === 'error') return 'error'
 	if (s.type === 'retrying') return (states.describe(s, Date.now()) ?? '').replace(/ \(.*$/s, '')
-	return states.describe(s, Date.now(), t.items)
+	return states.withJobs(states.describe(s, Date.now(), t.items), t.meta.background?.length ?? 0)
 }
 
 // Why a stopped session waits and what the user can do, in full.

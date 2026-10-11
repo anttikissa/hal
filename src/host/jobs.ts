@@ -91,6 +91,7 @@ async function start(sessionId: string, command: string, cwd: string, ms?: numbe
 	jobs.state.running.set(id, { sessionId, stop: run.stop, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
+	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
 	run.done.then(
 		(out) => jobs.finish(id, out),
 		(e) => jobs.finish(id, `[failed: ${e?.message ?? e}]\n`),
@@ -109,6 +110,7 @@ function forget(sessionId: string, id: string): void {
 	let left = (meta.background ?? []).filter((b) => b !== id)
 	if (left.length) meta.background = left
 	else delete meta.background
+	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
 }
 
 // A background command exited: its session hears how, unless it was
