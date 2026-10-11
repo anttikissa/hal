@@ -1,8 +1,8 @@
 <!-- TODO: human should review this.
-SYSTEM.md is the editable prompt template. HTML comments are omitted from it
-and its includes; AGENTS.md and CLAUDE.md keep them.
+SYSTEM.md is the editable prompt template. HTML comments are omitted.
 @path includes a literal file; @?path includes it if present. Paths may use
-variables and ~. Included files and $agents are not templates.
+variables and ~. Included files and $agents are not templates; included
+files lose HTML comments, $agents keeps them.
 $name and ${name} expand variables; unknown names remain literal.
 :: if key="glob" keeps matching content (* and ? wildcards); multiple
 conditions must all match. :: else selects its alternate branch.
