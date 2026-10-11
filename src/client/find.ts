@@ -35,7 +35,7 @@ function report(): void {
 	if (!r?.blockId || app.state.transcript?.meta.id !== r.sessionId || !backfill.complete(app.state.older, r.sessionId)) return
 	find.target = undefined
 	let f = frame.build(appView.view(), app.cols(), 24, true), at = f.items!.findIndex((i) => i.key === r.blockId)
-	app.state.notice = `Hal can't scroll the terminal, but #${r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback`
+	app.state.notice = `Hal can't scroll the terminal, but #${r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback.`
 }
 export const find = {
 	state: findController.create(), target: undefined as { sessionId: string; blockId?: string } | undefined,
