@@ -20,6 +20,10 @@ pricing provenance, actual spend, and subscription quota. New runs capture
 quota before/after and check concurrent subscription use before starting.
 Qualify quota inference when usage overlaps or reset boundaries change.
 
+Record each run's full system prompt and tool definitions as sent in its
+first request, after templates and plugins; later section updates are not
+needed. Store each distinct prompt once, keyed by its hash.
+
 Compare matched model/effort configurations separately from practical model
 trade-offs. Show sample sizes and uncertainty; do not invent confidence
 intervals from single samples or infer causation from version correlations.
