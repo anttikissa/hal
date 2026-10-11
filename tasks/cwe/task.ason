@@ -1,0 +1,7 @@
+{
+	title: 'Approval knows more /tmp variables',
+	spec: 'Approval lets rm -rf through for more spellings models use for scratch dirs: D=$(mktemp -d <args>) then rm -rf $D, and $D/<path> when D was set to a literal /tmp/ path (n=/tmp/ws; rm -rf $n/src). $D/<path> still asks when D came from mktemp, since a failed mktemp leaves D empty and the path becomes /<path>. Any later assignment to the name that is not a /tmp path forgets it. Invariant: nothing allowed resolves outside /tmp/, or to all of /tmp (rm -rf /tmp/./* asks).',
+	status: 'done',
+	needs: ['6f'],
+	foldInto: ['6f']
+}

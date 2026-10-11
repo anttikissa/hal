@@ -32,6 +32,13 @@ test('dangerous commands are caught and their offending part marked; harmless on
 		['rm a.txt', []],
 		['rm -rf /tmp/hal-test-1', []],
 		['D=$(mktemp -d); rm -rf $D', []],
+		['T=$(mktemp -d /tmp/x.XXXX); rm -rf $T', []],
+		['n=/tmp/ws; rm -rf $n/src $n/home-*', []],
+		// A failed mktemp leaves T empty: $T/x is /x.
+		['T=$(mktemp -d); rm -rf $T/x', ['rm -rf $T/x']],
+		['n=/tmp/ws; n=/; rm -rf $n/src', ['rm -rf $n/src']],
+		['n=/tmp/ws; rm -rf $n/../x', ['rm -rf $n/../x']],
+		['rm -rf /tmp/./*', ['rm -rf /tmp/./*']],
 		['git checkout -b feature', []],
 		// v followed by a digit is a version tag, not a file.
 		['git checkout v1.2', []],

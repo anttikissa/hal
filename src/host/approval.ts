@@ -29,27 +29,35 @@ function segments(command: string): Mark[] {
 	return out
 }
 
-// Assignments like D=/tmp/x or D=$(mktemp -d), so rm -rf $D is known safe.
+const mktemp = '/tmp/mktemp'
+
+// Assignments like D=/tmp/x or D=$(mktemp -d [template]), so rm -rf $D
+// is known safe. Any other assignment to the name forgets it.
 function tmpVars(command: string): Map<string, string> {
 	let vars = new Map<string, string>()
-	for (let m of command.matchAll(/(?:^|[\s;])([A-Za-z_]\w*)=(?:(\/tmp\/[^\s;&|]+)|\$\(mktemp -d\))/g)) vars.set(m[1]!, m[2] ?? '/tmp/mktemp')
+	for (let m of command.matchAll(/(?:^|[\s;])([A-Za-z_]\w*)=(?:(\/tmp\/[^\s;&|]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g)) {
+		if (m[2] || m[3]) vars.set(m[1]!, m[2] ?? mktemp)
+		else vars.delete(m[1]!)
+	}
 	return vars
 }
 
 // A removal inside /tmp (not /tmp itself): scratch space models clean
 // up. `dir`: where the command runs, if cd made it known (a relative
-// target resolves against it).
+// target resolves against it). $D/x needs D set to a literal path: a
+// failed mktemp leaves D empty, making it /x.
 function safeTmp(token: string, vars: Map<string, string>, dir?: string): boolean {
 	let t = token.replace(/^['"]|['"]$/g, '')
-	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?$/)
-	if (v && vars.has(v[1]!)) t = vars.get(v[1]!)!
+	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?(\/.*)?$/)
+	let value = v && vars.get(v[1]!)
+	if (value && !(v![2] && value === mktemp)) t = value + (v![2] ?? '')
 	if (t.includes('..') || /[$`~\\]/.test(t)) return false
 	if (!t.startsWith('/')) {
 		if (!dir) return false
 		t = resolve(dir, t)
 	}
-	if (!t.startsWith('/tmp/') || t === '/tmp/' || t === '/tmp/*') return false
-	return resolve('/', t).startsWith('/tmp/')
+	let r = resolve('/', t)
+	return r.startsWith('/tmp/') && r !== '/tmp/*'
 }
 
 // Where `cd <arg>` goes from `dir`, or undefined if that can't be told:
