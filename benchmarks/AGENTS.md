@@ -1,5 +1,7 @@
 # Benchmarks
 
+Every benchmark session's name starts with "BENCHMARKS".
+
 Keep benchmark work here. Track only small generic instructions and helpers.
 Results, logs, fixtures, dependencies, cloned projects and local configuration
 stay gitignored. Fetch missing inputs only when a requested run needs them.
