@@ -320,7 +320,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'tool': {
 			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 			let { command, description } = item.input
-			if (typeof command === 'string' && typeof description === 'string')
+			if (item.name === 'bash' && typeof command === 'string' && typeof description === 'string')
 				return { kind, text: `▸ ${oneLine(description)}\n  ${item.input.background === true ? '&' : '$'} ${command}` }
 			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		}

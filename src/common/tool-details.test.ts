@@ -41,6 +41,10 @@ test('send headers distinguish requested destinations from host-resolved ones', 
 	expect(toolDetails.headline('send', { ...input, to: '157-cms' }, 'no session 157-cms').text).toBe('To 157-cms: Report completion')
 	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('To 157-cms: Report completion')
 	expect(toolDetails.lines('send', input)).toEqual(['text: Done', 'queue: true'])
+	for (let outcome of ['Sent to', 'Queued in', 'Waiting in', 'Interrupted']) {
+		let output = `${outcome} tab 2 · 157-cms · Review: it reads this before its next request`
+		expect(toolDetails.headline('send', input, output).text).toBe('To tab 2 (157-cms): Report completion')
+	}
 })
 
 test('command labels remain literal for discovery, sparse plans and other commands', () => {
@@ -55,4 +59,36 @@ test('stored-output reads are distinguishable from file reads without repeating 
 	expect(toolDetails.headline('read_blob', input).text).toBe('Read blob 10-zap#1969')
 	expect(toolDetails.lines('read_blob', input)).toEqual(['offset: 2', 'limit: 10'])
 	expect(toolDetails.headline('read', { path: 'example.txt' }).text).toBe('Read example.txt')
+})
+
+test('multi-file reads retain every range and unknown argument under its file', () => {
+	let input = { paths: [{ path: 'first.ts', offset: 10, limit: 5 }, { path: 'second.ts', offset: 30, extra: 'keep me' }] }
+	expect(toolDetails.headline('read', input).text).toBe('Read 2 files')
+	expect(toolDetails.lines('read', input)).toEqual(['Read first.ts', 'offset: 10', 'limit: 5', 'Read second.ts', 'offset: 30', 'extra: keep me'])
+	expect(toolDetails.lines('read', { paths: [null] }).join('\n')).toContain('(null)')
+})
+
+test('wait headers follow background-work result contracts and preserve invalid targets', () => {
+	expect(toolDetails.headline('wait', {}).text).toBe('Wait for background work')
+	expect(toolDetails.headline('wait', {}, 'Work needs attention: #t72, 12-xyz. Inspect the targets; available reports follow through their usual delivery.').text).toBe('Wait for #t72, 12-xyz')
+	expect(toolDetails.headline('wait', {}, 'No owned background command or subagent is running. Go on without waiting.').text).toBe('Wait (no background work running)')
+	expect(toolDetails.lines('wait', { targets: ['#t72', 123] })).toEqual([])
+	for (let name of ['wait', 'inspect', 'stop']) {
+		let input = name === 'wait' ? { targets: [{ nested: 'bad' }] } : { target: { nested: 'bad' } }
+		expect(toolDetails.headline(name, input).text).not.toContain('[object Object]')
+		expect(toolDetails.lines(name, input).join('\n')).toContain('bad')
+	}
+})
+
+test('multiline and invalid headline fields remain in expanded call details', () => {
+	for (let [name, input, detail] of [
+		['bash', { command: 'echo ok', description: 123 }, 'description: 123'],
+		['bash', { command: 'echo ok', description: 'First\nSecond' }, 'description: First\n  Second'],
+		['send', { to: '12-xyz', text: 'Hi', description: false }, 'description: false'],
+		['spawn', { name: 'First\nSecond', task: 'Work' }, 'name: First\n  Second'],
+		['inspect', { scope: 'all', fields: 'name,\nmodel' }, 'fields: name,\n  model'],
+	] as const) expect(toolDetails.lines(name, input).join('\n')).toContain(detail)
+	let write = { content: 'new file', path: 'created.txt' }
+	expect(toolDetails.headline('write', write).text).toBe('Write created.txt')
+	expect(toolDetails.lines('write', write)).toEqual(['content: new file'])
 })

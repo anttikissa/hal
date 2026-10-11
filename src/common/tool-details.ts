@@ -77,7 +77,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'send': {
 			let to = str('to')
 			if (!to) break
-			let sent = output?.match(/^Sent to (.+)$/)?.[1]
+			let sent = output?.match(/^(?:Sent to|Queued in|Waiting in|Interrupted) (.+?)(?=: it |$)/)?.[1]
 			let target = sent ? titles.address(sent, true) : /^\d+$/.test(to) ? `tab ${to}` : to
 			return { text: `To ${target}${str('description') ? `: ${str('description')}` : ''}`, keys: ['to', 'description'] }
 		}
@@ -90,7 +90,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'read':
 		case 'read_url':
 		case 'read_blob': {
-			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.map((p) => (p as { path?: unknown })?.path).join(', ')}`, key: 'paths' }
+			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.length} file${input.paths.length === 1 ? '' : 's'}` }
 			let key = name === 'read' ? 'path' : name === 'read_url' ? 'url' : 'id'
 			if (str(key)) return { text: `${name === 'read_blob' ? 'Read blob' : 'Read'} ${str(key)}`, key }
 			break
@@ -98,12 +98,15 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'notify':
 			if (str('text')) return { text: `Notify "${str('text')}"`, key: 'text' }
 			break
+		case 'write':
+			if (str('path')) return { text: `Write ${str('path')}`, key: 'path' }
+			break
 		// The file, then the purpose; the diff opens below (task ese).
 		case 'edit':
 			if (str('path')) return { text: `Edit ${str('path')}${str('description') ? `: ${str('description')}` : ''}`, keys: ['path', 'hash', 'description'] }
 			break
 		case 'inspect': {
-			if (input.target !== undefined) return { text: `Inspect ${String(input.target)}`, key: 'target' }
+			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: `Inspect ${String(input.target)}`, key: 'target' } : { text: 'Inspect' }
 			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
 			let what = (input.what as string | undefined) ?? 'sessions'
 			let target = what === 'sessions' ? (input.scope as string | undefined) ?? 'self' : what
@@ -117,16 +120,18 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			return { text: `Spawn ${what}${at ? ` (${at})` : ''}`, keys: str('name') ? ['name'] : [] }
 		}
 		case 'stop':
-			if (input.target !== undefined) return { text: `Stop ${String(input.target)}`, key: 'target' }
+			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: `Stop ${String(input.target)}`, key: 'target' } : { text: 'Stop' }
 			break
 		case 'wait': {
 			if (input.targets !== undefined) {
 				let targets = Array.isArray(input.targets) ? input.targets : [input.targets]
+				if (!targets.every((v) => typeof v === 'string' || typeof v === 'number')) return { text: 'Wait for background work' }
 				return { text: `Wait for ${targets.length ? targets.join(', ') : 'background work'}`, key: 'targets' }
 			}
-			if (output?.startsWith('No subagent')) return { text: 'Wait (no subagent running)' }
+			if (output?.startsWith('No owned background command or subagent') || output?.startsWith('No subagent')) return { text: 'Wait (no background work running)' }
+			let ready = output?.match(/^Work needs attention: (.+?)\. Inspect the targets;/)?.[1]
 			let who = ids(/(?:^Waiting for |, )(?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)
-			return { text: `Wait for ${who.length ? who.join(', ') : 'subagents'}` }
+			return { text: `Wait for ${ready ?? (who.length ? who.join(', ') : 'background work')}` }
 		}
 	}
 	if (str('description')) return { text: str('description')!, key: 'description' }
@@ -140,14 +145,20 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 	let shown = new Set<string>()
 	let head = toolDetails.headline(name, input)
 	// The open head wraps, so a one-line headline argument is not repeated.
-	if (head.key && !String(input[head.key]).includes('\n')) shown.add(head.key)
-	for (let k of head.keys ?? []) shown.add(k)
+	let complete = (key: string) => typeof input[key] === 'string' && (input[key] as string).trim() !== '' && !(input[key] as string).includes('\n')
+	if (head.key && (complete(head.key) || head.key === 'target' && typeof input.target === 'number' && Number.isSafeInteger(input.target) && input.target > 0)) shown.add(head.key)
+	for (let k of head.keys ?? []) if (complete(k)) shown.add(k)
+	if (name === 'wait' && head.key === 'targets' && (Array.isArray(input.targets) ? input.targets : [input.targets]).every((v) => typeof v === 'number' && Number.isSafeInteger(v) && v > 0 || typeof v === 'string' && v.trim() !== '' && !v.includes('\n'))) shown.add('targets')
+	if (name === 'read' && Array.isArray(input.paths) && input.paths.every((p) => p && typeof p === 'object' && !Array.isArray(p))) {
+		for (let p of input.paths) out.push(toolDetails.headline('read', p).text, ...toolDetails.lines('read', p))
+		shown.add('paths')
+	}
 	if (name === 'bash') {
 		let { command, modifies, background, timeout } = input
 		if (typeof command === 'string') {
 			let [first, ...rest] = command.split('\n')
 			out.push(`${background === true ? '&' : '$'} ${first}`, ...rest.map((l) => `  ${l}`))
-			shown.add('command').add('description')
+			shown.add('command')
 		}
 		let files = typeof modifies === 'string' ? [modifies] : Array.isArray(modifies) && modifies.every((f) => typeof f === 'string') ? modifies : undefined
 		if (files) {

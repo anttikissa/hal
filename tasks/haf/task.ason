@@ -1,0 +1,10 @@
+{
+	title: 'Tool cards retain truthful actions and complete arguments',
+	spec: 'Restore shared visible-plumbing invariants in terminal and web: a multi-file READ heads as Read N files and expands each file action with its complete ranges and unfamiliar arguments; a WRITE identifies its path independent of input-property order. WAIT default names background work, not only subagents; its result-aware header understands current Work needs attention and No owned background command or subagent results. Headline arguments suppress body details only when their valid readable value is represented completely; multiline, empty and invalid values remain visible, including Bash descriptions and inspect/send/spawn fields. Invalid structured execution targets never become object-coercion strings. Terminal expanded tool calls wrap full headlines and render shared toolDetails.lines for all tools, including full multiline Bash commands, declared files, nondefault controls and rejected input; closed cards stay concise and existing presentations remain intact. Web generic tool rendering applies Bash shell formatting only to Bash. Preserve immutable history, execution behavior and existing result paging. These replace older terminal omission of non-Bash call details and clipped expanded Bash commands. SEND result-aware headers extract the destination from sent, queued, waiting and interrupted outcomes without treating delivery prose as part of the session address.',
+	status: 'done',
+	notes: [
+		'SEND outcome wording changed in the host while the shared headline still parsed the old entire Sent to line, so delivery prose leaked into headers and queued/waiting/interrupted sends lost the resolved session ID. Terminal item-view had its own Bash-only detail rendering, bypassing shared toolDetails and clipping multiline commands. Reused existing shared formatting rather than introducing tool-specific UI implementations.'
+	],
+	needs: ['8t', 'vwh'],
+	foldInto: ['8t', 'vwh']
+}

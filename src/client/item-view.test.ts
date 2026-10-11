@@ -44,3 +44,17 @@ test('interrupted text decorates its end, preserving trailing spaces and line br
 		expect(item.text).toBe(text)
 	}
 })
+
+test('expanded tool cards preserve wrapped headlines, complete arguments and multiline shell commands', () => {
+	let render = (name: string, input: Record<string, unknown>, fold: 'open' | 'closed' = 'open') => itemView.itemLines({ type: 'tool', name, input, id: 'internal' }, 30, false, undefined, undefined, undefined, [], { fold }).map(Bun.stripANSI).join('\n')
+	let spawn = render('spawn', { name: 'A long session name that must not be clipped', task: 'First instruction\nSecond instruction', model: 'fake/model' })
+	expect(spawn.replace(/\n/g, ' ')).toContain('must not be clipped')
+	expect(spawn).toContain('task: First instruction\n  Second instruction')
+	expect(spawn).toContain('model: fake/model')
+	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5000 })
+	expect(bash).toContain('$ echo first\n  echo second')
+	expect(bash).toContain('Edits a.ts')
+	expect(bash).toContain('Timeout 5 s')
+	expect(render('bash', { command: 'echo first\necho second', description: 'Two commands' }, 'closed')).not.toContain('echo first')
+	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
+})

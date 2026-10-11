@@ -159,7 +159,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, body, width)
 		}
 		case 'tool': {
-			let { command, description } = item.input
+			let { command } = item.input
 			let prefix = titles.stamp(item.ts, '')
 			if (toolDetails.fullCommand(item.name, item.input)) {
 				if (fold !== 'open') return [strings.clipVisual(prefix + ansi.clean(String(command)), width)]
@@ -167,7 +167,13 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			}
 			let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)}`, width), item, width)
 			if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) return presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
-			let bash = typeof command === 'string' && typeof description === 'string'
+			let bash = item.name === 'bash'
+			if (fold === 'open' || fold === 'inline') {
+				let title = `${prefix}${ansi.clean(toolDetails.headline(item.name, item.input, look.result?.output).text)}`
+				let rows = ansi.wrap(title, width)
+				rows[0] = itemView.unsafe(rows[0]!, item, width)
+				return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ['', ...ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width)] : [])]
+			}
 			if (bash && fold === 'closed') return [head]
 			// Running bash output is laid out as its result glimpse will be
 			// (a blank row, then resultRows rows), so the card does not
@@ -175,8 +181,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let n = bash ? itemView.resultRows : 5
 			let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
 			if (!bash) return [head, ...live]
-			let commandLine = strings.clipVisual(`${item.input.background === true ? '&' : '$'} ${ansi.clean(command as string).replace(/\s+/g, ' ')}`, width)
-			return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(live.length ? ['', ...live] : [])]
+			let details = toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width))
+			return [head, ...details, ...(live.length ? ['', ...live] : [])]
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
