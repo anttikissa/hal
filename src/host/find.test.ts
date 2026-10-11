@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'fs'
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { Database } from 'bun:sqlite'
 import { findQuery, type FindBatch } from '../common/find.ts'
@@ -84,6 +84,18 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 	rmSync(`${home}/state/find.sqlite`)
 	ready = caughtUp(); find.init(); await ready
 	expect((await find.top('uniquenew'))[0]?.href).toBe(hit.href)
+}, 10000)
+
+test('a history rewritten under its index mark is reindexed, not a find failure', async () => {
+	let a = sessions.create({ cwd: '/example', model: 'example/model' })
+	let user = (text: string) => lines.encode({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
+	appendFileSync(history.file(a.id), user('first oldneedle') + user('second'))
+	let ready = caughtUp(); find.init(); await ready
+	// Longer first record: the old end offset now falls mid-line.
+	writeFileSync(history.file(a.id), user('first rewritten oldneedle') + user('second') + user('third newneedle'))
+	ready = caughtUp(); find.dirty(a.id); await ready
+	expect((await find.top('newneedle')).length).toBe(1)
+	expect((await find.top('rewritten')).length).toBe(1)
 }, 10000)
 
 test('unindexed history is searched and a new query suppresses the old stream', async () => {

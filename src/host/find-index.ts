@@ -130,9 +130,15 @@ async function catchup(sessionId: string): Promise<void> {
 		db.query('INSERT OR REPLACE INTO marks VALUES(?,?,?,?)').run(sessionId, end, stat?.size ?? 0, stat?.mtimeMs ?? 0)
 		batch = []
 	})()
-	let items = []
-	for await (let item of findIndex.records(sessionId, offset)) items.push(item)
-	if (items.some((i) => i.record.type === 'rebase' || (i.record.type === 'user' && i.record.replaces))) {
+	let items = [], stale = false
+	try { for await (let item of findIndex.records(sessionId, offset)) items.push(item) }
+	catch (e) {
+		// A history rewritten in place (cleanup, hand edit) can leave the
+		// mark mid-line: reindex from the start instead of failing find.
+		if (!offset) throw e
+		stale = true
+	}
+	if (stale || items.some((i) => i.record.type === 'rebase' || (i.record.type === 'user' && i.record.replaces))) {
 		items = []
 		for await (let item of findIndex.records(sessionId, 0)) items.push(item)
 		db.query('DELETE FROM docs WHERE sessionId=?').run(sessionId)

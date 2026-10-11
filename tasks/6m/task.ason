@@ -7,7 +7,8 @@ Result block navigation uses v8's stable block ids and hrefs. Browser result row
 	status: 'done',
 	notes: [
 		'v8 exposes request/kinds on find, find-cancel without an id, and per-tier replacement batches (not deltas); final done repeats a summary. Shared find-dialog + controller adapt this to existing modal machinery, with thin client adapters. Native result URLs required web startup to resume an explicitly addressed closed session before choosing a fallback tab.',
-		'Manually checked real headless Chrome through CDP at 390x800 and 1280x800: screenshots inspected, 52 streamed rows with highlighted matches, 44px filters, bounded overlay/list scrolling without horizontal overflow; toggle survives Escape/reopen, Enter scrolls to #6, and a fresh URL reopens a closed session. Focus change during debounce and terminal off-tail block visibility covered by behavior tests.'
+		'Manually checked real headless Chrome through CDP at 390x800 and 1280x800: screenshots inspected, 52 streamed rows with highlighted matches, 44px filters, bounded overlay/list scrolling without horizontal overflow; toggle survives Escape/reopen, Enter scrolls to #6, and a fresh URL reopens a closed session. Focus change during debounce and terminal off-tail block visibility covered by behavior tests.',
+		'Bug (11 Oct): a find error (multi-line, from the host) was put in the bottom border hint; its newlines broke the terminal frame, smearing the dialog and repeating the Query row. Invariant: errors show complete in the modal error area (terminal wraps it below the list; web pre-wraps it), and modal border text is always one line (newlines become spaces).'
 	],
 	needs: ['v8', 'w4']
 }

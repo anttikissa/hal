@@ -10,7 +10,7 @@ function open(remembered: FindFilter[]): ModalState {
 	return { ...modals.open({ title: 'Find', form: { text: 'Find', fields: [{ name: 'query', label: 'Query', type: 'text' }] } }), find: { filters: [...remembered], results: [], moved: false, focus: 0, done: true }, hint: 'Type a query · tab: filters/results · enter: open · esc: close' }
 }
 function input(m: ModalState, text: string): ModalState {
-	return { ...m, form: forms.set(m.form!, 0, text), query: findDialog.words(text), selected: 0, scroll: 0, items: [], find: { ...m.find!, request: undefined, results: [], moved: false, done: false } }
+	return { ...m, form: forms.set(m.form!, 0, text), query: findDialog.words(text), selected: 0, scroll: 0, items: [], error: undefined, find: { ...m.find!, request: undefined, results: [], moved: false, done: false } }
 }
 function words(text: string): string {
 	try { return findQuery.parse(text).words.join(' ') } catch { return '' }
@@ -49,7 +49,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 			results = [...results, ...next.slice(existing.length)]
 		} else results = [...results.filter((r) => r.kind !== b.tier), ...next].sort((a, c) => findQuery.tiers.indexOf(a.kind) - findQuery.tiers.indexOf(c.kind) || c.score - a.score)
 	}
-	return { ...m, items: results.map(findDialog.row), find: { ...f, results, done: b.done }, hint: b.error ?? (b.done ? `${results.length} results · enter: open · esc: close` : b.scanning ? `scanning ${b.scanning.toLocaleString()} histories…` : `searching ${b.tier}…`) }
+	return { ...m, items: results.map(findDialog.row), find: { ...f, results, done: b.done }, error: b.error, hint: b.error ? 'Find failed · esc: close' : (b.done ? `${results.length} results · enter: open · esc: close` : b.scanning ? `scanning ${b.scanning.toLocaleString()} histories…` : `searching ${b.tier}…`) }
 }
 function marks(text: string, query: string): [number, number][] {
 	let lower = text.toLocaleLowerCase(), ranges: [number, number][] = []
