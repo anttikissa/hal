@@ -10,7 +10,7 @@ import { toolPresentations } from './tool-presentation.ts'
 import { action } from '../common/action.ts'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
-import { type Tool, tools } from './tools.ts'
+import { type CallContext, type Tool, tools } from './tools.ts'
 
 const name = 'Action'
 
@@ -62,19 +62,20 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 }
 
 // The internal call an Action text stands for. Throws with what is wrong.
-function resolve(text: unknown): { name: string; input: Record<string, unknown> } {
+// `ctx`: the session it serves, when known (task pf2).
+function resolve(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
 	let parsed = action.parse(text)
 	let tool = actions.find(parsed.name)
-	if (tool.action?.resolve) return tool.action.resolve(parsed.raw)
+	if (tool.action?.resolve) return tool.action.resolve(parsed.raw, ctx)
 	return { name: tool.name, input: actions.generic(tool, parsed.raw) }
 }
 
 // A provider's native Action call as history keeps it: the internal call
 // plus the text, or unchanged when it does not resolve (tools.run then
 // reports why).
-function arrived(call: ToolCallBlock): ToolCallBlock {
+function arrived(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock {
 	if (call.name === name && call.action === undefined) try {
-		let { name: tool, input } = actions.resolve(call.input.action)
+		let { name: tool, input } = actions.resolve(call.input.action, ctx)
 		call = { type: 'tool_call', id: call.id, name: tool, input, action: call.input.action as string }
 	} catch {}
 	return toolPresentations.attach(call, call)

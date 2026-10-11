@@ -189,7 +189,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id, cacheId }, signal)) {
 				if (signal.aborted) return
 				if (event.type !== 'tool_call') { yield event; continue }
-				let call = actions.arrived({ ...event })
+				let call = actions.arrived({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })
 				if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
 				yield { ...call, type: 'tool_call' }
 			}
@@ -304,7 +304,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let cwd = sessions.open(id).cwd
 			status.transition(id, { type: 'tools' })
 			let ending = false
-			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
+			let ctx = { cwd, signal, sessionId: id, model, endTurn: () => (ending = true) }
 			// The round's calls run concurrently; results keep call order.
 			// wait starts once the others settle, so it sees children
 			// spawned in the same round.

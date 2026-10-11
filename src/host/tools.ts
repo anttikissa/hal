@@ -26,7 +26,9 @@ import { history } from './history.ts'
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
-export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
+// The session a call serves (task pf2); hooks read it to act per session or model.
+export type CallContext = { cwd: string; sessionId: string; model?: string }
+export type ToolContext = CallContext & { signal: AbortSignal; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
 // `diff`: what the call changed, for display only; providers never see it.
 export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } } | { text: string; diff: string }
 
@@ -50,7 +52,7 @@ export type ActionSpec = {
 	usage?: string[]
 	positional?: string[]
 	fields?: Record<string, string>
-	resolve?(raw: string): { name: string; input: Record<string, unknown> }
+	resolve?(raw: string, ctx?: CallContext): { name: string; input: Record<string, unknown> }
 }
 export type Tool<Output = string> = {
 	name: string
@@ -109,7 +111,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		// (actions.arrived): say why. Never run it, since approval saw
 		// only the unresolved call.
 		if (call.name === actions.name) {
-			actions.resolve(call.input.action)
+			actions.resolve(call.input.action, ctx)
 			throw new Error('the action did not resolve when it arrived; send it again')
 		}
 		let tool = tools.all().get(call.name)

@@ -1,15 +1,28 @@
 // Running turns (turns.ts): rounds, tools, pausing, failures and
 // recovering unfinished turns on the next host.
 
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
+import { actions } from './actions.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
-import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
+import { calls, client, created, fakeStream, testHome, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { lease } from './lease.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
 useHost()
+
+test('action resolution hears the session and model when a call arrives and when it runs', async () => {
+	let seen: unknown[] = [], spy = spyOn(actions, 'resolve').mockImplementation(((text: unknown, ctx: unknown) => { seen.push(ctx); throw new Error('nope') }) as any)
+	try {
+		let c = client(), id = created(c, testHome())
+		c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+		await until(() => calls.length === 1)
+		calls[0]!.push({ type: 'tool_call', id: 'x', name: 'Action', input: { action: 'NOPE' } }, { type: 'done', reason: 'tool_use' })
+		await until(() => calls.length === 2)
+		expect(seen).toEqual([{ cwd: testHome(), sessionId: id, model: 'fake/m1' }, expect.objectContaining({ cwd: testHome(), sessionId: id, model: 'fake/m1' })])
+	} finally { spy.mockRestore() }
+})
 
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
 	let a = client()

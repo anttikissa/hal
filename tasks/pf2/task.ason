@@ -1,0 +1,10 @@
+{
+	title: 'Hookable call paths carry their session context',
+	spec: 'Functions plugins commonly hook receive a context object naming the session they serve, so a hook can act per session, model or directory without guessing. Tool calls get ToolContext { cwd, signal, sessionId, model, ... }; action resolution gets the same identity: actions.resolve(text, ctx?) and actions.arrived(call, ctx?) take { sessionId, cwd, model } and pass it to Tool.action.resolve(raw, ctx?). turns.ts supplies it when a call arrives and when it runs, so both resolutions of one call see the same context. The context is optional where a caller has no session (tests, HELP); hooks treat a missing context as unknown, never as a match. New hookable paths follow the same rule: pass the context object, not loose fields.',
+	status: 'done',
+	notes: [
+		'Implemented for action resolution: CallContext { cwd, sessionId, model? } in tools.ts; ToolContext extends it. turns.ts passes the current model (after any mid-turn switch) at arrival and run. A pre-existing failure in turns.test.ts (a tool call runs on the host..., interactive: true in the view) also fails at HEAD 4128fdc8; unrelated.'
+	],
+	needs: ['an'],
+	foldInto: ['an']
+}
