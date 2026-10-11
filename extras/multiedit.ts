@@ -80,10 +80,12 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
   const v = hash ? { hash } : {}
   if (op === 'replace' && range === undefined) {
    open('OLD')
-   const [old, , j] = block(['NEW'], i); i = j
-   const [next, , k] = block(['END'], i); i = k
-    need(old.join(N).length > 0, 'needs nonempty old text')
-   edits.push({ path, old: old.join(N), new: next.join(N), ...v })
+    const [old, end, j] = block(['NEW', 'END'], i); i = j
+    // Undocumented tolerance: !!OLD closed by !!END removes the text.
+    let next: string[] = []
+    if (end === 'NEW') [next, , i] = block(['END'], i)
+     need(old.join(N).length > 0, 'needs nonempty old text')
+    edits.push({ path, old: old.join(N), new: next.join(N), ...v })
   } else if (op === 'replace' || op === 'delete') {
    need(range !== undefined, 'needs a line range A-B')
    let body: string[] = []
@@ -203,7 +205,9 @@ export const multiedit: Tool = {
 							const contexts = matches.map((n) => lease.numbered(lines, Array.from({ length: Math.min(lines.length, n + 2) - Math.max(1, n - 2) + 1 }, (_, j) => Math.max(1, n - 2) + j)))
 							throw new Error(`old matched ${count} times; count requires ${expected}. Set count to the exact intended number, extend old with surrounding context, or use version-checked ranges. First two matches in planned text after earlier steps (not a READ version):${String.fromCharCode(10)}${contexts.join(String.fromCharCode(10) + '…' + String.fromCharCode(10))}`)
 						}
-						p.next = Buffer.from(text.split(e.old).join(e.new))
+						// Removing whole lines also removes their newline, leaving no blank line.
+						const line = e.new === '' && count === 1 && (at === 0 || text[at - 1] === N) && text[at + e.old.length] === N
+						p.next = Buffer.from(line ? text.slice(0, at) + text.slice(at + e.old.length + 1) : text.split(e.old).join(e.new))
 					} else {
 						if (e.create && p.before) throw new Error('create: file exists; READ it and use write with its version')
 						p.next = Buffer.from(e.new)

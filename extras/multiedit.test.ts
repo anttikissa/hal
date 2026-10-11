@@ -72,6 +72,12 @@ test('inserts at one point and a range starting there apply in written order', a
  expect(readFileSync(a, 'utf8')).toBe(['1', 'x', 'y', 'two', '3'].join(nl) + nl)
 })
 
+test('removing whole lines by text, even with !!OLD alone, leaves no blank line; a fragment keeps its line', async () => {
+ const a = file('a', ['1', '2', '3', 'x y'].join(nl) + nl)
+ await run(parseBlocks(['', 'a replace', '!!OLD', '2', '!!END', 'a replace', '!!OLD', ' y', '!!NEW', '!!END'].join(nl)).edits)
+ expect(readFileSync(a, 'utf8')).toBe(['1', '3', 'x'].join(nl) + nl)
+})
+
 test('an action after the last block runs once the edit is written; a failed edit runs none', async () => {
  const a = file('a', 'old' + nl)
  const { edits, then } = parseBlocks(['', 'a replace', '!!OLD', 'old', '!!NEW', 'new', '!!END', 'BASH "cat a"'].join(nl))
