@@ -41,9 +41,12 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 			new Promise((resolve) => {
 				let socket = dial()
 				let open = false
+				// A dial into a dead network may hang for minutes: give up and retry.
+				let timer = setTimeout(() => open || socket.close(), wsLink.connectMs)
 				let conn: Conn = { send: (command) => socket.send(ason.stringify(command, 'short')), close: () => socket.close() }
 				socket.onopen = () => {
 					open = true
+					clearTimeout(timer)
 					resolve({ conn, role: 'client' })
 				}
 				socket.onmessage = (m) => {
@@ -58,6 +61,7 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 					on.event(event)
 				}
 				socket.onclose = (ev) => {
+					clearTimeout(timer)
 					if (ev?.code === 4000 || ev?.code === 4001) reload()
 					if (open) return on.dropped()
 					resolve(null)
@@ -83,4 +87,4 @@ function start(opts: LinkOptions): void {
 	void connection.start(startOpts)
 }
 
-export const wsLink = { baseMs: 250, maxDelayMs: 10_000, transport, start }
+export const wsLink = { baseMs: 250, maxDelayMs: 10_000, connectMs: 10_000, transport, start }

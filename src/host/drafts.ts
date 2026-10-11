@@ -48,9 +48,11 @@ function set(id: string, text: string, base?: number): Draft | undefined {
 
 // After a submit of `text`: the draft it was typed in is sent, so it
 // clears, unless it holds more than was sent (another client typed on).
-function sent(id: string, text: string): Draft | undefined {
-	let current = drafts.get(id).text.trim()
-	return current && text.includes(current) ? drafts.set(id, '') : undefined
+// `base`, the rev the sender's draft was typed from: if nobody changed
+// the draft since, it clears even when the host missed the last edits.
+function sent(id: string, text: string, base?: number): Draft | undefined {
+	let d = drafts.get(id), current = d.text.trim()
+	return current && (base === d.rev || text.includes(current)) ? drafts.set(id, '') : undefined
 }
 
 function reset(): void {

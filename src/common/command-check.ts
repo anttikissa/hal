@@ -63,7 +63,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
 	if (c.type === 'submit' && c.delivery !== undefined && !sendKeys.parse(c.delivery)) return 'submit: delivery must be steer, soft-steer or queue'
 	for (let flag of ['queue', 'amend', 'interactive']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
-	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
+	if ((c.type === 'draft' || c.type === 'submit') && c.base !== undefined && !Number.isInteger(c.base)) return `${c.type}: base must be an integer`
 	if (c.type === 'answer') {
 		let a = c.answers
 		let strings = a && typeof a === 'object' && !Array.isArray(a) && Object.values(a).every((v) => typeof v === 'string')

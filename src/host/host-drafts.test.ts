@@ -210,6 +210,23 @@ test('client crash before the host had the prompt: sent after restart', async ()
 	expect(userRecords().map((r) => (r.type === 'user' && r.blocks[0]?.type === 'text' ? r.blocks[0].text : ''))).toEqual(['never arrived'])
 })
 
+test('a prompt sent after offline edits clears the older host draft it replaced', async () => {
+	await client()
+	drafts.edit(id, 'first try')
+	await until(() => !drafts.local(id).dirty)
+	up = false
+	cut!()
+	await tick()
+	drafts.edit(id, 'rewritten prompt')
+	drafts.submit(id, 'rewritten prompt')
+	connection.stop()
+	up = true
+	events = []
+	await client()
+	await until(() => drafts.pending(id).length === 0)
+	await until(() => drafts.text(id) === '')
+})
+
 test('a refused prompt goes back into the editor, before text typed since', async () => {
 	await client()
 	let origSubmit = prompts.submit

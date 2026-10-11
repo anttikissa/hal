@@ -129,12 +129,13 @@ export type Command = (
 	// `edits` too, an edit of that inbox message while it still waits.
 	// A slash command (/name args) runs on the host at once instead.
 	// `rewind`: the text replaces prompt record #n, which and everything
-	// after it a rebase drops first (task 26q).
+	// after it a rebase drops first (task 26q). `base`: the draft rev the
+	// sent text emptied; the host clears its draft if still at that rev.
 	// Always the human's: another session's messages come from the host
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string; base?: number }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
