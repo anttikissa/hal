@@ -3,14 +3,24 @@
 // event with the full state the bug could hide in, posted to this
 // host's state/composer-debug.log. Records draft text, so it is off by
 // default. Anomalies (box and state disagree, the example drawn under
-// typed text, mismatched fonts) are logged with a page badge.
+// typed text, mismatched fonts) are logged; only a failed upload shows
+// on the page.
 import { app } from './app.ts'
 import { strings } from '../common/strings.ts'
 
 type Row = Record<string, unknown>
-let rows: Row[] = [], timer: ReturnType<typeof setTimeout> | undefined, serial = 0, anomalies = 0, lastAnomaly = ''
+let rows: Row[] = [], timer: ReturnType<typeof setTimeout> | undefined, serial = 0, lastAnomaly = ''
 const page = crypto.randomUUID().slice(0, 8)
 let badge: HTMLElement | undefined
+const fail = (text: string) => {
+	if (!badge) {
+		badge = document.createElement('div')
+		badge.className = 'ComposerDebug'
+		badge.setAttribute('role', 'status')
+		document.body.append(badge)
+	}
+	badge.textContent = text
+}
 
 const rect = (el: Element | null | undefined) => {
 	if (!el) return null
@@ -71,13 +81,10 @@ function record(event: string, detail: Row = {}): void {
 	if (found.length) {
 		;(s as Row).anomaly = found
 		let key = found.join('|')
-		if (key !== lastAnomaly) anomalies++
 		lastAnomaly = key
 	} else lastAnomaly = ''
 	rows.push(s)
 	if (rows.length > 400) rows.splice(0, rows.length - 400)
-	if (badge) badge.textContent = `composer debug ${serial}${anomalies ? ` · ${anomalies} anomal${anomalies === 1 ? 'y' : 'ies'}: ${found.join(', ') || 'last cleared'}` : ''}`
-	if (badge) badge.dataset.bad = String(!!found.length)
 	timer ??= setTimeout(flush, found.length ? 200 : 2000)
 }
 
@@ -88,19 +95,15 @@ async function flush(): Promise<void> {
 	try {
 		let res = await fetch('/composer-debug', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', keepalive: batch.length < 20, body: JSON.stringify({ page, ua: navigator.userAgent, rows: batch }) })
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
+		badge?.remove(); badge = undefined
 	} catch (error) {
 		rows = [...batch, ...rows].slice(-400)
-		if (badge) badge.textContent = `composer debug: upload failed: ${String(error)}`
+		fail(`composer debug: upload failed: ${String(error)}`)
 	}
 	if (rows.length) timer ??= setTimeout(flush, 2000)
 }
 
 function init(): void {
-	badge = document.createElement('div')
-	badge.className = 'ComposerDebug'
-	badge.setAttribute('aria-hidden', 'true')
-	badge.textContent = 'composer debug on'
-	document.body.append(badge)
 	let inBox = (e: Event) => e.target instanceof HTMLTextAreaElement && !!e.target.closest('.Composer .field') && !e.target.classList.contains('measure')
 	let later = (name: string) => { setTimeout(() => record(`${name}+task`), 0); requestAnimationFrame(() => requestAnimationFrame(() => record(`${name}+frame`))) }
 	for (let name of ['beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'keydown', 'keyup', 'focus', 'blur', 'paste', 'cut', 'select']) {
