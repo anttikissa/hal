@@ -46,6 +46,6 @@ test('each quirk rescues Sonnet; other models and unknown sessions get the stric
 })
 
 test('call markup is a quirk for Opus too; other quirks are not', () => {
-	expect(resolve([...head, '<invoke name="Action">', '<parameter name="action">BASH "ls"</parameter>'], 'anthropic/claude-opus-5-5')).toEqual({ edits, then: ['BASH "ls"'] })
+	expect(resolve([...head, '<invoke name="tool">', '<parameter name="cmd">BASH "ls"</parameter>'], 'anthropic/claude-opus-5-5')).toEqual({ edits, then: ['BASH "ls"'] })
 	expect(() => resolve([...head, '$ ls'], 'anthropic/claude-opus-5-5')).toThrow('EDIT line 8')
 })

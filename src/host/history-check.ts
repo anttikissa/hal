@@ -48,22 +48,9 @@ function check(value: unknown): HistoryRecord {
 	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
 	for (let b of r.type === 'assistant' ? [r.block] : r.type === 'user' ? r.blocks : []) {
 		if (b.type !== 'tool_call' && b.type !== 'tool_result') continue
-		if (b.type === 'tool_call') legacyCall(b)
 		if (b.presentation !== undefined) toolPresentation.check(b.presentation, b.type === 'tool_result' ? b.output : '')
 		if (b.presentationError !== undefined && typeof b.presentationError !== 'string') throw new Error('invalid tool presentation error')
 	}
 	return r
-}
-
-// Histories from before the rename to tools (task wev) name the native
-// tool Action with input { action } and keep its text in `action`; read
-// them as today's `tool` { cmd } and `cmd`, so display, pruning and
-// replay see one form and providers get calls the current tool accepts.
-function legacyCall(b: ToolCallBlock & { action?: unknown }): void {
-	if (typeof b.action === 'string' && b.cmd === undefined) b.cmd = b.action
-	delete b.action
-	if (b.name !== 'Action') return
-	b.name = 'tool'
-	if (b.input && 'action' in b.input) b.input = { cmd: b.input.action }
 }
 export const historyCheck = { check }

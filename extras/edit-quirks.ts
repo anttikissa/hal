@@ -56,7 +56,7 @@ export function fix(text: string, error: string): [string, Quirk] | undefined {
 		}
 		if (/^<\/?(invoke|parameter|function_calls|antml:)/.test(line)) {
 			const rest = raw.slice(k).join(N), held: string[] = []
-			for (const m of rest.matchAll(/<(?:antml:)?parameter name="(?:action|cmd)">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g)) if (m[1]!.trim()) held.push(m[1]!.trim())
+			for (const m of rest.matchAll(/<(?:antml:)?parameter name="cmd">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g)) if (m[1]!.trim()) held.push(m[1]!.trim())
 			return [[...raw.slice(0, k), ...held].join(N), 'markup']
 		}
 		if (/^\S+$/.test(line) && !/[@/.]/.test(line)) {

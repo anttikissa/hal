@@ -123,8 +123,6 @@ order in both clients; it is separate from delivery eligibility.
   syntax on demand; calls read like terminal lines in the UI and
   history; Hal's own parser accepts clear misuse a provider schema
   would reject; one tool works across providers (README.md, Tools).
-  Histories from before the rename (native `Action` { action }, block
-  field `action`) are read as the current form (task wev).
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.

@@ -61,22 +61,6 @@ test('replay sends calls back as their cmd text, old calls as their equivalent',
 	expect(replay.asNative({ type: 'tool_call', id: 'a', name: 'read', input: { path: 'x' } }).input).toEqual({ cmd: "READ { path: 'x' }" })
 })
 
-test('histories from before the rename replay as tool calls the current tool accepts (task wev)', () => {
-	let ts = '2026-10-01T12:00:00.000Z'
-	let records = [
-		{ type: 'user', blocks: [{ type: 'text', text: 'go' }], ts, n: 1 },
-		{ type: 'assistant', block: { type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, action: 'BASH "ls"' }, ts, n: 2 },
-		{ type: 'assistant', block: { type: 'tool_call', id: 'b', name: 'Action', input: { action: 'NOPE 1' } }, ts, n: 3 },
-		{ type: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'x' }, { type: 'tool_result', id: 'b', output: 'err', isError: true }], ts, n: 4 },
-	].map((r) => history.check(r))
-	expect(records[1]!.type === 'assistant' && records[1]!.block).toEqual({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' })
-	let blocks = replay.toMessages(records).flatMap((m): any[] => m.blocks)
-	expect(blocks.filter((b) => b.type === 'tool_call')).toEqual([
-		{ type: 'tool_call', id: 'a', name: 'tool', input: { cmd: 'BASH "ls"' } },
-		{ type: 'tool_call', id: 'b', name: 'tool', input: { cmd: 'NOPE 1' } },
-	])
-})
-
 test('READ leases the whole file; ranges clamp; EDIT applies every range to the leased version at once', async () => {
 	let id = created(client(), testHome())
 	let path = `${testHome()}/a.txt`
