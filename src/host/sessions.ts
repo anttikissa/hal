@@ -35,6 +35,7 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
 	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
 	if (data.slots !== undefined && (!Number.isSafeInteger(data.slots) || data.slots < 0)) throw new Error(`${path}: invalid slots`)
+	if (data.ownerCall !== undefined && (!Number.isSafeInteger(data.ownerCall) || data.ownerCall < 1 || !data.owner)) throw new Error(`${path}: invalid ownerCall`)
 	for (let key of ['owner', 'parent']) if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key]))) throw new Error(`${path}: invalid ${key}`)
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
 	if (data.interactive !== undefined && typeof data.interactive !== 'boolean') throw new Error(`${path}: invalid interactive`)

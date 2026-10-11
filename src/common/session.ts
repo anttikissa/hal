@@ -25,6 +25,7 @@ export interface SessionMeta {
 	noUser?: boolean
 	interactive?: boolean
 	owner?: string
+	ownerCall?: number
 	parent?: string
 	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
 	spawn?: SpawnKind

@@ -21,9 +21,9 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 
 export const tool: Tool = {
 	name: 'spawn',
-	syntax: { summary: 'a child session', aliases: { title: 'name', goal: 'task' } },
+	syntax: { summary: false, aliases: { title: 'name', goal: 'task' } },
 	description:
-		'Open a session in the tab after this one.',
+		'Open a session in the tab after this one. subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a session for the user. A <question> keeps a subagent open; answer through SEND. HELP SUBAGENTS covers coordination and resuming.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -50,7 +50,7 @@ export const tool: Tool = {
 		if (model !== undefined) { let selected = models.selection(model); if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`); model = models.qualified(selected.id, selected.effort); if (selected.note) note = ` Effort: ${selected.note}.` }
 		let cwd = resolve(ctx.cwd, text(input, 'cwd') ?? '.')
 		if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${cwd} is not a directory`)
-		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit })
+		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit, callId: ctx.callId })
 		if (kind === 'interactive') return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.${note}`
 		return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.${note}`
 	},

@@ -164,14 +164,14 @@ This is a fork of session $fork_parent and shares its history.
 ::
 
 :: section "Spawn budget"
-<!-- Subagents and non-interactive sessions get the second text: their
-"user" is an agent or nobody. -->
+<!-- TODO - to be reviewed by a human -11-fir: progressively disclose subagent coordination through HELP SUBAGENTS. -->
 ::: if subagent_slots="0"
 ::: else
+You may use subagents (budget: $subagent_slots, applies recursively); HELP SUBAGENTS to learn how.
 :::: if session_interactive="true" subagent="false"
-Your subagent budget: $subagent_slots - applies recursively. /budget to query. Spawn only when user approves.
+Spawn only when user approves.
 :::: else
-Your subagent budget: $subagent_slots - applies recursively. /budget to query. Agent-agent communication loses information: only use subagents for independent parallelizable work where risk of misunderstandings is small.
+Agent-agent communication loses information: use subagents only for independent parallelizable work where risk of misunderstandings is small.
 ::::
 :::
 ::

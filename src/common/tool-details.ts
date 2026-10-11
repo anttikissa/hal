@@ -103,6 +103,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (str('path')) return { text: `Edit ${str('path')}${str('description') ? `: ${str('description')}` : ''}`, keys: ['path', 'hash', 'description'] }
 			break
 		case 'inspect': {
+			if (input.target !== undefined) return { text: `Inspect ${String(input.target)}`, key: 'target' }
 			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
 			let what = (input.what as string | undefined) ?? 'sessions'
 			let target = what === 'sessions' ? (input.scope as string | undefined) ?? 'self' : what
@@ -115,7 +116,14 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			let at = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([tab, id]) => (tab ? `tab ${tab}, ${id}` : id))[0]
 			return { text: `Spawn ${what}${at ? ` (${at})` : ''}`, keys: str('name') ? ['name'] : [] }
 		}
+		case 'stop':
+			if (input.target !== undefined) return { text: `Stop ${String(input.target)}`, key: 'target' }
+			break
 		case 'wait': {
+			if (input.targets !== undefined) {
+				let targets = Array.isArray(input.targets) ? input.targets : [input.targets]
+				return { text: `Wait for ${targets.length ? targets.join(', ') : 'background work'}`, key: 'targets' }
+			}
 			if (output?.startsWith('No subagent')) return { text: 'Wait (no subagent running)' }
 			let who = ids(/(?:^Waiting for |, )(?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)
 			return { text: `Wait for ${who.length ? who.join(', ') : 'subagents'}` }

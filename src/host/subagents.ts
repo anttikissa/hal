@@ -15,6 +15,7 @@ import type { SessionMeta, SpawnKind } from '../common/session.ts'
 import { replay } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { summary } from '../common/summary.ts'
+import { work } from './work.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
@@ -27,7 +28,7 @@ import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { auth } from './auth.ts'
 
-export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string; model?: string; name?: string; limit: number }
+export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string; model?: string; name?: string; limit: number; callId?: string }
 
 // Opens the child and starts its first turn; returns its id. Throws,
 // spending nothing, when an owner ancestor has too few slots left or the
@@ -50,6 +51,10 @@ function spawn(owner: string, s: Spawn): string {
 	}
 	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name, autoclose: s.kind === 'subagent', interactive: promptCache.interactive(owner) })
 	Object.assign(child, { ...(s.kind !== 'interactive' && { owner, slots: s.limit }), spawn: s.kind } satisfies Partial<SessionMeta>)
+	if (child.owner && s.callId) {
+		let call = history.readSync(owner).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === s.callId)
+		if (call?.n !== undefined) child.ownerCall = call.n
+	}
 	if (s.fork) subagents.fork(owner, child.id)
 	liveFiles.save(child)
 	for (let ancestor of charged) {
@@ -156,18 +161,23 @@ function report(id: string): void {
 		text = last?.type === 'assistant' && last.block.type === 'text' ? last.block.text : `Session ${label} finished without a message`
 	}
 	let owner = meta.owner
+	subagents.delivering.add(id)
+	let settled = () => { subagents.delivering.delete(id); work.wake(id) }
 	let deliver = () => {
-		// A child stopped by tab close must not wake an idle, now unseen owner.
-		if (tabs.file().closed.some((tab) => tab.id === owner) && !tabs.file().open.includes(owner)) return
-		let refused = prompts.submit(owner, text, undefined, 'steer', { from: id, label, advisory: true, summary: summary.extract(text), ...(summary.extract(text) && end.status === 'completed' ? { report: summary.asks(text) ? 'question' as const : 'summary' as const } : {}) })
-		if (refused) diag.log(`report ${id} to ${owner}: ${refused}`)
+		try {
+			// A child stopped by tab close must not wake an idle, now unseen owner.
+			if (tabs.file().closed.some((tab) => tab.id === owner) && !tabs.file().open.includes(owner)) return
+			let refused = prompts.submit(owner, text, undefined, 'steer', { from: id, label, advisory: true, summary: summary.extract(text), ...(summary.extract(text) && end.status === 'completed' ? { report: summary.asks(text) ? 'question' as const : 'summary' as const } : {}) })
+			if (refused) diag.log(`report ${id} to ${owner}: ${refused}`)
+		} finally { settled() }
 	}
 	let ready = host.ready(owner)
 	if (!ready) return deliver()
-	ready.then(deliver, (e) => diag.log(`report ${id} to ${owner}: ${e?.message ?? e}`))
+	ready.then(deliver, (e) => { diag.log(`report ${id} to ${owner}: ${e?.message ?? e}`); settled() })
 }
 
 export const subagents = {
+	delivering: new Set<string>(),
 	spawn,
 	fork,
 	running,

@@ -66,7 +66,7 @@ function values(raw: string): Values {
 				purposes.push(raw.slice(i + 2, stop).trim())
 				if (close < 0) unclosed = true
 				i = close < 0 ? stop : close + 2
-			} else if (c === '#' || raw.startsWith('//', i)) i = lineEnd(raw, i)
+			} else if (c === '#' && !/^#t?\d+(?=\s|$)/.test(raw.slice(i)) || raw.startsWith('//', i)) i = lineEnd(raw, i)
 			else break
 		}
 		if (i >= raw.length) break

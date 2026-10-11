@@ -49,19 +49,16 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	expect(first).toHaveLength(1)
 	expect(first[0].blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
 	expect(first[0].blocks[0].text).toContain(p)
-	// The parent's turn ended at the wait, having seen the child.
-	await until(() => status.stateOf(p).type === 'idle')
-	let results = history.readSync(p).find((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))
-	expect(JSON.stringify(results)).toContain(child)
-	expect(history.readSync(p).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
+	// WAIT holds without another provider request until the child reports.
+	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
+	expect(history.readSync(p).some((r) => r.type === 'turn_end')).toBe(false)
 	expect(calls).toHaveLength(2)
-	// Its last text, without any send, wakes the parent with a turn of
-	// its own, and its tab closes.
+	// Its last text, without SEND, wakes the waiting parent and closes its tab.
 	calls[k]!.push({ type: 'text', text: 'looking' }, call('r1', 'read', { path: 'x' }), { type: 'done', reason: 'tool_use' })
 	let after = await callWith('"r1"', k + 1)
 	calls[after]!.push({ type: 'text', text: 'fixed it' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('fixed it')
-	let got = lastMessage(woke).blocks[0].text
+	let got = JSON.stringify(lastMessage(woke))
 	expect(got).toContain(`message from tab 2 (${child}), fixer`)
 	expect(got).not.toContain('looking')
 	await until(() => !tabs.file().open.includes(child))
@@ -73,7 +70,7 @@ test('wait with no subagent running says so at once and the turn goes on', async
 	let p = await parent(c)
 	calls[0]!.push(call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
-	expect(resultOf(1, 'w1').output).toMatch(/no subagent/i)
+	expect(resultOf(1, 'w1').output).toMatch(/no owned background command or subagent/i)
 	expect(status.stateOf(p).type).toBe('running')
 })
 
@@ -213,18 +210,18 @@ test('a child question wakes its waiting parent, stays open, and ordinary send r
 	calls[0]!.push(call('s1', 'spawn', { task: 'choose a format' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
 	let k = await callWith('choose a format')
 	let child = tabs.file().open[1]!
-	await until(() => status.stateOf(p).type === 'idle')
+	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
 	calls[k]!.push({ type: 'text', text: '<question>JSON or text?</question>' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('JSON or text?', k + 1)
 	expect(tabs.file().open).toContain(child)
 	expect(status.stateOf(child).type).toBe('idle')
-	expect(lastMessage(woke).blocks[0].text).toContain(`message from ${heard(tabs.label(child))}`)
+	expect(JSON.stringify(lastMessage(woke))).toContain(`message from ${heard(tabs.label(child))}`)
 	calls[woke]!.push(call('answer', 'send', { to: child, text: 'Use JSON', description: 'Answer the format question' }), call('w2', 'wait'), { type: 'done', reason: 'tool_use' })
 	let resumed = await callWith('Use JSON', woke + 1)
 	expect(calls[resumed]!.input.sessionId).toBe(child)
 	expect(lastMessage(resumed).blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
 	expect(sessions.open(p).slots).toBe(2)
-	await until(() => status.stateOf(p).type === 'idle')
+	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
 	calls[resumed]!.push({ type: 'text', text: 'JSON ready' }, { type: 'done', reason: 'end' })
 	let done = await callWith('JSON ready', resumed + 1)
 	expect(calls[done]!.input.sessionId).toBe(p)

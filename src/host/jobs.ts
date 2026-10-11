@@ -18,12 +18,13 @@ import { history } from './history.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
+import { work } from './work.ts'
 import { tools } from './tools.ts'
 import { busy } from './busy.ts'
 
-export type Run = { done: Promise<string>; stop: (why?: string) => void }
+export type Run = { done: Promise<string>; stop: (why?: string) => void; output: () => string }
 // `unsafe`: the call was flagged unsafeToStop, so a restart asks first.
-type Job = { sessionId: string; stop: () => void; unsafe?: { input: Record<string, unknown>; at: number } }
+type Job = { sessionId: string; stop: () => void; output?: () => string; unsafe?: { input: Record<string, unknown>; at: number } }
 
 // Starts `command` with bash -c in `cwd`, stdout and stderr merged.
 // `done` is the status line (`[exit N]`, `[timed out after Ns]`, …)
@@ -75,7 +76,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	}
 	child.on('error', (e) => (clearTimeout(timer), (settled = true), reject(e)))
 	child.on('close', (code, sig) => end(sig ? `killed by ${sig}` : `exit ${code}`, false))
-	return { done, stop: (why = 'stopped by the user') => end(why) }
+	return { done, stop: (why = 'stopped by the user') => end(why), output: () => `${head}${dropped ? `\n[${dropped} characters dropped]\n` : ''}${tail}` }
 }
 
 // Runs `command` for session `sessionId` in the background. One that
@@ -86,12 +87,22 @@ async function start(sessionId: string, command: string, cwd: string, ms?: numbe
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
-	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
-	if (early !== undefined) return early
-	jobs.state.running.set(id, { sessionId, stop: run.stop, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })
+	jobs.state.running.set(id, { sessionId, stop: run.stop, output: run.output, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
 	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
+	try {
+		let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
+		if (early !== undefined) {
+			jobs.state.running.delete(id)
+			jobs.forget(sessionId, id)
+			return early
+		}
+	} catch (e) {
+		jobs.state.running.delete(id)
+		jobs.forget(sessionId, id)
+		throw e
+	}
 	run.done.then(
 		(out) => jobs.finish(id, out),
 		(e) => jobs.finish(id, `[failed: ${e?.message ?? e}]\n`),
@@ -125,13 +136,17 @@ function finish(id: string, out: string): void {
 
 // Sends `text` to the session as an advisory message from 'bash <id>'.
 function tell(sessionId: string, id: string, text: string): void {
+	jobs.state.delivering.set(id, text)
+	let settled = () => { jobs.state.delivering.delete(id); work.wake(sessionId) }
 	let deliver = () => {
-		let refused = prompts.submit(sessionId, text, undefined, 'steer', { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
-		if (refused) diag.log(`bash ${id} to ${sessionId}: ${refused}`)
+		try {
+			let refused = prompts.submit(sessionId, text, undefined, 'steer', { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
+			if (refused) diag.log(`bash ${id} to ${sessionId}: ${refused}`)
+		} finally { settled() }
 	}
 	let ready = host.ready(sessionId)
 	if (!ready) return deliver()
-	ready.then(deliver, (e) => diag.log(`bash ${id} to ${sessionId}: ${e?.message ?? e}`))
+	ready.then(deliver, (e) => { diag.log(`bash ${id} to ${sessionId}: ${e?.message ?? e}`); settled() })
 }
 
 // The session's background commands still running here.
@@ -156,6 +171,11 @@ function stop(sessionId: string, ref: string): { refused?: string; stopped?: str
 	let ids = jobs.running(sessionId)
 	let n = ref.trim().match(/^#?t?(\d+)$/)?.[1]
 	let list = ids.map((id) => jobs.label(sessionId, id)).join(', ')
+	if (ref.trim() === 'all') {
+		if (!ids.length) return { refused: 'no background jobs running' }
+		for (let id of ids) jobs.state.running.get(id)!.stop()
+		return { stopped: list }
+	}
 	if (!ref.trim()) {
 		if (ids.length !== 1) return { refused: ids.length ? `several background jobs run (${list}); name one` : 'no background jobs running' }
 	} else if (n === undefined) return { refused: `not a job number: ${ref.trim()}` }
@@ -171,6 +191,7 @@ function stop(sessionId: string, ref: string): { refused?: string; stopped?: str
 function killAll(): void {
 	for (let job of jobs.state.running.values()) job.stop()
 	jobs.state.running.clear()
+	jobs.state.delivering.clear()
 }
 
 // A new host: every open or busy session whose metadata names
@@ -206,7 +227,7 @@ export const jobs = {
 	byMessage,
 	why,
 	// `running`: background commands of this process, by id.
-	state: { running: new Map<string, Job>() },
+	state: { running: new Map<string, Job>(), delivering: new Map<string, string>() },
 	// How long a background call waits for a command that fails at once.
 	graceMs: 100,
 	// Background jobs must not run unseen indefinitely; callers may override it.

@@ -15,6 +15,7 @@ import { stats } from '../stats.ts'
 import { tabs } from '../tabs.ts'
 import type { Tool } from '../tools.ts'
 import { version } from '../version.ts'
+import { work } from '../work.ts'
 
 // A model id, with until when it is rate limited on every account.
 function withLimit(id: string): string {
@@ -88,10 +89,11 @@ export const tool: Tool = {
 		summary: 'agent internals',
 		// Plain words fill what, scope, fields in order; HELP shows the object form.
 		positional: ['what', 'scope', 'fields'],
-		usage: ['INSPECT [{ what, scope, fields }]'],
+		usage: ['INSPECT <session-id|#t123>', 'INSPECT [{ what, scope, fields }]'],
 		resolve: (raw) => {
 			let { values } = callText.values(raw)
 			if (values.length === 1 && values[0] === 'tabs') return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
+			if (values.length === 1 && work.isTarget(values[0])) return { name: 'inspect', input: { target: values[0] } }
 			return { name: 'inspect', input: nativeTool.generic(tool, raw) }
 		},
 	},
@@ -99,12 +101,17 @@ export const tool: Tool = {
 	parameters: {
 		type: 'object',
 		properties: {
+			target: { type: 'string', description: 'Session ID or local tool-call reference (#t123, t123 or 123): status, available output and pending question. Bare numbers mean tool calls, not tabs. Cannot combine with what, scope or fields.' },
 			what: { type: 'string', enum: WHATS, description: 'sessions (default), host, models or clients' },
 			scope: { type: 'string', enum: SCOPES, description: 'self (default), project or all' },
 			fields: { type: 'string', description: 'Comma-separated fields, e.g. "name,cwd,context"' },
 		},
 	},
 	async run(input, ctx) {
+		if (input.target !== undefined) {
+			if ([input.what, input.scope, input.fields].some((v) => v !== undefined)) throw new Error('INSPECT target cannot be combined with what, scope or fields.')
+			return work.inspect(work.target(ctx.sessionId, input.target))
+		}
 		let what = oneOf('what', input.what, WHATS) ?? 'sessions'
 		let scope = oneOf('scope', input.scope, SCOPES) ?? 'self'
 		if (what === 'models') {

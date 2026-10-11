@@ -14,6 +14,7 @@ import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
+import { work } from './work.ts'
 import { pages, type Page, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
 import { noticeHistory } from './notice-history.ts'
@@ -27,6 +28,7 @@ import { stats } from './stats.ts'
 import { version } from './version.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
+import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
@@ -254,7 +256,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
 		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
 	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
-	else if (c.type === 'pause') refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : turns.stop(c.sessionId)
+	else if (c.type === 'pause') refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : work.pause(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
@@ -305,6 +307,7 @@ function broadcast(id: string, event: Event): void {
 	tabs.observe(id, event)
 	if (event.type === 'turn-end') void recap.prepare(id)
 	notify.route(host.state.clients, id, event)
+	work.changed(id, event)
 }
 
 // Whenever this process exits while it is host (quit, restart, SIGTERM,
@@ -338,6 +341,8 @@ function reset(): void {
 	recap.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()
 	turns.state.running.clear()
+	for (let running of tools.running.values()) running.controller.abort()
+	tools.running.clear()
 	jobs.killAll()
 	host.state.opening.clear()
 	host.state.clients.clear()

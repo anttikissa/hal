@@ -2,7 +2,7 @@
 // later as a message from the recorded call.
 
 import { expect, test } from 'bun:test'
-import { existsSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
 import { calls, client, testHome, toolSession, until, useHost } from './host-fixture.test.ts'
 import { jobs } from './jobs.ts'
 import { sessions } from './sessions.ts'
@@ -72,8 +72,17 @@ test('an idle session gets the result as a turn of its own', async () => {
 
 test('Escape does not stop the command; the paused session keeps its result waiting', async () => {
 	let c = client()
-	let { id, job } = await started(c, 'sleep 0.2; echo done')
+	let gate = `${testHome()}/release`
+	let { id, job } = await started(c, `while [ ! -e '${gate}' ]; do sleep 0.05; done; echo done`)
 	c.conn.send({ type: 'pause', sessionId: id })
+	await until(() => c.of('output').some((e) => e.text.includes('Still running')))
+	let notice = c.of('output').find((e) => e.text.includes('Still running'))!.text
+	expect(notice).toContain(job)
+	expect(notice).toContain('Run it')
+	expect(notice).toContain('/kill all')
+	expect(notice).toContain(`/stop ${id}`)
+	expect(jobs.running(id)).toHaveLength(1)
+	writeFileSync(gate, '')
 	await slow(() => c.views.get(id)?.inbox.length)
 	expect(c.views.get(id)!.inbox).toMatchObject([{ text: '[exit 0]\ndone\n', label: `bash ${job}` }])
 	expect(calls.length).toBe(2)

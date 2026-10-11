@@ -1,20 +1,28 @@
-// wait: ends the caller's turn until the next report of a subagent it
-// spawned (tasks t0, mt), which arrives as a message and starts a new turn.
-
-import { subagents } from '../subagents.ts'
-import { tabs } from '../tabs.ts'
+import { callText } from '../../common/call-text.ts'
+import { nativeTool } from '../native-tool.ts'
 import type { Tool } from '../tools.ts'
+import { work } from '../work.ts'
 
 export const tool: Tool = {
 	name: 'wait',
-	// WAIT waits for any child's report; { for, timeout } are accepted and ignored.
-	syntax: { summary: 'for a child report', aliases: { for: null, timeout: null } },
-	description: 'Wait for the next subagent session to report back. Ends this turn; its question or completion starts the next one. Answer a question through ordinary send.',
-	parameters: { type: 'object', properties: {} },
-	async run(_input, ctx) {
-		let active = subagents.running(ctx.sessionId)
-		if (!active.length) return 'No subagent of this session is running: none was spawned, or all have finished. Go on without waiting.'
-		ctx.endTurn?.()
-		return `Waiting for ${active.map((id) => tabs.label(id)).join(', ')}. This turn ends here; the next report starts a new one.`
+	syntax: {
+		summary: false,
+		positional: ['targets'],
+		usage: ['WAIT [<session-id|#t123> ...]', 'WAIT { targets: ["12-xyz", "#t123"] }'],
+		aliases: { for: 'targets', timeout: null },
+		resolve(raw) {
+			let { values } = callText.values(raw)
+			let input = values.every((v) => typeof v === 'string' || typeof v === 'number' || Array.isArray(v))
+				? { targets: values.flat() } : nativeTool.generic(tool, raw)
+			return { name: 'wait', input }
+		},
+	},
+	description: 'Yield until selected work completes, fails, stops or asks a question. Without targets, wait for any owned background command or subagent. Output chunks do not wake you. Completed targets return immediately; reports retain their normal delivery. Answer an agent through SEND. Tool references belong to this session; bare numbers mean tool calls, not tabs.',
+	parameters: { type: 'object', properties: { targets: { type: 'array', items: { type: 'string' }, description: 'Session IDs or tool-call references (#t123, t123 or 123); default any owned background work.' } } },
+	async run(input, ctx) {
+		let given = input.targets === undefined ? [] : Array.isArray(input.targets) ? input.targets : [input.targets]
+		let targets = given.length ? given.map((v) => work.target(ctx.sessionId, v)) : work.defaults(ctx.sessionId)
+		if (targets.some((t) => t.sessionId === ctx.sessionId && (!t.call || t.call.id === ctx.callId))) throw new Error('WAIT cannot wait for its own session or its own call. Name background work or another session.')
+		return work.wait(targets, ctx.signal)
 	},
 }

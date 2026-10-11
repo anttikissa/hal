@@ -15,10 +15,28 @@ Escape pauses the current turn and interrupts foreground tools under its existin
 /kill <id> remains selective. /kill all stops all background commands in the current session without stopping its agent or subagents, reports outcomes and retains output. Existing no-argument behavior remains.
 
 Verification covers target resolution, recursive ownership boundaries, process cancellation and retained output, WAIT races and question delivery, Escape leaving background work running while revealing it, paused-result delivery, kill-all scope, and continuation without restarting descendants. Coordination is event-driven with bounded live bookkeeping, not repeated polling or unbounded event accumulation. Tab visibility is unchanged; bash tabs and hidden agents are a deferred follow-up.`,
-	status: 'planned',
+	status: 'done',
 	notes: [
-		'Planning inspection: jobs.ts and tools/bash.ts deliberately detach background jobs from Escape cancellation; commands/kill.ts is the existing selective stop path. Earlier conversational claims that Escape already kills background jobs were wrong. Keep the final agreed Escape scope, reconciling older conflicting wording in xz, ker and 8v when implementing. /resume currently describes reopening closed sessions (18c); do not promise that an interrupted tool resumes. User-facing survivor notices need an actually callable route to recursive STOP, not merely instructions to type a model tool name as a slash command. Decide the smallest bridge during implementation. Optional tab visibility and process stdin messaging are deferred, not requirements of this task.'
+		'Planning inspection: jobs.ts and tools/bash.ts deliberately detach background jobs from Escape cancellation; commands/kill.ts is the existing selective stop path. Earlier conversational claims that Escape already kills background jobs were wrong. Keep the final agreed Escape scope, reconciling older conflicting wording in xz, ker and 8v when implementing. /resume currently describes reopening closed sessions (18c); do not promise that an interrupted tool resumes. User-facing survivor notices need an actually callable route to recursive STOP, not merely instructions to type a model tool name as a slash command. Decide the smallest bridge during implementation. Optional tab visibility and process stdin messaging are deferred, not requirements of this task.',
+		'Implementation: work.ts resolves shared targets and coordinates event-driven WAIT, snapshots and recursive STOP. /stop is the user bridge to the same operation; /kill all is background-only. Esc notices are durable output shared by terminal and web. Active tool controllers are tracked only until settlement, cleared at reset, and removed by identity to avoid stale calls deleting newer executions. Background jobs are registered during the grace window so STOP and inspection do not miss a running process.',
+		'Invariants restored: bare #t123 must be parsed as an actionable tool reference, not a comment. WAIT must not wake its owner before a child cancellation settles or its handoff reaches an owner held by a pending snapshot. Attention events are coalesced into microtasks; tool-output chunks never trigger checks. A deterministic pending-snapshot regression exercises the delivery race. Output is retained by existing bounded buffers and blobs; no polling, output-event log or new telemetry is introduced.',
+		'Resume lesson: /resume reopens a tab; ordinary SEND queues while a session is paused. HELP SUBAGENTS must explicitly instruct SEND with delivery emergency after /resume to start a new turn. Interrupted tools and descendants do not restart. Explicit STOP follows existing /kill cancellation semantics even for unsafeToStop work and reports its risk; ordinary steering protections remain unchanged. Finished sessions with no active owned work are left unchanged. Optional visibility and bash stdin messaging remain deferred.',
+		'Execution ownership follows persisted meta.owner and ownerCall, not subagents.owed: owed is a report-routing predicate that changes with the current sender. Unrelated SEND traffic must neither adopt nor detach execution work. A regression sends from an unrelated session before recursive STOP and checks that the original subtree still stops. Interactive spawns and ordinary forks without owner links stay independent. WAIT ignores output chunks and coalesces attention events, so growing output does not cause repeated wakeups or history scans.',
+		'Verification: 101 focused tests across 12 orchestration, lifecycle and prompt files passed with project typecheck. Full ./test reported 34 broader failures before the handoff-race fix; 14 identical failures were reproduced in an unchanged baseline checkout, including oversized modules, stale submit/interactive expectations, expired legacy SEND handling and provider-fixture JSON failures. Browser failures were not retried. Fresh-process tests verify the new HELP; the running host retains loaded modules until restart. STOP warns about unsafe work and active operations without individual cancellation support, which may finish despite stopping their agent.',
+		'The same pending-snapshot race applies to background command reports. jobs.state.delivering retains only capped results while delivery is pending; targeted and default WAIT include these pending reports, and INSPECT can read them before delivery. The command WAIT regression gates its owner snapshot, checks unrelated completion and streaming do not wake it, then verifies both targeted and default waits wake only after result delivery. This bookkeeping is bounded by in-flight delivery and clears on settlement/reset. WAIT stays a pending cancellable tool call while yielding; it makes no provider requests until attention arrives.'
 	],
-	needs: ['t0', 'v0', 'jm', 'z93', 'wa', '18c'],
-	foldInto: ['t0', 'v0', 'jm', 'z93', 'wa', '18c']
+	needs: ['t0', 'v0', 'jm', 'z93', 'wa', '18c', '3fv'],
+	foldInto: [
+		't0',
+		'v0',
+		'jm',
+		'z93',
+		'wa',
+		'18c',
+		'3fv',
+		'j1',
+		'xz',
+		'ker',
+		'8v'
+	]
 }
