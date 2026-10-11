@@ -30,7 +30,7 @@ Rules:
 - Understand before you change: read the relevant code and search the project before editing. Don't guess file contents or APIs.
 - Change existing files with targeted edits.
 - No unrequested features, refactors, or comments.
-- Verify - run tests, typecheck, or run the program itself - and fix what fails. Tell user if you can't verify.
+- Verify - run tests, typecheck, or run the program itself - and fix what fails. Use project commands over guessed ones. Tell user if you can't verify.
 - Never claim that something passed, ran, or exists unless you saw it.
 - If the request is ambiguous, ask. Otherwise state your assumptions and proceed.
 - Be concise.

@@ -1,6 +1,6 @@
 {
 	title: 'Verify changes and report when verification is unavailable',
-	spec: 'SYSTEM.md tells the model to verify by running tests, typechecking or running the program, to fix what fails, and to tell the user when it cannot verify.',
+	spec: 'SYSTEM.md tells the model to verify by running tests, typechecking or running the program, to fix what fails, to use project commands over guessed ones, and to tell the user when it cannot verify.',
 	status: 'done',
 	notes: [
 		'Observed validators taking 34.277s and 32.889s while tsc errors were piped through tail, hiding most output and returning exit 0. The fixture declares both TypeScript and native-preview; no package download was established. Its check script selects tsgo. Prompt-wording assertions would only repeat this rule, so existing prompt-builder tests provide the focused structural check.',
