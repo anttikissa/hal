@@ -1,0 +1,6 @@
+{
+	title: 'intro setting and hal -p --no-intro skip the first-run guide',
+	spec: 'The config.ason boolean setting intro (default true; src/common/settings.ts) decides whether the first tab of a fresh home opens hal/intro (src/host/tabs.ts create); false never opens it, and /intro still runs it. hal -p --no-intro sends tab-new with noIntro, and the host saves intro: false through config.update before creating the tab, so a scripted or benchmark home never stops at the guide. Rejected with --session. Tests: args parse --no-intro and reject it with --session.',
+	status: 'done',
+	needs: ['vc', 'rmt']
+}

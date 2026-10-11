@@ -62,6 +62,7 @@ const table: Setting[] = [
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
+	{ name: 'intro', label: 'First-run guide', type: { kind: 'boolean' }, default: true, description: 'Open the first-run guide (hal/intro) in the first tab of a fresh home. false never opens it; /intro still runs it.' },
 	{ name: 'sessionRecap', label: 'Session recap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
 	{ name: 'push', label: 'Push notifications', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 	{

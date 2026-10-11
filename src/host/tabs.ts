@@ -23,6 +23,8 @@ import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { projects } from './projects.ts'
 import { sessions } from './sessions.ts'
+import { settings } from '../common/settings.ts'
+import { config } from './config.ts'
 import { states } from '../common/states.ts'
 import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
@@ -145,7 +147,7 @@ function insert(id: string, index: number): void {
 
 function create(cwd: string, after?: string, autoclose = false, noUser = false, interactive = true): string {
 	// The very first tab of a fresh home is the offline welcome guide.
-	let first = tabs.file().open.length === 0 && !sessions.newest()
+	let first = settings.value('intro') !== false && tabs.file().open.length === 0 && !sessions.newest()
 	let open = tabs.file().open
 	let at = after === undefined ? -1 : open.indexOf(after)
 	let parent = at < 0 ? undefined : sessions.open(after!)
@@ -220,6 +222,7 @@ function act(c: TabCommand): Outcome {
 	let f = tabs.file()
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
+	if (c.type === 'tab-new' && c.noIntro) config.update({ intro: false })
 	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.noUser, c.interactive) }
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
