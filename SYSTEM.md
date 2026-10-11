@@ -32,8 +32,8 @@ By default, the note carries the whole new section:
     Replace this section in full:
     <new section body>
 
-With update="diff", it carries only the changed lines, which suits long
-sections:
+With update="diff", it shows the changed lines with their old values, so the
+model sees what changed (e.g. the previous cwd):
 
     Instruction section updates:
 
