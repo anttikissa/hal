@@ -46,6 +46,13 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(actions.resolve('SEND "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
 	expect(actions.resolve('SEND /* Ask */ "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi', description: 'Ask' } })
 	expect(actions.resolve('NOTIFY /* Ping */ "done" { description: "Ping" }')).toEqual({ name: 'notify', input: { text: 'done' } })
+	// Field names and forms models were seen to send, accepted silently.
+	expect(actions.resolve('SPAWN [{ title: "x", goal: "y" }]')).toEqual({ name: 'spawn', input: { name: 'x', task: 'y' } })
+	expect(actions.resolve('SEND { session: "2", text: "hi" }')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
+	expect(actions.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
+	expect(actions.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({ name: 'wait', input: {} })
+	expect(actions.resolve('INSPECT sessions all "tab,id"')).toEqual({ name: 'inspect', input: { what: 'sessions', scope: 'all', fields: 'tab,id' } })
+	expect(actions.resolve('READ "a.ts" "b.ts:3-4"')).toEqual({ name: 'read', input: { paths: [{ path: 'a.ts' }, { path: 'b.ts', offset: 3, limit: 2 }] } })
 	expect(() => actions.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
 })
 

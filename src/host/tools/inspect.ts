@@ -86,6 +86,9 @@ export const tool: Tool = {
 	name: 'inspect',
 	action: {
 		summary: 'agent internals',
+		// Plain words fill what, scope, fields in order; HELP shows the object form.
+		positional: ['what', 'scope', 'fields'],
+		usage: ['INSPECT [{ what, scope, fields }]'],
 		resolve: (raw) => {
 			let { values } = action.values(raw)
 			if (values.length === 1 && values[0] === 'tabs') return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }

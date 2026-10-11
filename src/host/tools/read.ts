@@ -19,10 +19,16 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 
 // READ "path" (the first tools.readLines lines), "path:10" (line 10),
 // "path:10-20", "path:1-" (to the end); an http(s) URL reads through read_url.
+// Undocumented: several local paths read each, as paths.
 function resolveAction(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = action.values(raw)
+	if (values.length > 1 && values.every((v) => typeof v === 'string' && v && !/^https?:\/\//i.test(v))) return { name: 'read', input: { paths: values.map((v) => one(v as string).input) } }
 	let [path] = values
 	if (values.length !== 1 || typeof path !== 'string' || !path) throw new Error(`READ takes one path, e.g. READ "src/main.ts:1-100"; got ${values.length} arguments`)
+	return one(path)
+}
+
+function one(path: string): { name: string; input: Record<string, unknown> } {
 	if (/^https?:\/\//i.test(path)) return { name: 'read_url', input: { url: path } }
 	let m = /:(\d+)(?:(-)(\d+)?)?$/.exec(path)
 	if (!m) return { name: 'read', input: { path } }
@@ -53,6 +59,14 @@ export const tool: Tool<ToolOutput> = {
 		required: ['path'],
 	},
 	async run(input, ctx) {
+		if (Array.isArray(input.paths)) {
+			let parts: string[] = []
+			for (let p of input.paths) {
+				let out = await tool.run(p as Record<string, unknown>, ctx).catch((e: Error) => `== READ ${(p as { path?: string })?.path}: ${e.message} ==`)
+				parts.push(typeof out === 'string' ? out : 'image' in out ? `${out.text}; READ it alone to see it` : out.text)
+			}
+			return parts.join('\n\n')
+		}
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)

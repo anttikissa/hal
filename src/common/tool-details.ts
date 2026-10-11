@@ -90,6 +90,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'read':
 		case 'read_url':
 		case 'read_blob': {
+			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.map((p) => (p as { path?: unknown })?.path).join(', ')}`, key: 'paths' }
 			let key = name === 'read' ? 'path' : name === 'read_url' ? 'url' : 'id'
 			if (str(key)) return { text: `Read ${str(key)}`, key }
 			break

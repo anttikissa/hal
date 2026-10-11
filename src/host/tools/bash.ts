@@ -44,6 +44,7 @@ export const tool: Tool = {
 	action: {
 		summary: false,
 		positional: ['command'],
+		aliases: { cmd: 'command' },
 		usage: ['BASH "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
 		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)' },
 		resolve(raw) {

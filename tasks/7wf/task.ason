@@ -1,0 +1,7 @@
+{
+	title: 'Actions accept the misuse models were seen to send',
+	spec: 'Each action silently accepts field names and forms models were seen to send whose meaning is clear, declared in its tools/ file as ActionSpec.aliases (a real field, or null to drop) and never shown by HELP: SPAWN title→name, goal→task; SEND session→to; BASH cmd→command; WAIT for and timeout ignored (it waits for any child). A one-item array argument [{…}] stands for the object. INSPECT takes plain words as what, scope, fields; READ with several local paths reads each in order (a missing one shows its error inline). Only cases seen in session histories qualify; reading a same-name file nearby when a path is missing does not (2 of 26 misses, one ambiguous).',
+	status: 'done',
+	needs: ['kaq'],
+	foldInto: ['kaq']
+}

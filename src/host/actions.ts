@@ -43,9 +43,13 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 	let next = 0
 	let usage = () => `Usage: ${actions.usage(tool).join(' | ')}`
 	for (let value of values) {
+		// [{ … }] stands for { … }.
+		if (Array.isArray(value) && value.length === 1 && value[0] && typeof value[0] === 'object' && !Array.isArray(value[0])) value = value[0]
 		if (value && typeof value === 'object' && !Array.isArray(value)) {
-			for (let [key, v] of Object.entries(value)) {
-				if (key === 'description' && !Object.hasOwn(properties, key)) continue
+			for (let [field, v] of Object.entries(value)) {
+				let alias = tool.action?.aliases?.[field]
+				if (alias === null || (field === 'description' && !Object.hasOwn(properties, field))) continue
+				let key = alias !== undefined && !Object.hasOwn(properties, field) ? alias : field
 				if (!Object.hasOwn(properties, key)) throw new Error(`${tool.name.toUpperCase()} has no field '${key}'. ${usage()}`)
 				if (Object.hasOwn(input, key)) throw new Error(`${tool.name.toUpperCase()} got '${key}' twice. ${usage()}`)
 				input[key] = v
