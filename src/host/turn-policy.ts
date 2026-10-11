@@ -30,8 +30,8 @@ function canceled(id: string): ToolResultBlock {
 // call that finished despite the steer stays as it is.
 function stoppedBy(result: ToolResultBlock, signal: AbortSignal): ToolResultBlock {
 	if (signal.reason !== jobs.steered || !(result.isError || result.output.includes(jobs.byMessage))) return result
-	let { isError: _, ...rest } = result
-	return { ...rest, interrupted: 'stopped' }
+	let { isError, ...rest } = result
+	return { ...rest, output: isError ? rest.output.replace(/^Error: /, '') : rest.output, interrupted: 'stopped' }
 }
 
 // The usage an unfinished turn had when it was last parked at a
