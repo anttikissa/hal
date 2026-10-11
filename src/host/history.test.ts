@@ -35,6 +35,9 @@ beforeEach(() => {
 afterEach(() => {
 	sessions.closeAll()
 	history.state.running.clear()
+	history.state.cache.clear()
+	history.state.next.clear()
+	pages.reset()
 	provider.stream = origStream
 	naming.prepare = origPrepare
 	diag.log = origLog
@@ -208,8 +211,7 @@ test('a corrupt record mid-file is reported when read and the file left untouche
 	appendFileSync(history.file(id), '{ type: @@ }\n' + lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }))
 	sessions.closeAll()
 	let before = readFileSync(history.file(id), 'utf8')
-	// Opening reads only the end of the history.
-	await history.open(id)
+	await expect(history.open(id)).rejects.toThrow(new RegExp(id))
 	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 	await expect(history.read(id)).rejects.toThrow()
 	expect(readFileSync(history.file(id), 'utf8')).toBe(before)

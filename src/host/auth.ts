@@ -31,6 +31,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { secrets } from './secrets.ts'
 import { usage } from './usage.ts'
+import { authRefresh } from './auth-refresh.ts'
 
 // `accountId`: the ChatGPT account an OpenAI entry was saved with.
 export type Credential = { type: 'token' | 'api-key'; value: string; email?: string; account: string; accountId?: string }
@@ -323,45 +324,6 @@ async function changed(signal?: AbortSignal): Promise<void> {
 	}
 }
 
-async function refresh(data: Entry, entry: Entry, replace: (next: Entry) => void, kind: Kind = 'anthropic'): Promise<string> {
-	let res: Response
-	// OpenAI's is the Codex CLI's refresh request.
-	let request = kind === 'openai' ? { client_id: OPENAI_CLIENT_ID, grant_type: 'refresh_token', refresh_token: entry.refreshToken, scope: 'openid profile email' } : { grant_type: 'refresh_token', refresh_token: entry.refreshToken, client_id: CLIENT_ID }
-	try {
-		res = await fetch(auth.tokenUrl(kind), {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(request),
-			signal: AbortSignal.timeout(auth.refreshTimeoutMs()),
-		})
-	} catch (e: any) {
-		throw fail(`${kind} token refresh failed: ${e?.name === 'TimeoutError' ? 'timed out' : (e?.message ?? e)}`, 'temporary')
-	}
-	let body: any = await res.json().catch(() => null)
-	if (!res.ok) {
-		// The provider's code and description, with anything token-like
-		// redacted: descriptions may echo the refresh token.
-		let code = typeof body?.error === 'string' && /^[\w.-]{1,64}$/.test(body.error) ? ` ${body.error}` : ''
-		if (typeof body?.error_description === 'string') code += ` (${body.error_description.split(entry.refreshToken).join('<redacted>').slice(0, 300).replace(/[\w.~+/=-]{24,}/g, '<redacted>')})`
-		// 4xx (invalid_grant): the refresh token is spent; only a new
-		// login fixes it. Anything else may pass.
-		let failure: Failure = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 ? 'auth' : 'temporary'
-		throw fail(`${kind} token refresh failed: HTTP ${res.status}${code}; if this persists, ${LOG_INS[kind]}`, failure)
-	}
-	if (!usable(body?.access_token)) throw fail(`${kind} token refresh returned no access token`, 'temporary')
-	let accountId = jwtClaims(body.access_token)?.['https://api.openai.com/auth']?.chatgpt_account_id
-	let expiresIn = typeof body.expires_in === 'number' ? body.expires_in : 3600
-	replace({
-		...entry,
-		accessToken: body.access_token,
-		refreshToken: usable(body.refresh_token) ? body.refresh_token : entry.refreshToken,
-		expires: clock.now() + expiresIn * 1000,
-		...(kind === 'openai' && usable(accountId) && { accountId }),
-	})
-	// Write now, so a crash cannot lose a rotated refresh token.
-	liveFiles.save(data)
-	return body.access_token
-}
 
 // Write pending changes and stop watching. The next call reopens.
 function close(): void {
@@ -411,7 +373,8 @@ export const auth = {
 	broke: (_id: string, _text: string): void => {},
 	tellBroken,
 	changed,
-	refresh,
+	refresh: (...args: Parameters<typeof authRefresh.refresh>): Promise<string> => authRefresh.refresh(...args),
+	fail,
 	close,
 	state: {
 		store: null as Entry | null,

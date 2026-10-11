@@ -41,8 +41,8 @@ const sse = (events: Uint8Array[]) =>
 // with SAW(<its first line>).
 const bashUse = (command: string) => [
 	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
-	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_b', name: 'bash', input: {} } }),
-	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ command, description: 'Run it' }) } }),
+	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_b', name: 'tool', input: {} } }),
+	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ cmd: `BASH ${JSON.stringify(command)}` }) } }),
 	sseEvent({ type: 'content_block_stop', index: 0 }),
 	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
 	sseEvent({ type: 'message_stop' }),
@@ -65,6 +65,8 @@ function reply(req: Request, body: any): Response {
 	requests.push(messages)
 	let lastBlock = messages.flatMap((m: any) => m.role === 'user' ? m.content : []).findLast((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>'))
 	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
+	let assistant = messages.findLastIndex((m: any) => m.role === 'assistant')
+	if (assistant > messages.findLastIndex((m: any) => m.content.includes(lastBlock)) && messages[assistant].content.some((b: any) => b.type === 'text' && b.text === 'PART1')) return sse([textDelta(continued), ...finish])
 	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
 	let stream = new ReadableStream<Uint8Array>({
@@ -96,7 +98,10 @@ beforeEach(() => {
 	holds = []
 	home = mkdtempSync(`${tmpdir()}/hal-e2e-`)
 	mkdirSync(`${home}/secrets`)
-	server = Bun.serve({ port: 0, idleTimeout: 0, fetch: async (req) => reply(req, await req.json()) })
+	server = Bun.serve({ port: 0, idleTimeout: 0, fetch: async (req) => {
+		let bytes = new Uint8Array(await req.arrayBuffer())
+		return reply(req, JSON.parse(new TextDecoder().decode(req.headers.get('content-encoding') === 'gzip' ? Bun.gunzipSync(bytes) : bytes)))
+	} })
 	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'fake-key' } }) + '\n', { mode: 0o600 })
 	// Provider tests exercise an already-set-up home; a fresh first tab is hal/intro.
 	mkdirSync(`${home}/sessions/1-ready`, { recursive: true })
@@ -311,7 +316,7 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	// The model got the cut-off text back, was told, and nothing was sent twice.
 	expect(requests).toHaveLength(4)
 	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text && bare(b.text)))
-	expect(texts.filter((t: string) => !t.startsWith('<hal-note>') && !t.startsWith('ECHO(<hal-note>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
+	expect(texts.filter((t: string) => !t.startsWith('<hal-note>') && !t.startsWith('ECHO(<hal-note>'))).toEqual(['hold it', 'PART1', continued, 'from b', 'ECHO(from b)', 'from a'])
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)

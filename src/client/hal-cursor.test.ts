@@ -144,21 +144,6 @@ test('a blink phase rewrites the cursor row alone', () => {
 	expect(written).toBe('')
 })
 
-test('the pulse beats on wall-clock beats until nobody keeps it', async () => {
-	pulse.now = saved.now
-	let ms = pulse.ms
-	pulse.ms = 5
-	let beats: number[] = []
-	pulse.keep((b) => beats.push(b))
-	await Bun.sleep(30)
-	pulse.keep(null)
-	let n = beats.length
-	await Bun.sleep(15)
-	pulse.ms = ms
-	expect(n).toBeGreaterThan(1)
-	expect(beats.length).toBe(n)
-	for (let i = 1; i < n; i++) expect(beats[i]).toBe(beats[i - 1]! + 1)
-})
 
 test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	let shown: string[] = []

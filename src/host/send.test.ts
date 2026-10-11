@@ -56,7 +56,7 @@ test('an advisory message reaches a working session with its next request, frame
 	expect(text).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<hal-note>[^\\n]+</hal-note>\\ncheck the tests$`))
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
-		{ type: 'prompt', text: 'go' },
+		{ type: 'prompt', text: 'go', interactive: true },
 		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
 	])
 	calls[next + 1]!.push({ type: 'done', reason: 'end' })
@@ -119,7 +119,7 @@ test("a client can't claim to be another session", async () => {
 	let id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hi', from: '7-abc' } as any)
 	await until(() => calls.length === 1)
-	expect(unkeyed(c.views.get(id)!.items)).toEqual([{ type: 'prompt', text: 'hi' }])
+	expect(unkeyed(c.views.get(id)!.items)).toEqual([{ type: 'prompt', text: 'hi', interactive: true }])
 	expect(history.readSync(id)[0]).not.toHaveProperty('blocks.0.from')
 })
 
@@ -181,14 +181,4 @@ test.each(['pause', 'failure', 'question'])('an emergency resumes a recipient af
 	expect(resultOf(next).output).toContain('it started a turn')
 	expect(lastText(recipient())).toMatch(/\nSTOP$/)
 	expect(c.views.get(a)!.inbox).toEqual([])
-})
-
-// The old-flag error is temporary (task zb0): this fails after the
-// deadline until the LEGACY-SEND check in tools/send.ts and this test are gone.
-test('the legacy send flags steer and queue are rejected until 2026-10-10', async () => {
-	let c = client()
-	let { b } = pair(c)
-	let next = await send(c, b, { to: '1', text: 'x', steer: true })
-	expect(resultOf(next)).toMatchObject({ isError: true, output: expect.stringContaining("delivery 'emergency'") })
-	expect(Date.now(), 'delete the LEGACY-SEND check in tools/send.ts and this test').toBeLessThan(Date.parse('2026-10-10T00:00:00Z'))
 })

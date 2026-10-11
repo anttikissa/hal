@@ -35,10 +35,6 @@ export const sendKeys = {
 	// A delivery from outside (a command, a stored draft, a plugin);
 	// undefined when not one.
 	parse(v: unknown): Delivery | undefined {
-		// LEGACY-DELIVERY (task 760): old clients and drafts send interrupt
-		// and interject. Delete by 2026-10-10 (prompt.test.ts fails then).
-		if (v === 'interrupt') return 'steer'
-		if (v === 'interject') return 'soft-steer'
 		return v === 'steer' || v === 'soft-steer' || v === 'queue' ? v : undefined
 	},
 	// The chord that sends `d`, for help text: plain Enter first.

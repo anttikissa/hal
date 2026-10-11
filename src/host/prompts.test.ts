@@ -56,12 +56,12 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 	await until(() => a.of('turn-end').length && b.of('turn-end').length)
 	let view = await fresh(id)
 	expect(shown(view.items)).toEqual([
-		{ type: 'prompt', text: 'go' },
+		{ type: 'prompt', text: 'go', interactive: true },
 		{ type: 'text', text: 'work', interrupted: true },
-		{ type: 'prompt', text: 'one', delivery: 'now' },
-		{ type: 'prompt', text: 'two', delivery: 'now' },
+		{ type: 'prompt', text: 'one', delivery: 'now', interactive: true },
+		{ type: 'prompt', text: 'two', delivery: 'now', interactive: true },
 		{ type: 'text', text: 'ok', interrupted: true },
-		{ type: 'prompt', text: 'three', delivery: 'now' },
+		{ type: 'prompt', text: 'three', delivery: 'now', interactive: true },
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
@@ -99,8 +99,8 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	let queuedAt = a.views.get(id)!.inbox.find((m) => m.delivery === 'after-turn')!.ts!
 	a.conn.send({ type: 'submit', sessionId: id, text: 'now' })
 	expect(a.views.get(id)!.inbox).toEqual([
-		{ id: expect.any(String), text: 'now', delivery: 'now', ts: expect.any(String), n: expect.any(Number) },
-		{ id: expect.any(String), text: 'later', delivery: 'after-turn', ts: expect.any(String), n: expect.any(Number) },
+		{ id: expect.any(String), text: 'now', delivery: 'now', ts: expect.any(String), n: expect.any(Number), interactive: true },
+		{ id: expect.any(String), text: 'later', delivery: 'after-turn', ts: expect.any(String), n: expect.any(Number), interactive: true },
 	])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
@@ -270,9 +270,9 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
 	expect(shown(view.items.filter((i) => i.type === 'prompt'))).toEqual([
-		{ type: 'prompt', text: 'go' },
-		{ type: 'prompt', text: 'first', delivery: 'now' },
-		{ type: 'prompt', text: 'second' },
+		{ type: 'prompt', text: 'go', interactive: true },
+		{ type: 'prompt', text: 'first', delivery: 'now', interactive: true },
+		{ type: 'prompt', text: 'second', interactive: true },
 	])
 	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
@@ -360,7 +360,7 @@ test('an edit after a tool with side effects keeps history and is sent on top', 
 		await until(() => a.of('turn-end').length === 2)
 		expect(await fresh(id)).toEqual(a.views.get(id)!)
 		expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([
-			{ type: 'prompt', text: 'clean up' },
+			{ type: 'prompt', text: 'clean up', interactive: true },
 			{ type: 'prompt', text: 'clean up, but keep x' },
 		])
 	} finally {

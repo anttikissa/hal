@@ -1,18 +1,6 @@
 // The frame: every row the terminal should show, from the first
 // transcript item to the prompt, and where the cursor goes. Pure; the
 // renderer (render.ts) decides how to get it onto the terminal.
-//
-// All history is always in the frame, never a viewport-sized slice
-// (tasks/cc/terminal.md rule 3). Every row fits the terminal width (a
-// wider one flows on over rows ending in ansi.FLOW), has
-// its tabs expanded, and carries no control characters from the text
-// it shows.
-//
-// Its parts are drawn by ansi.ts (escapes, painted rows), item-view.ts
-// (transcript items), form-view.ts (open questions), prompt-view.ts
-// (the prompt), tab-bar.ts (the tabs), help-row.ts (the last row) and
-// modal-view.ts (modals over it all). Task kx0 shares result status for background jobs.
-// Tasks: rqq.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'

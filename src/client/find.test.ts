@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test'
 import { keyHelp } from '../common/key-help.ts'
 import { app } from './app.ts'
-import { find } from './find.ts'
 import { render } from './render.ts'
 
 test('Ctrl-F debounces transient queries, cancels on Escape and tells where the selected block is', async () => {

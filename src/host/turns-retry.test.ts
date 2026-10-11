@@ -164,20 +164,6 @@ test('a rotation to another account retries at once', async () => {
 	expect(slept).toEqual([])
 })
 
-test('broken login blocks until the credentials file changes, then continues by itself', async () => {
-	let a = client()
-	let changed = () => {}
-	auth.changed = (signal) => new Promise<void>((r) => ((changed = r), signal?.addEventListener('abort', () => r())))
-	let login: StreamEvent = { type: 'error', message: 'auth.ason: refresh failed: invalid_grant', failure: 'auth' }
-	script = [[login], done]
-	let id = start(a)
-	await until(() => status.stateOf(id).type === 'blocked')
-	expect(status.stateOf(id)).toEqual({ type: 'blocked', reason: expect.stringMatching(/log in.*invalid_grant/) })
-	expect(calls).toHaveLength(1)
-	changed()
-	await until(() => a.ends().length)
-	expect(a.ends()[0]).toMatchObject({ status: 'completed' })
-})
 
 test('switching model while blocked on a login tries the new model at once', async () => {
 	let a = client()

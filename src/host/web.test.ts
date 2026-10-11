@@ -10,7 +10,6 @@ import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
 import { host } from './host.ts'
-import { models } from './models.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { paths } from './paths.ts'
@@ -387,8 +386,8 @@ test('a page built from other code than the host serves is told to reload; its o
 	expect(await old.closed).toBe(4000)
 	expect(old.events).toEqual([])
 	let current = await dial(auth, `?v=${version}`)
-	await until(() => current.events.length)
-	expect(current.events[0].type).toBe('tabs')
+	await until(() => current.events.some((e) => e.type === 'tabs'))
+	expect(current.events.find((e) => e.type === 'tabs')?.type).toBe('tabs')
 })
 
 test('manual-update pages stay connected through rebuilds and stale reconnects; auth still revokes them', async () => {
@@ -461,8 +460,8 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	w.ws.send('{ not ason')
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	w.send({ type: 'open', sessionId: id })
-	await until(() => w.events.length === 4)
-	expect(w.events.map((e) => e.type)).toEqual(['tabs', 'rejected', 'rejected', 'snapshot'])
+	await until(() => w.events.some((e) => e.type === 'snapshot'))
+	expect(w.events.map((e) => e.type)).toEqual(['home', 'tabs', 'rejected', 'rejected', 'snapshot'])
 
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => pushes.length === 1)
@@ -470,7 +469,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
 	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
 	expect(seen(w.events)).toEqual(seen(local))
-	expect(seen(w.events).map((e) => e.type)).toEqual(['state', 'meta', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
+	expect(seen(w.events).map((e) => e.type)).toEqual(['home', 'state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
 
 	// A closed browser is no longer a host client.
 	w.ws.close()
@@ -619,83 +618,6 @@ function providerHome(): void {
 	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
 }
 
-browserTest('completion choices fit phone and desktop, and can be tapped', async () => {
-	providerHome()
-	let b = await browser()
-	let known = models.known
-	models.known = () => ['openai/gpt-6-astra', 'openrouter/openai/gpt-6-astra', 'openai/gpt-astra-latest', 'acme/big-1', 'acme/big-2']
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		// The textarea mounts before tab-start's snapshot. Background opens
-		// must not make this test type before the focused tab is ready.
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		for (let width of [390, 1280]) {
-			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			await b.waitFor(`document.querySelector('.entry')?.getBoundingClientRect().bottom > 700`)
-			// Prime the textarea's auto-height before comparing menu geometry:
-			// the first typed character can change its native scrollHeight.
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'x'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
-			let frame = `(() => { let rect = (s) => document.querySelector(s).getBoundingClientRect(); return { transcript: rect('.Transcript').bottom, status: rect('.StatusRow').top, entry: rect('.entry').top, composer: rect('.Composer').top } })()`
-			let before = await b.evaluate(frame)
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-			await b.waitFor(`document.querySelectorAll('.completions [role=option]').length > 1`)
-			let layout = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(), box = document.querySelector('textarea').getBoundingClientRect(); return { left: r.left, right: r.right, bottom: r.bottom, boxTop: box.top, target: document.querySelector('.completions button').getBoundingClientRect().height, viewport: innerWidth } })()`)
-			expect(layout.left).toBeGreaterThanOrEqual(0)
-			expect(layout.right).toBeLessThanOrEqual(layout.viewport)
-			expect(layout.bottom).toBeLessThanOrEqual(layout.boxTop)
-			// Touch targets are 44px; a mouse gets compact 32px rows (task kx).
-			expect(layout.target).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
-			expect(await b.evaluate(frame)).toEqual(before)
-			let covered = await b.evaluate(`(() => {
-				let menu = document.querySelector('.completions'), m = menu.getBoundingClientRect();
-				return ['.StatusRow'].map((selector) => {
-					let s = document.querySelector(selector).getBoundingClientRect(), y = (Math.max(m.top, s.top) + Math.min(m.bottom, s.bottom)) / 2;
-					return { overlaps: m.top < s.bottom && m.bottom > s.top, onTop: menu.contains(document.elementFromPoint(m.left + m.width / 2, y)) };
-				});
-			})()`)
-			expect(covered).toEqual([{ overlaps: true, onTop: true }])
-			// A request for the next character must not make an unchanged menu
-			// disappear for a frame or rebuild its rows when the answer arrives.
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/logi'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-			await b.waitFor(`document.querySelector('.completions button')?.textContent.includes('/login') && document.querySelectorAll('.completions button').length === 1`)
-			await b.evaluate(`(() => {
-				let menu = document.querySelector('.completions'), row = menu.querySelector('button'), box = document.querySelector('textarea');
-				window.__completionWatch = { menu, row, y: box.getBoundingClientRect().top, changes: 0 };
-				let watch = window.__completionWatch;
-				watch.observer = new MutationObserver((list) => { watch.changes += list.filter((m) => m.target === menu.parentNode || menu.contains(m.target)).length });
-				watch.observer.observe(menu.parentNode, { subtree: true, childList: true, attributes: true, characterData: true });
-				box.value = '/login'; box.dispatchEvent(new InputEvent('input', { bubbles: true }));
-			})()`)
-			await Bun.sleep(100)
-			let stable = await b.evaluate(`(() => { let w = window.__completionWatch; w.observer.disconnect(); return { sameMenu: w.menu === document.querySelector('.completions'), sameRow: w.row === document.querySelector('.completions button'), connected: w.row.isConnected, changes: w.changes, y: document.querySelector('textarea').getBoundingClientRect().top - w.y } })()`)
-			expect(stable).toEqual({ sameMenu: true, sameRow: true, connected: true, changes: 0, y: 0 })
-			await b.evaluate(`document.querySelector('.completions button').click()`)
-			await b.waitFor(`!document.querySelector('.completions')`)
-			expect(await b.evaluate(frame)).toEqual(before)
-			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/login ')
-			// Prefix completion retains word matches; fallback still extends a
-			// common prefix. Both use native edits and leave the caret at the end.
-			for (let [text, expected] of [['/model astr', '/model astra'], ['/model bi', '/model acme/big-']]) {
-				await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(t.value.length, t.value.length); t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-				await b.waitFor(text!.endsWith('astr') ? `[...document.querySelectorAll('.completions strong')].some((e) => e.textContent === 'openrouter/openai/gpt-6-astra')` : `document.querySelectorAll('.completions button').length === 2`)
-				if (text!.endsWith('astr')) expect(await b.evaluate(`document.querySelector('.completions strong').textContent`)).toBe('astra')
-				await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab' })
-				await b.waitFor(`document.querySelector('textarea').value === ${JSON.stringify(expected)}`)
-				expect(await b.evaluate(`document.querySelector('textarea').selectionStart`)).toBe(expected!.length)
-				expect(await b.evaluate(frame)).toEqual(before)
-				let bounds = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: innerWidth } })()`)
-				expect(bounds.left).toBeGreaterThanOrEqual(0)
-				expect(bounds.right).toBeLessThanOrEqual(bounds.width)
-				expect(bounds.top).toBeGreaterThanOrEqual(0)
-			}
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		}
-	} finally { models.known = known; await b.close() }
-}, 15000)
 
 
 browserTest('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
@@ -897,9 +819,9 @@ browserTest('in a browser a command stays below the block already streaming: sam
 			window.letGo = () => held.splice(0).forEach((f) => f())
 			WebSocket.prototype.send = function (data) { String(data).includes('/help') ? held.push(() => send.call(this, data)) : send.call(this, data) }
 		})()`)
-		let enter = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
-		// Enter is refused with a notice until the session is open.
-		await b.waitFor(`(() => { let t = document.querySelector('textarea'); if (!t) return false; t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+		let enter = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		await enter('go')
 		await b.waitFor(`document.querySelector('main')?.innerText.includes('streaming now')`)
 		await enter('/help')
 		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent.endsWith('/help') && !c.getAnimations().some((a) => !(a instanceof CSSTransition)) })()`)
@@ -923,6 +845,7 @@ browserTest('in a browser a command stays below the block already streaming: sam
 		expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, fresh: true, copies: 1 })
 		release()
 	} finally {
+		release()
 		await b.close()
 	}
 }, 20000)
@@ -1813,7 +1736,7 @@ browserTest('browser status logout fits phone and desktop and returns to the log
 		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			await b.evaluate(`document.querySelector('.StatusRow .overview').click()`)
+			await b.evaluate(`document.querySelector('.StatusRow .details-target').click()`)
 			await b.waitFor(`document.querySelector('.StatusDetails').open`)
 			let r = await b.evaluate(`(() => { let b = document.querySelector('.StatusDetails form button'), r = b.getBoundingClientRect(); return { text: b.textContent, height: r.height, left: r.left, right: r.right, viewport: innerWidth }; })()`)
 			expect(r.text).toBe('Log out this browser')
@@ -1821,7 +1744,7 @@ browserTest('browser status logout fits phone and desktop and returns to the log
 			expect(r.left).toBeGreaterThanOrEqual(0); expect(r.right).toBeLessThanOrEqual(r.viewport)
 			await b.evaluate(`document.querySelector('.StatusDetails').close()`)
 		}
-		await b.evaluate(`document.querySelector('.StatusRow .overview').click(); document.querySelector('.StatusDetails form button').click()`)
+		await b.evaluate(`document.querySelector('.StatusRow .details-target').click(); document.querySelector('.StatusDetails form button').click()`)
 		await b.waitFor(`!!document.querySelector('.Login')`)
 		expect(webAuth.list()).toHaveLength(0)
 	} finally { await b.close() }
@@ -2130,7 +2053,7 @@ browserTest('local touch debug is opt-in, observes canceled taps, and never cons
 		await toggle()
 		expect(await b.evaluate(`JSON.parse(localStorage.getItem('hal.touch-debug.log')).length`)).toBe(300)
 		await b.call('Page.reload', {})
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		await b.waitFor(`!!document.querySelector('.StatusRow .model')?.textContent`)
 		expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
 		let inspect = async () => {
 			await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { drafts } from './common/drafts.ts'
+import { backfill } from './common/backfill.ts'
 import type { Event } from './common/protocol.ts'
 import { transcript } from './common/transcript.ts'
 import { app } from './client/app.ts'
@@ -76,8 +77,7 @@ async function terminalShowing(id: string): Promise<{ lines: string[]; events: E
 	})
 	app.send = (c: any) => conn.send(c)
 	conn.send({ type: 'open', sessionId: id })
-	// Pages are asked for a macrotask apart; wait until they stop.
-	for (let seen = -1; seen !== events.length; await Bun.sleep(1)) seen = events.length
+	while (!app.state.transcript || !backfill.complete(app.state.older, id)) await Bun.sleep(1)
 	conn.close()
 	return { lines: frame.build(appView.view(), 80, 24).lines, events }
 }

@@ -76,7 +76,7 @@ test('typing and Enter submits to the open session and clears the prompt', () =>
 	app.onEvent(snapshot())
 	type('hello')
 	enter()
-	expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'hello' }])
+	expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'hello', base: 0 }])
 	expect(appView.view().prompt.text).toBe('')
 })
 
@@ -122,9 +122,9 @@ test('while a turn runs, Enter steers, Ctrl-Enter soft-steers, Alt-Enter queues,
 	app.onKeys([{ ...key('enter'), alt: true }])
 	escape()
 	expect(sent).toEqual([
-		{ type: 'submit', sessionId: 's1', text: 'now' },
-		{ type: 'submit', sessionId: 's1', text: 'stop', delivery: 'soft-steer' },
-		{ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' },
+		{ type: 'submit', sessionId: 's1', text: 'now', base: 0 },
+		{ type: 'submit', sessionId: 's1', text: 'stop', delivery: 'soft-steer', base: 0 },
+		{ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue', base: 0 },
 		{ type: 'pause', sessionId: 's1' },
 	])
 })
@@ -195,12 +195,12 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true, base: 0 })
 	expect(appView.view().prompt.text).toBe('')
 	// The edit is over: the next prompt is a new one.
 	type('more')
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'more' })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'more', base: 0 })
 })
 
 test('an edit not yet acknowledged is sent again as an edit by the next client', () => {
@@ -217,7 +217,7 @@ test('an edit not yet acknowledged is sent again as an edit by the next client',
 		app.reset()
 		sent = []
 		app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'fix ti!', amend: true }])
+		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'fix ti!', amend: true, base: 0 }])
 	} finally {
 		drafts.store = store
 	}

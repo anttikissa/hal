@@ -62,16 +62,15 @@ test('commands and events cross the socket as ASON lines', async () => {
 	a.socket.write(create.slice(0, 7))
 	await Bun.sleep(5)
 	a.socket.write(create.slice(7))
-	// The tabs come first, unasked.
-	await until(() => a.events.length === 3)
-	expect(a.events.map((e) => e.type)).toEqual(['tabs', 'rejected', 'snapshot'])
-	expect(a.events[2]).toMatchObject({ type: 'snapshot', snapshot: { meta: { cwd: '/tmp/x', model: 'fake/m' } } })
+	await until(() => a.events.some((e) => e.type === 'snapshot'))
+	expect(a.events.map((e) => e.type)).toEqual(['home', 'tabs', 'rejected', 'snapshot'])
+	let snapshot = a.events.find((e) => e.type === 'snapshot')
+	expect(snapshot).toMatchObject({ type: 'snapshot', snapshot: { meta: { cwd: '/tmp/x', model: 'fake/m' } } })
 
-	// A second connection sees the same session.
 	let b = await dial()
-	b.socket.write(lines.encode({ type: 'open', sessionId: a.events[2].sessionId }))
-	await until(() => b.events.length === 2)
-	expect(b.events[1].snapshot.meta).toEqual(a.events[2].snapshot.meta)
+	b.socket.write(lines.encode({ type: 'open', sessionId: snapshot.sessionId }))
+	await until(() => b.events.some((e) => e.type === 'snapshot'))
+	expect(b.events.find((e) => e.type === 'snapshot').snapshot.meta).toEqual(snapshot.snapshot.meta)
 })
 
 test('a disconnected socket is no longer a host client', async () => {
@@ -100,6 +99,6 @@ test('a stale socket file left by a dead host is replaced', async () => {
 	expect(await server.serve()).toBe(true)
 	let a = await dial()
 	a.socket.write(lines.encode({ type: 'create', cwd: '/tmp' }))
-	await until(() => a.events.length === 2)
-	expect(a.events[1].type).toBe('snapshot')
+	await until(() => a.events.some((e) => e.type === 'snapshot'))
+	expect(a.events.find((e) => e.type === 'snapshot').type).toBe('snapshot')
 })

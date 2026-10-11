@@ -22,6 +22,7 @@ import { changedFiles } from './changed-files.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { pageSlices } from './page-slices.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
 type Marks = { rebaseVersion?: 1; rebase?: number; transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; files?: number }
@@ -46,50 +47,6 @@ function drive<T>(steps: Steps<T>): T {
 	}
 }
 
-// When the sliced work of this turn of the event loop must yield: all
-// of it shares one slice of sliceMs(), however many runs there are.
-function deadline(): number {
-	if (pages.state.until === undefined) {
-		pages.state.until = performance.now() + pages.sliceMs
-		setImmediate(() => (pages.state.until = undefined))
-	}
-	return pages.state.until
-}
-
-// Runs `steps` in slices, yielding to the event loop between them: the
-// value at once if they fit what is left of this turn's slice, or decode
-// at most syncBytes() (small reads always finish at once), else a
-// promise.
-function slices<T>(steps: Steps<T>): T | Promise<T> {
-	let decoded = 0
-	let run = (): IteratorResult<number, T> | undefined => {
-		for (;;) {
-			let small = decoded <= pages.syncBytes
-			if (!small && performance.now() >= pages.deadline()) return undefined
-			let r = steps.next()
-			if (r.done) return r
-			decoded += r.value
-			// A record that would overrun the slice waits for the next,
-			// unless the slice has only just begun.
-			let now = performance.now()
-			let end = pages.deadline()
-			if (decoded > pages.syncBytes && now > end - pages.sliceMs + 0.5 && now + (r.value / 1e6) * pages.msPerMB > end) return undefined
-		}
-	}
-	let r = run()
-	if (r) return r.value as T
-	let next = () => new Promise((resolve) => setImmediate(resolve))
-	return (async () => {
-		for (;;) {
-			await next()
-			let r = run()
-			if (!r) continue
-			// What the caller does with the value gets a slice of its own.
-			if (performance.now() >= pages.deadline()) await next()
-			return r.value as T
-		}
-	})()
-}
 
 // Bytes [start, end) of a history file. Every lazy read goes through
 // here, so what opening a session costs can be counted.
@@ -399,8 +356,8 @@ export const pages = {
 	// How much history catching up the marks reads at once.
 	chunk: 4 * 1024 * 1024,
 	drive,
-	deadline,
-	slices,
+	deadline: (): number => pageSlices.deadline(),
+	slices: <T>(steps: Steps<T>): T | Promise<T> => pageSlices.slices(steps),
 	readBytes,
 	parse,
 	raw,

@@ -132,7 +132,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 
 	let view = await fresh(id)
 	expect(shown(view.items)).toEqual([
-		{ type: 'prompt', text: 'what did I note?' },
+		{ type: 'prompt', text: 'what did I note?', interactive: true },
 		{ type: 'text', text: 'Let me look.' },
 		{ type: 'tool', id: 't1', name: 'read', input: { path: 'notes.txt' } },
 		{ type: 'tool-result', id: 't1', output: milk },

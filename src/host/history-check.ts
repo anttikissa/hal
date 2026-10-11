@@ -6,7 +6,6 @@ import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
 import type { HistoryRecord } from '../common/replay.ts'
-import type { ToolCallBlock } from '../common/blocks.ts'
 
 const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'notice', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase', 'rate_limit'])
 

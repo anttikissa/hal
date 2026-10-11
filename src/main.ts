@@ -1,6 +1,5 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-// Tasks: b, ah, nvm, 81y.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'

@@ -29,6 +29,7 @@ import { titles } from '../common/titles.ts'
 import { ansi } from './ansi.ts'
 import { frame, type Frame, type Past, type View } from './frame.ts'
 import { terminal } from './terminal.ts'
+import { renderView } from './render-view.ts'
 
 export interface Output {
 	write(s: string): void
@@ -324,118 +325,6 @@ function column(col: number): string {
 	return col > 0 ? `\r${CSI}${col + 1}G` : '\r'
 }
 
-/**
- * Paint the current view now. Force repaints everything (Ctrl-L, resize,
- * resume). Having two or more tabs enters full mode for good, and
- * showing another tab than last time repaints canonically: scrollback
- * holds only the tab shown.
- */
-function draw(force = false, trigger?: string): void {
-	let st = render.state
-	if (terminal.state.external || !st.out || (st.parked && !force)) return
-	st.parked = false
-	let { rows, cols } = st.out.size()
-	// Two or more tabs (startTabs until the host lists them) means full
-	// mode for good, from the first paint: no inline frame first that a
-	// clear then replaces, and a restart clears what the last run left.
-	if (!st.fullscreen && (st.view.tabs?.list.length ?? render.startTabs) > 1) {
-		st.fullscreen = force = true
-		trigger = 'the first paint with two or more tabs'
-	}
-	let tab = st.view.tabs?.focused
-	if (tab !== undefined) {
-		if (st.tab !== undefined && st.tab !== tab) {
-			st.fullscreen = force = true
-			trigger = 'a tab switch'
-		}
-		st.tab = tab
-	}
-	// A full redraw drops what kept blocks from shrinking (task fn), and
-	// every laid-out row, so all repaint in the current colors (a
-	// plugin's theme, task an).
-	if (force) {
-		frame.state.rows = new WeakMap()
-		frame.state.peaks.clear()
-		frame.state.history = undefined
-		st.past = undefined
-	}
-	// A long history is laid out a slice at a time (task 7j). Until it
-	// is, the tab's rows painted last stay; a tab not painted since the
-	// last full redraw shows its last screenful of items meanwhile.
-	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)
-	if (!past) {
-		render.later()
-		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
-	}
-	st.past = { session, past }
-	let next = frame.build(st.view, cols, rows, st.fullscreen, past)
-	// The modal's list moves only as far as it must from where it was.
-	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
-	// So does the prompt box.
-	st.view.prompt.scroll = next.promptScroll
-	let out = st.out
-	let pending = ''
-	for (let p of render.paintParts(next, rows, force, trigger)) {
-		if (typeof p === 'string') pending += p
-		else if (out.defer) {
-			if (pending) out.write(pending)
-			pending = ''
-			out.defer(p)
-		} else pending += p()
-	}
-	if (pending) out.write(pending)
-	render.painted(st.view)
-}
-
-// `view` with only the last items of its transcript, about a screen of
-// rows `cols` wide.
-function tail(view: View, cols: number, rows: number): View {
-	let t = view.transcript
-	if (!t) return view
-	let at = t.items.length
-	for (let n = 0; at > 0 && n < rows; ) n += frame.itemRows(t.items[--at]!, cols, t.meta.id).length + 1
-	return { ...view, transcript: { ...t, items: t.items.slice(at) } }
-}
-
-// Lays out the next slice of the history in a task of its own, and
-// paints once it is all laid out.
-function later(): void {
-	let st = render.state
-	if (st.slicing) return
-	st.slicing = setTimeout(() => {
-		st.slicing = null
-		if (!st.out) return
-		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs, true, st.out.size().rows)) render.request()
-		else render.later()
-	}, 0)
-}
-
-/**
- * Paint soon: at the end of this task (one host step's events paint
- * once, task a27) if nothing was painted in the last frameMs, else once
- * when that time is up. A stream of events never starves keyboard input.
- */
-function request(): void {
-	let st = render.state
-	if (st.timer) {
-		st.dirty = true
-		return
-	}
-	queueMicrotask(() => ((st.dirty = false), render.draw()))
-	st.timer = setTimeout(() => {
-		st.timer = null
-		if (!st.dirty) return
-		st.dirty = false
-		render.request()
-	}, render.frameMs)
-}
-
-/** Show a new view (transcript and prompt). */
-function show(view: View): void {
-	render.state.view = view
-	render.request()
-}
 
 /**
  * Erase the frame's last row (the help row), leave the cursor at its
@@ -490,11 +379,11 @@ export const render = {
 	paintParts,
 	clear,
 	column,
-	draw,
-	tail,
-	later,
-	request,
-	show,
+	draw: (force = false, trigger?: string): void => renderView.draw(force, trigger),
+	tail: (view: View, cols: number, rows: number): View => renderView.tail(view, cols, rows),
+	later: (): void => renderView.later(),
+	request: (): void => renderView.request(),
+	show: (view: View): void => renderView.show(view),
 	park,
 	init,
 	reset,

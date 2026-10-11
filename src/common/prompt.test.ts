@@ -146,13 +146,6 @@ describe('actions', () => {
 		expect(show(prompt.step(at('h|i'), { key: 'enter', shift: true }).state)).toBe('h\n|i')
 		expect(prompt.step(at('h|i'), key('escape'))).toEqual({ state: at('h|i'), action: { type: 'cancel' } })
 	})
-	// The legacy names are temporary (task 760): this fails after the
-	// deadline until every LEGACY-DELIVERY mapping and this test are gone.
-	test('the legacy delivery names interrupt and interject are deleted by 2026-10-10', () => {
-		expect(sendKeys.parse('interrupt')).toBe('steer')
-		expect(sendKeys.parse('interject')).toBe('soft-steer')
-		expect(Date.now(), 'delete the LEGACY-DELIVERY mapping in send-keys.ts and this test').toBeLessThan(Date.parse('2026-10-10T00:00:00Z'))
-	})
 	test('Enter chords send as sendKeys binds them (task 8kx)', () => {
 		let saved = { ...sendKeys }
 		try {
