@@ -54,6 +54,11 @@ remove repetition and empty phrases without weakening requirements.
 State a rule once, positively. Add a negative example only when the rule
 alone would be misread.
 
+When changing SYSTEM.md or this project's AGENTS.md on your own
+initiative, mark each change with an adjacent HTML comment containing
+`TODO - to be reviewed by a human -<session_id>`.
+Replace `<session_id>` with your current session ID.
+
 # Privacy
 
 Diagnostics and telemetry are opt-in, always: off by default, on only
