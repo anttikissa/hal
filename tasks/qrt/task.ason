@@ -1,0 +1,11 @@
+{
+	title: 'Generate unambiguous HELP object arguments',
+	spec: 'Generated tool usage in src/host/native-tool.ts displays named arguments as a JavaScript object with explicit key-value pairs, without surrounding square brackets that suggest an array. Values use schema-typed examples: quoted string placeholders, numeric examples, booleans, arrays and objects. Required fields and field descriptions continue to convey requiredness separately; existing Fields formatting and module-owned usage stay unchanged. Preserve the one native tool, argument validation, complete error messages and raw input, and singleton object-array compatibility. Multiple-object arrays remain invalid; this adds no bulk SPAWN. Restore the invariant that generated HELP distinguishes an object argument from an array argument. Native-tool tests exercise the generated format and unchanged singleton and multiple-object handling.',
+	status: 'done',
+	notes: [
+		'Observed SPAWN failure supplied a two-object array. The existing parser unwraps a singleton object array, and the existing compatibility test passed before this change. A multi-object array is not a bulk call and correctly fails with its complete input; only the generated Usage suffix changes. Typed values clarify JavaScript object syntax, while field schema requiredness and descriptions remain unchanged. No benchmark behavior or wording is added.',
+		'WAIT owns syntax.usage, so its normal help bypasses schema generation. Coverage of schema-generated arrays uses a WAIT definition copy without syntax; production module-owned usage remains unchanged.'
+	],
+	needs: ['3fv'],
+	foldInto: ['3fv']
+}

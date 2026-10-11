@@ -94,7 +94,14 @@ function usage(tool: Tool<unknown>): string[] {
 	let positional = tool.syntax?.positional ?? required
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
 	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `["<${k}>"]`))
-	if (rest.length) args.push(`[{ ${rest.join(', ')} }]`)
+	if (rest.length) {
+		let examples: Record<string, string> = { integer: '1', number: '1', boolean: 'true', object: '{}', null: 'null' }
+		let example = (type: string | undefined, key: string) => examples[type ?? ''] ?? JSON.stringify(`<${key}>`)
+		args.push(`{ ${rest.map((k) => {
+			let p = properties[k]!
+			return `${k}: ${p.type === 'array' ? `[${example(p.items?.type, k)}]` : example(p.type, k)}`
+		}).join(', ')} }`)
+	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }
 
