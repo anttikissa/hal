@@ -1,0 +1,11 @@
+{
+	title: 'Scope verification to the affected behavior',
+	spec: 'SYSTEM.md verification guidance tells the agent to run the smallest relevant test scope and expand it for cross-module changes or evidence of wider regressions. For a localized single-file change this favors affected-file tests over an unrelated full suite. Broader suites, typechecking, runtime checks, and security validation remain available and required where the changed behavior warrants them. Existing requirements to use project commands, fix failures, report inability to verify, and preserve validation, data-loss handling, security, and explicit user requirements remain intact. An adjacent human-review TODO marks the agent-initiated prompt change. Invariant: verification scope follows the change and regression risk, not a habitual full-suite launch.',
+	status: 'done',
+	notes: [
+		'Measured in seven original GPT evaluations: 115 total provider rounds. The empty-answer run changed one production module and its tests, ran the focused tests, then launched a full suite; 13 subsequent shell calls inspected its log or test process. A plugin-lifecycle run launched a full suite and made five subsequent process-check calls. Those two runs consumed 53 rounds together. Several follow-up calls also performed useful work, so these counts do not claim all follow-ups are removable. The preceding search/discovery task discloses WAIT; this change instead addresses choosing verification scope before launching unrelated tests. No benchmark names, answers or shell restrictions are added to the prompt. Effect on request counts remains unmeasured.',
+		'Verification: all 13 system-prompt tests pass after the one-line scope addition; git diff --check is clean. No extra tests or source changes are needed for this wording. The parent reviewed the prompt and task before commit. This fixed prompt text creates no growing state or per-tool runtime work. No request-count or benchmark improvement is claimed; the follow-up evaluation must measure that separately.'
+	],
+	needs: ['b3a'],
+	foldInto: ['3fv']
+}
