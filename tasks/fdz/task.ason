@@ -4,7 +4,7 @@
 	status: 'done',
 	notes: [
 		'Observed validators taking 34.277s and 32.889s while tsc errors were piped through tail, hiding most output and returning exit 0. The fixture declares both TypeScript and native-preview; no package download was established. Its check script selects tsgo. Prompt-wording assertions would only repeat this rule, so existing prompt-builder tests provide the focused structural check.',
-		'User reverted the SYSTEM.md verify rule to the original one-liner (11 Oct): its inspect-scripts-first clause made GPT read package.json before every test run, and the user had not asked for it.'
+		'User reverted the SYSTEM.md verify rule to the original one-liner (11 Oct). Provenance: session 07-lou (agent initiative, not a user request) instructed its subagent 09-pop to change the rule after npx validator latency in Sonnet benchmark runs. The inspect-scripts-first clause then made GPT read package.json before every test run.'
 	],
 	needs: ['3fv'],
 	foldInto: ['3fv']
