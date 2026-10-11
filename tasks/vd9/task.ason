@@ -1,0 +1,11 @@
+{
+	title: 'Tool instructions in their own prompt sections',
+	spec: 'SYSTEM.md keeps the general Action instructions, each action with its own guide (READ, BASH, EDIT, WRITE) and the other-actions list with $tools_summary in named sections, so a tool, summary or plugin change reaches a running session as a section update instead of rebuilding the system prompt and losing the provider cache. systemPrompt.inspect locates sections in text an assemble hook changed: a section whose rendered text is intact keeps it; otherwise it runs from its heading to the next later section heading or unchanged text between sections, and its body is what the hook produced. A section whose heading a hook removed is withdrawn; a hook that changes text outside every section still rebuilds.',
+	status: 'done',
+	notes: [
+		'SYSTEM.md sections: Actions (general rules), READ, BASH, EDIT, WRITE, Other actions ($tools_summary). The BASH/EDIT purpose hints moved into their own sections. Plugins that rewrite a guide must anchor on its section heading (# EDIT), not on neighboring lines: multiedit.ts matched "- Commands run in cwd;" and would have stopped installing its guide silently when that line moved.',
+		'Measured cost of a plugin swap before this: enabling, disabling or a .broken fallback of an EDIT plugin rebuilt every live session prompt (full cache write). Regression test in system-prompt.test.ts fails on the old inspect (hooked sections were dropped and their text counted as outside).'
+	],
+	needs: ['q5g'],
+	foldInto: ['q5g']
+}

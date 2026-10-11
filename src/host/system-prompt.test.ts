@@ -26,6 +26,20 @@ test('purpose guidance follows interaction mode, not subagent kind or autoclose'
 	expect(unattended.text).toContain('path')
 })
 
+test('a hook that rewrites a tool guide changes only that section; a removed heading withdraws its section', () => {
+	let input = { cwd: root, model: 'm/x', now: at, noUser: true }
+	let plain = systemPrompt.inspect(input), assemble = systemPrompt.assemble
+	systemPrompt.assemble = (...args) => assemble(...args).replace(/(# EDIT\n)[\s\S]*?(?=\n\n# )/, '$1- Use EDIT blocks.\n  !!NEW example').replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# )/, '')
+	try {
+		let hooked = systemPrompt.inspect(input)
+		let outside = (r: typeof plain) => r.sections.filter((s) => s.body.trim()).reduceRight((t, s) => t.slice(0, s.start) + t.slice(s.end), r.text).replace(/\n{3,}/g, '\n\n')
+		expect(outside(hooked)).toBe(outside(plain))
+		expect(hooked.sections.find((s) => s.title === 'EDIT')?.body).toBe('- Use EDIT blocks.\n  !!NEW example')
+		expect(hooked.sections.some((s) => s.title === 'WRITE')).toBe(false)
+		for (let s of hooked.sections.filter((s) => s.body.trim())) expect(hooked.text.slice(s.start, s.end)).toBe(`# ${s.title}\n${s.body}`)
+	} finally { systemPrompt.assemble = assemble }
+})
+
 test('says who, when and where: date, cwd and model', () => {
 	mkdirSync(`${root}/work`)
 	let text = systemPrompt.build({ cwd: `${root}/work`, model: 'anthropic/claude-x', now: at })

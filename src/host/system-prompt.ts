@@ -104,10 +104,21 @@ function inspect(input: PromptInput): { sources: PromptSource[]; text: string; p
 	let sources: PromptSource[] = [], problems: string[] = [], rendered: PromptRender = { sections: [] }
 	let text = systemPrompt.assemble({ ...input, rendered }, sources, problems)
 	let shift = text.indexOf(rendered.text ?? text)
+	if (shift >= 0) return { sources, text, problems, sections: rendered.sections.map((s) => s.body.trim() ? { ...s, start: s.start + shift, end: s.end + shift } : s) }
+	// A hook changed the text (task vd9). An intact section keeps its text;
+	// a changed one runs from its heading to the next later heading or
+	// unchanged text between sections. A missing heading withdraws it.
+	let full = rendered.text ?? '', shown = rendered.sections.filter((s) => s.body.trim()), from = 0
+	let gaps = shown.map((s, i) => full.slice(s.end, shown[i + 1]?.start ?? full.length).trim())
 	let sections = rendered.sections.flatMap((s) => {
 		if (!s.body.trim()) return [s]
-		let start = shift >= 0 ? s.start + shift : text.indexOf(`# ${s.title}\n${s.body}`)
-		return start < 0 ? [] : [{ ...s, start, end: start + s.end - s.start }]
+		let i = shown.indexOf(s), head = `# ${s.title}\n`, intact = text.indexOf(head + s.body, from)
+		let start = intact >= 0 ? intact : text.indexOf(head, from)
+		if (start < 0) return []
+		let at = start + head.length, end = intact >= 0 ? at + s.body.length : Math.min(text.length, ...[...shown.slice(i + 1).map((n) => text.indexOf(`\n# ${n.title}\n`, at)), ...gaps.slice(i).filter(Boolean).map((g) => text.indexOf(g, at))].filter((n) => n >= 0))
+		let body = text.slice(at, end).replace(/\s+$/, '')
+		from = at + body.length
+		return [{ ...s, body, start, end: from }]
 	})
 	return { sources, text, problems, sections }
 }
