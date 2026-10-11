@@ -7,6 +7,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { profile } from './profile.ts'
+import { toolModel } from './tool-model.ts'
 
 type Period = 'neutral' | 'morning' | 'afternoon' | 'evening'
 
@@ -98,7 +99,12 @@ function choose(text: string, previous?: string): string {
 
 function open(id: string): void {
 	let meta = sessions.open(id)
-	if (meta.model.startsWith('hal/') || (meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
+	if ((meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
+	if (meta.model === 'hal/tool') {
+		history.append(id, { type: 'output', text: toolModel.welcome, synthetic: true })
+		return
+	}
+	if (meta.model.startsWith('hal/')) return
 	mkdirSync(paths.stateDir(), { recursive: true })
 	let previous = liveFiles.liveFile<{ last?: string }>(`${paths.stateDir()}/greetings.ason`, {}, { watch: false, mode: 0o600 })
 	try {

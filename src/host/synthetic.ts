@@ -13,6 +13,7 @@ import { intro } from './intro.ts'
 import { pluginSyncSession } from './plugin-sync-session.ts'
 import { queueTest } from './queue-test.ts'
 import { scrollTest } from './scroll-test.ts'
+import { toolModel } from './tool-model.ts'
 
 export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; after?: () => void }
 export type Synthetic = (records: HistoryRecord[], answers?: Answers, sessionId?: string) => Reply
@@ -39,7 +40,7 @@ async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenera
 }
 
 export const synthetic = {
-	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records), 'queue-test': (records) => queueTest.run(records), 'plugin-sync': (_records, answers, id) => pluginSyncSession.run(answers, id!) } as Record<string, Synthetic>,
+	models: { tool: (records, _answers, id) => toolModel.run(records, id!), intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records), 'queue-test': (records) => queueTest.run(records), 'plugin-sync': (_records, answers, id) => pluginSyncSession.run(answers, id!) } as Record<string, Synthetic>,
 	find,
 	paced,
 	pauseMs: 400,

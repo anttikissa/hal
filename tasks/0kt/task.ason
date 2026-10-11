@@ -1,0 +1,9 @@
+{
+	title: 'Direct tool interface model',
+	spec: 'hal/tool is a selectable local synthetic model in terminal and web. It sends each typed prompt verbatim as the cmd input of the existing native tool, with no language model, interpretation, or provider tokens. Calls use the normal parser, execution, approval, streaming, history and complete error presentation. Each prompt executes once and the turn ends silently after its results, without repeating on continuation. Selecting this mode or creating an empty interactive session in it shows a short introduction explaining direct execution, an example BASH ls, HELP discovery, and that commands can change files. This welcome does not consume the first command. Slash commands retain their ordinary behavior. Verify actual execution, errors, subsequent commands and no duplicate execution.',
+	status: 'done',
+	notes: [
+		'The synthetic model resolves calls through nativeTool.arrived with session context, then uses the ordinary turn/tool pipeline. A backward scan stops at a prior tool call, so settled commands are not repeated. Welcome output uses existing model selection and empty-session greeting paths. Focused direct-model and greeting tests, typecheck and changed-file lint pass. turns.test.ts has a prompt expectation mismatch: actual prompt includes interactive: true; this change does not alter prompts.'
+	],
+	needs: ['mvd', '3fv']
+}
