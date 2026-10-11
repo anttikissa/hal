@@ -275,8 +275,9 @@ export default function (plugin: Plugin) {
 		const names = [...countsByPath.keys()]
 		const label = names.length ? names.join(', ') : 'files'
 		const purpose = typeof call.input.description === 'string' ? call.input.description.trim().replace(/\s+/g, ' ') : ''
-		const title = purpose || `Edit ${label}`
-		if (!result) return { title: `${title} (${edits.length} ${edits.length === 1 ? 'step' : 'steps'})`, blocks: names.map((path) => ({ kind: 'text', path, text: `${countsByPath.get(path)} requested` })) }
+		const title = purpose ? `Edit: ${purpose}` : `Edit ${label}`
+		const pending = (n: number) => `${n} ${n === 1 ? 'change' : 'changes'} pending`
+		if (!result) return { title: `${title} (${pending(edits.length)})`, blocks: names.map((path) => ({ kind: 'text', path, text: pending(countsByPath.get(path)!) })) }
 		if (result.isError) return { title: purpose ? `Edit failed: ${purpose}` : `Edit failed: ${label}`, blocks: names.map((path) => ({ kind: 'text', path, text: 'Requested edit' })) }
 		const headers = [...result.output.matchAll(/^== (.+)@[a-z0-9]+ verified ==\n/gm)]
 		if (!headers.length || result.output.includes('[cut:')) return { title, blocks: [...names.map((path) => ({ kind: 'text' as const, path, text: 'Requested edit' })), { kind: 'text', text: { from: 0, to: result.output.length } }] }

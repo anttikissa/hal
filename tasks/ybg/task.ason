@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Replay of 376 block-format EDIT calls from sessions and benchmarks (2026-10-11): with a Sonnet context, multiedit+edit-quirks resolves all 376 exactly as the former lenient multiedit did (82 errors either way); with a GPT context, all 376 match strict multiedit alone (102 errors). Quirk firings are found from strict error text (the faulting line is located outside blocks by content), so they need no hooks inside multiedit. The former private native-multiedit tests were obsolete (they failed against the plugin) and were dropped.',
-		'Undocumented tolerance (one documented form per job; others accepted silently): !!OLD closed by !!END removes the text; a text replace with empty new that matches whole lines once also removes their newline. delete A-B stays the documented way to remove lines.'
+		'Undocumented tolerance (one documented form per job; others accepted silently): !!OLD closed by !!END removes the text; a text replace with empty new that matches whole lines once also removes their newline. delete A-B stays the documented way to remove lines.',
+		'EDIT cards name themselves edits: titles start with Edit: <purpose> (or Edit <paths>); before the result arrives the title and each file say N change(s) pending. The earlier <purpose> (1 step) / 1 requested gave no hint the card was an edit (user, 2026-10-11).'
 	],
 	needs: ['pf2', 'vd9', 'an']
 }
