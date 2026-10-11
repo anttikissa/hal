@@ -1,0 +1,7 @@
+{
+	title: 'Include AGENTS.md and CLAUDE.md verbatim',
+	spec: 'AGENTS.md and CLAUDE.md join the system prompt verbatim (trimmed), like other agent apps: HTML comments, directives and $ text stay as written. Only SYSTEM.md and its includes lose HTML comments. Test: a project-file comment stays in the built prompt.',
+	status: 'done',
+	needs: ['q5'],
+	foldInto: ['q5']
+}

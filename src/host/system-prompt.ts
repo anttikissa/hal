@@ -72,7 +72,7 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 			let path = `${dir === '/' ? '' : dir}/${name}`, text = read(path)
 			if (text === undefined) continue
 			sources?.push({ path, bytes: Buffer.byteLength(text) })
-			parts.push(`<file path="${path}">\n${promptTemplate.uncomment(text).trim()}\n</file>`)
+			parts.push(`<file path="${path}">\n${text.trim()}\n</file>`)
 			break
 		}
 	}

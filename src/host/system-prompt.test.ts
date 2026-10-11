@@ -109,7 +109,7 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 	}
 })
 
-test('SYSTEM preprocessing removes comments and selects every matching condition; project files only lose comments', () => {
+test('SYSTEM preprocessing removes comments and selects every matching condition; project files stay verbatim', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
@@ -120,8 +120,7 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 		expect(text).not.toContain('OPENAI ONLY')
 		expect(text).not.toContain('secret')
 		expect(text).toContain('anthropic/claude-x ${unknown}')
-		expect(text).not.toContain('gone')
-		expect(text).toContain('kept')
+		expect(text).toContain('<!-- gone -->kept')
 		expect(text).toContain('::: if model="openai/*"')
 		expect(systemPrompt.build({ cwd: root, model: 'openai/gpt', now: at })).toContain('OPENAI ONLY')
 	} finally { systemPrompt.file = old }
