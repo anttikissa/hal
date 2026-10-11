@@ -57,13 +57,13 @@ export const tool: Tool = {
 			},
 			delivery: { type: 'string', enum: ['soft-steer', 'queue', 'emergency'], description: 'Default soft-steer' },
 		},
-		required: ['to', 'text', 'description'],
+		required: ['to', 'text'],
 	},
 	async run(input, ctx) {
 		let { to, text, description, delivery = 'soft-steer' } = input
 		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
 		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
-		if (typeof description !== 'string' || !description.trim()) throw new Error('description must be a non-empty string')
+		if (description !== undefined && (typeof description !== 'string' || !description.trim())) throw new Error('description must be a non-empty sentence; the message was not sent')
 		// LEGACY-SEND (task zb0): delete with its test by 2026-10-10.
 		if ('steer' in input || 'queue' in input) throw new Error("steer and queue are no longer parameters: use delivery 'emergency' or 'queue'")
 		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'emergency') throw new Error('delivery must be soft-steer, queue or emergency')
@@ -71,7 +71,7 @@ export const tool: Tool = {
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
-		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), summary: description.replace(/\s+/g, ' ').trim() }
+		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), ...(description && { summary: description.replace(/\s+/g, ' ').trim() }) }
 		if (delivery === 'soft-steer') sender.advisory = true
 		let refused = prompts.submit(id, text, undefined, delivery === 'emergency' ? 'steer' : delivery, sender)
 		if (refused) throw new Error(refused)

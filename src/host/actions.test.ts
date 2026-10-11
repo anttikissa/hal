@@ -42,6 +42,10 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(() => actions.resolve('ls -l')).toThrow(/unknown action LS/)
 	expect(() => actions.resolve('READ a.ts\nREAD b.ts')).toThrow(/one action per call/)
 	expect(() => actions.resolve('BASH "ls" { evil: 1 }')).toThrow(/no field 'evil'/)
+	// Every action takes an optional purpose: a comment or a description field, even where the tool keeps none.
+	expect(actions.resolve('SEND "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
+	expect(actions.resolve('SEND /* Ask */ "2" "hi"')).toEqual({ name: 'send', input: { to: '2', text: 'hi', description: 'Ask' } })
+	expect(actions.resolve('NOTIFY /* Ping */ "done" { description: "Ping" }')).toEqual({ name: 'notify', input: { text: 'done' } })
 	expect(() => actions.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
 })
 

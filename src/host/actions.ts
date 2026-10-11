@@ -32,8 +32,9 @@ function find(id: string): Tool<unknown> {
 }
 
 // Positional strings fill the tool's positional fields in order; an
-// object argument supplies fields by name. The purpose becomes the
-// description where the tool has one.
+// object argument supplies fields by name. Every action takes an optional
+// purpose, as a comment or a description field; it becomes the description
+// where the tool has one and is dropped elsewhere.
 function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 	let { values, purpose, unclosed } = action.values(raw)
 	let { properties = {}, required = [] } = schema(tool)
@@ -44,6 +45,7 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 	for (let value of values) {
 		if (value && typeof value === 'object' && !Array.isArray(value)) {
 			for (let [key, v] of Object.entries(value)) {
+				if (key === 'description' && !Object.hasOwn(properties, key)) continue
 				if (!Object.hasOwn(properties, key)) throw new Error(`${tool.name.toUpperCase()} has no field '${key}'. ${usage()}`)
 				if (Object.hasOwn(input, key)) throw new Error(`${tool.name.toUpperCase()} got '${key}' twice. ${usage()}`)
 				input[key] = v
@@ -86,7 +88,7 @@ function usage(tool: Tool<unknown>): string[] {
 	if (tool.action?.usage) return tool.action.usage
 	let { properties = {}, required = [] } = schema(tool)
 	let positional = tool.action?.positional ?? required
-	let rest = Object.keys(properties).filter((k) => !positional.includes(k))
+	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
 	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `["<${k}>"]`))
 	if (rest.length) args.push(`[{ ${rest.join(', ')} }]`)
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
