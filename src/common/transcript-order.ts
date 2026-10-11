@@ -11,7 +11,12 @@ function order(items: Item[]): Item[] {
 
 function replace(items: Item[], start: number, before: Item[], after: Item[]): Item[] {
 	let keys = new Set(before.map((item) => item.key))
-	return [...items.slice(0, start), ...transcriptOrder.order([...items.slice(start).filter((item) => !keys.has(item.key)), ...after])]
+	let previous = new Map(items.slice(start).map((item) => [item.key, item]))
+	let next = [...items.slice(0, start), ...transcriptOrder.order([...items.slice(start).filter((item) => !keys.has(item.key)), ...after.map((item) => {
+		let old = previous.get(item.key)
+		return old && Object.keys(old).length === Object.keys(item).length && Object.entries(item).every(([key, value]) => Reflect.get(old, key) === value) ? old : item
+	})])]
+	return next.length === items.length && next.every((item, i) => item === items[i]) ? items : next
 }
 
 export const transcriptOrder = { order, replace }

@@ -14,7 +14,7 @@ import { Icon } from './Icon.tsx'
 const heat = (n: number | undefined) => (n === undefined ? '' : `heat-${n}`)
 
 function Parts(props: { group: StatusGroup }) {
-	return <span dir="ltr"><For each={props.group.parts}>{(part) => <span class={heat(part.heat)}>{part.text}</span>}</For></span>
+	return <span dir="ltr"><For each={props.group.parts} keyed={false}>{(part) => <span class={heat(part().heat)}>{part().text}</span>}</For></span>
 }
 
 export function StatusRow(props: { view: ViewState; connected: boolean; color?: number }) {
@@ -60,8 +60,8 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 			<dialog ref={(e) => (details = e)} class="StatusDetails" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
 				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
 				<p class={tone()}>{line().text}</p>
-				<For each={status.groups(props.view)}>{(group) => <div class="fact">
-					{group.href ? <a href={group.href}><Parts group={group} /></a> : <Parts group={group} />}
+				<For each={status.groups(props.view)} keyed={false}>{(group) => <div class="fact">
+					{group().href ? <a href={group().href}><Parts group={group()} /></a> : <Parts group={group()} />}
 				</div>}</For>
 				<form method="post" action="/logout"><button type="submit"><Icon name="logout" />Log out this browser</button></form>
 			</dialog>

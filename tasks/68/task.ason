@@ -1,9 +1,9 @@
 {
 	title: 'Web status row',
-	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-colored, tokens this run, and subscription usage windows. It sits just above the composer. Its groups are separated by space, not dots, and flow onto more rows when the width runs out, at any width, each group whole: a group never breaks inside, and one wider than the row (a long cwd) is cut with an ellipsis at its start, so the directory name at its end stays; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colors come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths.',
+	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-colored, tokens this run, and subscription usage windows. It sits just above the composer. Its groups are separated by space, not dots, and flow onto more rows when the width runs out, at any width, each group whole: a group never breaks inside, and one wider than the row (a long cwd) is cut with an ellipsis at its start, so the directory name at its end stays; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colors come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths. Pushed facts update existing status-detail and text-part slots rather than recreating every node.',
 	status: 'done',
-	needs: ['1g'],
 	notes: [
 		'StatusRow uses transcript.meta plus transcript.stats (snapshot and turn-end), pure view.status groups, titles.modelName and compact token counts. Heat steps come from generated theme classes statusCool/Warm/Hot at <60, 60–84 and >=85 percent; CSS uses flex on desktop and three-column/two-row phone grid without dropping a fact. Checked representative generated-CSS previews in headless Chrome at desktop 1280x800 and emulated phone 390x844 via CDP: all groups visible, no horizontal overflow; long name/cwd and windows each wrap within their phone grid cells. A live authenticated browser was not available for a manual app check.'
-	]
+	],
+	needs: ['1g']
 }

@@ -287,6 +287,26 @@ test('rows only grow at the end as items arrive', () => {
 	}
 })
 
+test('streaming updates only its row; results replace their call row without mutating it', () => {
+	let st = running([
+		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'one' } },
+	] as Event[], { type: 'idle' })
+	let before = view.rows(st.transcript!.items)
+	st = view.onEvent(st, { type: 'stream', sessionId, event: { type: 'text', text: ' two' } })
+	let streamed = view.rows(st.transcript!.items, st.sent, before)
+	expect(streamed[0]).toBe(before[0])
+	expect(streamed[1]).toBe(before[1])
+	expect(streamed.at(-1)).not.toBe(before.at(-1))
+	expect(view.rows(st.transcript!.items, st.sent, streamed)).toBe(streamed)
+	st = view.onEvent(st, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'done' }] })
+	let completed = view.rows(st.transcript!.items, st.sent, streamed)
+	expect(completed[1]).not.toBe(streamed[1])
+	expect(completed[1]!.result?.output).toBe('done')
+	expect(streamed[1]!.result).toBeUndefined()
+	expect(completed.at(-1)).toBe(streamed.at(-1))
+})
+
 test('a sent prompt shows pending, then as the host’s item under the same key, once', () => {
 	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }] as Event[])
 	let sending = [{ id: 'c7', text: 'go' }]

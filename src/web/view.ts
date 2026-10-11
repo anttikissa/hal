@@ -241,7 +241,7 @@ function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 // `note`: a queued message's compact row starts with it (task 16).
 export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true; waiting?: true; note?: string }
 
-function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
+function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = []): Row[] {
 	let out: Row[] = []
 	let calls = new Map<string, Row>()
 	items = promptChanges.group(items)
@@ -259,7 +259,13 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 		if (item.type === 'tool') calls.set(item.id, row)
 		out.push(row)
 	}
-	return out
+	if (!before.length) return out
+	let previous = new Map(before.map((row) => [row.key, row]))
+	let next = out.map((row) => {
+		let old = previous.get(row.key)
+		return old && old.item === row.item && old.result === row.result && old.at === row.at ? old : row
+	})
+	return next.length === before.length && next.every((row, i) => row === before[i]) ? before : next
 }
 
 // `rows` and after them the prompts still pending (`id`: the submit's

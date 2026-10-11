@@ -69,8 +69,9 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
-	let rows = createMemo(() => view.rows(items(), props.view.sent))
-	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, props.tabs?.map((t) => t.id), props.view.transcript?.queueHold))
+	let rows = createMemo<Row[]>((before) => view.rows(items(), props.view.sent, before))
+	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), { equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true) })
+	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, tabIds(), props.view.transcript?.queueHold))
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)

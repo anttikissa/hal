@@ -95,6 +95,8 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	let pages!: HTMLElement
 	let track!: HTMLElement
 	let probe!: HTMLElement
+	let byId = createMemo(() => new Map(props.tabs.map((tab) => [tab.id, tab])))
+	let ids = createMemo(() => props.tabs.map((tab) => tab.id), { equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]) })
 	let [room, setRoom] = createSignal({ width: 0, ch: 8 })
 	// start..end-1 are fully visible; edge marks come only from tabs under 10% visible.
 	let [visible, setVisible] = createSignal({ start: 0, end: 0, markStart: 0, markEnd: 0 })
@@ -182,10 +184,10 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					</span>
 					{layout().overflow && <EdgeButton edge={edge(true)} left active={current() >= 0 && current() < visible().start} onClick={() => page(true)} />}
 					<div class="track" ref={(e) => (track = e)} onScroll={measureVisible}>
-						<For each={props.tabs.map((tab) => tab.id)}>
-							{(id) => {
-								let tab = () => props.tabs.find((t) => t.id === id)!
-								return <Link tab={tab()} n={props.tabs.findIndex((t) => t.id === id) + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(() => center(true))} />
+						<For each={ids()}>
+							{(id, i) => {
+								let tab = () => byId().get(id)!
+								return <Link tab={tab()} n={i() + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(() => center(true))} />
 							}}
 						</For>
 					</div>
@@ -210,9 +212,9 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<ul tabindex={-1} autofocus>
 					{/* Keyed by id: each tabs event brings new objects, and a row
 					    replaced between touch down and up loses its click. */}
-					<For each={props.tabs.map((tab) => tab.id)}>
+					<For each={ids()}>
 						{(id, i) => {
-							let tab = () => props.tabs.find((t) => t.id === id)!
+							let tab = () => byId().get(id)!
 							return (
 								<li>
 									<Link tab={tab()} n={i() + 1} shown={id === props.shown} name dir onPick={() => setOpen(false)} />

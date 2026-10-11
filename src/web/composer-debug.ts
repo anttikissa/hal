@@ -9,7 +9,7 @@ import { app } from './app.ts'
 import { strings } from '../common/strings.ts'
 
 type Row = Record<string, unknown>
-let rows: Row[] = [], timer: ReturnType<typeof setTimeout> | undefined, serial = 0, lastAnomaly = ''
+let rows: Row[] = [], timer: ReturnType<typeof setTimeout> | undefined, serial = 0
 const page = crypto.randomUUID().slice(0, 8)
 let badge: HTMLElement | undefined
 const fail = (text: string) => {
@@ -33,15 +33,21 @@ const font = (el: Element | null | undefined) => {
 	return { family: s.fontFamily, size: s.fontSize, letter: s.letterSpacing, pad: s.paddingLeft, opacity: s.opacity, visibility: s.visibility }
 }
 // One character's width in an element's font, so hint and box columns can be compared.
+let widths = new WeakMap<Element, { key: string; width: number }>()
 const chWidth = (el: Element | null | undefined) => {
 	if (!el) return null
+	let style = getComputedStyle(el), key = `${style.font}|${style.letterSpacing}`
+	let cached = widths.get(el)
+	if (cached?.key === key) return cached.width
 	let probe = document.createElement('span')
 	probe.textContent = '0'.repeat(20)
-	probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${getComputedStyle(el).font};letter-spacing:${getComputedStyle(el).letterSpacing}`
+	probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${style.font};letter-spacing:${style.letterSpacing}`
 	document.body.append(probe)
 	let w = probe.getBoundingClientRect().width / 20
 	probe.remove()
-	return Math.round(w * 1000) / 1000
+	let width = Math.round(w * 1000) / 1000
+	widths.set(el, { key, width })
+	return width
 }
 
 function snapshot(): Row {
@@ -78,11 +84,7 @@ function anomaly(s: Row): string[] {
 function record(event: string, detail: Row = {}): void {
 	let s = { n: ++serial, at: new Date().toISOString(), ms: Math.round(performance.now()), event, ...detail, ...snapshot() }
 	let found = anomaly(s)
-	if (found.length) {
-		;(s as Row).anomaly = found
-		let key = found.join('|')
-		lastAnomaly = key
-	} else lastAnomaly = ''
+	if (found.length) (s as Row).anomaly = found
 	rows.push(s)
 	if (rows.length > 400) rows.splice(0, rows.length - 400)
 	timer ??= setTimeout(flush, found.length ? 200 : 2000)
@@ -131,12 +133,10 @@ function init(): void {
 	document.addEventListener('selectionchange', () => { if (document.activeElement?.closest('.Composer .field')) record('selectionchange') }, { passive: true })
 	// Example and layout changes the events above don't cause (timers, host events, resizes).
 	let watched = new WeakSet<Element>()
-	// The example animates every few ms: record a change only if it shows a
-	// fault or 250ms passed since the last one.
 	let hintAt = 0
 	let hintChanges = new MutationObserver(() => {
 		let now = performance.now()
-		if (now - hintAt < 250 && anomaly(snapshot()).join('|') === lastAnomaly) return
+		if (now - hintAt < 250) return
 		hintAt = now
 		record('hint-mutation')
 	})
@@ -150,8 +150,13 @@ function init(): void {
 		}
 	}
 	let queued = false
-	new MutationObserver(() => { if (!queued) { queued = true; queueMicrotask(() => { queued = false; attach() }) } }).observe(document.body, { childList: true, subtree: true })
+	new MutationObserver((records) => {
+		if (queued || !records.some((r) => [...r.addedNodes].some((n) => n instanceof Element && (n.matches('.Composer, .entry, .field, .actions, .hint') || n.querySelector('.Composer, .entry, .field, .actions, .hint'))))) return
+		queued = true
+		queueMicrotask(() => { queued = false; attach() })
+	}).observe(document.body, { childList: true, subtree: true })
 	attach()
+	document.fonts.addEventListener('loadingdone', () => { widths = new WeakMap(); record('fonts-loaded') })
 	visualViewport?.addEventListener('resize', () => record('vv-resize'))
 	document.addEventListener('visibilitychange', () => { record(`visibility-${document.visibilityState}`); if (document.visibilityState === 'hidden') void flush() })
 	// A disagreement can appear without any composer event (a host event resets the text).
