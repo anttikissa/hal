@@ -58,6 +58,12 @@ bun local/records/query.ts --timeline
 The append-only ledger is `local/records/ledger.asonl`. Reimporting unchanged
 sources adds no attempts; metadata revisions supersede earlier records without
 rewriting history. Queries resolve revisions without counting them as new runs.
+Each record's `systemPrompt` points to `local/records/prompts/<sha256>.json`:
+the system prompt and tool definitions of the run's first provider request
+with tools, as rendered after templates and plugins. It is taken from saved
+request bodies (`native-bodies.jsonl`, `*.body.json`, proxy `*.req.json`);
+runs without them record it as unknown. Hal prompts embed the cwd and date,
+so most runs store a distinct file.
 All artifacts and local helpers remain ignored. JSON output retains detailed
 configuration, cost provenance and references for inspection or graphing.
 
