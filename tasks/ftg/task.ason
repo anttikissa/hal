@@ -5,7 +5,8 @@
 	notes: [
 		'Subagent ownership uses SessionMeta.owner for reports, waits, question answers, greeting eligibility and owned-work stopping. SessionMeta.parent records only fork origin. The first spawned prompt contains only its task; the spawn tool retains argument mechanics. subagents.fork inherits promptCache through its explicit inherit API; session closure closes cache live files.',
 		'SYSTEM.md documents template syntax and uses role, budget, date, cwd, model and local-instruction sections. Role guidance moved from spawn.ts/subagents.ts has source-marked human-review TODOs; subagent first messages now carry only tasks. Model effort is part of the rendered identity, not a forced cache rebuild.',
-		'Sections are rendered from a single hookable SYSTEM.md template. Files included from SYSTEM.md are rendered as part of the template (task krw); project files ($agents) stay verbatim, preserve internal whitespace, and are not parsed as template directives. Prompt-file UI watches and /system use the same session variables. /system reports full malformed-template diagnostics; normal requests retain the last good prompt and a standing error, or raw recovery input if none exists.'
+		'Sections are rendered from a single hookable SYSTEM.md template. Files included from SYSTEM.md are rendered as part of the template (task krw); project files ($agents) stay verbatim, preserve internal whitespace, and are not parsed as template directives. Prompt-file UI watches and /system use the same session variables. /system reports full malformed-template diagnostics; normal requests retain the last good prompt and a standing error, or raw recovery input if none exists.',
+		'SYSTEM.md opening comment explains why sections exist (prompt-cache stability), shows the full and diff hal-note update formats, and is laid out in spaced paragraphs for human readers.'
 	],
 	needs: ['r92', 'q5g'],
 	foldInto: ['t0']

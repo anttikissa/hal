@@ -1,19 +1,55 @@
 <!-- TODO: human should review this.
+
 SYSTEM.md is the editable prompt template. HTML comments are omitted.
-@path includes a file as part of the template; @?path includes it if present.
-Paths may use variables and ~, relative to the including file. $agents is not
-a template and keeps HTML comments.
-$name and ${name} expand variables; unknown names remain literal.
-:: if key="glob" keeps matching content (* and ? wildcards); multiple
-conditions must all match. :: else selects its alternate branch.
-Conditionals may nest and may contain sections; sections cannot nest.
-:: section "Unique title" introduces # Unique title followed by its body.
-Updates replace the whole section; update="diff" sends explicit old/new lines.
-Opening, else and closing fences have matching counts of at least two colons.
-Use two colons outside, three inside. Empty sections produce no heading.
+
+@path includes a file as part of the template; @?path includes it only if it
+exists. Paths may use variables and ~, and resolve relative to the including
+file. $agents is not a template and keeps its HTML comments.
+
+$name and ${name} expand variables; unknown names stay as written.
+
+:: if key="glob" keeps its content when the variable matches (* and ?
+wildcards). Several conditions on one line must all match. :: else selects
+the alternate branch. Conditionals may nest and may contain sections;
+sections cannot nest.
+
+Opening, else and closing fences use the same number of colons, at least
+two: two at the top level, three inside a block.
+
+:: section "Unique title" renders as "# Unique title" followed by its body.
+An empty section renders nothing, not even its heading.
+
+Why sections: to keep the provider's prompt cache valid, the system prompt
+never changes during a session. When a section's content changes (a new cwd,
+an edited AGENTS.md), Hal leaves the system prompt as it is and appends the
+change to the transcript as a <hal-note>.
+
+By default, the note carries the whole new section:
+
+    Instruction section updates:
+
+    # Local instructions
+    Replace this section in full:
+    <new section body>
+
+With update="diff", it carries only the changed lines, which suits long
+sections:
+
+    Instruction section updates:
+
+    # Local instructions
+    Update these lines (- old, + new):
+     unchanged context
+    -old line
+    +new line
+
+A change outside every section cannot be sent this way: Hal rebuilds the
+system prompt, losing the cache, and notes that earlier replies followed the
+old text.
+
 Variables: harness, model (including effort), date, cwd, hal_dir, home,
-session_dir, hal_source, user_notes, web_url, tools_summary, agents,
-kind, subagent, owner, fork, parent, subagent_slots, autoclose, interactive.
+session_dir, hal_source, user_notes, web_url, tools_summary, agents, kind,
+subagent, owner, fork, parent, subagent_slots, autoclose, interactive.
 -->
 
 :: section "Identity"
