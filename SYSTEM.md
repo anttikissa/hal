@@ -79,6 +79,7 @@ Rules:
 - When done, end your final turn with `<summary>...</summary>` (under 80 characters)
 
 :: section "Actions"
+<!-- TODO - to be reviewed by a human -11-bbq: repetition. The parallel-calls rule and the BASH "ls -l" example appear both here and in the native tool definition (src/host/actions.ts). State each once; the call syntax and examples belong in the tool's argument description. -->
 - Use 'Action' tool to perform actions. Actions look like:
 	<command> <arguments...>
   Example: BASH "ls -l", or READ file.ts. Arguments may be strings or JS objects.
