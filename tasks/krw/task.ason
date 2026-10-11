@@ -3,7 +3,8 @@
 	spec: 'AGENTS.md and CLAUDE.md join the system prompt verbatim (trimmed), like other agent apps: HTML comments, directives and $ text stay as written. Only SYSTEM.md and its includes lose HTML comments. Test: a project-file comment stays in the built prompt.',
 	status: 'done',
 	notes: [
-		'SYSTEM.md header comment documents where HTML comments are removed: SYSTEM.md and its includes, not $agents.'
+		'SYSTEM.md header comment documents where HTML comments are removed: SYSTEM.md and its includes, not $agents.',
+		'Files included from SYSTEM.md (user request, 11 Oct) render as templates: comments removed, directives, variables and nested includes apply, resolved relative to the including file. Include cycles and frames left open in an included file are reported against that file. $agents stays verbatim; AGENTS.md @imports, if wanted, follow agent-app conventions, not this template.'
 	],
 	needs: ['q5'],
 	foldInto: ['q5']

@@ -33,11 +33,14 @@ test('invalid fences, nested sections, duplicate titles and repeated else report
 	expect(render('<!-- first\nsecond\n-->\n:: section "x"\n:::').problems[0]).toContain('SYSTEM.md:5:')
 })
 
-test('literal loaded content preserves code whitespace and does not become template syntax', () => {
+test('includes render as templates while $agents stays literal', () => {
 	let literal = ':: section "Pretend"\n  $model\n\n    code\n::'
-	writeFileSync(`${root}/part.md`, literal)
+	writeFileSync(`${root}/part.md`, '<!-- note -->\n:: if model="c*"\n  $model\n:: else\nwrong\n::\n@part.md')
 	let result = render(':: section "Real"\n@part.md\n$agents\n::', { agents: literal, model: 'changed' })
-	expect(result.problems).toEqual([])
-	expect(result.text).toBe(`# Real\n${literal}\n${literal}`)
+	expect(result.problems.join()).toMatch(/part\.md:7: include cycle/)
+	expect(result.text).toBe(`# Real\n  changed\n${literal}`)
 	expect(result.sections).toHaveLength(1)
+	expect(render('@part.md\nkept', { model: 'x' }).problems).toEqual([`${root}/part.md:7: include cycle: ${root}/part.md`])
+	writeFileSync(`${root}/part.md`, ':: if model="x"\nopen')
+	expect(render('@part.md\n::\nafter', { model: 'x' }).problems).toEqual([`${root}/part.md:1: unclosed if block`, `${root}/SYSTEM.md:2: unexpected closing directive`])
 })

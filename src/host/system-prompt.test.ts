@@ -145,18 +145,19 @@ test('bad SYSTEM directives never throw: each is reported with its line and the 
 	} finally { systemPrompt.file = old }
 })
 
-test('SYSTEM includes lose comments but keep directives, nested includes and variables literally', () => {
+test('SYSTEM includes are templates resolved relative to their file', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		mkdirSync(`${root}/more`)
-		let raw = '::: if model="wrong/*"\n@../SYSTEM.md\n${model}\n:::\n@?missing.md\n'
-		writeFileSync(`${root}/more/part.md`, `<!-- note\nfor me -->${raw}`)
+		writeFileSync(`${root}/more/inner.md`, 'inner ${model}')
+		writeFileSync(`${root}/more/part.md`, '<!-- note\nfor me -->::: if model="wrong/*"\nhidden\n:::\n@inner.md\n@?missing.md\n')
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
-		expect(text).toContain(raw.trimEnd())
+		expect(text).toContain('Hello\ninner m/x')
 		expect(text).not.toContain('for me')
-		expect(text).not.toContain('@?absent.md')
+		expect(text).not.toContain('hidden')
+		expect(text).not.toContain('@?')
 		writeFileSync(`${root}/SYSTEM.md`, 'Before\n@missing.md\nAfter')
 		let problems: string[] = []
 		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: at }, problems)).toContain('Before\nAfter')
