@@ -26,7 +26,8 @@ import { history } from './history.ts'
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
-// The session a call serves (task pf2); hooks read it to act per session or model.
+// The session a call serves (task pf2), added where a plugin needed it
+// (model-scoped EDIT quirks), not preemptively.
 export type CallContext = { cwd: string; sessionId: string; model?: string }
 export type ToolContext = CallContext & { signal: AbortSignal; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
 // `diff`: what the call changed, for display only; providers never see it.
