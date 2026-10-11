@@ -1,6 +1,6 @@
 {
 	title: 'Mark agent-initiated prompt guidance for human review',
-	spec: 'When changing SYSTEM.md or this project’s AGENTS.md on its own initiative, the agent marks each change with an adjacent `<!-- TODO - to be reviewed by a human -<session_id> -->` comment, using its current session ID. User-requested changes do not require this marker. AGENTS.md states this directive under spec and prompt writing; it reaches agents because AGENTS.md is included verbatim.',
+	spec: 'When changing SYSTEM.md or this project’s AGENTS.md on its own initiative, the agent marks each change with an adjacent `<!-- TODO - to be reviewed by a human -<current session id> -->` comment, filling in its current session ID. User-requested changes do not require this marker. AGENTS.md states this directive under spec and prompt writing; it reaches agents because AGENTS.md is included verbatim.',
 	status: 'done',
 	notes: [
 		'AGENTS.md comments were once stripped (q5), which hid the marker; krw now includes AGENTS.md verbatim, so the directive shows the complete comment.'
