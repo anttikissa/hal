@@ -22,7 +22,7 @@ button:has(> .icon) { display: inline-flex; align-items: center; justify-content
    sets --sel-back); a solid block (bg in its color) reverses back. */
 .page { --sel-text: var(--canvas); }
 ::selection { background-color: var(--sel-back); color: var(--sel-text); -webkit-text-fill-color: var(--sel-text); }
-.Question button[aria-pressed="true"], .Question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
+.Question button[aria-pressed="true"], .Question mark, .Card.question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
 /* Focus: one style, 2px in the control's own color, outside it. Inside
    where a clipping strip or list would cut it off; flush against a
    control that already draws a border, so it reads as a thicker one. */
@@ -434,7 +434,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Question > .CardHeader .label a { color: inherit; text-decoration: underline; }
 @media (pointer: coarse) { .Question button, .Question button.answer { min-width: 44px; min-height: 44px; } }
 .Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }
+.Question mark, .Card.question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }
 .Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.5lh 1ch; }
 .Picker[open] { display: flex; flex-direction: column; gap: 0.25lh; }
 .Picker .top { display: flex; align-items: center; gap: 0.6ch; }

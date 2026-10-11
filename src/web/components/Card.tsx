@@ -36,6 +36,7 @@ import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
 import { hrefs } from '../hrefs.ts'
 import { folds } from '../folds.ts'
+import { forms } from '../../common/forms.ts'
 
 const { opened, toggled } = folds
 // Tool cards showing their whole result, by the same key.
@@ -223,6 +224,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let text = createMemo(() => shown()?.text ?? '')
 	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
 	let parts = () => {
+		let item = props.row.item
+		// A past question keeps its quote's marks, as the open form showed them.
+		if (item.type === 'question' && item.form.quote?.marks?.length) {
+			let q = item.form.quote
+			let indent = (t: string, marked: boolean) => t.split('\n').map((l, i) => <>{i ? '\n    ' : ''}{marked && l ? <mark>{l}</mark> : l}</>)
+			return <>{'    '}<For each={forms.quoteParts(q)}>{(p) => indent(p.text, p.marked)}</For>{text().slice(q.text.length + 4 * q.text.split('\n').length)}</>
+		}
 		let l = linked()
 		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={external(p.href)} target="_blank" rel="noopener">{p.text}</a>))
 	}
