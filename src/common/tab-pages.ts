@@ -21,8 +21,8 @@ export type Sizes = { cell: number; named?: number; edge: number }
 // Characters in the widest number, the width of a cell's number part.
 const digits = (count: number): number => String(Math.max(1, count)).length
 
-// Failed over asking over attention over working; done marks never.
-const rank: Record<MarkKind, number> = { failed: 5, asking: 4, paused: 3, noticed: 2, working: 1, done: 0 }
+// Failed over asking over attention over working and jobs; done marks never.
+const rank: Record<MarkKind, number> = { failed: 5, asking: 4, paused: 3, noticed: 2, working: 1, jobs: 1, done: 0 }
 
 function urgent(tabs: Tab[]): Mark | undefined {
 	let best: Mark | undefined

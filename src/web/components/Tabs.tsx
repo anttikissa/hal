@@ -27,7 +27,7 @@ const NAME = 12
 // one keeps its slot.
 function Marker(props: { mark: Mark | undefined }) {
 	return (
-		<span class={['marker', ...(props.mark ? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : [])] : [])]} role="img" aria-label={props.mark?.label}>
+		<span class={['marker', ...(props.mark ? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])] : [])]} role="img" aria-label={props.mark?.label}>
 			{props.mark?.glyph ?? ''}
 		</span>
 	)

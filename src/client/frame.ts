@@ -59,7 +59,7 @@ export interface View {
 	modal?: ModalState
 	/** The host's tabs and the one shown: a tab bar row above the prompt;
 	 * `lit` is the blink phase while an indicator blinks. */
-	tabs?: { list: Tab[]; focused?: string; lit?: boolean }
+	tabs?: { list: Tab[]; focused?: string; lit?: boolean; alt?: boolean }
 	/** Tab completion's choices: listed in the help row, or described
 	 * one per row in the help area (task 4qh). */
 	choices?: string[] | Hint[]
@@ -378,7 +378,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	if (over !== undefined) lines.push(over)
 	else if (lines.length || above) lines.push('')
 	let anchor = lines.length
-	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true))
+	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
 	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))

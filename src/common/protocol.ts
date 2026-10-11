@@ -214,7 +214,8 @@ export type CommandType = Command['type']
 // `hal`: its cwd is the Hal repo, which has its own prompt placeholders.
 // `color`: the project color index (colors.project, task 22), only while
 // open tabs span two or more projects.
-export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; hal?: true; color?: number }
+// `jobs`: background commands still running.
+export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; hal?: true; color?: number; jobs?: number }
 
 // ── Events (host → client) ──
 

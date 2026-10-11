@@ -71,8 +71,6 @@ export const colors = {
 		fg: [colors.fgL, colors.fgC, 57],
 		cursor: [colors.fgL, colors.fgC, 55],
 		cursorIdle: [0.6, 0, 55],
-		// The Hal cursor while background jobs run: bash's magenta.
-		cursorBash: [colors.fgL, colors.fgC, 320],
 		bold: [0.9, 0.06, 55],
 		code: [0.86, 0.04, 55],
 		linkFg: [0.88, 0.15, 55],
@@ -123,6 +121,8 @@ export const colors = {
 		warningFg: [0.86, 0.16, 95],
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
+		// Background jobs running: bash's magenta.
+		jobsFg: [colors.fgL, colors.fgC, 320],
 	}),
 	// Project colors (task 22), CSS --p0..--p7: one L and C, hues spread
 	// with a single cyan; the display clips what is out of its gamut.

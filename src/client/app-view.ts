@@ -37,7 +37,7 @@ function view(): View {
 	let example = placeholders.follow(appView.state.example, t?.meta.id ?? '', list, st.prompt.text, pulse.now())
 	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
-	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
+	if (v.tabs && tabBar.blinks(st.tabs)) Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
 	let stopped = t && appView.why(t), notice = st.notice ?? (t && queueEdit.notice(t)) ?? versions.notice()
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
@@ -107,7 +107,7 @@ function tick(t: Transcript, now: number): View['tick'] {
 // a ticking time counts.
 function blinks(view: View): string {
 	let lit = view.tabs?.lit
-	return view.hal || lit !== undefined || view.tick ? JSON.stringify([view.hal, lit, view.tick]) : ''
+	return view.hal || lit !== undefined || view.tick ? JSON.stringify([view.hal, lit, view.tabs?.alt, view.tick]) : ''
 }
 
 export const appView = {
