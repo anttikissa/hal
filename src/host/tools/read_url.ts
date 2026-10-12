@@ -34,7 +34,7 @@ async function body(res: Response, limit: number): Promise<{ bytes: Uint8Array; 
 
 function htmlText(html: string): string {
 	let title = entities((html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] ?? '').replace(/<[^>]*>/g, '').trim())
-	let body = html.replace(/<!--[^]*?-->/g, '').replace(/<(script|style|noscript|template|head)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
+	let body = html.replace(/<!--[^]*?-->/g, '').replace(/<template\b(?=[^>]*\bshadowrootmode\s*=)[^>]*>/gi, '').replace(/<(script|style|noscript|template|head)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
 	body = body.replace(/<br\b[^>]*\/?>/gi, '\n').replace(/<\/?(?:p|div|section|article|main|header|footer|nav|h[1-6]|li|ul|ol|blockquote|pre|table|tr|td|th|hr)\b[^>]*>/gi, '\n').replace(/<[^>]*>/g, '')
 	body = entities(body).replace(/\r\n?/g, '\n').replace(/[\t \f]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 	return [title, body].filter(Boolean).join('\n\n')

@@ -42,6 +42,15 @@ test('HTML title, blocks, entities and redirects; plain text and JSON pass throu
 	expect(await tool.run({ url: url() }, ctx())).toBe('a\n  b\n')
 })
 
+test('server-rendered shadow DOM retains listing details, not inert template content', async () => {
+	response = () => new Response('<html><head><title>Listing</title></head><body><listing-page><template shadowrootmode="open"><style>hidden style</style><h1>Apple Pencil</h1><p>69 €</p><template>inert content</template><p>Pickup in Tampere</p><script>hidden script</script></template></listing-page></body></html>', { headers: { 'content-type': 'text/html' } })
+	let out = await tool.run({ url: url() }, ctx())
+	expect(out).toContain('Apple Pencil')
+	expect(out).toContain('69 €')
+	expect(out).toContain('Pickup in Tampere')
+	for (let hidden of ['hidden style', 'hidden script', 'inert content']) expect(out).not.toContain(hidden)
+})
+
 test('an empty HTML app shell or empty text tells the model nothing was read', async () => {
 	response = () => new Response('<html><head><script src="/app.js"></script></head><body><div id="app"></div></body></html>', { headers: { 'content-type': 'text/html' } })
 	let shell = await tool.run({ url: url('/article') }, ctx())

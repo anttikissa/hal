@@ -1,0 +1,10 @@
+{
+	title: 'Preserve server-rendered shadow DOM in URL reads',
+	spec: 'READ URLs preserves readable content inside declarative shadow DOM templates (template with shadowrootmode), while ordinary inert templates, scripts and styles remain excluded. Restore the invariant that server-rendered visible listing text survives HTML extraction. Use plain fetch and stdlib extraction without a browser, proxy or new dependency. A focused regression test covers listing details inside a shadow template and excludes ordinary template content.',
+	status: 'done',
+	notes: [
+		'Plain Bun fetch and a Chrome user-agent both returned full listing HTML with HTTP 200. The extractor discarded visible content inside template shadowrootmode wrappers. Preserving those wrappers restored descriptions, prices and locations on all three reported Tori URLs without JavaScript execution or extra requests. ./test read_url passed all 9 tests.'
+	],
+	needs: ['g9'],
+	foldInto: ['g9']
+}
