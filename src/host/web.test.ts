@@ -962,11 +962,11 @@ browserTest('compact status keeps two lines and opens full live details without 
 			expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
 			expect(geometry.fill).toBe('83%')
 			expect(geometry.duplicated).toBe(false)
-			expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('b3')
+			expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('⣄')
 			expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
 		}
 		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
-		await b.waitFor("document.querySelector('.budget').textContent === 'b0'")
+		await b.waitFor("document.querySelector('.budget').textContent === ''")
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
 		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 		// A master update alone must repaint quota on this idle view. No

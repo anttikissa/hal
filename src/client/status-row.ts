@@ -40,7 +40,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])
-	out.push([{ text: ansi.clean(titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: ` b${info.slots ?? settings.subagentSlots()}`, href: '/budget' }])
+	out.push([{ text: ansi.clean(titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: titles.budget(info.slots ?? settings.subagentSlots()).replace(/^(?=.)/, ' '), href: '/budget' }])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])
 	let pct = statusRow.percent(s)

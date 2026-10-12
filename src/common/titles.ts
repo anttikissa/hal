@@ -23,6 +23,12 @@ function modelLabel(id: string, effort?: string, full = false): string {
 	return effort && effort !== titles.defaults[id] ? `${name} ${effort}` : name
 }
 
+// Spawn slots left (task r92): 1–8 as a braille pile filled from the
+// bottom, ⡀ … ⣿; above 8 the plain number; 0 nothing.
+function budget(slots: number): string {
+	return slots > 8 ? String(slots) : slots >= 1 ? '⡀⣀⣄⣤⣦⣶⣷⣿'[slots - 1]! : ''
+}
+
 function learn(event: { names: Record<string, string>; defaults?: Record<string, string> }): void {
 	Object.assign(titles.names, event.names)
 	Object.assign(titles.defaults, event.defaults)
@@ -153,4 +159,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, address, receipt, messageHead, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, stamp, ended, address, receipt, messageHead, author, who, title, letter, blockId }

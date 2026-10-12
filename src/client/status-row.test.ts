@@ -19,7 +19,7 @@ const info: StatusInfo = {
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
-const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high b3 · 87k/1000k (9%)'
+const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high ⣄ · 87k/1000k (9%)'
 
 test('a wide row shows every part, the right side flush right', () => {
 	let row = text(info, 140)
@@ -33,8 +33,8 @@ test('narrowing drops secondary facts but preserves the linked budget beside the
 		let parts = statusRow.fit({ ...info, slots: 12 }, cols)
 		let row = parts.map((p) => p.text).join('')
 		expect(strings.visLen(row)).toBeLessThanOrEqual(cols)
-		expect(row).toContain(' b12')
-		expect(parts.find((p) => p.text === ' b12')?.href).toBe('/budget')
+		expect(row).toContain(' 12')
+		expect(parts.find((p) => p.text === ' 12')?.href).toBe('/budget')
 	}
 	expect(text(info, 20)).not.toContain('host')
 })
