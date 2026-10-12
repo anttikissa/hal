@@ -1,0 +1,7 @@
+{
+	title: '/config documents what it writes',
+	spec: 'When /config writes a key to config.ason that has no comment, the comment before it is the setting description, its choices and its default, wrapped at 70 columns (a secret gets no default). config.ason holds only changed keys; /config lists every setting, so there is no example file to drift from settings.ts.',
+	status: 'done',
+	needs: ['c0h'],
+	foldInto: ['c0h']
+}

@@ -6,7 +6,8 @@
 
 import { ason } from '../common/ason.ts'
 import type { Event } from '../common/protocol.ts'
-import { settings } from '../common/settings.ts'
+import { settings, type Setting } from '../common/settings.ts'
+import { strings } from '../common/strings.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { models } from './models.ts'
@@ -52,7 +53,10 @@ function update(values: Record<string, unknown>): string[] {
 	for (let s of settings.table) {
 		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue
 		if (Object.is(values[s.name], s.default)) delete data[s.name]
-		else data[s.name] = values[s.name]
+		else {
+			data[s.name] = values[s.name]
+			config.explain(data, s)
+		}
 		changed.push(s.name)
 	}
 	config.point(data)
@@ -69,6 +73,16 @@ function point(data: Record<string, unknown>): void {
 	let comments = ((data as any)[ason.COMMENTS] ?? {}) as Record<string, string>
 	if (first === undefined || Object.values(comments).some((c) => c.includes(POINTER))) return
 	;(data as any)[ason.COMMENTS] = { ...comments, [first]: POINTER + '\n' + (comments[first] ?? '') }
+}
+
+// Puts `s`'s description, default and choices on its key, unless the
+// key has a comment already: a value /config writes reads like a
+// documented line (task hyt).
+function explain(data: Record<string, unknown>, s: Setting): void {
+	let comments = ((data as any)[ason.COMMENTS] ?? {}) as Record<string, string>
+	if (comments[s.name]?.trim()) return
+	let text = `${s.description}${s.type.kind === 'choice' ? ` One of: ${s.type.options.join(', ')}.` : ''}${s.type.kind === 'secret' ? '' : ` Default: ${ason.stringify(s.default, 'short')}.`}`
+	;(data as any)[ason.COMMENTS] = { ...comments, [s.name]: strings.wordWrap(text, 70).map((l) => `// ${l}`).join('\n') }
 }
 
 // The /config modal's content (protocol `settings`): every setting's
@@ -102,6 +116,7 @@ export const config = {
 	warnings,
 	update,
 	point,
+	explain,
 	event,
 	reset,
 }

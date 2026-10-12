@@ -29,6 +29,8 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	// The file points to /config; other keys and the user's comments stay.
 	let text = readFileSync(`${testHome()}/config.ason`, 'utf8')
 	expect(text).toStartWith('{\n\t// Every setting, its default and meaning: /config\n')
+	// A key /config writes carries its description and default.
+	expect(text).toContain('\t// Preferred port for the browser client (127.0.0.1); tries through 9100\n\t// if busy. Default: 9001.\n\twebPort: 4321')
 	expect(ason.parse(text)).toEqual({ extra: 'kept', push: false, webPort: 4321 })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config push true' })
 	await until(() => c.of('settings').length === 3)
