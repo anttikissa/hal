@@ -65,10 +65,35 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 		expect(el.scrollTop).toBe(920)
 		// Reader scrolls back to bottom and resumes following.
 		scroll.leave()
-		scroll.check('scroll', true)
+		scroll.touchStart()
+		el.scrollTop = 910
+		scroll.touchEnd()
+		// Still above bottom: a new downward gesture reaches it.
+		scroll.touchStart()
+		el.scrollTop = 920
+		scroll.touchEnd()
 		expect(scroll.state.pinned).toBe(true)
 		scroll.follow(() => { el.scrollHeight += 100 })
 		expect(el.scrollTop).toBe(1020)
+	} finally {
+		Object.assign(scroll.state, original)
+	}
+})
+
+test('content shrinking to the bottom never resumes following for a reader', () => {
+	let original = { ...scroll.state }
+	let el = box(1000, 300, 400)
+	Object.assign(scroll.state, { el, pinned: false, touching: false, pressing: false, set: 300 })
+	try {
+		el.scrollHeight = 700
+		scroll.check('content')
+		expect(scroll.state.pinned).toBe(false)
+		scroll.check('scroll', true)
+		expect(scroll.state.pinned).toBe(false)
+		scroll.check('resize')
+		scroll.follow(() => { el.scrollHeight += 500 })
+		expect(el.scrollTop).toBe(300)
+		expect(scroll.state.pinned).toBe(false)
 	} finally {
 		Object.assign(scroll.state, original)
 	}

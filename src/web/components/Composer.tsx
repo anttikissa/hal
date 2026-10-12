@@ -110,6 +110,22 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		// document syncs first, so Send is enabled before the tap ends.
 		document.addEventListener('pointerdown', sync, true)
 		document.addEventListener('touchstart', sync, { capture: true, passive: true })
+		let touched: { button: Element; at: number; x: number; y: number } | undefined
+		let remember = (e: PointerEvent) => {
+			let button = e.target instanceof Element && e.target.closest('.Composer .actions button')
+			touched = e.pointerType === 'touch' && button ? { button, at: e.timeStamp, x: e.clientX, y: e.clientY } : undefined
+		}
+		let misplaced = (e: MouseEvent) => {
+			let tap = touched
+			touched = undefined
+			if (!tap || e.detail === 0 || e.timeStamp - tap.at > 1000 || Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 24 || tap.button.contains(e.target as Node)) return
+			e.preventDefault()
+			e.stopImmediatePropagation()
+		}
+		document.addEventListener('pointerdown', remember, true)
+		document.addEventListener('click', misplaced, true)
+		let finished = (e: PointerEvent) => { if (touched && e.pointerType === 'touch') { touched.at = e.timeStamp; touched.x = e.clientX; touched.y = e.clientY } }
+		document.addEventListener('pointerup', finished, true)
 		// A new width can change how the text wraps.
 		let width = 0
 		let resized = new ResizeObserver(() => { if (input.clientWidth !== width) { width = input.clientWidth; fit() } })
@@ -121,6 +137,9 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 			document.removeEventListener('selectionchange', moved)
 			document.removeEventListener('pointerdown', sync, true)
 			document.removeEventListener('touchstart', sync, true)
+			document.removeEventListener('pointerdown', remember, true)
+			document.removeEventListener('click', misplaced, true)
+			document.removeEventListener('pointerup', finished, true)
 			document.removeEventListener('pointerdown', outside, true)
 			document.removeEventListener('focusin', outside)
 			document.removeEventListener('focusout', leaving)

@@ -24,6 +24,17 @@ const atBottom = 1
 
 function leave(): void {
 	scroll.state.pinned = false
+	scroll.state.intent = undefined
+}
+
+function intent(): void {
+	let el = scroll.state.el
+	if (el) scroll.state.intent = { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight }
+}
+
+function wheel(): void {
+	scroll.leave()
+	intent()
 }
 
 // A new finger gesture is deliberate, unlike leftover wheel momentum.
@@ -32,11 +43,12 @@ function leave(): void {
 function touchStart(): void {
 	scroll.state.touching = true
 	scroll.leave()
+	intent()
 }
 
 function touchEnd(): void {
 	scroll.state.touching = false
-	scroll.check('touchend')
+	scroll.check('touchend', true)
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -45,7 +57,7 @@ function onKey(e: KeyboardEvent): void {
 	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
 	if (find) return scroll.leave()
 	// Tab may focus a card off screen, and the browser scrolls it into view.
-	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) scroll.leave()
+	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) { scroll.leave(); intent() }
 }
 
 // Sets the view's position and remembers it as ours, so the scroll
@@ -75,12 +87,16 @@ function check(why: string, scrolled = false): void {
 	// A move we did not make, while a mouse button or finger is down,
 	// is the reader dragging: selecting past the edge, middle-button
 	// autoscroll, or the scrollbar thumb.
-	if (scrolled && (st.pressing || st.touching) && Math.abs(el.scrollTop - st.set) > 2) scroll.leave()
+	if (scrolled && (st.pressing || st.touching) && Math.abs(el.scrollTop - st.set) > 2) st.pinned = false
 	let g = scroll.gap(el)
-	// At the very bottom, however it got there: pinned again. Not while
-	// a finger is down, since the drag may be heading up.
+	// Content shrinking to the bottom is not permission to follow again.
+	// Only an actual reader scroll can resume following there.
 	if (g <= atBottom) {
-		if (!st.touching) st.pinned = true
+		let reader = st.intent
+		if (scrolled && !st.touching && reader && reader.height === el.scrollHeight && reader.client === el.clientHeight && el.scrollTop > reader.top + atBottom) {
+			st.pinned = true
+			st.intent = undefined
+		}
 		return
 	}
 	// Pinned but above the bottom:
@@ -162,13 +178,13 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	// content box) it is the reader taking the view.
 	let press = (e: PointerEvent) => {
 		scroll.state.pressing = true
-		if (e.target === el && e.offsetX >= el.clientWidth) scroll.leave()
+		if (e.target === el && e.offsetX >= el.clientWidth) { scroll.leave(); intent() }
 	}
 	let release = () => { scroll.state.pressing = false; scroll.check('release') }
 	el.addEventListener('pointerdown', press, { passive: true })
 	addEventListener('pointerup', release, { passive: true })
 	addEventListener('pointercancel', release, { passive: true })
-	addEventListener('wheel', scroll.leave, { passive: true })
+	addEventListener('wheel', wheel, { passive: true })
 	el.addEventListener('touchstart', scroll.touchStart, { passive: true })
 	el.addEventListener('touchend', scroll.touchEnd, { passive: true })
 	el.addEventListener('touchcancel', scroll.touchEnd, { passive: true })
@@ -185,7 +201,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		removeEventListener('pointerup', release)
 		removeEventListener('pointercancel', release)
 		scroll.state.pressing = false
-		removeEventListener('wheel', scroll.leave)
+		removeEventListener('wheel', wheel)
 		el.removeEventListener('touchstart', scroll.touchStart)
 		el.removeEventListener('touchend', scroll.touchEnd)
 		el.removeEventListener('touchcancel', scroll.touchEnd)
@@ -230,7 +246,7 @@ export const scroll = {
 	// `pinned`: see the header. `pressing`: a mouse button or pen is down
 	// in the transcript. `set`: the last position this module set.
 	// `reanchor`: takes reflow's reading anchor at the current view.
-	state: { el: null as Box | null, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
+	state: { el: null as Box | null, intent: undefined as { top: number; height: number; client: number } | undefined, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
 	// Called when a pinned view is pulled back to the bottom, with the
 	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
 	onPull: (_gap: number, _why: string): void => {},

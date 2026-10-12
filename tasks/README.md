@@ -57,6 +57,17 @@ interrupt active work through hard steering and continue with the new context
 (task 6eq); unsafe-to-stop calls finish first. Display order is block-start
 order in both clients; it is separate from delivery eligibility.
 
+## Reading position
+
+The reader owns the viewport in both web and terminal. While reading away
+from the live bottom, keep the same content in view through new output,
+background completions, folding, status updates and layout changes. Resume
+bottom-following only through deliberate reader navigation or an explicit
+send action, never because content shrank or the viewport happened to reach
+the bottom. Preserve each tab's reading position. Terminal buffer limits
+and unavoidable canonical rebuilds are documented in tasks/cc/terminal.md;
+minimize those exceptions and report the reason through render.clear.
+
 ## Architecture
 
 - Runs on macOS and Linux only: the host lock uses flock through bun:ffi

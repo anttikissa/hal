@@ -185,7 +185,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
 		let hit = e.target as Element
-		if ((!folding() && props.row.note === undefined) || hit.closest('a, .more, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
+		if ((!folding() && props.row.note === undefined && !(closable() && hit.closest('.mark'))) || hit.closest('a, .more, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		let selection = getSelection()
 		if (!hit.closest('.mark') && selection && !selection.isCollapsed && root) {
 			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
@@ -252,7 +252,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
 	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? titles.who(props.row.item) : undefined} open={expanded()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (

@@ -7,6 +7,13 @@ These are HOLY TRUTHS that you must obey. You often have a hard time
 understanding how terminals work, and especially what the USER wants from a
 terminal UI. Read this document to understand the rules of the game.
 
+The shared reading-position rule is in tasks/README.md. Terminal scrollback
+is not cursor-addressable, and Hal cannot read the emulator's scroll offset.
+When a canonical rebuild is unavoidable, record its reason through
+render.clear; ordinary appended output must not trigger such a rebuild.
+Keep high-water marks across streaming and tool completion so shrinking
+output does not force a rebuild and snap the reader to the bottom.
+
 ## Layout
 
 Bottom-anchored sections:
