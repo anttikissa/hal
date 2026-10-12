@@ -104,6 +104,15 @@ dependencies, especially on the host path. Never cut trust-boundary
 validation, data-loss handling, security, accessibility or explicit
 requirements.
 
+## Tools
+
+Teach one obvious syntax in prompts, HELP and examples. Accept observed
+deviations when the request has only one possible meaning; preserve
+validation, security checks and data-loss handling. Use benchmarks to
+find rejected but unambiguous calls, add the needed leniency and cover
+the observed case with a focused regression test. Reject ambiguous calls
+with an explanation and the canonical syntax.
+
 ## Design checks
 
 - Add capabilities only as tools behind the one native `tool`, never

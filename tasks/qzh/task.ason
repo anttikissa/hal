@@ -1,10 +1,11 @@
 {
-	title: 'Tool leniency only for observed frequent misuse',
-	spec: 'A tool accepts an alternative argument form only when real models (session histories) send it by mistake, as approved by the user; guessed forms stay errors with usage. INSPECT accepts the lone word tabs (quoted or bare), meaning { what: sessions, scope: all }: claude-opus-5-5 sent INSPECT "tabs" on 9 Oct. Any other plain word is an error.',
+	title: 'Canonical tool guidance and observed syntax leniency',
+	spec: 'AGENTS.md Tools teaches one obvious syntax in prompts, HELP and examples. Tools accept observed deviations when the request has only one possible meaning, while preserving validation, security checks and data-loss handling. Benchmarks expose rejected but unambiguous calls; implement the needed leniency with a focused regression test for the observed case. Ambiguous calls remain errors with an explanation and canonical syntax. This replaces the requirement for separate user approval of each alternative form; guessed forms are not advertised. INSPECT accepts the lone word tabs (quoted or bare), meaning { what: sessions, scope: all }: claude-opus-5-5 sent INSPECT "tabs" on 9 Oct. Other plain words currently remain errors.',
 	status: 'done',
 	notes: [
 		'Provenance (session histories, 9 Oct): the only plain-word INSPECT a real model sent was INSPECT "tabs" (claude-opus-5-5); all other calls used objects (claude-opus-5-5, gpt-6-astra). Other words and aliases are guesses.',
-		'A plain-word INSPECT grammar (words by value, aliases) was added and reverted: after its usage line advertised INSPECT sessions all "..." and INSPECT project "...", models used those; that was the docs prompting them, not accidental misuse.'
+		'A plain-word INSPECT grammar (words by value, aliases) was added and reverted: after its usage line advertised INSPECT sessions all "..." and INSPECT project "...", models used those; that was the docs prompting them, not accidental misuse.',
+		'12 Oct: verified nativeTool.resolve already accepts BASH ls and BASH "ls -l" as the commands ls and ls -l. The reported session 172-phd call 62 instead contained two complete EDIT commands on separate lines and was rejected by the one-tool-per-call grammar. This policy update does not change that parser or run benchmarks.'
 	],
 	needs: ['jm'],
 	foldInto: ['jm']
