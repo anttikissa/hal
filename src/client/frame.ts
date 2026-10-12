@@ -229,12 +229,16 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let keep = () => {
 		if (save) frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), bash, lines }
 	}
+	let imageStart = start
+	while (imageStart > 0 && items[imageStart - 1]?.type === 'image') imageStart--
+	let imagePrompt = items[imageStart - 1]?.type === 'prompt'
 	for (let i = start; i < items.length; i++) {
 		if (stable === i && i > start && performance.now() > deadline) {
 			keep()
 			return undefined
 		}
 		let item = items[i]!
+		if (item.type !== 'image') imagePrompt = item.type === 'prompt'
 		if (item.type === 'tool') callKeys.set(item.id, item.key)
 		let look: Look = { fold: view.folds?.states.get(item.type === 'tool-result' ? callKeys.get(item.id) ?? '' : item.key), pastes: view.folds?.pastes }
 		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) {
@@ -264,7 +268,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			// A prompt's images join its card; they draw nothing alone.
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
-			let merged = item.type === 'image' && ['prompt', 'image'].includes(items[i - 1]?.type ?? '')
+			let merged = item.type === 'image' && imagePrompt
 			// A call shows its attached result's status, or while it
 			// runs, its elapsed time (task wm0).
 			let ticks = item.type === 'tool' && item.id === view.tick?.call

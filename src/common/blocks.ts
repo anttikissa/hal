@@ -25,7 +25,7 @@ export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name:
 // or stopped it running (task ker); not a failure.
 // `diff`: a numbered diff of what the call changed (EDIT), for display;
 // providers never see it.
-export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }
+export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock; images?: ImageBlock[]; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:
@@ -142,4 +142,8 @@ function parseModelId(id: string): { provider: string; model: string } | undefin
 	return { provider: id.slice(0, slash), model: id.slice(slash + 1) }
 }
 
-export const blocks = { newTurn, apply, collect, parseModelId }
+function resultImages(result: ToolResultBlock): ImageBlock[] {
+	return [...(result.image ? [result.image] : []), ...(result.images ?? [])]
+}
+
+export const blocks = { newTurn, apply, collect, parseModelId, resultImages }

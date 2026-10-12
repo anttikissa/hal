@@ -5,6 +5,7 @@
 // sent before Apply.
 import { connection } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
+import { blocks } from '../common/blocks.ts'
 import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRow, type RebaseRows } from '../common/rebase-rows.ts'
 import { toolDetails } from '../common/tool-details.ts'
@@ -173,7 +174,7 @@ function parts(st: RebaseState, row: RebaseRow): Part[] {
 			else if (b.type === 'image') out.push({ kind: 'image', blob: b.blob, bytes: b.bytes })
 			else if (b.type === 'tool_result') {
 				text(b.isError ? 'error' : 'output', b.output)
-				if (b.image) out.push({ kind: 'image', blob: b.image.blob, bytes: b.image.bytes })
+				for (let image of blocks.resultImages(b)) out.push({ kind: 'image', blob: image.blob, bytes: image.bytes })
 			}
 		} else if (r.type === 'assistant') {
 			let b = r.block

@@ -48,6 +48,14 @@ function boxOf(f: Frame): { top: number; bottom: number; rows: string[] } {
 	return { top, bottom, rows: lines.slice(top + 1, bottom) }
 }
 
+test('every image returned by a tool remains linked, including consecutive images', () => {
+	let images = ['0123456789ab', '0123456789ac'].map((blob): Item => ({ type: 'image', blob, mediaType: 'image/png', bytes: 12 }))
+	for (let cols of [40, 100]) {
+		let output = frame.build(view([{ type: 'tool-result', id: 'r', output: 'images' }, ...images]), cols).lines.join('\n')
+		for (let image of images) if (image.type === 'image') expect(output).toContain(`/s/${image.blob}`)
+	}
+})
+
 test('EDIT line lists cannot consume the title or block reference', () => {
 	let item = { type: 'tool', id: 'edit', name: 'edit', input: { path: 'src/host/file-changes.ts' }, key: '62', ts: new Date().toISOString() } as const
 	let status = '(+5 −6, lines 6, 25, 28, 31, 37, 42, 59, 71, 100, 120)'

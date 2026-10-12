@@ -1,6 +1,6 @@
 // Provider-only projection. Omission decisions are saved before a request:
 // reopening cannot resurrect payloads or slide the cache frontier each round.
-import type { Message, UserBlock } from '../common/blocks.ts'
+import { blocks as conversationBlocks, type Message, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
@@ -45,8 +45,8 @@ function omit(id: string, r: HistoryRecord): HistoryRecord {
 		if (b.type !== 'tool_result') return b
 		let full = /whole output in blob ([0-9a-f]{12}|[0-9a-z]{6})\b/.exec(b.output)?.[1]
 		let output = pruning.marker('tool output', full ? `${id}/${full}` : ref)
-		if (b.image) output += '\n' + pruning.marker('image', `${id}/${b.image.blob}`)
-		let { image: _image, ...rest } = b
+		for (let image of conversationBlocks.resultImages(b)) output += '\n' + pruning.marker('image', `${id}/${image.blob}`)
+		let { image: _image, images: _images, ...rest } = b
 		return { ...rest, output }
 	})
 	return { ...r, blocks }
@@ -93,8 +93,8 @@ function imageCost(id: string, blob: string, model?: string): number {
 function estimate(id: string, messages: Message[], overhead = 0, model?: string): number {
 	let images = 0
 	for (let m of messages) for (let b of m.blocks) {
-		let blob = b.type === 'image' ? b.blob : b.type === 'tool_result' ? b.image?.blob : undefined
-		if (blob) images += pruning.imageCost(id, blob, model)
+		let imagesInBlock = b.type === 'image' ? [b] : b.type === 'tool_result' ? conversationBlocks.resultImages(b) : []
+		for (let image of imagesInBlock) images += pruning.imageCost(id, image.blob, model)
 	}
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }

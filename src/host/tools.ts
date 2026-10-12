@@ -31,7 +31,7 @@ import { history } from './history.ts'
 export type CallContext = { cwd: string; sessionId: string; model?: string }
 export type ToolContext = CallContext & { signal: AbortSignal; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
 // `diff`: what the call changed, for display only; providers never see it.
-export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } } | { text: string; diff: string }
+export type ToolOutput = string | { text: string; image?: { mediaType: string; data: string; source?: string }; images?: { mediaType: string; data: string; source?: string }[]; diff?: string; isError?: boolean }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.
@@ -126,10 +126,20 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
-		else if ('diff' in out) result = { type: 'tool_result', id: call.id, output: out.text, diff: out.diff }
 		else {
-			let image = blobs.store(ctx.sessionId, out.image.mediaType, out.image.data)
-			result = { type: 'tool_result', id: call.id, output: out.text, image: { type: 'image', blob: image.blob, mediaType: image.mediaType, bytes: image.bytes } }
+			result = { type: 'tool_result', id: call.id, output: out.text, ...(out.isError && { isError: true }), ...(out.diff !== undefined && { diff: out.diff }) }
+			let images = []
+			for (let image of [...(out.image ? [out.image] : []), ...(out.images ?? [])]) {
+				try {
+					let saved = blobs.store(ctx.sessionId, image.mediaType, image.data)
+					images.push({ type: 'image' as const, blob: saved.blob, mediaType: saved.mediaType, bytes: saved.bytes })
+				} catch (e: any) {
+					result.output += `\nError${image.source ? ` reading ${image.source}` : ''}: ${e?.message ?? e}`
+					result.isError = true
+				}
+			}
+			if (images.length === 1) result.image = images[0]
+			else if (images.length) result.images = images
 		}
 	} catch (e: any) {
 		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }

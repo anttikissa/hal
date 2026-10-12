@@ -1,7 +1,7 @@
 // OpenAI-compatible Chat Completions provider (OpenRouter, OpenCode Go,
 // Ollama and other local servers). Wire mapping: tasks/7f/mapping.md.
 
-import type { StopReason, StreamEvent, Usage } from '../common/blocks.ts'
+import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort, type Capability } from './effort.ts'
@@ -39,9 +39,9 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 				if (b.type === 'text') texts.push(b.text)
 				else if (b.type === 'tool_result') {
 					out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
-					if (b.image) {
-						let data = images ? req.image?.(b.image.blob) : undefined
-						if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${b.image.mediaType};base64,${data}` } })
+					for (let image of blocks.resultImages(b)) {
+						let data = images ? req.image?.(image.blob) : undefined
+						if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${data}` } })
 						else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
 					}
 				}

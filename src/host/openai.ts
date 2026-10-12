@@ -9,7 +9,7 @@
 // on OpenAI's side); its JSON is the thinking block's signature and is
 // replayed as a reasoning item whose summary is rebuilt from the text.
 
-import type { AssistantBlock, StopReason, StreamEvent, Usage } from '../common/blocks.ts'
+import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { auth, jwtClaims } from './auth.ts'
 import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
@@ -37,9 +37,9 @@ function input(req: ProviderRequest): unknown[] {
 			for (let b of m.blocks) {
 				if (b.type === 'tool_result') {
 					out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
-					if (b.image) {
-						let data = req.image?.(b.image.blob)
-						parts.push(data === undefined ? { type: 'input_text', text: provider.imageNote('its file is gone') } : { type: 'input_image', detail: 'auto', image_url: `data:${b.image.mediaType};base64,${data}` })
+					for (let image of blocks.resultImages(b)) {
+						let data = req.image?.(image.blob)
+						parts.push(data === undefined ? { type: 'input_text', text: provider.imageNote('its file is gone') } : { type: 'input_image', detail: 'auto', image_url: `data:${image.mediaType};base64,${data}` })
 					}
 				}
 				else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })

@@ -1,6 +1,7 @@
 // Recover a whole stored tool result, attachment image, or history block.
 import { replay } from '../../common/replay.ts'
 import { attachments } from '../../common/attachments.ts'
+import { blocks } from '../../common/blocks.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
@@ -39,21 +40,24 @@ export const tool: Tool<ToolOutput> = {
 			if (!record && raw.some((r) => r.n === n)) return `Block ${input.id} was dropped by rebase.`
 			if (!record) throw new Error(`block ${input.id} not found`)
 			let value = record.type === 'assistant' ? record.block : record.type === 'user' && record.blocks.length === 1 ? record.blocks[0] : record
-			if (value?.type === 'tool_result') {
-				if (!value.image) return page(value.output)
-				let image = blobs.read(id, value.image.blob)
-				if (!image) throw new Error(`image blob ${value.image.blob} not found`)
-				return { text: page(value.output), image: { mediaType: image.mediaType, data: image.bytes.toString('base64') } }
-			}
-			if (value?.type === 'image') {
-				let image = blobs.read(id, value.blob)
-				if (!image) throw new Error(`image blob ${value.blob} not found`)
-				return { text: `Image block ${input.id}`, image: { mediaType: image.mediaType, data: image.bytes.toString('base64') } }
-			}
-			let text = value?.type === 'tool_call'
+			let refs = value?.type === 'tool_result' ? blocks.resultImages(value) : value?.type === 'image' ? [value] : value?.type === 'user' ? value.blocks.flatMap((b) => b.type === 'image' ? [b] : b.type === 'tool_result' ? blocks.resultImages(b) : []) : []
+			let text = value?.type === 'tool_result' ? value.output : value?.type === 'image' ? `Image block ${input.id}` : value?.type === 'tool_call'
 				? [toolDetails.headline(value.name, value.input).text, ...toolDetails.lines(value.name, value.input)].join('\n')
 				: toolDetails.value(value).join('\n')
-			return page(text)
+			let images: { mediaType: string; data: string; source: string }[] = []
+			let errors: string[] = []
+			for (let ref of refs) {
+				let source = `${id}/${ref.blob}`
+				try {
+					let image = blobs.read(id, ref.blob)
+					if (!image) throw new Error(`image blob ${source} not found`)
+					images.push({ mediaType: image.mediaType, data: image.bytes.toString('base64'), source })
+				} catch (e: any) {
+					errors.push(`Error reading image blob ${source}: ${e?.message ?? e}`)
+				}
+			}
+			let output = [page(text), ...errors].join('\n')
+			return images.length || errors.length ? { text: output, images, ...(errors.length && { isError: true }) } : output
 		}
 		let id = ref![1] ?? ctx.sessionId
 		let blob = ref![2]!

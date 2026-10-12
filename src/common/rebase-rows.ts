@@ -2,7 +2,7 @@
 // Tasks: rqq.
 import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'
-import type { UserBlock } from './blocks.ts'
+import { blocks as conversationBlocks, type UserBlock } from './blocks.ts'
 import { rebase, type RebasePlan } from './rebase.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import { tokenEstimates } from './token-estimates.ts'
@@ -54,7 +54,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 		if (/\[pruned /.test(text)) row.carries.push('pruned')
 	}
 	let payload = (row: RebaseRow, blocks: UserBlock[]) => {
-		let images = blocks.flatMap((b) => b.type === 'image' ? [b] : b.type === 'tool_result' && b.image ? [b.image] : [])
+		let images = blocks.flatMap((b) => b.type === 'image' ? [b] : b.type === 'tool_result' ? conversationBlocks.resultImages(b) : [])
 		if (images.length) row.carries.push(`${images.length} image${images.length === 1 ? '' : 's'}`)
 		for (let image of images) row.characters += image.bytes ?? options.blobSizes?.[image.blob] ?? 0
 		for (let b of blocks) if (b.type === 'text') carry(row, b.text); else if (b.type === 'tool_result') carry(row, b.output)

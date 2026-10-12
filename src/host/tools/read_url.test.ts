@@ -5,6 +5,8 @@ import { attachments } from '../../common/attachments.ts'
 import { paths } from '../paths.ts'
 import { tools } from '../tools.ts'
 import { tool } from './read_url.ts'
+import { nativeTool } from '../native-tool.ts'
+import { blocks } from '../../common/blocks.ts'
 
 let home: string
 let server: ReturnType<typeof Bun.serve>
@@ -80,6 +82,22 @@ test('image is a stored image result replayable to Anthropic, not base64 history
 	response = () => new Response(Buffer.alloc(attachments.maxBytes + 1), { headers: { 'content-type': 'image/png' } })
 	let huge = await tools.run({ type: 'tool_call', id: '2', name: 'read_url', input: { url: url() } }, ctx())
 	expect(huge.isError).toBe(true)
+})
+
+test('mixed URL batches retain valid images around invalid image data and HTTP failures', async () => {
+	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
+	response = (req) => {
+		let path = new URL(req.url).pathname
+		if (path === '/denied') return new Response('Denied', { status: 403 })
+		return new Response(path === '/fake' ? 'not an image' : png, { headers: { 'content-type': 'image/png' } })
+	}
+	let call = nativeTool.resolve(`READ "${url('/one')}" "${url('/fake')}" "${url('/denied')}" "${url('/two')}"`)
+	let result = await tools.run({ type: 'tool_call', id: 'batch', ...call }, ctx())
+	expect(result.isError).toBe(true)
+	expect(blocks.resultImages(result)).toHaveLength(2)
+	expect(result.output).toContain(`${url('/fake')}: attachment is not image/png`)
+	expect(result.output).toContain(`HTTP 403 reading ${url('/denied')}`)
+	expect(requested).toEqual(['/one', '/fake', '/denied', '/two'])
 })
 
 test('binary downloads go in the download directory with path, type and size', async () => {

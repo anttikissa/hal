@@ -156,7 +156,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r), ts: r.ts }]
-	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts) : b.type === 'image' ? transcript.imageItem(b, r.ts) : transcript.resultItem(b, r.ts)))
+	if (r.type === 'user') return r.blocks.flatMap((b): Shown[] => b.type === 'text' ? [transcript.promptItem(b.text, b, r.ts)] : b.type === 'image' ? [transcript.imageItem(b, r.ts)] : [transcript.resultItem(b, r.ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, r.ts))])
 	return [transcript.endItem(r)]
 }
 function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
@@ -364,7 +364,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
 		let done = transcript.settle(t.items, t.live).map((item): Item => item.type === 'tool' && event.results.some((r) => r.id === item.id) ? { ...item, partial: undefined } : item)
-		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b, event.ts)), event.n, done.length)]
+		let items = [...done, ...transcript.keyed(event.results.flatMap((b) => [transcript.resultItem(b, event.ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, event.ts))]), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	// Attachments, notices and other session events are not turn ends.

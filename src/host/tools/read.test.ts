@@ -2,6 +2,14 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { attachments } from '../../common/attachments.ts'
+import { blocks } from '../../common/blocks.ts'
+import { replay } from '../../common/replay.ts'
+import { transcript } from '../../common/transcript.ts'
+import { anthropic } from '../anthropic.ts'
+import { history } from '../history.ts'
+import { openai } from '../openai.ts'
+import { openaiCompat } from '../openai-compat.ts'
+import { pruning } from '../pruning.ts'
 import { blobs } from '../blobs.ts'
 import { nativeTool } from '../native-tool.ts'
 import { paths } from '../paths.ts'
@@ -88,4 +96,101 @@ test('batched ranges match individual leased reads; mixed failures preserve succ
 	expect(failed.output).toContain('missing.txt')
 	expect(failed.output).toContain('ENOENT')
 	expect(failed.output).toContain('binary.bin looks like a binary file')
+})
+
+test('mixed batches retain every durable image, errors and leases across history and providers', async () => {
+	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
+	let gif = Buffer.from('GIF89a\0\0')
+	writeFileSync(`${home}/one.png`, png)
+	writeFileSync(`${home}/two.gif`, gif)
+	writeFileSync(`${home}/a.txt`, 'first\nsecond\n')
+	writeFileSync(`${home}/invalid.txt`, Buffer.from([0xff]))
+	let resolved = nativeTool.resolve('READ "one.png" "missing" "a.txt:2-2" "invalid.txt" "two.gif"')
+	let result = await tools.run({ type: 'tool_call', id: 'batch', ...resolved }, ctx())
+	expect(result.isError).toBe(true)
+	expect(result.output).toContain('ENOENT')
+	expect(result.output).toContain('missing')
+	expect(result.output).toContain('invalid.txt')
+	expect(result.output).toContain('== READ a.txt@')
+	expect(result.output).toContain('2: second')
+	expect(result.output).not.toContain('READ it alone')
+	expect(blocks.resultImages(result).map((b) => b.mediaType)).toEqual(['image/png', 'image/gif'])
+	for (let name of ['one.png', 'two.gif']) rmSync(`${home}/${name}`)
+	history.append('s', { type: 'user', blocks: [{ type: 'text', text: 'read these' }] })
+	history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'batch', ...resolved } })
+	let record = history.append('s', { type: 'user', blocks: [result] })
+	let records = await history.read('s')
+	let messages = replay.toMessages(records)
+	let req = { model: 'test', messages, image: (blob: string) => blobs.base64('s', blob) }
+	let expected = [png, gif].map((bytes) => bytes.toString('base64'))
+	let sent: any = anthropic.toMessages(req).at(-1).content[0]
+	expect(sent.is_error).toBe(true)
+	expect(sent.content.filter((b: any) => b.type === 'image').map((b: any) => b.source.data)).toEqual(expected)
+	let responses: any = openai.input(req).at(-1)
+	expect(responses.content.map((b: any) => b.image_url)).toEqual(expected.map((data, i) => `data:${i ? 'image/gif' : 'image/png'};base64,${data}`))
+	let chat: any = openaiCompat.toMessages(req).at(-1)
+	expect(chat.content.filter((b: any) => b.type === 'image_url').map((b: any) => b.image_url.url)).toEqual(responses.content.map((b: any) => b.image_url))
+	let recovered = await tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	expect(blocks.resultImages(recovered).map((b) => blobs.base64('s', b.blob))).toEqual(expected)
+	let shown = transcript.recordItems(record, 0)
+	expect(shown.filter((b) => b.type === 'image').map((b) => b.blob)).toEqual(blocks.resultImages(result).map((b) => b.blob))
+	expect(new Set(shown.map((b) => b.key)).size).toBe(3)
+	let omitted = pruning.omit('s', record)
+	expect(omitted.type).toBe('user')
+	if (omitted.type === 'user' && omitted.blocks[0]?.type === 'tool_result') {
+		expect(blocks.resultImages(omitted.blocks[0])).toEqual([])
+		for (let image of blocks.resultImages(result)) expect(omitted.blocks[0].output).toContain(`s/${image.blob}`)
+	}
+	let withoutImages = messages.map((m) => ({ ...m, blocks: m.blocks.map((b) => b.type === 'tool_result' ? { ...b, images: undefined } : b) })) as typeof messages
+	expect(pruning.estimate('s', messages) - pruning.estimate('s', withoutImages)).toBeGreaterThanOrEqual(2 * pruning.maxImageTokens)
+	let missing = blocks.resultImages(result)[0]!
+	rmSync(blobs.find('s', missing.blob)!.path)
+	let partial = await tools.run({ type: 'tool_call', id: 'partial', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	expect(partial.isError).toBe(true)
+	expect(partial.output).toContain(`image blob s/${missing.blob} not found`)
+	expect(blocks.resultImages(partial).map((b) => blobs.base64('s', b.blob))).toEqual([expected[1]])
+})
+
+test('successful image batches and legacy single-image records share replay and display behavior', async () => {
+	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
+	writeFileSync(`${home}/one.png`, png)
+	let batch = await tools.run({ type: 'tool_call', id: 'r', ...nativeTool.resolve('READ "one.png" "one.png"') }, ctx())
+	expect(batch.isError).toBeUndefined()
+	expect(blocks.resultImages(batch)).toHaveLength(2)
+	let single = await read('one.png')
+	expect(single.images).toBeUndefined()
+	expect(single.image).toBeDefined()
+	let record = { type: 'user' as const, n: 3, ts: '', blocks: [single] }
+	expect(transcript.recordItems(record, 0).filter((b) => b.type === 'image')).toHaveLength(1)
+	let recoveredRecord = history.append('s', record)
+	let recovered = await tools.run({ type: 'tool_call', id: 'old', name: 'read_blob', input: { id: `#${recoveredRecord.n}` } }, ctx())
+	expect(blocks.resultImages(recovered)).toHaveLength(1)
+})
+
+test('READ_BLOB recovers images from every sibling result and direct image in a user record', async () => {
+	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
+	let saved = Array.from({ length: 4 }, () => blobs.store('s', 'image/png', png.toString('base64')))
+	let images = saved.map((b) => ({ type: 'image' as const, blob: b.blob, mediaType: b.mediaType, bytes: b.bytes }))
+	let record = history.append('s', { type: 'user', blocks: [
+		{ type: 'tool_result', id: 'legacy', output: 'legacy output', image: images[0] },
+		{ type: 'tool_result', id: 'multi', output: 'multi output', images: images.slice(1, 3) },
+		images[3]!,
+	] })
+	let recover = () => tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	let whole = await recover()
+	expect(whole.isError).toBeUndefined()
+	expect(blocks.resultImages(whole)).toHaveLength(4)
+	expect(whole.output).toContain('legacy output')
+	expect(whole.output).toContain('multi output')
+	for (let image of images) expect(whole.output).toContain(image.blob)
+	rmSync(blobs.find('s', images[1]!.blob)!.path)
+	let partial = await recover()
+	expect(partial.isError).toBe(true)
+	expect(blocks.resultImages(partial)).toHaveLength(3)
+	expect(partial.output).toContain(`image blob s/${images[1]!.blob} not found`)
+	for (let image of images.filter((_, i) => i !== 1)) rmSync(blobs.find('s', image.blob)!.path)
+	let gone = await recover()
+	expect(gone.isError).toBe(true)
+	expect(blocks.resultImages(gone)).toEqual([])
+	for (let image of images) expect(gone.output).toContain(`image blob s/${image.blob} not found`)
 })

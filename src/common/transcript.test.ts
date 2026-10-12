@@ -20,6 +20,17 @@ function snap(snapshot: Omit<Snapshot, 'meta' | 'state'>): Event {
 	return { type: 'snapshot', sessionId, snapshot: { meta, state: { type: 'idle' }, ...snapshot } }
 }
 
+test('live and restored tool images share stable items, including legacy single-image results', () => {
+	let images = [{ type: 'image' as const, blob: '0123456789ab', mediaType: 'image/png', bytes: 12 }, { type: 'image' as const, blob: '0123456789ac', mediaType: 'image/gif', bytes: 8 }]
+	for (let attached of [{ images }, { image: images[0] }]) {
+		let result = { type: 'tool_result' as const, id: 'r', output: 'images and an error', isError: true, ...attached }
+		let live = fold([snap({ history: [] }), { type: 'turn-start', sessionId, provider: 'fake' }, { type: 'tool-results', sessionId, results: [result], n: 3, ts }])!
+		let restored = fold([snap({ history: [{ type: 'user', blocks: [result], n: 3, ts }] })])!
+		expect(live.items).toEqual(restored.items)
+		expect(live.items.filter((b) => b.type === 'image')).toHaveLength('images' in attached ? 2 : 1)
+	}
+})
+
 test('a snapshot shows history as display items without provider details', () => {
 	let t = fold([
 		snap({

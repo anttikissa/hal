@@ -2,7 +2,7 @@
 // key credentials from src/host/auth.ts. Wire mapping:
 // tasks/7f/mapping.md; OAuth contract: tasks/ya/anthropic.ts.
 
-import type { AssistantBlock, StopReason, StreamEvent, Usage, UserBlock } from '../common/blocks.ts'
+import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Usage, type UserBlock } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
@@ -39,7 +39,8 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
 		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
 	}
-	let content = b.image ? [{ type: 'text', text: b.output }, userBlock(b.image, req)] : b.output
+	let images = blocks.resultImages(b)
+	let content = images.length ? [{ type: 'text', text: b.output }, ...images.map((image) => userBlock(image, req))] : b.output
 	return { type: 'tool_result', tool_use_id: b.id, content, ...(b.isError ? { is_error: true } : {}) }
 }
 
