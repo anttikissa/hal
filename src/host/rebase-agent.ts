@@ -159,6 +159,7 @@ function results(id: string, results: ToolResultBlock[]): { record?: HistoryReco
 		if (result) { result.output = text; result.isError = true }
 		failure = text
 	}
+	if (result) delete result.outputBlob
 	let written = history.append(id, record)
 	if (failure) {
 		slash.output(id, failure, true)

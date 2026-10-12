@@ -139,7 +139,7 @@ test('mixed batches retain every durable image, errors and leases across history
 	expect(omitted.type).toBe('user')
 	if (omitted.type === 'user' && omitted.blocks[0]?.type === 'tool_result') {
 		expect(blocks.resultImages(omitted.blocks[0])).toEqual([])
-		for (let image of blocks.resultImages(result)) expect(omitted.blocks[0].output).toContain(`s/${image.blob}`)
+		for (let [i] of blocks.resultImages(result).entries()) expect(omitted.blocks[0].output).toContain(`s/${record.n}.${i + 1}`)
 	}
 	let withoutImages = messages.map((m) => ({ ...m, blocks: m.blocks.map((b) => b.type === 'tool_result' ? { ...b, images: undefined } : b) })) as typeof messages
 	expect(pruning.estimate('s', messages) - pruning.estimate('s', withoutImages)).toBeGreaterThanOrEqual(2 * pruning.maxImageTokens)

@@ -1,7 +1,7 @@
 // Recover a whole stored tool result, attachment image, or history block.
 import { replay } from '../../common/replay.ts'
 import { attachments } from '../../common/attachments.ts'
-import { blocks } from '../../common/blocks.ts'
+import { blocks, type UserBlock } from '../../common/blocks.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
@@ -13,7 +13,7 @@ export const tool: Tool<ToolOutput> = {
 	description: 'Read an immutable blob or history record. Text is paged with offset (first line, 1-based) and limit. For lossless recovery of long/cut lines or JSON use charOffset (1-based character position) instead. Images return as images.',
 	parameters: {
 		type: 'object',
-		properties: { id: { type: 'string', description: 'A blob id, sessionId/blobId, a block id (#t35; any kind letter or none), or sessionId#t35' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
+		properties: { id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, #t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
 		required: ['id'],
 	},
 	readOnly: true,
@@ -29,23 +29,38 @@ export const tool: Tool<ToolOutput> = {
 			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
 		}
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(reference)
-		let block = /^(?:([\w-]+))?#[a-z]?([1-9]\d*)$/.exec(reference)
+		let block = /^(?:([\w-]+))?#[a-z]?([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference) ?? /^([\w-]+)\/([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
+		if (ref && block && blobs.find(ref[1] ?? ctx.sessionId, ref[2]!)) block = null
 		if (!ref && !block) throw new Error(`invalid blob or block id: ${JSON.stringify(input.id)}`)
 		if (block) {
 			let n = Number(block[2])
 			if (!Number.isSafeInteger(n)) throw new Error('block number is too large')
+			let slot = block[3] === undefined ? undefined : Number(block[3])
+			if (slot !== undefined && !Number.isSafeInteger(slot)) throw new Error('item number is too large')
 			let id = block[1] ?? ctx.sessionId
 			let raw = history.readSync(id)
 			let record = replay.current(raw).find((r) => r.n === n)
 			if (!record && raw.some((r) => r.n === n)) return `Block ${input.id} was dropped by rebase.`
 			if (!record) throw new Error(`block ${input.id} not found`)
 			let value = record.type === 'assistant' ? record.block : record.type === 'user' && record.blocks.length === 1 ? record.blocks[0] : record
+			if (slot !== undefined || reference.includes('/')) {
+				let items = record.type === 'user' ? record.blocks.flatMap((b): UserBlock[] => b.type === 'tool_result' ? [b, ...blocks.resultImages(b)] : [b]) : [value]
+				value = items[slot ?? 0]
+				if (!value) throw new Error(`history item ${input.id} not found`)
+			}
 			let refs = value?.type === 'tool_result' ? blocks.resultImages(value) : value?.type === 'image' ? [value] : value?.type === 'user' ? value.blocks.flatMap((b) => b.type === 'image' ? [b] : b.type === 'tool_result' ? blocks.resultImages(b) : []) : []
 			let text = value?.type === 'tool_result' ? value.output : value?.type === 'image' ? `Image block ${input.id}` : value?.type === 'tool_call'
 				? [toolDetails.headline(value.name, value.input).text, ...toolDetails.lines(value.name, value.input)].join('\n')
 				: toolDetails.value(value).join('\n')
 			let images: { mediaType: string; data: string; source: string }[] = []
 			let errors: string[] = []
+			if (value?.type === 'tool_result') {
+				let blob = value.outputBlob ?? /\n\[cut: [^\n]*whole output in blob ([0-9a-f]{12}|[0-9a-z]{6})\.[^\n]*\]$/.exec(value.output)?.[1]
+				if (blob) {
+					try { text = blobs.text(id, blob) }
+					catch (e: any) { errors.push(`Error reading output blob ${id}/${blob}: ${e?.message ?? e}`) }
+				}
+			}
 			for (let ref of refs) {
 				let source = `${id}/${ref.blob}`
 				try {

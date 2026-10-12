@@ -75,6 +75,19 @@ function number(id: string): number {
 function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord {
 	let { n, ts, ...rest } = record
 	let full = { ...rest, n: n ?? history.number(id), ts: ts ?? new Date().toISOString() } as HistoryRecord
+	if (full.type === 'user') {
+		let slot = 0
+		for (let b of full.blocks) {
+			if (b.type === 'tool_result') {
+				if (b.outputBlob) {
+					let ref = `${id}/${full.n}${slot ? `.${slot}` : ''}`
+					b.output = b.output.replace(`whole output in blob ${b.outputBlob}. Page it with READ_BLOB "${b.outputBlob}"`, `whole output in history item ${ref}. Page it with READ_BLOB "${ref}"`)
+				}
+				slot += blocks.resultImages(b).length
+			}
+			slot++
+		}
+	}
 	let line = lines.encode(full)
 	if (busy.starts(full)) busy.add(id)
 	history.write(history.file(id), line)

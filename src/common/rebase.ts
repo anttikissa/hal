@@ -80,7 +80,7 @@ function edited(r: HistoryRecord, text: string): HistoryRecord {
 			return { ...r, blocks: [{ ...first, text }, ...r.blocks.filter((b) => b.type !== 'text')] }
 		}
 		if (r.blocks.length === 1 && r.blocks[0]?.type === 'tool_result') {
-			let { image: _image, ...b } = r.blocks[0]
+			let { image: _image, images: _images, outputBlob: _outputBlob, ...b } = r.blocks[0]
 			return { ...r, blocks: [{ ...b, output: text }] }
 		}
 	}
@@ -119,7 +119,7 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 		if (r.type !== 'user' || !batch) return r
 		return { ...r, blocks: r.blocks.map((b) => {
 			if (b.type !== 'tool_result' || !batch.has(b.id)) return b
-			let { image: _image, ...rest } = b
+			let { image: _image, images: _images, outputBlob: _outputBlob, ...rest } = b
 			return { ...rest, output: batch.get(b.id)! }
 		}) }
 	})

@@ -2,6 +2,7 @@
 // record forms are read as current ones (legacyCall).
 // Tasks: jf, nvm, svt, 6eq, rqq.
 import { toolPresentation } from '../common/tool-presentation.ts'
+import { attachments } from '../common/attachments.ts'
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
@@ -46,6 +47,7 @@ function check(value: unknown): HistoryRecord {
 	if (r.type === 'rebase' && r.contextChanged !== undefined && r.contextChanged !== true) throw new Error('invalid rebase setting flag')
 	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
 	for (let b of r.type === 'assistant' ? [r.block] : r.type === 'user' ? r.blocks : []) {
+		if (b.type === 'tool_result' && b.outputBlob !== undefined && (typeof b.outputBlob !== 'string' || !attachments.blobId.test(b.outputBlob))) throw new Error('invalid tool output blob')
 		if (b.type !== 'tool_call' && b.type !== 'tool_result') continue
 		if (b.presentation !== undefined) toolPresentation.check(b.presentation, b.type === 'tool_result' ? b.output : '')
 		if (b.presentationError !== undefined && typeof b.presentationError !== 'string') throw new Error('invalid tool presentation error')

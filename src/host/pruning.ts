@@ -22,7 +22,7 @@ function marker(kind: string, ref: string): string {
 
 // Match our reserved generated form, recursively, before any tool executes.
 function copied(value: unknown): string | undefined {
-	if (typeof value === 'string') return /\[pruned [^\]\n;]+; read_blob id=[\w/#-]+\]/.exec(value)?.[0]
+	if (typeof value === 'string') return /\[pruned [^\]\n;]+; read_blob id=[\w/#.-]+\]/.exec(value)?.[0]
 	if (value && typeof value === 'object') for (let child of Object.entries(value).flat()) {
 		let found = pruning.copied(child)
 		if (found) return found
@@ -40,12 +40,16 @@ function omit(id: string, r: HistoryRecord): HistoryRecord {
 	let ref = `${id}#${r.n}`
 	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>, ...(r.block.cmd !== undefined && { cmd: pruning.argumentsOf(r.block.cmd, ref) as string }) } }
 	if (r.type !== 'user') return r
+	let slot = 0
+	let itemRef = (at: number) => `${id}/${r.n}${at ? `.${at}` : ''}`
 	let blocks: UserBlock[] = r.blocks.map((b) => {
-		if (b.type === 'image') return { type: 'text', text: pruning.marker('image', `${id}/${b.blob}`) }
+		let at = slot++
+		if (b.type === 'image') return { type: 'text', text: pruning.marker('image', itemRef(at)) }
 		if (b.type !== 'tool_result') return b
-		let full = /whole output in blob ([0-9a-f]{12}|[0-9a-z]{6})\b/.exec(b.output)?.[1]
-		let output = pruning.marker('tool output', full ? `${id}/${full}` : ref)
-		for (let image of conversationBlocks.resultImages(b)) output += '\n' + pruning.marker('image', `${id}/${image.blob}`)
+		let images = conversationBlocks.resultImages(b)
+		slot += images.length
+		let output = pruning.marker('tool output', itemRef(at))
+		for (let [i] of images.entries()) output += '\n' + pruning.marker('image', itemRef(at + i + 1))
 		let { image: _image, images: _images, ...rest } = b
 		return { ...rest, output }
 	})

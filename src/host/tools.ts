@@ -148,7 +148,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	if (/<hal-note/i.test(result.output)) {
 		history.append(ctx.sessionId, { type: 'notice', text: tools.imitationWarning })
 	}
-	result.output = call.name === 'read_blob' ? result.output : call.name === 'bash' ? tools.cap(result.output, ctx.sessionId, tools.bashMaxChars, tools.bashMaxLines) : tools.cap(result.output, ctx.sessionId)
+	if (call.name !== 'read_blob') result.output = tools.cap(result.output, ctx.sessionId, call.name === 'bash' ? tools.bashMaxChars : tools.maxChars, call.name === 'bash' ? tools.bashMaxLines : Infinity, (blob) => { result.outputBlob = blob })
 	// Only a time worth showing (1 s or more, task wm0) is kept.
 	let ms = Math.round(performance.now() - start)
 	if (ms >= 1000) result.ms = ms
@@ -157,19 +157,20 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 
 // Retain the whole result when cut, and show both ends: a bash failure
 // usually says why at the end. Leave room for the recoverable reference.
-function cap(output: string, sessionId?: string, max = tools.maxChars, maxLines = Infinity): string {
+function cap(output: string, sessionId?: string, max = tools.maxChars, maxLines = Infinity, onStore?: (blob: string) => void): string {
 	let lines = output.split(/(?<=\n)/)
 	let byLines = lines.length > maxLines
 	if (output.length <= max && !byLines) return output
 	let saved = sessionId && blobs.storeOutput(sessionId, output)
+	if (saved) onStore?.(saved.blob)
 	let note = saved
 		? `\n[cut: ${lines.length} lines, ${Buffer.byteLength(output)} bytes total; whole output in blob ${saved.blob}. Page it with READ_BLOB "${saved.blob}" { offset: 1, limit: 100 }, or grep -n / sed -n '1,100p' ${saved.path}]`
 		: `\n[output truncated: ${output.length - max} more characters]`
 	let gap = byLines ? `[… ${lines.length - maxLines} lines omitted …]\n` : ''
 	let head = byLines ? lines.slice(0, Math.ceil(maxLines / 2)).join('') : output
 	let tail = byLines ? lines.slice(-Math.floor(maxLines / 2)).join('') : output
-	let room = Math.max(0, max - note.length - gap.length)
-	return `${head.slice(0, Math.ceil(room / 2))}${gap}${tail.slice(-Math.floor(room / 2))}${note}`
+	let room = Math.max(0, max - note.length - gap.length - (onStore && sessionId ? 2 * (sessionId.length + 32) : 0))
+	return `${head.slice(0, Math.ceil(room / 2))}${gap}${room > 1 ? tail.slice(-Math.floor(room / 2)) : ''}${note}`
 }
 
 // Stops a tool's process group: SIGTERM now, SIGKILL killAfterMs later
