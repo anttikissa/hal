@@ -74,7 +74,7 @@ function migrate(): void {
 export const theme = { names, active, select, migrate, file }
 
 export const command: SlashCommand = {
-	help: () => '/theme asks which color theme to use, the active one chosen; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
+	help: () => '/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
 	complete: (args) => names().filter((n) => n.startsWith(args)),
 	run(args, answers) {
 		let now = active()

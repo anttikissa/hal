@@ -22,7 +22,7 @@ const METHODS: Record<string, string> = {
 const KEYS = 'API keys: set ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY or OPENROUTER_API_KEY'
 
 export const command: SlashCommand = {
-	help: () => '/login: choose a Claude or ChatGPT subscription login, or paste an API key for Claude, ChatGPT, OpenCode or OpenRouter. /login claude | chatgpt | opencode also work directly; keys may instead be set in environment variables.',
+	help: () => '/login: choose a Claude or ChatGPT subscription login, or paste an API key for Claude, ChatGPT, OpenCode or OpenRouter.\n/login claude | chatgpt | opencode also work directly.\n\nKeys may instead be set in environment variables.',
 	complete: (args) => PROVIDERS.filter((p) => p.startsWith(args)),
 	async run(args, answers, ctx) {
 		let selected = args.trim()

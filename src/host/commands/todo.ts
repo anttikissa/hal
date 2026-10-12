@@ -8,7 +8,7 @@ import { status } from '../status.ts'
 import { subagents } from '../subagents.ts'
 
 export const command: SlashCommand = {
-	help: () => '/todo <item>: append and commit an item in this directory’s TODO.md, or ask the model to file it. A busy session delegates to a subagent, spending one spawn slot. Bare /todo lists open items.',
+	help: () => '/todo <item>: append and commit an item in this directory’s TODO.md, or ask the model to file it. A busy session delegates to a subagent, spending one spawn slot.\n/todo alone lists open items.',
 	async run(args, _answers, ctx) {
 		let item = args.trim()
 		let path = resolve(ctx.cwd, 'TODO.md')

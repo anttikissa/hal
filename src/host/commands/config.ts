@@ -11,7 +11,7 @@ function parsed(args: string): { name: string; value?: string } {
 }
 
 export const command: SlashCommand = {
-	help: () => '/config lists all settings to change. /config <name> shows one; /config <name> <value> sets one. Defaults are not stored. Secret values are never shown.',
+	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored. Secret values are never shown.',
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
 	record(args) {
 		let { name, value } = parsed(args)

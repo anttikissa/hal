@@ -19,7 +19,7 @@ export function sessionRow({ id, meta, error }: SessionListing, self: string): s
 }
 
 export const command: SlashCommand = {
-	help: () => '/tabs lists open tabs, marking this session; /tabs all adds closed sessions, newest first, with their closing times. Session ids link to their tabs.',
+	help: () => '/tabs lists open tabs, marking this session.\n/tabs all adds closed sessions, newest first, with their closing times. Session ids link to their tabs.',
 	complete: (args) => ['all'].filter((v) => v.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (args && args !== 'all') return { error: 'usage: /tabs [all]' }

@@ -6,7 +6,7 @@ import { commandList } from '../../common/commands/list.ts'
 import { commands, type SlashCommand } from '../commands.ts'
 
 export const command: SlashCommand = {
-	help: () => '/help lists every command by category; /help <name> shows one in detail.',
+	help: () => '/help lists every command by category.\n/help <name> shows one in detail.',
 	complete: (args) => commandList.all().map((c) => c.name).filter((n) => n.startsWith(args)),
 	run(args) {
 		let all = commandList.all().filter((c) => !c.hidden)
@@ -15,8 +15,8 @@ export const command: SlashCommand = {
 			let info = commandList.byName(name)
 			if (!info) return { error: `no command /${name}` }
 			let text = commands.all().get(name)?.help?.(rest.join(' ')) ?? info.description
-			if (['login', 'quit', 'suspend', 'budget'].includes(name)) text += '\nAgents: unavailable through the command tool.'
-			if (name === 'send' || name === 'queue') text += '\nAgents: use the send tool instead.'
+			if (['login', 'quit', 'suspend', 'budget'].includes(name)) text += '\n\nAgents: unavailable through the command tool.'
+			if (name === 'send' || name === 'queue') text += '\n\nAgents: use the send tool instead.'
 			return { say: text }
 		}
 		let width = Math.max(...all.map((c) => c.name.length)) + 1

@@ -38,7 +38,7 @@ async function cleanup(args: string[], current: string) {
 }
 
 export const command: SlashCommand = {
-	help: () => '/changes lists the files this session declared and changed, with diffs and the calls that changed them; /changes clear starts a fresh list without deleting history; /changes cleanup [apply] [session-id] previews, then removes, excluded generated-file metadata from a history, keeping a backup.',
+	help: () => '/changes lists the files this session declared and changed, with diffs and the calls that changed them.\n/changes clear starts a fresh list without deleting history.\n/changes cleanup [apply] [session-id] previews, then removes, excluded generated-file metadata from a history, keeping a backup.',
 	complete: (args) => ['clear', 'cleanup'].filter((s) => s.startsWith(args)),
 	async run(args, _answers, ctx) {
 		let words = args.split(/\s+/).filter(Boolean)

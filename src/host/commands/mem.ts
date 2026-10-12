@@ -39,7 +39,7 @@ async function report(): Promise<string> {
 }
 
 export const command: SlashCommand = {
-	help: () => "/mem shows the host process's memory: resident size, JS heap, the sessions whose history is loaded and other holders, and the machine's free memory. /mem gc runs a full garbage collection and shows the before and after. Nothing else changes.",
+	help: () => "/mem shows the host process's memory: resident size, JS heap, the sessions whose history is loaded and other holders, and the machine's free memory.\n/mem gc runs a full garbage collection and shows the before and after. Nothing else changes.",
 	async run(args) {
 		if (args && args !== 'gc') return { error: 'usage: /mem [gc]' }
 		let before = await report()

@@ -8,7 +8,7 @@ import { web } from '../web.ts'
 
 export const command: SlashCommand = {
 	help: () =>
-		'/auth shows a one-time code for logging a browser in to the web client: it works once, for 10 minutes. `hal auth` in a shell prints one too. /auth revoke logs every browser out.',
+		'/auth shows a one-time code for logging a browser in to the web client: it works once, for 10 minutes. `hal auth` in a shell prints one too.\n/auth revoke logs every browser out.',
 	complete: (args) => ('revoke'.startsWith(args) ? ['revoke'] : []),
 	run(args) {
 		if (args === 'revoke') {

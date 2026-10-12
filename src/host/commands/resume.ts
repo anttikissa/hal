@@ -9,7 +9,7 @@ import { closedSessions, sessionRow } from './tabs.ts'
 const recent = 20
 
 export const command: SlashCommand = {
-	help: () => `/resume [all|session id]: list the ${recent} most recently closed sessions (all: every one), or reopen the session named.`,
+	help: () => `/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume <session id> reopens the session named.`,
 	complete: (args) => ['all', ...closedSessions().map((s) => s.id)].filter((v) => v.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (!args || args === 'all') {

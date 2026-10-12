@@ -11,7 +11,7 @@ function isDir(path: string): boolean {
 }
 
 export const command: SlashCommand = {
-	help: () => '/cd <dir>: change this session\'s working directory and safely interrupt and continue active work (~ is home; relative to the current one). Offers to create a missing directory. /cd alone goes to the Hal home; /cd - goes back.',
+	help: () => '/cd <dir>: change this session\'s working directory and safely interrupt and continue active work (~ is home; relative to the current one). Offers to create a missing directory.\n/cd alone goes to the Hal home.\n/cd - goes back.',
 	complete(args: string, ctx: Context): string[] {
 		if (args === '~') return ['~/']
 		let head = args.slice(0, args.lastIndexOf('/') + 1)

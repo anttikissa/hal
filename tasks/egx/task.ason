@@ -1,0 +1,7 @@
+{
+	title: 'Command help text layout',
+	spec: 'Every /help <name> text uses paragraphs separated by one blank line. Each usage form or example sits on its own line, with no blank lines between consecutive forms or examples. An Agents: line, when a command has one (its own help or the one /help appends for denied commands), is the last paragraph, preceded by a blank line.',
+	status: 'done',
+	needs: ['et'],
+	foldInto: ['et']
+}

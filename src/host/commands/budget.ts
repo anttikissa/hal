@@ -6,7 +6,7 @@ import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 
 export const command: SlashCommand = {
-	help: () => '/budget: show spawn slots left. /budget <n> sets them; /budget +n or -n adjusts them.',
+	help: () => '/budget shows spawn slots left.\n/budget <n> sets them.\n/budget +n or -n adjusts them.',
 	run(args, _answers, ctx) {
 		let meta = sessions.open(ctx.sessionId)
 		let current = meta.slots ?? settings.subagentSlots()

@@ -45,7 +45,7 @@ async function toggle(verb: 'disable' | 'enable', arg: string) {
 }
 
 export const command: SlashCommand = {
-	help: () => `/plugins lists the plugin files in ${plugins.dir()}: content hash, expiry, each hook as module.key kind, and the last load error. /plugins disable <file> adds plugin.disable() as the first line of the file's registration body, switching it off without deleting it; /plugins enable <file> removes that line.`,
+	help: () => `/plugins lists the plugin files in ${plugins.dir()}: content hash, expiry, each hook as module.key kind, and the last load error.\n/plugins disable <file> adds plugin.disable() as the first line of the file's registration body, switching it off without deleting it.\n/plugins enable <file> removes that line.`,
 	complete: (args) => {
 		let m = /^(disable|enable) (.*)$/.exec(args)
 		if (m) return files().map((f) => `${m[1]} ${f}`).filter((s) => s.startsWith(args))
