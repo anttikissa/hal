@@ -2095,6 +2095,28 @@ browserTest('card headers restore short or open and tool commands expand apart f
 	} finally { await b.close() }
 }, 15000)
 
+browserTest('change-card disclosure restores complete vertically unclipped diffs (task r7m)', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	for (let i = 0; i < 3; i++) history.append(id, { type: 'output', text: 'Instructions changed', change: { name: 'AGENTS.md', what: 'changed', diff: Array.from({ length: 12 }, (_, n) => `+change ${i} line ${n}`).join('\n') } })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.Card .change .mark')`)
+		for (let i = 0; i < 2; i++) {
+			await b.evaluate(`document.querySelector('.change .mark').click()`)
+			await b.waitFor(`document.querySelectorAll('.change .lines').length === 3`)
+			expect(await b.evaluate(`(() => { let c = document.querySelector('.change'); return { expanded: c.querySelector('.mark').getAttribute('aria-expanded'), rows: c.querySelectorAll('.lines > div').length, unclipped: c.scrollHeight <= c.clientHeight } })()`)).toEqual({ expanded: 'true', rows: 36, unclipped: true })
+			await b.evaluate(`document.querySelector('.change .lines').click()`)
+			expect(await b.evaluate(`document.querySelectorAll('.change .lines').length`)).toBe(3)
+			await b.evaluate(`document.querySelector('.change .mark').click()`)
+			await b.waitFor(`document.querySelectorAll('.change .lines').length === 0`)
+			expect(await b.evaluate(`document.querySelector('.change .mark').getAttribute('aria-expanded')`)).toBe('false')
+		}
+	} finally { await b.close() }
+}, 15000)
+
 browserTest('prose disclosure appears only when a glimpse hides rendered content (task 42j)', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Fixing' }] })

@@ -302,7 +302,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<>
 			{link()}
 			<div class="content diff change">
-				<For each={promptChanges.rows(props.row.item)}>{(r) => <div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}</For>
+				<For each={promptChanges.rows(props.row.item)}>{(r, i) => <Show when={i() === 0} fallback={<div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}><button type="button" class="row head mark" aria-label={r.text} aria-expanded={expanded() ? 'true' : 'false'}><span class="disclosure" aria-hidden="true">▸</span>{r.text}</button></Show>}</For>
 				<Show when={expanded()}>
 					<For each={promptChanges.run(props.row.item)}>
 						{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></div></>}
@@ -328,7 +328,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', level() === 'glimpse' && props.row.item.type !== 'tool' ? 'glimpse' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} style={{ '--glimpse': settings.glimpseRows() }} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', level() === 'glimpse' && props.row.item.type !== 'tool' && !isChange() ? 'glimpse' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} style={{ '--glimpse': settings.glimpseRows() }} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<>

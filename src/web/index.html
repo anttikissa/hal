@@ -93,7 +93,8 @@ html.typing .App { position: absolute; }
 .Card .who { color: var(--quiet); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
-.Card .change > div:not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.Card .change > :not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.Card .change > .mark { display: block; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
 .ToolPresentation { white-space: normal; }
 .ToolPresentation section + section, .raw-tool { margin-top: 1lh; }
 .ToolPresentation .path { overflow-wrap: anywhere; margin-bottom: 0.25lh; }

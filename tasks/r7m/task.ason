@@ -1,0 +1,10 @@
+{
+	title: 'Restore change-card disclosure and complete contents',
+	spec: 'Web prompt-change cards retain their compact summary layout and have an accessible disclosure button on the summary row that opens and closes the card by pointer or keyboard. Summary rows remain fully visible vertically; expanded cards show every diff row with horizontal scrolling rather than generic glimpse clipping. Other card kinds retain their existing preview limits. Terminal change cards retain their existing working disclosure behavior.',
+	status: 'done',
+	notes: [
+		'The specialized change branch lacked a mark or CardHeader, so the shared click guard rejected collapse while expanded. Its notice glimpse state also received the generic content max-height despite rendering full diffs. The first summary row is now a native disclosure button, and change cards bypass only the generic glimpse class. Existing short/open fold states and terminal behavior remain unchanged.'
+	],
+	needs: ['ar'],
+	foldInto: ['ar']
+}
