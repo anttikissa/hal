@@ -34,8 +34,9 @@ test('rewind drops the prompt and everything after it, then sends the edit once'
 	calls[2]!.push({ type: 'text', text: 're uno' }, { type: 'done', reason: 'end' })
 	await until(() => a.views.get(id)!.state.type === 'idle' && a.of('turn-end').length === 3)
 	expect(calls).toHaveLength(3)
-	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(1)
-	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt' || i.type === 'text'))).toEqual([
+	expect(history.readSync(id).filter((r) => r.type === 'user' && r.amends === n)).toHaveLength(1)
+	expect(a.views.get(id)!.items.some((i) => i.canceledReference)).toBe(true)
+	expect(shown(a.views.get(id)!.items.filter((i) => !i.canceledReference && (i.type === 'prompt' || i.type === 'text')))).toEqual([
 		{ type: 'prompt', text: 'uno' },
 		{ type: 'text', text: 're uno' },
 	])
@@ -65,5 +66,5 @@ test('rewind refuses a running session, a non-prompt and a dropped record', asyn
 	a.conn.send({ type: 'submit', sessionId: id, text: 'again', rewind: two, id: 'bad3' })
 	await until(() => a.of('rejected').length === 3)
 	expect(a.of('rejected')[2]!.reason).toContain('not a prompt')
-	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(1)
+	expect(history.readSync(id).filter((r) => r.type === 'user' && r.amends !== undefined)).toHaveLength(1)
 })

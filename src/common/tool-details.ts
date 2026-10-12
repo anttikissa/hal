@@ -197,4 +197,6 @@ const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wai
 // Discovery and history commands open directly to their complete output (18n).
 const fullCommand = (name: string, input: Record<string, unknown>): boolean => name === 'command' && typeof input.command === 'string' && /^\s*\/(?:help|rebase)(?:\s|$)/.test(input.command)
 
-export const toolDetails = { fullCommand, value, headline, lines, unsafe, readOnly }
+const harmless = (name: string, input: Record<string, unknown>): boolean => readOnly.has(name) || (name === 'command' && typeof input.command === 'string' && /^\s*\/(?:rename|help)(?:\s|$)/.test(input.command))
+
+export const toolDetails = { fullCommand, value, headline, lines, unsafe, readOnly, harmless }

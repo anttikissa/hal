@@ -204,7 +204,7 @@ export const tools = {
 	// Larger files are refused rather than loaded whole.
 	maxFileBytes: 20_000_000,
 	// Unknown tools count as having side effects.
-	readOnly: (name: string): boolean => toolDetails.readOnly.has(name) || tools.all().get(name)?.readOnly === true,
+	readOnly: (name: string, input: Record<string, unknown> = {}): boolean => toolDetails.harmless(name, input) || tools.all().get(name)?.readOnly === true,
 	defs: (): ToolDef[] => [...tools.all().values()].map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
 	killAfterMs: 2000,
 	// Foreground bash streams its output while it runs.

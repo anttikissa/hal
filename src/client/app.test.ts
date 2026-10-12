@@ -191,7 +191,7 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	up()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	expect(appView.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
-	expect(appView.view().editing).toMatch(/editing/)
+	expect(appView.view().editing).toContain('[amending prompt]')
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
@@ -235,12 +235,12 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	up()
 	paused()
 	type('!')
-	// Changed: Down is no way out; Escape is, keeping the text typed.
+	// Changed: Down is no way out; Escape discards the edit.
 	down()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	escape()
 	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
-	expect(appView.view().prompt.text).toBe('fix ti!')
+	expect(appView.view().prompt.text).toBe('')
 	expect(appView.view().editing).toBeUndefined()
 })
 
@@ -786,8 +786,10 @@ test('a draft from elsewhere does not replace a recalled entry but is what Down 
 })
 
 test('the last prompt being edited is skipped by the first Up', () => {
-	working('one')
-	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'two', provider: 'anthropic' })
+	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, state: { type: 'running', phase: 'streaming' }, history: [
+		{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts: '' },
+		{ type: 'user', blocks: [{ type: 'text', text: 'two' }], n: 2, ts: '' },
+	] } })
 	up()
 	expect(appView.view().prompt.text).toBe('two')
 	up()
@@ -850,11 +852,11 @@ test('output in a tab not shown paints nothing', () => {
 })
 
 test('the status row sits below the prompt box and its numbers follow each turn end', () => {
-	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it' }, history: [], state: { type: 'idle' }, stats: { window: 200_000 } } })
+	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it', slots: 3 }, history: [], state: { type: 'idle' }, stats: { window: 200_000 } } })
 	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
-	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 b3 · 0/200k (0%)')
+	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 ⣄ · 0/200k (0%)')
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'go', provider: 'anthropic' })
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed', stats: { context: 50_000, window: 200_000 } })
 	expect(status()).toContain('50k/200k (25%)')
@@ -897,7 +899,7 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 		app.onEvent({ type: 'queue-hold', sessionId: 's1', message: 'q1' })
 		app.onEvent({ type: 'queue-edit', sessionId: 's1', edit: acquire.edit, message: 'q1', text: 'queued text' })
 		expect(app.state.prompt.text).toBe('queued text')
-		expect(appView.view().editing).toContain('queued message')
+		expect(appView.view().editing).toContain('waiting message')
 		app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'a separate draft', rev: 1 } })
 		expect(app.state.prompt.text).toBe('queued text')
 		type('!')

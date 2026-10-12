@@ -17,6 +17,7 @@
 // the marker as an undoable edit. The text stays the only state.
 
 import { createEffect, createMemo, createSignal, For, Show, onSettled } from 'solid-js'
+import { amend } from '../../common/amend.ts'
 import { queueEdit } from '../../common/queue-edit.ts'
 import { attachments } from '../../common/attachments.ts'
 import { states } from '../../common/states.ts'
@@ -295,6 +296,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
 			</div>
 			<div class="help">
+				<Show when={props.view.editing && !props.view.editing.aside && props.view.editing}>{(e) => <span style={{ color: 'var(--attention-fg)' }}>{amend.hint(e(), props.text).split(']')[0]}]</span>}</Show>
 				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
 						<span>

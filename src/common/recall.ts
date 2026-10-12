@@ -19,7 +19,7 @@ export type Shown = { text: string; cursor: number }
 
 // Human prompts sent to the session, oldest first.
 function entries(t: Transcript): string[] {
-	return t.items.flatMap((i) => (i.type === 'prompt' && i.from === undefined && i.origin !== 'model' ? [i.text] : []))
+	return t.items.flatMap((i) => (i.type === 'prompt' && !i.canceledReference && i.from === undefined && i.origin !== 'model' ? [i.text] : []))
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are

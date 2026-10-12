@@ -326,7 +326,8 @@ test('an edit after only reading replaces the prompt: the model sees it as if wr
 	await until(() => a.of('turn-end').length === 3)
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(shown(view.items.slice(3))).toEqual([
+	expect(view.items.some((i) => i.canceledReference && i.type === 'prompt' && i.text === 'what did I ntoe?')).toBe(true)
+	expect(shown(view.items.slice(3).filter((i) => !i.canceledReference))).toEqual([
 		{ type: 'prompt', text: 'what did I note?' },
 		{ type: 'text', text: 'Milk.' },
 		{ type: 'turn-end', status: 'completed' },
@@ -383,7 +384,8 @@ test('an edit sent while the paused turn is still stopping waits for it to end',
 	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
 	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'user', 'assistant', 'turn_end'])
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
-	expect(shown(a.views.get(id)!.items)).toEqual([
+	expect(a.views.get(id)!.items.some((i) => i.canceledReference && i.type === 'text' && i.text === 'partial')).toBe(true)
+	expect(shown(a.views.get(id)!.items.filter((i) => !i.canceledReference))).toEqual([
 		{ type: 'prompt', text: 'right' },
 		{ type: 'text', text: 'ok' },
 		{ type: 'turn-end', status: 'completed' },
@@ -475,7 +477,7 @@ test('an edit of a delivered steering message replaces it when only reading happ
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.views.get(id)!.state.type === 'idle')
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map((i: any) => i.text)).toEqual(['look', 'and hurry'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt' && !i.canceledReference).map((i: any) => i.text)).toEqual(['look', 'and hurry'])
 })
 
 test('a resend of an edit still waiting for its paused turn to stop acks without a second prompt', async () => {
@@ -498,7 +500,7 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	await until(() => a.views.get(id)!.state.type === 'idle')
 	expect(calls).toHaveLength(2)
 	expect((await records(id)).filter((r) => r.type === 'user')).toHaveLength(2)
-	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([{ type: 'prompt', text: 'right' }])
+	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt' && !i.canceledReference))).toEqual([{ type: 'prompt', text: 'right' }])
 })
 
 test('agent reports and soft steering wait through a question and restart until the human replies', async () => {

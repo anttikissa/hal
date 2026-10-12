@@ -84,10 +84,7 @@ function rewind(id: string, n: number, text: string, command?: string): string |
 	if (!mine) return `#${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
 	let later = current.slice(at)
 	if (later.some((r) => r.type === 'compact' || r.type === 'reset')) return `#${n} is before the latest compaction or clear.`
-	let drop = later.flatMap((r) => (r.n === undefined || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' ? [] : [r.n]))
-	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop, edit: [] })
-	rebasePlans.broadcast(id, n)
-	return prompts.submit(id, text, command)
+	return prompts.amend(id, text, command, n)
 }
 
 function answer(c: Command & { type: 'rebase-apply' }): Event {

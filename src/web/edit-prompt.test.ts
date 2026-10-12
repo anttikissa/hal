@@ -68,7 +68,8 @@ test('sending the edit rewinds there, and the draft comes back; an emptied edit 
 	editPrompt.edit('1')
 	app.input('uno')
 	app.send()
-	expect(sent.filter((c) => c.type === 'submit')).toMatchObject([{ sessionId, text: 'uno', rewind: 1 }])
+	expect(sent.filter((c) => c.type === 'submit')).toMatchObject([{ sessionId, text: 'uno' }])
+	expect(sent.find((c) => c.type === 'submit').rewind).toBeUndefined()
 	expect(app.state.text).toBe('my draft')
 	// Idle at the start: nothing was paused, so nothing continues.
 	editPrompt.edit('5')

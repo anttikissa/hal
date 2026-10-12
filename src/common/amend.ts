@@ -23,9 +23,9 @@ import type { Item, Transcript } from './transcript.ts'
 // it only then); and for an earlier prompt, `rewind`, its record
 // number, `later`, how many messages follow it, and `changed`, whether
 // tools with side effects ran since.
-export type Editing = { sessionId: string; original: string; inbox?: string; aside?: true; paused?: boolean; rewind?: number; later?: number; changed?: boolean; queueEdit?: string }
+export type Editing = { sessionId: string; original: string; target?: string; inbox?: string; aside?: true; paused?: boolean; rewind?: number; later?: number; changed?: boolean; queueEdit?: string }
 
-const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' && i.from === undefined && i.origin !== 'model'
+const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' && !i.canceledReference && i.from === undefined && i.origin !== 'model'
 
 // Keys of the prompts the human sent since the latest compaction (a
 // clear leaves no items before it): each has an Edit button. A record
@@ -49,9 +49,9 @@ function at(t: Transcript, key: string): { editing: Editing; command?: unknown }
 	if (!item || !mine(item) || !amend.editable(t.items).has(key)) return undefined
 	let sessionId = t.meta.id
 	let command = states.busy(t.state) ? { type: 'pause', sessionId } : undefined
-	let editing: Editing = { sessionId, original: item.text, aside: true, paused: !!command }
+	let editing: Editing = { sessionId, original: item.text, target: key, aside: true, paused: !!command }
 	let after = t.items.slice(i + 1)
-	editing.changed = after.some((x) => x.type === 'tool' && !toolDetails.readOnly.has(x.name))
+	editing.changed = after.some((x) => !x.canceledReference && x.type === 'tool' && !toolDetails.harmless(x.name, x.input))
 	if (t.items.findLast(mine) !== item) {
 		editing.rewind = Number(key)
 		editing.later = after.filter((x) => !['turn-end', 'divider', 'tool-result', 'image'].includes(x.type)).length
@@ -80,16 +80,19 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
 	if (waiting) return { editing: { sessionId, original: waiting.text, inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined
-	let last = t.items.findLast((i) => i.type === 'prompt' && i.from === undefined && i.origin !== 'model')
-	if (last?.type !== 'prompt') return undefined
-	return { editing: { sessionId, original: last.text }, command: { type: 'pause', sessionId } }
+	let last = t.items.findLast(mine)
+	if (!last) return undefined
+	let changed = t.items.slice(t.items.indexOf(last) + 1).some((i) => !i.canceledReference && i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
+	return { editing: { sessionId, original: last.text, target: last.key, changed, paused: true }, command: { type: 'pause', sessionId } }
 }
 
 // Enter while editing. Alt-Enter (`queue`) and an emptied editor act as
 // they do anywhere: queue a new message, or continue.
 function enter(editing: Editing, t: Transcript | undefined, text: string, queue = false): unknown {
 	if (editing.queueEdit) return undefined
+	if (!queue && text === editing.original) return resume(editing, t)
 	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
+	if (editing.changed) return { type: 'submit', sessionId: editing.sessionId, text }
 	if (editing.rewind !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, rewind: editing.rewind }
 	let command = { type: 'submit', sessionId: editing.sessionId, text, amend: true }
 	return editing.inbox === undefined ? command : { ...command, edits: editing.inbox }
@@ -108,15 +111,28 @@ function resume(editing: Editing, t: Transcript | undefined): unknown {
 // prompt is replaced only if nothing with side effects ran since
 // (prompts.amend on the host).
 function bar(editing: Editing): string {
-	if (editing.queueEdit) return 'Editing queued message · Saving keeps its place in the queue'
-	if (editing.rewind === undefined) return editing.changed ? 'Editing the last prompt · files changed since, so sending adds it as a new prompt' : 'Editing the last prompt · sending replaces it'
-	let k = editing.later ?? 0
-	let text = `Editing prompt #${editing.rewind} · sending rewinds here: ${k} later message${k === 1 ? '' : 's'} leave${k === 1 ? 's' : ''} the context`
-	return editing.changed ? `${text} · files changed since stay as they are` : text
+	return amend.hint(editing).split(']')[0] + ']'
 }
 
 export const amend = {
-	hint: (editing?: Editing) => (editing?.queueEdit ? 'editing queued message: Enter saves, Down unchanged or Escape cancels' : editing?.inbox === undefined || editing.paused ? 'editing the last prompt: Enter sends it, Down or Escape continues' : 'editing a waiting message: Enter replaces it, Down or Escape keeps it'),
+	hint: (editing?: Editing, text = editing?.original) => {
+		if (!editing) return ''
+		let waiting = !!editing.queueEdit || (editing.inbox !== undefined && !editing.paused)
+		let changed = text !== editing.original
+		let label = waiting ? 'editing waiting message' : editing.changed ? 'editing prompt' : 'amending prompt'
+		if (editing.rewind !== undefined) label += ` #${editing.rewind}`
+		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : 'amend'}, ` : ''
+		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'discard' : 'continue'}`
+	},
+	step(editing: Editing, t: Transcript, dir: -1 | 1) {
+		if (editing.queueEdit) return undefined
+		let keys = editable(t.items)
+		let list = t.items.filter((i) => mine(i) && keys.has(i.key))
+		let atIndex = list.findIndex((i) => i.key === editing.target)
+		let item = list[(atIndex < 0 ? list.length : atIndex) + dir]
+		let begun = item && at(t, item.key)
+		return begun && { ...begun.editing, aside: editing.aside, paused: editing.paused, inbox: undefined }
+	},
 	editable,
 	at,
 	bar,

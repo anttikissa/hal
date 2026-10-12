@@ -55,7 +55,7 @@ function disclose(id: string, start: Fold, keys: string[], fallback: Fold): void
 // The states of `t`'s cards, as the shared rules see them; one per use.
 function at(t: Transcript): (item: Item) => Fold {
 	let start = toggle.starts(t)
-	return (item) => folds.level(`${t.meta.id}#${item.key}`, start(item))
+	return (item) => folds.level(`${t.meta.id}#${item.key}${item.canceledReference ? ':canceled' : ''}`, start(item))
 }
 
 // Applies `mode` with `args` to the cards of the session shown, as
@@ -69,11 +69,12 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	scroll.follow(() => {
 		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
+			let id = `${t.meta.id}#${item.key}${item.canceledReference ? ':canceled' : ''}`
 			let current = at(item)
-			if (current !== 'short') opened.set(`${t.meta.id}#${item.key}`, current)
+			if (current !== 'short') opened.set(id, current)
 			let next = toggle.step(item, current, p.open, false)
-			setRaw((s) => toggled(s, `${t.meta.id}#${item.key}`, next === 'inline'))
-			folds.set(`${t.meta.id}#${item.key}`, next, result ? [item.key, result] : [item.key])
+			setRaw((s) => toggled(s, id, next === 'inline'))
+			folds.set(id, next, result ? [item.key, result] : [item.key])
 		}
 		flush()
 	})

@@ -22,9 +22,9 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let snap: Snapshot = { meta: { ...sessions.open(id), slots: sessions.open(id).slots ?? settings.subagentSlots() }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
 	if (pages.marks(id).rebase !== undefined) {
 		let c = pages.rebased(id)
-		c.display ??= { rewrites: rebaseDisplay.dividers(c.records), dropped: replay.current(c.records.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !c.current.has(r.n) ? [r.n] : []) }
-		snap.rewrites = c.display.rewrites
-		snap.dropped = c.display.dropped
+		c.display ??= { rewrites: rebaseDisplay.dividers(c.records), dropped: replay.current(c.records.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !c.shown.has(r.n) ? [r.n] : []) }
+		if (c.display.rewrites?.length) snap.rewrites = c.display.rewrites
+		if (c.display.dropped.length) snap.dropped = c.display.dropped
 	}
 	let hold = queueEdits.state.get(id)
 	if (hold) snap.queueHold = hold.message

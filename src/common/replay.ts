@@ -35,13 +35,13 @@ export type FileChange =
 // records may be written out of number order. Records of old histories
 // have no `n` on disk and get their byte offset + 1 when read (pages.ts),
 // which no later number reuses. Absent only in records built by hand.
-export type HistoryRecord = Numbered &
+export type HistoryRecord = Numbered & { canceledReference?: true } &
 	(
 	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; replaces?: true; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; replaces?: true; amends?: number; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
@@ -283,7 +283,8 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 	for (let r of records) {
 		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
 		if (r.type === 'user' && r.replaces) {
-			let at = replay.lastPrompt(out)
+			let target = r.amends
+			let at = target === undefined ? replay.lastPrompt(out) : out.findIndex((x) => x.n === target)
 			if (at >= 0) {
 				let delivered = new Set(out.slice(at).flatMap((x) => (x.type === 'user' ? (x.inbox ?? []) : [])))
 				out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]

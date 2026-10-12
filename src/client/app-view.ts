@@ -43,7 +43,7 @@ function view(): View {
 	let stopped = t && appView.why(t), notice = st.notice ?? (t && (queueEdit.notice(t) ?? inbox.heldNotice(t))) ?? versions.notice()
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
-	if (st.editing) v.editing = amend.hint(st.editing)
+	if (st.editing) v.editing = amend.hint(st.editing, st.prompt.text)
 	if (versions.state.newCode) v.newCode = true
 	let activity = t && appView.activity(t)
 	if (activity) v.activity = activity

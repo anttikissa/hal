@@ -153,21 +153,26 @@ function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { co
 // prompt: the view after, the command to send and the input's new text;
 // undefined if the key means nothing here.
 function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { view: ViewState; command?: unknown; text: string } | undefined {
+	let editing = st.editing
+	if (editing && key !== 'escape' && st.transcript) {
+		let next = amend.step(editing, st.transcript, key === 'up' ? -1 : 1)
+		if (next) return { view: { ...st, editing: next }, text: next.original }
+		if (key === 'up') return { view: st, text }
+	}
 	if (key === 'up') {
-		let begun = !st.editing && amend.begin(st.transcript, text)
+		let begun = !editing && amend.begin(st.transcript, text)
 		return begun ? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original } : undefined
 	}
-	let editing = st.editing
 	if (!editing || editing.aside || (key === 'down' && text !== editing.original)) return undefined
 	let command = amend.resume(editing, st.transcript)
-	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: text === editing.original ? '' : text }
+	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: '' }
 	if (command) out.command = command
 	return out
 }
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.transcript && (queueEdit.notice(st.transcript) ?? inbox.heldNotice(st.transcript))) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
+	return st.notice ?? (st.transcript && (queueEdit.notice(st.transcript) ?? inbox.heldNotice(st.transcript)))
 }
 
 // Tab in the message box with `text` (the caret at its end): the
@@ -224,7 +229,10 @@ function line(st: ViewState, connected: boolean): Line {
 // The web help row: the shared state hints (sendKeys.hints), or the
 // keys of the completion menu or a queue edit, which only the web has.
 function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
-	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift-enter', 'newline'], ['esc', 'cancel']]
+	if (st.editing) {
+		let hint = amend.hint(st.editing, text)
+		return hint.slice(hint.indexOf(']') + 2).split(', ').map((s) => s.split(': ') as [string, string])
+	}
 	if (!menu) return sendKeys.hints(st.transcript?.state, text)
 	let busy = !!st.transcript && states.busy(st.transcript.state)
 	let command = sendKeys.commandDraft(text)

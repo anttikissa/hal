@@ -104,7 +104,7 @@ function cancel(id: string): string | undefined {
 function save(id: string): string | undefined {
 	let e = queueEdit.current(id)
 	if (!queueEdit.ready(id) || !e) return 'The queued message is not open for editing yet. Wait a moment, then save.'
-	if (!e.text.trim()) return queueEdit.cancel(id)
+	if (!e.text.trim() || e.text === e.original) return queueEdit.cancel(id)
 	// Never clear the original draft or show a second optimistic queue row.
 	e.saving = connection.nextId()
 	drafts.save(id)

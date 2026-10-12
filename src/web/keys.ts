@@ -135,7 +135,9 @@ function key(e: KeyInput, target: Target): boolean {
 		if (waiting) return queuedPrompt.begin(waiting.id)
 	}
 	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original) return queuedPrompt.cancel()
-	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
+	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? !st.text.slice(0, target.cursor).includes('\n') : e.key === 'ArrowDown' ? !st.text.slice(target.cursor).includes('\n') : true)
+	if (plain && edge && e.key === 'ArrowDown' && st.view.editing?.aside && st.view.editing.rewind === undefined && st.text === st.view.editing.original) return editPrompt.leave()
+	let edit = plain && edge && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
 		st.view = edit.view
 		if (edit.command) connection.send(edit.command)

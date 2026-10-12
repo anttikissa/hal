@@ -1,0 +1,11 @@
+{
+	title: 'Amend prompts with clear hints and canceled references',
+	spec: 'Terminal and web use yellow [amending prompt] for sent prompts safe to replace; side effects use [editing prompt] and Enter sends as new. Enter is hinted only when text differs exactly from the original, with amend or send as new; unchanged Enter dismisses and continues without sending. Escape discards edits and continues only a turn paused by editing. Waiting and queued messages share [editing waiting message], save and back wording, preserving their delivery and queue locking. Up/Down at editor edge rows browse editable older prompts with identified target, respecting compaction boundaries; older safe amendment removes subsequent conversation from model context, never undoes files; side effects since target instead send as new. Harmless session commands including rename do not block amendment; host remains authoritative. Replaced prompt and subsequent output stay as canceled reference, initially closed, expandable with existing block controls, durable across reconnect and lazy history paging, excluded from model replay. Normal terminal and web behavior and accessibility remain intact. Regression tests exercise text equality, Escape discard, older-target safety, reference persistence and replay exclusion.',
+	status: 'done',
+	notes: [
+		'Canceled references reuse records already in the history file; only the display projection retains them. Active replay and session essentials exclude them. Older safe amendments store an amends record number rather than a destructive rebase, preserving lazy paging. Cached display and active maps remain separate; no timer, new dependency, or additional output copies on disk. Disclosure state resets when a card becomes canceled so old open states cannot keep it open.',
+		'Focused verification uncovered a stale app status assertion from r92 expecting b3 instead of the existing three-slot braille marker. The fixture now sets slots:3 explicitly and asserts the current marker. Full-suite unrelated failures are reported separately.'
+	],
+	needs: ['dg', '26q'],
+	foldInto: ['dg', '26q']
+}

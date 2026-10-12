@@ -9,6 +9,7 @@ import { prompt, type PromptState } from '../common/prompt.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { clipboard } from './clipboard.ts'
 import { recall } from '../common/recall.ts'
+import { promptLayout } from '../common/prompt-layout.ts'
 import type { Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
 
@@ -34,12 +35,10 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 		return true
 	}
 	let editing = st.editing
-	if (!editing || !(k.key === 'escape' || (k.key === 'down' && st.prompt.text === editing.original))) return false
+	if (!editing || !(k.key === 'escape' || (k.key === 'down' && editing.rewind === undefined && st.prompt.text === editing.original))) return false
 	st.editing = undefined
-	if (st.prompt.text === editing.original) {
-		st.prompt = prompt.cleared(st.prompt)
-		drafts.edit(id, '')
-	}
+	st.prompt = prompt.cleared(st.prompt)
+	drafts.edit(id, '')
 	let command = amend.resume(editing, st.transcript)
 	if (command) send(command)
 	return true
@@ -50,6 +49,18 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	let t = st.transcript
 	if (st.editing?.queueEdit || !plain(k) || !t || (k.key !== 'up' && k.key !== 'down')) return false
+	if (st.editing) {
+		let rows = promptLayout.rows(st.prompt.text, width)
+		let { row } = promptLayout.position(st.prompt.text, rows, st.prompt.cursor)
+		if (k.key === 'up' ? row > 0 : row < rows.length - 1) return false
+		let next = amend.step(st.editing, t, k.key === 'up' ? -1 : 1)
+		if (next) {
+			st.editing = next
+			st.prompt = { ...prompt.cleared(st.prompt), text: next.original, cursor: k.key === 'up' ? recall.topEnd(next.original, width) : next.original.length }
+			drafts.edit(t.meta.id, next.original)
+		}
+		return true
+	}
 	let id = t.meta.id
 	let { text, cursor } = st.prompt
 	let shown = recall.step(id, recall.entries(t), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))

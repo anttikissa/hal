@@ -95,6 +95,7 @@ function receipt(item: Shown): 0 | 1 | 2 {
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
 	if (item.type === 'prompt' && item.report && item.summary) label = `${label} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}`
+	if (label !== undefined && item.canceledReference) label += ' (canceled)'
 	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
 }
 

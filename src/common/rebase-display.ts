@@ -5,9 +5,10 @@ import type { Item } from './transcript.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 
 function current(raw: HistoryRecord[]): HistoryRecord[] {
-	if (!raw.some((r) => r.type === 'rebase')) return replay.current(raw)
-	let projected = replay.current(raw), byNumber = new Map(projected.map((r) => [r.n, r]))
-	return rebase.latest(raw).flatMap((r) => r.type === 'rebase' ? [r] : byNumber.has(r.n) ? [byNumber.get(r.n)!] : [])
+	let projected = replay.current(raw), active = new Set(projected), byNumber = new Map(projected.filter((r) => r.n !== undefined).map((r) => [r.n, r]))
+	let candidates: HistoryRecord[] = raw.filter((r) => r.type !== 'rebase')
+	for (let r of rebase.latest(raw)) if (r.type === 'rebase') candidates = rebase.apply(candidates, r)
+	return [...candidates.map((r) => active.has(r) ? r : byNumber.get(r.n) ?? { ...r, canceledReference: true as const }), ...rebase.latest(raw).filter((r) => r.type === 'rebase')]
 }
 
 function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): string {

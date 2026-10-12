@@ -15,7 +15,7 @@ import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
 // An item as shown; Item adds its key.
-export type Shown = { originSession?: string } & (
+export type Shown = { originSession?: string; canceledReference?: true } & (
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
 	| ({ type: 'prompt'; text: string; waiting?: true; ts?: string } & Sender)
@@ -146,7 +146,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 	let items = r.type === 'assistant'
 		? transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts], interrupted: r.interrupted })
 		: transcript.keyed(transcript.recordShown(r), r.n, at)
-	return r.originSession === undefined ? items : items.map((item) => ({ ...item, originSession: r.originSession }))
+	return items.map((item) => ({ ...item, ...(r.originSession === undefined ? {} : { originSession: r.originSession }), ...(r.canceledReference ? { canceledReference: true as const } : {}) }))
 }
 function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'rate_limit') return [{ type: 'output', text: r.text, ts: r.ts }]
@@ -212,7 +212,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (cleared >= 0) history = history.slice(cleared)
 	let early = cleared >= 0 ? [] : transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	for (let r of [...early, ...history]) {
-		if (replay.isPrompt(r)) prompt = items.length
+		if (!r.canceledReference && replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
 		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history), ts: r.ts }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
@@ -383,7 +383,8 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 // After `items`, a prompt event's texts; an edit (`replaces`) takes
 // the place of the last prompt and everything after it.
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
-	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
+	let at = event.amends === undefined ? t.prompt : items.findIndex((i) => i.key === String(event.amends))
+	let keep = event.replaces && at !== undefined && at >= 0 ? items.map((i, index) => index < at || (i.type === 'output' && (i.change !== undefined || i.synthetic)) ? i : { ...i, canceledReference: true as const }) : items
 	let { live: _live, ...rest } = t
 	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }

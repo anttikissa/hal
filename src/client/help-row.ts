@@ -53,7 +53,10 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	let h = colors.help()
 	let line = (text: string, fg = h.description!) => ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
 	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
-	if (v.editing) return line(v.editing, colors.warning().fg!)
+	if (v.editing) {
+		let parts = /^(\[[^\]]+\]) (.*)$/.exec(v.editing)
+		return parts ? line(`${ansi.sgr({ fg: colors.warning().fg! })}${parts[1]} ${helpRow.paint(parts[2]!.split(', ').map((s) => s.split(': ') as Hint))}`) : line(v.editing, colors.warning().fg!)
+	}
 	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
 	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]

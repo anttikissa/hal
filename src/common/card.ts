@@ -61,6 +61,7 @@ function failed(result: { output: string; isError?: boolean; interrupted?: 'canc
 // How `item` starts. A message queued for the turn end is its queue
 // card's one row.
 function initial(item: Shown, blocks?: SessionMeta['blocks'], failed = false): Fold {
+	if (item.canceledReference && card.toggles(item)) return 'short'
 	if (item.type === 'prompt' && item.waiting && item.delivery === 'after-turn') return 'short'
 	let k = card.kind(item, failed)
 	return k ? card.verbosity(k, blocks) : 'long'

@@ -57,6 +57,15 @@ test('blocks start as the session sets their kind, over the settings; a failed c
 	expect(failed.map((i) => at(i))).toEqual(['glimpse', 'long', 'long', 'glimpse', 'glimpse', 'long'])
 })
 
+test('canceled prompt and output start closed and remain expandable', () => {
+	let canceled = items.slice(0, 3).map((i) => ({ ...i, canceledReference: true as const }))
+	let at = toggle.starts({ items: canceled, meta: { blocks: { prompt: 'long', thinking: 'long', text: 'long' } } as SessionMeta })
+	expect(canceled.map(at)).toEqual(['short', 'short', 'short'])
+	let plan = toggle.plan('expand', canceled, 'ura10-12', at)
+	expect(typeof plan).not.toBe('string')
+	if (typeof plan !== 'string') expect(plan.items).toHaveLength(3)
+})
+
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)

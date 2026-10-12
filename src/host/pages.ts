@@ -17,6 +17,7 @@
 import { closeSync, existsSync, openSync, readSync as readFd, statSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import type { Snapshot } from '../common/protocol.ts'
+import { rebaseDisplay } from '../common/rebase-display.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { changedFiles } from './changed-files.ts'
 import { history } from './history.ts'
@@ -36,7 +37,7 @@ export type Tail = { history: HistoryRecord[]; earlier: HistoryRecord[]; older?:
 type Steps<T> = Generator<number, T, void>
 // `scanned`: bytes whose line offsets are known; `size`: what `list` covers.
 // `display`: snapshots.build's rewrites and dropped, for the same size.
-type Rebased = { scanned: number; offsets: number[]; size: number; records: HistoryRecord[]; list: HistoryRecord[]; current: Map<number | undefined, HistoryRecord>; display?: { rewrites: Snapshot['rewrites']; dropped: number[] } }
+type Rebased = { scanned: number; offsets: number[]; size: number; records: HistoryRecord[]; list: HistoryRecord[]; shown: Map<number | undefined, HistoryRecord>; current: Map<number | undefined, HistoryRecord>; display?: { rewrites: Snapshot['rewrites']; dropped: number[] } }
 
 const NL = 10
 
@@ -105,7 +106,7 @@ function lineAt(path: string, offset: number): Line {
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
-	if (r.type === 'rebase') m.rebase = offset
+	if (r.type === 'rebase' || (r.type === 'user' && r.replaces)) m.rebase = offset
 	if (r.type === 'output' && r.transition) m.transitions = [offset]
 	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
 	if (r.type === 'output' && r.transitionDone) m.transitions = []
@@ -224,7 +225,7 @@ function* markedSteps(id: string): Steps<Line[]> {
 // alone, states.fromHistory, inbox.pending and forms.open answer as
 // they would from the whole history.
 function essentials(id: string): HistoryRecord[] {
-	if (pages.marks(id).rebase !== undefined) return pages.rebased(id).list
+	if (pages.marks(id).rebase !== undefined) return [...pages.rebased(id).current.values()]
 	return pages.marked(id).map((l) => l.record)
 }
 
@@ -237,14 +238,15 @@ function rebased(id: string): Rebased {
 	let records = history.readSync(id)
 	for (let key of pages.state.rebased.keys()) if (!history.state.cache.has(key)) pages.state.rebased.delete(key)
 	let c = pages.state.rebased.get(id)
-	if (!c || c.scanned > size) c = { scanned: 0, offsets: [], size: -1, records: [], list: [], current: new Map() }
+	if (!c || c.scanned > size) c = { scanned: 0, offsets: [], size: -1, records: [], list: [], shown: new Map(), current: new Map() }
 	let buf = pages.readBytes(path, c.scanned, size), at = 0
 	for (let nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1) if (buf.subarray(at, nl).some((b) => b > 32)) c.offsets.push(c.scanned + at)
 	c.scanned += at
 	if (c.size !== c.scanned) {
 		c.records = records.slice(0, c.offsets.length)
-		c.list = replay.current(c.records)
-		c.current = new Map(c.list.map((r) => [r.n, r]))
+		c.list = rebaseDisplay.current(c.records)
+		c.shown = new Map(c.list.map((r) => [r.n, r]))
+		c.current = new Map(replay.current(c.records).map((r) => [r.n, r]))
 		c.size = c.scanned
 		c.display = undefined
 	}
@@ -270,7 +272,7 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL)) throw new Error(`${path}: ${before} is not a record boundary`)
 	// Rebase undo and cross-page groups need the audit trail.
 	if (pages.marks(id).rebase !== undefined) {
-		let { records, offsets, current } = pages.rebased(id)
+		let { records, offsets, shown: current } = pages.rebased(id)
 		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && l.record.type !== 'rebase' && current.has(l.record.n))
 		let at = found.findIndex((l) => l.offset >= end - budget)
 		if (at < 0) at = Math.max(0, found.length - 1)

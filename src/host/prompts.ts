@@ -134,10 +134,10 @@ function senders(list: UserBlock[]): Sender[] {
 // like any other. The edit is of the human's last text in the prompt:
 // the other texts it delivered from the inbox stay. A prompt with no
 // text of the human's is not theirs to edit: the edit goes on top.
-function amend(id: string, text: string, command?: string): string | undefined {
+function amend(id: string, text: string, command?: string, target?: number): string | undefined {
 	autoclose.promote(id)
-	let records = history.readSync(id)
-	let at = replay.lastPrompt(records)
+	let records = replay.current(history.readSync(id))
+	let at = target === undefined ? replay.lastPrompt(records) : records.findIndex((r) => r.n === target)
 	let old = records[at]
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
 	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
@@ -147,7 +147,7 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	parts[mine] = { type: 'text', text }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)
-	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true }
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true, ...(target === undefined ? {} : { amends: target }) }
 	if (command !== undefined) record.command = command
 	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
 	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))
@@ -178,7 +178,7 @@ function edit(id: string, message: string, text: string, command?: string, held 
 // Whether the records after a prompt leave the world as it was: no
 // tool call except read-only ones (tools.readOnly).
 function harmless(records: HistoryRecord[]): boolean {
-	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name))
+	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name, r.block.input))
 }
 
 // Records inbox messages (and a new prompt `extra`) as one prompt, its
@@ -219,6 +219,7 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 	let shown = prompts.images(record.blocks)
 	if (shown.length) event.images = shown
 	if (record.replaces) event.replaces = true
+	if (record.amends !== undefined) event.amends = record.amends
 	if (record.n !== undefined) event.n = record.n
 	if (record.command !== undefined) event.command = record.command
 	if (record.inbox?.length) event.inbox = record.inbox

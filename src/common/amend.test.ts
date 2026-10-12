@@ -18,8 +18,8 @@ function session(state: SessionState, prompts: string[][] = [['hi'], ['fix ti']]
 const running: SessionState = { type: 'running', phase: 'streaming' }
 
 test('Up on an empty prompt while the model works pauses it and edits the last prompt', () => {
-	for (let state of [running, { type: 'retrying', at: ts, reason: 'x' }, { type: 'blocked', reason: 'log in' }] as SessionState[]) {
-		expect(amend.begin(session(state), '')).toEqual({ editing: { sessionId: 's1', original: 'fix ti' }, command: { type: 'pause', sessionId: 's1' } })
+	for (let state of [running, { type: 'blocked', reason: 'question' }] as SessionState[]) {
+		expect(amend.begin(session(state), '')).toMatchObject({ editing: { sessionId: 's1', original: 'fix ti', paused: true }, command: { type: 'pause', sessionId: 's1' } })
 	}
 	// The last text the user sent, not a steering message delivered before it.
 	expect(amend.begin(session(running, [['steer', 'typed']]), '')?.editing.original).toBe('typed')
@@ -35,6 +35,10 @@ test('Enter sends the edit for the host to place; an emptied edit just continues
 	let paused = session({ type: 'paused' })
 	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
 	expect(amend.enter(editing, paused, '  ')).toEqual({ type: 'continue', sessionId: 's1' })
+	expect(amend.enter(editing, paused, 'fix ti')).toEqual({ type: 'continue', sessionId: 's1' })
+	expect(amend.hint(editing, 'fix ti')).not.toContain('enter:')
+	expect(amend.hint(editing, 'fix it')).toContain('enter: amend')
+	expect(amend.hint({ ...editing, changed: true }, 'fix it')).toContain('enter: send as new')
 	// Alt-Enter queues it as a new message instead.
 	expect(amend.enter(editing, paused, 'later', true)).toEqual({ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' })
 })
@@ -76,5 +80,27 @@ test('Up never recalls what another session sent', () => {
 	let peer = { ...t, inbox: [{ id: 'm1', text: 'mine' }, { id: 'm2', text: 'theirs', from: 's9' }] }
 	expect(amend.begin(peer, '')?.editing).toEqual({ sessionId: 's1', original: 'mine', inbox: 'm1' })
 	let delivered = { ...t, items: [...t.items, { type: 'prompt' as const, text: 'theirs', from: 's9', key: 'x' }], inbox: [{ id: 'm2', text: 'theirs', from: 's9' }] }
-	expect(amend.begin(delivered, '')?.editing).toEqual({ sessionId: 's1', original: 'fix ti' })
+	expect(amend.begin(delivered, '')?.editing).toMatchObject({ sessionId: 's1', original: 'fix ti' })
+})
+
+test('unchanged edits continue without sending, and older targets respect side effects', () => {
+	let t = transcript.fromSnapshot({ meta, state: { type: 'paused' }, history: [
+		{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts },
+		{ type: 'assistant', block: { type: 'text', text: 'answer' }, n: 2, ts },
+		{ type: 'user', blocks: [{ type: 'text', text: 'two' }], n: 3, ts },
+	] })
+	let last = { ...amend.at(t, '3')!.editing, paused: true }
+	expect(amend.enter(last, t, 'two')).toEqual({ type: 'continue', sessionId: 's1' })
+	expect(amend.hint(last, 'two')).not.toContain('enter:')
+	expect(amend.hint(last, 'twoa')).toContain('enter: amend')
+	let earlier = amend.step(last, t, -1)!
+	expect(earlier.rewind).toBe(1)
+	expect(amend.enter(earlier, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: 'uno', rewind: 1 })
+	expect(amend.step(earlier, t, 1)?.original).toBe('two')
+	t.items.push({ type: 'tool', key: '4', id: 't1', name: 'command', input: { command: '/rename Title' } })
+	expect(amend.at(t, '1')!.editing.changed).toBe(false)
+	t.items.push({ type: 'tool', key: '5', id: 't2', name: 'write', input: { path: 'x' } })
+	let changed = amend.at(t, '1')!.editing
+	expect(amend.enter(changed, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: 'uno' })
+	expect(amend.hint(changed, 'uno')).toContain('enter: send as new')
 })

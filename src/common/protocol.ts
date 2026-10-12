@@ -251,7 +251,7 @@ export type Event =
 	// that takes the place of the last prompt and everything after it.
 	// `senders`: who sent each text ({} the human), when not all the human.
 	// `command`: as in turn-start, for the last text.
-	| { type: 'prompt'; inbox?: string[]; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string; ts?: string }
+	| { type: 'prompt'; inbox?: string[]; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; amends?: number; n?: number; command?: string; ts?: string }
 	// `ts`: when the block it streams into started (task hp).
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string; model?: string; effort?: string }
 	// A canceled partial text block, durable before broadcast (task 6eq).
