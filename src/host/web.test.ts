@@ -2144,7 +2144,7 @@ browserTest('composer history skips agents and remains navigable after native de
 
 browserTest('background completion prompts have working collapse controls at phone and desktop widths', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	history.append(id, { type: 'user', label: 'bash #t1', blocks: [{ type: 'text', text: 'Background command finished\noutput to inspect' }] })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', label: 'bash #t1', from: id, advisory: true, text: 'Background command finished\noutput to inspect' }] })
 	let b = await browser()
 	try {
 		await server.serve(); web.start()

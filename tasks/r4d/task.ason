@@ -5,7 +5,8 @@
 	notes: [
 		'Assistant text and user prompts fold on the web only once /toggle closes them (folds.closed); a click reopens them. Prompts toggle open/closed only: on the web pastes are already links to their page, so there is no inline state. Typed /toggle and Ctrl-O run in the page, unrecorded, as in the terminal. Card fold state moved to src/web/folds.ts.',
 		'2026-10-12: background completion was a plain prompt with no mark control while open; toggle rejected non-folding open prompts. Expose timestamp mark with aria-expanded and allow that explicit control through the guard. Prose selection and links retain their behavior.',
-		'Verification: the previous long-tool selection/browser test passed once, then failed with AbortError from Promise.all(animation.finished), not a behavior assertion. Removed that flaky test per project rules, without retry or timeout changes. A separate background-completion prompt test covers the newly added explicit collapse control at phone and desktop widths.'
+		'Verification: the previous long-tool selection/browser test passed once, then failed with AbortError from Promise.all(animation.finished), not a behavior assertion. Removed that flaky test per project rules, without retry or timeout changes. A separate background-completion prompt test covers the newly added explicit collapse control at phone and desktop widths.',
+		'Final verification: background completion fixture puts from/label/advisory on UserText, matching real job completions; its phone/desktop collapse check passes. Four scroll unit tests, Send compatibility-click regression, pinned-growth and queued-reader browser checks, 27 terminal render tests, typecheck and changed-file lint passed. Device behavior remains to be confirmed on iPhone.'
 	],
 	needs: ['ghs'],
 	foldInto: ['4s']
