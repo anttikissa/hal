@@ -27,7 +27,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 	let prefix = titles.stamp(item.ts, '')
 	let hw = look.headerWidth ?? width
 	if (toolDetails.fullCommand(item.name, item.input)) {
-		if (fold === 'short') return [strings.clipVisual(prefix + ansi.clean(String(command)), hw)]
+		if (fold === 'short') return [strings.expandTabs(strings.clipVisual(prefix + ansi.clean(String(command)), hw))]
 		return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
 	}
 	let title = ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)
@@ -42,7 +42,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 	// Short: running, its latest output line follows the title.
 	if (fold === 'short') {
 		let last = item.partial?.split('\n').findLast((l) => l.trim())
-		return [last ? toolView.unsafe(strings.clipVisual(`${prefix}${title}  ${ansi.quiet(ansi.clean(last.trim()), itemView.itemStyle(item))}`, hw), item, hw) : head]
+		return [last ? toolView.unsafe(strings.expandTabs(strings.clipVisual(`${prefix}${title}  ${ansi.quiet(ansi.clean(last.trim()), itemView.itemStyle(item))}`, hw)), item, hw) : head]
 	}
 	// Running output is laid out as its result glimpse will be (a blank
 	// row, then the glimpse rows), so the card keeps its height when the
