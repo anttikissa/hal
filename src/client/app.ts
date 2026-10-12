@@ -259,6 +259,13 @@ function onKeys(events: KeyEvent[]): void {
 			continue
 		}
 		delete st.choices
+		// Typing snaps the terminal to the bottom, so blocks held tall
+		// (task fn) may shrink now without a jolt.
+		if (frame.state.padded) {
+			frame.state.peaks.clear()
+			frame.state.history = undefined
+			frame.state.padded = false
+		}
 		// Tab and command keys, whatever has the keys.
 		if (app.tabKey(k) || clientCommands.key(k)) continue
 		if (st.modal) {

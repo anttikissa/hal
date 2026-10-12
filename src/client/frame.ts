@@ -280,7 +280,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			}
 			look = frame.look(item, look)
 			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)
+			let natural = rows.length
 			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
+			if (rows.length > natural) frame.state.padded = true
 			// An attached result's padding row replaces its call's bottom one.
 			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
 			else if (rows.length && lines.length && look.gap !== false) lines.push('')
@@ -289,7 +291,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (item.type === 'tool') card = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
 			if (card && (item.type === 'tool' || item.type === 'tool-result') && item.id === card.id && !(next?.type === 'tool-result' && next.id === card.id)) {
+				let natural = lines.length
 				water.card(frame.state.peaks, lines, card.start, `${cols} ${session} call ${card.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)
+				if (lines.length > natural) frame.state.padded = true
 				card = undefined
 			}
 			if (ticks) {
@@ -399,6 +403,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 
 // `history`: the last frame's transcript rows (lines), where each of its
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
+// `padded`: some block is drawn taller than it is (water.ts).
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, ref, queuedRows, order: batchOrder.order, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, ref, queuedRows, order: batchOrder.order, promptWidth }
