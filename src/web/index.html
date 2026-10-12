@@ -204,6 +204,15 @@ html.typing .App { position: absolute; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
 .CardHeader .cursor { vertical-align: top; }
+/* Task hyt: a live block's elapsed time and spinner, one cell kept for it; a glimpse clamps the text (while streaming, its last rows). */
+.CardHeader .ticker { display: flex; gap: 0.5ch; padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
+.CardHeader .spinner { display: inline-block; width: 1ch; }
+.CardHeader .spinner.on::after { content: '⠁'; animation: spin 2s steps(1, end) infinite; }
+@keyframes spin { 0% { content: '⠁'; } 12.5% { content: '⠈'; } 25% { content: '⠐'; } 37.5% { content: '⠠'; } 50% { content: '⢀'; } 62.5% { content: '⡀'; } 75% { content: '⠄'; } 87.5% { content: '⠂'; } }
+.CardHeader .latest { margin-left: 1ch; color: var(--quiet); }
+.Card.glimpse .content { max-height: calc(var(--glimpse) * 1lh); overflow: hidden; }
+.Card.glimpse.streaming .content { display: flex; flex-direction: column; justify-content: flex-end; }
+@media (prefers-reduced-motion: reduce) { .CardHeader .spinner.on::after { animation: none; content: '·'; } }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
    table too wide scrolls sideways in its own box, and while more of it

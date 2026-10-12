@@ -1,0 +1,23 @@
+{
+	title: 'Block verbosity: short, glimpse, long; /blocks; spinner',
+	spec: `Every block that expands and collapses has one of three verbosity states, named the same in code, config.ason and commands: short (its title row alone), glimpse (its title row, then blockVerbosityGlimpseRows rows; done, the last row says '… N more lines' at its right) and long (everything). A prompt with pastes and a tool with a presentation add inline after long.
+
+Kinds and their config.ason defaults (common/settings.ts, flat keys so /config lists and sets them): blockVerbosityPrompt long (the user's prompts), blockVerbosityText long (replies), blockVerbosityThinking short, blockVerbosityTool short (tool calls with their results), blockVerbosityFailed glimpse (a call whose result is an error or whose bash exit is not 0, so the error shows), blockVerbosityMessage glimpse (another session's message or report, and send and spawn calls), blockVerbosityNotice short (background command reports, prompt-file change cards, Hal's own prompts); blockVerbosityGlimpseRows 3. A message queued for the turn end stays its one-row queue card. common/card.ts maps an item to its kind and start state.
+
+/blocks [kind state|kind default|reset] shows or changes the current session's overrides. They are session metadata (meta.blocks), validated on load, saved and synced to every client; a fork inherits them. A hal/tool session starts with tool long: its calls are what the user typed. A block's start state is the session's override, else the client's own setting (the terminal reads config.ason; the web reads it from the page it was served). Ctrl-O, /toggle, /expand, /collapse and a click on a web card act on top, per client: one named block steps short, glimpse, long (inline), short; /expand sets long and /collapse short; a group becomes long when more than half are not long, else short.
+
+Nothing jumps: a short or glimpse block keeps its height while it streams and when it ends. Short shows the end of streaming text on its one row (from a word start) and its start once done; glimpse shows the last rows while streaming and the first once done. A running tool's short row shows its latest output line after its title; its glimpse lays out running output as the result glimpse will be (task 4y4). A running web tool card keeps its state. Long blocks grow as text streams; only they have the Hal cursor. Thinking has a title row like replies ('15:41 Thinking', then its text); short thinking is the time and its text.
+
+Activity: a streaming thinking or reply block and a running tool call show, before the block id, their elapsed time from 1 s, '(12s)', and a one-cell spinner (frames ⠁⠈⠐⠠⢀⡀⠄⠂, one per pulse beat in the terminal, so no extra timer; a CSS animation on the web, a still dot under reduced motion). Thinking, reply and tool title rows always keep that cell, blank once done, so nothing shifts.
+
+Tool titles start with the tool as a word: 'Bash <purpose>'; headlines that start with their verb (Read, Edit, Write) keep it.
+
+The web follows the same states, defaults and overrides: a click on a card's header steps it; a glimpse clamps the text to the glimpse rows (bottom-aligned while streaming); a tool's glimpse is its result glimpse and show all/show less sets long or glimpse.`,
+	status: 'done',
+	notes: [
+		'Decisions taken without the user (session 172-ink): spinner frames are the dot orbit from the 172-jaw brainstorm; the terminal advances it on the existing 250 ms pulse, so a full orbit takes 2 s and no timer is added. Thinking in glimpse and long has its own title row (it used to flow from the time, task 77f) so the elapsed time and spinner have a fixed place. A nonzero bash exit counts as failed (wm0 notes: most print an error). send and spawn calls are messages. hal/tool sessions start with tool long. Queued one-row cards and whole-output commands (/help) step short and long only. The web glimpse clamps text with CSS and shows no count; running web tools no longer open after a second. No config-example.ason: /config lists every setting and documents what it writes (task tj2).',
+		'Terminal modules: tool calls and results moved from item-view.ts to tool-view.ts, and frame.ref became itemView.place, to keep both under 400 lines; block-view.ts holds glimpse, tail and spinner. card.initial needs the failed flag from the result, so start states come from toggle.starts (one scan per use) or, in frame.layout, from the next item. The web Card reads bash() inside a memo that runs at once: declare it before level() (a TDZ error halted Solid otherwise).'
+	],
+	needs: ['c5x', 'wm0', 'ghs', 'r4d', 'v8y', 'fn', 'pc'],
+	foldInto: ['c5x']
+}

@@ -15,6 +15,7 @@ function create(parent: string): string {
 	let child = sessions.create({ cwd: meta.cwd, model: models.qualified(meta.model, meta.effort) })
 	// Automatic, so the fork can name itself; fits the 60-character limit.
 	child.slots = meta.slots ?? settings.subagentSlots()
+	if (meta.blocks) child.blocks = { ...meta.blocks }
 	child.name = `${Array.from(meta.name ?? parent).slice(0, 53).join('').trimEnd()} (fork)`
 	liveFiles.save(child)
 	subagents.fork(parent, child.id)

@@ -81,7 +81,39 @@ const table: Setting[] = [
 		description: "Web pages record every message box event with its full state, draft text included, to this host's state/composer-debug.log, and show a debug badge.",
 		browser: true,
 	},
+	...verbosityRows(),
+	{
+		name: 'blockVerbosityGlimpseRows',
+		label: 'Glimpse rows',
+		type: { kind: 'integer', min: 1, max: 50 },
+		default: 3,
+		description: 'Rows of text a glimpse shows below its title row.',
+		browser: true,
+	},
 ]
+
+// How much of each kind of transcript block shows at first (task hyt):
+// short is the title row alone, glimpse adds blockVerbosityGlimpseRows
+// rows, long shows everything. /blocks overrides them per session.
+function verbosityRows(): Setting[] {
+	let kinds: [string, string, string, string][] = [
+		['Prompt', 'Prompt blocks', 'long', 'Your prompts'],
+		['Text', 'Reply blocks', 'long', "Hal's replies"],
+		['Thinking', 'Thinking blocks', 'short', "Hal's thinking"],
+		['Tool', 'Tool blocks', 'short', 'Tool calls and their output'],
+		['Failed', 'Failed tool blocks', 'glimpse', 'Tool calls that failed, so the error shows'],
+		['Message', 'Message blocks', 'glimpse', 'Messages between sessions, sent and received'],
+		['Notice', 'Notice blocks', 'short', "Hal's notices: background command reports, prompt-file changes"],
+	]
+	return kinds.map(([key, label, value, what]) => ({
+		name: `blockVerbosity${key}`,
+		label,
+		type: { kind: 'choice', options: ['short', 'glimpse', 'long'] },
+		default: value,
+		description: `${what}: short shows the title row, glimpse a few rows more, long everything. Ctrl-O steps one block; /blocks changes the current session.`,
+		browser: true,
+	}))
+}
 
 // Why `value` doesn't fit `type`, or undefined if it does.
 function problem(type: SettingType, value: unknown): string | undefined {
@@ -178,4 +210,5 @@ export const settings = {
 	push: (): boolean => settings.value('push') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
+	glimpseRows: (): number => settings.value('blockVerbosityGlimpseRows') as number,
 }

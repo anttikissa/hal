@@ -1,5 +1,5 @@
 // Which transcript blocks this terminal shows expanded or collapsed
-// (tasks ghs, v8y): /toggle, /expand and /collapse typed here and
+// (tasks ghs, v8y, hyt): /toggle, /expand and /collapse typed here and
 // Ctrl-O change them locally, unrecorded; a toggle event (the model's
 // command) changes them too. In memory only, per session: not stored,
 // not synced to other clients. Pastes shown inline are fetched from
@@ -22,9 +22,13 @@ function of(id: string): Map<string, Fold> {
 	return m
 }
 
-// Block `item`'s state in session `id`.
-function fold(id: string, item: Item): Fold {
-	return folds.of(id).get(item.key) ?? toggle.initial(item)
+// Session `id`'s block states: toggled ones, the rest as they start
+// (toggle.starts). Make one per use: it scans the transcript.
+function at(id: string): (item: Item) => Fold {
+	let t = folds.transcriptOf(id)
+	let start = t ? toggle.starts(t) : () => 'long' as Fold
+	let states = folds.of(id)
+	return (item) => states.get(item.key) ?? start(item)
 }
 
 // The transcript of session `id`, shown or kept for a hidden tab.
@@ -40,7 +44,7 @@ function run(id: string, args: string, mode: Mode = 'toggle'): string | undefine
 	if (!t) return undefined
 	let states = folds.of(id)
 	let items = toggle.items(t)
-	let done = toggle.apply(mode, states, items, args)
+	let done = toggle.apply(mode, states, items, args, toggle.starts(t))
 	if (typeof done === 'string') return done
 	// Pastes opened inline: their text comes from the host.
 	for (let key of done) {
@@ -71,7 +75,7 @@ function open(): void {
 	let t = app.state.transcript
 	if (!t) return
 	let id = t.meta.id
-	let at = (i: Item) => folds.fold(id, i)
+	let at = folds.at(id)
 	app.close()
 	app.open(blocksDialog.update(blocksDialog.open(), toggle.items(t), at), (action) => {
 		let error = folds.run(id, action.answers.target ?? '')
@@ -93,4 +97,4 @@ function event(e: Event & { type: 'toggle' | 'paste-text' }): void {
 	app.show()
 }
 
-export const folds = { state, of, fold, transcriptOf, run, typed, open, event }
+export const folds = { state, of, at, transcriptOf, run, typed, open, event }

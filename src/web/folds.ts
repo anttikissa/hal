@@ -1,10 +1,9 @@
-// Which web cards are open or closed (tasks w5, r4d, v8y): kept by session
-// and block key, not by the DOM, in memory only. Folding cards
-// (thinking, tools, another session's message) start closed and are
-// `opened`; assistant text and the user's prompts start open and are
-// `closed` (/toggle names them). /toggle, /expand and
-// /collapse typed here and Ctrl-O change cards locally and unrecorded,
-// as in the terminal (task ghs); the model's command arrives as an event.
+// How much of each web card shows (tasks w5, r4d, v8y, hyt): short,
+// glimpse or long, kept by session and block key, not by the DOM, in
+// memory only. A card starts as the session sets its kind
+// (card.initial); a click, /toggle, /expand, /collapse and Ctrl-O
+// change it locally and unrecorded, as in the terminal (task ghs); the
+// model's command arrives as an event.
 
 import { createSignal, flush, untrack } from 'solid-js'
 import type { ModalState } from '../common/modals.ts'
@@ -13,13 +12,12 @@ import { forms } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { toggle, type Fold, type Mode } from '../common/toggle.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
-import type { Item } from '../common/transcript.ts'
+import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
 import { scroll } from './scroll.ts'
 
-const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
+const [states, setStates] = createSignal<ReadonlyMap<string, Fold>>(new Map())
 const [raw, setRaw] = createSignal<ReadonlySet<string>>(new Set())
-const [closed, setClosed] = createSignal<ReadonlySet<string>>(new Set())
 
 function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
 	let next = new Set(set)
@@ -28,33 +26,28 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
 	return next
 }
 
-// Whether `item`'s card starts open and closes (text and the user's
-// prompts), rather than starting closed.
-function closable(item: Item): boolean {
-	return toggle.toggles(item) && toggle.initial(item) === 'open'
+// Card `id`'s (`<session>#<key>`) state, `start` until changed here.
+function level(id: string, start: Fold): Fold {
+	return states().get(id) ?? start
 }
 
-// Whether card `id` (`<session>#<key>`) of `item` shows open.
-function isOpen(id: string, item: Item): boolean {
-	return folds.closable(item) ? !closed().has(id) : opened().has(id)
-}
-
-// Opens or closes card `id`; closing the card the address names drops
-// the address's #block without a new history entry.
-// `closes`: the card starts open (a queued row's note never does).
-function set(id: string, item: Item, on: boolean, keys: string[] = [item.key], closes = folds.closable(item)): void {
+// Sets card `id`; collapsing the card the address names drops the
+// address's #block without a new history entry. `keys`: the blocks
+// the card shows (a call and its result).
+function set(id: string, fold: Fold, keys: string[]): void {
 	// The updater sees earlier sets of the same batch (/expand t*).
-	untrack(() => (closes ? setClosed((s) => toggled(s, id, !on)) : setOpened((s) => toggled(s, id, on))))
+	untrack(() => setStates((s) => new Map(s).set(id, fold)))
 	let hash = decodeURIComponent(location.hash.slice(1)).replace(/^[a-z](?=\d)/, '')
-	if (!on && hash && keys.includes(hash)) {
+	if (fold === 'short' && hash && keys.includes(hash)) {
 		history.replaceState(history.state, '', location.pathname + location.search)
 		app.aim()
 	}
 }
 
-// Card `item`'s state in session `sid`, as the shared rules see it.
-function fold(sid: string, item: Item): Fold {
-	return folds.isOpen(`${sid}#${item.key}`, item) ? raw().has(`${sid}#${item.key}`) ? 'inline' : 'open' : 'closed'
+// The states of `t`'s cards, as the shared rules see them; one per use.
+function at(t: Transcript): (item: Item) => Fold {
+	let start = toggle.starts(t)
+	return (item) => folds.level(`${t.meta.id}#${item.key}`, start(item))
 }
 
 // Applies `mode` with `args` to the cards of the session shown, as
@@ -62,7 +55,7 @@ function fold(sid: string, item: Item): Fold {
 function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	let t = app.state.view.transcript
 	if (!t) return undefined
-	let at = (i: Item) => folds.fold(t.meta.id, i)
+	let at = folds.at(t)
 	let p = toggle.plan(mode, toggle.items(t), args, at)
 	if (typeof p === 'string') return p
 	scroll.follow(() => {
@@ -70,7 +63,7 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
 			let next = toggle.step(item, at(item), p.open, false)
 			setRaw((s) => toggled(s, `${t.meta.id}#${item.key}`, next === 'inline'))
-			folds.set(`${t.meta.id}#${item.key}`, item, next !== 'closed', result ? [item.key, result] : [item.key])
+			folds.set(`${t.meta.id}#${item.key}`, next, result ? [item.key, result] : [item.key])
 		}
 		flush()
 	})
@@ -96,7 +89,7 @@ function onEvent(event: Event): boolean {
 // The dialog `m` with the hint for the session shown.
 function hinted(m: ModalState): ModalState {
 	let t = app.state.view.transcript
-	return t ? blocksDialog.update(m, toggle.items(t), (i) => folds.fold(t.meta.id, i), false) : m
+	return t ? blocksDialog.update(m, toggle.items(t), folds.at(t), false) : m
 }
 
 // Ctrl-O: the "Expand or collapse blocks" dialog (task v8y).
@@ -118,7 +111,7 @@ function key(k: Key, cursor?: number): void {
 	if (!m?.compact) return
 	if (k.key === 'tab') {
 		if (!t) return
-		let next = blocksDialog.complete(m, toggle.items(t), (i) => folds.fold(t.meta.id, i), cursor, false)
+		let next = blocksDialog.complete(m, toggle.items(t), folds.at(t), cursor, false)
 		app.setView({ ...app.state.view, modal: next })
 		// The caret stays after the completed id, not at the end.
 		let field = document.activeElement
@@ -131,4 +124,4 @@ function key(k: Key, cursor?: number): void {
 	if (error) app.setNotice(error)
 }
 
-export const folds = { raw, setRaw, opened, setOpened, closed, toggled, closable, isOpen, set, fold, run, typed, onEvent, hinted, open, input, key }
+export const folds = { raw, setRaw, toggled, level, set, at, run, typed, onEvent, hinted, open, input, key }

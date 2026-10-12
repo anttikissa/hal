@@ -82,6 +82,8 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 		meta.model = selection.id
 		if (selection.effort === undefined) delete meta.effort
 		else meta.effort = selection.effort
+		// hal/tool runs what the user types: its calls show whole (task hyt).
+		if (selection.id === 'hal/tool' && !meta.blocks?.tool) meta.blocks = { ...meta.blocks, tool: 'long' }
 	}
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed, previous })

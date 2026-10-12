@@ -2,7 +2,8 @@
 // The first row of every headed transcript card: time and label flow as
 // one paragraph, so a wrapped label continues at the left edge, under
 // the time, as in the terminal; actions and the block link stay right.
-// Tasks: 4v, hp, 77f, kx0.
+// `activity`: a live block's elapsed time and spinner, before the link
+// (task hyt). Tasks: 4v, hp, 77f, kx0, hyt.
 import { Show } from 'solid-js'
 import { bashResult } from '../../common/bash-result.ts'
 import { diff } from '../../common/diff.ts'
@@ -10,7 +11,7 @@ import type { JSX } from '@solidjs/web'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
+export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
 	let exit = () => props.result ? bashResult.failure(props.result, props.bash) : undefined
 	let rest = () => props.result && (bashResult.interrupted(props.result) ?? bashResult.duration(props.result.ms))
 	// An EDIT's counts and changed lines, as in the terminal.
@@ -29,6 +30,7 @@ export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.
 			{props.actions}
 			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class="exit">{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>
 			<Show when={stats()}>{(s) => <span class="status diff">(<Show when={s().added}><span class="add">+{s().added}</span></Show>{s().added && s().removed ? ' ' : ''}<Show when={s().removed}><span class="del">−{s().removed}</span></Show>, {s().lines}{rest() ? `, ${rest()}` : ''})</span>}</Show>
+			{props.activity}
 			{props.reference}
 		</header>
 	)

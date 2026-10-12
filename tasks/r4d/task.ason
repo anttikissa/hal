@@ -8,7 +8,8 @@
 		'Verification: the previous long-tool selection/browser test passed once, then failed with AbortError from Promise.all(animation.finished), not a behavior assertion. Removed that flaky test per project rules, without retry or timeout changes. A separate background-completion prompt test covers the newly added explicit collapse control at phone and desktop widths.',
 		'Final verification: background completion fixture puts from/label/advisory on UserText, matching real job completions; its phone/desktop collapse check passes. Four scroll unit tests, Send compatibility-click regression, pinned-growth and queued-reader browser checks, 27 terminal render tests, typecheck and changed-file lint passed. Device behavior remains to be confirmed on iPhone.',
 		'The phone log showed taps on the completion header label, which the initial timestamp-only fix still ignored. The regression now clicks the actual label at phone and desktop widths and checks that automatic completion reports do not carry a read checkmark.',
-		'Header-only fixes kept completions classified as open-by-default prompts and left output taps inert. The completion regression uses a real labeled advisory payload with 80 output lines and CDP touchStart/touchEnd at phone width, not only DOM click(), and tests default collapse plus opening and reclosing.'
+		'Header-only fixes kept completions classified as open-by-default prompts and left output taps inert. The completion regression uses a real labeled advisory payload with 80 output lines and CDP touchStart/touchEnd at phone width, not only DOM click(), and tests default collapse plus opening and reclosing.',
+		'Task hyt: web folds keep one Fold per card (short, glimpse, long) instead of opened/closed sets; a click steps it; running tools no longer open after a second.'
 	],
 	needs: ['ghs'],
 	foldInto: ['4s']

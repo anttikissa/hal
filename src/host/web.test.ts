@@ -553,6 +553,7 @@ async function launch() {
 	ws.onmessage = (m) => {
 		let msg = JSON.parse(String(m.data))
 		waiting.get(msg.id)?.(msg)
+		if (msg.method === 'Runtime.exceptionThrown') diagnostics.push(`[EXCEPTION] ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`)
 		if (msg.method !== 'Runtime.consoleAPICalled') return
 		let text = msg.params.args.map((a: any) => a.value ?? a.description ?? '').join(' ')
 		if (/^\[[A-Z][A-Z_]+\]/.test(text)) diagnostics.push(text)
@@ -1371,7 +1372,8 @@ browserTest('EDIT statistics preserve readable closed titles and full-width open
 				}
 				expect(rows[1].stats).toContain('120')
 			}
-			await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+			// From the glimpse through long back to short (task hyt).
+			for (let i = 0; i < 2; i++) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
 		}
 	} finally { await b.close() }
 }, 15000)
@@ -1838,7 +1840,7 @@ browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes 
 			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 			await b.waitFor(`document.querySelectorAll('.Card.folds').length >= 3`)
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'o', code: 'KeyO', windowsVirtualKeyCode: 79, modifiers: 2 })
-			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Expands tool block t${calls[2]}'`)
+			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Shows a glimpse of tool block t${calls[2]}'`)
 			let box = await b.evaluate(`(() => { let d = document.querySelector('.Picker.compact'), r = d.getBoundingClientRect(); return { left: r.left, right: r.right, height: r.height, fits: d.scrollHeight <= d.clientHeight && d.scrollWidth <= d.clientWidth, width: innerWidth } })()`)
 			expect(box.left).toBeGreaterThanOrEqual(0)
 			expect(box.right).toBeLessThanOrEqual(box.width)
@@ -1932,7 +1934,7 @@ browserTest('foreground and background Bash share header status without losing o
 		await b.waitFor(`document.querySelectorAll('.CardHeader > .status').length === 2`)
 		for (let width of [320, 1200]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 320 })
-			let headers = await b.evaluate(`Array.from(document.querySelectorAll('.CardHeader'), h => ({ status: h.querySelector(':scope > .status').textContent, beforeLink: h.querySelector(':scope > .status').nextElementSibling.matches('.link'), fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`)
+			let headers = await b.evaluate(`Array.from(document.querySelectorAll('.CardHeader'), h => ({ status: h.querySelector(':scope > .status').textContent, beforeLink: h.querySelector(':scope > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`)
 			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1)'])
 			expect(headers.every((h: any) => h.beforeLink && h.fits && h.exit === 'exit 1')).toBe(true)
 		}
@@ -1947,6 +1949,55 @@ browserTest('foreground and background Bash share header status without losing o
 	} finally { await b.close() }
 })
 
+
+browserTest('cards start as their kind sets, a click steps short, glimpse, long, and live headers keep a spinner cell (task hyt)', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let lines = Array.from({ length: 12 }, (_, i) => `row ${i + 1}`).join('\n')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Run the checks' }] })
+	history.append(id, { type: 'assistant', block: { type: 'thinking', text: `First thought\n${lines}` } })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'ok', name: 'bash', input: { description: 'Count rows', command: 'seq 12' } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'ok', output: `[exit 0]\n${lines}`, ms: 1200 }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'bad', name: 'bash', input: { description: 'Read missing', command: 'cat nope' } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'bad', output: '[exit 1]\ncat: nope: No such file', ms: 1100 }] })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'All done.' } })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.Card.tool').length === 2`)
+		let state = `Array.from(document.querySelectorAll('.Card.thinking, .Card.tool, .Card.assistant'), c => c.classList.contains('glimpse') ? 'glimpse' : c.classList.contains('open') || !c.classList.contains('folds') ? 'open' : 'short')`
+		// Thinking and a passing call short, the failed call open with its error, the reply whole.
+		expect(await b.evaluate(state)).toEqual(['short', 'short', 'open', 'open'])
+		expect(await b.evaluate(`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`)).toBe(4)
+		let shot = async (name: string) => {
+			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+			writeFileSync(`/tmp/hal-verbosity-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
+		}
+		await shot('start')
+		let steps: string[] = []
+		for (let i = 0; i < 3; i++) {
+			await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
+			steps.push((await b.evaluate(state))[0])
+			if (i === 0) await shot('thinking-glimpse')
+		}
+		expect(steps).toEqual(['glimpse', 'open', 'short'])
+		let height = `document.querySelector('.Card.thinking .content').getBoundingClientRect().height`
+		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
+		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+		let glimpse = await b.evaluate(height)
+		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
+		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+		expect(await b.evaluate(height)).toBeGreaterThan(glimpse)
+		// The passing call: a glimpse of its output, then all of it.
+		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('more lines')
+		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
+		await shot('steps')
+	} finally { await b.close() }
+}, 15000)
 
 browserTest('a touch on Send sends once, even when iOS withholds the click', async () => {
 	providerHome()
@@ -2164,6 +2215,9 @@ browserTest('background completion prompts have working collapse controls at pho
 			await tap('.Card.user .CardHeader .label')
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'true'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(false)
+			// A glimpse, then all of it, then collapsed again (task hyt).
+			await tap('.Card.user .content')
+			await b.waitFor(`!document.querySelector('.Card.user').classList.contains('glimpse')`)
 			await tap('.Card.user .content')
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'false'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(true)

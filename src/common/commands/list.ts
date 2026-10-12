@@ -18,6 +18,7 @@ const list: CommandInfo[] = [
 	{ name: 'account', description: 'switch this session to another login', category: 'session' },
 	{ name: 'autoclose', description: 'show or set automatic tab closure', category: 'session' },
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
+	{ name: 'blocks', description: 'show or set how blocks of a kind start: short, glimpse or long', category: 'session' },
 	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session' },

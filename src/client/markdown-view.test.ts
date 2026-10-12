@@ -87,7 +87,8 @@ describe('high-water mark', () => {
 describe('tool card high-water mark', () => {
 	afterEach(() => frame.state.peaks.clear())
 	let input = { command: 'seq 9', description: 'Count' }
-	let view = (items: any[], folds?: View['folds']): View => ({ transcript: { meta: { id: 'c', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items }, prompt: { text: '', cursor: 0 }, folds })
+	// Tool cards as a glimpse (task hyt): running output against the result glimpse.
+	let view = (items: any[], folds?: View['folds']): View => ({ transcript: { meta: { id: 'c', cwd: '/', model: 'm', createdAt: '', blocks: { tool: 'glimpse' } }, state: { type: 'idle' }, inbox: [], items }, prompt: { text: '', cursor: 0 }, folds })
 	let height = (v: View) => frame.build(v, 40).history
 	let output = '1\n2\n3\n4\n5\n6\n7\n8\n9\n'
 

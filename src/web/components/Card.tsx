@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
-// Tasks: w5, 6eq, 18n, kx0. One transcript row as a card in its theme colors (view.show). A
-// thinking or tool card (the call with its result) folds, closed at
-// first: its header is a button naming what is inside, and a click
-// anywhere on the card toggles it, except on a link or a click that
-// ends a text selection. Hidden contents are inert. The height
+// Tasks: w5, 6eq, 18n, kx0, hyt. One transcript row as a card in its theme colors (view.show). A
+// card starts short, as a glimpse or long, as the session starts its
+// kind (task hyt); folded, its header is a button naming what is
+// inside, and a click anywhere on the card steps it, except on a link
+// or a click that ends a text selection. Hidden contents are inert. The height
 // animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
 // the card streams, so Hal's cursor follows its last character (in the
 // header while a folding card is closed). Whether a card is open is
@@ -38,11 +38,9 @@ import { view, type Row } from '../view.ts'
 import { hrefs } from '../hrefs.ts'
 import { folds } from '../folds.ts'
 import { forms } from '../../common/forms.ts'
-import { toggle as blockToggle } from '../../common/toggle.ts'
-
-const { toggled } = folds
-// Tool cards showing their whole result, by the same key.
-const [whole, setWhole] = createSignal<ReadonlySet<string>>(new Set())
+import { toggle as blockToggle, type Fold } from '../../common/toggle.ts'
+import type { SessionMeta } from '../../common/session.ts'
+import { settings } from '../../common/settings.ts'
 
 // A new card fades in (--fade-ms, --ease-out from the page's CSS). A
 // script animation, not a CSS one: moving the card in the list, as when
@@ -71,41 +69,48 @@ const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv r
 // Tool cards' header icons, by tool name.
 const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', read_url: 'web', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
 
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean }) {
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
-	let open = () => folds.isOpen(id(), props.row.item)
+	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
+	// Short, glimpse or long (task hyt): as the session starts its kind,
+	// until a click, /toggle or Ctrl-O steps it; a call fails with its result.
+	let level = () => folds.level(id(), card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash())))
+	let open = () => level() !== 'short'
 	// The setters may run in an effect: they read the state as of the call.
-	let setOpen = (on: boolean) => untrack(() => folds.set(id(), props.row.item, on, [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
-	// Assistant text and the user's prompts start open; /toggle closes
-	// them (task r4d), and a closed one folds like thinking.
-	let closable = () => folds.closable(props.row.item)
+	let setLevel = (fold: Fold) => untrack(() => folds.set(id(), fold, [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
+	// Replies and the user's prompts read as plain cards until collapsed
+	// (task r4d); a collapsed one folds like thinking.
+	let closable = () => ['prompt', 'text'].includes(card.kind(props.row.item) ?? '')
 	let expanded = open
-	// A tool still streaming after a second opens and stays open (task
-	// a5): opening at once and closing on the result made quick calls
-	// flash and jolted the scroll.
-	let running = () => props.row.item.type === 'tool' && !!props.row.item.partial && !props.row.result
-	createEffect(running, (on) => {
+	// The call the session runs; it keeps its state (task hyt): its
+	// header shows its time, spinner and, short, its latest output line.
+	let running = () => props.row.item.type === 'tool' && props.running?.call === props.row.item.id
+	let live = () => !!props.cursor || running()
+	let [now, setNow] = createSignal(Date.now())
+	createEffect(live, (on) => {
 		if (!on) return
-		let t = setTimeout(() => running() && setOpen(true), 1000)
-		return () => clearTimeout(t)
+		setNow(Date.now())
+		let t = setInterval(() => setNow(Date.now()), 1000)
+		return () => clearInterval(t)
 	})
+	let elapsed = () => { let ts = Date.parse((running() ? props.running?.since : undefined) ?? (props.row.item as { ts?: string }).ts ?? ''); return live() && Number.isFinite(ts) ? bashResult.duration(now() - ts, true) : undefined }
+	let spins = () => ['thinking', 'text', 'tool'].includes(props.row.item.type)
+	let activity = () => <Show when={spins()}><span class="ticker"><Show when={elapsed()}>{(e) => <span class="elapsed">({e()})</span>}</Show><span class={['spinner', live() ? 'on' : '']} aria-hidden="true" /></span></Show>
+	let latest = () => { let item = props.row.item; return item.type === 'tool' && running() && !open() ? item.partial?.split('\n').findLast((l) => l.trim())?.trim() : undefined }
 	let fullCommand = () => { let item = props.row.item; return item.type === 'tool' && toolDetails.fullCommand(item.name, item.input) }
-	let full = () => fullCommand() || whole().has(id())
-	let setFull = (on: boolean) => untrack(() => setWhole(toggled(whole(), id(), on)))
+	let full = () => fullCommand() || level() === 'long' || level() === 'inline'
 	createEffect(
 		() => props.target,
 		(on) => {
-			if (!on) return
-			setOpen(true)
-			setFull(true)
+			if (on) setLevel('long')
 		},
 	)
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
-	let long = () => !presentation() && !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows
+	let long = () => !presentation() && !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > settings.glimpseRows()
 	// The link shows the block's id, #t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -193,7 +198,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
 		}
 		scroll.follow(() => {
-			setOpen(!expanded())
+			setLevel(blockToggle.next(props.row.item, level(), false))
 			flush()
 		})
 	}
@@ -202,7 +207,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let more = (e: MouseEvent) => {
 		let button = e.currentTarget as HTMLElement
 		scroll.follow(() => {
-			setFull(!full())
+			setLevel(full() ? 'glimpse' : 'long')
 			flush()
 		})
 		if (!full()) button.scrollIntoView({ block: 'nearest' })
@@ -248,9 +253,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let sendButton = () => <Show when={props.discard}><button type="button" class="send" aria-label="Send queued message now" title="Send now; it keeps its sender and arrival time" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue next ${props.row.key}` })}><Icon name="send" /></button></Show>
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
-	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? titles.who(props.row.item) : undefined} open={expanded()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? titles.who(props.row.item) : undefined} open={expanded()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
@@ -300,16 +304,17 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', level() === 'glimpse' && props.row.item.type !== 'tool' ? 'glimpse' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} style={{ '--glimpse': settings.glimpseRows() }} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<Show when={folding()} fallback={plain(s)}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job #t${n()} (/kill #t${n()})`} aria-label={`Kill background job #t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
+								<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
 							</CardHeader>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { blocksDialog } from './blocks-dialog.ts'
+import type { SessionMeta } from './session.ts'
 import { toggle, type Fold } from './toggle.ts'
 import type { Item } from './transcript.ts'
 
@@ -13,8 +14,9 @@ const items = [
 	{ type: 'tool', key: '16', id: 'b', name: 'bash', input: {} },
 	{ type: 'thinking', key: '17', text: 'more' },
 ] as Item[]
+const start = toggle.starts({ items, meta: {} as SessionMeta })
 const keys = (args: string, mode: 'toggle' | 'expand' | 'collapse' = 'toggle') => {
-	let p = toggle.plan(mode, items, args, toggle.initial)
+	let p = toggle.plan(mode, items, args, start)
 	return typeof p === 'string' ? p : p.items.map((i) => i.key)
 }
 
@@ -32,30 +34,36 @@ test('targets: lists, kinds, ranges and * leave user and assistant blocks alone 
 	expect(keys('q*')).toBe('nothing to toggle in q*')
 })
 
-test('/toggle steps one named block and applies the majority rule to more; a tie expands', () => {
+test('one named block steps short, glimpse, long (inline); more go long while most are not, else short', () => {
 	let states = new Map<string, Fold>()
-	expect(toggle.apply('toggle', states, items, 't*')).toEqual(['14', '16'])
-	expect([states.get('14'), states.get('16')]).toEqual(['open', 'open'])
-	states.set('16', 'closed')
-	toggle.apply('toggle', states, items, 't*')
-	expect([states.get('14'), states.get('16')]).toEqual(['open', 'open'])
-	toggle.apply('toggle', states, items, 'r*')
-	expect([states.get('11'), states.get('17')]).toEqual(['open', 'open'])
-	toggle.apply('collapse', states, items, '10-17')
-	expect(states.get('14')).toBe('closed')
-	let steps = [1, 2, 3].map(() => (toggle.apply('toggle', states, items, '#u10'), states.get('10')))
-	expect(steps).toEqual(['inline', 'closed', 'open'])
-	toggle.apply('expand', states, items, 'u10')
-	expect(states.get('10')).toBe('open')
+	expect(toggle.apply('toggle', states, items, 't*', start)).toEqual(['14', '16'])
+	expect([states.get('14'), states.get('16')]).toEqual(['long', 'long'])
+	states.set('16', 'glimpse')
+	toggle.apply('toggle', states, items, 't*', start)
+	expect([states.get('14'), states.get('16')]).toEqual(['long', 'long'])
+	toggle.apply('toggle', states, items, 't*', start)
+	expect([states.get('14'), states.get('16')]).toEqual(['short', 'short'])
+	toggle.apply('collapse', states, items, '10-17', start)
+	expect(states.get('11')).toBe('short')
+	let steps = [1, 2, 3, 4].map(() => (toggle.apply('toggle', states, items, '#u10', start), states.get('10')))
+	expect(steps).toEqual(['inline', 'short', 'glimpse', 'long'])
+	toggle.apply('expand', states, items, 'u10', start)
+	expect(states.get('10')).toBe('long')
+})
+
+test('blocks start as the session sets their kind, over the settings; a failed call as failed', () => {
+	let failed = [...items.slice(0, 5), { type: 'tool-result', key: '15', id: 'a', output: 'x', isError: true }] as Item[]
+	let at = toggle.starts({ items: failed, meta: { blocks: { thinking: 'long', prompt: 'glimpse' } } as SessionMeta })
+	expect(failed.map((i) => at(i))).toEqual(['glimpse', 'long', 'long', 'glimpse', 'glimpse', 'long'])
 })
 
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
-	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, toggle.initial)
+	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
 	expect(typed('t*').blocks).toEqual({ hint: 'Expands 2 tool blocks: t14, t16' })
-	expect(typed('').blocks).toEqual({ hint: 'Expands tool block t16' })
+	expect(typed('').blocks).toEqual({ hint: 'Shows a glimpse of tool block t16' })
 	expect(typed('t1,').blocks?.invalid).toBe(true)
-	let tab = (text: string) => blocksDialog.complete(typed(text), items, toggle.initial)
+	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')
 	expect(tab('r').blocks?.choices).toEqual(['r17', 'r11'])
 	expect(tab('r1').blocks?.choices).toEqual(['r17', 'r11'])
@@ -68,21 +76,22 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 test('queued inbox blocks share targeting, defaults and expansion with history', () => {
 	let all = toggle.items({ items, inbox: [{ id: 'queued', n: 20, text: 'First\nLast', from: 'other', delivery: 'after-turn' }] })
 	let states = new Map<string, Fold>()
-	expect(toggle.initial(all.at(-1)!)).toBe('closed')
-	expect(toggle.apply('toggle', states, all, '#m20')).toEqual(['20'])
-	expect(states.get('20')).toBe('open')
+	let at = toggle.starts({ items: all, meta: {} as SessionMeta })
+	expect(at(all.at(-1)!)).toBe('short')
+	expect(toggle.apply('toggle', states, all, '#m20', at)).toEqual(['20'])
+	expect(states.get('20')).toBe('long')
 	let dialog = blocksDialog.open()
 	dialog.form!.values[0] = 'm20'
-	expect(blocksDialog.update(dialog, all, (i) => states.get(i.key) ?? toggle.initial(i)).blocks?.hint).toContain('Collapses')
-	toggle.apply('collapse', states, all, 'm*')
-	expect(states.get('20')).toBe('closed')
+	expect(blocksDialog.update(dialog, all, (i) => states.get(i.key) ?? at(i)).blocks?.hint).toContain('Collapses')
+	toggle.apply('collapse', states, all, 'm*', at)
+	expect(states.get('20')).toBe('short')
 })
 
 test('range expansion preserves inline detail and web hints respect native paste links', () => {
 	let item = items[0]!
 	expect(toggle.step(item, 'inline', true)).toBe('inline')
-	expect(toggle.step(item, 'open', undefined, false)).toBe('closed')
+	expect(toggle.step(item, 'long', undefined, false)).toBe('short')
 	let dialog = blocksDialog.open()
 	dialog.form!.values[0] = item.key
-	expect(blocksDialog.update(dialog, items, () => 'open', false).blocks?.hint).toContain('Collapses')
+	expect(blocksDialog.update(dialog, items, () => 'long', false).blocks?.hint).toContain('Collapses')
 })

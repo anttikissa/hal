@@ -67,11 +67,11 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 					if (Array.isArray(first) && first.length === 1) first = first[0]
 					if (first && typeof first === 'object' && !Array.isArray(first)) fields = first as Record<string, unknown>
 				} catch {}
-				return { text: purpose ? oneLine(purpose) : titled(parsed.name, fields).text }
+				return { text: purpose ? `${verb(parsed.name)} ${oneLine(purpose)}` : titled(parsed.name, fields).text }
 			} catch { break }
 		}
 		case 'bash': {
-			let text = (str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)) || 'bash'
+			let text = `Bash ${str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)}`.trimEnd()
 			return { text: input.background === true ? `${text} (background)` : text, key: str('description') ? 'description' : undefined }
 		}
 		case 'send': {
@@ -135,10 +135,15 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			return { text: `Wait for ${ready ?? (who.length ? who.join(', ') : 'background work')}` }
 		}
 	}
-	if (str('description')) return { text: str('description')!, key: 'description' }
+	if (str('description')) return { text: `${verb(name)} ${str('description')}`, key: 'description' }
 	let first = Object.entries(input).find(([, v]) => typeof v === 'string' && oneLine(v))
-	let verb = name.charAt(0).toUpperCase() + name.slice(1)
-	return first ? { text: `${verb} ${oneLine(first[1] as string)}`, key: first[0] } : { text: verb }
+	return first ? { text: `${verb(name)} ${oneLine(first[1] as string)}`, key: first[0] } : { text: verb(name) }
+}
+
+// A tool's name as the word its title starts with (task hyt): 'Bash',
+// 'Read url'.
+function verb(name: string): string {
+	return (name.charAt(0).toUpperCase() + name.slice(1)).replaceAll('_', ' ')
 }
 
 function lines(name: string, input: Record<string, unknown>): string[] {

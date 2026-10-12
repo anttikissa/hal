@@ -1,8 +1,7 @@
 // Transcript items as the frame shows them: the rows of each item and
-// the style it wears. Pure.
-// Tasks: fn, hp, hr, hse, a1k, 6eq, kx0.
+// the style it wears. Pure. Tool calls and results: tool-view.ts.
+// Tasks: fn, hp, hr, hse, a1k, 6eq, kx0, hyt.
 
-import { presentationView } from './tool-presentation.ts'
 import { interruption } from '../common/interruption.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
@@ -13,19 +12,19 @@ import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
-import { toolDetails } from '../common/tool-details.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
+import { blockView } from './block-view.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
-import { resolve } from 'path'
+import { toolView } from './tool-view.ts'
 
-// How a block is drawn (frame.look): its fold state when toggled (task
-// ghs), the paste texts a prompt shown inline needs (client/folds.ts),
-// a call's result, whether it is padded and has a blank row above, its
-// status, style, and rows a plugin draws itself.
+// How a block is drawn (frame.look): its verbosity (task hyt), the paste
+// texts a prompt shown inline needs (client/folds.ts), a call's result,
+// whether it is padded and has a blank row above, its status, style,
+// and rows a plugin draws itself.
 export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
@@ -91,30 +90,24 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 }
 
 // Rows for one item at `width` columns, without the side padding;
-// `streaming`: the item is still growing.
-// `tool`: the name of the call a tool result is drawn right under (or
-// under another of its results); attached, it needs no link back.
-// `images`: the image items of a prompt, drawn in its card (frame.layout).
-// `look`: the block's fold state, when toggled (task ghs), and the
-// pastes a prompt shown inline needs.
+// `look.fold` is its verbosity (task hyt), `look.headerWidth` what its
+// title row leaves for the status and block id at its right.
+// `streaming`: the text is still coming: a short block shows its end, a
+// glimpse its last rows.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = [], look: Look = {}): string[] {
-	let fold = look.fold ?? (item.type === 'tool' || item.type === 'tool-result' ? undefined : card.initial(item))
+	let fold = look.fold ?? card.initial(item)
 	let key = (item as { key?: string }).key ?? ''
+	let hw = look.headerWidth ?? width
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let source = card.text(item)
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
-			if (item.report && (fold ?? 'closed') === 'closed') return itemView.closedRow(item, '', width)
-			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, look.headerWidth ?? width, undefined, session)
+			if (fold === 'short') return item.report ? itemView.closedRow(item, '', width) : itemView.closedRow(item, item.summary && !item.report ? item.summary : source, hw, undefined, session)
 			let body = card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
-			// Another session's message: its summary, then a glimpse;
-			// opened, its whole text.
-			if (item.summary && !item.report && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
-			else if (item.summary && !item.report) {
-				let more = body.length - 3
-				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
-			}
+			// Another session's message: its summary, then its text quieter.
+			if (fold === 'glimpse') body = blockView.glimpse(body, width, false, itemView.itemStyle(item))
+			if (item.summary && !item.report) body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
 			// Its images follow as labels packed into rows: a quick
 			// way to open those its markers name.
 			let rows: string[] = []
@@ -127,28 +120,24 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fits) rows[rows.length - 1] += ' ' + linked
 				else rows.push(linked)
 			}
-			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, look.headerWidth ?? width, session)
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session)
 		case 'image':
 			return [itemView.imageLabel(item, session)]
 		// Markdown hides trailing blanks except before interruption marks.
 		// Empty thinking draws nothing, not a bare header (tasks fn, hp, 6eq).
+		// Short, the time and its text; else headed like a reply, so the
+		// title row holds its activity (task hyt).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-			let prefix = titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : '')
-			if (fold === 'closed' && !streaming) return itemView.closedRow(item, item.text, width, prefix)
-			// The time leads the first paragraph, so wrapped rows continue at
-			// the left edge (task 77f); before a heading, list or code it
-			// stands on its own row.
-			let text = item.text.trim()
-			let first = markdown.parse(text.split('\n', 1)[0]!, false)[0]
-			let flows = first?.type === 'line' && first.kind === 'p' && !first.marker
-			let body = markdownView.lines(flows ? prefix + text : text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
-			return flows ? body : [...ansi.wrap(prefix.trimEnd(), width), ...body]
+			if (fold === 'short') return itemView.closedRow(item, item.text, hw, titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : ''), undefined, streaming)
+			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
+			if (fold === 'glimpse') body = blockView.glimpse(body, width, streaming, itemView.itemStyle(item))
+			return itemView.headed(item, body, hw)
 		}
 		case 'text': {
 			let text = card.text(item).trimEnd()
 			if (!text.trim() && !item.interrupted) return streaming ? [''] : []
-			if (fold === 'closed' && !streaming) return itemView.closedRow(item, text, width)
+			if (fold === 'short') return itemView.closedRow(item, text, hw, undefined, undefined, streaming)
 			let body = markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			if (item.interrupted) {
 				let tail = interruption.tail(item.text).replace(/\r\n?/g, '\n').split('\n')
@@ -156,75 +145,13 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (tail.length === 1 && strings.visLen(last) + strings.visLen(tail[0]!) > width) { body.push(last); last = ''; tail[0] = tail[0]!.trimStart() }
 				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.log().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
 			}
-			return itemView.headed(item, body, width)
+			if (fold === 'glimpse') body = blockView.glimpse(body, width, streaming, itemView.itemStyle(item))
+			return itemView.headed(item, body, hw)
 		}
-		case 'tool': {
-			let { command } = item.input
-			let prefix = titles.stamp(item.ts, '')
-			if (toolDetails.fullCommand(item.name, item.input)) {
-				if (fold !== 'open') return [strings.clipVisual(prefix + ansi.clean(String(command)), width)]
-				return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
-			}
-			let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)}`, width), item, width)
-			if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) return presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
-			let bash = item.name === 'bash'
-			if (fold === 'open' || fold === 'inline') {
-				let title = `${prefix}${ansi.clean(toolDetails.headline(item.name, item.input, look.result?.output).text)}`
-				let rows = ansi.wrap(title, width)
-				rows[0] = itemView.unsafe(rows[0]!, item, width)
-				return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ['', ...ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width)] : [])]
-			}
-			if (bash && fold === 'closed') return [head]
-			// Running bash output is laid out as its result glimpse will be
-			// (a blank row, then resultRows rows), so the card does not
-			// shrink when the call finishes (task 4y4).
-			let n = bash ? itemView.resultRows : 5
-			let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
-			if (!bash) return [head, ...live]
-			let details = toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width))
-			return [head, ...details, ...(live.length ? ['', ...live] : [])]
-		}
-		case 'tool-result': {
-			// A glimpse: tool output can be long, the model sees all of it.
-			let call = calls?.get(item.id)
-			// A canceled call's note to the model: the title says "(canceled)".
-			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
-			let style = itemView.itemStyle(item, tool)
-			// Attached, nothing to show draws nothing; apart, the header
-			// row stays, for its time, link and status. A closed call is
-			// its header row (task ghs): attached results draw nothing.
-			if (tool && ((fold ?? (item.presentation ? 'closed' : undefined)) === 'closed' || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
-			if (tool && (item.presentation || item.presentationError) && (fold === 'open' || fold === 'inline')) return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(fold === 'inline' || item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
-			let wide = width, max = fold === 'open' ? look.full ? Infinity : itemView.openRows : itemView.resultRows
-			// An attached EDIT result shows its diff in diff colors.
-			let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
-			let rows: string[] = [], used = 0
-			while (used < lines.length && rows.length <= max) {
-				let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * wide * 4), wide, false)
-				rows.push(...wrapped)
-				tones.push(...wrapped.map(() => diff.tone(line)))
-			}
-			let shown = rows.slice(0, max)
-			let more = rows.length - shown.length + lines.length - used
-			let status = tool ? '' : itemView.resultStatus(item, !!call, style)
-			let res = shown.map((l, i) => {
-				let prefix = !i && item.isError ? '✗ ' : ''
-				// Apart from its call, a result is its own block: it leads with its time.
-				if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
-				let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
-				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
-				let text = strings.clipVisual(prefix + l, width)
-				let line = painted ? diffView.paint(text, tones[i]!, style) : tool ? text : ansi.quiet(text, style)
-				return !i && status ? itemView.right(line, status, width) : line
-			})
-			if (more) {
-				let marker = ansi.quiet(`… ${more} more lines${fold === 'open' ? ` in ${itemView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
-				let last = res.at(-1)!
-				if (strings.visLen(last) + 2 + strings.visLen(marker) <= width) res[res.length - 1] = itemView.right(last, marker, width)
-				else res.push(marker)
-			}
-			return res
-		}
+		case 'tool':
+			return toolView.call(item, width, fold, look)
+		case 'tool-result':
+			return toolView.result(item, width, fold, look, session, calls?.get(item.id), tool)
 		case 'turn-end':
 			if (item.status === 'error') return ansi.wrap(titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`), width)
 			if (item.status === 'completed') return []
@@ -258,7 +185,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					}
 					return out
 				})
-				if (fold !== 'open') return summary
+				if (fold === 'short') return blockView.glimpse(summary, width, false, style, 1)
+				if (fold === 'glimpse') return blockView.glimpse(summary, width, false, style)
 				let tone = diff.tone
 				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
@@ -307,37 +235,6 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
 	})
 }
 
-// A flagged call's title row with an italic "unsafe to stop" in the
-// title's own color, never red (task ker); clipped to make room.
-function unsafe(row: string, item: Item & { type: 'tool' }, width: number): string {
-	let label = 'unsafe to stop'
-	if (!toolDetails.unsafe(item.name, item.input) || width < 3 * label.length) return row
-	return `${strings.clipVisual(row, width - label.length - 2)}  \x1b[3m${label}\x1b[23m`
-}
-
-// `text` in the exit color, then back to `style`'s.
-function exitColor(text: string, style: Style | undefined): string {
-	if (ansi.mono()) return text
-	return ansi.sgr({ fg: colors.exit().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
-}
-
-// The status after a tool card's title (task wm0), quiet: a nonzero
-// exit in the exit color, then the time; '' with neither.
-function status(exit: string | undefined, time: string | undefined, style: Style | undefined): string {
-	if (!exit && !time) return ''
-	if (!exit) return ansi.quiet(`(${time})`, style)
-	return ansi.quiet('(', style) + itemView.exitColor(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
-}
-
-// A finished call's status from its result; `bash`: a bash call's.
-// Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
-	let text = bashResult.interrupted(item)
-	if (text) return ansi.quiet(`(${text})`, style)
-	if (item.diff && !item.isError) return diffView.status(item.diff, style, bashResult.duration(item.ms))
-	return itemView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style)
-}
-
 // `row` with `end` at the right of `width` columns, two spaces apart
 // at least; the row is clipped to make room.
 function right(row: string, end: string, width: number): string {
@@ -356,28 +253,38 @@ function inlined(text: string, pastes: Look['pastes']): string {
 	})
 }
 
-// A closed block's one row (task ghs): its title (or `head`), then the
-// start of its text, quiet.
-function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' ', session?: string): string[] {
+// A short block's one row (tasks ghs, hyt): its title (or `head`), then
+// the start of its text, quiet; while it streams, its end.
+function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' ', session?: string, streaming = false): string[] {
 	head = ansi.clean(head)
 	let call = bashResult.background(item)
 	if (call && strings.visLen(head) >= width) head = titles.stamp(item.ts, `${call} `)
-	let first = ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
+	let first = streaming ? blockView.tail(ansi.clean(text), width - strings.visLen(head)) : ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
 	let row = strings.expandTabs(strings.clipVisual(head + first, width))
 	row = row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row
 	let href = session && call?.startsWith('#') && transcript.href(session, call.slice(1))
 	return [href ? `\x1b]8;;${ansi.webUrl(href)}\x07${row}${ansi.LINK_OFF}` : row]
 }
 
-// Where an open result's whole output is: the file its cut note names,
-// else its line in the session's history file.
-function fullAt(output: string, session: string | undefined, key = ''): string {
-	let cut = /cat (\S+)\]\s*$/.exec(output)?.[1]
-	if (cut) return cut
-	let home = process.env.HAL_HOME ?? resolve(import.meta.dir, '../..')
-	let path = `${home}/sessions/${session ?? '?'}/history.asonl`
-	if (process.env.HOME && path.startsWith(process.env.HOME + '/')) path = '~' + path.slice(process.env.HOME.length)
-	return `${path} line ${/^\d+/.exec(key)?.[0] ?? '?'}`
+// The text width beside an item's id, and how to put the id on row
+// `at`, after `status` if there is one; the row is clipped to make room.
+// `head`: the room the title row has left of them.
+function place(item: Keyed, cols: number, session: string | undefined, style: Style | undefined, status = ''): { inner: number; head: number; mark: (lines: string[], at: number) => void } {
+	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	status = [status, itemView.receipt(item, style)].filter(Boolean).join(' ')
+	let ref = itemView.ref(item, session)
+	// On a very narrow terminal the text needs every column.
+	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
+	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
+	if (item.type === 'tool' && item.name === 'edit') status = strings.clipVisual(status, Math.floor(inner / 3))
+	let mark = (lines: string[], at: number) => {
+		if ((!ref && !status) || lines.length <= at) return
+		let link = ref ? ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
+		let end = status && link ? `${status} ${link}` : status || link
+		if (status) lines[at] = itemView.right(lines[at]!, end, width)
+		else lines[at] += ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref!.text))) + link
+	}
+	return { inner, head: status ? Math.max(1, inner - strings.visLen(status) - 2) : inner, mark }
 }
 
 function receipt(item: Item, style?: Style): string {
@@ -386,13 +293,9 @@ function receipt(item: Item, style?: Style): string {
 }
 
 export const itemView = {
-	// Rows of a tool result shown in the transcript: closed, and opened.
-	resultRows: 3,
 	receipt,
-	openRows: 200,
 	inlined,
 	closedRow,
-	fullAt,
 	toolStyle,
 	itemStyle,
 	itemLines,
@@ -400,9 +303,6 @@ export const itemView = {
 	imageLabel,
 	ref,
 	quoteLines,
-	unsafe,
-	exitColor,
-	status,
-	resultStatus,
 	right,
+	place,
 }

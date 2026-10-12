@@ -75,6 +75,8 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
+	// The call the session runs now: its card ticks (task hyt).
+	let running = () => { let st = props.view.transcript?.state; return st?.type === 'running' && st.phase === 'tools' && st.call ? { call: st.call, since: st.since } : undefined }
 	// Otherwise its own line after the last row, before waiting and
 	// pending messages: the cursor is the work now, they the future.
 	let line = () => (
@@ -104,7 +106,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={props.view.transcript?.meta.blocks} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} />}>
 						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
 					</Show>
 					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>

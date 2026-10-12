@@ -17,6 +17,7 @@ import { inbox, type InboxItem } from '../common/inbox.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
+import { settings } from '../common/settings.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { states } from '../common/states.ts'
@@ -321,7 +322,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// A glimpse, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
 			let rows = (item.diff ?? (item.interrupted ? bashResult.display(item.output, true) : bash ? bashResult.display(item.output) : item.output)).replace(/\n$/, '').split('\n')
-			let shown = full ? rows : rows.slice(0, view.resultRows)
+			let shown = full ? rows : rows.slice(0, settings.glimpseRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			// An EDIT's diff: its rows as they are; Card colors each.
 			if (item.diff) return { kind: 'result log', text: shown.join('\n') }
@@ -349,8 +350,6 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 }
 
 export const view = {
-	// Rows of a tool result shown in the transcript.
-	resultRows: 8,
 	onEvent,
 	key,
 	formKey,

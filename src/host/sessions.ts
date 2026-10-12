@@ -6,6 +6,7 @@
 // Tasks: gj, p87.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
+import { card, type Kind, type Verbosity } from '../common/card.ts'
 import { session, type SessionMeta } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { names } from '../common/names.ts'
@@ -43,6 +44,8 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
 	if (data.startingState !== undefined && (!data.startingState || typeof data.startingState.cwd !== 'string' || typeof data.startingState.model !== 'string' || typeof data.startingState.autoclose !== 'boolean')) throw new Error(`${path}: invalid startingState`)
+	let blocks = data.blocks
+	if (blocks !== undefined && !(blocks && typeof blocks === 'object' && Object.entries(blocks).every(([k, v]) => card.kinds.includes(k as Kind) && card.levels.includes(v as Verbosity)))) throw new Error(`${path}: invalid blocks`)
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
 }
@@ -118,6 +121,8 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		slots: settings.subagentSlots(),
 		...(init.noUser && { noUser: true }),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
+		// Its calls are what the user typed: shown whole (task hyt).
+		...(selection.id === 'hal/tool' && { blocks: { tool: 'long' } }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
 	meta.nameVersion = 0

@@ -53,12 +53,12 @@ test('queued cards expand by inbox ID and their padding matches each sender', ()
 		expect(closed[at + 1]).toBe(ansi.paint('', style, 100))
 	}
 	expect(plain(closed).join('\n')).not.toContain('Agent last')
-	v.folds = { states: new Map([['20', 'open']]), sig: '20 open' }
+	v.folds = { states: new Map([['20', 'long']]), sig: '20 long' }
 	let opened = plain(frame.build(v, 100).lines).join('\n')
 	expect(opened).toContain('Agent last')
 	expect(opened).toContain('#m20')
 	expect(opened).not.toContain('Human last')
-	v.folds = { states: new Map([['20', 'closed']]), sig: '20 closed' }
+	v.folds = { states: new Map([['20', 'short']]), sig: '20 short' }
 	expect(plain(frame.build(v, 100).lines).join('\n')).not.toContain('Agent last')
 })
 
@@ -478,7 +478,7 @@ test('tool timestamps and command-output headers match ordinary message time and
 	expect(lines[ordinary + 2]).toBe('Message body')
 	expect(lines[output + 1]).toBe('')
 	expect(lines[output + 2]).toBe('Command body')
-	expect(lines.some(line => line.startsWith('08:50 Inspect files'))).toBe(true)
+	expect(lines.some(line => line.startsWith('08:50 Bash Inspect files'))).toBe(true)
 	expect(lines.some(line => line.startsWith('08:50 Read example.txt'))).toBe(true)
 })
 
@@ -498,6 +498,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
 	])
 	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816', '1817'][i]! }))
+	v.transcript!.meta.blocks = { tool: 'glimpse' }
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
@@ -505,7 +506,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).toContain('\nM notes.md')
 	expect(printed).not.toContain('#1813>')
 	let title = lines.find((line) => line.includes('Read missing'))!
-	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\) #t1815$/)
+	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\)   #t1815$/)
 	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
@@ -549,7 +550,7 @@ test('parallel results sit under their calls unless the batch overflows a screen
 
 test('a closed card is one text row inside its padding rows (task ghs)', () => {
 	let item = { type: 'prompt', text: 'first line\nsecond line', key: 'u1' } as unknown as Parameters<typeof frame.itemRows>[0]
-	let rows = frame.itemRows(item, 60, 'x', undefined, undefined, undefined, [], '', { fold: 'closed' })
+	let rows = frame.itemRows(item, 60, 'x', undefined, undefined, undefined, [], '', { fold: 'short' })
 	expect(rows.map(strip).map((r) => r.trim()).filter(Boolean)).toHaveLength(1)
 	expect(rows).toHaveLength(3)
 })
@@ -568,7 +569,7 @@ test('help and rebase command cards open directly to full input and output witho
 		let v = view([{ type: 'tool', id: 'c', name: 'command', input: { command } }, { type: 'tool-result', id: 'c', output: Array.from({ length: 240 }, (_, i) => `output ${i}`).join('\n') }])
 		let closed = plain(frame.build(v, 70).lines).join('\n')
 		if (command !== '/rename Example') expect(closed).not.toContain('output 0')
-		v.folds = { states: new Map([['~0', 'open']]), sig: 'open' }
+		v.folds = { states: new Map([['~0', 'long']]), sig: 'long' }
 		let opened = plain(frame.build(v, 70).lines).join('\n')
 		expect(opened).toContain(command)
 		if (command !== '/rename Example') {

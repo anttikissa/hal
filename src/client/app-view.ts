@@ -21,6 +21,7 @@ import type { StatusInfo } from './status-row.ts'
 import { tabBar } from './tab-bar.ts'
 import { versions } from './versions.ts'
 import { folds } from './folds.ts'
+import { blockView } from './block-view.ts'
 
 function view(): View {
 	let st = app.state
@@ -96,12 +97,17 @@ function why(t: Transcript): string | undefined {
 	return states.describe(s, Date.now(), t.items)
 }
 
-// The running tool call's elapsed time, from 1 s on (task wm0).
-function tick(t: Transcript, now: number): View['tick'] {
+// The live block's elapsed time from 1 s on (task wm0) and spinner
+// frame (task hyt): the running tool call's, else the streaming last
+// item's.
+function tick(t: Transcript, now: number, beat = pulse.beat()): View['tick'] {
 	let s = t.state
-	if (s.type !== 'running' || s.phase !== 'tools' || !s.call || !s.since) return undefined
-	let label = bashResult.duration(now - Date.parse(s.since), true)
-	return label ? { call: s.call, label } : undefined
+	if (s.type !== 'running') return undefined
+	let spin = blockView.spin(beat)
+	let since = s.phase === 'tools' && s.call ? s.since : halCursor.streaming(t) ? t.items.at(-1)?.ts : undefined
+	if (since === undefined) return undefined
+	let label = bashResult.duration(now - Date.parse(since), true) ?? ''
+	return s.phase === 'tools' && s.call ? { call: s.call, label, spin } : { label, spin }
 }
 
 // What blinks in `view`, as a key that changes with every blink phase;

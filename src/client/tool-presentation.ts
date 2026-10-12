@@ -15,11 +15,11 @@ function lines(presentation: ToolPresentation, output: string, width: number, st
 	])
 }
 
-function call(item: Item & { type: 'tool' }, head: string, width: number, fold: Fold | undefined, result: Item | undefined, style: Style | undefined): string[] {
+function call(item: Item & { type: 'tool' }, head: string, width: number, fold: Fold, result: Item | undefined, style: Style | undefined): string[] {
 	let rows = [head]
 	if (item.presentationError) rows.push(...ansi.wrap(ansi.clean(item.presentationError), width))
 	if (fold === 'inline') rows.push('Raw call', ...toolDetails.value(item.input).flatMap((r) => ansi.wrap(ansi.clean(r), width)))
-	else if (fold === 'open') {
+	else if (fold === 'long') {
 		if (!result && item.presentation) rows.push(...presentationView.lines(item.presentation, '', width, style))
 		rows.push(...ansi.wrap('Toggle again for raw call and result', width))
 	}

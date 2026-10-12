@@ -31,7 +31,8 @@ afterEach(() => {
 })
 
 const snapshot = (state: SessionState = { type: 'idle' }): Event => {
-	let snap: Snapshot = { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state }
+	// Long thinking has the cursor; short, its spinner (task hyt).
+	let snap: Snapshot = { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '', blocks: { thinking: 'long' } }, history: [], state }
 	return { type: 'snapshot', sessionId: 's1', snapshot: snap }
 }
 const state = (s: SessionState) => app.onEvent({ type: 'state', sessionId: 's1', state: s })

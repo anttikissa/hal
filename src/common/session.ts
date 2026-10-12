@@ -1,6 +1,8 @@
 // Session metadata as stored in sessions/<id>/session.ason. Browser-safe
 // shape only; the host owns reading and writing it.
-// Tasks: gj, p87.
+// Tasks: gj, p87, hyt.
+import type { Kind, Verbosity } from './card.ts'
+
 export interface SessionMeta {
 	id: string
 	// Working directory and provider/model id for the next turn.
@@ -33,6 +35,8 @@ export interface SessionMeta {
 	slots?: number
 	// Ids of background bash commands still running (task v0).
 	background?: string[]
+	// How kinds of blocks start, over the client's settings (task hyt).
+	blocks?: Partial<Record<Kind, Verbosity>>
 }
 
 export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
