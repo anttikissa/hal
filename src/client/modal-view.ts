@@ -73,6 +73,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (m.find.focus > 0 && m.find.focus < 5) fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
 		content.push(strings.clipVisual(row, inner), '')
 	}
+	if (m.status) content.push(...strings.wordWrap(m.status, inner).map((r) => strings.clipVisual(r, inner)), '')
 	if (m.blocks) content.push(...modalView.blocksLines(m, inner))
 	// The restart dialog: its flagged calls above the list, each block id
 	// a link to its block on the web (task ker).
@@ -98,7 +99,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		// Leading spaces are the picker's tree indentation: keep them.
 		let label = ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' ')
 		if (column) label = strings.clipVisual(label, column - 2).padEnd(column - 2) + '  '
-		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
+		// The model tree's highlight alone marks the selection.
+		let row = strings.clipVisual((m.tree ? '' : i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
 		let value = m.tree ? undefined : modalView.cell(m, i, current)
 		if (table && m.values?.[i]) {

@@ -222,7 +222,7 @@ function selection(st: ModalState, previous?: number): ModalState {
 	let row = t.rows[st.selected]
 	let shownId = row?.id ?? row?.default ?? t.current
 	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
-	let hint = row?.id ? `${effortKeys ? '←/→: lower/higher effort, ' : ''}enter: pick` : `←/→: close/open, enter: ${row?.default ? 'pick default' : 'open'}`
+	let hint = row?.id ? `${effortKeys ? '←→: effort · ' : ''}enter: pick` : `←→: close/open · enter: ${row?.default ? 'pick default' : 'open'}`
 	let level = picker.label(st, shownId)
 	// A chevron shows only where ←/→ can still move; the level keeps its
 	// column when the left one is gone.
@@ -230,15 +230,15 @@ function selection(st: ModalState, previous?: number): ModalState {
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let fallback = cap?.levels.length ? cap.policy ?? cap.default : undefined
-	// A pinned level shows as :level; otherwise the title names the default.
-	let pinned = chosen && chosen !== fallback
-	let title = `Model: ${shownId}${pinned ? `:${chosen}` : fallback ? ` (default effort: ${fallback})` : ''}`
-	return { ...st, title, ...(values && { values }), hint: `${hint}, esc: cancel` }
+	// The status line says what Enter does, with the effort it sends.
+	let effortText = chosen && chosen !== fallback ? `, ${chosen} effort` : fallback ? `, ${fallback} effort (default)` : ''
+	let status = !row ? 'No models match' : !row.id && !row.default ? 'Opens this group' : `${shownId === t.current ? 'Stays on' : 'Switches to'} ${shownId}${effortText}`
+	return { ...st, status, ...(values && { values }), hint: `${hint} · esc: close` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
 function open(current: string, ids: string[], names: Record<string, string> = {}, capabilities?: Record<string, EffortCapability>, selectedEffort?: string): ModalState {
-	let st = modals.open({ title: `Model: ${current}`, form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
+	let st = { ...modals.open({ title: 'Model', form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', placeholder: 'opus, gpt, 5.5…' }] } }), question: 'Which model and effort?' }
 	let open = ancestors(tree(ids, current), current)
 	return picker.refilter({ ...st, tree: { rows: [], open, current, capabilities, ...(selectedEffort && { effort: selectedEffort }) } }, ids, names)
 }
