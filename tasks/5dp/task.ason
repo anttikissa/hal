@@ -1,0 +1,6 @@
+{
+	title: 'Faint disabled composer buttons',
+	spec: 'A disabled web composer button (Nudge, Send, Queue, attach and the other actions) keeps its quiet color but draws its icon and label at 40% opacity, so it reads as disabled (user request 2026-10-12). The divider beside it keeps full strength. This is an exception to the readable-text invariant in tasks/README.md. Terminal behavior is unchanged: it has no such buttons.',
+	status: 'done',
+	needs: []
+}
