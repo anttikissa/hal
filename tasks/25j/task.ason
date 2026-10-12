@@ -1,0 +1,10 @@
+{
+	title: 'Inspect subscription plans and usage health',
+	spec: 'INSPECT subscriptions exposes configured Anthropic and OpenAI subscription accounts and API-key entries through the existing native tool. HELP names the view and its comma-separated fields: provider, slot, account, plan, status, windows, limits, error. Each account is a plain-text block; slot marks the caller-selected or preferred account. A read refreshes subscription usage through the shared /status reader without a model request or paid API-key request. Show every reported window, percent used, ISO reset and observation timestamps; unknown data and unknown plans are explicit, never inferred from quota. Report API keys, successful reads, exhausted quota, unavailable usage, login failures, timeouts and other refresh failures; failed reads retain and label cached windows. Show current provider/account and model/account limits with their reset times. Preserve full safe error messages, paths and HTTP response bodies, redact credential values, and mark refresh failures as tool errors while keeping successful accounts visible. Errors remain visible when omitted from fields. Validate field selection before network work. Keep /status presentation unchanged. Reuse account migration, plan learning and master usage updates instead of a separate subscription cache. Tests cover live plans and windows, partial failures with cache, no-data and API-key cases, limits, validation and credential redaction.',
+	status: 'done',
+	notes: [
+		'statusUsage.rows shares refresh, email migration and master usage publication with /status. subscriptionPlan exposes known plans for either provider while plan keeps the existing OpenAI-only /status suffix. HTTP failures retain endpoint, status and body with credential values and credential JSON fields redacted. No additional cache or background polling is introduced; each inspection explicitly refreshes subscriptions. Host-fixture tests must create a session to initialize directories and close usage/limits stores before their temporary home is removed.'
+	],
+	needs: ['jm', 'ab'],
+	foldInto: ['ed', 'ab']
+}

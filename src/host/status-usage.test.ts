@@ -108,3 +108,19 @@ test('recheck rereads only the provider\'s skipped accounts, once unless forced'
 		expect(read).toEqual(['openai a@example.com', 'openai a@example.com'])
 	} finally { auth.all = all; statusUsage.refresh = refresh; limits.store = lstore; statusUsage.state.checked.clear() }
 })
+
+test('usage HTTP failures preserve endpoint, status and body while redacting credentials', async () => {
+	let all = auth.all, credential = auth.credential, fetchOld = globalThis.fetch
+	let account = { name: 'a@example.test', entry: { accessToken: 'old-secret', refreshToken: 'refresh-secret', apiKey: 'key-secret' }, replace: () => {} }
+	auth.all = (() => ({ data: {}, list: [account] })) as typeof all
+	auth.credential = (async () => ({ type: 'token', value: 'new-secret', account: account.name })) as typeof credential
+	globalThis.fetch = (async () => new Response(JSON.stringify({ error: 'account suspended', details: 'Bearer new-secret refresh-secret key-secret', access_token: 'server-issued-secret' }), { status: 403, statusText: 'Forbidden' })) as unknown as typeof fetch
+	try {
+		let error = await statusUsage.refresh('openai', account).catch((e: Error) => e.message)
+		expect(error).toContain('https://chatgpt.com/backend-api/wham/usage: HTTP 403 Forbidden')
+		expect(error).toContain('account suspended')
+		expect(error).not.toContain('-secret')
+		expect(error).toContain('Bearer <redacted>')
+		expect(error).toContain('"access_token":"<redacted>"')
+	} finally { auth.all = all; auth.credential = credential; globalThis.fetch = fetchOld }
+})

@@ -15,7 +15,7 @@ import { version } from './version.ts'
 import { web } from './web.ts'
 
 type Account = ReturnType<typeof auth.all>['list'][number]
-export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
+export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; subscriptionPlan?: string; error?: string; refreshError?: string; loginRequired?: boolean; windows: Windows; apiKey: boolean }
 
 const reset = (at: string, now = clock.now(), zone?: string): string => usageWindows.reset(at, now, zone)
 
@@ -79,6 +79,13 @@ function payload(kind: Kind, raw: any): Windows {
 	return out
 }
 
+function redact(text: string, entry: Record<string, any>): string {
+	for (let key of ['accessToken', 'refreshToken', 'apiKey', 'idToken']) {
+		if (auth.usable(entry[key])) text = text.split(entry[key]).join('<redacted>')
+	}
+	return text.replace(/Bearer\s+[^\s"']+/gi, 'Bearer <redacted>').replace(/("(?:access_?token|refresh_?token|id_?token|api_?key)"\s*:\s*")[^"]*"/gi, '$1<redacted>"')
+}
+
 // Returns 'old → new' when the account's plan changed.
 async function refresh(kind: Kind, account: Account): Promise<string | undefined> {
 	let { data } = auth.all(kind)
@@ -89,7 +96,7 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	if (kind === 'anthropic') Object.assign(headers, { 'anthropic-version': '2023-06-01', 'anthropic-beta': 'oauth-2025-04-20', Accept: 'application/json' })
 	if (kind === 'openai' && credential.accountId) headers['ChatGPT-Account-ID'] = credential.accountId
 	let response = await fetch(url, { headers, signal: AbortSignal.timeout(5000) })
-	if (!response.ok) throw new Error(`HTTP ${response.status}`)
+	if (!response.ok) throw new Error(statusUsage.redact(`${url}: HTTP ${response.status} ${response.statusText}\n${await response.text()}`, { ...account.entry, accessToken: credential.value }))
 	let raw = await response.json()
 	let windows = statusUsage.payload(kind, raw)
 	if (!Object.keys(windows).length) throw new Error('no windows returned')
@@ -153,9 +160,8 @@ function runtime(zone?: string): string {
 	return `Runtime:\nPID: ${process.pid} · version: ${version.state.loaded ?? 'unknown'}\nStarted: ${date} (${Math.floor(uptime / 3600)}h ${Math.floor(uptime % 3600 / 60)}m ago)${web.state.server ? `\nWeb: port ${web.state.server.port}${web.state.server.port !== web.port() ? ` (preferred ${web.port()} busy)` : ''}` : ''}`
 }
 
-async function show(sessionId: string, model: string): Promise<string> {
+async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 	let rows: UsageRow[] = []
-	let broken = false
 	for (let kind of ['anthropic', 'openai'] as const) {
 		let list: Account[]
 		try { list = auth.all(kind).list } catch (e: any) {
@@ -166,24 +172,34 @@ async function show(sessionId: string, model: string): Promise<string> {
 		for (let [i, account] of list.entries()) {
 			let apiKey = !auth.usable(account.entry.accessToken)
 			let error: string | undefined
+			let refreshError: string | undefined
+			let loginRequired = false
 			if (!apiKey) {
 				try {
 					let changed = await statusUsage.refresh(kind, account)
 					if (changed) error = `plan changed: ${changed}`
 				} catch (e) {
 					let failure = statusUsage.problem(e)
+					refreshError = statusUsage.redact(e instanceof Error ? e.message : String(e), account.entry)
 					error = `${failure.text} — showing cached usage`
-					broken ||= failure.login
+					loginRequired = failure.login
 				}
 			}
 			let current = auth.all(kind).list[i]?.entry ?? account.entry
 			let email = current.email ?? jwtClaims(current.accessToken ?? '')?.['https://api.openai.com/profile']?.email
 			let name = typeof email === 'string' && email.includes('@') ? email : account.name
 			let key = usage.store()[kind]?.[name] ? name : account.name
-			let plan = kind === 'openai' && typeof current.plan === 'string' && /^[\w -]{1,32}$/.test(current.plan) ? current.plan : undefined
-			rows.push({ provider: kind, slot: `${i + 1}/${list.length}${(account.name === selected || name === selected) ? ' *' : ''}`, account: name, plan, error, windows: apiKey ? {} : usage.windows(kind, key), apiKey })
+			let subscriptionPlan = typeof current.plan === 'string' && /^[\w -]{1,32}$/.test(current.plan) ? current.plan : undefined
+			let plan = kind === 'openai' ? subscriptionPlan : undefined
+			rows.push({ provider: kind, slot: `${i + 1}/${list.length}${(account.name === selected || name === selected) ? ' *' : ''}`, account: name, plan, subscriptionPlan, error, refreshError, loginRequired, windows: apiKey ? {} : usage.windows(kind, key), apiKey })
 		}
 	}
+	return rows
+}
+
+async function show(sessionId: string, model: string): Promise<string> {
+	let rows = await statusUsage.rows(sessionId, model)
+	let broken = rows.some((row) => row.loginRequired)
 	// Times show in the asking client's zone, as its status line does.
 	let zone = clients.timezone(sessionId)
 	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
@@ -204,4 +220,4 @@ function recheck(kind: string, force = false): Promise<void> {
 	return run
 }
 
-export const statusUsage = { state: { checked: new Set<string>(), running: new Map<string, Promise<void>>() }, reset, bar, table, payload, refresh, recheck, problem, runtime, show }
+export const statusUsage = { state: { checked: new Set<string>(), running: new Map<string, Promise<void>>() }, reset, bar, table, payload, redact, refresh, recheck, problem, runtime, rows, show }
