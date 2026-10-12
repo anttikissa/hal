@@ -79,11 +79,31 @@ Record new design decisions in the project's canonical spec.
 
 ## Motion
 
-Frequent and keyboard-driven interactions should normally be instant. Follow
-product no-motion rules. Otherwise, animate only to explain a change; keep motion
-brief, interruptible, and independent of input handling. Provide reduced-motion
-behavior. Prefer transform/opacity when suitable; measure suspected jank.
-Do not add noise, glass, glow, or ornamental microinteractions as polish.
+After Emil Kowalski's animation skills (github.com/emilkowalski/skills),
+loosened by the user. Product motion rules override these defaults.
+
+- Name the purpose before animating: feedback, state indication, spatial
+  consistency, or preventing a jarring change. Without one, change instantly.
+  Do not add noise, glass, glow, or ornamental microinteractions as polish.
+- State changes take effect at once; only their look animates. Never delay
+  input, focus, or enabled state for an animation.
+- Time each direction by its frequency. A frequent or keyboard-driven change
+  (typing hides a placeholder, enables Send) takes about 50 ms: 3 frames at
+  60 Hz. Its rare reverse (the box empties again) may fade back slower, up to
+  about 300 ms, since nobody waits on it. Keep other UI motion under 300 ms:
+  presses 100-160 ms, tooltips 125-200 ms, dropdowns 150-250 ms.
+- Use one strong ease-out (cubic-bezier(0.23, 1, 0.32, 1)) for entering and
+  leaving, plain ease for hover and color, ease-in-out only for movement on
+  screen. Never ease-in: it delays the moment the user watches.
+- Animate opacity and transform (clip-path when needed). Enter from
+  scale(0.95) and opacity 0, never scale(0); anchor popovers at their trigger.
+- Use CSS transitions and keyframes; script an animation only when CSS cannot
+  express it. Use transitions for anything the user can trigger quickly: they
+  retarget from the current value, while keyframes restart.
+- Leave the way you entered. Gate hover motion behind
+  `@media (hover: hover) and (pointer: fine)`.
+- Under prefers-reduced-motion, keep fades and color changes; drop movement.
+- Check feel at 2-5x duration or frame by frame; measure suspected jank.
 
 ## Completion gate
 

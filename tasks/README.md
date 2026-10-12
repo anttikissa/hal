@@ -294,13 +294,17 @@ Readable text (below) still applies.
 
 ## Motion (web)
 
-After Emil Kowalski: animate only opacity, color and transform (the
-user's exceptions: a card opening or closing animates its height, as
-in tasks/4s/demo.tsx [F12], and a tab marker appearing its width); one
-strong ease-out (--ease-out); short (80–300 ms), exits faster than
-entrances; nothing that happens in milliseconds (a round trip) may
-show, so state changes that are usually brief start after a delay;
-no motion under prefers-reduced-motion.
+After Emil Kowalski, loosened by the user (skills/ui-craft, Motion):
+animate only opacity, color and transform (the user's exceptions: a
+card opening or closing animates its height, as in tasks/4s/demo.tsx
+[F12], and a tab marker appearing its width); one strong ease-out
+(--ease-out); short (50-300 ms). Each direction is timed by its
+frequency: a frequent or keyboard-driven change takes --snap-ms (50
+ms), its rare reverse may take up to --back-ms (300 ms); the state
+itself changes at once. Motion is CSS; script it only when CSS cannot.
+Nothing that happens in milliseconds (a round trip) may show, so state
+changes that are usually brief start after a delay. Under
+prefers-reduced-motion, fades and color changes stay; movement goes.
 
 ## Readable text (invariant, terminal and web)
 

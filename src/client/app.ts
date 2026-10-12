@@ -91,7 +91,8 @@ function show(): void {
 	clearTimeout(st.typing)
 	let f = st.form ?? st.modal?.form
 	let now = pulse.now()
-	let next = Math.min(v.placeholder?.next ?? Infinity, ...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
+	// A returning example fades in on every frame.
+	let next = Math.min(v.placeholder?.back !== undefined ? 1 : Infinity, v.placeholder?.next ?? Infinity, ...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
 	if (next === Infinity) return
 	st.typing = setTimeout(app.show, pulse.until(next))
 	;(st.typing as { unref?: () => void }).unref?.()

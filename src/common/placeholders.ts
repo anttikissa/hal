@@ -26,8 +26,9 @@ const hal = [
 // An example as drawn: `cut`, graphemes already erased from its left,
 // is drawn blank so `text` keeps its columns; `fade`: the edge being
 // erased, drawn fading where the client can (terminal: ansi.fades());
-// `next`: ms until it changes (Infinity: never).
-export type Shown = { cut: string; text: string; fade?: 'left' | 'right'; next: number }
+// `next`: ms until it changes (Infinity: never); `back`: ms since an
+// emptied prompt brought it back, while it fades in (BACK).
+export type Shown = { cut: string; text: string; fade?: 'left' | 'right'; next: number; back?: number }
 
 // A rotating example (a form field's placeholder list) `ms` after it
 // appeared: hold one, erase it a grapheme at a time, type the next, in
@@ -36,8 +37,11 @@ export type Shown = { cut: string; text: string; fade?: 'left' | 'right'; next: 
 const HOLD = 3000
 const LONG_HOLD = 4500
 const ERASE = 5
-// The prompt's example erasing as typing starts: twice as fast.
-const GONE = ERASE / 2
+// Typing is frequent, so the example erases from its left in 50 ms (3
+// frames at 60 Hz); emptying the prompt again is rare, so it fades back
+// over 300 ms.
+const GONE = 50
+const BACK = 300
 const TYPE = 35 / 3
 // Each list's graphemes and cycle length, computed once: rotate runs on
 // every repaint (every few ms while typing), so its cost must not grow
@@ -74,10 +78,11 @@ function rotate(list: string[], ms: number): Shown {
 }
 
 // The main prompt's example. `key`: whose prompt (a session); `since`:
-// when its box was first seen empty, the rotation's clock; `gone`: the
+// when its box was last seen turning empty, the rotation's clock;
+// `typed`: typing has hidden it before, so it fades back; `gone`: the
 // example shown when typing started, and when, now erasing from its
-// left at twice the erase speed (a prototype).
-export type PromptExample = { key?: string; since?: number; gone?: { items: string[]; at: number } }
+// left (a prototype).
+export type PromptExample = { key?: string; since?: number; typed?: boolean; gone?: { items: string[]; at: number } }
 
 // The example over prompt `key` holding `typed` at `now`, from `list`
 // (none: no example); updates `st`. The typed text covers the example's
@@ -91,22 +96,25 @@ function follow(st: PromptExample, key: string, list: string[] | undefined, type
 	if (!typed) {
 		st.gone = undefined
 		st.since ??= now
-		return rotate(list, now - st.since)
+		let shown = rotate(list, now - st.since)
+		return st.typed && now - st.since < BACK ? { ...shown, back: now - st.since } : shown
 	}
 	if (st.since !== undefined) {
 		st.gone = { items: graphemes(rotate(list, now - st.since).text), at: now }
 		st.since = undefined
+		st.typed = true
 	}
 	let g = st.gone
 	if (!g || typed.includes('\n')) return undefined
-	let n = Math.floor((now - g.at) / GONE) + 1
+	let step = GONE / g.items.length
+	let n = Math.floor((now - g.at) / step) + 1
 	let covered = strings.visLen(typed)
 	while (n < g.items.length && strings.visLen(g.items.slice(0, n).join('')) <= covered) n++
 	if (n >= g.items.length) {
 		st.gone = undefined
 		return undefined
 	}
-	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: GONE - ((now - g.at) % GONE) }
+	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: step - ((now - g.at) % step) }
 }
 
-export const placeholders = { general, hal, graphemes, rotate, follow }
+export const placeholders = { general, hal, graphemes, rotate, follow, BACK }

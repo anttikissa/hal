@@ -10,7 +10,9 @@
 <style>
 /* The one stylesheet: layout only. Colors come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
-:root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
+/* --snap-ms: a frequent change (typing starts: 3 frames at 60 Hz);
+   --back-ms: its rare reverse (the box empties again). */
+:root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; --snap-ms: 50ms; --back-ms: 300ms; }
 /* Icons (icons.ts): one stroke width, in 24-grid units, for both grids. */
 :root { --icon-stroke: 1.5; }
 .icon { width: 1.25em; height: 1.25em; flex: none; fill: currentColor; vertical-align: -0.3em; }
@@ -368,8 +370,8 @@ html.typing .App { position: absolute; }
    erases from its left as typing starts and fades back in when the box
    empties. */
 /* One line of text sits centered in the 44px row the buttons set. */
-.entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
-.entry .hint.gone { opacity: 0; transition-duration: 80ms; }
+.entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity var(--back-ms) var(--ease-out); }
+.entry .hint.gone { opacity: 0; transition-duration: var(--snap-ms); }
 /* An erased start keeps the rest in its columns; the edge being erased
    fades over 3ch, like the terminal's last 3 glyphs (placeholders.ts). */
 .entry .hint .cut { visibility: hidden; }
@@ -378,11 +380,16 @@ html.typing .App { position: absolute; }
 .entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
 /* The hidden copy Composer.tsx measures: the box's width and text, no height. */
 .entry textarea.measure { position: absolute; inset: 0 0 auto; height: 0; min-height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
-.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color var(--snap-ms) var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
+/* Typing turns Send on (frequent) and emptying the box turns it off
+   (rare); Nudge the other way round. */
+.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; transition-duration: 120ms, var(--back-ms); }
 /* Faded contents, not the button, so the divider keeps its color. */
-.entry > button:disabled > *, .entry .actions button:disabled > * { opacity: 0.4; }
+.entry > button > *, .entry .actions button > * { transition: opacity var(--snap-ms) var(--ease-out); }
+.entry > button:disabled > *, .entry .actions button:disabled > * { opacity: 0.4; transition-duration: var(--back-ms); }
+.entry .actions button.toggle > * { transition-duration: var(--back-ms); }
+.entry .actions button.toggle:disabled > * { transition-duration: var(--snap-ms); }
 .help { display: flex; flex-wrap: wrap; gap: 0 1ch; padding-top: 0.25lh; color: var(--description); }
 /* 'key: description, …' as in the terminal's help row; /keys sits right. */
 .help > :not(:nth-last-child(-n + 2))::after { content: ','; color: var(--description); }
@@ -421,11 +428,12 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .entry .actions.nudge-actions .go { right: 0; z-index: 1; background-color: inherit; }
   /* Each direction uses the transition of the state it enters: tucking
      slides behind Send, then hides; returning jumps back and fades in. */
-  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity 500ms ease-in-out; }
+  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity var(--back-ms) var(--ease-out); }
   .entry .actions.nudge-actions.tucked { width: 44px; }
-  .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform 250ms var(--ease-out), opacity 0s 250ms; }
+  .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform var(--snap-ms) var(--ease-out), opacity 0s var(--snap-ms); }
 }
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry .actions.nudge-actions .toggle, .entry .actions.nudge-actions.tucked .toggle, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+/* Reduced motion keeps fades and drops movement. */
+@media (prefers-reduced-motion: reduce) { .Card .body, .Tabs .strip .marker { transition: none; } .entry .actions.nudge-actions.tucked .toggle { transition: opacity var(--snap-ms) var(--ease-out); } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
 .Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
 /* Options: a hairline in the card's color; the chosen one solid in it,

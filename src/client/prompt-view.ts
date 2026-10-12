@@ -51,12 +51,17 @@ function rule(cols: number, left = '', center = ''): string {
 // An example in `fg` on `bg` from column `from` (where the text before
 // it ends) to `width`: its cut blank, then its text, clipped. A fading
 // edge (ansi.fades()) steps its last or first 3 glyphs toward `bg`,
-// unless clipped. Ends in `back`.
+// unless clipped; a returning one (`back`) fades in from `bg` on a
+// quartic ease-out, near the web's --ease-out. Ends in `back`.
 function example(ex: Shown, fg: Oklch, bg: Oklch, width: number, back: Oklch | undefined, from = 0): string {
 	let pad = Math.max(0, strings.visLen(ex.cut) - from)
 	let room = width - from - pad
 	let text = ansi.clean(ex.text)
 	if (room <= 0 || !text) return ''
+	if (ex.back !== undefined && ansi.fades()) {
+		let t = 1 - (1 - Math.min(1, ex.back / placeholders.BACK)) ** 4
+		fg = [bg[0] + (fg[0] - bg[0]) * t, bg[1] + (fg[1] - bg[1]) * t, fg[2]]
+	}
 	let end = back ? ansi.sgr({ fg: back }) : ''
 	if (!ex.fade || !ansi.fades() || strings.visLen(text) > room) return ' '.repeat(pad) + ansi.sgr({ fg }) + strings.clipVisual(text, room) + end
 	let g = placeholders.graphemes(text)
