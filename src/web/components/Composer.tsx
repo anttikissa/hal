@@ -42,8 +42,10 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	}
 	createEffect(() => props.text, () => fit())
 	// The example over the box (placeholders.follow), redrawn when its
-	// text next changes. With reduced motion its clock stands still: the
-	// first example stays, and typing hides it at once.
+	// text next changes. As typing starts, the part right of the typed
+	// text fades out by CSS (--snap-ms) instead of erasing on a timer.
+	// With reduced motion its clock stands still: the first example
+	// stays, and typing hides it at once.
 	let reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 	let [tick, setTick] = createSignal(0)
 	let example = createMemo(() => {
@@ -52,7 +54,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		return reduced && props.text ? undefined : app.placeholder(props.text, reduced ? 0 : Date.now())
 	})
 	createEffect(example, (ex) => {
-		if (!ex || reduced || ex.next === Infinity) return
+		if (!ex || reduced || ex.next === Infinity || props.text) return
 		let timer = setTimeout(() => setTick((n) => n + 1), ex.next)
 		return () => clearTimeout(timer)
 	})
@@ -268,7 +270,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				</button>
 				{/* Our own placeholder, so it can erase and fade at its edges. */}
 				<div class="field">
-				<span class={['hint', example()?.fade, { gone: !example() }]} aria-hidden="true"><span class="cut">{example()?.cut}</span><span class="text">{example()?.text}</span></span>
+				<span class={['hint', example()?.fade, { gone: !example() || !!props.text }]} aria-hidden="true"><span class="cut">{example()?.cut}</span><span class="text">{example()?.text}</span></span>
 				<textarea
 					ref={box}
 					rows={1}
