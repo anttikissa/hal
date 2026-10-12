@@ -87,6 +87,23 @@ function arrived(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock {
 	return toolPresentations.attach(call, call)
 }
 
+function multiple(text: string, ctx?: CallContext) {
+	return callText.split(text).map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
+}
+
+function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
+	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string') return [nativeTool.arrived(call, ctx)]
+	try {
+		let commands = callText.split(call.input.cmd)
+		if (commands.length < 2) return [nativeTool.arrived(call, ctx)]
+		let resolved = commands.map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
+		return resolved.map((resolved, i) => {
+			let member: ToolCallBlock = { type: 'tool_call', id: i ? crypto.randomUUID() : call.id, ...resolved, sequence: call.id }
+			return toolPresentations.attach(member, member)
+		})
+	} catch { return [toolPresentations.attach(call, call)] }
+}
+
 // Exact syntax lines, from the module or its schema.
 function usage(tool: Tool<unknown>): string[] {
 	if (tool.syntax?.usage) return tool.syntax.usage
@@ -121,4 +138,4 @@ function summary(): string {
 	return [...tools.all().values()].filter((t) => t.syntax?.summary !== false).map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`).join('\n')
 }
 
-export const nativeTool = { name, def, find, generic, resolve, arrived, usage, help, summary }
+export const nativeTool = { name, def, find, generic, resolve, arrived, multiple, expand, usage, help, summary }

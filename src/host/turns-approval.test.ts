@@ -145,6 +145,27 @@ test('each dangerous call is asked once, harmless ones not at all; answers survi
 	expect(history.readSync(id).filter((r) => r.type === 'question')).toHaveLength(2)
 })
 
+test('compound commands retain individual approvals and declined results', async () => {
+	let c = client(), id = session(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'tidy' })
+	await until(() => calls.length === 1)
+	round1({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd: 'READ notes.txt\nBASH "rm -rf junk"\nREAD notes.txt' } })
+	await until(() => transcript.question(c.views.get(id)))
+	let question = transcript.question(c.views.get(id))!
+	expect(question.form.quote!.text).toBe('rm -rf junk')
+	expect(ran).toEqual([])
+	c.conn.send({ type: 'answer', sessionId: id, question: question.id, answers: { run: 'no' } })
+	await until(() => calls.length === 2)
+	expect(existsSync(`${home}/junk`)).toBe(true)
+	let out = results(calls[1]!)
+	expect(out).toHaveLength(3)
+	expect(out[1]).toMatchObject({ isError: true, output: expect.stringContaining('declined') })
+	expect(out[0].output).toContain('milk')
+	expect(out[2].output).toContain('milk')
+	finish(calls[1]!)
+	await until(() => c.of('turn-end').length)
+})
+
 test("Escape at an approval pauses with the turn's usage; the call has not run and continue asks again", async () => {
 	let a = client()
 	let id = session(a)

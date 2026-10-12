@@ -5,7 +5,7 @@ import { nativeTool } from './native-tool.ts'
 import { sessions } from './sessions.ts'
 
 async function* call(cmd: string, sessionId: string): AsyncGenerator<StreamEvent> {
-	yield nativeTool.arrived({ type: 'tool_call', id: `tool-${crypto.randomUUID()}`, name: 'tool', input: { cmd } }, { sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/tool' })
+	yield* nativeTool.expand({ type: 'tool_call', id: `tool-${crypto.randomUUID()}`, name: 'tool', input: { cmd } }, { sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/tool' })
 	yield { type: 'done', reason: 'tool_use' }
 }
 

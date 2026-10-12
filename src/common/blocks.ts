@@ -18,7 +18,7 @@ export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string
 
 // `cmd`: the native tool's call text this internal call came from (task
 // aks); replay sends that back instead of name and input.
-export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name: string; input: Record<string, unknown>; cmd?: string }
+export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name: string; input: Record<string, unknown>; cmd?: string; sequence?: string }
 
 // `ms`: the call's wall time (task wm0); records before it have none.
 // `interrupted`: a new user message canceled the call before it started
@@ -117,7 +117,7 @@ function apply(turn: Turn, event: StreamEvent): void {
 			else turn.blocks.push({ type: 'thinking', text: '', signature: event.value, provider: turn.provider })
 			break
 		case 'tool_call':
-			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input, ...(event.cmd !== undefined && { cmd: event.cmd }), ...(event.presentation !== undefined && { presentation: event.presentation }), ...(event.presentationError !== undefined && { presentationError: event.presentationError }) })
+			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input, ...(event.cmd !== undefined && { cmd: event.cmd }), ...(event.sequence !== undefined && { sequence: event.sequence }), ...(event.presentation !== undefined && { presentation: event.presentation }), ...(event.presentationError !== undefined && { presentationError: event.presentationError }) })
 			break
 		case 'usage':
 			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v

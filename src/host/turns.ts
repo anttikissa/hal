@@ -35,7 +35,6 @@ import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
 import { nativeTool } from './native-tool.ts'
-import { edit } from './tools/edit.ts'
 import { bash } from './tools/bash.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
@@ -189,9 +188,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id, cacheId }, signal)) {
 				if (signal.aborted) return
 				if (event.type !== 'tool_call') { yield event; continue }
-				let call = nativeTool.arrived({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })
-				if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
-				yield { ...call, type: 'tool_call' }
+				for (let call of nativeTool.expand({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })) {
+					if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
+					yield { ...call, type: 'tool_call' }
+				}
 			}
 			return
 		}
@@ -324,12 +324,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					if (running.steered && !running.unsafe) { delete running.steered; prompts.interrupt(running) }
 				}
 			}
-			let early = calls.filter((c) => c.name !== 'wait')
-			let settled = new Map<string, ToolResultBlock>()
-			let run = await edit.batch(calls, cwd, id, runOne)
-			for (let r of await Promise.all(early.map(run))) settled.set(r.id, r)
-			for (let call of calls) if (!settled.has(call.id)) settled.set(call.id, await run(call))
-			let results = calls.map((c) => settled.get(c.id)!)
+			let results = await tools.round(calls, ctx, runOne)
 			if (turns.state.running.get(id) !== running) return
 			if (contextTransitions.pending(id)?.kind === 'rebase') {
 				let { stop } = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)

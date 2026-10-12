@@ -9,8 +9,8 @@
 //
 // A round's calls run concurrently, their results in call order; only
 // wait starts after the others settle, so it sees children spawned in
-// the same round (turns.ts). Calls that must follow one another belong
-// in separate rounds.
+// the same round. Commands within one native call run in written order
+// (task ep8).
 
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
@@ -22,6 +22,7 @@ import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { history } from './history.ts'
+import { edit } from './tools/edit.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
@@ -119,7 +120,8 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		// (nativeTool.arrived): say why. Never run it, since approval saw
 		// only the unresolved call.
 		if (call.name === nativeTool.name) {
-			nativeTool.resolve(call.input.cmd, ctx)
+			if (typeof call.input.cmd === 'string') nativeTool.multiple(call.input.cmd, ctx)
+			else nativeTool.resolve(call.input.cmd, ctx)
 			throw new Error('the tool call did not resolve when it arrived; send it again')
 		}
 		let tool = tools.all().get(call.name)
@@ -153,6 +155,25 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	let ms = Math.round(performance.now() - start)
 	if (ms >= 1000) result.ms = ms
 	return toolPresentations.attach(call, result)
+}
+
+async function round(calls: ToolCallBlock[], ctx: CallContext, runOne: (call: ToolCallBlock) => Promise<ToolResultBlock>): Promise<ToolResultBlock[]> {
+	let groups = new Map<string, ToolCallBlock[]>()
+	for (let call of calls) {
+		let key = call.sequence ?? call.id
+		let group = groups.get(key)
+		if (group) group.push(call)
+		else groups.set(key, [call])
+	}
+	let settled = new Map<string, ToolResultBlock>()
+	let run = await edit.batch(calls.filter((c) => !c.sequence), ctx.cwd, ctx.sessionId, runOne)
+	let dispatch = async (group: ToolCallBlock[]) => {
+		for (let call of group) settled.set(call.id, await run(call))
+	}
+	let early = [...groups.values()].filter((g) => g[0]!.name !== 'wait')
+	await Promise.all(early.map(dispatch))
+	for (let group of groups.values()) if (!settled.has(group[0]!.id)) await dispatch(group)
+	return calls.map((c) => settled.get(c.id)!)
 }
 
 // Retain the whole result when cut, and show both ends: a bash failure
@@ -213,6 +234,7 @@ export const tools = {
 	unsafe: (call: ToolCallBlock): boolean => call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true,
 	page,
 	run,
+	round,
 	cap,
 	killGroup,
 }

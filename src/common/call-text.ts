@@ -100,4 +100,28 @@ function values(raw: string): Values {
 	return { values: out, ...(purpose && { purpose }), ...(unclosed && { unclosed: true as const }) }
 }
 
-export const callText = { parse, values, maxChars }
+function split(text: string): string[] {
+	callText.parse(text)
+	if (!text.includes('\n')) return [text]
+	let starts = [0], lineStart = true, first = true
+	for (let i = 0; i < text.length;) {
+		let c = text[i]!
+		if (/\s/.test(c)) { if (c === '\n') lineStart = true; i++; continue }
+		if (text.startsWith('/*', i)) {
+			let close = text.indexOf('*/', i + 2)
+			i = close < 0 ? lineEnd(text, i) : close + 2
+			continue
+		}
+		if (c === '#' || text.startsWith('//', i)) { i = lineEnd(text, i); continue }
+		if (lineStart && /^[A-Za-z_]+(?=\s|$|\/\*)/.test(text.slice(i))) {
+			if (!first) starts.push(i)
+		}
+		first = false
+		lineStart = false
+		if ('{["\'`'.includes(c)) i = ason.parseAt(text, i).end
+		else while (i < text.length && !/\s/.test(text[i]!)) i++
+	}
+	return starts.map((start, i) => text.slice(start, starts[i + 1]).trim())
+}
+
+export const callText = { parse, values, split, maxChars }
