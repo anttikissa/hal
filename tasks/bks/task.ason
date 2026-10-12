@@ -1,0 +1,10 @@
+{
+	title: 'Calmer error colors from existing palette',
+	spec: 'The built-in palette and shipped themes render errors with their existing info style, not hot red, in both terminal and web. This replaces the hot-red error default, including the wopr red-error exception. Errors, including failed READ output and failure labels, remain complete and visible; only color changes. Reuse colors.info() at call time, introducing no new color values. themes/hal.ts mirrors the built-in error style.',
+	status: 'done',
+	notes: [
+		'Reused info styles in the built-in palette and all shipped themes so theme overrides cannot restore hot red. Focused colors, item-view and frame tests: 51 passed, including every shipped theme contrast check. No output or failure semantics changed.'
+	],
+	needs: ['1w', 'd3'],
+	foldInto: ['1w', 'd3']
+}

@@ -70,8 +70,8 @@ export const look: Look = {
 	log: () => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
 	warning: () => ({ fg: [0.87, 0.18, 82], bg: [0.2, 0.05, 82], code: [0.92, 0.12, 82], linkBg: [0.28, 0.06, 82] }),
-	// Errors: hot red.
-	error: () => ({ fg: [0.72, 0.24, 25], bg: [0.2, 0.08, 25], code: [0.84, 0.16, 25], linkBg: [0.24, 0.07, 25] }),
+	// Errors: the existing calm info palette.
+	error: () => colors.info(),
 	info: () => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: () => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),

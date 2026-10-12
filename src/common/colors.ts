@@ -91,7 +91,7 @@ export const colors = {
 	// User messages and the prompt input: the same bright blue card.
 	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
 	// Messages and commands from another session (task 9p): hot pink,
-	// apart from bash's magenta and the error red.
+	// apart from bash's magenta and the calm error color.
 	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
 	// placeholder: the example request in an empty prompt, readable but
 	// quieter than typed text.
@@ -102,8 +102,8 @@ export const colors = {
 	warning: (): Style => ({ fg: [0.87, 0.18, 82], bg: [0.2, 0.05, 82], code: [0.92, 0.12, 82], linkBg: [0.28, 0.06, 82] }),
 	// Questions waiting on the user: green, apart from warnings.
 	question: (): Style => ({ fg: [colors.fgL, colors.fgC, 150], bg: [colors.bgL, colors.bgC, 150], code: [0.92, 0.1, 150], linkBg: [0.28, 0.06, 150] }),
-	// Errors: hot red.
-	error: (): Style => ({ fg: [0.72, 0.24, 25], bg: [0.2, 0.08, 25], code: [0.84, 0.16, 25], linkBg: [0.24, 0.07, 25] }),
+	// Errors: the existing calm info palette.
+	error: (): Style => colors.info(),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
@@ -161,11 +161,10 @@ export const colors = {
 	// selected row's popupCurrent background (L 0.42).
 	popupNote: (): Style => ({ fg: [0.8, 0, 0] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
-	// A nonzero exit status (task wm0): coral, beside bash's magenta,
-	// softer than the error red: exit 1 is often harmless.
+	// A nonzero exit status (task wm0): coral, beside bash's magenta.
+	// Exit 1 is often harmless.
 	exit: (): Style => ({ fg: [0.75, 0.17, 15] }),
-	// Edit diffs: soft pastels, easy on the eyes (the error red is too
-	// harsh for so many lines).
+	// Edit diffs: soft pastels, easy on the eyes.
 	diff: (): Style => ({ addFg: [0.8, 0.16, 146], removeFg: [0.72, 0.16, 28] }),
 	// The web page's own surfaces (custom properties on .page): canvas
 	// and text, the focus accent, form fields, borders, and buttons (the
@@ -184,8 +183,8 @@ export const colors = {
 		// Where a press or a linked card's flash starts (web/flash.ts).
 		flash: [1, 0, 0],
 	}),
-	// Tools: each kind its own hue. Red is kept for real failures. A
-	// tool without its own entry (tool + capitalized name) uses `tool`.
+	// Tools: each kind its own hue.
+	// A tool without its own entry (tool + capitalized name) uses `tool`.
 	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
 	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
