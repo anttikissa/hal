@@ -46,6 +46,6 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 		let fallback = cap?.policy ?? cap?.default
 		let cacheChanged = ctx.model === choice.id && choice.id.startsWith('anthropic/') && (ctx.effort ?? fallback) !== (choice.effort ?? fallback)
 		ctx.setModel(next)
-		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic message cache' : ''}${choice.id === 'hal/tool' && previous !== next ? `\n\n${toolModel.welcome}` : ''}` }
+		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic prompt cache for messages' : ''}${choice.id === 'hal/tool' && previous !== next ? `\n\n${toolModel.welcome}` : ''}` }
 	},
 }
