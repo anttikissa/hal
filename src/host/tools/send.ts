@@ -34,18 +34,18 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	let state = status.stateOf(id)
 	if ((item.delivery === 'after-turn') && notify.asked(id)) return `Queued in ${to}: it waits for the user's answer, then reads this`
 	let held = { paused: 'paused', error: 'failed' }[state.type as string]
-	if (held) return `Waiting in ${to}: it is ${held}; it reads this when the user continues it`
+	if (held) return `Waiting in ${to}: it is ${held}; this message stays pending. To resume it, SEND "${id}" "Continue your work and read pending messages" { delivery: "steer" }`
 	if (state.type === 'blocked') return `Waiting in ${to}: it waits for the user (${state.reason}); it reads this after`
 	if ((item.delivery === 'after-turn')) return `Queued in ${to}: it reads this after its current turn`
-	return delivery === 'emergency' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
+	return delivery === 'steer' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
 }
 
 export const tool: Tool = {
 	name: 'send',
 	syntax: { summary: 'message to session', positional: ['to', 'text'], aliases: { session: 'to' } },
 	description:
-		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round; queue waits for the current turn to end; emergency interrupts all but unsafe and background work — only to stop harmful or wasted work, or restart a stuck agent. ' +
-		'When a child asks you a question, use send to answer.',
+		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work. ' +
+		'Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed. Steer also bypasses pending text questions. emergency is a compatibility alias for steer. When a child asks you a question, use send to answer.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -55,7 +55,7 @@ export const tool: Tool = {
 				type: 'string',
 				description: 'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
 			},
-			delivery: { type: 'string', enum: ['soft-steer', 'queue', 'emergency'], description: 'Default soft-steer' },
+			delivery: { type: 'string', enum: ['soft-steer', 'queue', 'steer', 'emergency'], description: 'Default soft-steer; emergency aliases steer' },
 		},
 		required: ['to', 'text'],
 	},
@@ -64,14 +64,15 @@ export const tool: Tool = {
 		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
 		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
 		if (description !== undefined && (typeof description !== 'string' || !description.trim())) throw new Error('description must be a non-empty sentence; the message was not sent')
-		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'emergency') throw new Error('delivery must be soft-steer, queue or emergency')
+		if (delivery === 'emergency') delivery = 'steer'
+		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'steer') throw new Error('delivery must be soft-steer, queue or steer (emergency aliases steer)')
 		let id = target(to.trim())
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
 		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), ...(description && { summary: description.replace(/\s+/g, ' ').trim() }) }
 		if (delivery === 'soft-steer') sender.advisory = true
-		let refused = prompts.submit(id, text, undefined, delivery === 'emergency' ? 'steer' : delivery, sender)
+		let refused = prompts.submit(id, text, undefined, delivery, sender)
 		if (refused) throw new Error(refused)
 		return outcome(id, text, ctx.sessionId, delivery)
 	},

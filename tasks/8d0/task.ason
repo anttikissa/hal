@@ -1,0 +1,10 @@
+{
+	title: 'SEND steer resumes recipients with actionable pause feedback',
+	spec: 'SEND advertises delivery soft-steer (default), queue and steer, matching user delivery terminology. Steer starts or resumes idle, paused or failed recipients, bypasses text questions and interrupts active work, preserving unsafe-call deferral, background work, sender provenance and blocked forms. Accept emergency as a compatibility alias for steer. Replace zb0 emergency-only naming and guidance: ordinary updates still use soft-steer; explicit continuation uses steer. HELP SEND and SUBAGENTS explain this distinction. A paused or failed SEND result reports the waiting message and gives an exact SEND steer continuation call for that recipient, without implying only the user can resume it. Restore invariant: a sender can discover and perform explicit continuation from the result, while ordinary sends respect pauses.',
+	status: 'done',
+	notes: [
+		'Reading HELP SEND did not prevent the failure: emergency naming discouraged routine continuation, and the paused result implied only a human could resume. Steer is normalized at the tool boundary; scheduling remains unchanged. Existing recovery tests cover both spellings after pause, failure and text question. No new persistent state or polling.'
+	],
+	needs: ['zb0'],
+	foldInto: ['zb0']
+}

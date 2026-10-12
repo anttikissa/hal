@@ -79,13 +79,13 @@ test('an idle session gets the message as a turn of its own, with full attention
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 })
 
-test('emergency is read like the user steering; queue waits for the turn to end', async () => {
+test('steer is read like the user steering; queue waits for the turn to end', async () => {
 	let c = client()
 	let { a, b, by } = pair(c)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
 	await until(() => calls.length === 1)
 	let next = await send(c, b, { to: '1', text: 'later', delivery: 'queue' })
-	calls[next]!.push(sendCall({ to: '1', text: 'now', delivery: 'emergency' }, 's2'), { type: 'done', reason: 'tool_use' })
+	calls[next]!.push(sendCall({ to: '1', text: 'now', delivery: 'steer' }, 's2'), { type: 'done', reason: 'tool_use' })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a && lastText(i).endsWith('now'))
 	await until(() => recipient() >= 0)
 	expect(c.views.get(a)!.inbox.map((m) => [m.text, (m.delivery === 'after-turn'), m.advisory])).toEqual([
@@ -150,7 +150,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	])
 })
 
-test('a paused session stays paused: the message waits for the user to continue', async () => {
+test('an ordinary send respects a pause and offers explicit continuation', async () => {
 	let c = client()
 	let { a, b } = pair(c)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
@@ -158,7 +158,8 @@ test('a paused session stays paused: the message waits for the user to continue'
 	c.conn.send({ type: 'pause', sessionId: a })
 	await until(() => c.of('turn-end').length === 1)
 	let next = await send(c, b, { to: '1', text: 'fyi' })
-	expect(resultOf(next)).toMatchObject({ output: `Waiting in ${tabs.label(a)}: it is paused; it reads this when the user continues it` })
+	expect(resultOf(next).output).toContain(`Waiting in ${tabs.label(a)}: it is paused`)
+	expect(resultOf(next).output).toContain(`SEND "${a}" "Continue your work and read pending messages" { delivery: "steer" }`)
 	expect(c.views.get(a)!.state.type).toBe('paused')
 	expect(c.views.get(a)!.inbox.map((m) => m.text)).toEqual(['fyi'])
 	c.conn.send({ type: 'continue', sessionId: a })
@@ -166,7 +167,7 @@ test('a paused session stays paused: the message waits for the user to continue'
 	expect(lastText(next + 1)).toMatch(/\nfyi$/)
 })
 
-test.each(['pause', 'failure', 'question'])('an emergency resumes a recipient after %s instead of waiting for a human', async (stop) => {
+test.each(['steer', 'emergency'].flatMap((delivery) => ['pause', 'failure', 'question'].map((stop) => [delivery, stop])))('%s resumes a recipient after %s instead of waiting for a human', async (delivery, stop) => {
 	let c = client()
 	let { a, b } = pair(c)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
@@ -175,7 +176,7 @@ test.each(['pause', 'failure', 'question'])('an emergency resumes a recipient af
 	else if (stop === 'failure') calls[0]!.push({ type: 'error', message: '400 bad request', status: 400 })
 	else calls[0]!.push({ type: 'text', text: '<question>Continue?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
-	let next = await send(c, b, { to: '1', text: 'STOP', delivery: 'emergency' })
+	let next = await send(c, b, { to: '1', text: 'STOP', delivery })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a)
 	await until(() => recipient() >= 0)
 	expect(resultOf(next).output).toContain('it started a turn')
