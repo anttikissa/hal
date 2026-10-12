@@ -5,7 +5,8 @@
 
 import { attachments } from './attachments.ts'
 import { titles } from './titles.ts'
-import type { Item } from './transcript.ts'
+import { transcript, type Item, type Transcript } from './transcript.ts'
+import { card } from './card.ts'
 
 // `inline`: a prompt open with its pastes' text in place of markers.
 export type Fold = 'closed' | 'open' | 'inline'
@@ -45,7 +46,7 @@ function parse(args: string): Target | string {
 
 // Whether `item` expands and collapses.
 function toggles(item: Item): boolean {
-	return item.type === 'tool' || item.type === 'thinking' || item.type === 'text' || item.type === 'prompt' || (item.type === 'output' && !!item.change)
+	return card.toggles(item)
 }
 
 // The blocks `target` names in `items`, in transcript order, or why
@@ -105,11 +106,9 @@ function describe(p: Plan, next: (item: Item) => Fold): string {
 	return `${verb} ${toggle.noun(p.items)}${ids.length > 1 ? ':' : ''} ${ids.length > 6 ? `${ids[0]}-${ids.at(-1)}` : ids.join(', ')}`
 }
 
-// A block's state until toggled: tools closed (a glimpse), another
-// session's message closed (its summary and glimpse), prompt-file
-// changes closed (their summary rows), the rest open.
+// Shared defaults; terminal tools retain their native untoggled glimpse.
 function initial(item: Item): Fold {
-	return item.type === 'tool' || (item.type === 'output' && !!item.change) || (item.type === 'prompt' && !!item.summary) ? 'closed' : 'open'
+	return card.initial(item)
 }
 
 // Whether a prompt has pastes, so it has three states.
@@ -119,9 +118,17 @@ function pastes(item: Item): string[] {
 }
 
 // The state after `now`: closed, open, then (with pastes) inline.
-function next(item: Item, now: Fold): Fold {
+function next(item: Item, now: Fold, inlinePastes = true): Fold {
 	if (now === 'closed') return 'open'
-	return now === 'open' && (toggle.pastes(item).length || (item.type === 'tool' && item.presentation)) ? 'inline' : 'closed'
+	return now === 'open' && (inlinePastes && toggle.pastes(item).length || (item.type === 'tool' && item.presentation)) ? 'inline' : 'closed'
+}
+
+function step(item: Item, now: Fold, open?: boolean, inlinePastes = true): Fold {
+	return open === undefined ? toggle.next(item, now, inlinePastes) : !open ? 'closed' : now === 'closed' ? 'open' : now
+}
+
+function items(t: Pick<Transcript, 'items' | 'inbox'>): Item[] {
+	return [...t.items, ...t.inbox.map((m) => transcript.waitingItem(m))]
 }
 
 // Applies `mode` with `args` to `states` (key → state). Returns the
@@ -130,8 +137,8 @@ function apply(mode: Mode, states: Map<string, Fold>, items: Item[], args: strin
 	let state = (i: Item) => states.get(i.key) ?? toggle.initial(i)
 	let p = toggle.plan(mode, items, args, state)
 	if (typeof p === 'string') return p
-	for (let i of p.items) states.set(i.key, p.open === undefined ? toggle.next(i, state(i)) : !p.open ? 'closed' : state(i) === 'closed' ? 'open' : state(i))
+	for (let i of p.items) states.set(i.key, toggle.step(i, state(i), p.open))
 	return p.items.map((i) => i.key)
 }
 
-export const toggle = { kinds, parse, toggles, resolve, plan, noun, describe, initial, pastes, next, apply }
+export const toggle = { kinds, parse, toggles, resolve, plan, noun, describe, initial, pastes, next, step, items, apply }

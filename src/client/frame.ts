@@ -3,6 +3,7 @@
 // renderer (render.ts) decides how to get it onto the terminal.
 
 import { bashResult } from '../common/bash-result.ts'
+import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
@@ -153,13 +154,12 @@ function look(_item: Item, look: Look): Look {
 	return look
 }
 
-// A queued message's compact row (task 16): `note`, then its text, no
-// header; one row, cut with an ellipsis. Its id links to the web, where
-// it opens in full.
-function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number, session?: string): string[] {
+// Queued cards share their sender's style, whether compact or expanded.
+function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number, session?: string, look: Look = {}): string[] {
+	if ((look.fold ?? toggle.initial(item)) !== 'closed') return frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', { ...look, pad: false })
 	let style = itemView.itemStyle(item)
 	let { inner, mark } = frame.ref(item, cols, session, style)
-	let lines = [strings.clipVisual(ansi.clean(`${note} ${item.text}`.replace(/\s+/g, ' ')), inner)]
+	let lines = [strings.clipVisual(ansi.clean(`${note} ${card.text(item)}`.split('\n')[0]!).replace(/\s+/g, ' '), inner)]
 	mark(lines, 0)
 	return lines.flatMap((r) => ansi.paintRows(r, style, cols))
 }
@@ -340,19 +340,21 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	]
 	// A stack of queued rows is one block: a padding row of its
 	// background above the first and below the last, none between.
-	let stacked = false
-	let edge = ansi.paint('', colors.user(), cols)
+	let stacked: string | undefined
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
-		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session) : frame.itemRows(item, cols, session)
-		if (stacked && !queued) lines.push(edge)
-		if (rows.length && (lines.length || above) && !(stacked && queued)) lines.push('')
-		if (queued && !stacked) lines.push(edge)
-		stacked = queued
+		let look: Look = { fold: view.folds?.states.get(item.key), pastes: view.folds?.pastes }
+		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session, look) : frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
+		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
+		let joined = edge !== undefined && stacked === edge
+		if (stacked && !joined) lines.push(stacked)
+		if (rows.length && (lines.length || above) && !joined) lines.push('')
+		if (edge && !joined) lines.push(edge)
+		stacked = edge
 		lines.push(...rows)
 	}
-	if (stacked) lines.push(edge)
+	if (stacked) lines.push(stacked)
 	// The chrome, built apart to know its height for the padding.
 	let history = lines
 	lines = []

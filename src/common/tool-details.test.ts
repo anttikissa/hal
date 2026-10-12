@@ -47,6 +47,15 @@ test('send headers distinguish requested destinations from host-resolved ones', 
 	}
 })
 
+test('SEND exposes slash commands before destinations even with a purpose', () => {
+	let input = { to: '2', text: '/close', description: 'Finish session' }
+	expect(toolDetails.headline('send', input).text).toBe('/close → tab 2: Finish session')
+	expect(toolDetails.lines('send', input)).toEqual([])
+	let multiline = { ...input, text: '/close\nnot discarded' }
+	expect(toolDetails.lines('send', multiline)).toContain('text: /close')
+	expect(toolDetails.lines('send', multiline)).toContain('  not discarded')
+})
+
 test('command labels remain literal for discovery, sparse plans and other commands', () => {
 	for (let command of ['/help', '/help rebase', '/rebase run --paused drop t4-; edit #u2 "new; edit is text"', '/rebase preview edit #2 `full\\nreplacement`', '/rename Keep slash labels']) {
 		expect(toolDetails.headline('command', { command }).text).toBe(command)

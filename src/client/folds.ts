@@ -39,12 +39,13 @@ function run(id: string, args: string, mode: Mode = 'toggle'): string | undefine
 	let t = folds.transcriptOf(id)
 	if (!t) return undefined
 	let states = folds.of(id)
-	let done = toggle.apply(mode, states, t.items, args)
+	let items = toggle.items(t)
+	let done = toggle.apply(mode, states, items, args)
 	if (typeof done === 'string') return done
 	// Pastes opened inline: their text comes from the host.
 	for (let key of done) {
 		if (states.get(key) !== 'inline') continue
-		for (let name of toggle.pastes(t.items.find((i) => i.key === key)!)) {
+		for (let name of toggle.pastes(items.find((i) => i.key === key)!)) {
 			if (folds.state.pastes.has(name)) continue
 			folds.state.pastes.set(name, {})
 			app.send({ type: 'paste-text', sessionId: id, name })
@@ -72,12 +73,13 @@ function open(): void {
 	let id = t.meta.id
 	let at = (i: Item) => folds.fold(id, i)
 	app.close()
-	app.open(blocksDialog.update(blocksDialog.open(), t.items, at), (action) => {
+	app.open(blocksDialog.update(blocksDialog.open(), toggle.items(t), at), (action) => {
 		let error = folds.run(id, action.answers.target ?? '')
 		if (error) app.state.notice = error
 		return undefined
 	}, (m, k) => {
-		let items = folds.transcriptOf(id)?.items ?? []
+		let t = folds.transcriptOf(id)
+		let items = t ? toggle.items(t) : []
 		if (k.key === 'tab' && !k.shift && !k.ctrl && !k.alt) return { state: blocksDialog.complete(m, items, at) }
 		let r = modals.step(m, k)
 		return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: blocksDialog.update(r.state, items, at) } : r

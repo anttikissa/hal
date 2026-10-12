@@ -10,6 +10,7 @@ import type { Item } from '../../common/transcript.ts'
 import type { SlashCommand } from '../commands.ts'
 import { host } from '../host.ts'
 import { sessionBlocks } from '../session-blocks.ts'
+import { status } from '../status.ts'
 
 const syntax = 'Targets:\n24 or #t24: one block\n10-24: a range\nt14,r2-9: a list\nt*: every tool block\nau10-40: user and assistant blocks in 10-40\nempty: the latest tool block\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant blocks alone unless named.'
 const help: Record<Mode, string> = {
@@ -33,7 +34,7 @@ function folding(mode: Mode): SlashCommand {
 		run(args, _answers, ctx) {
 			let target = toggle.parse(args)
 			if (typeof target === 'string') return { error: target }
-			let found = toggle.resolve(sessionBlocks.of(ctx.sessionId), target, mode)
+			let found = toggle.resolve(toggle.items({ items: sessionBlocks.of(ctx.sessionId), inbox: status.inboxOf(ctx.sessionId) }), target, mode)
 			if (typeof found === 'string') return { error: found }
 			host.broadcast(ctx.sessionId, { type: 'toggle', sessionId: ctx.sessionId, target: args.trim(), ...(mode !== 'toggle' && { mode }) })
 			return { result: `${done[mode]} ${toggle.noun(found)}${found.length > 1 ? ':' : ''} ${found.map(label).join(', ')}` }

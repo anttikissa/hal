@@ -8,6 +8,7 @@ import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
+import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
@@ -17,7 +18,6 @@ import { transcript, type Item as Keyed, type Shown as Item } from '../common/tr
 import { ansi } from './ansi.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
-import { summary } from '../common/summary.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
 import { resolve } from 'path'
@@ -98,16 +98,16 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // `look`: the block's fold state, when toggled (task ghs), and the
 // pastes a prompt shown inline needs.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = [], look: Look = {}): string[] {
-	let fold = look.fold
+	let fold = look.fold ?? (item.type === 'tool' || item.type === 'tool-result' ? undefined : card.initial(item))
 	let key = (item as { key?: string }).key ?? ''
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
-			let source = bashResult.background(item) ? bashResult.display(item.text) : item.report ? summary.answer(item.text) : item.summary ? summary.strip(item.text) : item.text
+			let source = card.text(item)
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
 			if (item.report && (fold ?? 'closed') === 'closed') return itemView.closedRow(item, '', width)
-			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
-			let body = ansi.wrap(source, width).map(ansi.links)
+			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, look.headerWidth ?? width, undefined, session)
+			let body = card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
 			// Another session's message: its summary, then a glimpse;
 			// opened, its whole text.
 			if (item.summary && !item.report && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
@@ -146,7 +146,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return flows ? body : [...ansi.wrap(prefix.trimEnd(), width), ...body]
 		}
 		case 'text': {
-			let text = summary.answer(item.text).trimEnd()
+			let text = card.text(item).trimEnd()
 			if (!text.trim() && !item.interrupted) return streaming ? [''] : []
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, text, width)
 			let body = markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
@@ -358,11 +358,15 @@ function inlined(text: string, pastes: Look['pastes']): string {
 
 // A closed block's one row (task ghs): its title (or `head`), then the
 // start of its text, quiet.
-function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' '): string[] {
+function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' ', session?: string): string[] {
 	head = ansi.clean(head)
+	let call = bashResult.background(item)
+	if (call && strings.visLen(head) >= width) head = titles.stamp(item.ts, `${call} `)
 	let first = ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
 	let row = strings.expandTabs(strings.clipVisual(head + first, width))
-	return [row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row]
+	row = row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row
+	let href = session && call?.startsWith('#') && transcript.href(session, call.slice(1))
+	return [href ? `\x1b]8;;${ansi.webUrl(href)}\x07${row}${ansi.LINK_OFF}` : row]
 }
 
 // Where an open result's whole output is: the file its cut note names,

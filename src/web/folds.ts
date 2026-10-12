@@ -14,7 +14,6 @@ import type { Event } from '../common/protocol.ts'
 import { toggle, type Fold, type Mode } from '../common/toggle.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item } from '../common/transcript.ts'
-import { bashResult } from '../common/bash-result.ts'
 import { app } from './app.ts'
 import { scroll } from './scroll.ts'
 
@@ -32,7 +31,7 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
 // Whether `item`'s card starts open and closes (text and the user's
 // prompts), rather than starting closed.
 function closable(item: Item): boolean {
-	return item.type === 'text' || (item.type === 'prompt' && !item.summary && !bashResult.background(item))
+	return toggle.toggles(item) && toggle.initial(item) === 'open'
 }
 
 // Whether card `id` (`<session>#<key>`) of `item` shows open.
@@ -64,12 +63,12 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	let t = app.state.view.transcript
 	if (!t) return undefined
 	let at = (i: Item) => folds.fold(t.meta.id, i)
-	let p = toggle.plan(mode, t.items, args, at)
+	let p = toggle.plan(mode, toggle.items(t), args, at)
 	if (typeof p === 'string') return p
 	scroll.follow(() => {
 		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			let next = p.open === undefined ? item.type === 'tool' && item.presentation ? toggle.next(item, at(item)) : at(item) === 'closed' ? 'open' : 'closed' : p.open ? 'open' : 'closed'
+			let next = toggle.step(item, at(item), p.open, false)
 			setRaw((s) => toggled(s, `${t.meta.id}#${item.key}`, next === 'inline'))
 			folds.set(`${t.meta.id}#${item.key}`, item, next !== 'closed', result ? [item.key, result] : [item.key])
 		}
@@ -97,7 +96,7 @@ function onEvent(event: Event): boolean {
 // The dialog `m` with the hint for the session shown.
 function hinted(m: ModalState): ModalState {
 	let t = app.state.view.transcript
-	return t ? blocksDialog.update(m, t.items, (i) => folds.fold(t.meta.id, i)) : m
+	return t ? blocksDialog.update(m, toggle.items(t), (i) => folds.fold(t.meta.id, i), false) : m
 }
 
 // Ctrl-O: the "Expand or collapse blocks" dialog (task v8y).
@@ -119,7 +118,7 @@ function key(k: Key, cursor?: number): void {
 	if (!m?.compact) return
 	if (k.key === 'tab') {
 		if (!t) return
-		let next = blocksDialog.complete(m, t.items, (i) => folds.fold(t.meta.id, i), cursor)
+		let next = blocksDialog.complete(m, toggle.items(t), (i) => folds.fold(t.meta.id, i), cursor, false)
 		app.setView({ ...app.state.view, modal: next })
 		// The caret stays after the completed id, not at the end.
 		let field = document.activeElement

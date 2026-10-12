@@ -58,3 +58,17 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(render('bash', { command: 'echo first\necho second', description: 'Two commands' }, 'closed')).not.toContain('echo first')
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
 })
+
+test('background reports and thinking start closed, expand fully, and SEND shows /close', () => {
+	for (let label of ['bash #t19', 'bash b123abc']) {
+		let item = { type: 'prompt' as const, text: '[exit 1]\nfirst\nlast', from: 'self', label, delivery: 'next-round' as const }
+		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('last')
+		expect(itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'open' }).join('\n')).toContain('last')
+		expect(itemView.receipt(item)).toBe('')
+	}
+	let thinking = { type: 'thinking' as const, text: 'first\n\nlast' }
+	expect(itemView.itemLines(thinking, 80)).toHaveLength(1)
+	expect(itemView.itemLines(thinking, 80, false, undefined, undefined, undefined, [], { fold: 'open' }).join('\n')).toContain('last')
+	let send = { type: 'tool' as const, id: 's', name: 'send', input: { to: '42', text: '/close' } }
+	expect(itemView.itemLines(send, 24)[0]).toContain('/close')
+})

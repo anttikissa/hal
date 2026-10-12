@@ -4,7 +4,7 @@
 
 Targets: "/toggle #t24", "t24", "#24" and "24" all name block 24 (block keys are history line numbers, so the number alone is unique; a wrong letter is ignored). "/toggle 10-24" is an inclusive range. With no target, it toggles the latest tool block. An unknown block or a range with nothing to toggle is an error naming the target.
 
-Blocks that toggle: tool calls with their results (one block), thinking, assistant text, user prompts and messages from other sessions. Defaults stay as today in the terminal: tool results closed (a glimpse), session messages folded to their summary and glimpse, thinking, assistant text and prompts open. A single target flips that block. A range flips each block in it, except assistant text and user prompts, which only a single target toggles.
+Blocks that toggle: tool calls with their results (one block), thinking, assistant text, user prompts and messages from other sessions. Defaults stay as today in the terminal: tool results closed (a glimpse), session messages folded to their summary and glimpse, thinking closed in both clients (task c5x), assistant text and normal prompts open. A single target flips that block. A range flips each block in it, except assistant text and user prompts, which only a single target toggles.
 
 Closed assistant text and closed prompts show one preview line with their block id, like closed thinking. A prompt with paste attachments has three states in turn: closed; open with [paste/<name>] markers; open with the pasted text inline. Without pastes it has two.
 

@@ -79,7 +79,8 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (!to) break
 			let sent = output?.match(/^(?:Sent to|Queued in|Waiting in|Interrupted) (.+?)(?=: it |$)/)?.[1]
 			let target = sent ? titles.address(sent, true) : /^\d+$/.test(to) ? `tab ${to}` : to
-			return { text: `To ${target}${str('description') ? `: ${str('description')}` : ''}`, keys: ['to', 'description'] }
+			let command = typeof input.text === 'string' && /^\s*\//.test(input.text) ? str('text') : undefined
+			return { text: `${command ? `${command} → ` : 'To '}${target}${str('description') ? `: ${str('description')}` : ''}`, keys: ['to', 'description', ...(command ? ['text'] : [])] }
 		}
 		case 'command':
 			if (str('command')) return { text: str('command')!, key: 'command' }

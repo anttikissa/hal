@@ -39,6 +39,29 @@ function plain(lines: string[]): string[] {
 	return lines.map((l) => strip(l).trim())
 }
 
+test('queued cards expand by inbox ID and their padding matches each sender', () => {
+	let v = view([])
+	v.transcript!.inbox = [
+		{ id: 'a', n: 20, text: 'Agent first\nAgent last', from: 'other', delivery: 'after-turn' },
+		{ id: 'b', n: 21, text: 'Human first\nHuman last', delivery: 'after-turn' },
+	]
+	let closed = frame.build(v, 100).lines
+	for (let [text, style] of [['Agent first', colors.message()], ['Human first', colors.user()]] as const) {
+		let at = closed.findIndex((line) => strip(line).includes(text))
+		expect(at).toBeGreaterThan(0)
+		expect(closed[at - 1]).toBe(ansi.paint('', style, 100))
+		expect(closed[at + 1]).toBe(ansi.paint('', style, 100))
+	}
+	expect(plain(closed).join('\n')).not.toContain('Agent last')
+	v.folds = { states: new Map([['20', 'open']]), sig: '20 open' }
+	let opened = plain(frame.build(v, 100).lines).join('\n')
+	expect(opened).toContain('Agent last')
+	expect(opened).toContain('#m20')
+	expect(opened).not.toContain('Human last')
+	v.folds = { states: new Map([['20', 'closed']]), sig: '20 closed' }
+	expect(plain(frame.build(v, 100).lines).join('\n')).not.toContain('Agent last')
+})
+
 // The prompt box in a frame: the indices of its two rules and the
 // plain rows between them.
 function boxOf(f: Frame): { top: number; bottom: number; rows: string[] } {
@@ -487,7 +510,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
 	let jobTitle = lines.find((line) => line.includes('Background command finished'))!
-	expect(plain([jobTitle])[0]).toMatch(/Background command finished #1813 +\(exit 123\) #s1817$/)
+	expect(plain([jobTitle])[0]).toMatch(/Background command finished #1813 missing file +\(exit 123\) #s1817$/)
 	expect(jobTitle).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])

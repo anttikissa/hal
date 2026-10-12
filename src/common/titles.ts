@@ -4,6 +4,7 @@
 // Tasks: rqq.
 
 import type { Shown } from './transcript.ts'
+import { bashResult } from './bash-result.ts'
 
 // Names sent by the host's cached models.dev catalog; fall back to the
 // complete id, never a guessed marketing name.
@@ -87,7 +88,7 @@ function messageHead(item: Shown & { type: 'prompt' }): string {
 
 // Receipts describe model delivery, not transport acknowledgement of normal prompts.
 function receipt(item: Shown): 0 | 1 | 2 {
-	return item.type === 'prompt' && ((item.delivery === 'next-round') || (item.delivery === 'after-turn') || item.queuedAt) ? item.waiting ? 1 : 2 : 0
+	return item.type === 'prompt' && !bashResult.background(item) && ((item.delivery === 'next-round') || (item.delivery === 'after-turn') || item.queuedAt) ? item.waiting ? 1 : 2 : 0
 }
 
 // Who wrote `item`, or undefined for an item without a header.

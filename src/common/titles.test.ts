@@ -58,3 +58,11 @@ test('receipts distinguish inbox delivery from model history without marking imm
 	expect(titles.title({ ...prompt, delivery: 'next-round', waiting: true })).toBe('You (soft-steering)')
 	expect(titles.title({ ...prompt, delivery: 'next-round' })).toBe('You (soft-steered)')
 })
+
+test('background reports carry command status rather than message receipts', () => {
+	for (let label of ['bash #19', 'bash #t19', 'bash b123abc']) {
+		for (let waiting of [true, undefined] as const) {
+			expect(titles.receipt({ type: 'prompt', text: '[exit 1]\nfailed', label, from: 'self', delivery: 'next-round', waiting })).toBe(0)
+		}
+	}
+})

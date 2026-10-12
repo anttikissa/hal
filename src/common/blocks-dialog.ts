@@ -27,15 +27,15 @@ function open(): ModalState {
 }
 
 // `m` with its hint for the field's text; Tab's list goes.
-function update(m: ModalState, items: Item[], fold: (item: Item) => Fold): ModalState {
+function update(m: ModalState, items: Item[], fold: (item: Item) => Fold, inlinePastes = true): ModalState {
 	let p = toggle.plan('toggle', items, m.form!.values[0]!, fold)
-	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, (i) => toggle.next(i, fold(i))) }
+	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, (i) => toggle.next(i, fold(i), inlinePastes)) }
 	return { ...m, blocks: hint }
 }
 
 // Tab: the item under the cursor gets the common prefix of the block
 // ids it matches; several are listed, newest first. Never cycles.
-function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, cursor = m.form!.cursor): ModalState {
+function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, cursor = m.form!.cursor, inlinePastes = true): ModalState {
 	let text = m.form!.values[0]!
 	let before = text.slice(0, cursor)
 	let token = /#?[a-z]*\d*$/i.exec(before)![0]
@@ -47,7 +47,7 @@ function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, curs
 	let fill = found.length === 1 ? (end ? found[0]!.key : parts[1]! + titles.blockId(found[0]!)) : parts[1]! + (end ? '' : parts[2]!) + completion.common(found.map((i) => i.key))
 	let value = before.slice(0, before.length - token.length) + fill + text.slice(cursor)
 	let form = { ...forms.set(m.form!, 0, value), cursor: cursor - token.length + fill.length }
-	let next = blocksDialog.update({ ...m, form }, items, fold)
+	let next = blocksDialog.update({ ...m, form }, items, fold, inlinePastes)
 	return found.length > 1 ? { ...next, blocks: { ...next.blocks!, choices: found.map((i) => titles.blockId(i)) } } : next
 }
 

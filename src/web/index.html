@@ -165,7 +165,7 @@ html.typing .App { position: absolute; }
 /* A prompt the host hasn't taken yet looks sent; only one that stays
    pending grays, after a delay, so a normal round trip shows nothing. */
 .Card.user { transition: color 300ms var(--ease-out); }
-.Transcript > .Card.queued:has(+ .Card.queued) { margin-bottom: 0; }
+.Transcript > .Card.queued.user:has(+ .Card.queued.user), .Transcript > .Card.queued.message:has(+ .Card.queued.message) { margin-bottom: 0; }
 .Card.queued { cursor: pointer; }
 /* Queue edits share the existing pencil and discard is an ×, each a real
    44px target beside the reference; reserve all controls so long

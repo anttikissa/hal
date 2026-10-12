@@ -9,6 +9,7 @@ import { completions, type Menu } from './completions.ts'
 import { amend, type Editing } from '../common/amend.ts'
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
+import { card } from '../common/card.ts'
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
@@ -21,7 +22,6 @@ import { sendKeys } from '../common/send-keys.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
-import { summary } from '../common/summary.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 
@@ -299,29 +299,22 @@ function jobs(rows: Row[]): ReadonlySet<string> {
 	return out
 }
 
-function oneLine(s: string): string {
-	return s.replace(/\s+/g, ' ').trim()
-}
-
 // `full`: a tool result's whole output, not its glimpse.
 function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
-			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: bashResult.background(item) ? bashResult.display(item.text) : item.report ? summary.answer(item.text) : item.summary ? summary.strip(item.text) : item.text }
+			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: card.text(item) }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
 		case 'text':
-			return { kind: 'assistant', text: summary.answer(item.text) }
+			return { kind: 'assistant', text: card.text(item) }
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool': {
 			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-			let { command, description } = item.input
-			if (item.name === 'bash' && typeof command === 'string' && typeof description === 'string')
-				return { kind, text: `▸ ${oneLine(description)}\n  ${item.input.background === true ? '&' : '$'} ${command}` }
 			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		}
 		case 'tool-result': {

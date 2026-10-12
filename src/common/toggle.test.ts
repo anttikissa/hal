@@ -40,7 +40,7 @@ test('/toggle steps one named block and applies the majority rule to more; a tie
 	toggle.apply('toggle', states, items, 't*')
 	expect([states.get('14'), states.get('16')]).toEqual(['open', 'open'])
 	toggle.apply('toggle', states, items, 'r*')
-	expect([states.get('11'), states.get('17')]).toEqual(['closed', 'closed'])
+	expect([states.get('11'), states.get('17')]).toEqual(['open', 'open'])
 	toggle.apply('collapse', states, items, '10-17')
 	expect(states.get('14')).toBe('closed')
 	let steps = [1, 2, 3].map(() => (toggle.apply('toggle', states, items, '#u10'), states.get('10')))
@@ -63,4 +63,26 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 	expect(tab('t14 #r1').form!.values[0]).toBe('t14 #r1')
 	expect(tab('t14 a').form!.values[0]).toBe('t14 a12')
 	expect(blocksDialog.pack(['t1', 't2', 't3', 't4', 't5'], 18, 2)).toEqual(['t1       t2', 't3       +2 more'])
+})
+
+test('queued inbox blocks share targeting, defaults and expansion with history', () => {
+	let all = toggle.items({ items, inbox: [{ id: 'queued', n: 20, text: 'First\nLast', from: 'other', delivery: 'after-turn' }] })
+	let states = new Map<string, Fold>()
+	expect(toggle.initial(all.at(-1)!)).toBe('closed')
+	expect(toggle.apply('toggle', states, all, '#m20')).toEqual(['20'])
+	expect(states.get('20')).toBe('open')
+	let dialog = blocksDialog.open()
+	dialog.form!.values[0] = 'm20'
+	expect(blocksDialog.update(dialog, all, (i) => states.get(i.key) ?? toggle.initial(i)).blocks?.hint).toContain('Collapses')
+	toggle.apply('collapse', states, all, 'm*')
+	expect(states.get('20')).toBe('closed')
+})
+
+test('range expansion preserves inline detail and web hints respect native paste links', () => {
+	let item = items[0]!
+	expect(toggle.step(item, 'inline', true)).toBe('inline')
+	expect(toggle.step(item, 'open', undefined, false)).toBe('closed')
+	let dialog = blocksDialog.open()
+	dialog.form!.values[0] = item.key
+	expect(blocksDialog.update(dialog, items, () => 'open', false).blocks?.hint).toContain('Collapses')
 })

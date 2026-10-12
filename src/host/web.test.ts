@@ -2170,3 +2170,34 @@ browserTest('background completion prompts have working collapse controls at pho
 		}
 	} finally { await b.close() }
 })
+
+browserTest('queued cards share block controls and keep sender backgrounds when expanded', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let queued = history.append(id, { type: 'inbox', id: 'agent-queue', from: 'reviewer', text: '**First line**\n\nLast line of the complete message', delivery: 'after-turn' })
+	history.append(id, { type: 'inbox', id: 'human-queue', text: 'Human queue', delivery: 'after-turn' })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.Card.queued').length === 2`)
+		let command = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		for (let width of [390, 1200]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			expect(await b.evaluate(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)).toBe(false)
+			await command(`/expand #m${queued.n}`)
+			await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+			let shown = await b.evaluate(`(() => { let agent = document.querySelector('.Card.queued.message'), human = document.querySelector('.Card.queued.user'), body = agent.querySelector('.content'); return { agent: getComputedStyle(agent).backgroundColor, human: getComputedStyle(human).backgroundColor, body: getComputedStyle(body).backgroundColor, margin: parseFloat(getComputedStyle(agent).marginBottom), overflow: document.documentElement.scrollWidth > innerWidth + 1, receipt: !!agent.querySelector('.receipt') }; })()`)
+			expect(shown.agent).not.toBe(shown.human)
+			expect(['rgba(0, 0, 0, 0)', shown.agent]).toContain(shown.body)
+			expect(shown.margin).toBeGreaterThan(0)
+			expect(shown.overflow).toBe(false)
+			expect(shown.receipt).toBe(true)
+			await command(`/collapse #m${queued.n}`)
+			await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+			await b.evaluate(`document.querySelector('.Card.queued.message').click()`)
+			await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+			await command(`/toggle #m${queued.n}`)
+			await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+		}
+	} finally { await b.close() }
+}, 10000)
