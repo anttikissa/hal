@@ -369,6 +369,7 @@ html.typing .App { position: absolute; }
 /* The caption overlays the help row under the buttons, right-aligned,
    so hovering never moves the layout. */
 .entry .caption { position: absolute; top: 100%; right: 0; z-index: 1; padding: 0.25lh 0 0 1ch; background: var(--canvas); color: var(--cursor); font-size: 0.85em; white-space: nowrap; pointer-events: none; }
+.entry:has(button:disabled:hover) .caption { color: var(--quiet); }
 .entry .actions button.go:not(:disabled) { color: var(--cursor); }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It

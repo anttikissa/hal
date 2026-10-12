@@ -1,0 +1,7 @@
+{
+	title: 'Quiet disabled composer captions',
+	spec: 'On the web, the caption beneath a hovered disabled composer action uses --quiet instead of --cursor. Enabled captions keep their current color. Caption wording stays unchanged: do not explain why the button is disabled (user request 2026-10-12). CSS derives the color from the hovered button disabled state, so changes while hovering take effect immediately. Mobile Nudge retains the approved 50 ms hide and 300 ms return timings from task arg. Terminal behavior is unchanged because it has no button hover captions.',
+	status: 'done',
+	needs: ['5dp'],
+	foldInto: ['02s']
+}
