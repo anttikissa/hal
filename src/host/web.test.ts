@@ -2144,17 +2144,18 @@ browserTest('composer history skips agents and remains navigable after native de
 
 browserTest('background completion prompts have working collapse controls at phone and desktop widths', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	history.append(id, { type: 'user', blocks: [{ type: 'text', label: 'bash #t1', from: id, advisory: true, text: 'Background command finished\noutput to inspect' }] })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', label: 'bash #t1', from: id, advisory: true, delivery: 'next-round', text: 'Background command finished\noutput to inspect' }] })
 	let b = await browser()
 	try {
 		await server.serve(); web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`!!document.querySelector('.Card.user .mark')`)
+		expect(await b.evaluate(`!!document.querySelector('.Card.user [title^="Read by Hal"], .Card.user [title^="Delivered, not read"]')`)).toBe(false)
 		for (let width of [390, 1200]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`document.querySelector('.Card.user .content').click()`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('true')
-			await b.evaluate(`document.querySelector('.Card.user .mark').click()`)
+			await b.evaluate(`document.querySelector('.Card.user .CardHeader .label').click()`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('false')
 			await b.evaluate(`document.querySelector('.Card.user .mark').click()`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('true')
