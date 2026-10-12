@@ -22,13 +22,18 @@ import { Icon } from './Icon.tsx'
 // Characters a name gets in a cell.
 const NAME = 12
 
-// The marker: the same glyph as the terminal's (common/tab-mark.ts),
-// styled by its kind; a blinking one pulses. Always there, so an empty
-// one keeps its slot.
 function Marker(props: { mark: Mark | undefined }) {
+	let marker!: HTMLSpanElement
+	createEffect(() => props.mark, (mark) => {
+		if (!mark?.blinks) return
+		let frame = requestAnimationFrame(() => {
+			for (let animation of marker.getAnimations()) animation.startTime = performance.now() - Date.now() % 2000
+		})
+		return () => cancelAnimationFrame(frame)
+	})
 	return (
-		<span class={['marker', ...(props.mark ? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])] : [])]} role="img" aria-label={props.mark?.label}>
-			{props.mark?.glyph ?? ''}
+		<span ref={(e) => (marker = e)} class={['marker', ...(props.mark ? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])] : [])]} role="img" aria-label={props.mark?.label}>
+			{props.mark?.glyph === '▪' ? '' : props.mark?.glyph ?? ''}
 		</span>
 	)
 }

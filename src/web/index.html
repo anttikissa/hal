@@ -438,7 +438,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .entry .actions.nudge-actions.tucked { width: 44px; }
   .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform var(--snap-ms) var(--ease-out), opacity 0s var(--snap-ms); }
 }
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry button > *, .entry .actions.nudge-actions .toggle, .entry .actions.nudge-actions.tucked .toggle, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry button > *, .entry .actions.nudge-actions .toggle, .entry .actions.nudge-actions.tucked .toggle { transition: none; } .cursor-line span, .Card .cursor, .status .dot { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
 .Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
 /* Options: a hairline in the card's color; the chosen one solid in it,
@@ -536,23 +536,24 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .strip .tab[style*="--project"]::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 3px; background: var(--project); }
 .Tabs .strip .tab[aria-current] { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 0 -3px 0 var(--active-fg); font-weight: 600; }
 .Tabs .sheet .tab[aria-current] .n { font-weight: 600; }
-.Tabs .marker { display: inline-block; width: 1ch; text-align: left; }
-.Tabs .strip .marker { overflow: hidden; transition: width 150ms var(--ease-out); }
-.Tabs .strip .marker:not([aria-label]) { width: 0; }
+.Tabs .tab .n { text-box: trim-both cap alphabetic; }
+.Tabs .marker { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1ch; height: 1cap; margin-left: 0.25ch; }
+.Tabs .marker.working::before, .Tabs .marker.jobs::before { content: ''; width: 0.4em; height: 0.4em; background: currentColor; }
+.Tabs .strip .marker { overflow: hidden; }
+.Tabs .strip .marker:not([aria-label]) { width: 0; margin-left: 0; }
 .Tabs .strip :focus-visible { outline-offset: -2px; }
 .Tabs .strip .name { width: 12ch; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; }
 .Tabs .edge { display: flex; flex: none; align-items: center; justify-content: center; width: var(--edge); padding: 0.25lh 0; text-decoration: none; color: var(--inactive-fg); }
 .Tabs .edge[hidden] { display: none; }
-.Tabs .marker.blink { animation: pulse 1s steps(2) infinite; }
-.Tabs .marker.working { color: var(--active-fg); }
-/* Background jobs: bash's magenta; a working marker alternates with it every other blink. */
-.Tabs .marker.jobs { color: var(--jobs-fg); }
-.Tabs .marker.working.with-jobs { animation: pulse 1s steps(2) infinite, marker-jobs 2s steps(1, end) infinite; }
-@keyframes marker-jobs { 50% { color: var(--jobs-fg); } }
-.Tabs .marker.asking, .Tabs .marker.noticed { color: var(--warning-fg); font-weight: 600; }
-.Tabs .marker.paused { color: var(--paused-fg); font-weight: 600; }
-.Tabs .marker.failed { color: var(--error-fg); }
-.Tabs .marker.done { color: var(--done-fg); }
+.Tabs .marker { color: var(--mark-lit); }
+.Tabs .marker.blink { animation: marker-blink 2s steps(1, end) infinite; }
+.Tabs .marker.working.with-jobs { --mark-alt: var(--jobs-fg); }
+@keyframes marker-blink {
+  0%, 100% { color: var(--mark-lit); }
+  25%, 75% { color: var(--mark-dark); }
+  50% { color: var(--mark-alt, var(--mark-lit)); }
+}
+.Tabs .marker.asking, .Tabs .marker.noticed, .Tabs .marker.paused { font-weight: 600; }
 .Tabs button { flex: none; background: transparent; color: inherit; padding: 0.25lh 1ch; }
 @media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }

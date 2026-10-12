@@ -168,6 +168,10 @@ function css(): string {
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
+	let tab = colors.tab(), hal = colors.assistant()
+	for (let [kind, fg] of Object.entries({ asking: tab.warningFg!, noticed: tab.warningFg!, working: hal.cursor!, jobs: tab.jobsFg!, failed: tab.errorFg!, paused: tab.pausedFg!, done: tab.doneFg! })) {
+		rules.push(`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`)
+	}
 	// Percentages used, one class per whole percent (colors.heat).
 	for (let used = 0; used <= 100; used++) rules.push(`.heat-${used} { --heat: ${oklch.toCss(colors.heat(used))}; color: var(--heat) }`)
 	return rules.join('\n')

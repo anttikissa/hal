@@ -1,0 +1,10 @@
+{
+	title: 'Web tab markers match terminal blink and alignment',
+	spec: 'Web tab markers restore terminal parity: blink phases switch instantly at wall-clock half-second boundaries, using terminal lit and dark colors, with background jobs alternating every other lit phase. Status blinking remains enabled with reduced motion, overriding the old web exception. Working and jobs squares are CSS squares centered on tab numeral cap height, independent of glyph baseline. Squares and checkmarks have the same small gap after the numeral. Keep terminal layout unchanged. Covers src/web/components/Tabs.tsx, src/web/index.html, theme CSS in src/host/web.ts, and browser verification in src/host/web.test.ts.',
+	status: 'done',
+	notes: [
+		'CSS steps(2) opacity animation did not match terminal colors or phase. Theme CSS emits mark colors directly from colors.assistant/tab and blinkDim. A single 2-second steps(1, end) animation contains the four half-second phases; the Web Animations startTime aligns it to Date.now modulo 2000 after mark updates, with no recurring JavaScript timer. CSS cap-height trimming aligns numerals and square containers. Chrome verifies centering, discrete opaque colors including alternate jobs color, reduced-motion blinking, and existing tab navigation.'
+	],
+	needs: ['fr'],
+	foldInto: ['fr']
+}

@@ -736,6 +736,38 @@ browserTest('in a browser a queued message address shows its card at the bottom'
 	}
 }, 20000)
 
+browserTest('tab squares align with numerals and blink in terminal colors', async () => {
+	let id = tabs.create('/tmp')
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		await b.waitFor(`!!document.querySelector('.Tabs .strip .tab .n')`)
+		let list = tabs.list().map((t) => ({ ...t, state: { type: 'running' as const, phase: 'streaming' as const }, jobs: 1 }))
+		for (let c of host.state.clients) c.deliver({ type: 'tabs', tabs: list })
+		await b.waitFor(`!!document.querySelector('.Tabs .strip .marker.working.with-jobs')?.getAnimations().length`)
+		let result = JSON.parse(await b.evaluate(`JSON.stringify((() => {
+			let m = document.querySelector('.Tabs .strip .marker.working'), n = m.previousElementSibling;
+			let mr = m.getBoundingClientRect(), nr = n.getBoundingClientRect();
+			let a = m.getAnimations()[0]; a.pause(); a.effect.updateTiming({ delay: 0 });
+			let ctx = document.createElement('canvas').getContext('2d');
+			let rgb = color => { ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+			let values = [100, 400, 600, 900, 1100, 1400, 1600, 1900].map(t => { a.currentTime = t; return [rgb(getComputedStyle(m).color), getComputedStyle(m).opacity]; });
+			let s = getComputedStyle(m);
+			return { center: Math.abs(mr.y + mr.height / 2 - nr.y - nr.height / 2), gap: mr.x - nr.right, values, lit: rgb(s.getPropertyValue('--mark-lit').trim()), dark: rgb(s.getPropertyValue('--mark-dark').trim()), alt: rgb(s.getPropertyValue('--jobs-fg').trim()) };
+		})())`))
+		expect(result.center).toBeLessThan(0.5)
+		expect(result.gap).toBeGreaterThan(0)
+		expect(result.values).toEqual([result.lit, result.lit, result.dark, result.dark, result.alt, result.alt, result.dark, result.dark].map((c) => [c, '1']))
+	} finally {
+		await b.call('Emulation.setEmulatedMedia', { features: [] })
+		await b.close()
+	}
+})
+
 browserTest('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
 	let origCwd = host.cwd
 	host.cwd = () => '/tmp'
