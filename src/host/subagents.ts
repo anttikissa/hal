@@ -127,9 +127,13 @@ function owed(id: string, records: HistoryRecord[]): boolean {
 	let reports = false
 	let starts = true
 	for (let r of records) {
-		if (r.type === 'turn_end') starts = true
+		if (r.type === 'inbox' && r.delivery !== 'after-turn' && r.from === undefined && r.origin !== 'model') owned = reports = false
+		else if (r.type === 'turn_end') starts = true
 		else if (r.type === 'continue' || r.type === 'assistant') starts = false
-		else if (r.type === 'user' && starts) {
+		else if (r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')) {
+			owned = reports = false
+			starts = false
+		} else if (r.type === 'user' && starts) {
 			let first = r.blocks.find((b) => b.type === 'text')
 			if (!first) continue
 			starts = false

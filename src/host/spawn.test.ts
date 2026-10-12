@@ -10,6 +10,7 @@ import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
+import { subagents } from './subagents.ts'
 
 useHost()
 
@@ -113,6 +114,25 @@ test('fork gives the child the history so far; fresh does not', async () => {
 	let messages = conversation(forked)
 	expect(messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user', 'user'])
 	expect(messages[2].blocks.map((b: any) => b.id)).toEqual(['s1', 's2'])
+})
+
+for (let delivery of ['steer', 'soft-steer'] as const) test(`human ${delivery} takes over an active delegated turn without reporting its answer`, async () => {
+	let c = client()
+	let p = await parent(c)
+	calls[0]!.push(call('s1', 'spawn', { task: 'delegated work', kind: 'subagent-leave-open' }), { type: 'done', reason: 'tool_use' })
+	let k = await callWith('delegated work')
+	let child = tabs.file().open[1]!
+	c.conn.send({ type: 'open', sessionId: child })
+	prompts.submit(child, 'Work for me instead', undefined, delivery)
+	expect(subagents.owed(child, history.readSync(child))).toBe(false)
+	if (delivery === 'soft-steer') calls[k]!.push(call('r1', 'read', { path: 'x' }), { type: 'done', reason: 'tool_use' })
+	let human = await callWith('Work for me instead', k + 1)
+	calls[human]!.push({ type: 'text', text: 'Human answer' }, { type: 'done', reason: 'end' })
+	await until(() => status.stateOf(child).type === 'idle')
+	expect(tabs.file().open).toContain(child)
+	expect(history.readSync(child).some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text === 'Human answer')).toBe(true)
+	expect(JSON.stringify(history.readSync(p))).not.toContain('Human answer')
+	expect(subagents.owed(child, history.readSync(child))).toBe(false)
 })
 
 test('a human queued follow-up keeps autoclose, and its turn reports nothing to the parent', async () => {

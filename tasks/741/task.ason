@@ -1,0 +1,10 @@
+{
+	title: 'Human takeover stops automatic subagent reports',
+	spec: 'Restore the invariant that replies to human-controlled work stay in its tab rather than being automatically sent to the spawning owner. A human steer or soft-steer relinquishes reporting immediately, even midway through an owner-started turn, before inbox delivery; human text in delivered user records relinquishes reporting regardless of block order. This is derived durably from history across restart and applies to terminal and web. Human queued follow-ups relinquish reporting only when delivered; slash commands leave reporting unchanged. Continuations and background or child wakeups preserve human control. A later new turn explicitly started by the owner may delegate work again. Keep spawn lineage and slot accounting unchanged. This replaces mt notes that report the active turn after human takeover.',
+	status: 'done',
+	notes: [
+		'subagents.owed now clears reporting for human non-queued inbox receipts and human text anywhere in user records, including mid-turn steering. History remains the source of truth; no new metadata or per-turn state. Existing mt notes describing reports after takeover are superseded. ./test spawn.test.ts autoclose.test.ts passed: 24 tests, including active-turn steer and soft-steer regressions.'
+	],
+	needs: ['mt'],
+	foldInto: ['mt']
+}
