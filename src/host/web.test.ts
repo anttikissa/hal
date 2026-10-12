@@ -1372,8 +1372,7 @@ browserTest('EDIT statistics preserve readable closed titles and full-width open
 				}
 				expect(rows[1].stats).toContain('120')
 			}
-			// From the glimpse through long back to short (task hyt).
-			for (let i = 0; i < 2; i++) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+			await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
 		}
 	} finally { await b.close() }
 }, 15000)
@@ -1950,15 +1949,17 @@ browserTest('foreground and background Bash share header status without losing o
 })
 
 
-browserTest('cards start as their kind sets, a click steps short, glimpse, long, and live headers keep a spinner cell (task hyt)', async () => {
+browserTest('card headers restore short or open and tool commands expand apart from output (tasks hyt, bp1)', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let lines = Array.from({ length: 12 }, (_, i) => `row ${i + 1}`).join('\n')
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Run the checks' }] })
 	history.append(id, { type: 'assistant', block: { type: 'thinking', text: `First thought\n${lines}` } })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'ok', name: 'bash', input: { description: 'Count rows', command: 'seq 12' } } })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'ok', name: 'bash', input: { description: 'Count rows', command: 'seq 12\necho done' } } })
 	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'ok', output: `[exit 0]\n${lines}`, ms: 1200 }] })
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'bad', name: 'bash', input: { description: 'Read missing', command: 'cat nope' } } })
 	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'bad', output: '[exit 1]\ncat: nope: No such file', ms: 1100 }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'wide', name: 'bash', input: { description: 'Wide command', command: `printf '${'x'.repeat(70)}'` } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'wide', output: '[exit 0]\nok' }] })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'All done.' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	let b = await browser()
@@ -1966,14 +1967,14 @@ browserTest('cards start as their kind sets, a click steps short, glimpse, long,
 		await server.serve(); web.start()
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.Card.tool').length === 2`)
+		await b.waitFor(`document.querySelectorAll('.Card.tool').length === 3`)
 		let state = `Array.from(document.querySelectorAll('.Card.thinking, .Card.tool, .Card.assistant'), c => c.classList.contains('glimpse') ? 'glimpse' : c.classList.contains('open') || !c.classList.contains('folds') ? 'open' : 'short')`
 		// Thinking and a passing call short, the failed call open with its error, the reply whole.
-		expect(await b.evaluate(state)).toEqual(['short', 'short', 'open', 'open'])
-		expect(await b.evaluate(`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`)).toBe(4)
+		expect(await b.evaluate(state)).toEqual(['short', 'short', 'open', 'short', 'open'])
+		expect(await b.evaluate(`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`)).toBe(5)
 		let shot = async (name: string) => {
 			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
-			writeFileSync(`/tmp/hal-verbosity-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
+			writeFileSync(`/tmp/hal-172-ink-disclosure-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 		}
 		await shot('start')
 		let steps: string[] = []
@@ -1982,20 +1983,41 @@ browserTest('cards start as their kind sets, a click steps short, glimpse, long,
 			steps.push((await b.evaluate(state))[0])
 			if (i === 0) await shot('thinking-glimpse')
 		}
-		expect(steps).toEqual(['glimpse', 'open', 'short'])
-		let height = `document.querySelector('.Card.thinking .content').getBoundingClientRect().height`
-		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
-		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
-		let glimpse = await b.evaluate(height)
-		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
-		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
-		expect(await b.evaluate(height)).toBeGreaterThan(glimpse)
-		// The passing call: a glimpse of its output, then all of it.
+		expect(steps).toEqual(['glimpse', 'short', 'glimpse'])
 		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('more lines')
-		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe('$ seq 12…')
+		await b.evaluate(`document.querySelector('.Card.tool .command-toggle').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toContain('echo done')
+		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).not.toContain('row 12')
+		await shot('command')
+		await b.evaluate(`document.querySelector('.Card.tool .command-toggle').click()`)
+		await b.evaluate(`document.querySelector('.Card.tool .more').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
-		await shot('steps')
+		await b.evaluate(`document.querySelector('.Card.tool .CardHeader').click(); document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
+		await shot('long-restored')
+		await b.evaluate(`document.querySelector('.Card.tool .more').click()`)
+		await b.evaluate(`document.querySelector('.Card.tool .result-text').click(); document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).not.toContain('row 12')
+		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[1].querySelector('.command-toggle') === null`)).toBe(true)
+		await shot('glimpse-restored')
+		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.mark').click()`)
+		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle') === null`)).toBe(true)
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+		await b.waitFor(`!!document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle')`)
+		await shot('phone')
+		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle').click()`)
+		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command').textContent`)).toContain('x'.repeat(70))
+		expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+		await shot('phone-command')
+		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle').click()`)
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
+		await b.waitFor(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle') === null`)
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/collapse a*'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
+		await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.assistant').classList.contains('glimpse')`)).toBe(false)
 	} finally { await b.close() }
 }, 15000)
 
@@ -2215,9 +2237,6 @@ browserTest('background completion prompts have working collapse controls at pho
 			await tap('.Card.user .CardHeader .label')
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'true'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(false)
-			// A glimpse, then all of it, then collapsed again (task hyt).
-			await tap('.Card.user .content')
-			await b.waitFor(`!document.querySelector('.Card.user').classList.contains('glimpse')`)
 			await tap('.Card.user .content')
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'false'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(true)

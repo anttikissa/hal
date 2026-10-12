@@ -124,6 +124,9 @@ html.typing .App { position: absolute; }
 .CardHeader .flow { min-width: 0; }
 .CardHeader .stamp { padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
 .CardHeader .mark { position: relative; }
+.CardHeader .disclosure { display: inline-block; width: 1ch; margin-right: 0.5ch; transform-origin: center; transition: transform var(--toggle-ms) var(--ease-out); }
+.CardHeader .mark[aria-expanded="true"] .disclosure { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .CardHeader .disclosure { transition: none; } }
 @media (pointer: coarse) { .CardHeader .mark::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 /* A flowing header (a question): time and label are one text, wrapping to the left edge. */
 .CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; vertical-align: top; opacity: 0.8; }
@@ -193,6 +196,9 @@ html.typing .App { position: absolute; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 .Card .more { min-height: 44px; }
 .Card .more .icon { margin-right: 0.75ch; }
+.ToolCommand { margin-bottom: 1lh; }
+.ToolCommand .command.clipped { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ToolCommand .command-toggle { display: block; min-height: 44px; padding: 0; background: none; color: inherit; font: inherit; text-decoration: underline; }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }

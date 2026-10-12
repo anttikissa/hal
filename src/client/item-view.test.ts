@@ -60,6 +60,20 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
 })
 
+test('Bash glimpse clips only the first command line, with stable live and finished height', () => {
+	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash' }
+	let rows = (partial?: string) => toolView.call({ ...item, partial }, 20, 'glimpse', {}).map(Bun.stripANSI)
+	expect(rows()[1]).toBe('$ echo first…')
+	expect(rows()).toHaveLength(2)
+	let output = 'first\nsecond'
+	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'glimpse', {}, undefined, '1', 'bash')
+	expect(rows(output).length).toBe(rows().length + 1 + finished.length)
+	let narrow = toolView.call({ ...item, input: { command: 'echo ' + 'x'.repeat(60) } }, 20, 'glimpse', {})
+	expect(narrow[1]?.endsWith('…')).toBe(true)
+	expect(Bun.stringWidth(narrow[1]!)).toBeLessThanOrEqual(20)
+	expect(toolView.call(item, 20, 'long', {}).join('\n')).toContain('echo later')
+})
+
 test('background reports and thinking start closed, expand fully, and SEND shows /close', () => {
 	for (let label of ['bash #t19', 'bash b123abc']) {
 		let item = { type: 'prompt' as const, text: '[exit 1]\nfirst\nlast', from: 'self', label, delivery: 'next-round' as const }

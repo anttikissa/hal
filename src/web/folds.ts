@@ -17,6 +17,7 @@ import { app } from './app.ts'
 import { scroll } from './scroll.ts'
 
 const [states, setStates] = createSignal<ReadonlyMap<string, Fold>>(new Map())
+const opened = new Map<string, Fold>()
 const [raw, setRaw] = createSignal<ReadonlySet<string>>(new Set())
 
 function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
@@ -36,12 +37,19 @@ function level(id: string, start: Fold): Fold {
 // the card shows (a call and its result).
 function set(id: string, fold: Fold, keys: string[]): void {
 	// The updater sees earlier sets of the same batch (/expand t*).
+	if (fold !== 'short') opened.set(id, fold)
 	untrack(() => setStates((s) => new Map(s).set(id, fold)))
 	let hash = decodeURIComponent(location.hash.slice(1)).replace(/^[a-z](?=\d)/, '')
 	if (fold === 'short' && hash && keys.includes(hash)) {
 		history.replaceState(history.state, '', location.pathname + location.search)
 		app.aim()
 	}
+}
+
+function disclose(id: string, start: Fold, keys: string[], fallback: Fold): void {
+	let current = level(id, start)
+	if (current !== 'short') opened.set(id, current)
+	set(id, current === 'short' ? opened.get(id) ?? fallback : 'short', keys)
 }
 
 // The states of `t`'s cards, as the shared rules see them; one per use.
@@ -61,7 +69,9 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	scroll.follow(() => {
 		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			let next = toggle.step(item, at(item), p.open, false)
+			let current = at(item)
+			if (current !== 'short') opened.set(`${t.meta.id}#${item.key}`, current)
+			let next = toggle.step(item, current, p.open, false)
 			setRaw((s) => toggled(s, `${t.meta.id}#${item.key}`, next === 'inline'))
 			folds.set(`${t.meta.id}#${item.key}`, next, result ? [item.key, result] : [item.key])
 		}
@@ -124,4 +134,4 @@ function key(k: Key, cursor?: number): void {
 	if (error) app.setNotice(error)
 }
 
-export const folds = { raw, setRaw, toggled, level, set, at, run, typed, onEvent, hinted, open, input, key }
+export const folds = { raw, setRaw, toggled, level, set, disclose, at, run, typed, onEvent, hinted, open, input, key }

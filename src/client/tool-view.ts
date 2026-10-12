@@ -50,8 +50,10 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 	let n = settings.glimpseRows()
 	let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
 	if (!bash) return [head, ...live]
-	let details = toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width))
-	return [head, ...details, ...(live.length ? ['', ...live] : [])]
+	let details = toolDetails.lines(item.name, item.input)
+	let commandRows = typeof command === 'string' ? command.split('\n').length : 0
+	let preview = commandRows ? [strings.expandTabs(strings.clipVisual(ansi.clean(details[0]!) + (commandRows > 1 ? '…' : ''), width))] : []
+	return [head, ...preview, ...details.slice(commandRows).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(live.length ? ['', ...live] : [])]
 }
 
 // A result's rows: `call` the id of the bash call it answers (its output

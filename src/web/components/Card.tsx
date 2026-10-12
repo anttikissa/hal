@@ -1,9 +1,8 @@
 /// <reference lib="dom" />
-// Tasks: w5, 6eq, 18n, kx0, hyt. One transcript row as a card in its theme colors (view.show). A
+// Tasks: w5, 6eq, 18n, kx0, hyt, bp1. One transcript row as a card in its theme colors (view.show). A
 // card starts short, as a glimpse or long, as the session starts its
-// kind (task hyt); folded, its header is a button naming what is
-// inside, and a click anywhere on the card steps it, except on a link
-// or a click that ends a text selection. Hidden contents are inert. The height
+// kind (task hyt); the header switches short and its previous open state.
+// Body taps collapse except on a link or after text selection. Hidden contents are inert. The height
 // animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
 // the card streams, so Hal's cursor follows its last character (in the
 // header while a folding card is closed). Whether a card is open is
@@ -16,6 +15,7 @@
 // (host tools cap what they keep), so nothing is fetched.
 
 import { ToolPresentation } from './ToolPresentation.tsx'
+import { ToolCommand } from './ToolCommand.tsx'
 import { interruption } from '../../common/interruption.ts'
 import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
@@ -110,7 +110,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
-	let long = () => !presentation() && !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > settings.glimpseRows()
+	let long = () => !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output) : props.row.item.type === 'tool' ? props.row.item.partial ?? '' : '').replace(/\n$/, '').split('\n').length > settings.glimpseRows()
 	// The link shows the block's id, #t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -170,10 +170,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return toolIcons[item.name]
 	}
 	let headerParts = createMemo(() => hrefs.urlParts(head() ?? ''))
+	let call = createMemo(() => { let item = props.row.item; return item.type === 'tool' ? toolDetails.lines(item.name, item.input) : [] })
+	let command = <Show when={call().length}><ToolCommand lines={call()} compact={!full()} /></Show>
 	let body = () => {
 		let item = props.row.item
 		if (item.type !== 'tool') return lines().join('\n')
-		if (presentation() || presentationError()) return <>
+		if ((presentation() || presentationError()) && full()) return <>
 			<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
 			<Show when={presentation()}>{(p) => <Show when={!props.row.result?.isError} fallback={<div class="error">{props.row.result?.output}</div>}><ToolPresentation presentation={p()} output={props.row.result?.output} /></Show>}</Show>
 			<Show when={!presentation()}><div>{toolDetails.lines(item.name, item.input).join('\n')}{'\n'}{props.row.result?.output}</div></Show>
@@ -184,21 +186,21 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>
 		// The call once (task 8t), then its output: the result, or what
 		// has streamed so far.
-		let call = toolDetails.lines(item.name, item.input)
-		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
-		return <>{[...call, ...(out && call.length ? [''] : [])].map((l) => l + '\n').join('')}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
+		let partial = item.partial?.replace(/\n$/, '')
+		let out = result()?.text ?? (full() ? partial : partial?.split('\n').slice(-settings.glimpseRows()).join('\n'))
+		return <><Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>{command}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
 		let hit = e.target as Element
 		let control = hit.closest('.mark, .CardHeader')
-		if ((!folding() && props.row.note === undefined && !(closable() && control)) || hit.closest('a, .more, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
+		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .more, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		let selection = getSelection()
 		if (!control && selection && !selection.isCollapsed && root) {
 			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
 		}
 		scroll.follow(() => {
-			setLevel(blockToggle.next(props.row.item, level(), false))
+			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])], blockToggle.next(props.row.item, 'short', false)))
 			flush()
 		})
 	}
@@ -322,7 +324,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
 										{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
-										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'show less' : 'show all'}</button></Show>
+										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'Show less' : 'Show all'}</button></Show>
 									</div>
 								</div>
 							</div>
