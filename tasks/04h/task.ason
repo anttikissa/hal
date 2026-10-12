@@ -1,0 +1,10 @@
+{
+	title: 'Match the climbing tool spinner to the approved 10fps cadence',
+	spec: 'Restore the preview-speed invariant with the user-approved trial cadence of 10fps: terminal live-tool climbing frames advance every 100ms, two frames of the existing 50ms animation grid, so 28 frames take 2.8s. Supersede hcv’s 4fps cadence choice. Reuse the one pulse timer, scheduling both tool frame boundaries and normal 250ms beat boundaries while a tool is active. Thinking/reply orbit, cursor and tab blink timing remain unchanged; without an active tool use the existing pulse cadence. Changing cadence re-arms the same timer, and stopping clears it. No per-card timer, polling loop or accumulating animation state. Web spinners remain unchanged pending the user decision.',
+	status: 'done',
+	notes: [
+		'The single pulse timer schedules the union of 100ms tool frames and 250ms blink beats; it does not shift cursor/tab phases or add another timer. At 10fps the climb takes 2.8s. While a tool runs, there are 12 timer callbacks per second because 250ms and 750ms blink boundaries fall between tool frames; app.beat still paints only changed views. No higher cadence persists once the call ends. The regression covers 99/100ms frame changes, wrap at 2800ms and returning to normal cadence. A deterministic fake-timer check covers the union of boundaries, one active timer, re-arming and stopping. 82 focused terminal tests and scoped lint pass.'
+	],
+	needs: ['hcv'],
+	foldInto: ['hcv']
+}

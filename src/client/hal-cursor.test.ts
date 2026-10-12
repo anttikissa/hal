@@ -164,3 +164,18 @@ test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	now = 4 * pulse.ms
 	expect(bar()).toBe(lit)
 })
+
+test('tool climbing advances at 10fps without changing the normal blink beat', () => {
+	render.show = () => {}
+	app.onEvent(snapshot({ type: 'running', phase: 'tools', call: 'c1', since: '1970-01-01T00:00:00Z' }))
+	let t = app.state.transcript!
+	let first = appView.tick(t, 0)!.spin
+	expect(appView.tick(t, 99)!.spin).toBe(first)
+	expect(appView.tick(t, 100)!.spin).not.toBe(first)
+	expect(appView.tick(t, 2800)!.spin).toBe(first)
+	expect(pulse.state.interval).toBe(100)
+	now = 100
+	expect(pulse.beat()).toBe(0)
+	state({ type: 'idle' })
+	expect(pulse.state.interval).toBe(pulse.ms)
+})

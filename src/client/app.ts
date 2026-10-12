@@ -85,7 +85,7 @@ function createState(): AppState {
 // its text next changes, on the pulse's frame grid.
 function show(): void {
 	let v = appView.view()
-	pulse.keep(appView.blinks(v) ? app.beat : null)
+	pulse.keep(appView.blinks(v) ? app.beat : null, v.tick?.call ? pulse.frame * 2 : pulse.ms)
 	render.show(v)
 	let st = app.state
 	clearTimeout(st.typing)

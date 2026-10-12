@@ -1,9 +1,8 @@
 // The one pulse every blink in the terminal follows (the Hal cursor,
-// later the tab indicators). Beats are wall-clock quarter seconds, so
-// everything that blinks is in phase. The timer runs only while someone
-// keeps it: `keep(fn)` while something on screen blinks, `keep(null)`
-// once nothing does. Each beat calls the keeper, which repaints; the
-// renderer writes only the rows that changed.
+// later the tab indicators). Blink beats stay on wall-clock quarter
+// seconds; a live tool can also request finer frame boundaries. The
+// timer runs only while someone keeps it and the renderer writes only
+// rows that changed.
 
 // The beat now: a count of `ms()` periods since the epoch.
 function beat(): number {
@@ -18,34 +17,35 @@ const slow = (b: number): boolean => b % 4 < 2
 
 function schedule(): void {
 	let now = pulse.now()
-	let next = (Math.floor(now / pulse.ms) + 1) * pulse.ms
 	let st = pulse.state
+	let next = Math.min((Math.floor(now / pulse.ms) + 1) * pulse.ms, (Math.floor(now / st.interval) + 1) * st.interval)
 	st.timer = setTimeout(() => {
 		st.timer = null
 		let fn = st.onBeat
 		if (!fn) return
 		pulse.schedule()
-		fn(next / pulse.ms)
+		fn(Math.floor(next / pulse.ms))
 	}, Math.max(1, next - now))
 	// Blinking alone never keeps a process alive.
 	;(st.timer as { unref?: () => void }).unref?.()
 }
 
-// Calls `fn` on every beat from now on; null stops the timer.
-function keep(fn: ((beat: number) => void) | null): void {
+// Calls `fn` on beat and requested frame boundaries; null stops it.
+function keep(fn: ((beat: number) => void) | null, interval = pulse.ms): void {
 	pulse.state.onBeat = fn
 	let st = pulse.state
-	if (!fn && st.timer) {
+	if ((!fn || interval !== st.interval) && st.timer) {
 		clearTimeout(st.timer)
 		st.timer = null
 	}
+	st.interval = interval
 	if (fn && !st.timer) pulse.schedule()
 }
 
 const running = (): boolean => pulse.state.timer !== null
 
 export const pulse = {
-	state: { onBeat: null as ((beat: number) => void) | null, timer: null as ReturnType<typeof setTimeout> | null },
+	state: { onBeat: null as ((beat: number) => void) | null, timer: null as ReturnType<typeof setTimeout> | null, interval: 250 },
 	/** One beat's length. */
 	ms: 250,
 	// Animations (rotating examples) repaint on finer wall-clock frames:
