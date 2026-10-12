@@ -7,7 +7,7 @@
 		'The shared host.broadcast boundary supplies effective configured slots on every metadata event, keeping legacy sessions without a stored count consistent across local terminal, remote terminal and web without persisting a compatibility migration.',
 		'With 0 spawn slots SYSTEM.md renders no Session role or Spawn budget section (empty bodies drop their headings); the question rule says owner, not spawner. SPAWN and WAIT stay in the action list: hiding them is not worth the code, and changing that list would bust the prompt cache when /budget raises or spending exhausts the slots.',
 		'Web bN was a link with a 44px hit area beside Send; users misclicked it into the plain-text /budget page. Invariant: no web status-row element navigates away from the chat.',
-		'Braille cells reach into the descender, so on the web the pile sank below the model name. The web lifts .budget by 0.2em so its bottom dot row sits on the text baseline; the terminal cannot shift glyphs.'
+		'Braille cells reach into the descender, so on the web the pile sank below the model name. The web measures the bottom row ink descent of ⣀ in the rendered font on a canvas and lifts .budget by it, since a fixed em lift missed on iOS; the terminal cannot shift glyphs.'
 	],
 	needs: ['t0', 'pc'],
 	foldInto: ['t0']

@@ -13,6 +13,18 @@ import { Icon } from './Icon.tsx'
 
 const heat = (n: number | undefined) => (n === undefined ? '' : `heat-${n}`)
 
+// Braille cells hang below the baseline by a font-dependent amount;
+// lift the pile by its bottom row's measured ink descent so it rests
+// on the text baseline in whatever font renders it (task r92).
+function lift(e: HTMLElement) {
+	requestAnimationFrame(() => {
+		let cs = getComputedStyle(e), ctx = document.createElement('canvas').getContext('2d')
+		if (!ctx) return
+		ctx.font = `${cs.fontSize} ${cs.fontFamily}`
+		e.style.top = `${-ctx.measureText('⣀').actualBoundingBoxDescent}px`
+	})
+}
+
 function Parts(props: { group: StatusGroup }) {
 	return <span dir="ltr"><For each={props.group.parts} keyed={false}>{(part) => <span class={heat(part().heat)}>{part().text}</span>}</For></span>
 }
@@ -48,7 +60,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				<span class="secondary">
 					<span class="cwd" style={props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? <><span class="full">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort, true)}</span><span class="short">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort)}</span></> : ''}</span>
-					<span class="budget" aria-label={`Spawn budget: ${meta()?.slots ?? settings.subagentSlots()} slots left`}>{titles.budget(meta()?.slots ?? settings.subagentSlots())}</span>
+					<span class="budget" ref={lift} aria-label={`Spawn budget: ${meta()?.slots ?? settings.subagentSlots()} slots left`}>{titles.budget(meta()?.slots ?? settings.subagentSlots())}</span>
 					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
 						<span class={['window', heat(win(name)?.used)]}>
 							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
