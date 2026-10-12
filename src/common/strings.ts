@@ -130,7 +130,13 @@ function visLen(s: string, startColumn = 0): number {
 	return n
 }
 
-/** Expand tabs to the spaces they display as. */
+/**
+ * Replace tabs with spaces at four-column stops, restarting on each line.
+ * Keeps ANSI escapes. Expand display text before measuring, clipping or
+ * wrapping it, and before adding screen padding. Raw terminal tabs use
+ * different stops and can overflow a measured row, corrupting repaints.
+ * Keep the original text for storage and editing offsets.
+ */
 function expandTabs(s: string): string {
 	if (!s.includes('\t')) return s
 	return s
@@ -231,7 +237,7 @@ function clean(s: string): string {
 	return s.replace(/(?![\n\t])\p{Cc}/gu, '\ufffd')
 }
 
-/** Clip to at most `max` columns, ending with '…' if anything was cut. */
+/** Clip to at most `max` columns, ending with '…' if cut. Keeps raw tabs; use expandTabs for terminal display. */
 function clipVisual(s: string, max: number): string {
 	if (max <= 0) return ''
 	if (strings.visLen(s) <= max) return s
