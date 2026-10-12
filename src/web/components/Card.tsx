@@ -2,7 +2,7 @@
 // Tasks: w5, 6eq, 18n, kx0, hyt, bp1. One transcript row as a card in its theme colors (view.show). A
 // card starts short, as a glimpse or long, as the session starts its
 // kind (task hyt); the header switches short and its previous open state.
-// Body taps collapse except on a link or after text selection. Hidden contents are inert. The height
+// Only header taps collapse an open card. Hidden contents are inert. The height
 // animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
 // the card streams, so Hal's cursor follows its last character (in the
 // header while a folding card is closed). Whether a card is open is
@@ -195,10 +195,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		let hit = e.target as Element
 		let control = hit.closest('.mark, .CardHeader')
 		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .more, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
-		let selection = getSelection()
-		if (!control && selection && !selection.isCollapsed && root) {
-			for (let i = 0; i < selection.rangeCount; i++) if (selection.getRangeAt(i).intersectsNode(root)) return
-		}
+		if (!control && expanded()) return
 		scroll.follow(() => {
 			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])], blockToggle.next(props.row.item, 'short', false)))
 			flush()

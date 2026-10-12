@@ -1,0 +1,11 @@
+{
+	title: 'Header-only web card collapse',
+	spec: 'Web cards collapse only through their title/header disclosure control. Body taps never collapse open assistant replies, user prompts, thinking, tools, notices or queued messages, including taps that clear native text selection. Links and body controls retain their own actions. Closed compact rows without a separate header remain tappable to open. This replaces bp1 body-tap collapse and r4d unselected-output collapse; configured initial fold states, header open-state restoration and terminal controls remain unchanged. Regression checks cover phone touch and desktop clicks, selection clearing, and header collapse.',
+	status: 'done',
+	notes: [
+		'Card rejects all non-header collapse attempts before touching fold state; it no longer inspects Selection, so clearing an iPhone selection cannot trigger body collapse. Closed rows retain their existing opening behavior. Existing tool disclosure regression now checks inert body taps and header restoration. The phone helper checks its hit target and taps body text away from the header: Chrome touch adjustment redirected a near-header body tap onto the native mark button. Reduced-motion emulation keeps behavioral hit testing separate from disclosure animation tests. An unchanged queued-card regression failed waiting for /expand to reveal Last line, before any click-collapse assertion; left unrelated behavior unchanged. Physical iPhone Safari is unverified.',
+		'Final focused verification: both changed browser regressions passed (49 assertions), changed-file oxlint reported zero warnings/errors, and git diff --check passed. No layout or color changes.'
+	],
+	needs: ['bp1', 'r4d'],
+	foldInto: ['bp1', 'r4d']
+}

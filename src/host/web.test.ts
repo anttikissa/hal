@@ -2051,7 +2051,9 @@ browserTest('card headers restore short or open and tool commands expand apart f
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
 		await shot('long-restored')
 		await rotate('.Card.tool .more')
-		await b.evaluate(`document.querySelector('.Card.tool .result-text').click(); document.querySelector('.Card.tool .mark').click()`)
+		await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .mark').getAttribute('aria-expanded')`)).toBe('true')
+		await b.evaluate(`document.querySelector('.Card.tool .CardHeader').click(); document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).not.toContain('row 12')
 		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[1].querySelector('.command-toggle') === null`)).toBe(true)
 		await shot('glimpse-restored')
@@ -2273,10 +2275,12 @@ browserTest('composer history skips agents and remains navigable after native de
 	} finally { await b.close() }
 }, 15000)
 
-browserTest('background completion prompts have working collapse controls at phone and desktop widths', async () => {
+browserTest('assistant and completion bodies stay open through selection taps at phone and desktop widths', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	history.append(id, { type: 'user', blocks: [{ type: 'text', label: 'bash #t1', from: id, advisory: true, delivery: 'next-round', text: '[exit 0]\n' + Array.from({ length: 80 }, (_, i) => `output line ${i}`).join('\n') }] })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Select this answer.\n\nTap outside the selection to keep reading.' } })
 	let b = await browser()
+	await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 	try {
 		await server.serve(); web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
@@ -2288,7 +2292,7 @@ browserTest('background completion prompts have working collapse controls at pho
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390, maxTouchPoints: 1 })
 			let tap = async (selector: string) => {
 				if (width !== 390) { await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`); return }
-				let point = await b.evaluate(`(() => { let el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({block:'nearest'}); let r = el.getBoundingClientRect(); return {x:r.left+8,y:r.top+8} })()`) as { x: number; y: number }
+				let point = await b.evaluate(`(() => { let el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({block:'nearest'}); let r = el.getBoundingClientRect(), header = el.closest('.Card').querySelector('.CardHeader').getBoundingClientRect(), inset = Math.min(40, r.height / 2); let point = {x:r.left+r.width/2,y:Math.max(inset,r.top+inset,el.closest('.CardHeader') ? 0 : header.bottom+inset)}; if (!document.elementFromPoint(point.x, point.y)?.closest(${JSON.stringify(selector)})) throw new Error('Tap misses ' + ${JSON.stringify(selector)}); return point })()`) as { x: number; y: number }
 				await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
 				await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
 			}
@@ -2296,8 +2300,26 @@ browserTest('background completion prompts have working collapse controls at pho
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'true'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(false)
 			await tap('.Card.user .content')
+			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await b.evaluate(`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.user .content')); getSelection().addRange(range); })()`)
+			await tap('.Card.user .content')
+			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await b.evaluate(`getSelection().removeAllRanges()`)
+			await tap('.Card.user .content')
+			expect(await b.evaluate(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await tap('.Card.user .CardHeader .label')
 			await b.waitFor(`document.querySelector('.Card.user .mark').getAttribute('aria-expanded') === 'false'`)
 			expect(await b.evaluate(`document.querySelector('.Card.user .body').inert`)).toBe(true)
+			await tap('.Card.assistant .CardHeader .label')
+			await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
+			await tap('.Card.assistant .CardHeader .label')
+			await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'true'`)
+			await b.evaluate(`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.assistant .content')); getSelection().addRange(range); })()`)
+			await tap('.Card.assistant .content')
+			expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await b.evaluate(`getSelection().removeAllRanges()`)
+			await tap('.Card.assistant .content')
+			expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe('true')
 		}
 	} finally { await b.close() }
 })
