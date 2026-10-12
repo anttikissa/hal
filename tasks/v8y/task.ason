@@ -6,7 +6,7 @@ Syntax (shared by all three commands): a list of items separated by commas, spac
 
 /expand expands every matched block and /collapse collapses them; neither name may be confused with /close, which closes the tab. /toggle flips one named block; for anything more (a range, '*' or a list) it applies the majority rule to the whole match: expand all when more than half are collapsed, otherwise collapse all; a tie expands, since expanding hides nothing. Fold state stays per client, so each client applies /toggle's rule to its own state.
 
-Dialog (Ctrl-O, runs /toggle; footer "enter: toggle · tab: complete · esc: close"): the field, flush with the box's left padding like every row below it (no indent, no prompt sign); a blank row; a live hint that updates on every keystroke and says what Enter does ("Expands 12 tool blocks: t4-t88") or why the input is invalid; a blank row; then a help area:
+Dialog (Ctrl-O, runs /toggle; footer "enter: toggle · tab: complete · esc: close"): the line "Which cards to expand or collapse?", a blank row, the field, flush with the box's left padding like every row below it (no indent, no prompt sign); a blank row; a live hint that updates on every keystroke and says what Enter does ("Expands 12 tool blocks: t4-t88") or why the input is invalid; a blank row; then a help area:
     t1905, 1905   one block      *       all blocks
     1880-1905     a range        t*, r*  all of a kind
     t1890, t1905  a list         empty   latest tool block

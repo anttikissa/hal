@@ -53,7 +53,14 @@ async function search(c: Search): Promise<void> {
 		if (!current()) return
 		for (let m of c.meta ?? []) findIndex.state.meta.set(m.id, m)
 		let q = findQuery.parse(c.query, c.kinds), now = Date.now()
-		if (!c.query.trim()) { send([], true); return }
+		// No query: the sessions whose histories changed last (task 6m).
+		if (!c.query.trim()) {
+			let recent = [...findIndex.state.meta.values()].map((m) => ({ m, at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt) }))
+			recent.sort((a, b) => b.at - a.at)
+			send(recent.slice(0, 50).map(({ m, at }) => ({ sessionId: m.id, name: m.name ?? '', blockId: '', kind: 'metadata', age: Math.max(0, now - at), snippet: m.cwd, score: at, href: `/${m.id}` })))
+			send([], true)
+			return
+		}
 		let pending: { meta: SessionMeta; offset: number }[] | undefined
 		let rebuilding = new Set<string>()
 		for (tier of q.kinds) {

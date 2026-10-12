@@ -39,6 +39,8 @@ export type ModalState = {
 	title: string
 	/** Key hints for the outline, such as "enter: switch". */
 	hint?: string
+	/** One line above the field, then a blank row (Ctrl-O, Ctrl-F). */
+	question?: string
 	find?: FindDialog
 	form?: FormState
 	items: string[]

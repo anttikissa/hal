@@ -1,29 +1,52 @@
-// The transient find modal shared by terminal and browser.
+// The transient find modal shared by terminal and browser (task 6m).
+// Focus: 0 the field, 1-4 the filters, 5 the results.
 import { findQuery, type FindBatch, type FindFilter, type FindResult } from './find.ts'
 import { forms, type Key } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
 
-export type FindDialog = { filters: FindFilter[]; results: FindResult[]; request?: string; moved: boolean; focus: number; done: boolean }
+// `tabs`: the open tabs' session ids in tab order, for the tab numbers.
+export type FindDialog = { filters: FindFilter[]; results: FindResult[]; request?: string; moved: boolean; focus: number; done: boolean; status: string; failed?: true; tabs: string[] }
 const filters: FindFilter[] = ['text', 'thinking', 'tools', 'other']
 const labels = ['user/assistant', 'thinking', 'tools', 'other']
-function open(remembered: FindFilter[]): ModalState {
-	return { ...modals.open({ title: 'Find', form: { text: 'Find', fields: [{ name: 'query', label: 'Query', type: 'text' }] } }), find: { filters: [...remembered], results: [], moved: false, focus: 0, done: true }, hint: 'Type a query · tab: filters/results · enter: open · esc: close' }
+const question = 'Find anything: text, tab, card, project, whatever'
+const recent = 'Showing recent tabs'
+const keys = ['↓: filters · enter: open · esc: close', '←→: move · space: toggle · ↑↓: field/results · esc: close', '↑↓: move · enter: open · esc: close']
+
+function open(remembered: FindFilter[], tabs: string[] = []): ModalState {
+	let m = modals.open({ title: 'Find', form: { text: 'Find', fields: [{ name: 'query', type: 'text' }] } })
+	return { ...m, question, hint: keys[0], find: { filters: [...remembered], results: [], moved: false, focus: 0, done: false, status: recent, tabs } }
 }
 function input(m: ModalState, text: string): ModalState {
-	return { ...m, form: forms.set(m.form!, 0, text), query: findDialog.words(text), selected: 0, scroll: 0, items: [], error: undefined, find: { ...m.find!, request: undefined, results: [], moved: false, done: false } }
+	return { ...m, form: forms.set(m.form!, 0, text), query: findDialog.words(text), selected: 0, scroll: 0, items: [], error: undefined, find: { ...m.find!, request: undefined, results: [], moved: false, done: false, failed: undefined, status: text.trim() ? 'Searching…' : recent } }
 }
 function words(text: string): string {
 	try { return findQuery.parse(text).words.join(' ') } catch { return '' }
 }
 function toggle(m: ModalState, i: number): ModalState {
-	let f = filters[i]!, enabled = m.find!.filters
-	return { ...findDialog.input(m, m.form!.values[0]!), find: { ...m.find!, request: undefined, results: [], moved: false, done: false, filters: enabled.includes(f) ? enabled.filter((v) => v !== f) : [...enabled, f] }, items: [], selected: 0, scroll: 0 }
+	let f = filters[i]!, enabled = m.find!.filters, next = findDialog.input(m, m.form!.values[0]!)
+	return { ...next, find: { ...next.find!, filters: enabled.includes(f) ? enabled.filter((v) => v !== f) : [...enabled, f] } }
 }
+// `m` with focus on `focus` and the footer naming that part's keys.
+function focus(m: ModalState, focus: number): ModalState {
+	let moved = m.find!.moved || focus === 5
+	return { ...m, hint: keys[focus === 0 ? 0 : focus < 5 ? 1 : 2], find: { ...m.find!, focus, moved } }
+}
+// Down goes field, filters, results; Up back. Left and Right move among
+// the filters, Space or Enter toggles one; Tab cycles all six stops.
 function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 	let f = m.find!
+	let to = (n: number) => ({ state: findDialog.focus(m, n) })
 	if (k.key === 'escape') return { state: m, action: { type: 'cancel' } }
-	if (k.key === 'tab') return { state: { ...m, find: { ...f, focus: (f.focus + (k.shift ? 5 : 1)) % 6 } } }
-	if ((k.key === ' ' || k.key === 'space') && f.focus > 0 && f.focus < 5) return { state: findDialog.toggle(m, f.focus - 1) }
+	if (k.key === 'tab') return to((f.focus + (k.shift ? 5 : 1)) % 6)
+	if (f.focus > 0 && f.focus < 5) {
+		if (k.key === 'left' || k.key === 'right') return to(Math.min(4, Math.max(1, f.focus + (k.key === 'left' ? -1 : 1))))
+		if (k.key === ' ' || k.key === 'space' || k.key === 'enter') return { state: findDialog.toggle(m, f.focus - 1) }
+		if (k.key === 'up') return to(0)
+		if (k.key === 'down') return m.items.length ? { state: { ...findDialog.focus(m, 5), selected: 0, scroll: 0 } } : { state: m }
+		return { state: m }
+	}
+	if (f.focus === 0 && (k.key === 'down' || k.key === 'up')) return k.key === 'down' ? to(1) : { state: m }
+	if (f.focus === 5 && k.key === 'up' && m.selected === 0) return to(1)
 	if (k.key === 'up' || k.key === 'down') {
 		let r = modals.step(m, k)
 		return { state: { ...r.state, find: { ...f, moved: true } } }
@@ -33,9 +56,16 @@ function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 	let r = modals.step(m, k)
 	return { state: r.state.form!.values[0] !== m.form!.values[0] ? { ...findDialog.input(m, r.state.form!.values[0]!), form: r.state.form } : r.state }
 }
-function row(r: FindResult): string {
-	let age = r.age < 60000 ? 'now' : r.age < 3600000 ? `${Math.floor(r.age / 60000)}m` : r.age < 86400000 ? `${Math.floor(r.age / 3600000)}h` : `${Math.floor(r.age / 86400000)}d`
-	return `[${r.kind}] ${r.sessionId} ${r.name} · ${age} · ${r.snippet}`
+function age(ms: number): string {
+	return ms < 60000 ? 'now' : ms < 3600000 ? `${Math.floor(ms / 60000)}m` : ms < 86400000 ? `${Math.floor(ms / 3600000)}h` : `${Math.floor(ms / 86400000)}d`
+}
+// A result row: the tab number (blank for a closed session, then named by
+// its id), name, age, then the kind and snippet.
+function row(r: FindResult, tabs: string[]): string {
+	let n = tabs.indexOf(r.sessionId)
+	let width = String(tabs.length).length
+	let name = `${r.name || r.sessionId}${n < 0 && r.name ? ` (${r.sessionId})` : ''}`
+	return `${(n < 0 ? '' : String(n + 1)).padStart(width)}  ${name} · ${age(r.age)} · ${r.kind === 'metadata' ? '' : `[${r.kind}] `}${r.snippet}`
 }
 function batch(m: ModalState, b: FindBatch): ModalState {
 	let f = m.find!
@@ -49,7 +79,10 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 			results = [...results, ...next.slice(existing.length)]
 		} else results = [...results.filter((r) => r.kind !== b.tier), ...next].sort((a, c) => findQuery.tiers.indexOf(a.kind) - findQuery.tiers.indexOf(c.kind) || c.score - a.score)
 	}
-	return { ...m, items: results.map(findDialog.row), find: { ...f, results, done: b.done }, error: b.error, hint: b.error ? 'Find failed · esc: close' : (b.done ? `${results.length} results · enter: open · esc: close` : b.scanning ? `scanning ${b.scanning.toLocaleString()} histories…` : `searching ${b.tier}…`) }
+	let query = !!m.form!.values[0]!.trim()
+	let count = `${results.length} result${results.length === 1 ? '' : 's'}`
+	let status = b.error ? `Find failed: ${b.error}` : !query ? recent : b.done ? (results.length ? `Showing ${count}` : 'No results') : b.scanning ? `Showing ${count}, scanning ${b.scanning.toLocaleString()} histories…` : `Showing ${count}, searching ${b.tier}…`
+	return { ...m, items: results.map((r) => findDialog.row(r, f.tabs)), find: { ...f, results, done: b.done, status, ...(b.error ? { failed: true as const } : { failed: undefined }) } }
 }
 function marks(text: string, query: string): [number, number][] {
 	let lower = text.toLocaleLowerCase(), ranges: [number, number][] = []
@@ -64,4 +97,4 @@ function marks(text: string, query: string): [number, number][] {
 	}
 	return out
 }
-export const findDialog = { filters, labels, open, input, toggle, step, words, row, batch, marks }
+export const findDialog = { filters, labels, question, open, input, toggle, focus, step, words, row, batch, marks }

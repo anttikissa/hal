@@ -54,13 +54,24 @@ function table(m: ModalState, inner: number): number[] {
 
 function modalLines(m: ModalState, width: number, height: number): { rows: string[]; cursor: Cursor; scroll: number } {
 	let inner = Math.max(0, width - 4)
-	let fields: { rows: string[]; cursor?: Cursor } = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [] }
-	// The Ctrl-O field starts at the left edge, as its hint and help do.
-	if (m.blocks) fields = { rows: fields.rows.map((r) => r.slice(2)), cursor: fields.cursor && { ...fields.cursor, col: fields.cursor.col - 2 } }
+	let fields = modalView.head(m, inner)
 	let content = fields.rows.slice(0, height - 2)
 	if (m.find) {
 		if (m.find.focus !== 0) fields.cursor = undefined
-		content.push(strings.clipVisual(findDialog.labels.map((label, i) => `${m.find!.focus === i + 1 ? '›' : ''}[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`).join('  '), inner))
+		let red = m.find.failed ? ansi.sgr({ fg: colors.error().fg! }) : ''
+		content.push(...strings.wordWrap(m.find.status, inner).map((r) => (red ? red + r + UNCOLOR : r)), '')
+		// The filters: the focused one lit like a picker's selection, the
+		// cursor on its box.
+		let lit = ansi.sgr(colors.popupCurrent(colors.popup().neutralFg!)) || ansi.INVERSE
+		let row = '', col = 0
+		findDialog.labels.forEach((label, i) => {
+			let cell = `[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`
+			if (i) row += '   '
+			if (m.find!.focus === i + 1) { col = strings.visLen(ansi.clean(row)) + 1; cell = lit + cell + UNCOLOR + ansi.UNINVERSE }
+			row += cell
+		})
+		if (m.find.focus > 0 && m.find.focus < 5) fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
+		content.push(strings.clipVisual(row, inner), '')
 	}
 	if (m.blocks) content.push(...modalView.blocksLines(m, inner))
 	// The restart dialog: its flagged calls above the list, each block id
@@ -74,7 +85,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let below = modalView.footer(m, inner)
 	let visible = Math.max(0, height - 2 - content.length - below.length)
 	let scroll = modalView.modalScroll(m, visible)
-	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
+	let cursor = fields.cursor ?? { row: content.length, col: 0 }
 	// Settings-like rows: the items as a column as wide as the longest.
 	// Model picker: a table of postfix (with the selected row's effort),
 	// name and ID, each column as wide as its longest model row. Columns
@@ -139,8 +150,18 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 	return { text: `${value}   ${faint}${note}${back}` }
 }
 
-// The Ctrl-O dialog's rows below its field (task v8y): a blank row, the
-// live hint, then the help area, or Tab's block ids packed in as many rows.
+// The fields' rows and cursor. With a question (Ctrl-O, Ctrl-F): the
+// question, a blank row, the field flush with the left edge like every
+// row below it, and a blank row.
+function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor } {
+	let fields: { rows: string[]; cursor?: Cursor } = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [] }
+	if (!m.question) return fields
+	let top = [...strings.wordWrap(m.question, inner), '']
+	return { rows: [...top, ...fields.rows.map((r) => r.slice(2)), ''], cursor: fields.cursor && { row: fields.cursor.row + top.length, col: fields.cursor.col - 2 } }
+}
+
+// The Ctrl-O dialog's rows below its field (task v8y): the live hint,
+// then the help area, or Tab's block ids packed in as many rows.
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
@@ -163,7 +184,7 @@ function blocksLines(m: ModalState, width: number): string[] {
 	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + UNCOLOR))
 	let ids = m.blocks!.choices
 	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + UNCOLOR)
-	return ['', strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
+	return [strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
 }
 
 // The rows below the list: the selected item's details, wrapped, and why
@@ -213,7 +234,7 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
 	let box = modalView.modalBox(rows, cols)
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
-	if (m.compact && m.form) box.height = Math.min(box.height, m.form.form.fields.length + 2 + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
+	if (m.compact && m.form) box.height = Math.min(box.height, 2 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
 	while (lines.length < box.height) lines.push('')
 	let screen = Math.min(lines.length, rows)
 	let top = lines.length - screen + Math.floor((screen - box.height) / 2)
@@ -222,4 +243,4 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { table, modalBox, border, modalLines, cell, blocksLines, footer, highlight, modalScroll, overlay, withModal }
+export const modalView = { table, modalBox, border, modalLines, cell, head, blocksLines, footer, highlight, modalScroll, overlay, withModal }

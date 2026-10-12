@@ -15,7 +15,7 @@ const hooks = {
 }
 function open(): void {
 	app.close()
-	app.open(findDialog.open(find.state.filters), (a, m) => {
+	app.open(findDialog.open(find.state.filters, app.state.tabs.map((t) => t.id)), (a, m) => {
 		let r = m.find!.results[a.item ?? 0]
 		if (r) find.go(r)
 	}, (m, k) => {
@@ -23,6 +23,8 @@ function open(): void {
 		if (r.state.form?.values[0] !== m.form?.values[0] || r.state.find!.filters !== m.find!.filters) findController.update(find.state, hooks, r.state)
 		return r
 	})
+	// An empty query lists the recently updated tabs.
+	findController.update(find.state, hooks, app.state.modal!)
 }
 function go(r: NonNullable<typeof find.target>): void {
 	find.target = r

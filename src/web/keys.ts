@@ -86,8 +86,11 @@ function key(e: KeyInput, target: Target): boolean {
 			return true
 		}
 		if (st.view.modal.find) {
-			if (!k || e.ctrlKey || e.metaKey || e.altKey || !['enter', 'escape', 'up', 'down'].includes(k.key)) return false
-			find.key(k)
+			// Arrows move among field, filters and results; Space toggles a filter.
+			let f = st.view.modal.find.focus, filters = f > 0 && f < 5
+			let space = filters && k?.text === ' '
+			if (!k || e.ctrlKey || e.metaKey || e.altKey || (!space && !['enter', 'escape', 'up', 'down', ...(filters ? ['left', 'right'] : [])].includes(k.key))) return false
+			find.key(space ? { key: ' ' } : k)
 			return true
 		}
 		if ((target.kind === 'button' || target.kind === 'link') && (e.key === 'Enter' || e.key === ' ')) return false

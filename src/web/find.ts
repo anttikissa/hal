@@ -14,7 +14,8 @@ const hooks = {
 }
 function open(): void {
 	if (hooks.get()?.find) find.close()
-	hooks.set(findDialog.open(find.state.filters))
+	// An empty query lists the recently updated tabs.
+	findController.update(find.state, hooks, findDialog.open(find.state.filters, app.state.tabs.map((t) => t.id)))
 }
 function close(): void {
 	app.setView({ ...app.state.view, modal: undefined })
@@ -40,6 +41,6 @@ function key(k: Key): void {
 }
 function focus(index: number): void {
 	let m = hooks.get()
-	if (m?.find) hooks.set({ ...m, find: { ...m.find, focus: index } })
+	if (m?.find && m.find.focus !== index) hooks.set(findDialog.focus(m, index))
 }
 export const find = { state: findController.create(), open, close, input, toggle, key, focus, cancel: (): void => findController.close(find.state, hooks), event: (b: FindBatch): void => findController.event(hooks, b) }

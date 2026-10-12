@@ -59,6 +59,15 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
 	)
+	// Find: the focused part takes the DOM focus, as arrow keys move it.
+	let filters: HTMLButtonElement[] = []
+	createEffect(
+		() => props.modal?.find?.focus,
+		(f) => untrack(() => {
+			let el = f === undefined || !box.open ? undefined : f === 0 ? search : f < 5 ? filters[f - 1] : list
+			if (el && document.activeElement !== el) el.focus()
+		}),
+	)
 	let cancel = (e: Event) => { e.preventDefault(); app.modalKey({ key: 'escape' }) }
 	let outside = (e: MouseEvent) => {
 		let r = box.getBoundingClientRect()
@@ -70,12 +79,14 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				<div class="title">{props.modal?.title ?? ''}</div>
 				<button type="button" class="close" aria-label="Close" onClick={cancel}><Icon name="close" /></button>
 			</div>
+			<Show when={props.modal?.question}>{(q) => <p class="question">{q()}</p>}</Show>
 			<Show when={props.modal?.form}>
-				<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
+				<input ref={(e) => (search = e)} class="input" type="text" aria-label={props.modal?.question ?? 'Search'} autocomplete="off"
 					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
 					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, 0).text : undefined}
 					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))} onFocus={() => find.focus(0)} />
 			</Show>
+			<Show when={props.modal?.find}>{(f) => <div class={f().failed ? 'blocks-hint refused' : 'blocks-hint'} role="status">{f().status}</div>}</Show>
 			<Show when={props.modal?.blocks}>{(b) => (
 				<>
 					<div class={b().invalid ? 'blocks-hint refused' : 'blocks-hint'} role="status">{b().hint}</div>
@@ -96,7 +107,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.find}>
 				<div class="filters" role="group" aria-label="Search kinds">
 					<For each={findDialog.labels}>{(label, i) => (
-						<button type="button" aria-pressed={props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? 'true' : 'false'}
+						<button ref={(e) => (filters[i()] = e)} type="button" aria-pressed={props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? 'true' : 'false'}
 							onFocus={() => find.focus(i() + 1)} onClick={() => find.toggle(i())}>
 							{props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? '[x] ' : '[ ] '}{label}
 						</button>

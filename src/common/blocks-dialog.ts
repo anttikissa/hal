@@ -27,7 +27,7 @@ const kinds = ['tool', 'reasoning', 'assistant', 'user', 'message', 'system', 'q
 
 function open(): ModalState {
 	let m = modals.open({ title: 'Expand or collapse blocks', hint: 'enter: toggle · tab: complete · esc: close', form: { text: 'Expand or collapse blocks', fields: [{ type: 'text', name: 'target', placeholder: '24, 10-24 or t*' }] } })
-	return { ...m, compact: true, blocks: { hint: '', help: help() } }
+	return { ...m, compact: true, question: 'Which cards to expand or collapse?', blocks: { hint: '', help: help() } }
 }
 
 // `m` with its hint for the field's text; Tab's list goes.
