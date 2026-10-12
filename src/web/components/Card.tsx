@@ -123,7 +123,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 
 	// Another session's message with a summary folds under it.
 	// Prompt-file changes fold under their summary (task ar).
-	let folding = () => shut() || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
+	let folding = () => shut() || !!bashResult.background(props.row.item) || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text

@@ -14,6 +14,7 @@ import type { Event } from '../common/protocol.ts'
 import { toggle, type Fold, type Mode } from '../common/toggle.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item } from '../common/transcript.ts'
+import { bashResult } from '../common/bash-result.ts'
 import { app } from './app.ts'
 import { scroll } from './scroll.ts'
 
@@ -31,7 +32,7 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
 // Whether `item`'s card starts open and closes (text and the user's
 // prompts), rather than starting closed.
 function closable(item: Item): boolean {
-	return item.type === 'text' || (item.type === 'prompt' && !item.summary)
+	return item.type === 'text' || (item.type === 'prompt' && !item.summary && !bashResult.background(item))
 }
 
 // Whether card `id` (`<session>#<key>`) of `item` shows open.
