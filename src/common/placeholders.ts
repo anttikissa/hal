@@ -37,10 +37,11 @@ export type Shown = { cut: string; text: string; fade?: 'left' | 'right'; next: 
 const HOLD = 3000
 const LONG_HOLD = 4500
 const ERASE = 5
-// Typing is frequent, so the example erases from its left in 50 ms (3
-// frames at 60 Hz); emptying the prompt again is rare, so it fades back
-// over 300 ms.
-const GONE = 50
+// The prompt's example erasing as typing starts: twice as fast. Its
+// letter-by-letter erase is the effect, so the 50 ms rule for frequent
+// changes does not shorten it. Emptying the prompt again is rare, so
+// the example fades back over 300 ms.
+const GONE = ERASE / 2
 const BACK = 300
 const TYPE = 35 / 3
 // Each list's graphemes and cycle length, computed once: rotate runs on
@@ -106,15 +107,14 @@ function follow(st: PromptExample, key: string, list: string[] | undefined, type
 	}
 	let g = st.gone
 	if (!g || typed.includes('\n')) return undefined
-	let step = GONE / g.items.length
-	let n = Math.floor((now - g.at) / step) + 1
+	let n = Math.floor((now - g.at) / GONE) + 1
 	let covered = strings.visLen(typed)
 	while (n < g.items.length && strings.visLen(g.items.slice(0, n).join('')) <= covered) n++
 	if (n >= g.items.length) {
 		st.gone = undefined
 		return undefined
 	}
-	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: step - ((now - g.at) % step) }
+	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: GONE - ((now - g.at) % GONE) }
 }
 
 export const placeholders = { general, hal, graphemes, rotate, follow, BACK }

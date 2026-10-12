@@ -367,6 +367,7 @@ function reset(): void {
 	queueEdit.disconnected()
 	uploads.reset()
 	notices.reset()
+	appView.state.example = {}
 }
 
 export const app = {

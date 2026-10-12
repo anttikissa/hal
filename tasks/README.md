@@ -303,8 +303,8 @@ frequency: a frequent or keyboard-driven change takes --snap-ms (50
 ms), its rare reverse may take up to --back-ms (300 ms); the state
 itself changes at once. Motion is CSS; script it only when CSS cannot.
 Nothing that happens in milliseconds (a round trip) may show, so state
-changes that are usually brief start after a delay. Under
-prefers-reduced-motion, fades and color changes stay; movement goes.
+changes that are usually brief start after a delay; no motion under
+prefers-reduced-motion.
 
 ## Readable text (invariant, terminal and web)
 
