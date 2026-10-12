@@ -169,6 +169,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let presentation = () => props.row.result?.presentationError ? undefined : props.row.result?.presentation ?? (props.row.item.type === 'tool' ? props.row.item.presentation : undefined)
 	let presentationError = () => props.row.result?.presentationError ?? (props.row.item.type === 'tool' ? props.row.item.presentationError : undefined)
+	// An open message without a summary is headed by its sender, as in
+	// the terminal; its text then shows once, in the body.
+	let headsWho = () => props.row.item.type === 'prompt' && !props.row.item.summary && expanded()
 	let head = () => {
 		let item = props.row.item
 		// Closed thinking spends its width on the preview, not a label.
@@ -178,6 +181,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
 		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)
+		if (headsWho()) return titles.who(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		return item.type === 'tool' ? presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
@@ -337,7 +341,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 							<Show when={!closable()}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job #t${n()} (/kill #t${n()})`} aria-label={`Kill background job #t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
-								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
+								label={<Show when={headsWho()} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
@@ -349,7 +353,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 									<div class="content">
 										<Show when={props.row.item.type !== 'tool'} fallback={<>{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}<Show when={props.cursor && !md()}>{cursor()}</Show></>}>
 											<div ref={proseRef}>
-												<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
+												<Show when={props.row.item.type === 'prompt' && !headsWho()}><div class="sender">{who()}</div></Show>
 												{md() ? markdown() : body()}
 												<Show when={props.cursor && !md()}>{cursor()}</Show>
 											</div>
