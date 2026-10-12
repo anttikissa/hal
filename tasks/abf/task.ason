@@ -1,0 +1,10 @@
+{
+	title: 'Projected history pages omit rebase controls',
+	spec: 'Restore the invariant that host snapshots and earlier history pages contain already-projected display records, never rebase control records. Rebase plans validate against the complete original history on the host; clients do not apply them again to a partial or already-rewritten page. Preserve edited text, omitted dropped entries, canceled references supplied by the display projection, keyed rewrite dividers, page boundaries and undo. Terminal startup backfill and web incremental backfill use the same safe pages. Regression checks cover dropped and edited targets across page boundaries, both backfill modes and undo; malformed raw rebase targets still fail loudly. Existing histories stay untouched.',
+	status: 'done',
+	notes: [
+		'The display projection retained rebase controls alongside already-edited records. Returning both in snapshot and history pages made client backfill apply the plan again after its dropped targets were gone. Filter controls at page selection before choosing the start boundary; raw replay validation and snapshot rewrite metadata remain unchanged. Both terminal all-at-once and incremental backfill regression checks failed before the fix and pass with it, including undo. A real ./run PTY check now survives startup and exits 0 on Ctrl-C.'
+	],
+	needs: ['bq', 'z71'],
+	foldInto: ['bq', 'z71']
+}

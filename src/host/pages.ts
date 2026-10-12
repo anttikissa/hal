@@ -271,7 +271,7 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	// Rebase undo and cross-page groups need the audit trail.
 	if (pages.marks(id).rebase !== undefined) {
 		let { records, offsets, current } = pages.rebased(id)
-		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && current.has(l.record.n))
+		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && l.record.type !== 'rebase' && current.has(l.record.n))
 		let at = found.findIndex((l) => l.offset >= end - budget)
 		if (at < 0) at = Math.max(0, found.length - 1)
 		while (at > 0 && !turnStart(found[at]!.record)) at--
