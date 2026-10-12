@@ -255,6 +255,7 @@ html.typing .App { position: absolute; }
 .StatusRow .overview { position: relative; display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
 .StatusRow .details-target { position: absolute; inset: 0; width: 100%; height: 100%; background: none; }
 .StatusRow .budget { flex: none; position: relative; }
+.StatusRow .budget.pile { top: var(--lift, 0); }
 .StatusRow .budget:empty { display: none; }
 .StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
 .StatusRow { container-type: inline-size; }
