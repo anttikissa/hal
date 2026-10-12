@@ -201,7 +201,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
 	// A rerun starts from the saved answers, like /config: Enter keeps
 	// one, an emptied field removes it, Escape leaves it alone.
-	let known = (label: 'Name' | 'Language preference') => {
+	let known = (label: 'Name' | 'Language and tone') => {
 		let v = profile.field(profile.text(), label)
 		return v === undefined ? {} : { initial: v }
 	}
@@ -231,8 +231,8 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let say: string[] = []
 	if (!said(run, 'Nice to meet you')) say.push(name ? `Nice to meet you, ${name}.` : 'Nice to meet you.')
 	let reply = (r: Reply): Reply => ({ ...r, say: [...say, r.say].filter((x) => x).join('\n\n') || undefined })
-	let store = (label: 'Name' | 'Language preference', field: string) => {
-		let what = label === 'Name' ? 'name' : 'language preference'
+	let store = (label: 'Name' | 'Language and tone', field: string) => {
+		let what = label === 'Name' ? 'name' : 'language and tone'
 		let value = profile.value(answered(run, field))
 		if (value) {
 			profile.save({ [label]: value })
@@ -291,8 +291,8 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// Language comes last: the scripted intro can't switch language
 	// mid-way, so asking earlier would promise what it can't do.
 	let language = answered(run, 'language')
-	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.languages(), ...known('Language preference') }] } })
-	store('Language preference', 'language')
+	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.languages(), ...known('Language and tone') }] } })
+	store('Language and tone', 'language')
 	if (model) {
 		config.init()
 		config.state.data!.model = model

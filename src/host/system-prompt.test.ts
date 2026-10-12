@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { systemPrompt } from './system-prompt.ts'
-
+import { clients } from './clients.ts'
 let root = ''
 
 beforeEach(() => {
@@ -84,7 +84,7 @@ test('outside Git only the cwd itself is read', () => {
 	expect(text).not.toContain('PARENT RULE')
 })
 
-test('the date names the UTC offset of the clock prompt stamps use', () => {
+test('without a client, the date uses the host local timezone and offset', () => {
 	let tz = process.env.TZ
 	try {
 		let noon = Date.UTC(2026, 8, 26, 21, 30)
@@ -93,6 +93,27 @@ test('the date names the UTC offset of the clock prompt stamps use', () => {
 		process.env.TZ = 'Asia/Kolkata'
 		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: noon })).toMatch(/2026-09-27, Sunday\b.*UTC\+05:30/)
 	} finally {
+		if (tz === undefined) delete process.env.TZ
+		else process.env.TZ = tz
+	}
+})
+
+test('the Session section uses the client zone and follows zone changes on a UTC host', () => {
+	let tz = process.env.TZ
+	let client = clients.join(new Set(['timezone-test']))
+	try {
+		process.env.TZ = 'UTC'
+		let input = { cwd: root, model: 'm/x', now: Date.UTC(2026, 8, 26, 23, 30), sessionId: 'timezone-test' }
+		let session = () => systemPrompt.inspect(input).sections.find((s) => s.title === 'Session')!
+		expect(session().body).toContain('Timezone: UTC')
+		clients.input(client, { type: 'tab-start', timezone: 'Asia/Tokyo' })
+		expect(session().body).toContain('Timezone: Asia/Tokyo')
+		expect(session().body).toContain('2026-09-27, Sunday, UTC+09:00')
+		clients.input(client, { type: 'tab-resume', timezone: 'America/New_York' })
+		expect(session().body).toContain('Timezone: America/New_York')
+		expect(session().body).toContain('2026-09-26, Saturday, UTC-04:00')
+	} finally {
+		clients.state.records.delete(client)
 		if (tz === undefined) delete process.env.TZ
 		else process.env.TZ = tz
 	}

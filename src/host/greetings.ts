@@ -2,6 +2,7 @@
 // the ordinary output record is the durable choice shared by both clients.
 import { mkdirSync } from 'fs'
 import { clock } from './clock.ts'
+import { clients } from './clients.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
@@ -73,8 +74,7 @@ const pool: Record<Period, string[]> = {
 }
 
 function period(timezone?: string, now = clock.now()): Period {
-	// An absent or invalid profile zone must not fall back to the host's.
-	if (!timezone || !profile.timezone(timezone)) return 'neutral'
+	if (timezone !== undefined && !clients.zone(timezone)) return 'neutral'
 	let hour = Number(new Intl.DateTimeFormat('en', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }).format(now))
 	return hour >= 7 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 && hour < 23 ? 'evening' : 'neutral'
 }
@@ -87,9 +87,9 @@ function name(value?: string): string | undefined {
 	return text.replace(/[\\`*_[\]()#|>&!/-]/g, '\\$&')
 }
 
-function choose(text: string, previous?: string): string {
+function choose(text: string, previous?: string, timezone?: string): string {
 	let name = greetings.name(profile.field(text, 'Name'))
-	let period = greetings.period(profile.field(text, 'Timezone'))
+	let period = greetings.period(timezone)
 	let candidates = [...pool.neutral, ...(period === 'neutral' ? [] : pool[period])]
 		.filter((text) => name !== undefined || !text.includes('{name}'))
 		.map((text) => text.replace('{name}', () => name ?? ''))
@@ -97,7 +97,7 @@ function choose(text: string, previous?: string): string {
 	return candidates[Math.floor(greetings.random() * candidates.length)]!
 }
 
-function open(id: string): void {
+function open(id: string, timezone = clients.timezone(id)): void {
 	let meta = sessions.open(id)
 	if ((meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
 	if (meta.model === 'hal/tool') {
@@ -109,7 +109,7 @@ function open(id: string): void {
 	let previous = liveFiles.liveFile<{ last?: string }>(`${paths.stateDir()}/greetings.ason`, {}, { watch: false, mode: 0o600 })
 	try {
 		if (previous.last !== undefined && typeof previous.last !== 'string') throw new Error('greetings.ason: invalid last greeting')
-		let text = greetings.choose(profile.text(), previous.last)
+		let text = greetings.choose(profile.text(), previous.last, timezone)
 		history.append(id, { type: 'output', text, synthetic: true })
 		previous.last = text
 	} finally {

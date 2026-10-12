@@ -184,7 +184,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		let id = c.type === 'open-newest' ? sessions.newest() : undefined
 		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
 		id = sessions.create(c.type === 'create' ? c : { cwd: c.cwd ?? host.cwd() }).id
-		greetings.open(id)
+		greetings.open(id, client.record.timezone)
 		host.follow(client, id)
 		return { sessionId: id }
 	}
@@ -212,7 +212,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			return {}
 		})()
 	}
-	if (tabs.is(c)) return tabs.act(c)
+	if (tabs.is(c)) return tabs.act(c, client.record.timezone)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history' || c.type === 'plugin-sync') return c.type === 'plugin-sync' ? pluginSync.command(client, c) : { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid, c.version, c.newCode) : clients.screen(client.record, c)

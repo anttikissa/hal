@@ -3,22 +3,17 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { settings } from '../common/settings.ts'
+import { clients } from './clients.ts'
 import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
 import { promptTemplate, type PromptRender, type PromptSource } from './prompt-template.ts'
 export type { PromptSource } from './prompt-template.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
-// Local YYYY-MM-DD, weekday, UTC offset: the clock the [HH:MM] prompt
-// stamps (replay.clock) use, named so the two can't be misread.
-function date(now: number): string {
-	let d = new Date(now)
-	let two = (n: number) => String(n).padStart(2, '0')
-	// Not toLocaleDateString: building its formatter costs ~0.3 ms a call.
-	let weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()]
-	let off = -d.getTimezoneOffset()
-	let zone = off ? `UTC${off < 0 ? '-' : '+'}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}` : 'UTC'
-	return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}, ${weekday}, ${zone}`
+function date(now: number, timeZone: string): string {
+	let parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long', timeZoneName: 'longOffset' }).formatToParts(now)
+	let part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value
+	return `${part('year')}-${part('month')}-${part('day')}, ${part('weekday')}, ${part('timeZoneName').replace('GMT', 'UTC')}`
 }
 
 // Directories whose AGENTS.md (or CLAUDE.md) applies, outermost first:
@@ -81,8 +76,9 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
 	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
+	let timezone = (input.sessionId ? clients.timezone(input.sessionId) : undefined) ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 	let vars = {
-		date: date(input.now),
+		date: date(input.now, timezone), timezone,
 		session_id: input.sessionId ?? '', session_cwd: paths.display(input.cwd), session_model: input.model,
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		session_interactive: String(input.interactive ?? true), session_autoclose: String(input.autoclose ?? false),

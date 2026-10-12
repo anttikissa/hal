@@ -3,6 +3,7 @@ import { writeFileSync } from 'fs'
 import { markdown } from '../common/markdown.ts'
 import { replay } from '../common/replay.ts'
 import { greetings } from './greetings.ts'
+import { clock } from './clock.ts'
 import { titles } from '../common/titles.ts'
 import { calls, client, created, fresh, restartHost, testHome, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
@@ -23,14 +24,15 @@ test('arrival periods use only valid user-local time, including boundaries and d
 	let summer = Date.parse('2026-06-01T05:00:00Z')
 	expect(greetings.period('Europe/Paris', summer)).toBe('morning')
 	expect(greetings.period('Europe/Paris', Date.parse('2026-01-01T05:00:00Z'))).toBe('neutral')
-	for (let zone of [undefined, '', 'Not specified', 'invalid/zone', '+03:00']) expect(greetings.period(zone, summer)).toBe('neutral')
+	for (let zone of ['', 'Not specified', 'invalid/zone', '+03:00']) expect(greetings.period(zone, summer)).toBe('neutral')
+	expect(greetings.period(undefined, summer)).toBe(greetings.period(Intl.DateTimeFormat().resolvedOptions().timeZone, summer))
 })
 
-test('authored choices vary, names are optional data, and missing timezone stays neutral', () => {
+test('authored choices vary and names are optional data', () => {
 	let original = greetings.random
 	let samples = (profile: string) => Array.from({ length: 100 }, (_, i) => {
 		greetings.random = () => i / 100
-		return greetings.choose(profile)
+		return greetings.choose(profile, undefined, 'invalid/zone')
 	})
 	try {
 		let named = samples('Name: Sample Person')
@@ -49,6 +51,20 @@ test('authored choices vary, names are optional data, and missing timezone stays
 		let first = greetings.choose('')
 		expect(greetings.choose('', first)).not.toBe(first)
 	} finally { greetings.random = original }
+})
+
+test('new tabs greet in the creator client zone and ignore profile timezone', () => {
+	let now = clock.now
+	try {
+		clock.now = () => Date.UTC(2026, 5, 1, 10)
+		greetings.random = () => 0.999
+		writeFileSync(`${testHome()}/USER.md`, 'Timezone: America/New_York\n')
+		let c = client()
+		c.conn.send({ type: 'tab-start', timezone: 'Asia/Tokyo' })
+		c.conn.send({ type: 'tab-new', cwd: '/tmp' })
+		let id = tabs.file().open.at(-1)!
+		expect(history.readSync(id)[0]).toMatchObject({ type: 'output', text: expect.stringMatching(/evening/i) })
+	} finally { clock.now = now }
 })
 
 test('new interactive tabs have one shared durable output, no provider turn, and no immediate repeat after restart', async () => {

@@ -145,7 +145,7 @@ function insert(id: string, index: number): void {
 	open.splice(Math.max(0, Math.min(open.length, index)), 0, id)
 }
 
-function create(cwd: string, after?: string, autoclose = false, noUser = false, interactive = true): string {
+function create(cwd: string, after?: string, autoclose = false, noUser = false, interactive = true, timezone?: string): string {
 	// The very first tab of a fresh home is the offline welcome guide.
 	let first = settings.value('intro') !== false && tabs.file().open.length === 0 && !sessions.newest()
 	let open = tabs.file().open
@@ -158,7 +158,7 @@ function create(cwd: string, after?: string, autoclose = false, noUser = false, 
 		interactive,
 		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
 	}).id
-	greetings.open(id)
+	greetings.open(id, timezone)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
 	// The guide speaks first: no prompt needed to start it.
 	if (first && !status.transition(id, { type: 'submit' })) turns.start(id)
@@ -206,11 +206,11 @@ function resume(id?: string): Outcome {
 	return { tab: entry.id }
 }
 
-function start(cwd?: string, last?: string): Outcome {
+function start(cwd?: string, last?: string, timezone?: string): Outcome {
 	let open = tabs.file().open
 	let inCwd = (id: string) => cwd === undefined || resolve(sessions.open(id).cwd) === resolve(cwd)
 	let found = last !== undefined && open.includes(last) && inCwd(last) ? last : open.find(inCwd)
-	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd()) }
+	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd(), undefined, false, false, true, timezone) }
 }
 
 function is(c: Command): c is TabCommand {
@@ -218,15 +218,15 @@ function is(c: Command): c is TabCommand {
 }
 
 // Carries out a tab command; a change goes to every client.
-function act(c: TabCommand): Outcome {
+function act(c: TabCommand, timezone?: string): Outcome {
 	let f = tabs.file()
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
 	if (c.type === 'tab-new' && c.noIntro) config.update({ intro: false })
-	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.noUser, c.interactive) }
+	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.noUser, c.interactive, timezone) }
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
-	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last)
+	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last, timezone)
 	// A turn that asked keeps its mark until the user sends something (task nd6);
 	// a tab marked by /unread keeps it until its client shows another (task wr5).
 	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId) && !tabs.state.kept.has(c.sessionId)) f.attention = f.attention.filter((id) => id !== c.sessionId)

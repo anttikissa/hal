@@ -17,6 +17,7 @@ import { states } from '../common/states.ts'
 import { summary } from '../common/summary.ts'
 import { work } from './work.ts'
 import { blobs } from './blobs.ts'
+import { clients } from './clients.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
@@ -62,7 +63,7 @@ function spawn(owner: string, s: Spawn): string {
 		liveFiles.save(ancestor)
 		host.broadcast(ancestor.id, { type: 'meta', sessionId: ancestor.id, meta: { ...ancestor } })
 	}
-	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id)
+	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id, clients.timezone(owner))
 	let at = tabs.file().open.indexOf(owner)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
 	tabs.publish()

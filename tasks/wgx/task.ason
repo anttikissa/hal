@@ -1,0 +1,10 @@
+{
+	title: 'Private notes format and runtime timezone context',
+	spec: 'USER.md is private freeform Markdown. New files start with the preamble comment <!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->, then # User, a blank line and consecutive supplied Name and Language and tone lines. No example name or language value is stored. Intro reads and writes Language and tone, preserving unrelated contents, atomic writes and owner-only permissions. Timezone is runtime context, not a profile field: profile helpers neither write nor read it. Greetings use the client timezone, falling back to the host local timezone. SYSTEM.md includes the resolved IANA timezone and date in its updating Session section, so section updates convey timezone changes during a session. Use the existing validated per-session client timezone, otherwise Intl host local timezone; an attached remote client takes precedence over a UTC host. Restore the invariant that personal preference files do not override runtime timezone. Focused tests cover client precedence, host fallback, section changes and non-destructive profile edits.',
+	status: 'done',
+	notes: [
+		'Greetings run before the creating client follows the new session. Pass its validated connection timezone through host and tabs creation paths; a blank interactive child uses the owner session client zone. Existing handwritten Timezone lines remain untouched as freeform notes but are never consulted by greetings or prompt assembly.'
+	],
+	needs: ['ky', 'vc', 'wq', '8y'],
+	foldInto: ['ky', 'vc', 'wq', '8y']
+}

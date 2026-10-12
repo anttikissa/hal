@@ -2,12 +2,11 @@
 // user (task ky). A few optional field lines, not a schema: everything
 // else in it is the user's and stays byte for byte.
 import { existsSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'fs'
-import { clients } from './clients.ts'
 import { paths } from './paths.ts'
 
 // null removes a field's lines.
-export type Fields = { Name?: string | null; 'Language preference'?: string | null; Timezone?: string | null }
-const labels = ['Name', 'Language preference', 'Timezone'] as const
+export type Fields = { Name?: string | null; 'Language and tone'?: string | null }
+const labels = ['Name', 'Language and tone'] as const
 
 function file(): string {
 	return `${paths.home()}/USER.md`
@@ -28,11 +27,6 @@ function field(text: string, label: string): string | undefined {
 		.map((m) => profile.value(m[1])).findLast((v) => v !== undefined)
 }
 
-// A stored timezone is an IANA name, never a numeric offset.
-function timezone(v: string): boolean {
-	return clients.zone(v) !== undefined
-}
-
 // Writes the given fields: each replaces its first line in place (later
 // duplicates go), a missing one goes after the last field line, else
 // after the # User header, else at the end. Nothing else changes. A new
@@ -41,7 +35,7 @@ function save(fields: Fields): void {
 	let given = labels.filter((l) => profile.value(fields[l] ?? undefined) !== undefined)
 	let removed = labels.filter((l) => fields[l] === null)
 	if (!given.length && !removed.length) return
-	let lines = (profile.text() || '# User\n').split('\n')
+	let lines = (profile.text() || '<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n').split('\n')
 	let at = (label: string) => lines.findIndex((l) => new RegExp(`^${label}:`, 'i').test(l))
 	for (let label of removed) for (let i = at(label); i >= 0; i = at(label)) {
 		// A field line sits between blank lines: take one blank with it.
@@ -62,12 +56,13 @@ function save(fields: Fields): void {
 			lines.push(line, '')
 			continue
 		}
-		let next = lines[anchor + 1]
-		lines.splice(anchor + 1, 0, '', line, ...(next ? [''] : []))
+		if (/^# User\b/i.test(lines[anchor]!)) {
+			lines.splice(anchor + 1, lines[anchor + 1] === '' ? 1 : 0, '', line, '')
+		} else lines.splice(anchor + 1, 0, line)
 	}
 	let path = existsSync(profile.file()) ? realpathSync(profile.file()) : profile.file()
 	writeFileSync(`${path}.tmp`, lines.join('\n'), { mode: 0o600 })
 	renameSync(`${path}.tmp`, path)
 }
 
-export const profile = { file, text, value, field, timezone, save }
+export const profile = { file, text, value, field, save }

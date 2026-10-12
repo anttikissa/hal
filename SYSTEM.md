@@ -193,6 +193,7 @@ Agent-agent communication loses information: use subagents only for independent 
 :: section "Session" update="diff"
 Id: $session_id
 Date: $date
+Timezone: $timezone
 Model: $session_model
 Cwd: $session_cwd
 Autoclose: $session_autoclose

@@ -180,7 +180,7 @@ test('intro resumes through profile, save, model and secret search setup', async
 	// An environment key alone still gets the sign-in offer.
 	expect(field(c, id)?.name).toBe('login')
 	await reply(c, id, 'login', 'Skip', 'model')
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\n')
 	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your name to ${home}/USER.md.`)
 	let options = (field(c, id) as { options: string[] }).options
 	// Friendly names of the aliases a credential can use, never ids.
@@ -197,7 +197,7 @@ test('intro resumes through profile, save, model and secret search setup', async
 	await until(() => c.of('turn-end').length > 0)
 	expect(apiKeys.get('serper')).toBe('secret-SERPER-123')
 	expect(statSync(paths.authFile()).mode & 0o777).toBe(0o600)
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nLanguage preference: US English\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\nLanguage and tone: US English\n')
 	expect(readFileSync(history.file(id), 'utf8')).not.toContain('secret-SERPER-123')
 	expect(JSON.stringify(c.events)).not.toContain('secret-SERPER-123')
 	expect(sessions.open(id).model).toStartWith('anthropic/')
@@ -266,14 +266,14 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	await until(() => texts(c.views.get(id)!).filter((t) => t.includes('HAL 9001')).length === 2 && field(c, id)?.name === 'name')
 	expect(field(c, id)).toMatchObject({ initial: 'Rowan' })
 	// An emptied field removes the saved value; Escape keeps it.
-	profile.save({ 'Language preference': 'Terse' })
+	profile.save({ 'Language and tone': 'Terse' })
 	await reply(c, id, 'name', '', 'login')
 	await reply(c, id, 'login', 'Skip', 'theme')
 	await reply(c, id, 'theme', 'hal', 'language')
 	expect(field(c, id)).toMatchObject({ initial: 'Terse' })
 	c.conn.send({ type: 'pause', sessionId: id })
 	await until(() => c.of('turn-end').filter((e) => e.status === 'completed').length === 2)
-	expect(profile.text()).toBe('# User\n\nLanguage preference: Terse\n')
+	expect(profile.text()).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nLanguage and tone: Terse\n')
 	expect(texts(c.views.get(id)!).join('\n')).toContain('I removed your name from')
 })
 
@@ -295,7 +295,7 @@ test('text typed outside a question asks whether to go on; No ends the intro', (
 test('saving the profile rewrites only its fields and keeps everything else byte for byte', () => {
 	let original = '# User\nFreeform notes, kept verbatim.\nName: <name>\n\n## Working preferences\n\nLikes quiet rooms.\nName: stale'
 	writeFileSync(`${home}/USER.md`, original)
-	profile.save({ Name: 'Rowan', 'Language preference': '', Timezone: 'Europe/Paris' })
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\nFreeform notes, kept verbatim.\nName: Rowan\n\nTimezone: Europe/Paris\n\n## Working preferences\n\nLikes quiet rooms.')
+	profile.save({ Name: 'Rowan', 'Language and tone': 'Terse' })
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\nFreeform notes, kept verbatim.\nName: Rowan\nLanguage and tone: Terse\n\n## Working preferences\n\nLikes quiet rooms.')
 	expect(statSync(`${home}/USER.md`).mode & 0o777).toBe(0o600)
 })
