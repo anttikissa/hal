@@ -83,6 +83,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	}
 	let current = colors.popupCurrent(colors.popup().neutralFg!)
 	let below = modalView.footer(m, inner)
+	// Ctrl-O, Ctrl-F and Ctrl-M keep a blank row above and below their content.
+	if (m.question || m.tree) below = [...below, '']
 	let visible = Math.max(0, height - 2 - content.length - below.length)
 	let scroll = modalView.modalScroll(m, visible)
 	let cursor = fields.cursor ?? { row: content.length, col: 0 }
@@ -150,13 +152,13 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 	return { text: `${value}   ${faint}${note}${back}` }
 }
 
-// The fields' rows and cursor. With a question (Ctrl-O, Ctrl-F): the
-// question, a blank row, the field flush with the left edge like every
-// row below it, and a blank row.
+// The fields' rows and cursor. Ctrl-O, Ctrl-F and Ctrl-M: a blank row,
+// the question if any and a blank row, the field flush with the left
+// edge, and a blank row.
 function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor } {
 	let fields: { rows: string[]; cursor?: Cursor } = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [] }
-	if (!m.question) return fields
-	let top = [...strings.wordWrap(m.question, inner), '']
+	if (!m.question && !m.tree) return fields
+	let top = m.question ? ['', ...strings.wordWrap(m.question, inner), ''] : ['']
 	return { rows: [...top, ...fields.rows.map((r) => r.slice(2)), ''], cursor: fields.cursor && { row: fields.cursor.row + top.length, col: fields.cursor.col - 2 } }
 }
 
@@ -234,7 +236,7 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
 	let box = modalView.modalBox(rows, cols)
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
-	if (m.compact && m.form) box.height = Math.min(box.height, 2 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
+	if (m.compact && m.form) box.height = Math.min(box.height, 3 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
 	while (lines.length < box.height) lines.push('')
 	let screen = Math.min(lines.length, rows)
 	let top = lines.length - screen + Math.floor((screen - box.height) / 2)
