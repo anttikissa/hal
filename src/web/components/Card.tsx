@@ -72,6 +72,29 @@ const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}${props.row.item.canceledReference ? ':canceled' : ''}`
 	let root: HTMLElement | undefined
+	let prose: HTMLDivElement | undefined
+	let proseObserver: ResizeObserver | undefined
+	let [proseLong, setProseLong] = createSignal(false)
+	let measureProse = () => untrack(() => {
+		if (!prose || props.row.item.type === 'tool' || !blockToggle.toggles(props.row.item)) return
+		let lineHeight = parseFloat(getComputedStyle(prose).lineHeight)
+		let inset = getComputedStyle(prose.parentElement!)
+		setProseLong(prose.getBoundingClientRect().height + parseFloat(inset.paddingTop) + parseFloat(inset.paddingBottom) > settings.glimpseRows() * lineHeight + 1)
+	})
+	let proseRef = (el: HTMLDivElement) => {
+		if (prose) proseObserver?.unobserve(prose)
+		prose = el
+		proseObserver?.observe(el)
+		queueMicrotask(measureProse)
+	}
+	onSettled(() => {
+		if (props.row.item.type === 'tool' || !blockToggle.toggles(props.row.item)) return
+		proseObserver = new ResizeObserver(measureProse)
+		if (prose) proseObserver.observe(prose)
+		measureProse()
+		return () => proseObserver?.disconnect()
+	})
+	createEffect(() => settings.glimpseRows(), () => queueMicrotask(measureProse))
 	onSettled(() => root && enter(root))
 	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	// Short, glimpse or long (task hyt): as the session starts its kind,
@@ -260,11 +283,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<>
 			<Show when={!closable()}><Show when={title()} fallback={link()}>{heading()}</Show></Show>
 			<div class="content">
-				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
-					{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
-				</Show>
-				<Show when={props.cursor && !md()}>{cursor()}</Show>
-				{undoButton()}
+				<div ref={proseRef}>
+					<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
+						{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
+					</Show>
+					<Show when={props.cursor && !md()}>{cursor()}</Show>
+					{undoButton()}
+				</div>
 			</div>
 		</>
 	)
@@ -322,9 +347,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 							<div class="body" inert={!expanded()}>
 								<div class="contents">
 									<div class="content">
-										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
-										{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}
-										<Show when={props.cursor && !md()}>{cursor()}</Show>
+										<Show when={props.row.item.type !== 'tool'} fallback={<>{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}<Show when={props.cursor && !md()}>{cursor()}</Show></>}>
+											<div ref={proseRef}>
+												<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
+												{md() ? markdown() : body()}
+												<Show when={props.cursor && !md()}>{cursor()}</Show>
+											</div>
+										</Show>
 										<Show when={long()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 									</div>
 								</div>
@@ -333,7 +362,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</>
 						)}
 					</Show>
-					<Show when={props.row.note === undefined && !isChange() && props.row.item.type !== 'tool' && blockToggle.toggles(props.row.item) && expanded()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
+					<Show when={props.row.note === undefined && !isChange() && props.row.item.type !== 'tool' && blockToggle.toggles(props.row.item) && expanded() && proseLong()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 				</article>
 			)}
 		</Show>

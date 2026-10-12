@@ -2095,6 +2095,33 @@ browserTest('card headers restore short or open and tool commands expand apart f
 	} finally { await b.close() }
 }, 15000)
 
+browserTest('prose disclosure appears only when a glimpse hides rendered content (task 42j)', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Fixing' }] })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'word '.repeat(40).trim() } })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.Card').length >= 2`)
+		expect(await b.evaluate(`document.querySelector('.Card.user .more') === null`)).toBe(true)
+		expect(await b.evaluate(`document.querySelector('.Card.assistant .more') === null`)).toBe(true)
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+		await b.waitFor(`!!document.querySelector('.Card.assistant > .more')`)
+		expect(await b.evaluate(`document.querySelector('.Card.user .more') === null`)).toBe(true)
+		expect(await b.evaluate(`(() => { let c = document.querySelector('.Card.assistant'), m = c.querySelector('.more'), content = c.querySelector('.content'); return c.getBoundingClientRect().bottom > m.getBoundingClientRect().bottom && Math.abs(m.getBoundingClientRect().left - content.firstElementChild.getBoundingClientRect().left) < 1 })()`)).toBe(true)
+		await b.evaluate(`document.querySelector('.Card.assistant .more').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.assistant').classList.contains('glimpse')`)).toBe(true)
+		expect(await b.evaluate(`document.querySelector('.Card.assistant .content').scrollHeight > document.querySelector('.Card.assistant .content').clientHeight`)).toBe(true)
+		await b.evaluate(`document.querySelector('.Card.assistant .more').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.assistant .content').scrollHeight <= document.querySelector('.Card.assistant .content').clientHeight`)).toBe(true)
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
+		await b.waitFor(`document.querySelector('.Card.assistant .more') === null`)
+	} finally { await b.close() }
+}, 15000)
+
 browserTest('a touch on Send sends once, even when iOS withholds the click', async () => {
 	providerHome()
 	let b = await browser()

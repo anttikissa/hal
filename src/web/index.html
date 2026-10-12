@@ -195,6 +195,8 @@ html.typing .App { position: absolute; }
 .Card.target { scroll-margin-top: 0.5lh; }
 .Card :is(.more, .command-toggle) { display: block; position: relative; margin: 0.25lh 0 0 2ch; padding: 0; background: none; color: inherit; font: inherit; }
 .Card :is(.more, .command-toggle) .label { text-decoration: underline; text-underline-offset: 0.2em; }
+.Card:has(> .more) { padding-bottom: var(--card-inset); }
+.Card > .more { margin-left: 1ch; }
 @media (pointer: coarse) { .Card :is(.more, .command-toggle)::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 .ToolCommand { margin-bottom: 1lh; }
 .ToolCommand .command.clipped { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
