@@ -60,8 +60,8 @@ test('blocks start as the session sets their kind, over the settings; a failed c
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
-	expect(typed('t*').blocks).toEqual({ hint: 'Expands 2 tool blocks: t14, t16' })
-	expect(typed('').blocks).toEqual({ hint: 'Shows a glimpse of tool block t16' })
+	expect(typed('t*').blocks?.hint).toBe('Expands 2 tool blocks: t14, t16')
+	expect(typed('').blocks?.hint).toBe('Shows a glimpse of tool block t16')
 	expect(typed('t1,').blocks?.invalid).toBe(true)
 	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')

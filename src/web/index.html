@@ -481,13 +481,13 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Ctrl-O (task v8y): as tall as its field, hint and help. */
 .Picker.compact, .Picker.compact[open] { height: fit-content; max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; }
 .Picker .blocks-help { flex: none; color: var(--description); }
-.Picker .blocks-help dl { display: grid; grid-template-columns: max-content max-content max-content 1fr; gap: 0 2ch; margin: 0 0 0.25lh; }
+.Picker .blocks-help dl { display: grid; grid-template-columns: max-content max-content max-content 1fr; gap: 0 2ch; margin: 0 0 1lh; }
 .Picker .blocks-help dl > div { display: contents; }
 .Picker .blocks-help dt { color: var(--key); }
 .Picker .blocks-help dd { margin: 0; }
 .Picker .blocks-help p { margin: 0; }
 .Picker .blocks-help b { color: var(--key); font-weight: bold; }
-.Picker .blocks-hint { flex: none; overflow-wrap: anywhere; }
+.Picker .blocks-hint { flex: none; overflow-wrap: anywhere; margin-block: 0.75lh; }
 .Picker ul.blocks-ids { flex: none; display: flex; flex-wrap: wrap; gap: 0 2ch; overflow: visible; color: var(--key); }
 .Picker ul.blocks-ids li { padding: 0; min-height: 0; cursor: auto; }
 @media (max-width: 40rem) { .Picker .blocks-help dl { grid-template-columns: max-content 1fr; } }

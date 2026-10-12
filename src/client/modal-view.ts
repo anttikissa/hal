@@ -54,7 +54,9 @@ function table(m: ModalState, inner: number): number[] {
 
 function modalLines(m: ModalState, width: number, height: number): { rows: string[]; cursor: Cursor; scroll: number } {
 	let inner = Math.max(0, width - 4)
-	let fields = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [], cursor: undefined }
+	let fields: { rows: string[]; cursor?: Cursor } = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [] }
+	// The Ctrl-O field starts at the left edge, as its hint and help do.
+	if (m.blocks) fields = { rows: fields.rows.map((r) => r.slice(2)), cursor: fields.cursor && { ...fields.cursor, col: fields.cursor.col - 2 } }
 	let content = fields.rows.slice(0, height - 2)
 	if (m.find) {
 		if (m.find.focus !== 0) fields.cursor = undefined
@@ -137,13 +139,13 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 	return { text: `${value}   ${faint}${note}${back}` }
 }
 
-// The Ctrl-O dialog's rows below its field (task v8y): the live hint,
-// then the help area, or Tab's block ids packed in as many rows.
+// The Ctrl-O dialog's rows below its field (task v8y): a blank row, the
+// live hint, then the help area, or Tab's block ids packed in as many rows.
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
 	let hint = m.blocks!.invalid ? ansi.sgr({ fg: colors.error().fg! }) + m.blocks!.hint + UNCOLOR : m.blocks!.hint
-	let pairs = blocksDialog.help
+	let pairs = m.blocks!.help
 	let kw = (from: number) => Math.max(...pairs.filter((_, i) => i % 2 === from).map(([k]) => k.length)) + 2
 	let left = kw(0) + Math.max(...pairs.filter((_, i) => i % 2 === 0).map(([, d]) => d.length)) + 2
 	let two = left + kw(1) + Math.max(...pairs.filter((_, i) => i % 2 === 1).map(([, d]) => d.length)) <= width
@@ -155,13 +157,13 @@ function blocksLines(m: ModalState, width: number): string[] {
 		let w = Math.max(kw(0), kw(1))
 		for (let [k, d] of pairs) strings.wordWrap(d, Math.max(1, width - w)).forEach((line, i) => rows.push(cell([i ? '' : k, line], w) + UNCOLOR))
 	}
-	rows.push(...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
+	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
 	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + UNCOLOR))
 	let ids = m.blocks!.choices
 	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + UNCOLOR)
-	return [strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
+	return ['', strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
 }
 
 // The rows below the list: the selected item's details, wrapped, and why

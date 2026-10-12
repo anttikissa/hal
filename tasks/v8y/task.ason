@@ -6,16 +6,16 @@ Syntax (shared by all three commands): a list of items separated by commas, spac
 
 /expand expands every matched block and /collapse collapses them; neither name may be confused with /close, which closes the tab. /toggle flips one named block; for anything more (a range, '*' or a list) it applies the majority rule to the whole match: expand all when more than half are collapsed, otherwise collapse all; a tie expands, since expanding hides nothing. Fold state stays per client, so each client applies /toggle's rule to its own state.
 
-Dialog (Ctrl-O, runs /toggle): the field; below it a live hint that updates on every keystroke and says what Enter does ("Expands 12 tool blocks: t4-t88") or why the input is invalid; then a help area:
-  24, #t24   one block          t*   all tool blocks
-  10-24      a range            r*   all thinking (reasoning) blocks
-  t14, r2-9  a list             Tab  complete a block id
-  empty      latest tool block
-  User and assistant blocks change only when you name them (a, u).
-  Kinds: tool, reasoning, assistant, user, message, system, question
-The kinds row separates words with commas, like the terminal's key help row; each word's first letter (the kind letter) is bright and bold. The placeholder is static ("24, 10-24 or t*").
+Dialog (Ctrl-O, runs /toggle; footer "enter: toggle · tab: complete · esc: close"): the field, flush with the box's left padding like every row below it (no indent, no prompt sign); a blank row; a live hint that updates on every keystroke and says what Enter does ("Expands 12 tool blocks: t4-t88") or why the input is invalid; a blank row; then a help area:
+    t1905, 1905   one block      *       all blocks
+    1880-1905     a range        t*, r*  all of a kind
+    t1890, t1905  a list         empty   latest tool block
 
-Tab completes like /command completion: it fills the common prefix of the matching block ids for the item under the cursor; when several match it lists them in the help area, packed several per row, newest first, at least 10; more than fit end with "+N more". It never cycles.
+    User and assistant blocks change only when you name them (a, u).
+    Kinds: tool, reasoning, assistant, user, message, system, question
+  The examples use the session's real tool block ids: the latest (one block), the third latest to the latest (range) and the two latest (list). With fewer than two tool blocks they fall back to 24, 10-24 and t14, t24. The kinds row separates words with commas, like the terminal's key help row; each word's first letter (the kind letter) is bright and bold. The placeholder is static ("24, 10-24 or t*").
+
+  Tab completes like /command completion: it fills the common prefix of the matching block ids for the item under the cursor; when several match it lists them in the help area, packed several per row, newest first, at least 10; more than fit end with "+N more". It never cycles.
 
 Size: the terminal dialog is as tall as its content (field, hint, help or completions); the web dialog is as tall as its content too, not the full picker height.
 
