@@ -89,7 +89,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.find}>{(f) => <div class={f().failed ? 'blocks-hint refused' : 'blocks-hint'} role="status">{f().status}</div>}</Show>
 			<Show when={props.modal?.blocks}>{(b) => (
 				<>
-					<div class={b().invalid ? 'blocks-hint refused' : 'blocks-hint'} role="status">{b().hint}</div>
+					<div class={b().invalid ? 'blocks-hint invalid' : 'blocks-hint'} role="status">{b().hint}</div>
 					<Show when={b().choices} fallback={
 						<div class="blocks-help">
 							<dl><For each={b().help}>{([k, d]) => <div><dt>{k}</dt><dd>{d}</dd></div>}</For></dl>

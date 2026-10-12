@@ -481,6 +481,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li.row[aria-selected="true"] .note, .Picker li.row:hover .note, .Picker li.row:focus-within .note { visibility: visible; }
 .Picker .details, .Picker .refused { flex: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker .refused { color: var(--error-fg); }
+.Picker .invalid { color: var(--warning-fg); }
 .Picker .effort-controls { display: flex; gap: 1ch; flex: none; }
 .Picker .effort-controls button { min-height: 44px; min-width: 44px; }
 .Picker { max-height: calc(var(--app-height, 100dvh) - 1rem); overflow: hidden; }

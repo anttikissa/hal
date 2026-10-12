@@ -167,7 +167,7 @@ function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor }
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
-	let hint = m.blocks!.invalid ? ansi.sgr({ fg: colors.error().fg! }) + m.blocks!.hint + UNCOLOR : m.blocks!.hint
+	let hint = m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + m.blocks!.hint + UNCOLOR : m.blocks!.hint
 	let pairs = m.blocks!.help
 	let kw = (from: number) => Math.max(...pairs.filter((_, i) => i % 2 === from).map(([k]) => k.length)) + 2
 	let left = kw(0) + Math.max(...pairs.filter((_, i) => i % 2 === 0).map(([, d]) => d.length)) + 2
