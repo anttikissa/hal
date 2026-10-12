@@ -136,7 +136,7 @@ test('/queue drop: refused for the locked message; a dropped one never runs, eve
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop 1' })
 	expect(waiting(id)).toEqual(['queued', 'later'])
 	// The web's × names the message by id; history shows its position.
-	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop later' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop --id later' })
 	expect(waiting(id)).toEqual(['queued'])
 	await until(() => a.of('output').length === 2)
 	expect(a.of('output').map((e) => e.text)).toEqual(['That message is being edited; save or cancel the edit first.', 'dropped queued message 2: later'])

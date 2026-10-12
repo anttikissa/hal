@@ -10,12 +10,12 @@ import { status } from '../status.ts'
 
 const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.delivery === 'after-turn')
 
-// The message `/queue drop <key>` names: its position in /queue's list,
-// or its inbox id (the web's × sends it, so a queue that changed in
-// between cannot shift the target).
-function target(id: string, key: string): { n: number; item?: { id: string; text: string } } {
+// The web's × names an inbox id explicitly, so a queue that changed in
+// between cannot shift the target. Other text after /queue is a prompt.
+const dropPattern = /^drop\s+(?:(\d+)|--id\s+(\S+))$/
+function target(id: string, key: string, byId = false): { n: number; item?: { id: string; text: string } } {
 	let queued = queuedOf(id)
-	let n = /^\d+$/.test(key) ? Number(key) : queued.findIndex((m) => m.id === key) + 1
+	let n = !byId && /^\d+$/.test(key) ? Number(key) : queued.findIndex((m) => m.id === key) + 1
 	return { n, item: n > 0 ? queued[n - 1] : undefined }
 }
 
@@ -30,7 +30,12 @@ export const command: SlashCommand = {
 		'/queue clear drops all queued messages.',
 	].join('\n'),
 	record(args, id) {
-		let m = args.match(/^(drop|next|now)\s+(\S+)$/)
+		let drop = args.match(dropPattern)
+		if (drop) {
+			let { n } = target(id, (drop[1] ?? drop[2])!, drop[2] !== undefined)
+			return n > 0 ? `/queue drop ${n}` : undefined
+		}
+		let m = args.match(/^(next|now)\s+(\S+)$/)
 		let n = m ? target(id, m[2]!).n : 0
 		return n > 0 ? `/queue ${m![1]} ${n}` : undefined
 	},
@@ -43,11 +48,11 @@ export const command: SlashCommand = {
 			if (queued.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 			return { say: `cleared ${queued.length} queued message${queued.length === 1 ? '' : 's'}` }
 		}
-		let drop = args.match(/^drop(?:\s+(\S+))?$/)
+		let drop = args.match(dropPattern)
 		if (drop) {
-			if (!drop[1]) return { error: 'Say which message to drop: /queue drop <n>, where n is its number in /queue.' }
-			let { n, item } = target(id, drop[1])
-			if (!item) return { error: /^\d+$/.test(drop[1]) ? `There is no queued message ${drop[1]}. The queue has ${queued.length}.` : 'That message is no longer queued: it was already delivered or dropped.' }
+			let key = (drop[1] ?? drop[2])!
+			let { n, item } = target(id, key, drop[2] !== undefined)
+			if (!item) return { error: drop[1] !== undefined ? `There is no queued message ${key}. The queue has ${queued.length}.` : 'That message is no longer queued: it was already delivered or dropped.' }
 			if (item.id === queueEdits.held(id)) return { error: 'That message is being edited; save or cancel the edit first.' }
 			// The durable withdrawal /queue clear uses; the others keep their order.
 			history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })

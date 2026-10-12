@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { calls, client, created, fresh, until, useHost } from '../host-fixture.test.ts'
+import { calls, client, created, fresh, records, until, useHost } from '../host-fixture.test.ts'
 
 useHost()
 
@@ -43,4 +43,27 @@ test('/queue next starts the oldest as a new turn when no turn is running', asyn
 	await until(() => calls.length === 2)
 	expect(a.views.get(id)?.inbox).toEqual([])
 	expect(calls[1]!.input.messages.at(-1).blocks[0].text).toContain('later')
+})
+
+test('/queue drop only reserves numbers; web drops target IDs and refuse stale clicks', async () => {
+	let a = client()
+	let id = created(a)
+	let send = (text: string) => a.conn.send({ type: 'submit', sessionId: id, text })
+	send('working')
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'keep it', queue: true, id: 'it' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'numeric id', queue: true, id: '2' })
+	send('/queue drop it')
+	send('/queue drop')
+	await until(() => a.views.get(id)?.inbox.length === 4)
+	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['keep it', 'numeric id', 'drop it', 'drop'])
+	expect((await records(id)).filter((r) => r.type === 'command').map((r) => r.text)).toEqual(['/queue drop it', '/queue drop'])
+	send('/queue drop 1')
+	await until(() => a.views.get(id)?.inbox.length === 3)
+	send('/queue drop --id 2')
+	await until(() => a.views.get(id)?.inbox.length === 2)
+	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['drop it', 'drop'])
+	send('/queue drop --id 2')
+	await until(() => a.of('output').some((e) => e.text.includes('already delivered or dropped')))
+	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['drop it', 'drop'])
 })
