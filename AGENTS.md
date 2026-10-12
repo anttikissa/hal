@@ -74,6 +74,11 @@ to operate a host is not permission to publish its configuration.
 
 # Tests
 
+Run tests only for the code being developed unless changes are crosscutting.
+Use ./test <filename-pattern> for focused normal tests; patterns match filenames,
+not test names. ./test runs the normal suite; ./test-expensive runs web tests,
+including Chromium, only when explicitly needed. It accepts the same patterns.
+
 Tests are maintenance debt. Add one only if it catches a plausible
 regression worth its cost. Omit cosmetic tests and those a one-off check
 can replace. When unsure, omit.

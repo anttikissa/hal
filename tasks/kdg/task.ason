@@ -1,0 +1,11 @@
+{
+	title: 'Separate normal and web test suites',
+	spec: './test runs normal tests by default and never loads web test files or launches Chromium. ./test-expensive runs the separate web suite explicitly. Web test files are src/web/*.test.ts and src/host/web*.test.ts, including host HTTP and browser tests. Normal test files are the remaining src tests and extras tests. Both scripts accept filename patterns only, not test-name searches: exact relative or absolute filenames, directory prefixes, filename/path substrings and quoted shell globs; multiple patterns select their union. Focused runs execute only matching files, without typecheck or lint. An explicit test file from the other suite fails visibly with the correct script; no matches is an error. Default normal runs retain typecheck, lint, lock checks and private plugin import checks; expensive runs execute web tests only. Existing tests remain intact and expensive execution stays opt-in. This replaces task r combined suite and test-name selection. Benchmark tasks and verification use normal tests only and preserve historical results when replacing web-dependent tasks.',
+	status: 'done',
+	notes: [
+		'Verified 14 command-selection cases: 203 normal and 19 web files form a disjoint exhaustive partition of 222 test files; defaults, exact relative/absolute filenames, directory prefixes, quoted globs, substrings, multiple patterns, mismatched suites and no-match errors checked without executing Chromium. Actual focused ASON run passed 55 tests. Full normal ./test ran 1537 tests across 203 files: 1533 pass, 1 skip, 3 failures outside changed files (client/item-view.ts 404-line limit, host rewind timeout, stale pruning-home state flush during inspect fixture cleanup). Typecheck and lint passed; full suite is not green. Original log retained privately.',
+		'New normal-only ten-task benchmark manifest replaces four web-dependent or mixed-UI tasks. All ten historical oracle controls pass and all ten untouched controls fail under normal-only fixtures; static import audit excludes web/Chromium dependencies. Original manifests and failed controls preserved privately. Fixture preparation strips web test files before its baseline commit and installs current normal-only ./test; verification rejects web or empty selection.'
+	],
+	needs: ['r'],
+	foldInto: ['r']
+}

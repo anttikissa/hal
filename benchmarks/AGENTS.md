@@ -7,6 +7,11 @@ Results, logs, fixtures, dependencies, cloned projects and local configuration
 stay gitignored. Fetch missing inputs only when a requested run needs them.
 Keep benchmark dependencies out of Hal's runtime and package manifest.
 
+Benchmark suites contain ten normal-test tasks. Exclude web UI and Chromium
+from task selection, agent test runs and verification. Replace web-dependent
+tasks in a new versioned suite; preserve historical manifests and results.
+Fixtures use the normal-only ./test script and exclude web test files.
+
 Pi runs using Claude subscription auth load the Claude subscription plugin
 in both the plain pi and pi-multiedit arms. Verify it loaded before paid
 calls; built-in OAuth is not a substitute.

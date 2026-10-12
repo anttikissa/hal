@@ -1,0 +1,10 @@
+{
+	title: 'Keep verification focused on changed code',
+	spec: 'SYSTEM.md has the terse rule: Unless making crosscutting changes, only test what you changed. This replaces task qpv smallest-relevant-scope wording. AGENTS.md describes ./test filename-pattern selection and the explicit expensive suite; agents test only the code under development unless changes are crosscutting.',
+	status: 'done',
+	notes: [
+		'User provided the exact terse rule and requested filename-only focused selection. Focused system-prompt tests pass 13/13. This replaces qpv wording without adding a new testing requirement.'
+	],
+	needs: ['qpv'],
+	foldInto: ['qpv']
+}

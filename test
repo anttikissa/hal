@@ -9,23 +9,44 @@ unset STY
 if [[ $TERM == screen* ]]; then export TERM=xterm-256color; fi
 # Hosts under test are killed at any moment; a git call they make must
 # never take a lock, or a stale .git/index.lock breaks the next commit.
-# ./test <path-or-name>: only matching tests, no typecheck or lint. An
-# existing path runs that file or directory; any other text runs tests
-# whose name contains it.
-if [ $# -gt 0 ]; then
-	if [ -e "$1" ]; then
-		paths=()
-		for path in "$@"; do
-			if [ -e "$path" ] && [[ $path != /* && $path != ./* ]]; then path="./$path"; fi
-			paths+=("$path")
+# ./test [filename-pattern ...]: normal tests; patterns never match test names.
+# ./test-expensive [filename-pattern ...]: web tests, including Chromium.
+suite=normal
+if [ "${1-}" = --web ]; then suite=web; shift; fi
+paths=()
+roots=(src)
+if [ -d extras ]; then roots+=(extras); fi
+while IFS= read -r -d '' path; do
+	case "$path" in
+		src/web/*|src/host/web*.test.ts) kind=web ;;
+		*) kind=normal ;;
+	esac
+	if [ "$kind" != "$suite" ]; then
+		for pattern in "$@"; do
+			pattern=${pattern#"$PWD/"}; pattern=${pattern#./}
+			if [ "$pattern" = "$path" ]; then
+				echo "./test: $path belongs to the $kind suite; use $([ "$kind" = web ] && echo ./test-expensive || echo ./test)" >&2
+				exit 1
+			fi
 		done
-		exec bun test "${paths[@]}"
+		continue
 	fi
-	exec bun test ./src -t "$(printf '%s' "$*" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+	match=0
+	if [ $# -eq 0 ]; then match=1; fi
+	for pattern in "$@"; do
+		pattern=${pattern#"$PWD/"}; pattern=${pattern#./}; pattern=${pattern%/}
+		if [[ $path == $pattern || ${path##*/} == $pattern || $path == *"$pattern"* ]]; then match=1; fi
+	done
+	if [ "$match" -eq 1 ]; then paths+=("./$path"); fi
+done < <(find "${roots[@]}" -type f -name '*.test.ts' -print0)
+if [ ${#paths[@]} -eq 0 ]; then
+	echo "./test: no $suite test filenames match: $*" >&2
+	exit 1
 fi
+if [ $# -gt 0 ] || [ "$suite" = web ]; then exec bun test "${paths[@]}"; fi
 lock="$(git rev-parse --git-path index.lock 2>/dev/null)"
 had_lock=$([ -e "$lock" ] && echo 1)
-bun test ./src ./extras || status=1
+bun test "${paths[@]}" || status=1
 if [ -z "$had_lock" ] && [ -e "$lock" ]; then
 	echo "./test: the tests left $lock behind (a host git call takes a lock)" >&2
 	status=1
