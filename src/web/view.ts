@@ -166,7 +166,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.transcript && queueEdit.notice(st.transcript)) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
+	return st.notice ?? (st.transcript && (queueEdit.notice(st.transcript) ?? inbox.heldNotice(st.transcript))) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
 }
 
 // Tab in the message box with `text` (the caret at its end): the

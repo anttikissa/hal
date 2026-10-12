@@ -9,7 +9,9 @@
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
+import { summary } from './summary.ts'
 import { titles } from './titles.ts'
+import type { Transcript } from './transcript.ts'
 
 // Sender fields: another session sent it (task rj); none, the human.
 // `ts`: when it was first written to the inbox.
@@ -68,4 +70,13 @@ function note(item: InboxItem, tab?: number, held = false): string {
 	return titles.stamp(item.ts, `${who} (queued${held ? ', being edited' : ''})`)
 }
 
-export const inbox = { pending, sender, provenance, note }
+// Why queued messages wait after an asking turn (task nd6), and the way
+// past it: the notice under the transcript until the user answers.
+function heldNotice(t: Transcript): string | undefined {
+	if (!t.inbox.some((m) => m.delivery === 'after-turn')) return undefined
+	let last = t.items.findLast((i) => i.type === 'prompt' || i.type === 'text')
+	if (last?.type !== 'text' || !summary.asks(last.text)) return undefined
+	return 'The last assistant message was a question; queued messages, including those from other sessions, run after you answer it. /queue next sends the oldest now.'
+}
+
+export const inbox = { pending, sender, provenance, note, heldNotice }

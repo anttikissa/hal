@@ -5,6 +5,7 @@
 import { bashResult } from '../common/bash-result.ts'
 import { colors } from '../common/colors.ts'
 import { queueEdit } from '../common/queue-edit.ts'
+import { inbox } from '../common/inbox.ts'
 import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
@@ -38,7 +39,7 @@ function view(): View {
 	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
-	let stopped = t && appView.why(t), notice = st.notice ?? (t && queueEdit.notice(t)) ?? versions.notice()
+	let stopped = t && appView.why(t), notice = st.notice ?? (t && (queueEdit.notice(t) ?? inbox.heldNotice(t))) ?? versions.notice()
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing)
