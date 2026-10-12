@@ -105,7 +105,7 @@ function split(text: string): string[] {
 	if (!text.includes('\n')) return [text]
 	let starts = [0], lineStart = true, first = true, edit = false, block = false
 	for (let i = 0; i < text.length;) {
-		if (lineStart && edit) {
+		if (lineStart && edit && (block || text[i] === '!')) {
 			let end = lineEnd(text, i), line = text.slice(i, end).replace(/\r$/, '')
 			if (block || /^!!(OLD|NEW)$/.test(line)) {
 				block = line !== '!!END'
