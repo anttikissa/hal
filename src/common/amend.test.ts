@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { amend } from './amend.ts'
+import { drafts } from './drafts.ts'
 import type { Snapshot } from './protocol.ts'
 import type { SessionState } from './states.ts'
 import { transcript, type Transcript } from './transcript.ts'
@@ -55,6 +56,19 @@ test('Up edits a steering message still waiting in the inbox in place, without p
 	expect(amend.enter(begun!.editing, t, 'later')).toEqual({ type: 'submit', sessionId: 's1', text: 'later', amend: true, edits: 'm2' })
 	// Nothing was paused, so leaving the edit continues nothing.
 	expect(amend.resume(begun!.editing, t)).toBeUndefined()
+})
+
+test('Up right after Enter edits the prompt the host has not acknowledged yet', () => {
+	// Sent to an idle session: it starts a turn, so Up pauses it.
+	drafts.local('s1').sending.push({ id: 'c1', text: 'helo' })
+	let idle = session({ type: 'idle' })
+	let begun = amend.begin(idle, '')
+	expect(begun).toEqual({ editing: { sessionId: 's1', original: 'helo', inbox: 'c1', paused: true }, command: { type: 'pause', sessionId: 's1' } })
+	expect(amend.enter(begun!.editing, idle, 'hello')).toEqual({ type: 'submit', sessionId: 's1', text: 'hello', amend: true, edits: 'c1' })
+	expect(amend.resume(begun!.editing, session({ type: 'paused' }))).toEqual({ type: 'continue', sessionId: 's1' })
+	// Sent to a working session: it steers, so nothing pauses.
+	expect(amend.begin(session(running), '')).toEqual({ editing: { sessionId: 's1', original: 'helo', inbox: 'c1' } })
+	drafts.reset()
 })
 
 test('Up never recalls what another session sent', () => {

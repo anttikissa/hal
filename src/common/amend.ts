@@ -10,6 +10,7 @@
 // recalled.
 // Tasks: rqq.
 
+import { drafts } from './drafts.ts'
 import { states } from './states.ts'
 import { toolDetails } from './tool-details.ts'
 import type { Item, Transcript } from './transcript.ts'
@@ -66,6 +67,16 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 	let sessionId = t.meta.id
 	// Queued messages require queueEdit.begin and its host handshake.
 	if (t.inbox.some((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')) return undefined
+	// A prompt sent and not acknowledged yet is the last one, though the
+	// transcript lacks it (a slow link). The host knows it by its id, in
+	// the inbox or in history. Sent to a working session it steers (no
+	// pause); otherwise it starts a turn, which Up pauses.
+	let sent = drafts.pending(sessionId).at(-1)
+	if (sent?.delivery === 'queue') return undefined
+	if (sent && sent.rewind === undefined && !/^\/[a-z]/i.test(sent.text.trimStart())) {
+		let editing: Editing = { sessionId, original: sent.text, inbox: sent.id }
+		return states.busy(t.state) ? { editing } : { editing: { ...editing, paused: true }, command: { type: 'pause', sessionId } }
+	}
 	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
 	if (waiting) return { editing: { sessionId, original: waiting.text, inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined
@@ -88,7 +99,7 @@ function enter(editing: Editing, t: Transcript | undefined, text: string, queue 
 // or the one whose pause is still on its way; nothing if it ended or
 // was never paused (a waiting message was edited).
 function resume(editing: Editing, t: Transcript | undefined): unknown {
-	if (editing.queueEdit || !t || t.meta.id !== editing.sessionId || editing.inbox !== undefined || editing.paused === false) return undefined
+	if (editing.queueEdit || !t || t.meta.id !== editing.sessionId || (editing.inbox !== undefined && !editing.paused) || editing.paused === false) return undefined
 	return t.state.type === 'paused' || states.busy(t.state) ? { type: 'continue', sessionId: editing.sessionId } : undefined
 }
 
@@ -105,7 +116,7 @@ function bar(editing: Editing): string {
 }
 
 export const amend = {
-	hint: (editing?: Editing) => (editing?.queueEdit ? 'editing queued message: Enter saves, Down unchanged or Escape cancels' : editing?.inbox === undefined ? 'editing the last prompt: Enter sends it, Down or Escape continues' : 'editing a waiting message: Enter replaces it, Down or Escape keeps it'),
+	hint: (editing?: Editing) => (editing?.queueEdit ? 'editing queued message: Enter saves, Down unchanged or Escape cancels' : editing?.inbox === undefined || editing.paused ? 'editing the last prompt: Enter sends it, Down or Escape continues' : 'editing a waiting message: Enter replaces it, Down or Escape keeps it'),
 	editable,
 	at,
 	bar,
