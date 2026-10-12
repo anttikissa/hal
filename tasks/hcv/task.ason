@@ -1,0 +1,10 @@
+{
+	title: 'Climbing braille spinner for live terminal tool cards',
+	spec: 'Running terminal tool cards use the approved 28-frame two-dot braille climb: right-first then left-first, with two-frame pauses at the endpoints. The first four rows of frames.txt in this task preserve the approved artwork; map braille row/column bits [[0,3],[1,4],[2,5],[6,7]] into U+2800 glyphs. Thinking/reply cards and web spinners retain the existing dot orbit. Preserve the fixed one-cell activity slot, elapsed time and blank slot once complete. Use the existing terminal pulse cadence, one frame per beat, without a new timer or polling loop. User approval came through session 172-jaw: You can use that in streaming tool cards; web use remains pending the user decision.',
+	status: 'done',
+	notes: [
+		'Converted the preserved four-row artwork to 28 braille glyphs and checked two cycles against the source: every frame has exactly two dots and occupies one terminal cell. appView.tick selects the climb only when running a tool call; thinking/reply and web keep the dot orbit. Cadence is a design choice, not a user requirement: reuse the existing 250ms pulse (4fps, 7s per cycle), slower than the brainstorm preview at 8fps. This avoids a new timer or extra paints; no mutable animation state grows. Focused hal-cursor, frame and item-view tests and scoped lint pass.'
+	],
+	needs: ['hyt'],
+	foldInto: ['hyt']
+}

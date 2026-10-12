@@ -10,10 +10,12 @@ import { itemView } from './item-view.ts'
 
 // A dot circling its cell: one frame per pulse beat (pulse.ts).
 const spinner = [...'⠁⠈⠐⠠⢀⡀⠄⠂']
+const toolSpinner = [...'⣀⡠⠤⠢⠒⠊⠉⠉⠑⠒⠔⠤⢄⣀⣀⢄⠤⠔⠒⠑⠉⠉⠊⠒⠢⠤⡠⣀']
 
 // The spinner's frame at `beat`.
-function spin(beat: number): string {
-	return blockView.spinner[beat % blockView.spinner.length]!
+function spin(beat: number, tool = false): string {
+	let frames = tool ? toolSpinner : blockView.spinner
+	return frames[beat % frames.length]!
 }
 
 // The first `n` rows of `body`, or while it streams its last: its

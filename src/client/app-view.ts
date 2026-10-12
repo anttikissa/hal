@@ -103,7 +103,7 @@ function why(t: Transcript): string | undefined {
 function tick(t: Transcript, now: number, beat = pulse.beat()): View['tick'] {
 	let s = t.state
 	if (s.type !== 'running') return undefined
-	let spin = blockView.spin(beat)
+	let spin = blockView.spin(beat, s.phase === 'tools' && !!s.call)
 	let since = s.phase === 'tools' && s.call ? s.since : halCursor.streaming(t) ? t.items.at(-1)?.ts : undefined
 	if (since === undefined) return undefined
 	let label = bashResult.duration(now - Date.parse(since), true) ?? ''
