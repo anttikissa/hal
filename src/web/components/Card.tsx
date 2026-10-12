@@ -333,6 +333,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</>
 						)}
 					</Show>
+					<Show when={props.row.note === undefined && !isChange() && props.row.item.type !== 'tool' && blockToggle.toggles(props.row.item) && expanded()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 				</article>
 			)}
 		</Show>
