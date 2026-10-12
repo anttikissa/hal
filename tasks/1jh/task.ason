@@ -1,0 +1,10 @@
+{
+	title: 'Preserve literal EDIT blocks during command splitting',
+	spec: 'The native command splitter preserves block-format EDIT OLD and NEW contents verbatim through their exact END marker, including code beginning with words, tool names, unmatched quotes, comments and escaped marker lines. It still splits complete commands outside blocks and supports core structured EDIT arguments. Invariant: valid block-format EDIT cannot be rejected or have its content dispatched as commands because compound scanning interprets literal source code. Unclosed and malformed blocks reach EDIT validation unchanged; no execution or write validation is weakened. Cover the observed if-statement case, text replacement blocks, CRLF, trailing calls and unclosed blocks with focused regression tests.',
+	status: 'done',
+	notes: [
+		'The compound scanner treated if and await at the start of literal EDIT content as tool names, and tried parsing source-code braces as ASON. Keep an EDIT-only literal-block state through exact markers; escaped markers remain content and malformed blocks still reach the strict EDIT parser. The original rejected call now stays one command containing all four EDIT operations. Focused splitter, native-tool, tool-sequence and multiedit tests pass: 32 tests, 493 assertions; diff checks pass. Repairing the scanner initially hit the same bug, so the block-format plugin was temporarily disabled to use core structured EDIT, then re-enabled. No persistent plugin changes. The scan remains linear, with constant state and no extra I/O.'
+	],
+	needs: ['ep8', 'ybg'],
+	foldInto: ['ep8']
+}

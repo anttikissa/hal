@@ -103,8 +103,16 @@ function values(raw: string): Values {
 function split(text: string): string[] {
 	callText.parse(text)
 	if (!text.includes('\n')) return [text]
-	let starts = [0], lineStart = true, first = true
+	let starts = [0], lineStart = true, first = true, edit = false, block = false
 	for (let i = 0; i < text.length;) {
+		if (lineStart && edit) {
+			let end = lineEnd(text, i), line = text.slice(i, end).replace(/\r$/, '')
+			if (block || /^!!(OLD|NEW)$/.test(line)) {
+				block = line !== '!!END'
+				i = end < text.length ? end + 1 : end
+				continue
+			}
+		}
 		let c = text[i]!
 		if (/\s/.test(c)) { if (c === '\n') lineStart = true; i++; continue }
 		if (text.startsWith('/*', i)) {
@@ -113,8 +121,10 @@ function split(text: string): string[] {
 			continue
 		}
 		if (c === '#' || text.startsWith('//', i)) { i = lineEnd(text, i); continue }
-		if (lineStart && /^[A-Za-z_]+(?=\s|$|\/\*)/.test(text.slice(i))) {
+		let name = lineStart ? /^[A-Za-z_]+(?=\s|$|\/\*)/.exec(text.slice(i))?.[0] : undefined
+		if (name) {
 			if (!first) starts.push(i)
+			edit = name.toLowerCase() === 'edit'
 		}
 		first = false
 		lineStart = false
