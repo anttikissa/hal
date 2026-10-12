@@ -20,7 +20,7 @@ export function ToolCommand(props: { lines: string[]; compact: boolean }) {
 	return (
 		<div class="ToolCommand">
 			<div ref={(el) => (line = el)} class={whole() ? 'command' : 'command clipped'}>{whole() ? props.lines.join('\n') : (props.lines[0] ?? '') + (props.lines.length > 1 ? '…' : '')}</div>
-			<Show when={props.compact && clipped()}><button type="button" class="command-toggle" aria-expanded={expanded() ? 'true' : 'false'} onClick={toggle}>{expanded() ? 'Hide command' : 'Show command'}</button></Show>
+			<Show when={props.compact && clipped()}><button type="button" class="command-toggle" aria-expanded={expanded() ? 'true' : 'false'} onClick={toggle}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{expanded() ? 'Hide command' : 'Show command'}</span></button></Show>
 		</div>
 	)
 }

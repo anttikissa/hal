@@ -256,12 +256,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? titles.who(props.row.item) : undefined} open={expanded()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></Show>} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
 		<>
-			<Show when={title()} fallback={link()}>{heading()}</Show>
+			<Show when={!closable()}><Show when={title()} fallback={link()}>{heading()}</Show></Show>
 			<div class="content">
 				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
 					{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
@@ -309,7 +309,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', level() === 'glimpse' && props.row.item.type !== 'tool' ? 'glimpse' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} style={{ '--glimpse': settings.glimpseRows() }} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
+						<>
+						<Show when={closable() && title()}>{heading()}</Show>
 						<Show when={folding()} fallback={plain(s)}>
+							<Show when={!closable()}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job #t${n()} (/kill #t${n()})`} aria-label={`Kill background job #t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
@@ -318,17 +321,19 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<Show when={failed()}><span class="error">✗</span></Show>
 								<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
 							</CardHeader>
+							</Show>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">
 									<div class="content">
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
 										{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
-										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'Show less' : 'Show all'}</button></Show>
+										<Show when={long()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 									</div>
 								</div>
 							</div>
 						</Show>
+						</>
 						)}
 					</Show>
 				</article>

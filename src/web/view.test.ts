@@ -36,8 +36,8 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ kind: 'user prompt', text: 'go' },
 		{ kind: 'thinking', text: 'hm' },
 		{ kind: 'assistant', text: 'hello' },
-		{ kind: 'tool tool-bash', text: '▸ List files' },
-		{ kind: 'result log', text: '◂ a\n  b' },
+		{ kind: 'tool tool-bash', text: '▸ Bash List files' },
+		{ kind: 'result log', text: 'a\nb' },
 		{ kind: 'end log', text: 'Paused.' },
 		{ kind: 'user prompt', text: 'again' },
 		{ kind: 'end error', text: 'error: boom' },
@@ -337,8 +337,8 @@ test('a prompt’s [image/<name>] markers become links; the rest stays text', ()
 test('Bash headers own status; output and original source data remain complete', () => {
 	let good = { type: 'tool-result' as const, id: 'call', output: '[exit 0]\n M notes.md\n' }
 	let bad = { ...good, output: '[exit 123]\nerror: cannot access file\n' }
-	expect(view.show(good, false, true)?.text).toBe('◂  M notes.md')
-	expect(view.show(bad, false, true)?.text).toBe('◂ error: cannot access file')
+	expect(view.show(good, false, true)?.text).toBe(' M notes.md')
+	expect(view.show(bad, false, true)?.text).toBe('error: cannot access file')
 	expect(view.show(good, false, false)?.text).toContain('[exit 0]')
 	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M notes.md')
 	expect(good.output).toStartWith('[exit 0]')

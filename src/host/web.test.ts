@@ -1976,28 +1976,49 @@ browserTest('card headers restore short or open and tool commands expand apart f
 			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
 			writeFileSync(`/tmp/hal-172-ink-disclosure-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 		}
+		let rotate = async (selector: string) => {
+			let motion = await b.evaluate(`(async () => {
+				let button = document.querySelector(${JSON.stringify(selector)}), triangle = button.querySelector('.disclosure');
+				await Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished));
+				let before = triangle && getComputedStyle(triangle).transform;
+				button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse', button: 0 }));
+				button.click();
+				await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+				let current = document.querySelector(${JSON.stringify(selector)}), turn = triangle?.getAnimations().find(a => a.transitionProperty === 'transform');
+				if (turn) { turn.pause(); turn.currentTime = Number(turn.effect.getTiming().duration) / 2; }
+				let middle = triangle && getComputedStyle(triangle).transform;
+				let result = { same: current === button && current.querySelector('.disclosure') === triangle, rotates: !!turn && middle !== before, flashes: current.getAnimations().some(a => a.effect.getKeyframes().some(f => 'boxShadow' in f)) };
+				if (turn) turn.finish();
+				return result;
+			})()`)
+			expect(motion).toEqual({ same: true, rotates: true, flashes: false })
+		}
 		await shot('start')
+		await rotate('.Card.user .mark')
+		await rotate('.Card.user .mark')
+		await rotate('.Card.assistant .mark')
+		await rotate('.Card.assistant .mark')
 		let steps: string[] = []
 		for (let i = 0; i < 3; i++) {
-			await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
+			await rotate('.Card.thinking .mark')
 			steps.push((await b.evaluate(state))[0])
 			if (i === 0) await shot('thinking-glimpse')
 		}
 		expect(steps).toEqual(['glimpse', 'short', 'glimpse'])
-		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+		await rotate('.Card.tool .mark')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('more lines')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe('$ seq 12…')
-		await b.evaluate(`document.querySelector('.Card.tool .command-toggle').click()`)
+		await rotate('.Card.tool .command-toggle')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toContain('echo done')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).not.toContain('row 12')
 		await shot('command')
-		await b.evaluate(`document.querySelector('.Card.tool .command-toggle').click()`)
-		await b.evaluate(`document.querySelector('.Card.tool .more').click()`)
+		await rotate('.Card.tool .command-toggle')
+		await rotate('.Card.tool .more')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
 		await b.evaluate(`document.querySelector('.Card.tool .CardHeader').click(); document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
 		await shot('long-restored')
-		await b.evaluate(`document.querySelector('.Card.tool .more').click()`)
+		await rotate('.Card.tool .more')
 		await b.evaluate(`document.querySelector('.Card.tool .result-text').click(); document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).not.toContain('row 12')
 		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[1].querySelector('.command-toggle') === null`)).toBe(true)
@@ -2018,6 +2039,11 @@ browserTest('card headers restore short or open and tool commands expand apart f
 		await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
 		await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.assistant').classList.contains('glimpse')`)).toBe(false)
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		await b.evaluate(`document.querySelector('.Card.tool .more').click()`)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .more').getAttribute('aria-expanded')`)).toBe('true')
+		expect(await b.evaluate(`document.querySelector('.Card.tool .more .disclosure').getAnimations().length`)).toBe(0)
+		expect(await b.evaluate(`document.querySelector('.Card.tool .more').getAnimations().length`)).toBe(0)
 	} finally { await b.close() }
 }, 15000)
 

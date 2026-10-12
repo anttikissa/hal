@@ -326,7 +326,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			// An EDIT's diff: its rows as they are; Card colors each.
 			if (item.diff) return { kind: 'result log', text: shown.join('\n') }
-			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
+			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '') + shown.join('\n') }
 		}
 		case 'turn-end':
 			if (item.status === 'error') return { kind: 'end error', text: titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`) }

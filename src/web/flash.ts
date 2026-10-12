@@ -22,9 +22,12 @@ function on(el: Element, ms: number): void {
 	el.animate(frames, { duration: ms })
 }
 
-const button = (e: Event) => (e.target instanceof Element ? e.target.closest('button') : null)
+const button = (e: Event) => {
+	let b = e.target instanceof Element ? e.target.closest('button') : null
+	return b?.querySelector('.disclosure') ? null : b
+}
 
-// Flashes every button as it is pressed: a mouse on pointerdown; a
+// Flashes action buttons as they are pressed: a mouse on pointerdown; a
 // touch on click, so a scroll starting on a button does not flash; a
 // key (Enter, Space) on its click. Returns the uninstaller.
 function buttons(): () => void {
