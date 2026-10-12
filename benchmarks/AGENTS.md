@@ -12,9 +12,11 @@ from task selection, agent test runs and verification. Replace web-dependent
 tasks in a new versioned suite; preserve historical manifests and results.
 Fixtures use the normal-only ./test script and exclude web test files.
 
-Pi runs using Claude subscription auth load the Claude subscription plugin
-in both the plain pi and pi-multiedit arms. Verify it loaded before paid
-calls; built-in OAuth is not a substitute.
+New comparisons use Hal and pi-multiedit. Plain pi is retired; preserve its
+historical manifests, results, transcripts and receipts.
+
+Claude pi-multiedit runs load the Claude subscription plugin. Verify it loaded
+before paid calls; built-in OAuth is not a substitute.
 
 Preserve existing records and compatibility paths when consolidating caches.
 Keep credentials, account identities and host-specific paths out of tracked files.

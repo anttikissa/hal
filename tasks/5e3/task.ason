@@ -1,0 +1,10 @@
+{
+	title: 'Retire plain pi from new benchmark comparisons',
+	spec: 'New benchmark comparisons use Hal and pi-multiedit; plain pi is retired from active arms. Preserve historical plain-pi manifests, results, transcripts and receipts. benchmarks/AGENTS.md states the active arms and requires the Claude subscription plugin for Claude pi-multiedit runs, verified before paid calls. Arm selection is a user decision, not a claim of universal per-task dominance.',
+	status: 'done',
+	notes: [
+		'User retires plain pi from new comparisons after observed aggregate results. Historical records remain intact; this does not assert per-task dominance or remove historical support from private tooling. Documentation review confirms Claude subscription loading and paid-call authorization remain required.'
+	],
+	needs: ['dj1'],
+	foldInto: ['dj1']
+}

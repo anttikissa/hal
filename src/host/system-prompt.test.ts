@@ -15,15 +15,22 @@ afterEach(() => {
 
 const at = new Date(2026, 8, 26, 1, 52).getTime()
 
-test('purpose guidance follows interaction mode, not subagent kind or autoclose', () => {
+test('execution guidance follows interaction mode, not subagent kind or autoclose', () => {
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true, owner: '01-abc', kind: 'subagent', autoclose: true }
-	expect(systemPrompt.build(input)).toContain('BASH /*')
+	let interactive = systemPrompt.inspect(input)
+	expect(interactive.text).toContain('BASH /*')
+	expect(interactive.sections.find(s => s.title === 'BASH')?.body).toContain('so user messages')
 	let unattended = systemPrompt.inspect({ ...input, interactive: false })
 	expect(unattended.problems).toEqual([])
 	expect(unattended.text).not.toContain('/*')
 	expect(unattended.text).toContain('unsafeToStop')
 	expect(unattended.text).toContain('modifies')
 	expect(unattended.text).toContain('path')
+	let bash = unattended.sections.find(s => s.title === 'BASH')?.body
+	expect(bash).not.toContain('user messages')
+	expect(bash).toContain('foreground')
+	expect(bash).toContain('parallel work')
+	expect(bash).toContain('WAIT for completion')
 })
 
 test('a hook that rewrites a tool guide changes only that section; a removed heading withdraws its section', () => {

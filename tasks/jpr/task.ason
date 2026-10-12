@@ -1,0 +1,10 @@
+{
+	title: 'Keep interruption-driven background guidance interactive',
+	spec: 'SYSTEM.md BASH guidance requires long commands to run in the background to survive user interjection only for interactive sessions. Non-interactive guidance prefers foreground execution and permits background jobs for useful parallel work, not hypothetical user interruption. Both modes keep timeout controls and WAIT for actual background jobs rather than polling; unsafeToStop and modifies guidance remain. Rendered system-prompt checks distinguish the modes independently of subagent kind or autoclose.',
+	status: 'done',
+	notes: [
+		'Invariant restored: user-interruption advice is selected only when session_interactive is true; unattended rendering prefers foreground and retains real parallel jobs, timeout controls and WAIT. Extended the existing interaction-mode rendered-prompt check: 13 focused tests pass, 79 assertions; changed-file lint and diff check pass. No execution-engine change or measured token/request improvement is claimed.'
+	],
+	needs: ['b3a'],
+	foldInto: ['b3a']
+}
