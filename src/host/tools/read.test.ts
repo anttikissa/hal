@@ -91,6 +91,8 @@ test('batched ranges match individual leased reads; mixed failures preserve succ
 	writeFileSync(`${home}/binary.bin`, Buffer.from([0, 1]))
 	let failed = await call('READ "a.txt:2-2" "missing.txt" "binary.bin"')
 	expect(failed.isError).toBe(true)
+	expect(failed.output.split('\n')[0]).toContain('== READ missing.txt: ENOENT:')
+	expect(failed.output.indexOf('binary.bin looks like a binary file')).toBeLessThan(failed.output.indexOf('== READ a.txt@'))
 	expect(failed.output).toContain('== READ a.txt@')
 	expect(failed.output).toContain('2: second')
 	expect(failed.output).toContain('missing.txt')

@@ -1,0 +1,10 @@
+{
+	title: 'Lead batched READ output with failed paths',
+	spec: 'Batched READ places failed path or URL messages before successful reads so the normal result preview identifies the failed source and complete reason. Preserve every error, successful leased read and image, validation and the batch tool error flag. Keep relative order within failures and successes. Shared output gives terminal and web the same failure-first preview without client-specific rendering or rewriting old history. Regression coverage checks a successful read followed by missing and binary paths.',
+	status: 'done',
+	notes: [
+		'Restored invariant: a failed batched READ starts with failed sources and their complete reasons instead of successful file contents. Partition output during the existing sequential reads; failures and successes each retain call order, with no duplicate content or extra I/O. Both clients consume the same output. Existing immutable history is unchanged. Focused READ tests pass: 7 tests, 83 assertions; git diff --check passes. No browser run needed.'
+	],
+	needs: ['r17', '5er'],
+	foldInto: ['r17']
+}

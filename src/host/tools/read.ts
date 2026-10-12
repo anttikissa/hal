@@ -61,24 +61,22 @@ export const tool: Tool<ToolOutput> = {
 	},
 	async run(input, ctx) {
 		if (Array.isArray(input.paths)) {
-			let parts: string[] = []
+			let parts: string[] = [], errors: string[] = []
 			let images: { mediaType: string; data: string; source?: string }[] = []
-			let failed = false
 			for (let p of input.paths) {
 				try {
 					let item = p as Record<string, unknown>
 					let out = await (item.url !== undefined ? readUrl : tool).run(item, ctx)
 					let attached = typeof out === 'string' ? [] : [...(out.image ? [out.image] : []), ...(out.images ?? [])]
 					images.push(...attached.map((image) => ({ ...image, source: String(item.path ?? item.url) })))
-					parts.push(typeof out === 'string' ? out : out.text)
-					if (typeof out !== 'string' && out.isError) failed = true
+					if (typeof out !== 'string' && out.isError) errors.push(`== READ ${item.path ?? item.url} ==\n${out.text}`)
+					else parts.push(typeof out === 'string' ? out : out.text)
 				} catch (e: any) {
-					failed = true
-					parts.push(`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`)
+					errors.push(`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`)
 				}
 			}
-			let text = parts.join('\n\n')
-			return images.length || failed ? { text, images, ...(failed && { isError: true }) } : text
+			let text = [...errors, ...parts].join('\n\n')
+			return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
 		}
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = count(input, 'offset', 1)
