@@ -1,0 +1,10 @@
+{
+	title: 'Repair queued-card browser command submission',
+	spec: 'The queued-card browser regression enters slash commands through textarea input events and activates the composer Send/Run button at phone and desktop widths. Phone Enter remains a newline. Verify queued expansion, collapse, reopening and sender backgrounds without timeout increases or retries. Restore invariant: browser tests use supported user submission gestures for each input mode.',
+	status: 'done',
+	notes: [
+		'The failure was deterministic: mobile emulation sets pointer: coarse, so synthetic Enter inserts a newline rather than submitting. The helper now dispatches input, then clicks the existing composer .go button in a separate browser evaluation so Solid commits its draft state. Focused queued-card regression passed at both widths (13 assertions); file lint and diff check passed. No production changes, timeout changes, skips or retries.'
+	],
+	needs: ['r2f'],
+	foldInto: ['r2f']
+}

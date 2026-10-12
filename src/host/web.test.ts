@@ -2333,7 +2333,10 @@ browserTest('queued cards share block controls and keep sender backgrounds when 
 		await server.serve(); web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`document.querySelectorAll('.Card.queued').length === 2`)
-		let command = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		let command = async (text: string) => {
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`)
+			await b.evaluate(`document.querySelector('.Composer .go').click()`)
+		}
 		for (let width of [390, 1200]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			expect(await b.evaluate(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)).toBe(false)
