@@ -19,12 +19,12 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 
 // READ "path" (the first tools.readLines lines), "path:10" (line 10),
 // "path:10-20", "path:1-" (to the end); an http(s) URL reads through read_url.
-// Undocumented: several local paths read each, as paths.
+// Several local text paths read each range under its own lease.
 function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = callText.values(raw)
 	if (values.length > 1 && values.every((v) => typeof v === 'string' && v && !/^https?:\/\//i.test(v))) return { name: 'read', input: { paths: values.map((v) => one(v as string).input) } }
 	let [path] = values
-	if (values.length !== 1 || typeof path !== 'string' || !path) throw new Error(`READ takes one path, e.g. READ "src/main.ts:1-100"; got ${values.length} arguments`)
+	if (values.length !== 1 || typeof path !== 'string' || !path) throw new Error(`READ takes one path or several local text paths, e.g. READ "a.ts:1-100" "b.ts:1-100"; got ${values.length} arguments`)
 	return one(path)
 }
 
@@ -42,10 +42,10 @@ export const tool: Tool<ToolOutput> = {
 	description:
 		'Read a text file or image, or list a directory. Images are attached directly. Relative paths start from the working directory. ' +
 		'A text file comes as numbered lines under its editing lease, == READ <path>@<hash> ==; the hash covers the whole file, even when a range is shown, and EDIT needs it. ' +
-		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue.',
+		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue. Several local text paths can be read together, each with its own range and lease; read images alone.',
 	syntax: {
 		summary: false,
-		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
+		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-<end>" "<other-path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
 		fields: { offset: 'First line, 1-based: the :start of READ "path:start-end"', limit: 'Number of lines: from :start-end' },
 		resolve: resolveCall,
 	},
@@ -61,11 +61,17 @@ export const tool: Tool<ToolOutput> = {
 	async run(input, ctx) {
 		if (Array.isArray(input.paths)) {
 			let parts: string[] = []
+			let failed = false
 			for (let p of input.paths) {
-				let out = await tool.run(p as Record<string, unknown>, ctx).catch((e: Error) => `== READ ${(p as { path?: string })?.path}: ${e.message} ==`)
+				let out = await tool.run(p as Record<string, unknown>, ctx).catch((e: Error) => {
+					failed = true
+					return `== READ ${(p as { path?: string })?.path}: ${e.message} ==`
+				})
 				parts.push(typeof out === 'string' ? out : 'image' in out ? `${out.text}; READ it alone to see it` : out.text)
 			}
-			return parts.join('\n\n')
+			let text = parts.join('\n\n')
+			if (failed) throw new Error(text)
+			return text
 		}
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = count(input, 'offset', 1)

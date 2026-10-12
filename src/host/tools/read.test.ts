@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { attachments } from '../../common/attachments.ts'
 import { blobs } from '../blobs.ts'
+import { nativeTool } from '../native-tool.ts'
 import { paths } from '../paths.ts'
 import { tools } from '../tools.ts'
 
@@ -67,4 +68,24 @@ test('a READ without a range shows the first 200 lines and how to get more; offs
 	let whole = (await read('long.txt', { offset: 1 })).output
 	expect(whole).toContain('line 300')
 	expect(whole).not.toContain('for more')
+})
+
+test('batched ranges match individual leased reads; mixed failures preserve successes and are tool errors', async () => {
+	writeFileSync(`${home}/a.txt`, 'first\nsecond\nthird\n')
+	writeFileSync(`${home}/b.txt`, 'other\ntail\n')
+	let next = 0
+	let call = (cmd: string) => tools.run({ type: 'tool_call', id: `batch-${++next}`, ...nativeTool.resolve(cmd) }, ctx())
+	let batch = await call('READ "a.txt:2-2" "b.txt:1-1"')
+	expect(batch.isError).toBeUndefined()
+	let a = (await read('a.txt', { offset: 2, limit: 1 })).output
+	let b = (await read('b.txt', { offset: 1, limit: 1 })).output
+	expect(batch.output).toBe(`${a}\n\n${b}`)
+	writeFileSync(`${home}/binary.bin`, Buffer.from([0, 1]))
+	let failed = await call('READ "a.txt:2-2" "missing.txt" "binary.bin"')
+	expect(failed.isError).toBe(true)
+	expect(failed.output).toContain('== READ a.txt@')
+	expect(failed.output).toContain('2: second')
+	expect(failed.output).toContain('missing.txt')
+	expect(failed.output).toContain('ENOENT')
+	expect(failed.output).toContain('binary.bin looks like a binary file')
 })
