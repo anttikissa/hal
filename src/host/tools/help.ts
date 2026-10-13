@@ -39,7 +39,7 @@ export const tool: Tool = {
 			'',
 			'Tools:',
 			'',
-			...lines,
+			...nativeTool.align(lines),
 		].join('\n')
 	},
 }

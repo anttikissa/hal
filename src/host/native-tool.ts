@@ -111,6 +111,13 @@ function shown(tool: Tool<unknown>, interactive = false): string[] {
 	return lines.every((u) => u === name || u.startsWith(`${name} `)) ? lines : [...lines, '']
 }
 
+// Line up trailing `// comments` of usage lines in one column.
+function align(lines: string[]): string[] {
+	let split = lines.map((u) => /^(.*?\S)\s+(\/\/ .*)$/.exec(u))
+	let width = Math.max(0, ...split.map((m) => m?.[1]!.length ?? 0)) + 3
+	return lines.map((u, i) => (split[i] ? split[i]![1]!.padEnd(width) + split[i]![2] : u))
+}
+
 // Exact syntax lines, from the module or its schema. Interactive sessions
 // also see where the purpose comment goes, for tools that keep it (task 2bq).
 function usage(tool: Tool<unknown>, interactive = false): string[] {
@@ -141,7 +148,7 @@ function help(tool: Tool<unknown>, interactive = false): string {
 		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
 		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 	})
-	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...usage(tool, interactive).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
+	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...align(usage(tool, interactive)).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
 // One line per tool the system prompt does not explain, for $tools_summary.
@@ -149,4 +156,4 @@ function summary(): string {
 	return [...tools.all().values()].filter((t) => t.syntax?.summary !== false).map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`).join('\n')
 }
 
-export const nativeTool = { name, def, find, generic, resolve, arrived, multiple, expand, usage, shown, help, summary }
+export const nativeTool = { name, def, find, generic, resolve, arrived, multiple, expand, usage, shown, align, help, summary }
