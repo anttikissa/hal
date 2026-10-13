@@ -151,9 +151,10 @@ with an explanation and the canonical syntax.
   as new native tool descriptions, including in plugins and benchmark
   builds. Tools disclose detail progressively (HELP) and let the tool
   set change without busting the prompt cache.
-- Configure with command-line flags (e.g. `hal -p --no-user`), not
-  environment variables: env vars are hard to discover and cumbersome
-  to use.
+- Configure with command-line flags (e.g. `hal --no-user`), never
+  environment variables: they hide information and are hard to
+  discover and cumbersome to use. Replace an existing one with a flag
+  when you touch it.
 - The user is king. Hal's rules (UI, look, layout, tasks/) describe
   Hal's defaults, not limits on what the user may want. Never answer a
   wish with what Hal "won't" do: build it. Make hooks able to change
