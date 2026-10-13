@@ -1,15 +1,15 @@
 // /restart [all]|host|both (`local`, Ctrl-R, runs in the client,
-// src/client/commands/restart.ts). Bare means all. The host process exits with the
-// restart code once its reply is recorded; its peers take over as
-// usual, whichever wins. `both`: the client that typed it restarts
-// with the host (it marked itself). `all`: every connected client is
-// told first, and restarts (web: reloads) once the host has gone.
+// src/client/commands/restart.ts). Bare means all. The host process
+// exits with the restart code once its reply is recorded; its peers
+// take over as usual, whichever wins. `both`: the client that typed it
+// restarts with the host (it marked itself). `all`: every connected
+// client is told first, and restarts (web: reloads) once the host has gone.
 //
-// While a call flagged unsafeToStop runs in any session here (task
-// ker), foreground or background, a restart asks first: the session's
-// followers get the restart dialog, and its Restart anyway sends
-// /restart <scope> anyway. A model's restart is refused with "ask the
-// user first" twice; its third goes through.
+// Restart may be refused if there is an ongoing tool call with the
+// `unsafeToStop` flag set to true. A model's 3rd attempt will restart
+// anyway. The user will instead get a dialog that, when accepted, runs
+// "/restart <scope> anyway".
+//
 // Tasks: cf, 18n.
 
 import { toolDetails } from '../../common/tool-details.ts'
