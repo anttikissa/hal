@@ -3,7 +3,7 @@
 // /config, whose rows add a value column, a faint note shown on the
 // selected, hovered or focused row, an in-place edit field and the
 // selected row's details below (common/modals.ts).
-import { createEffect, For, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import { blocksDialog } from '../../common/blocks-dialog.ts'
@@ -32,7 +32,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 	let edit: HTMLInputElement | undefined
 	// An edit starting takes the focus; one ending gives it back.
 	createEffect(
-		() => props.modal?.edit?.index,
+		createMemo(() => props.modal?.edit?.index),
 		(index) => untrack(() => { if (index === undefined) { if (box.open) search?.focus() } else edit?.focus() }),
 	)
 	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
@@ -62,7 +62,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 	// Find: the focused part takes the DOM focus, as arrow keys move it.
 	let filters: HTMLButtonElement[] = []
 	createEffect(
-		() => props.modal?.find?.focus,
+		createMemo(() => props.modal?.find?.focus),
 		(f) => untrack(() => {
 			let el = f === undefined || !box.open ? undefined : f === 0 ? search : f < 5 ? filters[f - 1] : list
 			if (el && document.activeElement !== el) el.focus()
@@ -107,7 +107,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.find}>
 				<div class="filters" role="group" aria-label="Search kinds">
 					<For each={findDialog.labels}>{(label, i) => (
-						<button ref={(e) => (filters[i()] = e)} type="button" aria-pressed={props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? 'true' : 'false'}
+						<button ref={(e) => untrack(() => (filters[i()] = e))} type="button" aria-pressed={props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? 'true' : 'false'}
 							onFocus={() => find.focus(i() + 1)} onClick={() => find.toggle(i())}>
 							{props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? '[x] ' : '[ ] '}{label}
 						</button>
@@ -122,7 +122,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 						onClick={() => { if (!props.modal?.find) app.modalPick(i()) }}>
 						<Show when={props.modal?.values} fallback={
 						<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
-							<a href={props.modal?.find?.results[i()]?.href} tabindex={-1}>{marked(item, props.modal?.query, true)}</a>
+							<a href={props.modal?.find?.results[i()]?.href} tabindex={-1} onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.button === 0) find.close() }}>{marked(item, props.modal?.query, true)}</a>
 						</Show>}>
 							<span class="label">{marked(item, props.modal?.query)}</span>
 							<Show when={props.modal?.edit?.index === i()} fallback={<Show when={props.modal?.tree} fallback={<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>}>

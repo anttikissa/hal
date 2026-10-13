@@ -1,0 +1,10 @@
+{
+	title: 'Keep browser Find focus stable',
+	spec: 'Browser Find remains responsive while typing, receiving results, and moving focus among query, filters, and results. Focus changes must not trigger a reactive loop or sustained CPU spin; Escape and Close remain usable. A normal result-link click dismisses Find even when navigation only changes the current session hash; modifier clicks keep native new-tab behavior. Restore these invariants in the shared web picker without changing terminal navigation.',
+	status: 'done',
+	notes: [
+		'Solid 2 effects do not suppress unchanged computed values. The picker edit-focus effect and Find-focus effect could repeatedly steal focus on modal updates. Equality-gated memos limit these effects to actual transitions. Filter refs read their index untracked. Native same-session result links only change the hash, so ordinary clicks explicitly dismiss Find without intercepting navigation or modifier clicks. A focused real-Chrome check covers query results, filter navigation/toggling, result focus, a same-session link, and Escape. The broader web fixture run had unrelated failures and timed out.'
+	],
+	needs: ['6m'],
+	foldInto: ['6m']
+}

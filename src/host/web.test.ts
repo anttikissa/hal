@@ -1856,6 +1856,42 @@ browserTest('queued message edits retain the draft and require host protection t
 	}
 }, 20000)
 
+browserTest('Find keeps focus stable while results arrive and filters take focus', async () => {
+	let id = tabs.create('/tmp')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'findneedle' }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelector('main')?.innerText.includes('findneedle')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 })
+		await b.waitFor(`document.querySelector('.Picker[open] .input') === document.activeElement`)
+		await b.call('Input.insertText', { text: 'findneedle' })
+		await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent.startsWith('Showing 1 result')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown' })
+		await b.waitFor(`document.activeElement === document.querySelector('.Picker .filters button')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight' })
+		await b.waitFor(`document.activeElement === document.querySelectorAll('.Picker .filters button')[1]`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ' })
+		await b.waitFor(`document.querySelectorAll('.Picker .filters button')[1].getAttribute('aria-pressed') === 'false'`)
+		await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent.startsWith('Showing 1 result')`)
+		expect(await b.evaluate(`document.activeElement === document.querySelectorAll('.Picker .filters button')[1]`)).toBe(true)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown' })
+		await b.waitFor(`document.activeElement === document.querySelector('.Picker ul')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp' })
+		await b.waitFor(`document.activeElement === document.querySelector('.Picker .filters button')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown' })
+		await b.waitFor(`document.activeElement === document.querySelector('.Picker ul')`)
+		await b.evaluate(`document.querySelector('.Picker li a').click()`)
+		await b.waitFor(`!document.querySelector('.Picker[open]') && !!location.hash`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 })
+		await b.waitFor(`document.querySelector('.Picker[open]')`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
+		await b.waitFor(`!document.querySelector('.Picker[open]')`)
+	} finally { await b.close() }
+})
+
 browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes with Tab and expands', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt' }] })
