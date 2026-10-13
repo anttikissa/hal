@@ -89,8 +89,8 @@ Code with clear requirements and unlikely to ever change once it is written:
 - Write tests and run them; then delete the tests and leave a
   comment beside the code: "Tested once, then the tests were deleted. If
   you change this code, first write tests for: <cases>."
-- Keep tests for security and trust boundaries: a silent break there
-  is a vulnerability.
+- Exception: keep tests for security and trust boundaries, where a
+  silent break is a vulnerability.
 - Examples: AGENTS.md @path imports (only its project-boundary test
   stays), the system prompt's skill list, dropped file paths becoming
   attachments (client/paste.ts).
@@ -100,14 +100,20 @@ Experimental code, which is likely to change or be deleted:
 - When its design settles, it moves into another category.
 - All UI code is at first experimental in nature.
 
-TODO what kind of code should be tested? Some end-to-end test that test the whole system
-and is likely to find out if something breaks? Protocols and things like socket communication,
-new user experience (creating of state/, etc), what else?
-
-Load-bearing modules (such as ason.ts, live-file.ts) that rarely change:
+Self-contained modules that could be libraries (such as ason.ts,
+live-file.ts):
 - Write a test suite that covers corner cases, and keep it on. Bun
   upgrades and callers can break a module nobody touched, and a disabled
   suite rots. Move slow suites to ./test-expensive.
+
+Contracts between parts (stored history, host-client messages, replay):
+- Keep tests: a break shows far from the change or loses data.
+- src/e2e.test.ts covers the whole system: processes, a fake provider,
+  restarts and rejoins. Extend it rather than adding another.
+
+Tests never use the network. Fake a provider only with responses
+recorded from the real one; check new provider behavior against the
+real API once, by hand.
 
 Delete a flaky test: one that sometimes fails without a bug teaches
 everyone to ignore red. Never retry, lengthen its timeout or skip it.
@@ -115,7 +121,7 @@ everyone to ignore red. Never retry, lengthen its timeout or skip it.
 Test behavior and invariants, not implementation. Avoid source-text
 assertions, repeated constants or templates, and tests that restate
 one-line functions. Keep exact-output tests for format contracts (such
-as ASON). Don't test nondeterministic model wording.
+as ASON).
 
 # Code
 
