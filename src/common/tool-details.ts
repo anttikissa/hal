@@ -89,10 +89,9 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (str('query')) return { text: `Google "${str('query')}"`, key: 'query' }
 			break
 		case 'read':
-		case 'read_url':
 		case 'read_blob': {
 			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.length} file${input.paths.length === 1 ? '' : 's'}` }
-			let key = name === 'read' ? 'path' : name === 'read_url' ? 'url' : 'id'
+			let key = name === 'read_blob' ? 'id' : str('url') ? 'url' : 'path'
 			if (str(key)) return { text: `${name === 'read_blob' ? 'Read blob' : 'Read'} ${str(key)}`, key }
 			break
 		}
@@ -192,7 +191,7 @@ const unsafe = (name: string, input: Record<string, unknown>): boolean => name =
 
 // Built-in tools that change nothing (host tools.readOnly): an edit of
 // a prompt before them leaves the world as it was.
-const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'read_url', 'help'])
+const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'help'])
 
 // Discovery and history commands open directly to their complete output (18n).
 const fullCommand = (name: string, input: Record<string, unknown>): boolean => name === 'command' && typeof input.command === 'string' && /^\s*\/(?:help|rebase)(?:\s|$)/.test(input.command)

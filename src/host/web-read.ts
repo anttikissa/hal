@@ -1,8 +1,8 @@
 // Fetch a URL into readable text, a model-visible image, or a local file.
 import { mkdirSync } from 'fs'
-import { attachments } from '../../common/attachments.ts'
-import { paths } from '../paths.ts'
-import { type Tool, type ToolOutput, tools } from '../tools.ts'
+import { attachments } from '../common/attachments.ts'
+import { paths } from './paths.ts'
+import { type ToolContext, type ToolOutput, tools } from './tools.ts'
 
 function entities(text: string): string {
 	const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', hellip: '…', copy: '©' }
@@ -40,13 +40,11 @@ function htmlText(html: string): string {
 	return [title, body].filter(Boolean).join('\n\n')
 }
 
-export const tool: Tool<ToolOutput> & { maxTextBytes: number } = {
-	name: 'read_url',
-	description: 'Read a web page or text file, extracting readable text from HTML. Images are attached; other files are saved under /tmp.',
-	parameters: { type: 'object', properties: { url: { type: 'string', description: 'HTTP or HTTPS URL to read' } }, required: ['url'] },
+// READ's fetcher for http(s) URLs (task g9).
+export const webRead = {
 	// The most of a text or HTML body read before converting it.
 	maxTextBytes: 10_000_000,
-	async run(input, ctx) {
+	async run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
 		if (typeof input.url !== 'string') throw new Error('url must be an http(s) URL')
 		let url: URL
 		try { url = new URL(input.url) } catch { throw new Error('invalid URL') }
@@ -63,12 +61,12 @@ export const tool: Tool<ToolOutput> & { maxTextBytes: number } = {
 			return { text: `Image from ${res.url} (${type}, ${bytes.length} bytes)`, image: { mediaType: type, data: Buffer.from(bytes).toString('base64') } }
 		}
 		if (type === 'text/html' || type === 'application/xhtml+xml' || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json')) {
-			let { bytes, cut } = await body(res, tool.maxTextBytes)
+			let { bytes, cut } = await body(res, webRead.maxTextBytes)
 			let text = new TextDecoder().decode(bytes)
 			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
 			if (!readable.trim()) return `No readable content found at ${res.url} (empty page or JavaScript-rendered page).`
 			let max = tools.maxChars - 100
-			let more = cut ? `more than ${tool.maxTextBytes} bytes; ` : ''
+			let more = cut ? `more than ${webRead.maxTextBytes} bytes; ` : ''
 			if (readable.length > max) return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
 			return cut ? `${readable}\n[output truncated: the page is ${more.slice(0, -2)}]` : readable
 		}

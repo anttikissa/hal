@@ -67,7 +67,7 @@ function enter(el: HTMLElement): void {
 // after ; & | ( $( ), optionally behind env assignments or a wrapper.
 const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
-const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', read_url: 'web', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
+const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}${props.row.item.canceledReference ? ':canceled' : ''}`

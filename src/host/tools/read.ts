@@ -9,7 +9,7 @@ import { callText } from '../../common/call-text.ts'
 import { blobs } from '../blobs.ts'
 import { lease } from '../lease.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
-import { tool as readUrl } from './read_url.ts'
+import { webRead } from '../web-read.ts'
 
 function count(input: Record<string, unknown>, key: string, min: number): number | undefined {
 	let v = input[key]
@@ -19,7 +19,7 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 }
 
 // READ "path" (the first tools.readLines lines), "path:10" (line 10),
-// "path:10-20", "path:1-" (to the end); an http(s) URL reads through read_url.
+// "path:10-20", "path:1-" (to the end); an http(s) URL is fetched (web-read.ts).
 // Several paths read each range under its own lease, retaining images.
 function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = callText.values(raw)
@@ -30,7 +30,7 @@ function resolveCall(raw: string): { name: string; input: Record<string, unknown
 }
 
 function one(path: string): { name: string; input: Record<string, unknown> } {
-	if (/^https?:\/\//i.test(path)) return { name: 'read_url', input: { url: path } }
+	if (/^https?:\/\//i.test(path)) return { name: 'read', input: { url: path } }
 	let m = /:(\d+)(?:(-)(\d+)?)?$/.exec(path)
 	if (!m) return { name: 'read', input: { path } }
 	let start = Number(m[1]), end = m[2] ? (m[3] === undefined ? undefined : Number(m[3])) : start
@@ -43,7 +43,8 @@ export const tool: Tool<ToolOutput> = {
 	description:
 		'Read a text file or image, or list a directory. Images are attached directly. Relative paths start from the working directory. ' +
 		'A text file comes as numbered lines under its editing lease, == READ <path>@<hash> ==; the hash covers the whole file, even when a range is shown, and EDIT needs it. ' +
-		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue. Several paths or URLs can be read together, including images; each text file keeps its own range and lease.',
+		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue. Several paths or URLs can be read together, including images; each text file keeps its own range and lease. ' +
+		'An http(s) URL gives readable text from HTML; images are attached; other files are saved under /tmp.',
 	syntax: {
 		summary: false,
 		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-<end>" "<other-path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
@@ -65,7 +66,7 @@ export const tool: Tool<ToolOutput> = {
 			for (let p of input.paths) {
 				try {
 					let item = p as Record<string, unknown>
-					let out = await (item.url !== undefined ? readUrl : tool).run(item, ctx)
+					let out = await (item.url !== undefined ? webRead : tool).run(item, ctx)
 					let attached = typeof out === 'string' ? [] : [...(out.image ? [out.image] : []), ...(out.images ?? [])]
 					images.push(...attached.map((image) => ({ ...image, source: String(item.path ?? item.url) })))
 					if (typeof out !== 'string' && out.isError) errors.push(`== READ ${item.path ?? item.url} ==\n${out.text}`)
@@ -77,6 +78,7 @@ export const tool: Tool<ToolOutput> = {
 			let text = [...errors, ...parts].join('\n\n')
 			return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
 		}
+		if (typeof input.url === 'string') return webRead.run(input, ctx)
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)

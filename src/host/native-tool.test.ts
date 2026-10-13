@@ -38,7 +38,7 @@ test('only interactive HELP teaches purpose comments; validation never does', as
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {
 	expect(nativeTool.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2, modifies: ['a.ts'], description: 'Check it' } })
 	expect(nativeTool.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
-	expect(nativeTool.resolve('READ https://example.com/x:80')).toEqual({ name: 'read_url', input: { url: 'https://example.com/x:80' } })
+	expect(nativeTool.resolve('READ https://example.com/x:80')).toEqual({ name: 'read', input: { url: 'https://example.com/x:80' } })
 	expect(nativeTool.resolve('COMMAND /rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
 	expect(nativeTool.resolve('HELP edit')).toEqual({ name: 'help', input: { name: 'edit' } })
 	// An unclosed comment ends at its line, but never stands in for arguments.

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import { attachments } from '../../common/attachments.ts'
-import { paths } from '../paths.ts'
-import { tools } from '../tools.ts'
-import { tool } from './read_url.ts'
-import { nativeTool } from '../native-tool.ts'
-import { blocks } from '../../common/blocks.ts'
+import { attachments } from '../common/attachments.ts'
+import { paths } from './paths.ts'
+import { tools } from './tools.ts'
+import { webRead as tool } from './web-read.ts'
+import { nativeTool } from './native-tool.ts'
+import { blocks } from '../common/blocks.ts'
 
 let home: string
 let server: ReturnType<typeof Bun.serve>
@@ -64,14 +64,14 @@ test('bad schemes and HTTP errors cannot masquerade as successful content', asyn
 	for (let bad of ['file:///etc/passwd', 'data:text/plain,hi', 'javascript:alert(1)']) await expect(tool.run({ url: bad }, ctx())).rejects.toThrow(/http or https/)
 	expect(requested).toEqual([])
 	response = () => new Response('Denied', { status: 403 })
-	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read_url', input: { url: url() } }, ctx())
+	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read', input: { url: url() } }, ctx())
 	expect(result.isError).toBe(true)
 	expect(result.output).toContain('403')
 })
 
 test('large text says how many characters were cut', async () => {
 	response = () => new Response('x'.repeat(55_000), { headers: { 'content-type': 'text/plain' } })
-	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read_url', input: { url: url() } }, ctx())
+	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read', input: { url: url() } }, ctx())
 	expect(result.output.length).toBeLessThanOrEqual(tools.maxChars)
 	let cut = Number(result.output.match(/\[output truncated: (\d+) more characters\]/)?.[1])
 	expect(result.output.startsWith('x'.repeat(1000))).toBe(true)
@@ -81,15 +81,15 @@ test('large text says how many characters were cut', async () => {
 test('image is a stored image result replayable to Anthropic, not base64 history', async () => {
 	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
 	response = () => new Response(png, { headers: { 'content-type': 'image/png' } })
-	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read_url', input: { url: url() } }, ctx())
+	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read', input: { url: url() } }, ctx())
 	expect(result.image).toMatchObject({ type: 'image', mediaType: 'image/png', bytes: png.length })
 	expect(result.output).not.toContain(png.toString('base64'))
-	let { anthropic } = await import('../anthropic.ts')
-	let { blobs } = await import('../blobs.ts')
-	let messages = anthropic.toMessages({ model: 'claude-test', messages: [{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read_url', input: {} }] }, { role: 'user', blocks: [result] }], image: (id) => blobs.base64('s', id) })
+	let { anthropic } = await import('./anthropic.ts')
+	let { blobs } = await import('./blobs.ts')
+	let messages = anthropic.toMessages({ model: 'claude-test', messages: [{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read', input: {} }] }, { role: 'user', blocks: [result] }], image: (id) => blobs.base64('s', id) })
 	expect(messages[1].content[0].content[1].source.data).toBe(png.toString('base64'))
 	response = () => new Response(Buffer.alloc(attachments.maxBytes + 1), { headers: { 'content-type': 'image/png' } })
-	let huge = await tools.run({ type: 'tool_call', id: '2', name: 'read_url', input: { url: url() } }, ctx())
+	let huge = await tools.run({ type: 'tool_call', id: '2', name: 'read', input: { url: url() } }, ctx())
 	expect(huge.isError).toBe(true)
 })
 
