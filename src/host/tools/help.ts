@@ -26,10 +26,10 @@ export const tool: Tool = {
 			'Esc pauses the current turn and interrupts foreground tools; background commands and subagents survive and are listed. COMMAND "/kill t123" stops one background command; COMMAND "/kill all" stops all background commands here without stopping the agent. COMMAND "/stop <target>" exposes recursive STOP to users.',
 			'Stopping is not rollback: external effects may remain. Explicit STOP, like /kill and Esc, interrupts unsafeToStop calls too and warns that broken state may remain.',
 		].join('\n\n')
-		if (input.name) return nativeTool.help(nativeTool.find(input.name.toLowerCase()))
-		let lines = [...tools.all().values()].flatMap((t) => nativeTool.usage(t))
 		// Purpose comments are taught only to interactive sessions (task 2bq).
 		let interactive = promptCache.interactive(ctx.sessionId)
+		if (input.name) return nativeTool.help(nativeTool.find(input.name.toLowerCase()), interactive)
+		let lines = [...tools.all().values()].flatMap((t) => nativeTool.usage(t))
 		return [
 			`Syntax: <TOOL> ${interactive ? '[ /* <description> */ ] ' : ''}[ <args>... ]`,
 			'',

@@ -24,6 +24,7 @@ const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 test('only interactive HELP teaches purpose comments; validation never does', async () => {
 	let id = created(client(), testHome())
 	expect((await act(id, 'HELP')).output).toContain('/* <description> */')
+	expect((await act(id, 'HELP bash')).output).toContain('BASH /* <description> */ "<command>"')
 	sessions.open(id).interactive = false
 	for (let text of ['HELP', 'HELP BASH', 'HELP EDIT', 'BASH', 'EDIT', 'BASH "true" { unknown: 1 }']) {
 		let result = await act(id, text)

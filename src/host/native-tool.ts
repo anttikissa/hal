@@ -124,7 +124,8 @@ function usage(tool: Tool<unknown>): string[] {
 
 // HELP for one tool: description, syntax, every documented field. A field
 // without a description is internal, e.g. one a tool's own parser fills.
-function help(tool: Tool<unknown>): string {
+// Interactive sessions also see where the purpose comment goes (task 2bq).
+function help(tool: Tool<unknown>, interactive = false): string {
 	let { properties = {}, required = [] } = schema(tool)
 	let fields = Object.entries(properties).filter(([, p]) => p.description).map(([key, p]) => {
 		let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : p.type ?? 'value'
@@ -132,7 +133,9 @@ function help(tool: Tool<unknown>): string {
 		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
 		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 	})
-	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...nativeTool.usage(tool).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
+	let purpose = interactive && Object.hasOwn(properties, 'description')
+	let lines = nativeTool.usage(tool).map((u) => (purpose && !u.includes('/*') ? u.replace(/^\S+/, '$& /* <description> */') : u))
+	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...lines.map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
 // One line per tool the system prompt does not explain, for $tools_summary.
