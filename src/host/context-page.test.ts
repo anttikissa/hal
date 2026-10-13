@@ -31,7 +31,7 @@ test('the graph page needs login, links each round to its block, and rounds are 
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'hi' }] })
 	history.append(id, { type: 'round', usage, block: 2 })
 	let server = { timeout() {} } as any
-	let route = `http://localhost:9001/context/${id}`
+	let route = `http://localhost/context/${id}`
 	expect((await web.fetch(new Request(route), server))!.status).toBe(401)
 	let token = webAuth.redeem(webAuth.issue())
 	if (!('token' in token)) throw new Error('login failed')
@@ -40,7 +40,7 @@ test('the graph page needs login, links each round to its block, and rounds are 
 	let html = await res!.text()
 	expect(html).toContain(`href="/${id}#2"`)
 	expect(html).toContain('1000 tokens')
-	expect((await web.fetch(new Request(`http://localhost:9001/context/9999-zzz`, { headers }), server))!.status).toBe(404)
+	expect((await web.fetch(new Request(`http://localhost/context/9999-zzz`, { headers }), server))!.status).toBe(404)
 
 	let events = await web.fetch(new Request(`${route}/events`, { headers }), server)
 	let reader = events!.body!.getReader()

@@ -85,7 +85,7 @@ test('diff routes require login, validate selection, escape content and show ove
 	let other = sessions.create({ cwd: home, name: 'Neighbor' }).id
 	history.append(other, { type: 'file_changes', cwd: home, toolId: 'other', files: [{ path: 'a.txt', before: null, after: blob('neighbor\n') }] })
 	let server = {} as any
-	let route = `http://localhost:9001${changes.href(id)}`
+	let route = `http://localhost${changes.href(id)}`
 	expect((await web.fetch(new Request(route), server))!.status).toBe(401)
 	let token = webAuth.redeem(webAuth.issue())
 	if (!('token' in token)) throw new Error('login failed')

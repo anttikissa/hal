@@ -7,7 +7,6 @@
 
 import type { LinkState } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
-import { loginCookie } from '../common/login-cookie.ts'
 import { wsLink, type Socket } from '../common/ws-link.ts'
 
 // What main.ts keeps in secrets/remote.ason: the last host and a token
@@ -28,7 +27,7 @@ function origin(typed: string): string {
 	return url.origin
 }
 
-const cookie = (at: string, token: string) => `${loginCookie(at)}=${token}`
+const cookie = (token: string) => `hal=${token}`
 
 class Unavailable extends Error {}
 
@@ -49,7 +48,7 @@ async function login(at: string, code: string): Promise<string | undefined> {
 	if (!res.ok) throw new Error(`${at}: ${(await res.text()).trim() || `HTTP ${res.status}`}`)
 	for (let header of res.headers.getSetCookie()) {
 		let c = Bun.Cookie.parse(header)
-		if (c.name === loginCookie(at) && c.value) return c.value
+		if (c.name === 'hal' && c.value) return c.value
 	}
 	throw new Error(`${at} answered the login without a session cookie; is it a Hal host?`)
 }
@@ -64,7 +63,7 @@ async function probe(at: string): Promise<void> {
 
 // Whether the host still takes this token; throws if it can't be asked.
 async function valid(at: string, token: string): Promise<boolean> {
-	let res = await request(at, '/login', { headers: { cookie: cookie(at, token) } })
+	let res = await request(at, '/login', { headers: { cookie: cookie(token) } })
 	if (res.status === 204) return true
 	if (res.status === 401) return false
 	let message = `${at}/login: HTTP ${res.status}\n${await res.text()}`
@@ -107,7 +106,7 @@ async function signIn(typed: string | undefined, saved: Saved, ask: (question: s
 // as a page of it would send (host/web.ts checks both).
 function dial(at: string, token: string): Socket {
 	let url = `${at.replace(/^http/, 'ws')}/ws`
-	return new WebSocket(url, { headers: { cookie: cookie(at, token), origin: at, 'user-agent': 'hal-terminal' } } as any) as unknown as Socket
+	return new WebSocket(url, { headers: { cookie: cookie(token), origin: at, 'user-agent': 'hal-terminal' } } as any) as unknown as Socket
 }
 
 // Follows the host until the process ends; `loggedOut` runs when the

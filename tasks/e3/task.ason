@@ -10,8 +10,7 @@
 		'Paste markers are linked since task 31: [paste/<name>.txt] to /paste/<name>, through ansi.webUrl like images; /paste/ and /raw/ are file addresses in web.fetch (gate and ?auth=).',
 		'src/startup.test.ts fails its 100 ms budget on a loaded machine (several agents testing at once), on the base commit too.',
 		'The moved() renewal must snapshot the holders before re-inserting into the Map; use Array.from rather than an unnecessary array spread to satisfy the lint rule. The bind-port test narrows Bun.serve().port (typed number | undefined) before supplying it as web.port(), so full TypeScript and oxlint remain green.',
-		'Task v8: terminal Markdown host-relative session links (as printed by /find) also pass through ansi.webUrl, so their hidden OSC8 target includes the host web address and the current one-time login code; the recorded command output contains only the relative stable block link, never a login code.',
-		'Invariant: every visible terminal link carries the live code. The row caches (frame.ts) key on the code as well as the address, and a new code repaints, so Ctrl-L and redraws never repaint a spent or pre-restart code.'
+		'Task v8: terminal Markdown host-relative session links (as printed by /find) also pass through ansi.webUrl, so their hidden OSC8 target includes the host web address and the current one-time login code; the recorded command output contains only the relative stable block link, never a login code.'
 	],
 	needs: [],
 	foldInto: ['8a', 'qy', '7w']
