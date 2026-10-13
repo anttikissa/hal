@@ -107,7 +107,11 @@ function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 // Exact syntax lines, from the module or its schema. Interactive sessions
 // also see where the purpose comment goes, for tools that keep it (task 2bq).
 function usage(tool: Tool<unknown>, interactive = false): string[] {
-	if (interactive && Object.hasOwn(schema(tool).properties ?? {}, 'description')) return usage(tool).map((u) => (u.includes('/*') ? u : u.replace(/^\S+/, '$& /* <description> */')))
+	if (interactive) {
+		let lines = usage(tool), name = tool.name.toUpperCase()
+		if (!Object.hasOwn(schema(tool).properties ?? {}, 'description') || lines.some((u) => u.includes('/*'))) return lines
+		return lines.map((u) => (u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <description> */`) : u))
+	}
 	if (tool.syntax?.usage) return tool.syntax.usage
 	let { properties = {}, required = [] } = schema(tool)
 	let positional = tool.syntax?.positional ?? required
