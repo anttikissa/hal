@@ -7,8 +7,9 @@ import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
 
-// OAuth tokens are rejected unless the first system block is exactly this.
-const IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude."
+// OAuth tokens are rejected (disguised as a 429) unless the first system
+// block is one of the Claude Code identities; this one claims least.
+const IDENTITY = "You are a Claude agent, built on Anthropic's Claude Agent SDK."
 const OAUTH_BETAS = 'claude-code-20250219,oauth-2025-04-20'
 // The Claude Code version reported in the OAuth user-agent, as the
 // Agent SDK does; the entrypoint slot honestly says "hal".

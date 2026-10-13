@@ -85,7 +85,7 @@ const start = (usage = {}) => ({ type: 'message_start', message: { usage } })
 const stop = (reason: string, usage = {}) => [{ type: 'message_delta', delta: { stop_reason: reason }, usage }, { type: 'message_stop' }]
 const endTurn = () => sse(start(), ...stop('end_turn'))
 
-test('OAuth request: endpoint, headers and the required Claude Code system identity', async () => {
+test('OAuth request: endpoint, headers and the required Agent SDK system identity', async () => {
 	reply = endTurn
 	expect(await run(undefined, { system: 'Be brief.' })).toEqual([{ type: 'done', reason: 'end' }])
 	let s = seen[0]!
@@ -99,11 +99,11 @@ test('OAuth request: endpoint, headers and the required Claude Code system ident
 	expect(s.headers.get('user-agent')).toMatch(/^claude-cli\/\S+ \(external, hal/)
 	expect(s.headers.get('x-app')).toBe('cli')
 	// The identity must be the first system block, on its own.
-	expect(s.body.system[0]).toEqual({ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." })
+	expect(s.body.system[0]).toEqual({ type: 'text', text: "You are a Claude agent, built on Anthropic's Claude Agent SDK." })
 	expect(s.body.system.slice(1).map((b: any) => b.text.trim())).toEqual(['Be brief.'])
 	// The model reads the blocks joined with no separator: they must
 	// still read as separate paragraphs.
-	expect(s.body.system.map((b: any) => b.text).join('')).toContain('for Claude.\n\nBe brief.')
+	expect(s.body.system.map((b: any) => b.text).join('')).toContain('Agent SDK.\n\nBe brief.')
 	expect(s.body).toMatchObject({ model: 'claude-opus-4-5', stream: true })
 	expect(s.body.max_tokens).toBeGreaterThan(0)
 })
