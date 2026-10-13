@@ -12,7 +12,7 @@ import { queuedPrompt } from './queue-edit.ts'
 import { amend, type Editing } from '../common/amend.ts'
 import { backfill, type Backfill } from '../common/backfill.ts'
 import { completion } from '../common/completion.ts'
-import { connection, type LinkState } from '../common/connection.ts'
+import { connection } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
@@ -44,6 +44,7 @@ import { find } from './find.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
+import { linkState } from './link-state.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -166,27 +167,6 @@ function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 	// A task apart: an in-process host answers at once, holding off keys.
 	if (out.command) setTimeout(app.send, 0, out.command)
 	Object.assign(app.state, out.view)
-}
-
-// Every connection brings the tabs; tab-start asks the host to name the
-// tab to show: the focused one if any, else the start's.
-function onState(state: LinkState): void {
-	if (state.type !== 'connected') queueEdit.disconnected()
-	restart.linkChanged()
-	let st = app.state
-	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
-	// A new connection's host knows nothing this client watched.
-	delete st.watching
-	if (state.type === 'connected') {
-		let tab = app.focusedTab()
-		let last = tab?.id ?? st.start.last, cwd = tab?.cwd ?? st.start.cwd
-		let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-		app.send({ type: 'tab-start', ...(cwd === undefined ? {} : { cwd }), ...(last === undefined ? {} : { last }), ...(timezone ? { timezone } : {}) })
-		// A code for the web links this terminal prints (task e3).
-		app.send({ type: 'auth', link: true })
-		app.sendScreen()
-	}
-	app.show()
 }
 
 // Enter: a prompt (steering a busy turn as `delivery` says, task csn),
@@ -380,7 +360,7 @@ export const app = {
 	onEvent,
 	backgroundStep: tabSwitch.backgroundStep,
 	backfilled,
-	onState,
+	onState: linkState.onState,
 	focusedTab: tabSwitch.focusedTab,
 	onTabs: tabSwitch.onTabs,
 	focusOn: tabSwitch.focusOn,

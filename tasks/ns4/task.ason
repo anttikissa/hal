@@ -1,0 +1,7 @@
+{
+	title: 'A starting terminal says connecting, never host lost',
+	spec: 'The terminal shows "host lost; reconnecting…" only after its first join (connection.state.joined), when a host it had goes away. Before the first join (deciding host or peer, dialing a remote host) nothing was lost: it shows no notice, and a join still unfinished after linkState.joiningMs (500 ms) shows "connecting to the host…" until connected. src/client/link-state.ts holds the terminal link-state handler. Invariant (bug fix, 13 Oct): Ctrl-R showed "host lost; reconnecting…" for a frame on every restart, because paints wait a microtask (task a27) and the first attempt reports joining before connecting.',
+	status: 'done',
+	needs: ['r6'],
+	foldInto: ['r6']
+}

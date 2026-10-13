@@ -297,9 +297,14 @@ test('a config warning is shown and keeps the transcript', () => {
 	expect(appView.view().transcript).toBe(before)
 })
 
-test('losing the host is shown, and cleared on reconnect', () => {
+// Invariant (bug fix): a starting client never says the host was lost.
+test('joining says nothing before the first join; losing the host is shown, and cleared on reconnect', () => {
+	connection.state.joined = false
+	app.onState({ type: 'joining' })
+	expect(appView.view().notice).toBeUndefined()
+	connection.state.joined = true
 	app.onState({ type: 'disconnected', retryAt: Date.now() + 100 })
-	expect(appView.view().notice).toBeTruthy()
+	expect(appView.view().notice).toBe('host lost; reconnecting…')
 	app.onState({ type: 'connected', role: 'client' })
 	expect(appView.view().notice).toBeUndefined()
 })
