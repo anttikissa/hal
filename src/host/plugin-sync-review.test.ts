@@ -92,7 +92,8 @@ afterAll(() => {
 	pluginSyncReview.show = saved.show
 	pluginHistory.state = saved.hist
 	plugins.state.files = saved.files
-	process.env.HAL_HOME = saved.home
+	if (saved.home === undefined) delete process.env.HAL_HOME
+	else process.env.HAL_HOME = saved.home
 	plugins.report = saved.report
 })
 

@@ -93,7 +93,8 @@ afterEach(() => {
 afterAll(() => {
 	pluginHistory.state = saved.hist
 	plugins.state.files = saved.files
-	process.env.HAL_HOME = saved.home
+	if (saved.home === undefined) delete process.env.HAL_HOME
+	else process.env.HAL_HOME = saved.home
 	pluginSyncClient.send = saved.send
 	plugins.report = saved.report
 })
