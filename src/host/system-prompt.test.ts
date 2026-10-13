@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { systemPrompt } from './system-prompt.ts'
 import { clients } from './clients.ts'
@@ -82,6 +82,17 @@ test('outside Git only the cwd itself is read', () => {
 	let text = systemPrompt.build({ cwd: `${root}/a/b`, model: 'm/x', now: at })
 	expect(text).toContain('HERE RULE')
 	expect(text).not.toContain('PARENT RULE')
+})
+
+test('@path imports never read outside the project, even through a symlink', () => {
+	mkdirSync(`${root}/repo/.git`, { recursive: true })
+	writeFileSync(`${root}/SECRET`, 'SECRET TEXT')
+	symlinkSync(`${root}/SECRET`, `${root}/repo/link`)
+	writeFileSync(`${root}/repo/inside.md`, 'INSIDE TEXT')
+	writeFileSync(`${root}/repo/AGENTS.md`, '@inside.md\n@../SECRET\n@link')
+	let text = systemPrompt.build({ cwd: `${root}/repo`, model: 'm/x', now: at })
+	expect(text).toContain('INSIDE TEXT\n@../SECRET\n@link')
+	expect(text).not.toContain('SECRET TEXT')
 })
 
 test('without a client, the date uses the host local timezone and offset', () => {

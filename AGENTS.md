@@ -83,9 +83,31 @@ Tests are maintenance debt; keep the suite minimal. Add one only if it
 catches a plausible regression worth its cost. Omit cosmetic tests and
 those a one-off check can replace. When unsure, omit.
 
-Test code unlikely to change once, then delete the tests and leave a
-comment beside the code: "Tested once, then the tests were deleted. If
-you change this code, first write tests for: <cases>."
+Testing guidelines vary by code type:
+
+Code with clear requirements and unlikely to ever change once it is written:
+- Write tests and run them; then delete the tests and leave a
+  comment beside the code: "Tested once, then the tests were deleted. If
+  you change this code, first write tests for: <cases>."
+- Keep tests for security and trust boundaries: a silent break there
+  is a vulnerability.
+- Examples: AGENTS.md @path imports (only its project-boundary test
+  stays), the system prompt's skill list, dropped file paths becoming
+  attachments (client/paste.ts).
+
+Experimental code, which is likely to change or be deleted:
+- Write no tests. Check it by running it or having the user verify it.
+- When its design settles, it moves into another category.
+- All UI code is at first experimental in nature.
+
+TODO what kind of code should be tested? Some end-to-end test that test the whole system
+and is likely to find out if something breaks? Protocols and things like socket communication,
+new user experience (creating of state/, etc), what else?
+
+Load-bearing modules (such as ason.ts, live-file.ts) that rarely change:
+- Write a test suite that covers corner cases, and keep it on. Bun
+  upgrades and callers can break a module nobody touched, and a disabled
+  suite rots. Move slow suites to ./test-expensive.
 
 Delete a flaky test: one that sometimes fails without a bug teaches
 everyone to ignore red. Never retry, lengthen its timeout or skip it.
