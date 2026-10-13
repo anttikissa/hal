@@ -10,6 +10,7 @@ import { modelsDev } from './models-dev.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
 import { client, until } from './host-fixture.test.ts'
+import { picker } from '../common/picker.ts'
 
 // /model and the model list: the host lists every configured
 // provider's models, and switching is an ordinary command.
@@ -115,7 +116,7 @@ test('versioned GPT aliases complete and select their own generation', () => {
 		expect(models.resolve('gpt6').id).toBe('openai/gpt-6-sol')
 		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
 		expect(models.resolve('astra').id).toBe('openai/gpt-6-astra')
-		expect(models.resolve('luna').id).toBe('openai/gpt-6-luna')
+		expect(models.resolve('luna').login).toBe('/login chatgpt')
 		let c = client()
 		let id = created(c)
 		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
@@ -132,16 +133,38 @@ test('versioned GPT aliases complete and select their own generation', () => {
 	}
 })
 
-test('popular GPT and Claude tier aliases select the intended model', () => {
+test('family aliases and picker defaults advance versions without changing preferred families', () => {
 	let openaiKey = process.env.OPENAI_API_KEY
 	let anthropicKey = process.env.ANTHROPIC_API_KEY
 	try {
 		process.env.OPENAI_API_KEY = 'test-key'
 		process.env.ANTHROPIC_API_KEY = 'test-key'
 		provider.state.providers = { openai: fake([]), anthropic: fake([]) }
-		for (let [alias, id] of Object.entries({ gpt: 'openai/gpt-6.1-sol', sol: 'openai/gpt-6.1-sol', astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5-1', haiku: 'anthropic/claude-haiku-4-5' })) {
-			expect(models.resolve(alias).id).toBe(id)
+		let ids = ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-luna', 'anthropic/claude-opus-5-5', 'anthropic/claude-sonnet-5-5', 'anthropic/claude-fable-5-1', 'anthropic/claude-haiku-4-5']
+		let cache = () => {
+			for (let name of ['openai', 'anthropic']) models.state.lists.set(name, { at: Date.now(), ids: ids.filter((id) => id.startsWith(`${name}/`)) })
 		}
+		let choices = (targets: Record<string, string>) => {
+			for (let [alias, id] of Object.entries(targets)) expect(models.resolve(alias).id).toBe(id)
+			for (let alias of ['openai', 'gpt', 'anthropic', 'opus', 'fable', 'haiku']) {
+				let st = picker.step(picker.open('hal/intro', ids), { key: 'x', text: alias }, ids).state
+				let action = { type: 'submit' as const, item: st.selected, answers: {} }
+				expect(picker.command('s1', st, action)?.text).toBe(`/model ${targets[alias]}`)
+			}
+		}
+		cache()
+		let targets = { gpt: ids[0]!, openai: ids[0]!, sol: ids[0]!, astra: ids[1]!, luna: ids[2]!, opus: ids[3]!, anthropic: ids[3]!, claude: ids[3]!, sonnet: ids[4]!, fable: ids[5]!, haiku: ids[6]! }
+		choices(targets)
+		ids.push('openai/pollux-6.5', 'openai/gpt-6.2-terra', 'anthropic/claude-haiku-5-5', 'anthropic/claude-fable-5-2', 'openai/gpt-6.2-sol')
+		cache()
+		targets = { ...targets, gpt: ids.at(-1)!, openai: ids.at(-1)!, sol: ids.at(-1)!, haiku: 'anthropic/claude-haiku-5-5', fable: 'anthropic/claude-fable-5-2' }
+		choices(targets)
+		ids.push('openai/gpt-6.10-sol', 'openai/gpt-7-sol-mini', 'anthropic/claude-haiku-5-5-20261013', 'anthropic/claude-fable-6-20261013')
+		cache()
+		choices({ ...targets, gpt: 'openai/gpt-6.10-sol', openai: 'openai/gpt-6.10-sol', sol: 'openai/gpt-6.10-sol' })
+		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
+		expect(models.resolve('fable5.1').id).toBe('anthropic/claude-fable-5-1')
+		for (let id of ids) expect(models.resolve(id).id).toBe(id)
 	} finally {
 		if (openaiKey === undefined) delete process.env.OPENAI_API_KEY
 		else process.env.OPENAI_API_KEY = openaiKey

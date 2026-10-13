@@ -18,7 +18,7 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 			let id = base ? models.resolve(base).id : ctx.model
 			return id ? command.levels(id).filter((l) => l.startsWith(args.slice(colon + 1))).map((l) => `${base}:${l}`) : []
 		}
-		let all = [...new Set([...models.known(), 'gpt', 'sol', 'gpt-6.1', 'gpt-6', 'claude', 'opus', 'sonnet', 'fable', 'haiku', 'astra', 'luna', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])]
+		let all = [...new Set([...models.known(), 'gpt', 'openai', 'sol', 'gpt-6.1', 'gpt-6', 'claude', 'anthropic', 'opus', 'sonnet', 'fable', 'haiku', 'astra', 'luna', 'terra', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])]
 		let word = (id: string) => !id.startsWith(args) && id.split(/[/-]/).some((_, i, parts) => parts.slice(i).join('-').startsWith(args))
 		let first = all.filter((id) => id.startsWith(args))
 		let shown = new Set(first.map((id) => models.resolve(id).id ?? id))

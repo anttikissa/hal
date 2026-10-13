@@ -48,7 +48,7 @@ const withEffort = (st: ReturnType<typeof picker.open>) => rows(st).filter((_, i
 test('the picker opens as a tree on the current model, its categories open', () => {
 	let st = picker.open('anthropic/claude-sonnet-4-5', tree, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
 	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic (default: claude-opus-5-5)', '▶ opus (default: claude-opus-5-5)', '✓ anthropic/claude-sonnet-4-5', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai (default: gpt-6-sol)', '▼ anthropic (default: claude-opus-5-5)', '▶ opus (default: claude-opus-5-5)', '✓ anthropic/claude-sonnet-4-5', '▶ openrouter'])
 	expect(selected(st)).toContain('anthropic/claude-sonnet-4-5')
 	expect(enter(st)).toBe('/model anthropic/claude-sonnet-4-5')
 })
@@ -89,7 +89,7 @@ test('right opens a category, left closes it or moves from a closed category to 
 	st = press(st, key('left'))
 	expect(selected(st)).toMatch(/^▶ anthropic/)
 	st = press(press(st, key('up')), key('right'))
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▼ openai', '▶ gpt (default: gpt-6-sol)', '▶ anthropic (default: claude-opus-5-5)', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▼ openai (default: gpt-6-sol)', '▶ gpt (default: gpt-6-sol)', '▶ anthropic (default: claude-opus-5-5)', '▶ openrouter'])
 	// Enter on a category without a default opens it instead.
 	st = press(press(st, key('up')), key('enter'))
 	expect(st.items.some((r) => r.includes('hal/intro'))).toBe(true)

@@ -14,13 +14,13 @@ test('qualifiers preserve exact colon ids, parse only final effort, snap missing
 	let known = models.known
 	let envKey = auth.envKey
 	auth.envKey = () => 'test-only'
-	models.known = () => ['ollama/qwen3:8b', 'openrouter/vendor/model:free', 'openai/gpt-6-sol', 'openrouter/vendor/model:high']
+	models.known = () => ['ollama/qwen3:8b', 'openrouter/vendor/model:free', 'openai/gpt-6-sol', 'anthropic/claude-opus-5-5', 'openrouter/vendor/model:high']
 	try {
 		expect(models.selection('ollama/qwen3:8b')).toEqual({ id: 'ollama/qwen3:8b' })
 		expect(models.selection('openrouter/vendor/model:high')).toEqual({ id: 'openrouter/vendor/model:high' })
 		expect(models.selection('openrouter/vendor/model:free:default')).toEqual({ id: 'openrouter/vendor/model:free' })
 		expect(models.selection('openai/gpt-6-sol:max')).toEqual({ id: 'openai/gpt-6-sol', effort: 'max' })
-		expect(models.selection('gpt:high')).toEqual({ id: 'openai/gpt-6.1-sol', effort: 'high' })
+		expect(models.selection('gpt:high')).toEqual({ id: 'openai/gpt-6-sol', effort: 'high' })
 		// Nearest by rank, ties rounding up; every snap is said.
 		expect(models.selection('opus:none')).toMatchObject({ effort: 'low', note: expect.stringContaining('none → low') })
 		expect(models.selection('openai/gpt-5.5:max')).toMatchObject({ effort: 'xhigh' })

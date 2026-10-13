@@ -36,7 +36,7 @@
 
 import type { Pricing } from '../common/pricing.ts'
 import { blocks } from '../common/blocks.ts'
-import { picker } from '../common/picker.ts'
+import { modelAliases } from '../common/model-aliases.ts'
 import { settings } from '../common/settings.ts'
 import { existsSync } from 'fs'
 import { apiKeys } from './api-keys.ts'
@@ -144,8 +144,8 @@ function valid(id: string): boolean {
 // Short names choose the family's preferred model, then a provider we can
 // actually use. Subscriptions take precedence over metered API keys.
 function resolve(input: string): { id?: string; login?: string } {
-	// sol is the old Hal's other name for gpt.
-	let family = input.toLowerCase() === 'sol' ? 'gpt' : input.toLowerCase()
+	let family = input.toLowerCase()
+	family = modelAliases.families[family] ?? family
 	// opus-5.5, opus5.5, opus-5-5 (task kh): that Claude, if it exists.
 	let claude = /^(opus|sonnet|haiku|fable)-?(\d+)(?:[.-](\d+))?$/.exec(family)
 	if (claude) {
@@ -154,14 +154,14 @@ function resolve(input: string): { id?: string; login?: string } {
 		let access = models.resolve(claude[1]!)
 		return access.id ? { id } : access
 	}
-	let version = /^gpt-?(6(?:\.1)?)$/.exec(family)?.[1]
-	if (!version && !['gpt', 'claude', 'opus', 'astra', 'luna', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
-	let popular: Record<string, string> = { astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5-1', haiku: 'anthropic/claude-haiku-4-5' }
-	let own = family === 'gpt' || version || family === 'astra' || family === 'luna' ? 'openai' : family === 'claude' || family === 'opus' || family === 'sonnet' || family === 'fable' || family === 'haiku' ? 'anthropic' : undefined
-	let needle = family === 'claude' || family === 'opus' ? 'opus' : family
-	let candidates = models.known().filter((id) => version ? id.startsWith(`openai/gpt-${version}-`) : id.split('/').slice(1).join('/').toLowerCase().includes(needle))
-	let preferred = version ? `openai/gpt-${version}-sol` : popular[family] ?? (family === 'gpt' ? picker.defaults.gpt : own ? picker.defaults.opus : undefined)
-	if (preferred) candidates = [preferred, ...candidates.filter((id) => id !== preferred)]
+	let version = /^gpt-?(\d+(?:\.\d+)?)$/.exec(family)?.[1]
+	if (!version && !['sol', 'opus', 'astra', 'luna', 'terra', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
+	let own = version || ['sol', 'astra', 'luna', 'terra'].includes(family) ? 'openai' : ['opus', 'sonnet', 'fable', 'haiku'].includes(family) ? 'anthropic' : undefined
+	let candidates = models.known().filter((id) => own ? id.startsWith(`${own}/`) : id.split('/').slice(1).join('/').toLowerCase().includes(family))
+	if (own) {
+		let preferred = version ? `openai/gpt-${version}-sol` : modelAliases.select(family, candidates)
+		candidates = preferred ? [preferred] : []
+	}
 	let providers = own ? [own] : ['opencode-go', 'openrouter']
 	for (let name of providers) {
 		let available = name === 'openai' || name === 'anthropic'

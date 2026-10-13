@@ -14,6 +14,7 @@ import { fuzzy } from './fuzzy.ts'
 import { titles } from './titles.ts'
 import { modals } from './modals.ts'
 import { effort, type EffortCapability, type EffortLevel } from './effort.ts'
+import { modelAliases } from './model-aliases.ts'
 
 // The ids matching `query`, best first; ties keep the given order,
 // shorter ids first. An empty query keeps every id in order. An id's
@@ -30,9 +31,6 @@ function rank(ids: string[], query: string, names: Record<string, string> = {}):
 	return scored.map((s) => s.id)
 }
 
-// What the family aliases pick now (/model gpt, /model opus), and so the
-// default of their categories. Other categories default to their newest.
-const defaults: Record<string, string> = { gpt: 'openai/gpt-6.1-sol', opus: 'anthropic/claude-opus-5-5' }
 // Providers in the old Hal's order; others follow in the host's order.
 const providers = ['hal', 'openai', 'anthropic', 'google', 'opencode-go', 'openrouter']
 const FAMILY = /(?:^|[-_])(fable|opus|sonnet|haiku|gpt|gemini|grok|kimi|qwen|deepseek|glm|minimax)(?=[-_.\d]|$)/i
@@ -117,10 +115,10 @@ function tree(ids: string[], keep = ''): Node {
 		let inner = n.nodes.filter((c) => !bucket(c)).flatMap(finish)
 		let later = n.nodes.filter(bucket).flatMap(finish)
 		n.all = [...inner, ...n.ids.map((i) => i.id), ...later]
-		let preferred = Object.values(defaults).find((id) => n.all.includes(id))
+		let preferred = modelAliases.select(n.name, n.all)
 		// A provider has a default only through an alias (anthropic: opus);
 		// a bucket has none, so Enter opens it.
-		n.default = bucket(n) ? undefined : preferred ?? (n.path.includes('/') ? n.all[0] : undefined)
+		n.default = bucket(n) ? undefined : preferred ?? (!modelAliases.families[n.name] && n.path.includes('/') ? n.all[0] : undefined)
 		n.ids.sort((a, b) => Number(b.id === n.default) - Number(a.id === n.default))
 		return n.all
 	}
@@ -192,7 +190,7 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 		// alias's model ("claude": opus 5.5), else the higher row, so the
 		// most capable of equal matches.
 		let q = fuzzy.words(query)
-		let preferred = new Set(Object.values(defaults))
+		let preferred = new Set(Object.keys(modelAliases.families).map((alias) => modelAliases.select(alias, ids)))
 		let best = (text: (r: TreeRow) => string | undefined) => {
 			let found = { i: -1, score: -1, preferred: false }
 			built.rows.forEach((r, i) => {
@@ -338,4 +336,4 @@ function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 	return selected === undefined || selected !== cap.levels[direction === 'left' ? 0 : cap.levels.length - 1]
 }
-export const picker = { defaults, rank, refilter, selection, refresh, open, step, command, level, label, canAdjust, effortWidth }
+export const picker = { rank, refilter, selection, refresh, open, step, command, level, label, canAdjust, effortWidth }
