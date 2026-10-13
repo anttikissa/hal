@@ -81,6 +81,15 @@ test('bad values and unknown keys warn, naming the file, and fall back', () => {
 	expect(settings.model()).toBe('test/ok')
 })
 
+test('updating a card setting removes its legacy key so reset stays reset', () => {
+	writeFileSync(paths.configFile(), "{ blockVerbosityTool: 'long' }\n")
+	start()
+	expect(settings.value('cardVerbosityTool')).toBe('long')
+	config.update({ cardVerbosityTool: 'short' })
+	expect(settings.value('cardVerbosityTool')).toBe('short')
+	expect(readFileSync(paths.configFile(), 'utf8')).not.toContain('blockVerbosityTool')
+})
+
 test('a malformed file never crashes: defaults, a warning, and fixing it applies', async () => {
 	writeFileSync(paths.configFile(), "{ model: 'sk-secret' oops")
 	start()

@@ -96,7 +96,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 							<p>{blocksDialog.note}</p>
 							<p>Kinds: <For each={blocksDialog.kinds}>{(w, i) => <>{i() ? ', ' : ''}<b>{w[0]}</b>{w.slice(1)}</>}</For></p>
 						</div>}>
-						{(ids) => <ul class="blocks-ids" aria-label="Matching blocks"><For each={ids().length > 40 ? [...ids().slice(0, 39), `+${ids().length - 39} more`] : ids()}>{(id) => <li>{id}</li>}</For></ul>}
+						{(ids) => <ul class="blocks-ids" aria-label="Matching cards"><For each={ids().length > 40 ? [...ids().slice(0, 39), `+${ids().length - 39} more`] : ids()}>{(id) => <li>{id}</li>}</For></ul>}
 					</Show>
 				</>
 			)}</Show>

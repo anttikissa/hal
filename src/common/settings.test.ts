@@ -74,3 +74,14 @@ test('the page gets only browser settings, and bad page JSON means defaults', ()
 		expect(settings.pasteLines()).toBe(settings.check({}).values.pasteLines as number)
 	}
 })
+
+test('old verbosity keys load, with canonical card keys taking precedence', () => {
+	let raw = { blockVerbosityTool: 'long', blockVerbosityGlimpseRows: 5 }
+	expect(settings.check(raw).warnings).toEqual([])
+	expect(settings.check(raw).values.cardVerbosityTool).toBe('long')
+	expect(settings.check({ ...raw, cardVerbosityTool: 'short' }).values.cardVerbosityTool).toBe('short')
+	settings.state.raw = raw
+	expect(settings.glimpseRows()).toBe(5)
+	settings.load(settings.forPage())
+	expect(settings.value('cardVerbosityTool')).toBe('long')
+})

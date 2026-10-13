@@ -83,7 +83,7 @@ const table: Setting[] = [
 	},
 	...verbosityRows(),
 	{
-		name: 'blockVerbosityGlimpseRows',
+		name: 'cardVerbosityGlimpseRows',
 		label: 'Glimpse rows',
 		type: { kind: 'integer', min: 1, max: 50 },
 		default: 3,
@@ -92,25 +92,25 @@ const table: Setting[] = [
 	},
 ]
 
-// How much of each kind of transcript block shows at first (task hyt):
-// short is the title row alone, glimpse adds blockVerbosityGlimpseRows
-// rows, long shows everything. /blocks overrides them per session.
+// How much of each kind of transcript card shows at first (task hyt):
+// short is the title row alone, glimpse adds cardVerbosityGlimpseRows
+// rows, long shows everything. /cards overrides them per session.
 function verbosityRows(): Setting[] {
 	let kinds: [string, string, string, string][] = [
-		['Prompt', 'Prompt blocks', 'long', 'Your prompts'],
-		['Text', 'Reply blocks', 'long', "Hal's replies"],
-		['Thinking', 'Thinking blocks', 'short', "Hal's thinking"],
-		['Tool', 'Tool blocks', 'short', 'Tool calls and their output'],
-		['Failed', 'Failed tool blocks', 'glimpse', 'Tool calls that failed, so the error shows'],
-		['Message', 'Message blocks', 'glimpse', 'Messages between sessions, sent and received'],
-		['Notice', 'Notice blocks', 'short', "Hal's notices: background command reports, prompt-file changes"],
+		['Prompt', 'Prompt cards', 'long', 'Your prompts'],
+		['Text', 'Reply cards', 'long', "Hal's replies"],
+		['Thinking', 'Thinking cards', 'short', "Hal's thinking"],
+		['Tool', 'Tool cards', 'short', 'Tool calls and their output'],
+		['Failed', 'Failed tool cards', 'glimpse', 'Tool calls that failed, so the error shows'],
+		['Message', 'Message cards', 'glimpse', 'Messages between sessions, sent and received'],
+		['Notice', 'Notice cards', 'short', "Hal's notices: background command reports, prompt-file changes"],
 	]
 	return kinds.map(([key, label, value, what]) => ({
-		name: `blockVerbosity${key}`,
+		name: `cardVerbosity${key}`,
 		label,
 		type: { kind: 'choice', options: ['short', 'glimpse', 'long'] },
 		default: value,
-		description: `${what}: short shows the title row, glimpse a few rows more, long everything. Ctrl-O steps one block; /blocks changes the current session.`,
+		description: `${what}: short shows the title row, glimpse a few rows more, long everything. Ctrl-O steps one card; /cards changes the current session.`,
 		browser: true,
 	}))
 }
@@ -151,19 +151,20 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 	let warnings: string[] = []
 	for (let s of settings.table) {
 		values[s.name] = s.default
-		if (!(s.name in raw)) continue
-		let why = settings.problem(s.type, raw[s.name])
-		if (!why) values[s.name] = raw[s.name]
-		else warnings.push(`${s.name}: ${why}${s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[s.name]) ?? String(raw[s.name])}`}; using the default`)
+		let key = s.name in raw ? s.name : s.name.replace(/^cardVerbosity/, 'blockVerbosity')
+		if (!(key in raw)) continue
+		let why = settings.problem(s.type, raw[key])
+		if (!why) values[s.name] = raw[key]
+		else warnings.push(`${key}: ${why}${s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[key]) ?? String(raw[key])}`}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
-		if (!settings.table.some((s) => s.name === key)) warnings.push(`unknown setting '${key}', ignored`)
+		if (!settings.table.some((s) => s.name === key.replace(/^blockVerbosity/, 'cardVerbosity'))) warnings.push(`unknown setting '${key}', ignored`)
 	}
 	return { values, warnings }
 }
 
 function value(name: string): unknown {
-	return settings.check(settings.state.raw).values[name]
+	return settings.check(settings.state.raw).values[name.replace(/^blockVerbosity/, 'cardVerbosity')]
 }
 
 // The effective values of the settings marked `browser`, as the JSON the
@@ -210,5 +211,5 @@ export const settings = {
 	push: (): boolean => settings.value('push') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
-	glimpseRows: (): number => settings.value('blockVerbosityGlimpseRows') as number,
+	glimpseRows: (): number => settings.value('cardVerbosityGlimpseRows') as number,
 }

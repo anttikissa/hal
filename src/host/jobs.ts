@@ -84,7 +84,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 // result as a foreground one would; otherwise its id.
 async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run, unsafe?: Record<string, unknown>): Promise<string> {
 	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
-	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
+	if (call?.n === undefined) throw new Error('background Bash call has no recorded card id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
 	jobs.state.running.set(id, { sessionId, stop: run.stop, output: run.output, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })

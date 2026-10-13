@@ -41,9 +41,9 @@ function toggles(item: Shown): boolean {
 	return card.kind(item) !== undefined
 }
 
-// The config.ason key of `kind`'s start state: blockVerbosityTool.
+// The config.ason key of `kind`'s start state: cardVerbosityTool.
 function setting(kind: Kind): string {
-	return `blockVerbosity${kind[0]!.toUpperCase()}${kind.slice(1)}`
+	return `cardVerbosity${kind[0]!.toUpperCase()}${kind.slice(1)}`
 }
 
 // How `kind` starts in a session with overrides `blocks`: its

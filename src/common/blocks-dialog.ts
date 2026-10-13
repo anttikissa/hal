@@ -17,16 +17,16 @@ function help(items: Item[] = []): [string, string][] {
 	let tools = items.filter((i) => i.type === 'tool' && /^\d+$/.test(i.key) && toggle.toggles(i)).map((i) => i.key)
 	let [a, b, c] = tools.length > 1 ? [tools.at(-3) ?? tools.at(-2)!, tools.at(-2)!, tools.at(-1)!] : ['10', '14', '24']
 	return [
-		[`t${c}, ${c}`, 'one block'], ['*', 'all blocks'],
+		[`t${c}, ${c}`, 'one card'], ['*', 'all cards'],
 		[`${a}-${c}`, 'a range'], ['t*, r*', 'all of a kind'],
-		[`t${b}, t${c}`, 'a list'], ['empty', 'latest tool block'],
+		[`t${b}, t${c}`, 'a list'], ['empty', 'latest tool card'],
 	]
 }
-const note = 'User and assistant blocks change only when you name them (a, u).'
+const note = 'User and assistant cards change only when you name them (a, u).'
 const kinds = ['tool', 'reasoning', 'assistant', 'user', 'message', 'system', 'question']
 
 function open(): ModalState {
-	let m = modals.open({ title: 'Expand or collapse blocks', hint: 'enter: toggle · tab: complete · esc: close', form: { text: 'Expand or collapse blocks', fields: [{ type: 'text', name: 'target', placeholder: '24, 10-24 or t*' }] } })
+	let m = modals.open({ title: 'Expand or collapse cards', hint: 'enter: toggle · tab: complete · esc: close', form: { text: 'Expand or collapse cards', fields: [{ type: 'text', name: 'target', placeholder: '24, 10-24 or t*' }] } })
 	return { ...m, compact: true, question: 'Which cards to expand or collapse?', blocks: { hint: '', help: help() } }
 }
 
@@ -47,7 +47,7 @@ function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, curs
 	let end = before[before.length - token.length - 1] === '-'
 	let letters = parts[2]!.toLowerCase()
 	let found = items.filter((i) => /^\d+$/.test(i.key) && toggle.toggles(i) && i.key.startsWith(parts[3]!) && (!letters || letters.includes(titles.letter(i)))).reverse()
-	if (!found.length) return { ...m, blocks: { hint: `no block matches ${token || 'here'}`, invalid: true, help: m.blocks!.help } }
+	if (!found.length) return { ...m, blocks: { hint: `no card matches ${token || 'here'}`, invalid: true, help: m.blocks!.help } }
 	let fill = found.length === 1 ? (end ? found[0]!.key : parts[1]! + titles.blockId(found[0]!)) : parts[1]! + (end ? '' : parts[2]!) + completion.common(found.map((i) => i.key))
 	let value = before.slice(0, before.length - token.length) + fill + text.slice(cursor)
 	let form = { ...forms.set(m.form!, 0, value), cursor: cursor - token.length + fill.length }

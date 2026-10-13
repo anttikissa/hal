@@ -145,7 +145,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let link = () => (
 		<Show when={href()} fallback={ticks()}>
 			{(h) => (
-				<a class="link" href={h()} data-ref={blockId()} title="Link to this block" aria-label={`Link to block ${blockId()}`}>{ticks()}</a>
+				<a class="link" href={h()} data-ref={blockId()} title="Link to this card" aria-label={`Link to card ${blockId()}`}>{ticks()}</a>
 			)}
 		</Show>
 	)

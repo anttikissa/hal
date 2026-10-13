@@ -31,17 +31,17 @@ export const tool: Tool<ToolOutput> = {
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(reference)
 		let block = /^(?![1-9]\d*(?:\.\d+)?$)(?:([\w-]+)#)?#?[a-z]?([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference) ?? /^([\w-]+)\/([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
 		if (ref && block && blobs.find(ref[1] ?? ctx.sessionId, ref[2]!)) block = null
-		if (!ref && !block) throw new Error(`invalid blob or block id: ${JSON.stringify(input.id)}`)
+		if (!ref && !block) throw new Error(`invalid blob or card id: ${JSON.stringify(input.id)}`)
 		if (block) {
 			let n = Number(block[2])
-			if (!Number.isSafeInteger(n)) throw new Error('block number is too large')
+			if (!Number.isSafeInteger(n)) throw new Error('card number is too large')
 			let slot = block[3] === undefined ? undefined : Number(block[3])
 			if (slot !== undefined && !Number.isSafeInteger(slot)) throw new Error('item number is too large')
 			let id = block[1] ?? ctx.sessionId
 			let raw = history.readSync(id)
 			let record = replay.current(raw).find((r) => r.n === n)
-			if (!record && raw.some((r) => r.n === n)) return `Block ${input.id} was dropped by rebase.`
-			if (!record) throw new Error(`block ${input.id} not found`)
+			if (!record && raw.some((r) => r.n === n)) return `Card ${input.id} was dropped by rebase.`
+			if (!record) throw new Error(`card ${input.id} not found`)
 			let value = record.type === 'assistant' ? record.block : record.type === 'user' && record.blocks.length === 1 ? record.blocks[0] : record
 			if (slot !== undefined || reference.includes('/')) {
 				let items = record.type === 'user' ? record.blocks.flatMap((b): UserBlock[] => b.type === 'tool_result' ? [b, ...blocks.resultImages(b)] : [b]) : [value]

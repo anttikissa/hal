@@ -30,6 +30,11 @@ checks).
 - **client**: anything following sessions: the host's own terminal, a
   peer, a browser.
 - **server**: only the listeners (Unix socket, HTTP), never a role.
+- **card**: one expandable transcript unit: prompt, reply, thinking,
+  tool call with its result, message, system note or question. Provider
+  content blocks and code blocks remain blocks. `/cards` and
+  `cardVerbosity*` are canonical; `/blocks` and `blockVerbosity*` remain
+  accepted for compatibility (task 469).
 
 How sessions behave (states, who may pause, failures, interrupt delivery,
 drafts) is decided in tasks/j1/states.md; forms, commands, modals,

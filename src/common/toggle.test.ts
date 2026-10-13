@@ -29,8 +29,8 @@ test('targets: lists, kinds, ranges and * leave user and assistant blocks alone 
 	expect(keys('r*, 14')).toEqual(['11', '14', '17'])
 	expect(keys('')).toEqual(['16'])
 	expect(keys('x*')).toBe('unknown kind x in x* (kinds: t r a u m s q)')
-	expect(keys('15')).toBe('block 15 does not expand or collapse')
-	expect(keys('18', 'expand')).toBe('no block 18 to expand')
+	expect(keys('15')).toBe('card 15 does not expand or collapse')
+	expect(keys('18', 'expand')).toBe('no card 18 to expand')
 	expect(keys('q*')).toBe('nothing to toggle in q*')
 })
 
@@ -69,8 +69,8 @@ test('canceled prompt and output start closed and remain expandable', () => {
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
-	expect(typed('t*').blocks?.hint).toBe('Expands 2 tool blocks: t14, t16')
-	expect(typed('').blocks?.hint).toBe('Shows a glimpse of tool block t16')
+	expect(typed('t*').blocks?.hint).toBe('Expands 2 tool cards: t14, t16')
+	expect(typed('').blocks?.hint).toBe('Shows a glimpse of tool card t16')
 	expect(typed('t1,').blocks?.invalid).toBe(true)
 	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')

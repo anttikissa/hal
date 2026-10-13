@@ -52,6 +52,7 @@ function update(values: Record<string, unknown>): string[] {
 	}
 	for (let s of settings.table) {
 		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue
+		if (s.name.startsWith('cardVerbosity')) delete data[s.name.replace(/^cardVerbosity/, 'blockVerbosity')]
 		if (Object.is(values[s.name], s.default)) delete data[s.name]
 		else {
 			data[s.name] = values[s.name]

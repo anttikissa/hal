@@ -33,7 +33,7 @@ function parse(args: string): Target | string {
 	let parts: Part[] = []
 	for (let text of args.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)) {
 		let m = /^#?([a-z]*)(?:(\d+)(?:-#?[a-z]*(\d+))?|(\*))$/i.exec(text)
-		if (!m) return `not a block, range or kind: ${text}`
+		if (!m) return `not a card, range or kind: ${text}`
 		let letters = m[1]!.toLowerCase()
 		let bad = [...letters].find((c) => !kinds[c])
 		if (bad) return `unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`
@@ -57,14 +57,14 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 	let numbered = items.filter((i) => /^\d+$/.test(i.key))
 	if (!target.length) {
 		let tool = items.findLast((i) => i.type === 'tool')
-		return tool ? [tool] : `no tool block to ${verb}`
+		return tool ? [tool] : `no tool card to ${verb}`
 	}
 	let found = new Set<Item>()
 	for (let part of target) {
 		if (part.one) {
 			let item = numbered.find((i) => Number(i.key) === part.from)
-			if (!item) return `no block ${part.from} to ${verb}`
-			if (!toggle.toggles(item)) return `block ${part.from} does not expand or collapse`
+			if (!item) return `no card ${part.from} to ${verb}`
+			if (!toggle.toggles(item)) return `card ${part.from} does not expand or collapse`
 			found.add(item)
 			continue
 		}
@@ -96,7 +96,7 @@ function plan(mode: Mode, items: Item[], args: string, fold: (item: Item) => Fol
 function noun(items: Item[]): string {
 	let letters = new Set(items.map((i) => titles.letter(i)))
 	let kind = letters.size === 1 ? `${kinds[[...letters][0]!]} ` : ''
-	return items.length === 1 ? `${kind}block` : `${items.length} ${kind}blocks`
+	return items.length === 1 ? `${kind}card` : `${items.length} ${kind}cards`
 }
 
 // The live hint: what Enter does ("Expands 12 tool blocks: t4-t88").

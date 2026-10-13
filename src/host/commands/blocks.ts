@@ -1,5 +1,5 @@
-// /blocks (task hyt): show or set how kinds of blocks start in this
-// session, over each client's blockVerbosity* settings. The overrides
+// /cards (/blocks alias, task hyt): show or set how kinds of cards start in this
+// session, over each client's cardVerbosity* settings. The overrides
 // are session metadata, synced to every client.
 import { card, type Kind, type Verbosity } from '../../common/card.ts'
 import type { SessionMeta } from '../../common/session.ts'
@@ -8,15 +8,15 @@ import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
 
-const usage = '/blocks [<kind> short|glimpse|long|default | reset]'
+const usage = '/cards [<kind> short|glimpse|long|default | reset]'
 
 // 'tool long (this session), thinking short, …': each kind as it starts here.
 function describe(blocks: SessionMeta['blocks']): string {
-	return `Blocks: ${card.kinds.map((k) => `${k} ${card.verbosity(k, blocks)}${blocks?.[k] ? ' (this session)' : ''}`).join(', ')}`
+	return `Cards: ${card.kinds.map((k) => `${k} ${card.verbosity(k, blocks)}${blocks?.[k] ? ' (this session)' : ''}`).join(', ')}`
 }
 
 export const command: SlashCommand = {
-	help: () => `${usage}: show or set how blocks of a kind start in this session. short is the title row, glimpse a few rows more, long everything; default follows config.ason (blockVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O steps one block.`,
+	help: () => `${usage}: show or set how cards of a kind start in this session. short is the title row, glimpse a few rows more, long everything; default follows config.ason (cardVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O steps one card.`,
 	complete(args) {
 		let [kind = '', value] = args.split(/\s+/)
 		if (value === undefined) return [...card.kinds, 'reset'].filter((k) => k.startsWith(kind))

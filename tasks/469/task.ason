@@ -1,7 +1,10 @@
 {
 	title: 'User-facing term: card, not block',
 	spec: 'Every expandable transcript unit (prompt, reply, thinking, tool call with result, message, system note, question) is a card in all user- and model-facing text on the terminal and the web: dialog titles ("Expand or collapse cards"), hints ("Collapses tool card t1905"), help, /toggle, /expand and /collapse help, errors and results ("Expanded 3 thinking cards: ..."), /go help, link labels ("Link to this card") and HELP and tool descriptions. The command is /cards (/blocks stays an accepted alias); settings are cardVerbosityPrompt, cardVerbosityText, cardVerbosityThinking, cardVerbosityTool, cardVerbosityFailed, cardVerbosityMessage, cardVerbosityNotice and cardVerbosityGlimpseRows; config.ason keys under the old blockVerbosity names still load. Provider content blocks, code blocks and stored names (meta.blocks, history records) keep their names; code identifiers change only where they are user-facing. Task specs and tasks/README.md say card for this unit.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'User-facing transcript units are cards; stored fields, provider content blocks and code blocks retain their names. Canonical cardVerbosity keys win when both forms are present. Changing a card setting removes the legacy key, so resetting to a default cannot revive an old value.'
+	],
 	needs: ['v8y', 'hyt'],
 	foldInto: ['v8y']
 }

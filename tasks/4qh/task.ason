@@ -1,26 +1,26 @@
 {
-	title: '/go goes to blocks; one described completion row each',
-	spec: `/go also goes to a block: it shows the session as before and reveals the block as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the block is ("Hal can't scroll the terminal, but #123 is about 29% down the scrollback."). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the block, and the router keeps the hash on that switch.
+	title: '/go goes to cards; one described completion row each',
+	spec: `/go also goes to a card: it shows the session as before and reveals the card as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the card is ("Hal can't scroll the terminal, but #123 is about 29% down the scrollback."). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the card, and the router keeps the hash on that switch.
 
 Targets:
-- n: tab n. A bare number is always a tab, never a block.
-- #n, #<k>n or <k>n, where k is a kind letter of task 9p: block n of this session. Any letter or none names the same block, so #r12 opens block 12 even if it is a tool call. An unknown block is an error that names it. An exact session name (such as "t12") wins over a block.
-- <session>#<block> or <session>/<block>: a block of another session. <session> is any session target (tab number, id or name), and a closed session is reopened first, as today. The / form is a shortcut for users who forget the #. When a path also matches (a session directory such as ~/src/123), the path wins.
+- n: tab n. A bare number is always a tab, never a card.
+- #n, #<k>n or <k>n, where k is a kind letter of task 9p: card n of this session. Any letter or none names the same card, so #r12 opens card 12 even if it is a tool call. An unknown card is an error that names it. An exact session name (such as "t12") wins over a card.
+- <session>#<card> or <session>/<card>: a card of another session. <session> is any session target (tab number, id or name), and a closed session is reopened first, as today. The / form is a shortcut for users who forget the #. When a path also matches (a session directory such as ~/src/123), the path wins.
 - Directories work as today: the cwd of an open or closed session, never any other directory.
-This differs from /toggle and web anchors, where a bare number is a block. That is the user's decision: /go numbers stay tab numbers.
+This differs from /toggle and web anchors, where a bare number is a card. That is the user's decision: /go numbers stay tab numbers.
 
-Help: '/go <tab|session|directory>[#block]: go to a session, reopening it if closed, or to a block in it (#t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.'
+Help: '/go <tab|session|directory>[#card]: go to a session, reopening it if closed, or to a card in it (#t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.'
 
 Completion lists each candidate once, with a description. The terminal and the web show the same rows. The web shows the value in bold with the description under it. The terminal shows one candidate per row in the help area, at most 10, then "+N more". This also changes how the terminal shows the described completions of /model, /effort and /restart.
-- Empty or digits: open tabs by number. "1  Design /go navigation to message blocks  166-eta".
+- Empty or digits: open tabs by number. "1  Design /go navigation to message cards  166-eta".
 - Other text: sessions whose id or name starts with it, open and closed, one row each. "166-abc  Fix scroll drift (closed, 2 Oct)". Paths (~/, /, .) complete session directories, described as "directory".
-- #, a kind letter, or the part after <session># or <session>/: blocks of that session, newest first, filtered by the kind letter and number prefix. "#t38  16:29  See how the terminal reveals a found block". The headline is what the closed block shows in the transcript: a tool's description, or the first line of text. When the text could be a session or a block (t, r1), both groups are listed, sessions first.
+- #, a kind letter, or the part after <session># or <session>/: cards of that session, newest first, filtered by the kind letter and number prefix. "#t38  16:29  See how the terminal reveals a found card". The headline is what the closed card shows in the transcript: a tool's description, or the first line of text. When the text could be a session or a card (t, r1), both groups are listed, sessions first.
 
 Invariant restored (bug, screenshot 2026-10-06): a web completion shows only a description the host or the command list supplies. It never invents one: /go candidates were all labeled "path", and every tab appeared up to three times (number, id, name) and some twice.
 
-Model text that cites blocks (166-eta#u232) becomes links in task d92.
+Model text that cites cards (166-eta#u232) becomes links in task d92.
 
-Tests: target parsing (n is a tab; #n, r12, #r12 are blocks; 4#t12 and 166-eta/12 are blocks of another session; a matching path wins over x/n); one completion row per session; a block target in a closed session reopens it and reveals the block.`,
+Tests: target parsing (n is a tab; #n, r12, #r12 are cards; 4#t12 and 166-eta/12 are cards of another session; a matching path wins over x/n); one completion row per session; a card target in a closed session reopens it and reveals the card.`,
 	status: 'done',
 	notes: [
 		"Built as: SlashCommand.complete may return {value, description} candidates (host/commands.ts candidates/suggestions); /go sends one per session, directory or block, so the web no longer guesses labels (its 'path'/'directory' fallback is gone; an empty description shows nothing). Block rows come from replay.current + transcript.recordItems (tool results and turn ends skipped), capped at the newest 100 so a long history does not send thousands of rows per keystroke; times use the session client's timezone (clients.timezone). The go event carries block (letter + key, e.g. u12). Terminal: find.target accepts any {sessionId, blockId}, so go reuses Ctrl-F's reveal and paging. Web: router.go(id, replace, block) keeps the hash, then app.aim(); app.seek now waits until the shown transcript is the target's session, since a tab switched to before its snapshot looked complete and gave up as 'missing'. Terminal described completions (go, model, effort, restart) list as Hint rows via helpRow.rows, which grows the help area beyond one row only while they show.",
