@@ -78,7 +78,7 @@ test('inline choices: left/right change the value, up/down move between rows; ca
 	let down = press(st, [k('down'), k('left')]).st
 	expect(down).toMatchObject({ focus: 1, values: ['glimpse', 'short'] })
 	expect(press(down, [k('up')]).st.focus).toBe(0)
-	expect(forms.cards(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'glimpse', thinking: 'short' })
+	expect(forms.cards<Record<string, string>>(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'glimpse', thinking: 'short' })
 	expect(forms.cards(undefined, { bash: 'long' })).toEqual({ bash: 'long' })
 })
 
