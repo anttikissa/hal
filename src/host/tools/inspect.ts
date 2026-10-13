@@ -84,9 +84,11 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 	error: (r) => r.refreshError ?? 'none',
 }
 
+const usage = () => `Usage: ${nativeTool.usage(tool).join(' | ')}`
+
 function oneOf(name: string, value: unknown, valid: string[]): string | undefined {
 	if (value === undefined) return undefined
-	if (typeof value !== 'string' || !valid.includes(value)) throw new Error(`${name} must be one of: ${valid.join(', ')}`)
+	if (typeof value !== 'string' || !valid.includes(value)) throw new Error(`INSPECT ${name} must be one of: ${valid.join(', ')}. ${usage()}`)
 	return value
 }
 
@@ -94,7 +96,7 @@ function pick(value: unknown, valid: string[]): string[] {
 	if (value === undefined) return valid
 	let names = typeof value === 'string' ? value.split(',').map((f) => f.trim()).filter(Boolean) : []
 	let bad = names.filter((f) => !valid.includes(f))
-	if (!names.length || bad.length) throw new Error(`${bad.length ? `unknown field ${bad.join(', ')}; ` : ''}fields is a comma-separated list of: ${valid.join(', ')}`)
+	if (!names.length || bad.length) throw new Error(`${bad.length ? `unknown field ${bad.join(', ')}; ` : ''}fields is a comma-separated list of: ${valid.join(', ')}. ${usage()}`)
 	return names
 }
 
@@ -115,7 +117,10 @@ export const tool: Tool<ToolOutput> = {
 			let { values } = callText.values(raw)
 			if (values.length === 1 && values[0] === 'tabs') return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
 			if (values.length === 1 && work.isTarget(values[0])) return { name: 'inspect', input: { target: values[0] } }
-			return { name: 'inspect', input: nativeTool.generic(tool, raw) }
+			let input = nativeTool.generic(tool, raw)
+			// A lone unknown word was meant as a target or topic; say so in those terms.
+			if (values.length === 1 && typeof values[0] === 'string' && !WHATS.includes(values[0])) throw new Error(`INSPECT ${JSON.stringify(values[0])}: not a session ID, tool call ID or one of ${WHATS.join(', ')}. ${usage()}`)
+			return { name: 'inspect', input }
 		},
 	},
 	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
