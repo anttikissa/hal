@@ -128,7 +128,8 @@ minimize those exceptions and report the reason through render.clear.
   tool, exporting `tool`; `src/host/tools.ts` is the registry). Separate
   native calls run concurrently, results in call order; wait starts after
   the rest (task asp). Multiple commands within one native call run
-  sequentially in written order (task ep8).
+  concurrently if all are read-only; any effectful member makes the whole
+  batch sequential in written order (task ep8).
 - Providers see one native tool, `tool` { cmd: string } (task 3fv,
   `src/host/native-tool.ts`); `cmd` is a command string such as
   `READ "a.ts"` in the grammar of `src/common/call-text.ts`, and each

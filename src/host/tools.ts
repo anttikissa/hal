@@ -9,8 +9,8 @@
 //
 // A round's calls run concurrently, their results in call order; only
 // wait starts after the others settle, so it sees children spawned in
-// the same round. Commands within one native call run in written order
-// (task ep8).
+// the same round. Commands within one native call run concurrently only
+// when all are read-only; otherwise they run in written order (task ep8).
 
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
@@ -164,14 +164,15 @@ async function round(calls: ToolCallBlock[], ctx: CallContext, runOne: (call: To
 		if (group) group.push(call)
 		else groups.set(key, [call])
 	}
+	let batches = [...groups.values()].flatMap((group) => group.length > 1 && group.every((c) => c.name !== 'command' && tools.readOnly(c.name, c.input)) ? group.map((c) => [c]) : [group])
 	let settled = new Map<string, ToolResultBlock>()
 	let run = await edit.batch(calls.filter((c) => !c.sequence), ctx.cwd, ctx.sessionId, runOne)
 	let dispatch = async (group: ToolCallBlock[]) => {
 		for (let call of group) settled.set(call.id, await run(call))
 	}
-	let early = [...groups.values()].filter((g) => g[0]!.name !== 'wait')
+	let early = batches.filter((g) => g[0]!.name !== 'wait')
 	await Promise.all(early.map(dispatch))
-	for (let group of groups.values()) if (!settled.has(group[0]!.id)) await dispatch(group)
+	for (let group of batches) if (!settled.has(group[0]!.id)) await dispatch(group)
 	return calls.map((c) => settled.get(c.id)!)
 }
 

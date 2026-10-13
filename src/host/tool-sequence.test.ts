@@ -60,7 +60,7 @@ test('provider compound calls run sequentially and replay every result with its 
 test('direct mode accepts multiple EDITs and preserves runtime errors without dropping later calls', async () => {
 	let c = client(), id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
-	await until(() => history.readSync(id).some((r) => r.type === 'output' && r.text.includes('Direct tool mode')))
+	await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
 	for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, 'old\n')
 	let hash = lease.hash(Buffer.from('old\n'))
 	let cmd = `EDIT "a.txt@${hash}" { range: 1, lines: ["new a"] }\nEDIT "b.txt@${hash}" { range: 1, lines: ["new b"] }\nREAD missing.txt\nREAD a.txt`
@@ -73,4 +73,74 @@ test('direct mode accepts multiple EDITs and preserves runtime errors without dr
 	expect(results[2]).toMatchObject({ isError: true })
 	expect(results[2]!.output).toContain('missing.txt')
 	expect(results[3]!.output).toContain('new a')
+})
+
+test.each(['provider', 'hal/tool'])('%s read-only batches run concurrently and retain result order', async (mode) => {
+	let c = client(), id = created(c, testHome())
+	for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, path + '\n')
+	if (mode === 'hal/tool') {
+		c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
+		await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
+	}
+	let gate = Promise.withResolvers<void>(), started: unknown[] = []
+	let original = tools.run
+	let spy = spyOn(tools, 'run').mockImplementation(async (call, ctx) => {
+		started.push(call.input.path)
+		if (call.input.path === 'a.txt') await gate.promise
+		return original(call, ctx)
+	})
+	try {
+		let cmd = 'READ a.txt\nREAD b.txt'
+		c.conn.send({ type: 'submit', sessionId: id, text: mode === 'hal/tool' ? cmd : 'go' })
+		if (mode === 'provider') {
+			await until(() => calls.length === 1)
+			calls[0]!.push({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd } }, { type: 'done', reason: 'tool_use' })
+		}
+		await until(() => started.length === 2)
+		expect(started).toEqual(['a.txt', 'b.txt'])
+		gate.resolve()
+		if (mode === 'provider') {
+			await until(() => calls.length === 2)
+			calls[1]!.push({ type: 'done', reason: 'end' })
+		}
+		await until(() => c.of('turn-end').length)
+		let records = history.readSync(id)
+		let invoked = records.flatMap((r) => r.type === 'assistant' && r.block.type === 'tool_call' ? [r.block] : [])
+		let results = records.flatMap((r) => r.type === 'user' ? r.blocks.filter((b) => b.type === 'tool_result') : [])
+		expect(results.map((r) => r.id)).toEqual(invoked.map((b) => b.id))
+		expect(results.map((r) => r.output.split('\n')[1])).toEqual(['1: a.txt', '1: b.txt'])
+	} finally { gate.resolve(); spy.mockRestore() }
+})
+
+test.each(['bash', 'command', 'unregistered'])('%s makes the whole compound batch sequential', async (name) => {
+	let members = expand('READ a\nREAD b\nBASH true\nREAD c\nREAD d')
+	members[2] = { ...members[2]!, name, input: name === 'command' ? { command: '/rename changed' } : {} }
+	let gate = Promise.withResolvers<void>(), first = Promise.withResolvers<void>(), started: string[] = []
+	let pending = tools.round(members, { cwd: testHome(), sessionId: 'batch' }, async (call) => {
+		started.push(call.name)
+		if (started.length === 1) { first.resolve(); await gate.promise }
+		return { type: 'tool_result', id: call.id, output: String(started.length) }
+	})
+	try {
+		await first.promise
+		expect(started).toEqual(['read'])
+	} finally { gate.resolve(); await pending }
+	expect(started).toEqual(['read', 'read', name, 'read', 'read'])
+})
+
+test('read-only batches defer WAIT until other round work settles', async () => {
+	let members = [...expand('WAIT\nREAD a'), { type: 'tool_call' as const, id: 'other', name: 'bash', input: { command: 'true' } }]
+	let gate = Promise.withResolvers<void>(), other = Promise.withResolvers<void>(), started: string[] = []
+	let pending = tools.round(members, { cwd: testHome(), sessionId: 'batch' }, async (call) => {
+		started.push(call.name)
+		if (call.id === 'other') { other.resolve(); await gate.promise }
+		return { type: 'tool_result', id: call.id, output: call.name }
+	})
+	try {
+		await other.promise
+		expect(started).toEqual(['read', 'bash'])
+	} finally { gate.resolve() }
+	let results = await pending
+	expect(started).toEqual(['read', 'bash', 'wait'])
+	expect(results.map((r) => r.output)).toEqual(['wait', 'read', 'bash'])
 })
