@@ -1,6 +1,11 @@
 {
 	title: 'Card ids without #',
 	spec: 'Card ids read t123 everywhere they are shown: terminal and web links, the restart dialog, Find results, model-facing history headers ("[12:34 t125; 8.1s]"), tool descriptions and HELP examples. URLs keep the fragment (/<session>#t123), and # still separates a session from a card in typed references (166-eta#a30). Every parser still accepts a leading # so old histories and habits work: /toggle, /expand, /collapse, /go, /kill, /stop, INSPECT, WAIT and READ_BLOB. READ_BLOB accepts t35 and session#t35.1; a bare number keeps its current meaning (tool call for INSPECT and WAIT, tab for /go).',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Stored background labels change from "bash #t12" to "bash t12"; every reader (titles, bash-result, item-view, Card, web view, work.ts) accepts both, so old histories render and WAIT/INSPECT still find their results.',
+		'Markdown links bare t5 too, but not after # in an unknown session reference (07-qqq#u3 stays text), and only for ids older than the item, as before.',
+		'Rebase record numbers (#12 in /rebase plans) are not card ids and keep their #.'
+	],
 	needs: []
 }

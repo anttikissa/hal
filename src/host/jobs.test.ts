@@ -34,7 +34,7 @@ async function started(c: C, command: string): Promise<{ id: string; job: string
 	calls[0]!.push(bg(command), { type: 'done', reason: 'tool_use' })
 	await slow(() => calls.length === 2)
 	let job = /^started in background as (\S+)$/.exec(resultOf(1).output)?.[1]
-	expect(job).toMatch(/^#t\d+$/)
+	expect(job).toMatch(/^t\d+$/)
 	return { id, job: job! }
 }
 

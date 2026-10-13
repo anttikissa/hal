@@ -134,7 +134,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
 	let long = () => !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output) : props.row.item.type === 'tool' ? props.row.item.partial ?? '' : '').replace(/\n$/, '').split('\n').length > settings.glimpseRows()
-	// The link shows the block's id, #t35, as the terminal does. Its
+	// The link shows the block's id, t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
 	let blockId = () => titles.blockId(props.row.item)
@@ -145,7 +145,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let link = () => (
 		<Show when={href()} fallback={ticks()}>
 			{(h) => (
-				<a class="link" href={h()} data-ref={`#${blockId()}`} title="Link to this block" aria-label={`Link to block ${blockId()}`}>{ticks()}</a>
+				<a class="link" href={h()} data-ref={blockId()} title="Link to this block" aria-label={`Link to block ${blockId()}`}>{ticks()}</a>
 			)}
 		</Show>
 	)
@@ -158,13 +158,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// line. Prompts and model text show those words above their text
 	// (task hp).
 	let title = () => titles.title(props.row.item)
-	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(t?\d+)$/)?.[1]
+	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #?(t?\d+)$/)?.[1]
 	let who = () => {
 		let item = props.row.item
 		// A question is headed by its text, its addresses links.
 		if (item.type === 'question') return <For each={hrefs.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 		let ref = source(), t = titles.who(item)
-		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
+		return ref && t?.endsWith(ref) ? <>{t.slice(0, -ref.length)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">{ref}</a></> : t
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let presentation = () => props.row.result?.presentationError ? undefined : props.row.result?.presentation ?? (props.row.item.type === 'tool' ? props.row.item.presentation : undefined)
@@ -340,7 +340,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						<Show when={folding()} fallback={plain(s)}>
 							<Show when={!closable()}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} activity={activity()}
-								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job #t${n()} (/kill #t${n()})`} aria-label={`Kill background job #t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
+								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<Show when={headsWho()} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>

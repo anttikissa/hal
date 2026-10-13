@@ -13,7 +13,7 @@ export const tool: Tool<ToolOutput> = {
 	description: 'Read an immutable blob or history record. Text is paged with offset (first line, 1-based) and limit. For lossless recovery of long/cut lines or JSON use charOffset (1-based character position) instead. Images return as images.',
 	parameters: {
 		type: 'object',
-		properties: { id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, #t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
+		properties: { id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
 		required: ['id'],
 	},
 	readOnly: true,
@@ -29,7 +29,7 @@ export const tool: Tool<ToolOutput> = {
 			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
 		}
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(reference)
-		let block = /^(?:([\w-]+))?#[a-z]?([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference) ?? /^([\w-]+)\/([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
+		let block = /^(?![1-9]\d*(?:\.\d+)?$)(?:([\w-]+)#)?#?[a-z]?([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference) ?? /^([\w-]+)\/([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
 		if (ref && block && blobs.find(ref[1] ?? ctx.sessionId, ref[2]!)) block = null
 		if (!ref && !block) throw new Error(`invalid blob or block id: ${JSON.stringify(input.id)}`)
 		if (block) {

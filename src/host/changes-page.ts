@@ -31,7 +31,7 @@ async function serve(url: URL, css: string): Promise<Response> {
 		for (let step of file.steps) {
 			let c = step.change
 			let text = await changes.diff(id, c.before, c.after)
-			let block = step.call === undefined ? 'Call' : `<a href="/${id}#t${step.call}">#t${step.call}</a>`
+			let block = step.call === undefined ? 'Call' : `<a href="/${id}#t${step.call}">t${step.call}</a>`
 			steps.push(`<details><summary>${block} · ${escape(changes.time(step.ts, timeZone))}</summary><pre>${escape(text)}</pre></details>`)
 		}
 		let ids = changes.calls(id, file).map((c) => `<a href="${c.href}">${c.block}</a>`).join(' ')

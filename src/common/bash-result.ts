@@ -44,4 +44,4 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 }
 
 // Stored job labels identify literal Bash output and its original call.
-export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash (#t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, failure, duration, interrupted }
+export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, failure, duration, interrupted }

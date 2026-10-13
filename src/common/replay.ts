@@ -152,7 +152,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	}
 	let prev: HistoryRecord | undefined
 	let stamped: string | undefined
-	// Headers (task c2t): '[12:34 #t125; 8.1s]'. Each depends only on
+	// Headers (task c2t): '[12:34 t125; 8.1s]'. Each depends only on
 	// records at or before it, so earlier provider input never changes.
 	let calls = new Map<string, HistoryRecord>()
 	let wrote: string[] = []
@@ -166,7 +166,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	// Records built by hand (tests) have no number, so no id. No " in
 	// <origin>" suffix: a fork replays byte-identical to its parent, so
 	// the prompt cache still hits.
-	let ref = (r: HistoryRecord, letter: string, i = 0) => r.n === undefined ? '' : `#${letter}${r.n}${i ? `.${i}` : ''}`
+	let ref = (r: HistoryRecord, letter: string, i = 0) => r.n === undefined ? '' : `${letter}${r.n}${i ? `.${i}` : ''}`
 	let result = (block: ToolResultBlock): ToolResultBlock => {
 		let { presentation: _presentation, presentationError, ...b } = block
 		let call = calls.get(b.id)

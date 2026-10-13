@@ -30,7 +30,7 @@ const WORD = /[\p{L}\p{N}]/u
 const SEPARATOR = /^\s*\|?(\s*:?-+:?\s*\|)+\s*(:?-+:?\s*)?$/
 
 // A block id, <session>#<block> or a bare session id (tasks d92, b4b).
-const ID = /^(?:(\d+-[a-z]{3})(?:#([umartsq]\d+(?:\.\d+)?))?|#([umartsq]\d+(?:\.\d+)?))(?![\w#])/
+const ID = /^(?:(\d+-[a-z]{3})(?:#([umartsq]\d+(?:\.\d+)?))?|#?([umartsq]\d+(?:\.\d+)?))(?![\w#])/
 const ID_ALL = new RegExp(`${ID.source}$`)
 
 function same(a: Style, b: Style): boolean {
@@ -122,9 +122,9 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 			i += bare.length
 			continue
 		}
-		// A block id (task d92), #t5 or <session>#t5, or a bare session id
+		// A block id (task d92), t5, #t5 or <session>#t5, or a bare session id
 		// (task b4b), where the resolver knows it: a link. Else text.
-		let id = markdown.state.links && (c === '#' || /\d/.test(c)) && !WORD.test(s[i - 1] ?? '') ? ID.exec(s.slice(i)) : null
+		let id = markdown.state.links && (c === '#' || /[\dumartsq]/.test(c)) && !WORD.test(s[i - 1] ?? '') && s[i - 1] !== '#' ? ID.exec(s.slice(i)) : null
 		let to = id ? markdown.state.links!(id[1], id[2] ?? id[3]) : undefined
 		if (id && to) {
 			add(id[0], { ...st, href: to })

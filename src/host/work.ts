@@ -27,10 +27,10 @@ function target(self: string, value: unknown): Target {
 	if (session.isId(ref)) { sessions.open(ref); return { sessionId: ref, ref } }
 	let digits = /^#?t?(\d+)$/.exec(ref)?.[1]
 	let n = digits === undefined ? NaN : Number(digits)
-	if (!Number.isSafeInteger(n) || n < 1) throw new Error(`Invalid work target ${JSON.stringify(value)}; use a session ID or #t123, t123 or 123 (tool calls in this session, not tab numbers).`)
+	if (!Number.isSafeInteger(n) || n < 1) throw new Error(`Invalid work target ${JSON.stringify(value)}; use a session ID or t123 or 123 (tool calls in this session, not tab numbers).`)
 	let record = history.readSync(self).find((r) => r.n === n)
-	if (record?.type !== 'assistant' || record.block.type !== 'tool_call' || record.originSession && record.originSession !== self) throw new Error(`#t${n} is not a local tool call in session ${self}.`)
-	return { sessionId: self, ref: `#t${n}`, n, call: record.block }
+	if (record?.type !== 'assistant' || record.block.type !== 'tool_call' || record.originSession && record.originSession !== self) throw new Error(`t${n} is not a local tool call in session ${self}.`)
+	return { sessionId: self, ref: `t${n}`, n, call: record.block }
 }
 
 function children(t: Target): Target[] {
@@ -116,9 +116,9 @@ function inspect(t: Target): string {
 	if (t.call) {
 		let result = records.findLast((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result' && b.id === t.call!.id))
 		let block = result?.type === 'user' ? result.blocks.find((b) => b.type === 'tool_result' && b.id === t.call!.id) : undefined
-		let message = status.inboxOf(t.sessionId).findLast((m) => m.label === `bash ${t.ref}`)
-		let delivered = records.findLast((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.label === `bash ${t.ref}`))
-		let text = delivered?.type === 'user' ? delivered.blocks.find((b) => b.type === 'text' && b.label === `bash ${t.ref}`) : undefined
+		let message = status.inboxOf(t.sessionId).findLast((m) => m.label ?.replace(/^bash #/, 'bash ') === `bash ${t.ref}`)
+		let delivered = records.findLast((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.label ?.replace(/^bash #/, 'bash ') === `bash ${t.ref}`))
+		let text = delivered?.type === 'user' ? delivered.blocks.find((b) => b.type === 'text' && b.label ?.replace(/^bash #/, 'bash ') === `bash ${t.ref}`) : undefined
 		output = jobs.state.running.get(`${t.sessionId}:${t.n}`)?.output?.() ?? jobs.state.delivering.get(`${t.sessionId}:${t.n}`) ?? toolOutput.of(t.sessionId).find((p) => p.id === t.call!.id)?.output ?? message?.text ?? (text?.type === 'text' ? text.text : undefined) ?? (block?.type === 'tool_result' ? block.output : undefined)
 	} else {
 		let last = records.findLast((r) => r.type === 'assistant' && r.block.type === 'text')
@@ -148,7 +148,7 @@ function stop(t: Target): string {
 			let stopped = false
 			if (!at.call) for (let [key, running] of tools.running) if (key.startsWith(`${at.sessionId}:`) && !['bash', 'wait', 'stop', 'spawn'].includes(running.call.name)) {
 				let record = history.readSync(at.sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === running.call.id)
-				lines.push(`Warning: ${at.sessionId} #t${record?.n} (${running.call.name.toUpperCase()}) has no individual STOP support and may still finish after the agent stops.`)
+				lines.push(`Warning: ${at.sessionId} t${record?.n} (${running.call.name.toUpperCase()}) has no individual STOP support and may still finish after the agent stops.`)
 			}
 			if (!at.call && states.busy(status.stateOf(at.sessionId))) {
 				let refused = turns.stop(at.sessionId, 'stopped recursively', true)

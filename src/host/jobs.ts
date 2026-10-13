@@ -112,7 +112,7 @@ async function start(sessionId: string, command: string, cwd: string, ms?: numbe
 
 // The displayed id is the recorded tool-call block, not the internal job key.
 function label(sessionId: string, id: string): string {
-	return id.startsWith(`${sessionId}:`) ? `#t${id.slice(sessionId.length + 1)}` : id
+	return id.startsWith(`${sessionId}:`) ? `t${id.slice(sessionId.length + 1)}` : id
 }
 
 // Takes `id` off the session's list of running commands.
@@ -164,7 +164,7 @@ function kill(sessionId: string): void {
 	}
 }
 
-// Stops the session's background command `ref` (#t123, #123 or 123;
+// Stops the session's background command `ref` (t123, #t123 or 123;
 // none: its only one), as /kill does. Its session hears it was stopped
 // by the user, as for any exit. Returns a refusal, or what it stopped.
 function stop(sessionId: string, ref: string): { refused?: string; stopped?: string } {
@@ -181,7 +181,7 @@ function stop(sessionId: string, ref: string): { refused?: string; stopped?: str
 	} else if (n === undefined) return { refused: `not a job number: ${ref.trim()}` }
 	let id = n === undefined ? ids[0]! : `${sessionId}:${n}`
 	let job = jobs.state.running.get(id)
-	if (!job || job.sessionId !== sessionId) return { refused: `#t${n} is not running${ids.length ? ` (running: ${list})` : ''}` }
+	if (!job || job.sessionId !== sessionId) return { refused: `t${n} is not running${ids.length ? ` (running: ${list})` : ''}` }
 	job.stop()
 	return { stopped: jobs.label(sessionId, id) }
 }

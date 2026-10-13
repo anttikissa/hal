@@ -78,7 +78,7 @@ function dirRows(text: string, ctx: Context): Candidate[] {
 }
 
 export const command: SlashCommand = {
-	help: () => '/go <tab|session|directory>[#block]: go to a session, reopening it if closed, or to a block in it (#t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.',
+	help: () => '/go <tab|session|directory>[#block]: go to a session, reopening it if closed, or to a block in it (t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.',
 	complete(args, ctx) {
 		if (/^[~/.]/.test(args)) return dirRows(args, ctx)
 		if (/^\d*$/.test(args)) return tabs.list().map((t, i) => ({ value: String(i + 1), description: t.name === t.id ? t.id : `${t.name}  ${t.id}` })).filter((c) => c.value.startsWith(args))
@@ -88,7 +88,7 @@ export const command: SlashCommand = {
 			return s ? blockRows(s.id, split[2]!, `${split[1]}#`, ctx) : []
 		}
 		let rows = args.startsWith('#') ? [] : sessionRows(args, ctx)
-		return [...rows, ...blockRows(ctx.sessionId, args.replace(/^#/, ''), '#', ctx)]
+		return [...rows, ...blockRows(ctx.sessionId, args.replace(/^#/, ''), '', ctx)]
 	},
 	run(args, _answers, ctx) {
 		if (!args.trim()) return { error: 'give a tab number, session id, name or directory' }
@@ -101,7 +101,7 @@ export const command: SlashCommand = {
 			target = m[1] === undefined ? { id: ctx.sessionId } : session(m[1], ctx)
 			if (!target) return { error: `no session ${m[1]}` }
 			let hit = sessionBlocks.of(target.id).find((i) => i.key === m[4])
-			if (!hit) return { error: `no block #${m[3]}${m[4]} in ${target.id}` }
+			if (!hit) return { error: `no block ${m[3]}${m[4]} in ${target.id}` }
 			block = titles.blockId(hit)
 		}
 		if (target.closed) {

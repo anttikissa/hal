@@ -83,7 +83,7 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold,
 		// Apart from its call, a result is its own block: it leads with its time.
 		if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
 		let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
-		if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
+		if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07t${call}${ansi.LINK_OFF}> `
 		let text = strings.clipVisual(prefix + l, width)
 		let line = painted ? diffView.paint(text, tones[i]!, style) : tool ? text : ansi.quiet(text, style)
 		return !i && status ? itemView.right(line, status, width) : line

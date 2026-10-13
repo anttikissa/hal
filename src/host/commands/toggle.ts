@@ -12,7 +12,7 @@ import { host } from '../host.ts'
 import { sessionBlocks } from '../session-blocks.ts'
 import { status } from '../status.ts'
 
-const syntax = 'Targets:\n24 or #t24: one block\n10-24: a range\nt14,r2-9: a list\nt*: every tool block\nau10-40: user and assistant blocks in 10-40\nempty: the latest tool block\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant blocks alone unless named.'
+const syntax = 'Targets:\nt24 or 24: one block\n10-24: a range\nt14,r2-9: a list\nt*: every tool block\nau10-40: user and assistant blocks in 10-40\nempty: the latest tool block\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant blocks alone unless named.'
 const help: Record<Mode, string> = {
 	toggle: '/toggle [target] expands or collapses blocks: one named block flips; more expand when more than half are collapsed, else collapse.',
 	expand: '/expand [target] expands blocks.',

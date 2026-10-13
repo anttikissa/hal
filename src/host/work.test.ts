@@ -23,7 +23,7 @@ function invoke(self: string, cmd: string) {
 		host.broadcast(self, { type: 'tool-results', sessionId: self, results: [result] })
 		return result
 	})
-	return { promise, ref: `#t${record.n}` }
+	return { promise, ref: `t${record.n}` }
 }
 
 async function background(self: string, gate: string, unsafe = false) {
@@ -40,12 +40,12 @@ function owned(owner: string, name: string, limit = 0, callId?: string) {
 test('shared numeric targets inspect and stop a background call with its partial output retained', async () => {
 	let self = toolSession(client())
 	let ref = await background(self, 'gate')
-	for (let spelling of [ref, ref.slice(1), ref.slice(2)]) {
+	for (let spelling of [ref, `#${ref}`, ref.slice(1)]) {
 		let view = await invoke(self, `INSPECT ${spelling}`).promise
 		expect(view.output).toContain(`${ref}: running`)
 		expect(view.output).toContain('ready')
 	}
-	let stopped = await invoke(self, `STOP ${ref.slice(2)}`).promise
+	let stopped = await invoke(self, `STOP ${ref.slice(1)}`).promise
 	expect(stopped.isError).toBeUndefined()
 	expect(stopped.output).toContain(`Stopped ${ref}`)
 	await until(() => jobs.running(self).length === 0)
@@ -66,13 +66,13 @@ test('WAIT selects a command, ignores unrelated completion and streaming, and ca
 	host.broadcast(self, { type: 'tool-output', sessionId: self, id: 'other', at: 0, chunk: 'progress' })
 	expect(finished).toBe(false)
 	writeFileSync(`${testHome()}/first`, '')
-	await until(() => !jobs.state.running.has(`${self}:${first.slice(2)}`))
+	await until(() => !jobs.state.running.has(`${self}:${first.slice(1)}`))
 	expect(finished).toBe(false)
 	await host.ready(self)
 	let held = Promise.withResolvers<void>()
 	host.state.opening.set(self, held.promise)
 	writeFileSync(`${testHome()}/second`, '')
-	await until(() => jobs.state.delivering.has(`${self}:${second.slice(2)}`))
+	await until(() => jobs.state.delivering.has(`${self}:${second.slice(1)}`))
 	expect(finished).toBe(false)
 	expect(work.inspect(work.target(self, second))).toContain('done')
 	let any = invoke(self, 'WAIT').promise
@@ -119,7 +119,7 @@ test('STOP a recorded SPAWN call cancels its child, not siblings, and WAIT expos
 	let root = toolSession(client())
 	let spawned = invoke(root, 'SPAWN { task: "first child", kind: "subagent-leave-open" }')
 	expect((await spawned.promise).isError).toBeUndefined()
-	let child = sessions.openIds().find((id) => sessions.open(id).ownerCall === Number(spawned.ref.slice(2)))!
+	let child = sessions.openIds().find((id) => sessions.open(id).ownerCall === Number(spawned.ref.slice(1)))!
 	let sibling = owned(root, 'sibling')
 	let waiting = invoke(root, `WAIT ${child}`).promise
 	await until(() => work.listeners.size === 1)
@@ -168,7 +168,7 @@ test('/stop can interrupt one foreground command without pausing its session', a
 	calls[0]!.push({ type: 'tool_call', id: 'foreground', name: 'bash', input: { command: 'echo ready; sleep 30', description: 'Foreground work' } }, { type: 'done', reason: 'tool_use' })
 	await until(() => c.of('tool-output').some((e) => e.chunk.includes('ready')))
 	let record = history.readSync(self).find((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === 'foreground')!
-	let ref = `#t${record.n}`
+	let ref = `t${record.n}`
 	expect(work.inspect(work.target(self, ref))).toContain('ready')
 	c.conn.send({ type: 'submit', sessionId: self, text: `/stop ${ref}` })
 	await until(() => calls.length === 2)

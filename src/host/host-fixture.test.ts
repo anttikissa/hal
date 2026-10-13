@@ -41,7 +41,7 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 	let wake = () => {}
 	// Tool result headers (task c2t) have their own contract test in
 	// replay.test.ts; tests here check what the tools said.
-	let bare = (b: any) => b?.type === 'tool_result' && typeof b.output === 'string' ? { ...b, output: b.output.replace(/^\[[^\]\n]*#[a-z]\d+[^\]\n]*\]\n/, '') } : b
+	let bare = (b: any) => b?.type === 'tool_result' && typeof b.output === 'string' ? { ...b, output: b.output.replace(/^\[[^\]\n]* [a-z]\d+[^\]\n]*\]\n/, '') } : b
 	input = input?.messages ? { ...input, messages: input.messages.map((m: any) => Array.isArray(m.blocks) ? { ...m, blocks: m.blocks.map(bare) } : m) } : input
 	let call: Call = {
 		model,

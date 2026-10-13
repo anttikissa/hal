@@ -76,10 +76,10 @@ test('/go completion: one described row per session, directories, blocks newest 
 	expect(rows(`/go ${other.slice(0, 3)}`).items.filter((v) => v === `/go ${other}`)).toHaveLength(1)
 	expect(rows('/go Ro')).toEqual({ items: [`/go ${other}`], descriptions: [expect.stringContaining('Rows')] })
 	let blocks = rows('/go #')
-	expect(blocks.items).toEqual(['/go #t2', '/go #u1'])
+	expect(blocks.items).toEqual(['/go t2', '/go u1'])
 	expect(blocks.descriptions![0]).toEndWith('List files')
 	expect(blocks.descriptions![1]).toEndWith('first line')
-	expect(rows('/go t').items).toContain('/go #t2')
+	expect(rows('/go t').items).toContain('/go t2')
 	expect(rows(`/go ${other}#`).items).toEqual([])
 })
 
@@ -109,7 +109,7 @@ test('/go targets: n is a tab; #n, r12, #r12 and <session>#n, <session>/n are bl
 	expect((await go('r12')).block).toBeUndefined()
 	let before = a.of('go').length
 	a.conn.send({ type: 'submit', sessionId: first, text: '/go #r999' })
-	await until(() => a.of('output').some((o) => o.error && String(o.text).includes('#r999')))
+	await until(() => a.of('output').some((o) => o.error && String(o.text).includes('r999')))
 	expect(a.of('go')).toHaveLength(before)
 })
 

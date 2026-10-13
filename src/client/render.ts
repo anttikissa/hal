@@ -45,7 +45,7 @@ export interface Output {
  * clears from the frame's top row down (scrollback untouched); 'below'
  * erases rows past the frame's new end; 'row' erases the help row for
  * the shell. `blocks`: the parts whose row counts changed, as
- * '#t239 (tool-result)', 'waiting messages' or 'the prompt area'.
+ * 't239 (tool-result)', 'waiting messages' or 'the prompt area'.
  * Holds no transcript text.
  */
 export interface ClearReason {
@@ -172,7 +172,7 @@ function blockAt(f: Shape, row: number): string {
 			else lo = mid + 1
 		}
 		let item = f.items![lo]!
-		return `#${titles.blockId(item)} (${item.type})`
+		return `${titles.blockId(item)} (${item.type})`
 	}
 	return row < f.history ? 'waiting messages' : 'the prompt area'
 }

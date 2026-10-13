@@ -49,11 +49,11 @@ function flagged(): FlaggedCall[] {
 	return [...turns.state.running].flatMap(([id, running]) => [...running.unsafe ?? []].map(([call, unsafe]) => {
 		let n = history.readSync(id).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
 		let key = n === undefined ? undefined : `t${n}`
-		return { block: key ? `#${key}` : tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }
+		return { block: key ?? tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }
 	})).concat([...jobs.state.running].flatMap(([id, job]) => {
 		if (!job.unsafe) return []
 		let key = `t${id.slice(job.sessionId.length + 1)}`
-		return [{ block: `#${key}`, href: transcript.href(job.sessionId, key), title: toolDetails.headline('bash', job.unsafe.input).text, ms: now - job.unsafe.at }]
+		return [{ block: key, href: transcript.href(job.sessionId, key), title: toolDetails.headline('bash', job.unsafe.input).text, ms: now - job.unsafe.at }]
 	}))
 }
 

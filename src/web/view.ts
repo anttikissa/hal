@@ -296,10 +296,10 @@ function withPending(rows: Row[], pending: { id: string; text: string; ts?: stri
 }
 
 // Keys of the background Bash calls whose job still runs: started (the
-// result says so) and no 'bash #<key>' message has come back. The host
+// result says so) and no 'bash t<key>' message has come back. The host
 // refuses /kill for one that has just ended.
 function jobs(rows: Row[]): ReadonlySet<string> {
-	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && r.item.label?.startsWith('bash #') ? [r.item.label.slice(6).replace(/^t/, '')] : [])))
+	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && /^bash #?t?\d+$/.test(r.item.label ?? '') ? [r.item.label!.replace(/^bash #?t?/, '')] : [])))
 	let out = new Set<string>()
 	for (let r of rows) {
 		let n = r.result?.output.match(/^started in background as #t?(\d+)/)?.[1]

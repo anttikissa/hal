@@ -18,7 +18,7 @@ test('the session that last declared and changed the plugin gets the failure as 
 	await pluginReports.report(failure('/tmp/njq/plugins/x.ts'), '/tmp/njq/plugins/x.ts')
 	await until(() => calls.length === 1)
 	let text = JSON.stringify(calls[0]!.input.messages)
-	expect(text).toContain('#t7 declared and changed /tmp/njq/plugins/x.ts')
+	expect(text).toContain('t7 declared and changed /tmp/njq/plugins/x.ts')
 	expect(text).toContain('Error: boom')
 	expect(text).toContain('/tmp/njq/plugins/x.ts.broken')
 	expect(c.of('warning')).toEqual([])

@@ -22,7 +22,7 @@ import type { FindDialog } from './find-dialog.ts'
 import { bashResult } from './bash-result.ts'
 
 // A call flagged unsafeToStop running on the host (task ker): its block
-// id ('#t63'), its web address, title and time so far in ms.
+// id ('t63'), its web address, title and time so far in ms.
 export type FlaggedCall = { block: string; href?: string; title: string; ms: number }
 
 // What each list row of a tree modal is: a model `id`, or a category

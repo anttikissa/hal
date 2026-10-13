@@ -154,7 +154,7 @@ for (let escape of [false, true]) {
 			// Restarting the host asks first; nothing restarts (task ker).
 			a.conn.send({ type: 'submit', sessionId: id, text: '/restart host' })
 			await until(() => a.of('restart-ask').length)
-			expect(a.of('restart-ask')[0]).toMatchObject({ scope: 'host', calls: [{ block: expect.stringMatching(/^#t\d+$/), title: 'Bash Migrate' }] })
+			expect(a.of('restart-ask')[0]).toMatchObject({ scope: 'host', calls: [{ block: expect.stringMatching(/^t\d+$/), title: 'Bash Migrate' }] })
 			if (escape) {
 				a.conn.send({ type: 'pause', sessionId: id })
 				expect(toolSignal!.aborted).toBe(true)

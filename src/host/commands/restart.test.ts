@@ -34,7 +34,7 @@ test('a flagged background job makes a model ask the user: two restarts refused,
 	try {
 		let model = { ...ctx, sender: { origin: 'model' } } as any
 		let first = (await command.run('host', undefined, model)) as any
-		expect(first.error).toContain('THIS IS UNSAFE. #t7')
+		expect(first.error).toContain('THIS IS UNSAFE. t7')
 		expect(first.error).toContain('Ask the user first')
 		expect(((await command.run('host anyway', undefined, model)) as any).error).toContain('THIS IS UNSAFE')
 		expect(((await command.run('host', undefined, model)) as any).say).toBe('restarting the host')

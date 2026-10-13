@@ -110,7 +110,7 @@ async function batch(calls: ToolCallBlock[], cwd: string, sessionId: string, run
 	let running = history.state.running.get(sessionId)
 	let card = (c: ToolCallBlock) => {
 		let n = running?.ns[running.turn.blocks.findIndex((b) => b.type === 'tool_call' && b.id === c.id)]
-		return n === undefined ? c.id : `#t${n}`
+		return n === undefined ? c.id : `t${n}`
 	}
 	let member = new Map<string, () => Promise<ToolResultBlock>>()
 	for (let group of groups.values()) {

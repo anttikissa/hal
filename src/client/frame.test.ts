@@ -56,7 +56,7 @@ test('queued cards expand by inbox ID and their padding matches each sender', ()
 	v.folds = { states: new Map([['20', 'long']]), sig: '20 long' }
 	let opened = plain(frame.build(v, 100).lines).join('\n')
 	expect(opened).toContain('Agent last')
-	expect(opened).toContain('#m20')
+	expect(opened).toContain(' m20')
 	expect(opened).not.toContain('Human last')
 	v.folds = { states: new Map([['20', 'short']]), sig: '20 short' }
 	expect(plain(frame.build(v, 100).lines).join('\n')).not.toContain('Agent last')
@@ -86,7 +86,7 @@ test('EDIT line lists cannot consume the title or block reference', () => {
 		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
 		let header = rows.find(r => r.includes('Edit'))!
 		expect(header).toContain('Edit src/')
-		expect(header).toContain('#t62')
+		expect(header).toContain(' t62')
 		expect(header).toContain('…')
 		expect(strings.visLen(header)).toBeLessThanOrEqual(cols)
 	}
@@ -409,7 +409,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
 		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
-		for (let key of ['u4', 'a5', 't6', 'q7', 's8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
+		for (let key of ['u4', 'a5', 't6', 'q7', 's8']) expect(plain(lines).some((l) => l.endsWith(` ${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
@@ -421,7 +421,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		stream.transcript!.items[0]!.key = '9'
 		stream.hal = { at: 'stream', lit: true, color: colors.assistant().fg! }
 		let streamed = plain(frame.build(stream, 60).lines)
-		expect(streamed[0]).toMatch(/^Hal +#a9$/)
+		expect(streamed[0]).toMatch(/^Hal +a9$/)
 		expect(streamed[2]).toBe('Hel█')
 		// A block still streaming before it has a number is not linked.
 		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
@@ -458,7 +458,7 @@ test('a narrow thinking preview keeps time and block id without a label', () => 
 	let v = view([item])
 	v.transcript!.items[0]!.key = '35'
 	let lines = plain(frame.build(v, 24).lines)
-	expect(lines[0]).toMatch(/^10:51 x +#r35$/)
+	expect(lines[0]).toMatch(/^10:51 x +r35$/)
 	expect(lines[0]).not.toContain('high')
 	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
 })
@@ -506,24 +506,25 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).toContain('\nM notes.md')
 	expect(printed).not.toContain('#1813>')
 	let title = lines.find((line) => line.includes('Read missing'))!
-	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\)   #t1815$/)
+	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\)   t1815$/)
 	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
 	let jobTitle = lines.find((line) => line.includes('Background command finished'))!
-	expect(plain([jobTitle])[0]).toMatch(/Background command finished #1813 missing file +\(exit 123\) #s1817$/)
+	expect(plain([jobTitle])[0]).toMatch(/Background command finished 1813 missing file +\(exit 123\) s1817$/)
 	expect(jobTitle).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
-	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
+	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('t1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
-	expect(printed).toContain('Background command finished #1813')
-	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813']) {
+	expect(printed).toContain('Background command finished 1813')
+	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {
 		let job = view([{ type: 'prompt', text: '[exit 123]\nmissing file', from: 's', label }])
 		let rendered = frame.build(job, width).lines
-		expect(targets(rendered)).toContain(`${settings.webUrl()}/s${label.slice(5)}`)
-		expect(plain(rendered).join('\n')).toContain(label.slice(5))
+		let ref = label.slice(5).replace(/^#/, '')
+		expect(targets(rendered)).toContain(`${settings.webUrl()}/s#${ref}`)
+		expect(plain(rendered).join('\n')).toContain(ref)
 	}
 })
 

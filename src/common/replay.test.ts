@@ -249,12 +249,12 @@ test('replay headers carry block ids, steering, durations and what the model wro
 	]
 	let msgs = replay.toMessages(history)
 	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant', 'user'])
-	expect(msgs[0]!.blocks).toEqual([{ type: 'text', text: '[2026-01-01 12:33 #u1]\ngo' }])
+	expect(msgs[0]!.blocks).toEqual([{ type: 'text', text: '[2026-01-01 12:33 u1]\ngo' }])
 	// Assistant blocks reach the provider as produced; calls as tool cmd text.
 	expect(msgs[1]!.blocks).toEqual([{ type: 'thinking', text: 'hmm', signature: 's', provider: 'anthropic' }, { type: 'text', text: 'Running it.' }, { type: 'tool_call', id: 'toolu_1', name: 'tool', input: { cmd: "BASH { command: './test' }" } }])
-	expect(msgs[2]!.blocks).toEqual([{ type: 'tool_result', id: 'toolu_1', output: '[12:34 #t4; 8.1s; you wrote #r2 #a3]\nok', ms: 8100 }])
-	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: '[12:40 #m6; message from tab 3 (160-xyz), Builder; steering]\nhurry' }])
-	expect(msgs[5]!.blocks).toEqual([{ type: 'text', text: '[12:42 #u9; you wrote #a7]\nthanks' }])
+	expect(msgs[2]!.blocks).toEqual([{ type: 'tool_result', id: 'toolu_1', output: '[12:34 t4; 8.1s; you wrote r2 a3]\nok', ms: 8100 }])
+	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: '[12:40 m6; message from tab 3 (160-xyz), Builder; steering]\nhurry' }])
+	expect(msgs[5]!.blocks).toEqual([{ type: 'text', text: '[12:42 u9; you wrote a7]\nthanks' }])
 	// Appending never changes earlier provider input.
 	let more = replay.toMessages([...history, { type: 'assistant', block: { type: 'text', text: 'Welcome.' }, ts: at(12, 43), n: 10 }, { type: 'user', blocks: [{ type: 'text', text: 'bye' }], ts: at(12, 44), n: 11 }])
 	expect(JSON.stringify(more.slice(0, msgs.length))).toBe(JSON.stringify(msgs))

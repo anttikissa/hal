@@ -158,7 +158,7 @@ function seek(): void {
 	if (s === 'older') app.older()
 	else if (s === 'missing' || s === 'dropped') {
 		st.target = undefined
-		st.view = { ...st.view, notice: s === 'dropped' ? `Block #${t.key} was dropped by rebase.` : `no block #${t.key} in this session` }
+		st.view = { ...st.view, notice: s === 'dropped' ? `Block ${t.key} was dropped by rebase.` : `no block ${t.key} in this session` }
 	} else if (s !== 'wait') t.found = true
 }
 

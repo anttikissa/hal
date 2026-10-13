@@ -81,10 +81,10 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 	// Wrapped, a header continues at the left edge, under its time (task 77f).
 	let rows = ansi.wrap(ansi.clean(title), width)
 	let last = rows.at(-1)!
-	let call = item.type === 'prompt' && item.label?.match(/^bash #(t?\d+)$/)?.[1]
-	if (call && session && last.endsWith(`#${call}`)) {
+	let call = item.type === 'prompt' && item.label?.match(/^bash #?(t?\d+)$/)?.[1]
+	if (call && session && last.endsWith(call)) {
 		let href = transcript.href(session, call)
-		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length - 1)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07#${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
+		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
 	}
 	return [...rows, '', ...body]
 }
@@ -202,14 +202,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	}
 }
 
-// The id `item` shows, `#t35` (its kind letter, task 9p), and where it
+// The id `item` shows, `t35` (its kind letter, task 9p), and where it
 // links: the same block on the web, /<session>#t35 (tasks wc, 0z). Every block with a block
 // id has one, except a tool result, which the web shows in its call's
 // block; an item whose key is no block id has none.
 function ref(item: Keyed, session: string | undefined): { text: string; href: string } | undefined {
 	let id = titles.blockId(item)
 	let href = session && item.type !== 'tool-result' ? transcript.href(session, id) : undefined
-	return href ? { text: `#${id}`, href } : undefined
+	return href ? { text: id, href } : undefined
 }
 
 // Rows of a question's quote, indented, its marked parts in inverse.
@@ -262,7 +262,7 @@ function closedRow(item: Item, text: string, width: number, head = (titles.title
 	let first = streaming ? blockView.tail(ansi.clean(text), width - strings.visLen(head)) : ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
 	let row = strings.expandTabs(strings.clipVisual(head + first, width))
 	row = row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row
-	let href = session && call?.startsWith('#') && transcript.href(session, call.slice(1))
+	let href = session && call && /^t?\d+$/.test(call) && transcript.href(session, call)
 	return [href ? `\x1b]8;;${ansi.webUrl(href)}\x07${row}${ansi.LINK_OFF}` : row]
 }
 

@@ -54,7 +54,7 @@ async function report(text: string, path?: string): Promise<void> {
 	process.stderr.write(`${text}\n`)
 	let editor = path === undefined ? undefined : await pluginReports.lastEditor(path)
 	if (!editor) return everyone(text)
-	let by = editor.call === undefined ? 'A bash call' : `Your bash call #t${editor.call}`
+	let by = editor.call === undefined ? 'A bash call' : `Your bash call t${editor.call}`
 	let message = `${by} declared and changed ${path} at ${editor.ts}, before this failure; it was the last declared edit.\n${text}`
 	let deliver = () => {
 		let refused = prompts.submit(editor.id, message, undefined, 'steer', { from: editor.id, label: 'plugin loader' })
