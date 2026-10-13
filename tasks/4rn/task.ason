@@ -1,0 +1,10 @@
+{
+	title: 'HAL IDs in terminal status',
+	spec: 'The terminal status row displays the stable hal/* model ID instead of its friendly picker description at wide and narrow widths. HAL descriptions remain visible and searchable in the model picker; provider model display names and effort labels remain unchanged. This replaces task 1g display-name default for HAL models only. Web status behavior stays unchanged pending user confirmation.',
+	status: 'done',
+	notes: [
+		'Verified 18 focused status-row and picker tests, changed-file lint, and one-off rendering at 20 and 140 columns with a cached HAL description. No new state or repeated work; the footer uses the existing model ID.'
+	],
+	needs: ['f70'],
+	foldInto: ['1g']
+}
