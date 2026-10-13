@@ -61,6 +61,10 @@ function read(path: string): string | undefined {
 // Claude Code compatible imports (task d2j): a line that is only @path
 // becomes that file's text when its real path lies inside the project
 // root; anything else stays verbatim, so a repo cannot pull in ~/.ssh.
+// Tested once, then the tests were deleted. If you change this code,
+// first write tests for: a nested in-project import expands; ../outside,
+// a symlink leaving the project, a missing file, a cycle's closing line
+// and an inline @ stay verbatim; the outside file's text never appears.
 function imports(file: string, text: string, root: string, sources?: PromptSource[], chain = [file]): string {
 	return text.split('\n').map((line) => {
 		let name = /^\s*@(\S+)\s*$/.exec(line)?.[1]
