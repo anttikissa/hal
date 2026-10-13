@@ -191,23 +191,22 @@ test('all existing range forms remain accepted; a whole-file write combines with
  expect(readFileSync(a, 'utf8')).toBe('original')
 })
 
-test('version-checked file deletion commits with edits and deletes empty files', async () => {
+test('file deletion accepts advisory versions, commits with edits and deletes empty files', async () => {
  const a = file('a', 'remove\n'), empty = file('empty', ''), b = file('b', 'old')
- const parsed = parseBlocks(`a@${lease.hash(readFileSync(a))} delete\nempty@${lease.hash(readFileSync(empty))} delete`)
+ const parsed = parseBlocks(`a@${lease.hash(readFileSync(a))} delete\nempty delete`)
  const out = await run([...parsed.edits, { path: 'b', old: 'old', new: 'new' }])
  expect(existsSync(a)).toBe(false)
  expect(existsSync(empty)).toBe(false)
  expect(readFileSync(b, 'utf8')).toBe('new')
  expect(out).toContain(`${a} deleted verified`)
  expect(out).toContain('-1 remove')
- expect(() => parseBlocks('a delete')).toThrow('requires the READ version')
 })
 
 test('invalid or mixed file deletions reject the whole batch', async () => {
  const a = file('a', 'original'), hash = lease.hash(readFileSync(a))
  for (const edits of [
-  [{ path: 'a', delete: true }], [{ path: 'a', hash: 'stale', delete: true }],
-  [{ path: 'missing', hash, delete: true }], [{ path: 'a', hash, delete: false }],
+  [{ path: 'a', hash: 'stale', delete: true }], [{ path: 'a', hash: '', delete: true }],
+  [{ path: 'missing', delete: true }], [{ path: 'a', hash, delete: false }],
   [{ path: 'a', hash, delete: true, new: '' }],
   [{ path: 'a', hash, delete: true }, { path: 'a', hash, new: '' }],
   [{ path: 'a', hash, range: 1, lines: [] }, { path: 'a', hash, delete: true }],
@@ -246,7 +245,7 @@ test('cancellation after deletion restores the file; a changed target is never d
  } finally { mock.mockRestore() }
  mock = spyOn(io, 'save').mockImplementation(async (...args) => { writeFileSync(a, 'external'); await original(...args) })
  try {
-  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }])).rejects.toThrow('changed outside Hal')
+  await expect(run([{ path: 'a', delete: true }])).rejects.toThrow('changed outside Hal')
   expect(readFileSync(a, 'utf8')).toBe('external')
  } finally { mock.mockRestore() }
  mock = spyOn(io, 'save').mockImplementation(async (...args) => { unlinkSync(a); symlinkSync(b, a); await original(...args) })

@@ -25,7 +25,7 @@ const help = [
 	'  <path>@<version> insert-before N   then !!NEW ... !!END',
 	'  <path>@<version> insert-after N    then !!NEW ... !!END',
 	'  <path>@<version> delete A-B        (no block)',
-	'  <path>@<version> delete            (no block; deletes the file; matching version required)',
+	'  <path>@<version> delete            (no block; deletes the file)',
 	'  <path> replace                     then !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)',
 	'  <path> create                      then !!NEW ... !!END (file must not exist)',
 	'  <path>@<version> write             then !!NEW, whole new contents, !!END',
@@ -107,7 +107,6 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
 			need(old.join(N).length > 0, 'needs nonempty old text')
 			edits.push({ path, old: old.join(N), new: next.join(N), ...v })
 		} else if (op === 'delete' && range === undefined) {
-			need(!!hash, 'requires the READ version to delete a file')
 			edits.push({ path, ...v, delete: true })
 			i++
 		} else if (op === 'replace' || op === 'delete') {
@@ -257,7 +256,7 @@ export const multiedit: Tool = {
 			}, then: { type: 'array', items: { type: 'string' } }, edits: {
 				type: 'array', minItems: 1, items: {
 					anyOf: [
-						['path', 'old', 'new'], ['path', 'old', 'new', 'hash'], ['path', 'old', 'new', 'count'], ['path', 'old', 'new', 'hash', 'count'], ['path', 'range', 'lines'], ['path', 'hash', 'range', 'lines'], ['path', 'insert', 'lines'], ['path', 'hash', 'insert', 'lines'], ['path', 'new'], ['path', 'new', 'create'], ['path', 'hash', 'new'], ['path', 'hash', 'delete'],
+						['path', 'old', 'new'], ['path', 'old', 'new', 'hash'], ['path', 'old', 'new', 'count'], ['path', 'old', 'new', 'hash', 'count'], ['path', 'range', 'lines'], ['path', 'hash', 'range', 'lines'], ['path', 'insert', 'lines'], ['path', 'hash', 'insert', 'lines'], ['path', 'new'], ['path', 'new', 'create'], ['path', 'hash', 'new'], ['path', 'delete'], ['path', 'hash', 'delete'],
 					].map((required) => ({
 						type: 'object',
 						additionalProperties: false,
@@ -300,7 +299,7 @@ export const multiedit: Tool = {
 					if (p.kind && (p.kind === 'whole' || kind === 'whole')) throw new Error('a whole-file write cannot be combined with other edits of the same file (including deletion)')
 					if (e.hash !== undefined && (typeof e.hash !== 'string' || !p.before || lease.hash(p.before) !== e.hash)) throw new Error(`${e.path}: stale version; READ again`)
 					if (e.delete !== undefined) {
-						if (e.delete !== true || typeof e.hash !== 'string' || !e.hash || !p.before || Object.keys(e).some((k) => !['path', 'hash', 'delete'].includes(k))) throw new Error('file deletion requires an existing file and READ version, without other selectors')
+						if (e.delete !== true || !p.before || Object.keys(e).some((k) => !['path', 'hash', 'delete'].includes(k))) throw new Error('file deletion requires an existing file, without other selectors')
 						p.mode = (await lstat(path)).mode & 0o7777
 						p.next = null
 					} else if (kind === 'range') {
