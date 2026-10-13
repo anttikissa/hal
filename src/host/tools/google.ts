@@ -22,6 +22,7 @@ const defaultNum = 5
 
 export const tool: Tool & { url: string; format: typeof format } = {
 	name: 'google',
+	syntax: { usage: [`GOOGLE "search terms" [ { num: ${defaultNum} } ]`] },
 	description: 'Search the web with Google (through Serper). Returns titles, URLs and snippets.',
 	parameters: {
 		type: 'object',

@@ -178,7 +178,7 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	expect(spawnHelp).toContain('SPAWN [ { task: "<task>", kind: "<kind>", mode: "<mode>", model: "<model>", cwd: "<cwd>", name: "<name>", limit: "<limit>" } ]')
 	expect(nativeTool.resolve(nativeTool.usage(nativeTool.find('spawn'))[0])).toEqual({ name: 'spawn', input: { task: '<task>', kind: '<kind>', mode: '<mode>', model: '<model>', cwd: '<cwd>', name: '<name>', limit: '<limit>' } })
 	let googleHelp = (await act(id, 'HELP GOOGLE')).output
-	expect(googleHelp).toContain('GOOGLE "<query>" [ { num: 5 } ]')
+	expect(googleHelp).toContain('GOOGLE "search terms" [ { num: 5 } ]')
 	expect(googleHelp).toContain('num (integer, default 5)')
 	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets: ["<targets>"] } ]'])
 })
