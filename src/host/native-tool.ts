@@ -14,7 +14,7 @@ import { type CallContext, type Tool, tools } from './tools.ts'
 
 const name = 'tool'
 
-type Schema = { properties?: Record<string, { type?: string; description?: string; items?: { type?: string } }>; required?: string[] }
+type Schema = { properties?: Record<string, { type?: string; description?: string; default?: unknown; items?: { type?: string } }>; required?: string[] }
 const schema = (tool: Tool<unknown>) => tool.parameters as Schema
 
 function def(): ToolDef {
@@ -110,14 +110,14 @@ function usage(tool: Tool<unknown>): string[] {
 	let { properties = {}, required = [] } = schema(tool)
 	let positional = tool.syntax?.positional ?? required
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
-	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `["<${k}>"]`))
+	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `[ "<${k}>" ]`))
 	if (rest.length) {
-		let examples: Record<string, string> = { integer: '1', number: '1', boolean: 'true', object: '{}', null: 'null' }
-		let example = (type: string | undefined, key: string) => examples[type ?? ''] ?? JSON.stringify(`<${key}>`)
-		args.push(`{ ${rest.map((k) => {
+		let fields = rest.map((k) => {
 			let p = properties[k]!
-			return `${k}: ${p.type === 'array' ? `[${example(p.items?.type, k)}]` : example(p.type, k)}`
-		}).join(', ')} }`)
+			let value = p.default !== undefined ? JSON.stringify(p.default) : `"<${k}>"`
+			return `${k}: ${p.type === 'array' && p.default === undefined ? `[${value}]` : value}`
+		}).join(', ')
+		args.push(rest.some((k) => required.includes(k)) ? `{ ${fields} }` : `[ { ${fields} } ]`)
 	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }
@@ -128,7 +128,8 @@ function help(tool: Tool<unknown>): string {
 	let fields = Object.entries(properties).map(([key, p]) => {
 		let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : p.type ?? 'value'
 		let text = p.description
-		return `  ${key} (${type}${required.includes(key) ? ', required' : ''})${text ? `: ${text}` : ''}`
+		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
+		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 	})
 	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...nativeTool.usage(tool).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }

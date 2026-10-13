@@ -18,6 +18,8 @@ function format(data: Answer): string {
 	return parts.length ? parts.join('\n\n') : 'No results found.'
 }
 
+const defaultNum = 5
+
 export const tool: Tool & { url: string; format: typeof format } = {
 	name: 'google',
 	description: 'Search the web with Google (through Serper). Returns titles, URLs and snippets.',
@@ -25,7 +27,7 @@ export const tool: Tool & { url: string; format: typeof format } = {
 		type: 'object',
 		properties: {
 			query: { type: 'string', description: 'Search query' },
-			num: { type: 'integer', minimum: 1, maximum: 10, description: 'Number of results (default 5, at most 10)' },
+			num: { type: 'integer', minimum: 1, maximum: 10, default: defaultNum, description: 'Number of results, at most 10' },
 		},
 		required: ['query'],
 	},
@@ -34,7 +36,7 @@ export const tool: Tool & { url: string; format: typeof format } = {
 	async run(input, ctx) {
 		let query = typeof input.query === 'string' ? input.query.trim() : ''
 		if (!query) throw new Error('query must be a non-empty string')
-		let num = Math.min(10, Math.max(1, Number.isInteger(input.num) ? (input.num as number) : 5))
+		let num = Math.min(10, Math.max(1, Number.isInteger(input.num) ? (input.num as number) : defaultNum))
 		let key = auth.serperKey()
 		if (!key) throw new Error('no Serper API key: set serper: { apiKey } in the credentials file or SERPER_API_KEY')
 		let res = await fetch(tool.url, {
