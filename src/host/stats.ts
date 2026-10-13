@@ -53,7 +53,7 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	if (files) out.files = files
 	// Only an effort off the model's default is said (task r7r).
 	let level = models.effort(model, sessions.open(id).effort)
-	if (level && level !== models.defaultEffort(model)) out.effort = level
+	if (level && level !== models.effort(model)) out.effort = level
 	let context = stats.state.context.get(id) ?? stats.lastContext(records ?? pages.essentials(id))
 	if (context) out.context = context
 	let window = models.contextWindow(model)

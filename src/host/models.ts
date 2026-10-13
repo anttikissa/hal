@@ -17,7 +17,6 @@
 // - valid(id): whether a session may switch to id
 // - contextWindow(id): tokens id takes in, for the context meter
 // - effort(id, selected?): the reasoning effort requests send
-// - defaultEffort(id): the level id runs at with none pinned
 // - ttlMs: how long a provider's list is kept → 1 hour
 // - timeoutMs: how long asking a provider may take → 3 s
 // - fetchList(name): a provider's ids: cache, provider, then fallback
@@ -119,7 +118,7 @@ function known(): string[] {
 function nameEvent(ids: string[]): { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> } | undefined {
 	let names = models.names(ids)
 	let defaults: Record<string, string> = {}
-	for (let id of ids) { let level = models.defaultEffort(id); if (level) defaults[id] = level }
+	for (let id of ids) { let level = models.effort(id); if (level) defaults[id] = level }
 	return Object.keys(names).length || Object.keys(defaults).length ? { type: 'model-names', names, ...(Object.keys(defaults).length && { defaults }) } : undefined
 }
 
@@ -210,11 +209,6 @@ export const models = {
 	effort(id: string, selected?: string): string | undefined {
 		let parsed = blocks.parseModelId(id)
 		return selected ?? effort.describe(id)?.policy ?? (parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
-	},
-	// The level `id` runs at when the session pins none: what clients
-	// leave unsaid (task r7r).
-	defaultEffort(id: string): string | undefined {
-		return models.effort(id) ?? effort.describe(id)?.default
 	},
 	// `carry` is the effort kept when input names none (task 7vt).
 	selection(input: string, carry?: string): { id: string; effort?: string; note?: string } {
