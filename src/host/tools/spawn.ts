@@ -21,7 +21,8 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 
 export const tool: Tool = {
 	name: 'spawn',
-	syntax: { summary: false, aliases: { title: 'name', goal: 'task' } },
+	// task is required unless kind is interactive, so the schema cannot require it.
+	syntax: { summary: false, aliases: { title: 'name', goal: 'task' }, usage: ['SPAWN { task, [ kind, mode, model, cwd, name, limit ] }'] },
 	description:
 		'Open a session in the tab after this one. subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a session for the user. A <question> keeps a subagent open; answer through SEND. HELP SUBAGENTS covers coordination and resuming.',
 	parameters: {

@@ -125,8 +125,8 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
 	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `[ "<${k}>" ]`))
 	if (rest.length) {
-		let fields = rest.join(', ')
-		args.push(rest.some((k) => required.includes(k)) ? `{ ${fields} }` : `[ { ${fields} } ]`)
+		let req = rest.filter((k) => required.includes(k)), opt = rest.filter((k) => !required.includes(k))
+		args.push(!req.length ? `[ { ${opt.join(', ')} } ]` : `{ ${[...req, ...(opt.length ? [`[ ${opt.join(', ')} ]`] : [])].join(', ')} }`)
 	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }

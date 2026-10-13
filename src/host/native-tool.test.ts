@@ -53,7 +53,7 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(nativeTool.resolve('NOTIFY /* Ping */ "done" { description: "Ping" }')).toEqual({ name: 'notify', input: { text: 'done' } })
 	// Field names and forms models were seen to send, accepted silently.
 	expect(nativeTool.resolve('SPAWN [{ title: "x", goal: "y" }]')).toEqual({ name: 'spawn', input: { name: 'x', task: 'y' } })
-	expect(() => nativeTool.resolve('SPAWN [{ name: "one", task: "x" }, { name: "two", task: "y" }]')).toThrow('SPAWN takes 0 plain arguments, got another: [{"name":"one","task":"x"},{"name":"two","task":"y"}]. Usage: SPAWN [ { task, kind, mode, model, cwd, name, limit } ]')
+	expect(() => nativeTool.resolve('SPAWN [{ name: "one", task: "x" }, { name: "two", task: "y" }]')).toThrow('SPAWN takes 0 plain arguments, got another: [{"name":"one","task":"x"},{"name":"two","task":"y"}]. Usage: SPAWN { task, [ kind, mode, model, cwd, name, limit ] }')
 	expect(nativeTool.resolve('SEND { session: "2", text: "hi" }')).toEqual({ name: 'send', input: { to: '2', text: 'hi' } })
 	expect(nativeTool.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
 	expect(nativeTool.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({ name: 'wait', input: { targets: ['09-ada'] } })
@@ -177,7 +177,7 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	expect(agents).toContain('subagent-leave-open')
 	expect(agents).toContain('/resume')
 	let spawnHelp = (await act(id, 'HELP SPAWN')).output
-	expect(spawnHelp).toContain('SPAWN [ { task, kind, mode, model, cwd, name, limit } ]')
+	expect(spawnHelp).toContain('SPAWN { task, [ kind, mode, model, cwd, name, limit ] }')
 	let googleHelp = (await act(id, 'HELP GOOGLE')).output
 	expect(googleHelp).toContain('GOOGLE "search terms" [ { num: 5 } ]')
 	expect(googleHelp).toContain('num (integer, default 5)')
