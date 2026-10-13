@@ -3,7 +3,9 @@
 // run's start (the greeting) and the save, answer records the rest.
 import { existsSync } from 'fs'
 import { resolve } from 'path'
-import { forms, type Answers, type Form } from '../common/forms.ts'
+import type { StreamEvent } from '../common/blocks.ts'
+import { card, type Kind } from '../common/card.ts'
+import { forms, type Answers, type Field, type Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { settings } from '../common/settings.ts'
@@ -12,9 +14,11 @@ import { auth } from './auth.ts'
 import { config } from './config.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
+import { nativeTool } from './native-tool.ts'
 import { modelsDev } from './models-dev.ts'
 import { paths } from './paths.ts'
 import { profile } from './profile.ts'
+import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 import { theme } from './commands/theme.ts'
 import type { Reply } from './synthetic.ts'
@@ -127,7 +131,19 @@ const closing = "You're all set."
 const restart = 'Starting the intro.'
 const subscriptions = 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
 const yesNo = (name: string, text: string): Form => ({ text, fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }] })
-const words = ['no', 'one', 'two', 'three', 'four', 'five']
+const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six']
+// The sample thinking card the card question previews on (task 5zq).
+const sample = `Thinking cards hold the model's reasoning before it acts. Here it decides to list the files in this folder, so a tool card shows up below with the command and its output.
+
+Short shows a card's title row, glimpse adds a few rows, long shows everything. The choice is only where a card starts: Ctrl-O or a click still opens or closes any card.`
+
+// The sample cards: this thinking, then `ls -l` run for real, so the
+// card question has something to preview on.
+async function* samples(sessionId: string): AsyncGenerator<StreamEvent> {
+	yield { type: 'thinking', text: sample }
+	yield* nativeTool.expand({ type: 'tool_call', id: `intro-${crypto.randomUUID()}`, name: 'tool', input: { cmd: 'BASH /* List files */ "ls -l"' } }, { sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/intro' }).map((c) => ({ ...c, type: 'tool_call' as const }))
+	yield { type: 'done', reason: 'tool_use' }
+}
 
 function answered(records: HistoryRecord[], field: string): string | undefined {
 	for (let i = records.length - 1; i >= 0; i--) {
@@ -209,21 +225,22 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// Local servers answer before the model question (task vc).
 	let hello = (): Reply => (void models.warm(), { say: `${greeting}
 
-I have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
+I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
 	// Text typed while nothing was asked: the intro can't take it. Text
 	// sent while a question was open waited in the inbox; it is let be.
-	let typed = run.findLastIndex((r) => r.type === 'user')
+	// A tool result is no typing: the sample tool card's output.
+	let typed = run.findLastIndex((r) => r.type === 'user' && !r.blocks.some((b) => b.type === 'tool_result'))
 	let sent = run.findIndex((r) => r.type === 'inbox' && (run[typed] as { inbox?: string[] }).inbox?.includes(r.id))
 	if (sent >= 0 && forms.open(run.slice(0, sent))) typed = -1
 	if (typed >= 0) {
+		// Yes after the close starts over; before it, the run goes on.
+		let over = said(run, closing)
 		let go = answered(run.slice(typed), 'intro')
 		if (go === undefined) {
 			let user = run[typed] as HistoryRecord & { type: 'user' }
 			let text = user.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(' ').replace(/\s+/g, ' ').trim()
-		// Yes after the close starts over; before it, the run goes on.
-		let over = said(run, closing)
 			if (text.length > 80) text = `${text.slice(0, 79)}…`
 			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', over ? 'Start from the beginning?' : 'Continue with the intro?') }
 		}
@@ -282,6 +299,21 @@ I have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
 		if (key.trim()) apiKeys.save('serper', key.trim())
 		else if (answers?.key !== undefined || !replied(run, 'language')) say.push('Skipped web search for now.')
+	}
+	// Card verbosity (task 5zq): sample cards first, then the question,
+	// whose rows preview on them while it is open (Field.cards).
+	let startsAs = (kind: Kind) => settings.value(card.setting(kind)) as string
+	let levels = ['short', 'glimpse', 'long']
+	let row = (name: string, label: string, kind: Kind): Field => ({ type: 'choice', name, label, options: levels, initial: Math.max(0, levels.indexOf(startsAs(kind))), inline: true, cards: kind })
+	if (answered(run, 'toolCards') === undefined) {
+		if (sessionId && !run.some((r) => r.type === 'assistant' && r.block.type === 'thinking' && r.block.text === sample)) return { stream: samples(sessionId) }
+		return reply({ ask: { text: 'How verbose do you like your output? (/config changes it later)', fields: [row('toolCards', 'Tool', 'tool'), row('thinkingCards', 'Thinking', 'thinking')] } })
+	}
+	let picked = ([['tool', answers?.toolCards], ['thinking', answers?.thinkingCards]] as const).filter(([kind, v]) => v && levels.includes(v) && v !== startsAs(kind))
+	if (picked.length) {
+		config.init()
+		for (let [kind, v] of picked) config.state.data![card.setting(kind)] = v
+		liveFiles.save(config.state.data!)
 	}
 	// The theme (task 4c1): the answer writes plugins/theme.ts, which the
 	// plugin loader applies at once; a rerun starts from the active one.

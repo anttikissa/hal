@@ -5,7 +5,7 @@
 import { bashResult } from '../common/bash-result.ts'
 import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
-import type { FormState } from '../common/forms.ts'
+import { forms, type FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
 import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
@@ -189,7 +189,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let callCard: { id: string; key: string; start: number } | undefined
 	// The look of the last item that drew rows.
 	let drawn: Look | undefined
-	let blocks = view.transcript?.meta.blocks
+	let blocks = forms.cards(view.form, view.transcript?.meta.blocks)
 	let look = `${cols} ${session} ${card.signature(blocks)} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url} ${view.folds?.sig ?? ''}`
 	let kept = frame.state.history
 	let start = 0
@@ -339,7 +339,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
-		let look: Look = { fold: view.folds?.states.get(item.key) ?? card.initial(item, view.transcript?.meta.blocks), pastes: view.folds?.pastes }
+		let look: Look = { fold: view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)), pastes: view.folds?.pastes }
 		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session, look) : frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
 		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
 		let joined = edge !== undefined && stacked === edge

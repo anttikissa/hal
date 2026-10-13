@@ -1,0 +1,10 @@
+{
+	title: 'Intro card verbosity question with live sample cards',
+	spec: 'Before the theme step the intro shows a sample thinking card and a real ls -l tool card, then asks "How verbose do you like your output?" with two inline choice rows, Tool and Thinking, each short / glimpse / long, starting from the current setting. Up/down moves between rows, left/right changes a row. While the form is open the sample cards (and every card of that kind) start as the chosen level, live, in terminal and web (Field.inline, Field.cards, forms.cards). The answer saves changed levels to blockVerbosityTool / blockVerbosityThinking in config.ason. Rationale: the intro has no cards of its own to show what each level means.',
+	status: 'done',
+	notes: [
+		'The sample tool card runs a real ls -l through nativeTool.expand, so its output is the user cwd. A tool_result user record is not typed text (intro typed-text check). host-questions "intro resumes" times out at the model step independently of this task; with that step skipped the card step, config save, theme and language pass.'
+	],
+	needs: ['vc'],
+	foldInto: ['vc']
+}

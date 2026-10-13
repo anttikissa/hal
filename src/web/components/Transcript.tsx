@@ -12,6 +12,7 @@ import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, un
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
+import { forms } from '../../common/forms.ts'
 import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
@@ -106,7 +107,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={props.view.transcript?.meta.blocks} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} />}>
 						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
 					</Show>
 					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>

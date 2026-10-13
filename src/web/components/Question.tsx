@@ -72,7 +72,7 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 				{(field, i) =>
 					field.type === 'choice' ? (
 						<div role="group" aria-label={field.label ?? form().text} ref={(el) => (fields[untrack(i)] = el)}>
-							{field.label ? `${field.label}: ` : ''}
+							{field.inline ? <span style={{ 'min-width': `${Math.max(...form().fields.map((f) => (f.type === 'choice' && f.inline ? (f.label?.length ?? 0) + 1 : 0)))}ch` }}>{field.label ? `${field.label}:` : ''}</span> : field.label ? `${field.label}: ` : ''}
 							{field.help ? <div>{field.help}</div> : null}
 							<For each={field.options}>
 								{(option) => (

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { forms, type Form, type FormState, type Key } from './forms.ts'
+import { forms, type Field, type Form, type FormState, type Key } from './forms.ts'
 import type { HistoryRecord } from './replay.ts'
 
 const name: Form = { text: 'How should I call you?', fields: [{ type: 'text', name: 'name', placeholder: 'leave empty to stay nameless' }] }
@@ -68,6 +68,18 @@ test('choice options form a column: arrows move down it and past its ends to oth
 	let one = forms.start('q', { text: 'Pick', fields: [{ type: 'choice', name: 'c', options: ['a', 'b'] }] })
 	expect(press(one, [k('up')]).st.values).toEqual(['a'])
 	expect(press(one, [k('down'), k('down'), k('enter')]).action).toEqual({ type: 'submit', answers: { c: 'b' } })
+})
+
+test('inline choices: left/right change the value, up/down move between rows; cards preview the values', () => {
+	let row = (name: string, cards: string): Field => ({ type: 'choice', name, options: ['short', 'glimpse', 'long'], initial: 1, inline: true, cards })
+	let st = forms.start('q', { text: 'How verbose?', fields: [row('tool', 'tool'), row('thinking', 'thinking')] })
+	expect(press(st, [k('right'), k('right')]).st.values).toEqual(['long', 'glimpse'])
+	expect(press(st, [k('left'), k('left')]).st.values).toEqual(['short', 'glimpse'])
+	let down = press(st, [k('down'), k('left')]).st
+	expect(down).toMatchObject({ focus: 1, values: ['glimpse', 'short'] })
+	expect(press(down, [k('up')]).st.focus).toBe(0)
+	expect(forms.cards(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'glimpse', thinking: 'short' })
+	expect(forms.cards(undefined, { bash: 'long' })).toEqual({ bash: 'long' })
 })
 
 test('a single option is "press Enter"', () => {

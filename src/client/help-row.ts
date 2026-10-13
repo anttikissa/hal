@@ -36,7 +36,7 @@ function question(st: FormState): Hint[] {
 	let field = st.form.fields[st.focus]
 	let out: Hint[] = []
 	if (field?.type === 'choice' && field.options.length > 1) out.push(['←/→', 'choose'], ['first letter', 'answer'])
-	if (st.form.fields.length > 1) out.push(['tab', 'next field'])
+	if (st.form.fields.length > 1) out.push([field?.type === 'choice' && field.inline ? '↑/↓' : 'tab', 'next field'])
 	return [...out, ['enter', 'submit'], ['esc', 'pause']]
 }
 

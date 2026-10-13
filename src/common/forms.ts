@@ -16,7 +16,10 @@ export type Field = { help?: string } & (
 	| { type: 'integer'; name: string; label?: string; initial?: string }
 	// Never put a secret's current value in the form (it goes to history).
 	| { type: 'secret'; name: string; label?: string }
-	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number }
+	// `inline`: options in a row; left and right change it, up and down
+	// move between fields. `cards`: a card kind (card.kinds) whose cards
+	// start as the chosen option while the form is open: a live preview.
+	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number; inline?: true; cards?: string }
 )
 
 // `quote`: text shown as it is below the question (a command to
@@ -61,6 +64,8 @@ function invalid(value: unknown): string | undefined {
 		names.add(field.name)
 		if (field.type === 'choice') {
 			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string')) return `${field.name}: choices need options`
+			if (field.inline !== undefined && field.inline !== true) return `${field.name}: inline must be true`
+			if (field.cards !== undefined && typeof field.cards !== 'string') return `${field.name}: cards must be a card kind`
 		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer') return `${(field as Field).name}: unknown field type`
 		if ((field.type === 'text' || field.type === 'integer') && field.initial !== undefined && typeof field.initial !== 'string') return `${field.name}: initial must be a string`
 		if (field.help !== undefined && typeof field.help !== 'string') return `${field.name}: help must be a string`
@@ -192,6 +197,9 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 	if (field.type === 'choice' && plain) {
 		let at = field.options.indexOf(value)
 		let move = key.key === 'up' || key.key === 'left' ? -1 : key.key === 'down' || key.key === 'right' ? 1 : 0
+		// In a row only left and right change it, stopping at the ends.
+		if (field.inline && (key.key === 'left' || key.key === 'right')) return { state: forms.set(st, st.focus, field.options[Math.max(0, Math.min(field.options.length - 1, at + move))]!) }
+		if (field.inline) move = 0
 		let to = at + move
 		if (move && to >= 0 && to < field.options.length) return { state: forms.set(st, st.focus, field.options[to]!) }
 		// Past an end: the field above or below, if there is one.
@@ -267,4 +275,11 @@ function command(sessionId: string, st: FormState, action: FormAction): unknown 
 	return { type: 'answer', sessionId, question: st.id, answers: action.answers }
 }
 
-export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, example, set, answers, focusOn, step, command }
+// The card start states an open form previews (Field.cards) over the
+// session's own `blocks`: what cards show while it is filled in.
+function cards<B extends Record<string, string>>(st: FormState | undefined, blocks: B | undefined): B | undefined {
+	let shown = st?.form.fields.flatMap((f, i) => (f.type === 'choice' && f.cards ? [[f.cards, st.values[i]!]] : []))
+	return shown?.length ? ({ ...blocks, ...Object.fromEntries(shown) } as B) : blocks
+}
+
+export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, example, set, answers, focusOn, step, command, cards }
