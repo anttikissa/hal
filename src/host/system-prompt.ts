@@ -1,6 +1,6 @@
 // Hookable prompt assembly from one input snapshot (tasks ar, q5g, ftg).
 
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { settings } from '../common/settings.ts'
 import { clients } from './clients.ts'
@@ -58,16 +58,46 @@ function read(path: string): string | undefined {
 	}
 }
 
+// Claude Code compatible imports (task d2j): a line that is only @path
+// becomes that file's text when its real path lies inside the project
+// root; anything else stays verbatim, so a repo cannot pull in ~/.ssh.
+function imports(file: string, text: string, root: string, sources?: PromptSource[], chain = [file]): string {
+	return text.split('\n').map((line) => {
+		let name = /^\s*@(\S+)\s*$/.exec(line)?.[1]
+		if (!name) return line
+		let target: string
+		try {
+			target = realpathSync(resolve(dirname(file), name))
+		} catch {
+			return line
+		}
+		let rel = relative(root, target)
+		if (!rel || rel.split(sep)[0] === '..' || isAbsolute(rel) || chain.includes(target)) return line
+		let body = read(target)
+		if (body === undefined) return line
+		sources?.push({ path: target, bytes: Buffer.byteLength(body) })
+		return imports(target, body.trim(), root, sources, [...chain, target])
+	}).join('\n')
+}
+
 function agents(cwd: string, sources?: PromptSource[]): string {
 	let parts: string[] = []
 	let skillList = skills(cwd)
 	if (skillList) parts.push(skillList)
-	for (let dir of systemPrompt.candidates(cwd)) {
+	let dirs = systemPrompt.candidates(cwd), root = dirs[0]!
+	try {
+		root = realpathSync(root)
+	} catch {}
+	for (let dir of dirs) {
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
 			let path = `${dir === '/' ? '' : dir}/${name}`, text = read(path)
 			if (text === undefined) continue
 			sources?.push({ path, bytes: Buffer.byteLength(text) })
-			parts.push(`<file path="${path}">\n${text.trim()}\n</file>`)
+			let real = path
+			try {
+				real = realpathSync(path)
+			} catch {}
+			parts.push(`<file path="${path}">\n${imports(real, text.trim(), root, sources)}\n</file>`)
 			break
 		}
 	}
