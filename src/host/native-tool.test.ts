@@ -166,7 +166,7 @@ test('file tools work outside tracking scope and snapshot eligible literal filen
 test('HELP comes from the tool modules; $tools_summary lists only tools the prompt does not explain', async () => {
 	let id = created(client(), testHome())
 	let help = (await act(id, 'HELP bash')).output
-	expect(help).toContain('BASH "<command>"')
+	expect(help).toContain('BASH /* <description> */ "<command>"')
 	expect(help).toContain('timeout (number): Seconds')
 	expect((await act(id, 'HELP')).output).toContain('EDIT "<path>@<hash>"')
 	let summary = nativeTool.summary()
