@@ -6,7 +6,7 @@ import { resolve } from 'path'
 import type { StreamEvent } from '../common/blocks.ts'
 import { card, type Kind } from '../common/card.ts'
 import { forms, type Answers, type Field, type Form } from '../common/forms.ts'
-import type { HistoryRecord } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { settings } from '../common/settings.ts'
 import { apiKeys } from './api-keys.ts'
@@ -209,6 +209,8 @@ function choices(providers: string[]): Map<string, string> {
 // Every intro question is skippable: Escape moves on instead of
 // pausing a scripted turn that only an answer can continue.
 function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
+	records = replay.current(records)
+	records = records.slice(records.findLastIndex((r) => r.type === 'reset') + 1)
 	let reply = step(records, answers, sessionId)
 	return reply.ask ? { ...reply, ask: { ...reply.ask, skip: true } } : reply
 }
@@ -228,6 +230,8 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
+	let finished = run.findIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(closing))
+	if (finished >= 0) return (require('./intro-fun.ts') as typeof import('./intro-fun.ts')).introFun.run(run.slice(finished + 1))
 	// Text typed while nothing was asked: the intro can't take it. Text
 	// sent while a question was open waited in the inbox; it is let be.
 	// A tool result is no typing: the sample tool card's output.
