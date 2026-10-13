@@ -119,7 +119,8 @@ function onEvent(event: Event): void {
 	// Replayed as the chord bound to its delivery, so remapped keys hold (task 8kx).
 	let chord = resume && sendKeys.key(resume.delivery)
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: chord === 'alt-enter', ctrl: chord === 'ctrl-enter', cmd: chord === 'cmd-enter' }])
-	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
+	// A new link code repaints the screen, so no visible link keeps a spent one.
+	if (event.type === 'auth' && event.link !== undefined) { ansi.state.web = { url: event.link, code: event.code }; app.show() }
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') {
 		if (event.sessions) markdown.state.sessions = new Set(event.sessions)
