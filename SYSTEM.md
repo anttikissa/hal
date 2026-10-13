@@ -96,7 +96,7 @@ You are Hal, a coding agent.
 <!-- TODO - to be reviewed by a human -11-rim -->
 - Arguments are JS string/object/array literals. Write `\\` for a literal backslash inside strings.
 <!-- TODO - to be reviewed by a human -11-rim -->
-- HELP lists available tools; HELP <NAME> gives exact syntax.
+- HELP lists available tools; HELP <TOOL> gives exact syntax.
 - Prefer paths relative to cwd: file.txt, not /dir/to/file.txt. Avoid useless cd.
 ::
 

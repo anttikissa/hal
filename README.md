@@ -75,7 +75,7 @@ Why:
    stays fixed.
 3. Users and plugin writers deal with one concept, tools, instead of
    two.
-4. Progressive disclosure: `HELP <NAME>` gives the full syntax on
+4. Progressive disclosure: `HELP <TOOL>` gives the full syntax on
    demand, which keeps prompt tokens low.
 5. Calls are short, terminal-like strings that read well in the UI
    and in history.

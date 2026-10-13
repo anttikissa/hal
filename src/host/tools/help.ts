@@ -7,7 +7,7 @@ import { type Tool, tools } from '../tools.ts'
 
 export const tool: Tool = {
 	name: 'help',
-	syntax: { summary: false, positional: ['name'], usage: ['HELP', 'HELP <NAME>'] },
+	syntax: { summary: false, positional: ['name'], usage: ['HELP', 'HELP <TOOL>'] },
 	description: 'Explain a tool: its syntax, fields, defaults and units. Without a name, list every tool with its syntax.',
 	parameters: { type: 'object', properties: { name: { type: 'string', description: 'A tool name, e.g. EDIT' } } },
 	readOnly: true,
