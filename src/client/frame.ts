@@ -62,8 +62,8 @@ export interface View {
 	hal?: HalCursor
 	/** The status row below the prompt box (task 1g); blank without. */
 	status?: StatusInfo
-	/** A new commit is checked out: the help row offers ctrl-r. */
-	newCode?: boolean
+	/** Help row: newCode offers ctrl-r; noUser (hal --no-user) says USER.md is off. */
+	newCode?: boolean; noUser?: boolean
 	/** The notice stack, over the rows just above the tab bar (task qm). */
 	notices?: Folded
 	/** Toggled blocks' states and inline pastes (task ghs); `sig`

@@ -26,6 +26,8 @@ export type HelpInput = {
 	transcript?: { state: SessionState }
 	/** A new commit is checked out (task n1). */
 	newCode?: boolean
+	/** The host runs with --no-user. */
+	noUser?: boolean
 }
 
 // The keys of an open question. Choices move with left and right and
@@ -61,6 +63,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
+	if (v.noUser) left = `${ansi.sgr({ fg: colors.warning().fg! })}USER.md disabled${ansi.sgr({ fg: h.description! })}${left ? `; ${left}` : ''}`
 	let right = helpRow.paint([['/keys', 'shortcuts']])
 	let rw = strings.visLen(right)
 	if (rw + 1 > width) return line(left)

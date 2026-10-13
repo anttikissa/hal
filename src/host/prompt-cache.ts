@@ -40,9 +40,11 @@ function interactive(id: string): boolean {
 	return sessions.open(id).interactive ?? true
 }
 
+// state.noUser: this host process runs with --no-user, so no tab's
+// prompt has USER.md.
 function input(id: string, selected?: PromptInput): PromptInput {
 	let meta = sessions.open(id)
-	return { cwd: meta.cwd, model: models.qualified(meta.model, meta.effort), now: Date.now(), sessionId: id, noUser: meta.noUser, interactive: promptCache.interactive(id), owner: meta.owner, parent: meta.parent, slots: meta.slots, autoclose: meta.autoclose, ...selected }
+	return { cwd: meta.cwd, model: models.qualified(meta.model, meta.effort), now: Date.now(), sessionId: id, noUser: promptCache.state.noUser, interactive: promptCache.interactive(id), owner: meta.owner, parent: meta.parent, slots: meta.slots, autoclose: meta.autoclose, ...selected }
 }
 
 function outside(rendered: Rendering): string {
@@ -163,4 +165,4 @@ function rebased(id: string): void {
 function close(id: string): void { let data = promptCache.state.files.get(id); if (data) liveFiles.close(data); promptCache.state.files.delete(id); warnings.set(`system:${id}`) }
 function closeAll(): void { for (let id of promptCache.state.files.keys()) promptCache.close(id) }
 
-export const promptCache = { state: { files: new Map<string, Cache>() }, inactivityMs: 3_600_000, file, interactive, input, outside, updates, report, prepare, project, inherit, rebased, close, closeAll }
+export const promptCache = { state: { files: new Map<string, Cache>(), noUser: false }, inactivityMs: 3_600_000, file, interactive, input, outside, updates, report, prepare, project, inherit, rebased, close, closeAll }

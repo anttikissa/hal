@@ -34,6 +34,7 @@ import { models } from './host/models.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
+import { promptCache } from './host/prompt-cache.ts'
 import { version } from './host/version.ts'
 import { marksWorker } from './host/marks-worker.ts'
 import { paths } from './host/paths.ts'
@@ -125,9 +126,8 @@ function init(): void {
 	main.later(() => void version.init())
 }
 
-// The terminal client, for this home's host or (`remote`, an origin;
-// task tr) another machine's, whose drafts are kept apart and where
-// this machine's cwd means nothing.
+// The terminal client, for this home's host or (`remote`, an origin; task
+// tr) another machine's: drafts kept apart, this machine's cwd unused.
 function initTerminal(remote?: string): void {
 	terminal.init()
 	render.init()
@@ -149,9 +149,10 @@ function initTerminal(remote?: string): void {
 	app.init()
 }
 
-// Events from the host for the terminal: the host's version is kept
-// for the notice (client/versions.ts), the rest go to the app.
+// Host events for the terminal: the version goes to versions.ts, a peer's
+// unusable --no-user is told, the rest go to the app.
 function onEvent(event: Event): void {
+	if (event.type === 'host-mode' && promptCache.state.noUser && !event.noUser) app.state.notice = '--no-user: another Hal process hosts this home with USER.md'
 	if (event.type !== 'version') return app.onEvent(event)
 	versions.state.host = event.version
 	versions.report(app.send)
@@ -159,9 +160,8 @@ function onEvent(event: Event): void {
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either
-// way the terminal client talks to the host through connection.send and
-// gets events through onEvent; the host process uses the in-memory
-// connection.
+// way the terminal talks to the host through connection.send and gets
+// events through onEvent; the host process uses the in-memory one.
 function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) => void): Promise<void> {
 	let opts: Parameters<typeof link.start>[0] = {
 		socketPath: server.socketPath(),
@@ -196,10 +196,9 @@ async function becomeHost(): Promise<boolean> {
 	return true
 }
 
-// Refreshes the models.dev cache (task qq). The user hears of it only
-// if a model in use (the default or an open session's) has vanished.
-// Also lists a ChatGPT login's models now, so the first picker shows
-// them rather than models.dev's API-only ones (task q7).
+// Refreshes the models.dev cache (task qq); the user hears only if a model
+// in use (the default or an open session's) has vanished. Also lists a
+// ChatGPT login's models, so the first picker shows them (task q7).
 async function refreshModels(): Promise<void> {
 	void models.fetchList('openai').catch((e) => diag.log(`models of openai: ${e}`))
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
@@ -324,6 +323,7 @@ async function start(): Promise<void> {
 	// The release check loads only here; the checkout is this file's (task jjr).
 	if (parsed.kind === 'version') process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
 	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
+	if ('noUser' in parsed && parsed.noUser) promptCache.state.noUser = true
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
 	// scripts/perf sets HAL_STALLS: every event-loop block over 10 ms is

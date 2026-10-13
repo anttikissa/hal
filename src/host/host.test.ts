@@ -78,7 +78,7 @@ test('bad commands are rejected, not thrown', async () => {
 	a.conn.send({ type: 'submit', sessionId: id, text: 'not opened here' })
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('rejected').length === 10)
-	expect(a.events.every((e) => e.type === 'rejected' || e.type === 'tabs' || e.type === 'home')).toBe(true)
+	expect(a.events.every((e) => e.type === 'rejected' || e.type === 'tabs' || e.type === 'home' || e.type === 'host-mode')).toBe(true)
 	expect(calls).toEqual([])
 })
 

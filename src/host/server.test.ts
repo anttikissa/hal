@@ -63,7 +63,7 @@ test('commands and events cross the socket as ASON lines', async () => {
 	await Bun.sleep(5)
 	a.socket.write(create.slice(7))
 	await until(() => a.events.some((e) => e.type === 'snapshot'))
-	expect(a.events.map((e) => e.type)).toEqual(['home', 'tabs', 'rejected', 'snapshot'])
+	expect(a.events.map((e) => e.type)).toEqual(['home', 'host-mode', 'tabs', 'rejected', 'snapshot'])
 	let snapshot = a.events.find((e) => e.type === 'snapshot')
 	expect(snapshot).toMatchObject({ type: 'snapshot', snapshot: { meta: { cwd: '/tmp/x', model: 'fake/m' } } })
 

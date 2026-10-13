@@ -1,7 +1,10 @@
 {
-	title: 'hal -p --no-user leaves USER.md out of the new tab',
-	spec: 'hal -p --no-user creates its new tab with noUser: the session meta records noUser: true and its system prompt sets user_notes false, so the User notes section and USER.md are left out (for benchmarks). Rejected with --session. No environment variable controls this. Tests: args parse --no-user and reject it with --session; the assembled prompt omits USER.md when noUser is set.',
+	title: 'hal --no-user leaves USER.md out of every tab of this host',
+	spec: 'The --no-user option belongs to the host process: hal, hal serve and hal -p accept it (rejected with -r and auth). The process that hosts keeps it in promptCache.state.noUser and every prompt assembly (turns, /system, prompt-files, prompt-trail) passes it as PromptInput.noUser, so user_notes is false and the User notes section and USER.md are left out of every tab. It is never sent from a client or peer to the host and never stored per session. On connect the host sends host-mode { noUser } to each client; the terminal help row then starts with "USER.md disabled" in the warning color. A terminal peer with --no-user whose host includes USER.md shows a notice saying so; hal -p --no-user against such a host exits 2 before sending anything. No environment variable controls this. Tests: args parse --no-user for hal, serve and -p and reject it elsewhere; the assembled prompt omits USER.md when noUser is set.',
 	status: 'done',
+	notes: [
+		'Changed 13 Oct (user): was a per-tab flag carried by tab-new and stored as meta.noUser, only for hal -p. The user wanted it global to the host process and applied to all tabs, never forwarded from client or peer.'
+	],
 	needs: ['q5'],
 	foldInto: ['q5']
 }

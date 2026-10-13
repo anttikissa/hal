@@ -16,7 +16,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 	let finish!: (code: number) => void
 	let done = new Promise<number>((resolve) => (finish = resolve))
 	let id = '', session = '', modelId = '', promptId = ''
-	let begun = false, started = false, settled = false
+	let begun = false, started = false, settled = false, noUser = false
 	let targets: { tabs: string[]; sessions: string[] } | undefined
 	let text = ''
 	let end = (code: number) => { if (!settled) { settled = true; finish(code) } }
@@ -39,14 +39,21 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		id = connection.nextId()
 		connection.send({ type: 'open', sessionId: session, id })
 	}
+	// --no-user waits to hear the host leaves USER.md out (host-mode).
 	let begin = () => {
 		begun = true
+		if (job.noUser && !noUser) return
 		if (job.session) return target()
 		id = connection.nextId()
-		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, ...(job.noUser && { noUser: true }), ...(job.noIntro && { noIntro: true }), id })
+		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, ...(job.noIntro && { noIntro: true }), id })
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return
+		if (e.type === 'host-mode' && job.noUser) {
+			if (!e.noUser) return fail('--no-user: another Hal process hosts this home with USER.md; quit it or drop --no-user', 2)
+			noUser = true
+			return begun && !id ? begin() : undefined
+		}
 		if (e.type === 'tabs') {
 			targets = { tabs: e.tabs.map((t) => t.id), sessions: e.sessions ?? targets?.sessions ?? e.tabs.map((t) => t.id) }
 			if (job.session) target()

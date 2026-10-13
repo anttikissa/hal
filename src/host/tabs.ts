@@ -145,7 +145,7 @@ function insert(id: string, index: number): void {
 	open.splice(Math.max(0, Math.min(open.length, index)), 0, id)
 }
 
-function create(cwd: string, after?: string, autoclose = false, noUser = false, interactive = true, timezone?: string): string {
+function create(cwd: string, after?: string, autoclose = false, interactive = true, timezone?: string): string {
 	// The very first tab of a fresh home is the offline welcome guide.
 	let first = settings.value('intro') !== false && tabs.file().open.length === 0 && !sessions.newest()
 	let open = tabs.file().open
@@ -154,7 +154,6 @@ function create(cwd: string, after?: string, autoclose = false, noUser = false, 
 	let id = sessions.create({
 		cwd: parent?.cwd ?? cwd,
 		autoclose,
-		noUser,
 		interactive,
 		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
 	}).id
@@ -210,7 +209,7 @@ function start(cwd?: string, last?: string, timezone?: string): Outcome {
 	let open = tabs.file().open
 	let inCwd = (id: string) => cwd === undefined || resolve(sessions.open(id).cwd) === resolve(cwd)
 	let found = last !== undefined && open.includes(last) && inCwd(last) ? last : open.find(inCwd)
-	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd(), undefined, false, false, true, timezone) }
+	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd(), undefined, false, true, timezone) }
 }
 
 function is(c: Command): c is TabCommand {
@@ -223,7 +222,7 @@ function act(c: TabCommand, timezone?: string): Outcome {
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
 	if (c.type === 'tab-new' && c.noIntro) config.update({ intro: false })
-	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.noUser, c.interactive, timezone) }
+	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.interactive, timezone) }
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last, timezone)

@@ -38,6 +38,7 @@ import { rebaseRows } from '../common/rebase-rows.ts'
 import { rebasePlans } from './rebase-plans.ts'
 import { queueEdits } from './queue-edits.ts'
 import { recap } from './recap.ts'
+import { promptCache } from './prompt-cache.ts'
 import { models } from './models.ts'
 import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
@@ -64,6 +65,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	warnings.send(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	if (process.env.HOME) client.deliver({ type: 'home', path: process.env.HOME })
+	client.deliver({ type: 'host-mode', noUser: promptCache.state.noUser })
 	// The tabs come with the first events, so no client has to ask; their
 	// states need the open tabs' marks, caught up in slices first. Held
 	// commands run a turn of the event loop after the tabs (task 7j).

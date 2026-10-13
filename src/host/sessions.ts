@@ -40,7 +40,6 @@ function validate(id: string, data: Record<string, any>): void {
 	for (let key of ['owner', 'parent']) if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key]))) throw new Error(`${path}: invalid ${key}`)
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
 	if (data.interactive !== undefined && typeof data.interactive !== 'boolean') throw new Error(`${path}: invalid interactive`)
-	if (data.noUser !== undefined && typeof data.noUser !== 'boolean') throw new Error(`${path}: invalid noUser`)
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
 	if (data.startingState !== undefined && (!data.startingState || typeof data.startingState.cwd !== 'string' || typeof data.startingState.model !== 'string' || typeof data.startingState.autoclose !== 'boolean')) throw new Error(`${path}: invalid startingState`)
@@ -107,7 +106,7 @@ function claimId(now = new Date()): string {
 	}
 }
 
-function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean; noUser?: boolean; interactive?: boolean }): SessionMeta {
+function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean; interactive?: boolean }): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
 	let meta: SessionMeta = {
@@ -119,7 +118,6 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		startingState: { cwd: init.cwd, model: models.qualified(selection.id, selection.effort), autoclose: init.autoclose ?? false },
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
-		...(init.noUser && { noUser: true }),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
 		// Its calls are what the user typed: shown whole (task hyt).
 		...(selection.id === 'hal/tool' && { blocks: { tool: 'long' } }),

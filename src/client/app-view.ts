@@ -45,6 +45,7 @@ function view(): View {
 	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing, st.prompt.text)
 	if (versions.state.newCode) v.newCode = true
+	if (appView.state.noUser) v.noUser = true
 	let activity = t && appView.activity(t)
 	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
@@ -123,7 +124,8 @@ export const appView = {
 	// shown where the role would be.
 	// `plugins`: the plugin sync indicator of a remote terminal (b81).
 	// `example`: the prompt example's clock (placeholders.follow).
-	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined, example: {} as PromptExample },
+	// `noUser`: the host runs with --no-user (host-mode event).
+	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined, example: {} as PromptExample, noUser: false },
 	view,
 	status,
 	activity,

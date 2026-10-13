@@ -126,6 +126,7 @@ function onEvent(event: Event): void {
 		return app.onTabs(event.tabs)
 	}
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
+	if (event.type === 'host-mode') return void ((appView.state.noUser = event.noUser), app.show())
 	if (event.type === 'restart') return restart.withHost()
 	if (event.type === 'restart-ask') return restart.ask(event, app.open)
 	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text') return clientCommands.event(event)

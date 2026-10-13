@@ -161,7 +161,7 @@ export type Command = (
 	// command that creates, reopens or picks a tab names it in its ack.
 	// After an open tab: inherit its cwd, model and effort; otherwise use
 	// cwd and the default model, appending the new tab.
-	| { type: 'tab-new'; cwd: string; after?: string; autoclose?: boolean; noUser?: boolean; noIntro?: boolean; interactive?: boolean }
+	| { type: 'tab-new'; cwd: string; after?: string; autoclose?: boolean; noIntro?: boolean; interactive?: boolean }
 	// Out of the tabs, remembering its position; the session and any
 	// running turn carry on. Closing the last tab is refused.
 	| { type: 'tab-close'; sessionId: string }
@@ -335,6 +335,8 @@ export type Event =
 	| { type: 'version'; version: string }
 	// The host user's home directory, for showing paths from ~.
 	| { type: 'home'; path: string }
+	// Host-process options, sent on connect: noUser is hal --no-user.
+	| { type: 'host-mode'; noUser: boolean }
 	| { type: 'restart' } // /restart all: terminals exit; web waits for host return.
 	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
 	// Repaint terminals following this session; no reload on the web.
