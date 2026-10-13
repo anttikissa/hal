@@ -33,7 +33,7 @@ export const tool: Tool = {
 			background: { type: 'boolean', description: 'Start asynchronous task; the result will be delivered as a message from "bash t<number>"' },
 			// Its effect stays unsaid (task ker): steering lets it finish.
 			unsafeToStop: { type: 'boolean', description: 'Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning).' },
-			modifies: { type: 'array', items: { type: 'string' }, description: 'Absolute or cwd-relative paths/globs this command creates, changes or deletes. All directories are accepted; change tracking includes only cwd and /tmp files, excluding .git, node_modules, Git-ignored untracked files and aliases to excluded files.' },
+			modifies: { type: 'array', items: { type: 'string' }, description: "Absolute or cwd-relative paths/globs this command creates, changes or deletes. Don't include paths starting with .git/ or node_modules/." },
 		},
 		required: ['command'],
 	},
