@@ -4,27 +4,12 @@
 import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
-import { effort, type Capability } from './effort.ts'
+import { effort } from './effort.ts'
+import { compatCatalog } from './compat-catalog.ts'
+export type { Endpoint } from './compat-catalog.ts'
 import { effort as vocabulary, type EffortLevel } from '../common/effort.ts'
 import { effortCatalog } from './effort-catalog.ts'
 
-// keyEnv names the environment variable holding the API key, used when
-// the credentials file stores none for the endpoint (api-keys.ts);
-// without keyEnv (local servers) no Authorization header is sent.
-// `login`: the /login argument that stores the key, named in messages.
-// `images: false`: the server rejects image input, so the model is told
-// in text that one was attached instead.
-// `models: false`: no GET /models; the picker lists models.dev's.
-// `headers`: extra headers for each chat request.
-export type Endpoint = {
-	baseUrl: string
-	keyEnv?: string
-	login?: string
-	images?: false
-	models?: false
-	headers?: (req: ProviderRequest) => Record<string, string>
-	capability?: (model: string) => Capability | undefined
-}
 
 // `images`: whether the endpoint takes image input.
 function toMessages(req: ProviderRequest, images = true): unknown[] {
@@ -164,15 +149,6 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 	return { base: ep.baseUrl.replace(/\/+$/, ''), headers }
 }
 
-// Load verified descriptors lazily; never fetch to interpret a saved selection.
-function cachedCapability(name: string, model: string): Capability | undefined {
-	if (name === 'openrouter' && openaiCompat.state.catalog !== effortCatalog.file()) {
-		openaiCompat.state.capabilities.clear()
-		for (let [id, cap] of Object.entries(effortCatalog.read())) openaiCompat.state.capabilities.set(id, { ...cap, wire: (level) => ({ reasoning: { effort: level } }) })
-		openaiCompat.state.catalog = effortCatalog.file()
-	}
-	return openaiCompat.state.capabilities.get(`${name}/${model}`)
-}
 function create(name: string): Provider {
 	let p: Provider = {
 		request(req) {
@@ -214,24 +190,12 @@ function init(): void {
 }
 
 export const openaiCompat = {
-	state: { capabilities: new Map<string, Capability>(), catalog: '' },
-	cachedCapability,
-	// Provider name -> endpoint. Replace from local.ts to add servers or
-	// point one elsewhere.
-	endpoints(): Record<string, Endpoint> {
-		return {
-			openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
-			// OpenCode asks clients to name themselves and the session.
-			'opencode-go': {
-				baseUrl: 'https://opencode.ai/zen/go/v1',
-				keyEnv: 'OPENCODE_API_KEY',
-				login: 'opencode',
-				models: false,
-				headers: (req) => ({ 'user-agent': 'hal', ...(req.sessionId && { 'x-opencode-session': req.sessionId }) }),
-			},
-			ollama: { baseUrl: 'http://localhost:11434/v1' },
-		}
-	},
+	get state() { return compatCatalog.state },
+	set state(value: typeof compatCatalog.state) { compatCatalog.state = value },
+	get cachedCapability() { return compatCatalog.cachedCapability },
+	set cachedCapability(value: typeof compatCatalog.cachedCapability) { compatCatalog.cachedCapability = value },
+	get endpoints() { return compatCatalog.endpoints },
+	set endpoints(value: typeof compatCatalog.endpoints) { compatCatalog.endpoints = value },
 	toMessages,
 	body,
 	parse,

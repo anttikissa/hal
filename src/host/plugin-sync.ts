@@ -25,7 +25,6 @@ import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
-import { pluginSyncSession } from './plugin-sync-session.ts'
 import { plugins } from './plugins.ts'
 
 type Client = { deliver(event: Event): void }
@@ -119,7 +118,7 @@ function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): 
 		let names = [...new Set([...pluginSync.portable(), ...cmd.names])].filter((n) => !ignore.has(n)).sort()
 		return reply({ home: pluginSync.home(), heads: names.map(pluginSync.headOf), ignored: [...ignore] })
 	}
-	if (cmd.op === 'step') return pluginSyncSession.step(cmd), reply({})
+	if (cmd.op === 'step') return (require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.step(cmd), reply({})
 	if (cmd.op === 'history') return reply({ versions: cmd.files.filter((f) => !ignore.has(f)).flatMap(pluginSync.versionsOf) })
 	if (cmd.op === 'content') {
 		let allowed = new Set([...pluginHistory.state.versions.values()].filter((v) => v.hash && !ignore.has(v.file)).map((v) => v.hash!))

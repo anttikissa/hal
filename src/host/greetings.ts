@@ -4,12 +4,10 @@ import { mkdirSync } from 'fs'
 import { clock } from './clock.ts'
 import { clients } from './clients.ts'
 import { history } from './history.ts'
-import { intro } from './intro.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { profile } from './profile.ts'
-import { toolModel } from './tool-model.ts'
 
 type Period = 'neutral' | 'morning' | 'afternoon' | 'evening'
 
@@ -102,10 +100,12 @@ function open(id: string, timezone = clients.timezone(id)): void {
 	let meta = sessions.open(id)
 	if ((meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
 	if (meta.model === 'hal/tool') {
+		let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')
 		history.append(id, { type: 'output', text: toolModel.welcome, synthetic: true })
 		return
 	}
 	if (meta.model === 'hal/intro') {
+		let { intro } = require('./intro.ts') as typeof import('./intro.ts')
 		let text = intro.accounts().names.length
 			? 'This is Hal, running the hal/intro model. Pick a model with /model or Ctrl-M.'
 			: `This is Hal, running the hal/intro model. No provider configured - run /login to get started.

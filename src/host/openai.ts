@@ -10,24 +10,15 @@
 // replayed as a reasoning item whose summary is rebuilt from the text.
 
 import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
-import { auth, jwtClaims } from './auth.ts'
+import { auth } from './auth.ts'
+import { provider as catalog } from './providers/openai.ts'
 import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
 import { openaiWs } from './openai-ws.ts'
 
-const SCOPE = 'api.responses.write'
-// A ChatGPT subscription's input limit: 400k window = 272k input + 128k
-// reserved output (old Hal: subscriptionContextWindow).
-const SUBSCRIPTION_WINDOW = 272_000
-
-function claims(token: string): { accountId?: string; api: boolean } {
-	let c = jwtClaims(token)
-	let id = c?.['https://api.openai.com/auth']?.chatgpt_account_id
-	let api = [c?.scp, c?.scope].some((v) => (Array.isArray(v) ? v.includes(SCOPE) : typeof v === 'string' && v.split(/\s+/).includes(SCOPE)))
-	return { ...(typeof id === 'string' && id && { accountId: id }), api }
-}
+const claims = (token: string) => catalog.claims(token)
 
 function input(req: ProviderRequest): unknown[] {
 	let out: unknown[] = []
@@ -204,15 +195,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	}
 }
 
-// Whether the first openai account is a ChatGPT subscription token.
-function subscription(): boolean {
-	try {
-		let entry = auth.all('openai').list[0]?.entry
-		return typeof entry?.accessToken === 'string' && !claims(entry.accessToken).api
-	} catch {
-		return false
-	}
-}
 
 // The models a ChatGPT subscription can use are the Codex backend's own
 // visible list: models.dev's OpenAI list has API-only ones ("gpt-5.6",
@@ -238,20 +220,6 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	return [...new Set(good.flatMap((r) => r.value))]
 }
 
-// Hash only; credential values never enter the model list or diagnostics.
-function modelsKey(): string {
-	try {
-		return String(Bun.hash(JSON.stringify(auth.all('openai').list.map((a) => a.entry))))
-	} catch {
-		return 'unavailable'
-	}
-}
-
-// A subscription caps input at 272k whatever the API model allows.
-function contextWindow(model: string): number | undefined {
-	let listed = modelsDev.contextWindow(`openai/${model}`)
-	return openai.subscription() ? Math.min(listed ?? SUBSCRIPTION_WINDOW, SUBSCRIPTION_WINDOW) : listed
-}
 
 // Registers the provider. Idempotent.
 function init(): void {
@@ -274,16 +242,19 @@ export const openai = {
 	codexUrl: 'https://chatgpt.com/backend-api/codex/responses',
 	codexModelsUrl: 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
 	listModels,
-	modelsKey,
-	// Reasoning effort for a model; undefined leaves the model's default.
-	effort: (_model: string): string | undefined => undefined,
-	// Verified GPT ids, including current alias targets, for offline discovery.
-	knownModels: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+	get modelsKey() { return catalog.modelsKey },
+	set modelsKey(value: typeof catalog.modelsKey) { catalog.modelsKey = value },
+	get effort() { return catalog.effort! },
+	set effort(value: NonNullable<typeof catalog.effort>) { catalog.effort = value },
+	get knownModels() { return catalog.knownModels },
+	set knownModels(value: string[]) { catalog.knownModels = value },
 	input,
 	body,
 	request,
 	parse,
-	subscription,
-	contextWindow,
+	get subscription() { return catalog.subscription },
+	set subscription(value: typeof catalog.subscription) { catalog.subscription = value },
+	get contextWindow() { return catalog.contextWindow },
+	set contextWindow(value: typeof catalog.contextWindow) { catalog.contextWindow = value },
 	init,
 }

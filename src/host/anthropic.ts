@@ -6,6 +6,7 @@ import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Us
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
+import { provider as catalog } from './providers/anthropic.ts'
 
 // OAuth tokens are rejected (disguised as a 429) unless the first system
 // block is one of the Claude Code identities; this one claims least.
@@ -256,7 +257,8 @@ export const anthropic = {
 	maxTokens: 64_000,
 	thinkingBudget: 10_000,
 	// Offered when neither the account's list nor models.dev has any.
-	knownModels: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-fable-5', 'claude-sonnet-5'],
+	get knownModels() { return catalog.knownModels },
+	set knownModels(value: string[]) { catalog.knownModels = value },
 	toMessages,
 	body,
 	headers,

@@ -56,7 +56,7 @@ async function fetchList(name: string): Promise<string[] | undefined> {
 	if (!p) return undefined
 	let cached = models.cached(name)
 	if (cached && Date.now() - cached.at < models.ttlMs) return cached.ids
-	let own = p.models ? await models.ask(name, (signal) => p.models!(signal)) : undefined
+	let own = p.models && (p.available?.() ?? true) ? await models.ask(name, (signal) => p.models!(signal)) : undefined
 	if (own) return own
 	let fallback = models.fallback(name)
 	return fallback.length ? fallback.map((m) => `${name}/${m}`) : undefined
@@ -138,7 +138,7 @@ function valid(id: string): boolean {
 	if (/\s/.test(id)) return false
 	if (id.startsWith('hal/')) return !!synthetic.find(id)
 	let slash = id.indexOf('/')
-	return slash > 0 && slash < id.length - 1 && !!provider.state.providers[id.slice(0, slash)]
+	return slash > 0 && slash < id.length - 1 && Object.hasOwn(provider.state.providers, id.slice(0, slash))
 }
 
 // Short names choose the family's preferred model, then a provider we can

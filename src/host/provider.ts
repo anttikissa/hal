@@ -56,6 +56,7 @@ export type Provider = {
 	open?(http: HttpRequest, req: ProviderRequest): Promise<ReadableStream<Uint8Array> | undefined>
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
+	available?(): boolean
 	// The model names it offers (without "provider/"), for the picker.
 	models?(signal: AbortSignal): Promise<string[]>
 	// Non-secret identity of the credentials behind a model catalog.
@@ -288,7 +289,9 @@ async function* stream(
 		yield { type: 'error', message: `Model id must be provider/model, got '${modelId}'` }
 		return
 	}
-	let p = provider.state.providers[id.provider]
+	let p: Provider | undefined
+	try { p = Object.hasOwn(provider.state.providers, id.provider) ? provider.state.providers[id.provider] : undefined }
+	catch (e) { yield { type: 'error', message: errorText(e) }; return }
 	if (!p) {
 		let known = Object.keys(provider.state.providers).join(', ') || 'none'
 		yield { type: 'error', message: `Unknown provider '${id.provider}' (known: ${known})` }

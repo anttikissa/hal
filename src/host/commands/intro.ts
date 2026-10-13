@@ -1,7 +1,6 @@
 // /intro (task vc): switch this tab to hal/intro and start a fresh run
 // at once. Its output marks the restart; the intro greets again after it.
 import type { SlashCommand } from '../commands.ts'
-import { intro } from '../intro.ts'
 import { status } from '../status.ts'
 import { turns } from '../turns.ts'
 
@@ -10,6 +9,7 @@ export const command: SlashCommand = {
 	run(_args, _answers, ctx) {
 		let state = status.stateOf(ctx.sessionId).type
 		if (state !== 'idle' && state !== 'paused' && state !== 'error') return { error: 'finish or pause the current turn first' }
+		let { intro } = require('../intro.ts') as typeof import('../intro.ts')
 		ctx.setModel('hal/intro')
 		ctx.say(intro.restart)
 		if (!status.transition(ctx.sessionId, { type: 'submit' })) turns.start(ctx.sessionId)

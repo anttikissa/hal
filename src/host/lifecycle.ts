@@ -1,12 +1,10 @@
 // Host initialization, role policy and supervised lifetime (task fd1).
 import { settings } from '../common/settings.ts'
-import { anthropic } from './anthropic.ts'
 import { config } from './config.ts'
 import { restartProcess } from './commands/restart.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
-import { openai } from './openai.ts'
-import { openaiCompat } from './openai-compat.ts'
+import { providers } from './providers.ts'
 import { paths } from './paths.ts'
 import { promptFiles } from './prompt-files.ts'
 import { server } from './server.ts'
@@ -16,9 +14,7 @@ import { version } from './version.ts'
 function initHost(): void {
 	paths.init()
 	host.init()
-	anthropic.init()
-	openai.init()
-	openaiCompat.init()
+	providers.init()
 	// Checks only while this process hosts: a peer has no clients.
 	promptFiles.start(host.state.clients)
 }
