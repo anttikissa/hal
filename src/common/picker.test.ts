@@ -202,6 +202,9 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 	expect(cancel.action).toEqual({ type: 'cancel' })
 	let submit = picker.step(st, key('enter'), ids)
 	expect(picker.command('s', submit.state, submit.action as any)?.text).toBe('/model ollama/gpt-oss:20b:low')
+	// A draft at the model's default picks the default, pinning no level.
+	let atDefault = picker.step(picker.open(ids[0]!, ids, {}, capabilities, 'medium'), key('enter'), ids)
+	expect(picker.command('s', atDefault.state, atDefault.action as any)?.text).toBe('/model ollama/gpt-oss:20b:default')
 	let unknown = picker.open(ids[1]!, ids, {}, capabilities)
 	expect(picker.label(unknown, ids[1]!)).toBe('default')
 	expect(picker.label(picker.step(unknown, key('right'), ids).state, ids[1]!)).toBe('none')

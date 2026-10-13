@@ -297,12 +297,16 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 }
 
 // The command Enter sends: switch the session to the selected model, or
-// to the selected category's default.
+// to the selected category's default. A draft at the model's default
+// sends :default, so the session pins no level.
 function command(sessionId: string, st: ModalState, action: Extract<ModalAction, { type: 'submit' }>): { type: 'submit'; sessionId: string; text: string } | undefined {
 	let row = action.item === undefined ? undefined : st.tree?.rows[action.item]
 	let id = row?.id ?? row?.default
-	let selected = st.tree?.searchEffort ?? (id === undefined ? undefined : picker.level(st, id))
-	return id === undefined ? undefined : { type: 'submit', sessionId, text: `/model ${id}${selected === undefined ? '' : `:${selected}`}` }
+	if (id === undefined) return undefined
+	let cap = st.tree?.capabilities?.[id]
+	let selected = st.tree?.searchEffort ?? picker.level(st, id)
+	if (st.tree?.searchEffort === undefined && selected !== undefined && selected === (cap?.policy ?? cap?.default)) selected = 'default'
+	return { type: 'submit', sessionId, text: `/model ${id}${selected === undefined ? '' : `:${selected}`}` }
 }
 // The level the picker's effort draft gives `id`: its nearest one.
 function level(st: ModalState, id: string): string | undefined {
