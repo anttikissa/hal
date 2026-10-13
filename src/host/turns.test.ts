@@ -150,7 +150,7 @@ test("a round's calls run concurrently, results in call order", async () => {
 	let id = toolSession(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	let bash = (callId: string, command: string): StreamEvent => ({ type: 'tool_call', id: callId, name: 'bash', input: { command, description: 'x', timeout: 5000 } })
+	let bash = (callId: string, command: string): StreamEvent => ({ type: 'tool_call', id: callId, name: 'bash', input: { command, description: 'x', timeout: 5 } })
 	// The first waits for what the second does: run in order, it times out.
 	calls[0]!.push(bash('t1', 'until [ -f ready ]; do sleep 0.01; done; echo saw it'), bash('t2', 'touch ready'), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)

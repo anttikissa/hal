@@ -127,7 +127,7 @@ function help(tool: Tool<unknown>): string {
 	let { properties = {}, required = [] } = schema(tool)
 	let fields = Object.entries(properties).map(([key, p]) => {
 		let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : p.type ?? 'value'
-		let text = tool.syntax?.fields?.[key] ?? p.description
+		let text = p.description
 		return `  ${key} (${type}${required.includes(key) ? ', required' : ''})${text ? `: ${text}` : ''}`
 	})
 	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...nativeTool.usage(tool).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')

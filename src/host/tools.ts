@@ -46,7 +46,7 @@ export type ToolOutput = string | { text: string; image?: { mediaType: string; d
 // prompt explains the tool already); `usage` lists exact syntax lines
 // for HELP (default: made from the schema); `positional` names the
 // fields string arguments fill, in order (default: required fields);
-// `fields` words a field for HELP where it differs from the schema;
+// field descriptions come only from `parameters`;
 // `resolve` maps the text after the name to a call when the grammar is
 // special, possibly of another tool. `aliases` silently accepts field
 // names models were seen to send: each maps to the real field, or null
@@ -55,7 +55,6 @@ export type SyntaxSpec = {
 	summary?: string | false
 	usage?: string[]
 	positional?: string[]
-	fields?: Record<string, string>
 	aliases?: Record<string, string | null>
 	resolve?(raw: string, ctx?: CallContext): { name: string; input: Record<string, unknown> }
 }

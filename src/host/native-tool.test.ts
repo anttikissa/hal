@@ -31,7 +31,7 @@ test('shared help and ordinary validation do not teach purpose comments', async 
 })
 
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {
-	expect(nativeTool.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2000, modifies: ['a.ts'], description: 'Check it' } })
+	expect(nativeTool.resolve('bash /* Check */ "ls -l" /* it */ { timeout: 2, modifies: ["a.ts"] }')).toEqual({ name: 'bash', input: { command: 'ls -l', timeout: 2, modifies: ['a.ts'], description: 'Check it' } })
 	expect(nativeTool.resolve('# note\n\nREAD "a b.ts":3-')).toEqual({ name: 'read', input: { path: 'a b.ts', offset: 3 } })
 	expect(nativeTool.resolve('READ https://example.com/x:80')).toEqual({ name: 'read_url', input: { url: 'https://example.com/x:80' } })
 	expect(nativeTool.resolve('COMMAND /rename Fix it')).toEqual({ name: 'command', input: { command: '/rename Fix it' } })
@@ -163,7 +163,7 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	let id = created(client(), testHome())
 	let help = (await act(id, 'HELP bash')).output
 	expect(help).toContain('BASH "<command>"')
-	expect(help).toContain('timeout (integer): Seconds')
+	expect(help).toContain('timeout (number): Seconds')
 	expect((await act(id, 'HELP')).output).toContain('EDIT "<path>@<hash>"')
 	let summary = nativeTool.summary()
 	for (let name of ['SPAWN', 'WAIT', 'STOP', 'BASH']) expect(summary).not.toContain(name)

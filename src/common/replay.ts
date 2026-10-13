@@ -123,7 +123,9 @@ type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
 // text the model wrote (an unresolved one as its cmd), and a call from
 // before the one native tool as the equivalent NAME { fields } text.
 function asNative(b: ToolCallBlock): ToolCallBlock {
-	let text = b.cmd ?? (b.name === 'tool' && typeof b.input.cmd === 'string' ? b.input.cmd : `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
+	// Calls stored before the native tool kept BASH timeouts in ms.
+	let input = b.name === 'bash' && typeof b.input.timeout === 'number' ? { ...b.input, timeout: b.input.timeout / 1000 } : b.input
+	let text = b.cmd ?? (b.name === 'tool' && typeof b.input.cmd === 'string' ? b.input.cmd : `${b.name.toUpperCase()} ${ason.stringify(input, 'short')}`)
 	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
 }
 

@@ -42,7 +42,6 @@ export const tool: Tool<ToolOutput> = {
 	syntax: {
 		summary: false,
 		usage: [usage],
-		fields: { lease: 'path@hash from READ', edits: 'The { range, lines } objects after the lease' },
 		resolve(raw) {
 			let { values, purpose, unclosed } = callText.values(raw)
 			let [named, ...edits] = values
@@ -58,7 +57,7 @@ export const tool: Tool<ToolOutput> = {
 		properties: {
 			path: { type: 'string', description: 'File path, absolute or relative to the working directory' },
 			hash: { type: 'string', description: 'The lease hash READ showed after @' },
-			edits: { type: 'array', items: { type: 'object' }, description: 'Changes: { range: "start-end", lines: [...] }' },
+			edits: { type: 'array', items: { type: 'object' }, description: 'The { range, lines } objects after the lease' },
 			description: { type: 'string', description: 'What the edit does, for the user' },
 		},
 		required: ['path', 'hash', 'edits'],

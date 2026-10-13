@@ -5,7 +5,6 @@
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
-import { nativeTool } from '../native-tool.ts'
 import type { Tool } from '../tools.ts'
 
 // The command without a leading `cd <cwd> &&`: it runs in cwd anyway,
@@ -21,49 +20,38 @@ export const bash = { withoutCd }
 export const tool: Tool = {
 	name: 'bash',
 	description:
-		'Run a command with bash -c in the working directory. Returns the exit status and stdout and stderr combined. ' +
-		'No stdin; long output is cut. After the timeout the command and its children are killed. ' +
-		'background: true returns at once with the recorded call card number (unless the command fails within 100 ms) and delivers the result later as a message from "bash t<number>".',
+		'Run a command with bash -c in the working directory. Long output is cut.',
 	parameters: {
 		type: 'object',
 		properties: {
 			command: { type: 'string', description: 'The command to run' },
 			description: {
 				type: 'string',
-				description: 'One short plain-language sentence for the user: what the command does and why, e.g. "Show the first 40 lines of the config"',
+				description: 'One short plain-language sentence for the user: e.g. "Show the first 40 lines of the config"',
 			},
-			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000 foreground, 600000 background)' },
-			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
+			timeout: { type: 'number', description: 'Seconds (default: 120 foreground, 600 background)' },
+			background: { type: 'boolean', description: 'Start asynchronous task; the result will be delivered as a message from "bash t<number>"' },
 			// Its effect stays unsaid (task ker): steering lets it finish.
 			unsafeToStop: { type: 'boolean', description: 'Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning).' },
 			modifies: { type: 'array', items: { type: 'string' }, description: 'Absolute or cwd-relative paths/globs this command creates, changes or deletes. All directories are accepted; change tracking includes only cwd and /tmp files, excluding .git, node_modules, Git-ignored untracked files and aliases to excluded files.' },
 		},
 		required: ['command'],
 	},
-	// Call-text timeouts are in seconds; the tool's in ms.
 	syntax: {
 		summary: false,
 		positional: ['command'],
 		aliases: { cmd: 'command' },
-		usage: ['BASH "<command>" [{ timeout, background, unsafeToStop, modifies }]'],
-		fields: { timeout: 'Seconds (default: 120 foreground, 600 background)' },
-		resolve(raw) {
-			let input = nativeTool.generic(tool, raw)
-			if (input.timeout !== undefined) {
-				if (typeof input.timeout !== 'number' || !(input.timeout > 0)) throw new Error(`BASH timeout is a positive number of seconds, got ${JSON.stringify(input.timeout)}`)
-				input.timeout = Math.round(input.timeout * 1000)
-			}
-			return { name: 'bash', input }
-		},
+		usage: ['BASH "<command>" [ { timeout, background, unsafeToStop, modifies } ]'],
 	},
 	async run(input, ctx) {
 		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
 		if (input.description !== undefined && (typeof input.description !== 'string' || !input.description.trim())) throw new Error('description must be a non-empty sentence; the command did not run')
+		if (input.timeout !== undefined && (typeof input.timeout !== 'number' || !Number.isFinite(input.timeout) || input.timeout <= 0)) throw new Error(`timeout must be a positive number of seconds, got ${JSON.stringify(input.timeout)}; the command did not run`)
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
 		if (input.unsafeToStop !== undefined && typeof input.unsafeToStop !== 'boolean') throw new Error('unsafeToStop must be a boolean; the command did not run')
 		let patterns = fileChanges.validate(input.modifies)
 		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
-		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined
+		let given = input.timeout === undefined ? undefined : Math.round((input.timeout as number) * 1000)
 		let observation = await fileChanges.begin(ctx, patterns)
 		let launched = false
 		let launch = () => {

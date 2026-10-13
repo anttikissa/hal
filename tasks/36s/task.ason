@@ -1,0 +1,10 @@
+{
+	title: 'Single-source tool fields and timeout units',
+	spec: 'Each tool declares its fields, types and user-facing descriptions once in parameters. HELP consumes those descriptions directly; syntax holds only call-text grammar, aliases, usage and prompt-summary controls, never alternate field descriptions. Preserve the users edited BASH wording. BASH timeout is a finite positive number of seconds in both parsed and direct inputs; convert to milliseconds only at the job-runner boundary. Defaults remain 120 seconds foreground and 600 seconds background, and invalid values fail before starting a command or tracking files. Preserve READ and EDIT help details when removing overrides. Stored legacy BASH calls without cmd keep their original meaning when rendered back into public call text, with legacy millisecond timeouts converted to seconds; newly accepted direct BASH calls retain canonical cmd text so replay is unambiguous. Verify declaration/help agreement, parser and direct timeout parity, invalid timeout rejection, replay compatibility and existing tool behavior.',
+	status: 'done',
+	notes: [
+		'Removed SyntaxSpec.fields; HELP reads parameters descriptions only. READ offset/limit and EDIT edits wording moved into parameters; the unused EDIT lease override was dropped. BASH resolve override removed: timeout stays seconds (type number) end to end and becomes ms only for jobs.exec; run() rejects non-finite or non-positive values before tracking or launching. Replay renders pre-native stored BASH calls with ms timeouts as seconds. Committed with the users own wording edits in bash.ts. Verified native-tool, tools, turns and replay tests, src typecheck and lint.'
+	],
+	needs: ['f70'],
+	foldInto: ['3fv']
+}

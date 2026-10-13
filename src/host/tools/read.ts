@@ -47,15 +47,14 @@ export const tool: Tool<ToolOutput> = {
 	syntax: {
 		summary: false,
 		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-<end>" "<other-path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
-		fields: { offset: 'First line, 1-based: the :start of READ "path:start-end"', limit: 'Number of lines: from :start-end' },
 		resolve: resolveCall,
 	},
 	parameters: {
 		type: 'object',
 		properties: {
 			path: { type: 'string', description: 'File or directory path' },
-			offset: { type: 'integer', minimum: 1 },
-			limit: { type: 'integer', minimum: 0 },
+			offset: { type: 'integer', minimum: 1, description: 'First line, 1-based: the :start of READ "path:start-end"' },
+			limit: { type: 'integer', minimum: 0, description: 'Number of lines: from :start-end' },
 		},
 		required: ['path'],
 	},
