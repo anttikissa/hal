@@ -122,10 +122,11 @@ function usage(tool: Tool<unknown>): string[] {
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }
 
-// HELP for one tool: description, syntax, every field.
+// HELP for one tool: description, syntax, every documented field. A field
+// without a description is internal, e.g. one a tool's own parser fills.
 function help(tool: Tool<unknown>): string {
 	let { properties = {}, required = [] } = schema(tool)
-	let fields = Object.entries(properties).map(([key, p]) => {
+	let fields = Object.entries(properties).filter(([, p]) => p.description).map(([key, p]) => {
 		let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : p.type ?? 'value'
 		let text = p.description
 		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`

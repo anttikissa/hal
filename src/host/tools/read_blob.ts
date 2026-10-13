@@ -10,10 +10,15 @@ import { type Tool, type ToolOutput, tools } from '../tools.ts'
 export const tool: Tool<ToolOutput> = {
 	name: 'read_blob',
 	syntax: { summary: 'read stored output or history' },
-	description: 'Read an immutable blob or history record. Text is paged with offset (first line, 1-based) and limit. For lossless recovery of long/cut lines or JSON use charOffset (1-based character position) instead. Images return as images.',
+	description: 'Read an immutable blob or history record. Text is paged; images return as images.',
 	parameters: {
 		type: 'object',
-		properties: { id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
+		properties: {
+			id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' },
+			offset: { type: 'integer', minimum: 1, description: 'First line, 1-based' },
+			limit: { type: 'integer', minimum: 1, description: 'Number of lines' },
+			charOffset: { type: 'integer', minimum: 1, description: '1-based character position; use instead of offset for lossless recovery of long or cut lines and JSON' },
+		},
 		required: ['id'],
 	},
 	readOnly: true,
