@@ -1,0 +1,10 @@
+{
+	title: 'Version-checked whole-file deletion in multiedit',
+	spec: 'extras/multiedit.ts accepts <path>@<version> delete without a block to remove an existing text file; delete A-B still removes lines. Whole-file deletion requires a nonempty matching READ version, cannot combine with other edits of the same canonical file, and follows existing canonical target semantics. HELP and the generated EDIT guide teach the syntax. Deletions validate before any batch changes, check target identity and bytes at commit, verify absence, and roll back with original contents and permissions if another batch operation fails or cancellation occurs. External replacements are preserved and failed rollback retains recovery copies. Successful output explicitly reports deletion with the removed-line diff and existing edit cards render it. Keep focused regression tests for deletion, validation, rollback and external conflicts.',
+	status: 'done',
+	notes: [
+		'Deletion uses null planned bytes, distinct from an empty-file write, through the existing commit and recovery flow. Rollback recreates deleted files with their saved permission bits and refuses external replacements; cancellation is checked after each verified commit, including the final operation. No idle work or persistent state is added beyond existing batch recovery. Focused multiedit and quirk tests pass (25 tests). Repository typecheck reports existing errors outside these extras; optional extras lint reports existing warnings on trailing then calls and an unused fixture variable.'
+	],
+	needs: ['ybg'],
+	foldInto: ['ybg']
+}

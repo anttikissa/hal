@@ -1,6 +1,6 @@
 import '../src/host/host.ts'
 import { expect, test, spyOn } from 'bun:test'
-import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync, chmodSync, statSync } from 'fs'
 import { multiedit, io, parseBlocks } from './multiedit.ts'
 import { fileChanges } from '../src/host/file-changes.ts'
 import { lease } from '../src/host/lease.ts'
@@ -189,4 +189,69 @@ test('all existing range forms remain accepted; a whole-file write combines with
  const a = file('a', 'original'), hash = lease.hash(readFileSync(a))
  await expect(run([{ path: 'a', hash, new: 'planned' }, { path: 'a', hash, range: 1, lines: ['other'] }])).rejects.toThrow('step 1 (a): a whole-file write cannot be combined')
  expect(readFileSync(a, 'utf8')).toBe('original')
+})
+
+test('version-checked file deletion commits with edits and deletes empty files', async () => {
+ const a = file('a', 'remove\n'), empty = file('empty', ''), b = file('b', 'old')
+ const parsed = parseBlocks(`a@${lease.hash(readFileSync(a))} delete\nempty@${lease.hash(readFileSync(empty))} delete`)
+ const out = await run([...parsed.edits, { path: 'b', old: 'old', new: 'new' }])
+ expect(existsSync(a)).toBe(false)
+ expect(existsSync(empty)).toBe(false)
+ expect(readFileSync(b, 'utf8')).toBe('new')
+ expect(out).toContain(`${a} deleted verified`)
+ expect(out).toContain('-1 remove')
+ expect(() => parseBlocks('a delete')).toThrow('requires the READ version')
+})
+
+test('invalid or mixed file deletions reject the whole batch', async () => {
+ const a = file('a', 'original'), hash = lease.hash(readFileSync(a))
+ for (const edits of [
+  [{ path: 'a', delete: true }], [{ path: 'a', hash: 'stale', delete: true }],
+  [{ path: 'missing', hash, delete: true }], [{ path: 'a', hash, delete: false }],
+  [{ path: 'a', hash, delete: true, new: '' }],
+  [{ path: 'a', hash, delete: true }, { path: 'a', hash, new: '' }],
+  [{ path: 'a', hash, range: 1, lines: [] }, { path: 'a', hash, delete: true }],
+ ]) {
+  await expect(run([{ path: 'new', new: 'created' }, ...edits])).rejects.toThrow('Nothing written')
+  expect(readFileSync(a, 'utf8')).toBe('original')
+  expect(existsSync(`${testHome()}/new`)).toBe(false)
+ }
+})
+
+for (const external of [false, true]) test(`failed batch restores deleted file and permissions; external replacement=${external}`, async () => {
+ const a = file('a', 'original'), b = file('b', 'before'), original = io.save
+ chmodSync(a, 0o751)
+ const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
+  if (args[0] === b) { if (external) writeFileSync(a, 'external'); throw new Error('injected failure') }
+  await original(...args)
+ })
+ try {
+  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }, { path: 'b', old: 'before', new: 'after' }])).rejects.toThrow(external ? 'Recovery copies:' : 'Rolled back all writes')
+  expect(readFileSync(a, 'utf8')).toBe(external ? 'external' : 'original')
+  expect(readFileSync(b, 'utf8')).toBe('before')
+  if (!external) expect(statSync(a).mode & 0o7777).toBe(0o751)
+  else {
+   const dir = readdirSync(paths.tmpDir()).find((p) => p.startsWith('multiedit-'))!
+   expect(readFileSync(`${paths.tmpDir()}/${dir}/0`, 'utf8')).toBe('original')
+  }
+ } finally { mock.mockRestore() }
+})
+
+test('cancellation after deletion restores the file; a changed target is never deleted', async () => {
+ const a = file('a', 'original'), b = file('b', 'original'), original = io.save, controller = new AbortController()
+ let mock = spyOn(io, 'save').mockImplementation(async (...args) => { await original(...args); controller.abort() })
+ try {
+  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }], controller.signal)).rejects.toThrow('Rolled back all writes')
+  expect(readFileSync(a, 'utf8')).toBe('original')
+ } finally { mock.mockRestore() }
+ mock = spyOn(io, 'save').mockImplementation(async (...args) => { writeFileSync(a, 'external'); await original(...args) })
+ try {
+  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }])).rejects.toThrow('changed outside Hal')
+  expect(readFileSync(a, 'utf8')).toBe('external')
+ } finally { mock.mockRestore() }
+ mock = spyOn(io, 'save').mockImplementation(async (...args) => { unlinkSync(a); symlinkSync(b, a); await original(...args) })
+ try {
+  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }])).rejects.toThrow('target identity changed')
+  expect(readFileSync(b, 'utf8')).toBe('original')
+ } finally { mock.mockRestore() }
 })
