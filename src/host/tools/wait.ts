@@ -8,7 +8,7 @@ export const tool: Tool = {
 	syntax: {
 		summary: false,
 		positional: ['targets'],
-		usage: ['WAIT [<session-id|t123> ...]', 'WAIT { targets: ["12-xyz", "t123"] }'],
+		usage: ['WAIT [ "<session id> | <tool call id>" ... ]   // until ONE of them (default: any owned work) finishes, fails or asks'],
 		aliases: { for: 'targets', timeout: null },
 		resolve(raw) {
 			let { values } = callText.values(raw)
