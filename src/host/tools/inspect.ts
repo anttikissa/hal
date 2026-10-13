@@ -112,7 +112,7 @@ export const tool: Tool<ToolOutput> = {
 		summary: 'agent internals and subscription status',
 		// Plain words fill what, scope, fields in order; HELP shows the object form.
 		positional: ['what', 'scope', 'fields'],
-		usage: ['INSPECT <session-id|#t123>', 'INSPECT subscriptions', 'INSPECT [{ what, scope, fields }]'],
+		usage: ['INSPECT "<session id> | <tool call id>"    // e.g. INSPECT 12-xyz, INSPECT t150', 'INSPECT subscriptions', 'INSPECT [{ what, scope, fields }]'],
 		resolve: (raw) => {
 			let { values } = callText.values(raw)
 			if (values.length === 1 && values[0] === 'tabs') return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
