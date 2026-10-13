@@ -92,9 +92,9 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	let blob = /id=([^\]]+)/.exec(marker.output)![1]
 	let recovered = await tools.run({ type: 'tool_call', id: 'r', name: 'read_blob', input: { id: blob, limit: 2 } }, ctx)
 	expect(recovered.output).toContain('first\nretained whole output\n')
-	let original = await tools.run({ type: 'tool_call', id: 'r2', name: 'read_blob', input: { id: `${id}#${result.n}` } }, ctx)
+	let original = await tools.run({ type: 'tool_call', id: 'r2', name: 'read_blob', input: { id: `${id}/${result.n}` } }, ctx)
 	expect(original.output).toContain('first\nretained whole output\n')
-	let tail = await tools.run({ type: 'tool_call', id: 'r3', name: 'read_blob', input: { id: `${id}#${result.n}`, charOffset: 5001 } }, ctx)
+	let tail = await tools.run({ type: 'tool_call', id: 'r3', name: 'read_blob', input: { id: `${id}/${result.n}`, charOffset: 5001 } }, ctx)
 	expect(tail.output).toStartWith(whole.slice(5000, 5100))
 	let rejected = await tools.run({ type: 'tool_call', id: 'bad', name: 'bash', input: { command: `printf '%s' '${marker.output}' > should-not-exist` } }, ctx)
 	expect(rejected.isError).toBe(true)

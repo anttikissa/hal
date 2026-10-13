@@ -37,7 +37,7 @@ function argumentsOf(value: unknown, ref: string): unknown {
 }
 
 function omit(id: string, r: HistoryRecord): HistoryRecord {
-	let ref = `${id}#${r.n}`
+	let ref = `${id}/${r.n}`
 	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>, ...(r.block.cmd !== undefined && { cmd: pruning.argumentsOf(r.block.cmd, ref) as string }) } }
 	if (r.type !== 'user') return r
 	let slot = 0

@@ -50,7 +50,7 @@ test('history addresses recover complete output and match each displayed image s
 		let result = await read(`source/${record.n}.${slot}`)
 		expect(blobs.base64('reader', blocks.resultImages(result)[0]!.blob)).toBe(expected)
 	}
-	expect((await read(`source#u${record.n}.3`, { offset: 151, limit: 1 })).output).toStartWith('payload 150\n')
+	expect((await read(`source/${record.n}.3`, { offset: 151, limit: 1 })).output).toStartWith('payload 150\n')
 	expect(blocks.resultImages(await read(`source/${record.n}`))).toHaveLength(2)
 	for (let ref of [`source/${record.n}.9`, `source/${record.n}.0`, 'source/0', 'source/9007199254740992', 'source/1.9007199254740992', 'source/../1']) expect((await read(ref)).isError).toBe(true)
 })

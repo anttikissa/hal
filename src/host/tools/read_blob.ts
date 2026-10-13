@@ -14,7 +14,7 @@ export const tool: Tool<ToolOutput> = {
 	parameters: {
 		type: 'object',
 		properties: {
-			id: { type: 'string', description: 'A history item (sessionId/35, sessionId/35.1, t35 or sessionId#t35.1), or a legacy blob id or sessionId/blobId' },
+			id: { type: 'string', description: 'A history item: <session id>/35, or t35 in this session (the number on a card, after any kind letter). Add .1 for its first part. Or a blob id from a cut output: <blob id> or <session id>/<blob id>.' },
 			offset: { type: 'integer', minimum: 1, description: 'First line, 1-based' },
 			limit: { type: 'integer', minimum: 1, description: 'Number of lines' },
 			charOffset: { type: 'integer', minimum: 1, description: '1-based character position; use instead of offset for lossless recovery of long or cut lines and JSON' },
@@ -34,7 +34,7 @@ export const tool: Tool<ToolOutput> = {
 			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
 		}
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(reference)
-		let block = /^(?![1-9]\d*(?:\.\d+)?$)(?:([\w-]+)#)?#?[a-z]?([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference) ?? /^([\w-]+)\/([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
+		let block = /^(?:([\w-]+)\/|[a-z])([1-9]\d*)(?:\.([1-9]\d*))?$/.exec(reference)
 		if (ref && block && blobs.find(ref[1] ?? ctx.sessionId, ref[2]!)) block = null
 		if (!ref && !block) throw new Error(`invalid blob or card id: ${JSON.stringify(input.id)}`)
 		if (block) {
