@@ -136,6 +136,10 @@ dependencies, especially on the host path. Never cut trust-boundary
 validation, data-loss handling, security, accessibility or explicit
 requirements.
 
+## Plugins
+
+Hal hot-reloads plugins/*.ts when they change; no restart is needed.
+
 ## Tools
 
 Teach one obvious syntax in prompts, HELP and examples. Accept observed
