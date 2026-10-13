@@ -56,14 +56,19 @@ import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { webLinks } from './web-links.ts'
+import { loginCookie } from '../common/login-cookie.ts'
 
-const cookieName = 'hal'
+// The login cookie's name for the address the browser asked for.
+function cookieName(req: Request): string {
+	let https = req.headers.get('x-forwarded-proto') === 'https'
+	return loginCookie(`${https ? 'https' : 'http'}://${req.headers.get('x-forwarded-host') ?? new URL(req.url).host}`)
+}
 
 type Data = { loginHash?: string; conn?: ReturnType<typeof host.adapt>; stale?: boolean; manualUpdates?: boolean; page?: string; info?: ClientInfo }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
-	let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+	let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(web.cookieName(req)))
 	if (!webAuth.validHash(h)) return false
 	webAuth.touch(h)
 	return true
@@ -86,7 +91,7 @@ function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wron
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
 	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
 	let maxAge = Math.floor(webAuth.tokenMs / 1000)
-	let cookie = new Bun.Cookie(cookieName, out.token, { path: '/', httpOnly: true, secure: !local, sameSite: 'strict', maxAge })
+	let cookie = new Bun.Cookie(web.cookieName(req), out.token, { path: '/', httpOnly: true, secure: !local, sameSite: 'strict', maxAge })
 	return { cookie: cookie.serialize() }
 }
 
@@ -239,10 +244,10 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	if (pathname === '/logout' && req.method === 'POST') {
 		if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
-		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(web.cookieName(req)))
 		if (!webAuth.validHash(h)) return new Response('log in first\n', { status: 401 })
 		webAuth.list(); web.revoke((webAuth.store()[h!] as import('./web-auth.ts').WebLogin).id)
-		return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', 'cache-control': 'no-store' } })
+		return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': `${web.cookieName(req)}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`, 'cache-control': 'no-store' } })
 	}
 	let check = pathname === '/login' && get
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
@@ -267,7 +272,7 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	let v = params.get('v')
 	let manualUpdates = v !== null && params.get('updates') === 'manual'
 	let stale = v !== null && v !== (await web.version())
-	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(web.cookieName(req)))
 	if (!webAuth.validHash(loginHash)) return new Response('log in first\n', { status: 401 })
 	if (srv.upgrade(req, { data: { loginHash, stale, manualUpdates, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
@@ -378,6 +383,7 @@ function revoke(id = 'all'): number {
 }
 
 export const web = {
+	cookieName,
 	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>(), watcher: null as FSWatcher | null },
 	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),

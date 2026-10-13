@@ -12,7 +12,8 @@ The client starts on the tab it left (a Ctrl-R restart keeps the -r arguments th
 		"The browser's WebSocket transport moved from src/web/link.ts to src/common/ws-link.ts (object wsLink) so the terminal shares it; its reload() callback is the terminal's logout. Bun's WebSocket takes { headers } (Cookie and Origin), which host/web.ts checks exactly as for a page, so the host needed no change.",
 		"Login flow and transport live in src/client/remote.ts; main.ts keeps state/remote.ason through liveFiles (client code may not import host) and runs main.initTerminal(origin), skipping host init, version checks and the Ctrl-C pause (terminal.onQuit stays a no-op). The code is read with Bun's prompt() before raw mode.",
 		'The view derivation (view, status, activity, why, blinks) moved out of client/app.ts into client/app-view.ts (appView), which also holds state.remote, the host name the status row shows; app.ts keeps state, events, keys and painting (show, beat).',
-		'Invariant (bug fix): a WebSocket dial that does not open within wsLink.connectMs (10 s) is closed and retried. A dial into a dead network (Mac sleep, network change) otherwise hung for minutes, leaving the terminal on host lost; reconnecting.'
+		'Invariant (bug fix): a WebSocket dial that does not open within wsLink.connectMs (10 s) is closed and retried. A dial into a dead network (Mac sleep, network change) otherwise hung for minutes, leaving the terminal on host lost; reconnecting.',
+		'The remote client sends and reads the login cookie under the same per-origin name as the host (common/login-cookie.ts).'
 	],
 	needs: ['8a', 'rw']
 }
