@@ -1,0 +1,7 @@
+{
+	title: 'AGENTS.md and CLAUDE.md @path imports',
+	spec: "For Claude Code compatibility, a line in AGENTS.md or CLAUDE.md that is only @path (optional surrounding whitespace) is replaced by that file's trimmed text, verbatim like the importing file. The path is relative to the importing file. Imported files may import further files. Trust boundary: the project is trusted, nothing outside it is. The project root is the Git root the importing file belongs to, else the session cwd. The resolved real path (symlinks and .. resolved) must lie inside that root; otherwise, or when the file is missing or unreadable, or would close a cycle, the line stays verbatim. Rationale: running an agent in a directory already trusts its AGENTS.md and the files beside it; a cloned repo must not pull ~/.ssh or Hal auth into the prompt. @ inside a sentence stays as text. Imported files count as prompt sources so the size report shows them. Tests: an in-project import expands; a missing file, an outside path and a symlink escaping the project stay verbatim; a cycle terminates.",
+	status: 'planned',
+	needs: ['krw'],
+	foldInto: ['krw']
+}
