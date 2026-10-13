@@ -12,6 +12,7 @@ test('direct tool mode welcomes, executes each command once and preserves parser
 	let c = client(), id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
 	await until(() => history.readSync(id).some((r) => r.type === 'output' && r.text.includes(toolModel.welcome)))
+	expect(sessions.open(id).blocks).toEqual(sessions.toolBlocks)
 	writeFileSync(`${testHome()}/example.txt`, 'hello')
 	for (let [index, text] of ['BASH ls', 'NO_SUCH_TOOL', 'HELP BASH'].entries()) {
 		c.conn.send({ type: 'submit', sessionId: id, text })

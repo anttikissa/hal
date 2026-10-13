@@ -5,6 +5,9 @@
 import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
 import { effort } from '../effort.ts'
+import { host } from '../host.ts'
+import { liveFiles } from '../live-file.ts'
+import { sessions } from '../sessions.ts'
 
 export const command: SlashCommand & { levels(id: string): string[] } = {
 	help: () => '/model <provider/model or family>[:level]: switch this session immediately, interrupting active work and continuing safely, keeping its effort (snapped to the nearest supported level).\n/model :level changes only the effort; :default clears it.\n/model alone opens the picker (Ctrl-M too).',
@@ -45,7 +48,14 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 		let fallback = cap?.policy ?? cap?.default
 		let cacheChanged = ctx.model === choice.id && choice.id.startsWith('anthropic/') && (ctx.effort ?? fallback) !== (choice.effort ?? fallback)
 		ctx.setModel(next)
-		let welcome = choice.id === 'hal/tool' ? (require('../tool-model.ts') as typeof import('../tool-model.ts')).toolModel.welcome : ''
+		let welcome = ''
+		if (choice.id === 'hal/tool') {
+			welcome = (require('../tool-model.ts') as typeof import('../tool-model.ts')).toolModel.welcome
+			let meta = sessions.open(ctx.sessionId)
+			meta.blocks = { ...meta.blocks, ...sessions.toolBlocks }
+			liveFiles.save(meta)
+			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
+		}
 		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic prompt cache for messages' : ''}${welcome ? `\n\n${welcome}` : ''}` }
 	},
 }

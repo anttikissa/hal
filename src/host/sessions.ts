@@ -119,8 +119,7 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
-		// Its calls are what the user typed: shown whole, failed or not (task hyt).
-		...(selection.id === 'hal/tool' && { blocks: { tool: 'long', failed: 'long' } }),
+		...(selection.id === 'hal/tool' && { blocks: { ...toolBlocks } }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
 	meta.nameVersion = 0
@@ -218,7 +217,11 @@ function newest(): string | undefined {
 	return best?.id
 }
 
+// hal/tool's calls are what the user typed: shown whole, failed or not (task hyt).
+const toolBlocks: NonNullable<SessionMeta['blocks']> = { tool: 'long', failed: 'long' }
+
 export const sessions = {
+	toolBlocks,
 	ids,
 	state: { open: new Map<string, SessionMeta>() },
 	validate,
