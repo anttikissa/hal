@@ -23,7 +23,7 @@ export type HelpInput = {
 	/** The hint while the last prompt is being edited. */
 	editing?: string
 	choices?: string[] | Hint[]
-	transcript?: { state: SessionState }
+	transcript?: { state: SessionState; items?: readonly { type: string }[] }
 	/** A new commit is checked out (task n1). */
 	newCode?: boolean
 	/** The host runs with --no-user. */
@@ -60,7 +60,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 		return parts ? line(`${ansi.sgr({ fg: colors.warning().fg! })}${parts[1]} ${helpRow.paint(parts[2]!.split(', ').map((s) => s.split(': ') as Hint))}`) : line(v.editing, colors.warning().fg!)
 	}
 	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
-	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text)
+	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text, v.transcript?.items)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
 	if (v.noUser) left = `${ansi.sgr({ fg: colors.warning().fg! })}USER.md disabled${ansi.sgr({ fg: h.description! })}${left ? `; ${left}` : ''}`

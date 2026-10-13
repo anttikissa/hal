@@ -1,0 +1,7 @@
+{
+	title: 'Help row advertises ctrl-o: toggle cards',
+	spec: 'With an empty prompt and no retry, pause or error hint, the help row (terminal and web, sendKeys.hints) ends with "ctrl-o: toggle cards" when the transcript has more than 10 items or any tool or thinking item. The check reads item types only, never fold state: the hint must cost nothing per repaint, and "toggle" stays true whether cards are open or closed.',
+	status: 'done',
+	needs: ['h67'],
+	foldInto: ['h67']
+}

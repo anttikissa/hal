@@ -47,14 +47,16 @@ export const sendKeys = {
 	},
 	// The help rows' hints for a session's state and prompt text, shared
 	// by the terminal and the web (task h67). Commands never queue (7t).
-	hints(state: SessionState | undefined, text: string): [string, string][] {
+	// `items`: the transcript's, for the Ctrl-O hint without a fold scan.
+	hints(state: SessionState | undefined, text: string, items: readonly { type: string }[] = []): [string, string][] {
 		let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
 		let esc: [string, string][] = working ? [['esc', 'pause']] : []
 		if (!text.trim()) {
 			if (state?.type === 'retrying') return [['enter', 'retry now'], ...esc]
 			if (state?.type === 'paused') return [['enter', 'continue']]
 			if (state?.type === 'error') return [['enter', 'retry']]
-			return esc
+			let cards = items.length > 10 || items.some((i) => i.type === 'tool' || i.type === 'thinking')
+			return cards ? [...esc, ['ctrl-o', 'toggle cards']] : esc
 		}
 		if (commandDraft(text)) return [['enter', 'run'], ['shift-enter', 'newline'], ...esc]
 		let send = chords.find((c) => sendKeys[c] && sendKeys[c] !== 'queue')

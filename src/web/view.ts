@@ -233,7 +233,7 @@ function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 		let hint = amend.hint(st.editing, text)
 		return hint.slice(hint.indexOf(']') + 2).split(', ').map((s) => s.split(': ') as [string, string])
 	}
-	if (!menu) return sendKeys.hints(st.transcript?.state, text)
+	if (!menu) return sendKeys.hints(st.transcript?.state, text, st.transcript?.items)
 	let busy = !!st.transcript && states.busy(st.transcript.state)
 	let command = sendKeys.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
