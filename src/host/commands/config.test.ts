@@ -9,7 +9,7 @@ import { warnings } from '../warnings.ts'
 
 useHost()
 // As main.ts wires it: every change reaches the clients.
-beforeEach(() => config.init(() => warnings.all()))
+beforeEach(() => void (config.state.onChange = () => warnings.all()))
 afterEach(() => config.reset())
 
 test('bare /config opens the modal with values and what config.ason holds; a change refreshes it', async () => {
@@ -21,7 +21,7 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	let opened = c.of('settings')[0]
 	expect(opened.sessionId).toBe(id)
 	expect(opened.values.push).toBe('false')
-	expect(opened.stored).toEqual({ push: 'push: false' })
+	expect(opened.stored).toEqual({ model: "model: 'anthropic/claude-opus-5-5'", push: 'push: false' })
 	expect(history.readSync(id).some((r) => r.type === 'question')).toBe(false)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config webPort 4321' })
 	await until(() => c.of('settings').length === 2)
@@ -31,12 +31,12 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	expect(text).toStartWith('{\n\t// Every setting, its default and meaning: /config\n')
 	// A key /config writes carries its description and default.
 	expect(text).toContain('\t// Preferred port for the browser client (127.0.0.1); tries through 9100\n\t// if busy. Default: 9001.\n\twebPort: 4321')
-	expect(ason.parse(text)).toEqual({ extra: 'kept', push: false, webPort: 4321 })
+	expect(ason.parse(text)).toEqual({ model: 'anthropic/claude-opus-5-5', extra: 'kept', push: false, webPort: 4321 })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config push true' })
 	await until(() => c.of('settings').length === 3)
 	text = readFileSync(`${testHome()}/config.ason`, 'utf8')
 	expect(text.match(/\/config/g)?.length).toBe(1)
-	expect(ason.parse(text)).toEqual({ extra: 'kept', webPort: 4321 })
+	expect(ason.parse(text)).toEqual({ model: 'anthropic/claude-opus-5-5', extra: 'kept', webPort: 4321 })
 })
 
 test('secret settings never reach history, output, events, or warnings', async () => {

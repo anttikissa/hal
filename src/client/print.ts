@@ -7,7 +7,7 @@ import { connection } from '../common/connection.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { summary } from '../common/summary.ts'
 
-type Job = { prompt: string; cwd: string; model?: string; session?: string; keep?: true; noUser?: true; noIntro?: true; delivery?: Delivery }
+type Job = { prompt: string; cwd: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
 type Out = { out(text: string): void; err(text: string): void }
 
 // begin() once connected; tabs may arrive asynchronously afterward.
@@ -45,7 +45,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		if (job.noUser && !noUser) return
 		if (job.session) return target()
 		id = connection.nextId()
-		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, ...(job.noIntro && { noIntro: true }), id })
+		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, id })
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return
@@ -64,10 +64,15 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		if (e.type === 'ack' && e.id === id && e.tab && !job.session) {
 			session = e.tab
 			connection.send({ type: 'open', sessionId: session })
-			return opened()
+			return job.model ? opened() : undefined
 		}
 		if (!('sessionId' in e) || e.sessionId !== session) return
-		if (e.type === 'snapshot' && job.session && !promptId && !modelId) return opened()
+		if (e.type === 'snapshot' && !promptId && !modelId && (job.session || !job.model)) {
+			// Without a default model a new tab is the intro, which only asks.
+			if (job.session || e.snapshot.meta.model !== 'hal/intro') return opened()
+			connection.send({ type: 'tab-close', sessionId: session })
+			return fail('no default model yet: pass -m <model>, or run hal to choose one', 2)
+		}
 		if (e.type === 'output' && modelId && !promptId) {
 			if (!e.error) return submit()
 			if (!job.session) connection.send({ type: 'tab-close', sessionId: session })

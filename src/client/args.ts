@@ -10,7 +10,7 @@ export type Args =
 	| { kind: 'auth' }
 	| { kind: 'serve'; noUser?: true }
 	| { kind: 'remote'; host?: string }
-	| { kind: 'print'; prompt: string; dir?: string; model?: string; session?: string; keep?: true; noUser?: true; noIntro?: true; delivery?: Delivery }
+	| { kind: 'print'; prompt: string; dir?: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
 	| { kind: 'error'; message: string }
 
 const usage = `Usage:
@@ -19,7 +19,6 @@ const usage = `Usage:
     --session <id|tab>                    send to an existing session (default: soft-steer)
     --steer | --soft-steer | --queue      delivery to a busy session
     --keep                                keep a newly created tab open
-    --no-intro                            never run the first-run guide (saves intro: false)
   hal -r [host]                           follow a remote Hal
   hal serve                               run the foreground headless host
   hal auth                                print a one-time web login code
@@ -49,7 +48,7 @@ function parseRest(argv: string[]): Args {
 	if (first === 'auth' && !rest.length) return { kind: 'auth' }
 	if (first === '-r' && rest.length <= 1) return rest[0] === undefined ? { kind: 'remote' } : rest[0].startsWith('-') ? { kind: 'error', message: `-r: unexpected ${rest[0]}` } : { kind: 'remote', host: rest[0] }
 	if (!argv.includes('-p') && !argv.includes('--print')) return { kind: 'error', message: `unknown arguments: ${argv.join(' ')}` }
-	let opts: { prompt?: string; dir?: string; model?: string; print?: true; session?: string; keep?: true; noIntro?: true; delivery?: Delivery } = {}
+	let opts: { prompt?: string; dir?: string; model?: string; print?: true; session?: string; keep?: true; delivery?: Delivery } = {}
 	let names: Record<string, 'dir' | 'model' | 'session'> = { '-d': 'dir', '--dir': 'dir', '-m': 'model', '--model': 'model', '-s': 'session', '--session': 'session' }
 	for (let i = 0; i < argv.length; i++) {
 		let arg = argv[i]!
@@ -57,10 +56,9 @@ function parseRest(argv: string[]): Args {
 		if (arg === '-p' || arg === '--print') {
 			if (opts.print) return { kind: 'error', message: `${arg} given twice` }
 			opts.print = true
-		} else if (arg === '--keep' || arg === '--no-intro') {
-			let key = ({ '--keep': 'keep', '--no-intro': 'noIntro' } as const)[arg]
-			if (opts[key]) return { kind: 'error', message: `${arg} given twice` }
-			opts[key] = true
+		} else if (arg === '--keep') {
+			if (opts.keep) return { kind: 'error', message: `${arg} given twice` }
+			opts.keep = true
 		} else if (['--steer', '--soft-steer', '--queue'].includes(arg)) {
 			if (opts.delivery) return { kind: 'error', message: 'choose one delivery flag' }
 			opts.delivery = arg.slice(2) as Delivery
@@ -75,7 +73,6 @@ function parseRest(argv: string[]): Args {
 	}
 	if (!opts.prompt?.trim()) return { kind: 'error', message: '-p needs a prompt' }
 	if (opts.session && opts.keep) return { kind: 'error', message: '--keep cannot be used with --session' }
-	if (opts.session && opts.noIntro) return { kind: 'error', message: '--no-intro applies to a new tab, not --session' }
 	if (opts.session && opts.dir) return { kind: 'error', message: '--dir cannot be used with --session; use /cd to change its directory' }
 	let { print: _print, ...job } = opts
 	return { kind: 'print', ...job, prompt: opts.prompt }

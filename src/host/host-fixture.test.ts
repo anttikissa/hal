@@ -75,6 +75,9 @@ export function useHost(withNaming = false, withGreetings = false, withRecaps = 
 	beforeEach(() => {
 		home = mkdtempSync(`${tmpdir()}/hal-host-`)
 		process.env.HAL_HOME = home
+		// Unset, the default model is the intro; tests that want it remove this.
+		writeFileSync(`${home}/config.ason`, "{ model: 'anthropic/claude-opus-5-5' }\n")
+		config.init()
 		liveFiles.onError = () => {}
 		turns.stream = fakeStream
 		// Unrelated exact-replay tests isolate title reminders, not user ownership.

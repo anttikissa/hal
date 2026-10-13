@@ -10,6 +10,7 @@ import { subagents } from './subagents.ts'
 import { status } from './status.ts'
 import { history } from './history.ts'
 import { tabs } from './tabs.ts'
+import { config } from './config.ts'
 
 useHost()
 
@@ -27,14 +28,19 @@ const rejected = (c: C, id: string) => c.events.find((e: any) => e.type === 'rej
 // Opens a new tab and returns its id, as named in the answer.
 const newTab = (c: C, cwd = '/tmp/w', after?: string) => ack(c, send(c, { type: 'tab-new', cwd, ...(after ? { after } : {}) })).tab as string
 
-test('a fresh home opens the offline intro, which starts by itself; later tabs use the configured provider model', async () => {
+test('without a default model, new tabs run the intro, which starts by itself; once one is set, tabs use it', async () => {
+	config.update({ model: 'hal/intro' })
 	let c = client()
 	let first = newTab(c)
 	expect(sessions.open(first).model).toBe('hal/intro')
-	expect(sessions.open(newTab(c)).model).not.toBe('hal/intro')
 	// The intro starts by itself and waits on its first question.
 	await until(() => status.stateOf(first).type === 'blocked')
 	expect(history.readSync(first).some((r) => r.type === 'user')).toBe(false)
+	// A headless tab (hal -p) gets the intro model but no scripted start.
+	let headless = ack(c, send(c, { type: 'tab-new', cwd: '/tmp/w', interactive: false })).tab as string
+	expect(status.stateOf(headless).type).toBe('idle')
+	config.update({ model: 'anthropic/claude-opus-5-5' })
+	expect(sessions.open(newTab(c)).model).toBe('anthropic/claude-opus-5-5')
 })
 
 

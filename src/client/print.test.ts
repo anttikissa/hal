@@ -20,12 +20,25 @@ test('print creates an autoclosing tab and returns a question with exit 3', asyn
 		run.begin()
 		expect(sent[0]).toMatchObject({ autoclose: true, interactive: false })
 		event({ type: 'ack', id: sent[0].id, tab: '07-bah' })
+		event({ type: 'snapshot', sessionId: '07-bah', snapshot: { meta: { model: 'anthropic/claude-opus-5-5' } } as any })
 		let prompt = sent.find((s) => s.type === 'submit')
 		event({ type: 'turn-start', sessionId: '07-bah', provider: 'test', command: prompt.id })
 		event({ type: 'stream', sessionId: '07-bah', event: { type: 'text', text: 'Need input.\n<question>Which file?</question>' } })
 		event({ type: 'turn-end', sessionId: '07-bah', status: 'completed' })
 		expect(await run.done).toBe(3)
 		expect(out.join('')).toBe('Need input.\nWhich file?\n')
+	})
+})
+
+// Invariant (bug fix): without a default model, hal -p exits instead of
+// waiting forever on the intro's question.
+test('print refuses a new tab running the intro', async () => {
+	await harness({ prompt: 'task', cwd: '/tmp' }, async ({ run, sent, event }) => {
+		run.begin()
+		event({ type: 'ack', id: sent[0].id, tab: '07-bah' })
+		event({ type: 'snapshot', sessionId: '07-bah', snapshot: { meta: { model: 'hal/intro' } } as any })
+		expect(await run.done).toBe(2)
+		expect(sent.some((s) => s.type === 'submit')).toBe(false)
 	})
 })
 

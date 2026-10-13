@@ -71,9 +71,6 @@ test('new interactive tabs have one shared durable output, no provider turn, and
 	greetings.random = () => 0
 	let a = client()
 	a.conn.send({ type: 'tab-start', cwd: '/tmp' })
-	let intro = tabs.file().open[0]!
-	expect(sessions.open(intro).model).toBe('hal/intro')
-	expect(history.readSync(intro)).toEqual([])
 	a.conn.send({ type: 'tab-new', cwd: '/tmp' })
 	let id = tabs.file().open[1]!
 	a.conn.send({ type: 'open', sessionId: id })

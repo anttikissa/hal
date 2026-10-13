@@ -146,21 +146,17 @@ function insert(id: string, index: number): void {
 }
 
 function create(cwd: string, after?: string, autoclose = false, interactive = true, timezone?: string): string {
-	// The very first tab of a fresh home is the offline welcome guide.
-	let first = settings.value('intro') !== false && tabs.file().open.length === 0 && !sessions.newest()
+	// A tab on hal/intro (the default model until config.ason sets one) is
+	// the welcome guide, which speaks first: no prompt needed to start it.
 	let open = tabs.file().open
 	let at = after === undefined ? -1 : open.indexOf(after)
 	let parent = at < 0 ? undefined : sessions.open(after!)
-	let id = sessions.create({
-		cwd: parent?.cwd ?? cwd,
-		autoclose,
-		interactive,
-		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
-	}).id
-	if (!first) greetings.open(id, timezone)
+	let model = parent ? models.qualified(parent.model, parent.effort) : undefined
+	let intro = interactive && (model ?? models.defaultModel()) === 'hal/intro'
+	let id = sessions.create({ cwd: parent?.cwd ?? cwd, autoclose, interactive, ...(model && { model }) }).id
+	if (!intro) greetings.open(id, timezone)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
-	// The guide speaks first: no prompt needed to start it.
-	if (first && !status.transition(id, { type: 'submit' })) turns.start(id)
+	if (intro && !status.transition(id, { type: 'submit' })) turns.start(id)
 	return id
 }
 
@@ -221,7 +217,6 @@ function act(c: TabCommand, timezone?: string): Outcome {
 	let f = tabs.file()
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
-	if (c.type === 'tab-new' && c.noIntro) config.update({ intro: false })
 	if (c.type === 'tab-new') outcome = { tab: tabs.create(c.cwd, c.after, c.autoclose, c.interactive, timezone) }
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)

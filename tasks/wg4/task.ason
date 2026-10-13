@@ -1,0 +1,7 @@
+{
+	title: 'hal/intro is the default model until config.ason sets one',
+	spec: 'The model setting defaults to hal/intro (src/common/settings.ts). An interactive tab created on hal/intro, whether from that default or inherited from its source tab, is the first-run guide and starts by itself (src/host/tabs.ts create). A provider tab gets the usual greeting instead. Choosing a model in the intro saves it to config.ason, so later tabs use it. A home whose config.ason sets no model returns to the intro on the next new tab; -m or /model picks a model for one session. This replaces the intro setting and hal -p --no-intro (task m3m): neither exists. hal -p without -m refuses a new tab on hal/intro, exiting 2 with "no default model yet: pass -m <model>, or run hal to choose one", because the intro only asks and -p would wait forever (src/client/print.ts; invariant from a bug found on 13 Oct, and print.test.ts checks it). Host tests run on a home whose config.ason sets anthropic/claude-opus-5-5, loaded by host-fixture.test.ts; a test that wants the intro removes the model.',
+	status: 'done',
+	needs: ['vc'],
+	foldInto: ['m3m']
+}

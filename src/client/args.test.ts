@@ -26,7 +26,6 @@ test('print target and delivery flags validate combinations', () => {
 	expect(args.parse(['--no-user'])).toEqual({ kind: 'terminal', noUser: true })
 	expect(args.parse(['serve', '--no-user'])).toEqual({ kind: 'serve', noUser: true })
 	for (let bad of [['-r', '--no-user'], ['auth', '--no-user'], ['--no-user', '--no-user']]) expect(args.parse(bad).kind).toBe('error')
-	expect(args.parse(['-p', 'answer', '--no-intro'])).toEqual({ kind: 'print', prompt: 'answer', noIntro: true })
-	for (let flags of [['--session'], ['--session', '12', '--keep'], ['--session', '12', '--no-intro'], ['--steer', '--queue'], ['--session', '12', '-d', '/tmp']])
+	for (let flags of [['--session'], ['--session', '12', '--keep'], ['--steer', '--queue'], ['--session', '12', '-d', '/tmp']])
 		expect(args.parse(['-p', 'answer', ...flags]).kind).toBe('error')
 })
