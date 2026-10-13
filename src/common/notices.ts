@@ -13,7 +13,8 @@ export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit' |
 // `color`: the sending tab's project color (colors.project p0..p7), set
 // when tabs have colors; the card takes it instead of the kind's.
 export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string }
-export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; at: number }
+// `href`: where a web card links when it names no session.
+export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; href?: string; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
 
 // A history entry (task py, host/notice-history.ts): `block` is the

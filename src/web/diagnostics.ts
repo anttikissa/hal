@@ -77,6 +77,13 @@ function init(context: () => DiagnosticContext): void {
 	document.addEventListener('visibilitychange', () => { record('visibility', document.visibilityState); report() })
 	addEventListener('pageshow', () => { record('pageshow'); report() })
 	addEventListener('focus', () => { record('focus'); report() })
+	// The main thread blocked for 200 ms or more (Chromium only): a
+	// 'longtask' breadcrumb, ms its length. Read state/web-diag.log on the
+	// host serving the page; context.heap gives the heap at report time.
+	if (PerformanceObserver.supportedEntryTypes?.includes('longtask')) new PerformanceObserver((list) => {
+		for (let e of list.getEntries()) if (e.duration >= 200) { record('longtask'); entries.at(-1)!.ms = Math.round(e.duration) }
+		report()
+	}).observe({ type: 'longtask', buffered: true })
 	record('start'); report()
 }
 

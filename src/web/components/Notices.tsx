@@ -26,7 +26,7 @@ export function Notices(props: { entries: Notice[] }) {
 				</Show>
 				<For each={folded().shown}>
 					{(n) => (
-						<a class={['card', 'notice', n.kind, ...(n.color === undefined ? [] : ['project', 'project-tint', 'tinted'])]} style={n.color === undefined ? undefined : { '--bar': `var(--p${n.color})`, '--tint': `var(--p${n.color}-bg)` }} href={n.session ? router.format(n.session) : undefined} onClick={(e) => click(e, n)}>
+						<a class={['card', 'notice', n.kind, ...(n.color === undefined ? [] : ['project', 'project-tint', 'tinted'])]} style={n.color === undefined ? undefined : { '--bar': `var(--p${n.color})`, '--tint': `var(--p${n.color}-bg)` }} href={n.session ? router.format(n.session) : n.href} onClick={(e) => click(e, n)}>
 							<strong>{n.title}</strong>
 							<span class="line">{n.line}</span>
 						</a>

@@ -1,0 +1,9 @@
+{
+	title: 'Web page memory warning and long-task diagnostics',
+	spec: 'In Chrome the web page checks its JS heap (performance.memory.usedJSHeapSize) once a minute (src/web/memory.ts). From 1 GiB a warning notice stays in the stack: "This page uses N GB of memory", "Click to reload it before it freezes."; clicking the card reloads the page at its current path and query. The notice goes when the heap falls below 1 GiB. Browsers without performance.memory run nothing. The check sends nothing and is always on. A Notice may carry href, the link of a web card that names no session. With webDiagnostics on, every main-thread block of 200 ms or more (PerformanceObserver longtask, Chromium only) becomes a longtask breadcrumb with ms, and every report context carries heap, the JS heap in MiB (0 when unknown). Both land in state/web-diag.log on the host serving the page.',
+	status: 'done',
+	notes: [
+		'performance.memory is bucketed and refreshed at most every 20 minutes without --enable-precise-memory-info (Chromium memory_info.cc), so the warning can lag; it counts JS heap plus external memory, not DOM nodes. measureUserAgentSpecificMemory needs cross-origin isolation (COOP/COEP), which Hal does not set. Origin: a Hal tab reached 4 GB RSS and 100-300% CPU, went blank and stopped answering DevTools; its cause was not captured.'
+	],
+	needs: ['s0', 'qm']
+}
