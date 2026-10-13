@@ -11,7 +11,8 @@
 		'Under Code, AGENTS.md opens with the efficiency principle the user asked to write down (7 Oct): Hal is efficient: small, quick to start, light on CPU, memory, network and tokens; agents treat it so and measure before calling anything costly.',
 		'Live clarification trial 07-las unnecessarily listed all sessions before answering its known child. Replaced blanket inspect-before-send with decision-driven inspection, stable-ID replies, and minimal coordination chatter.',
 		'Superseded by vmj: hierarchical clarification, concise briefs, stable-ID replies and minimal coordination are universal Hal guidance in SYSTEM.md, not repository policy. AGENTS.md retains only development-specific orchestration constraints.',
-		"User is king (2026-10-09): Hal's rules in AGENTS.md, tasks/README.md and tasks are defaults, not limits. Agents build what the user wishes instead of citing what Hal won't do. Hooks must be able to change any default. Current behavior is not a requirement. Replaces 'a convention never overrides the request; explain and ask'."
+		"User is king (2026-10-09): Hal's rules in AGENTS.md, tasks/README.md and tasks are defaults, not limits. Agents build what the user wishes instead of citing what Hal won't do. Hooks must be able to change any default. Current behavior is not a requirement. Replaces 'a convention never overrides the request; explain and ask'.",
+		'Test-once rule (user decision 13 Oct): code unlikely to change is tested once, its tests deleted, and a comment beside it lists the tests to write before changing it. Keeps the suite minimal.'
 	],
 	needs: []
 }

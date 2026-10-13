@@ -54,6 +54,10 @@ remove repetition and empty phrases without weakening requirements.
 State a rule once, positively. Add a negative example only when the rule
 alone would be misread.
 
+When changing SYSTEM.md or this project's AGENTS.md on your own
+initiative, mark each change with an adjacent
+`<!-- TODO - to be reviewed by a human -<current session id> -->` comment.
+
 # Privacy
 
 Diagnostics and telemetry are opt-in, always: off by default, on only
@@ -70,9 +74,18 @@ to operate a host is not permission to publish its configuration.
 
 # Tests
 
-Tests are maintenance debt. Add one only if it catches a plausible
-regression worth its cost. Omit cosmetic tests and those a one-off check
-can replace. When unsure, omit.
+Run tests only for the code being developed unless changes are crosscutting.
+Use ./test <filename-pattern> for focused normal tests; patterns match filenames,
+not test names. ./test runs the normal suite; ./test-expensive runs web tests,
+including Chromium, only when explicitly needed. It accepts the same patterns.
+
+Tests are maintenance debt; keep the suite minimal. Add one only if it
+catches a plausible regression worth its cost. Omit cosmetic tests and
+those a one-off check can replace. When unsure, omit.
+
+Test code unlikely to change once, then delete the tests and leave a
+comment beside the code: "Tested once, then the tests were deleted. If
+you change this code, first write tests for: <cases>."
 
 Delete a flaky test: one that sometimes fails without a bug teaches
 everyone to ignore red. Never retry, lengthen its timeout or skip it.
@@ -95,13 +108,34 @@ dependencies, especially on the host path. Never cut trust-boundary
 validation, data-loss handling, security, accessibility or explicit
 requirements.
 
+## Tools
+
+Teach one obvious syntax in prompts, HELP and examples. Accept observed
+deviations when the request has only one possible meaning; preserve
+validation, security checks and data-loss handling. Use benchmarks to
+find rejected but unambiguous calls, add the needed leniency and cover
+the observed case with a focused regression test. Reject ambiguous calls
+with an explanation and the canonical syntax.
+
 ## Design checks
 
-- A convention never overrides the user's request. If they conflict,
-  explain the conflict and ask.
+- Add capabilities only as tools behind the one native `tool`, never
+  as new native tool descriptions, including in plugins and benchmark
+  builds. Tools disclose detail progressively (HELP) and let the tool
+  set change without busting the prompt cache.
+- Configure with command-line flags (e.g. `hal -p --no-user`), not
+  environment variables: env vars are hard to discover and cumbersome
+  to use.
+- The user is king. Hal's rules (UI, look, layout, tasks/) describe
+  Hal's defaults, not limits on what the user may want. Never answer a
+  wish with what Hal "won't" do: build it. Make hooks able to change
+  any default. When a request changes a tracked default, name the rule
+  it replaces once, then do it and update that rule. Plugins may do
+  anything the user wants, even what Hal's rules forbid (unreadable
+  text, dim, fades): the rules bind Hal's defaults, not the user.
 - Do not invent requirements. Trace each requirement and its rationale
   to the user's request or a concrete constraint; distinguish design
-  choices from requirements.
+  choices from requirements. Current behavior is not a requirement.
 - Before finishing, ask: "What does this cost after a day? With 10×
   the data?" Check repeated work, elapsed-time loops and growing state.
 

@@ -79,9 +79,13 @@ Use ./test <filename-pattern> for focused normal tests; patterns match filenames
 not test names. ./test runs the normal suite; ./test-expensive runs web tests,
 including Chromium, only when explicitly needed. It accepts the same patterns.
 
-Tests are maintenance debt. Add one only if it catches a plausible
-regression worth its cost. Omit cosmetic tests and those a one-off check
-can replace. When unsure, omit.
+Tests are maintenance debt; keep the suite minimal. Add one only if it
+catches a plausible regression worth its cost. Omit cosmetic tests and
+those a one-off check can replace. When unsure, omit.
+
+Test code unlikely to change once, then delete the tests and leave a
+comment beside the code: "Tested once, then the tests were deleted. If
+you change this code, first write tests for: <cases>."
 
 Delete a flaky test: one that sometimes fails without a bug teaches
 everyone to ignore red. Never retry, lengthen its timeout or skip it.
