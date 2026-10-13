@@ -149,10 +149,10 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 		// name and ID are details. A singleton such as Haiku needs only
 		// its short name.
 		let name = names[id]
-		let label = family ? leaf : name ? titles.shortName(id, name) : id
+		let label = id.startsWith('hal/') ? id : family ? leaf : name ? titles.shortName(id, name) : id
 		out.items.push(`${indent}${id === current ? '✓ ' : '  '}${label}`)
 		// Rows outside a family still need the effort cell (task r7r).
-		out.values.push(family ? `\t${name ?? ''}\t${id}` : '\t\t')
+		out.values.push(family ? `\t${name ?? ''}\t${id}` : id.startsWith('hal/') ? `\t${name ?? ''}\t` : '\t\t')
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)

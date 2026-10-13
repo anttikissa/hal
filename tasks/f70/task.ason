@@ -1,0 +1,11 @@
+{
+	title: 'HAL model descriptions and BBS tool welcome',
+	spec: 'The terminal and web model pickers keep the hal/* IDs as labels and show short searchable descriptions beside all built-in HAL models: direct tools without AI, scroll testing, steering and queue testing, plugin synchronization, and setup guide/offline playground. Use the existing model-name event and shared picker presentation, without provider loading or network requests for HAL descriptions. hal/tool welcomes users as the HAL 9001 Tool Protocol Server in a dial-up BBS voice. Explain the happy mixture of SMTP/NNTP/IRC-style protocols, JavaScript-compatible literals and C-style comments; direct execution as model-issued calls, no AI, and file modification risk. Show BASH and READ, multiline strings and INSPECT objects, a multiline EDIT using the lease from READ, and HELP discovery. Name Postels law, paraphrased as tolerant reception and strict output, with models inventing syntax off the top of their heads as the rationale. Demonstrate case-insensitive names, bare single arguments, purpose comments, named cmd alias objects, and rejection of an unquoted multiword bash command because the second argument must be an options object. Keep every example consistent with existing validation and data-loss protection.',
+	status: 'done',
+	notes: [
+		'HAL descriptions use the existing model-names event. The shared picker keeps hal/* IDs as the first cell and puts descriptions in its existing name cell, so terminal and web share display and search behavior. The welcome uses the built-in multiline EDIT { range, lines } syntax rather than the proposed !!NEW syntax; it requires the READ lease and explicitly says the example replaces line 1. No parser, provider, timer or persistent-state changes.',
+		'Verification: 31 focused tests pass across host-models, tool-model, picker and call-text. Tracked src typecheck and changed-file lint pass. A one-off parser check resolves every valid welcome example and confirms the unquoted multiword BASH example is rejected.'
+	],
+	needs: ['0kt', '0x'],
+	foldInto: ['0kt', '0x']
+}

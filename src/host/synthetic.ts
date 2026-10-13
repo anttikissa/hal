@@ -43,6 +43,13 @@ export const synthetic = {
 		'queue-test': (records) => (require('./queue-test.ts') as typeof import('./queue-test.ts')).queueTest.run(records),
 		'plugin-sync': (_records, answers, id) => (require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.run(answers, id!),
 	} as Record<string, Synthetic>,
+	descriptions: {
+		tool: 'Tool protocol server - no AI',
+		intro: 'Setup guide and offline playground',
+		'scroll-test': 'Scripted scroll testing',
+		'queue-test': 'Steering and queue testing',
+		'plugin-sync': 'Review and sync remote plugins',
+	} as Record<string, string>,
 	find,
 	paced,
 	pauseMs: 400,

@@ -125,7 +125,7 @@ function nameEvent(ids: string[]): { type: 'model-names'; names: Record<string, 
 function names(ids: string[]): Record<string, string> {
 	let out: Record<string, string> = {}
 	for (let id of ids) {
-		let name = modelsDev.displayName(id)
+		let name = id.startsWith('hal/') ? synthetic.descriptions[id.slice(4)] : modelsDev.displayName(id)
 		if (name) out[id] = name
 	}
 	return out

@@ -23,5 +23,50 @@ function run(records: HistoryRecord[], sessionId: string): Reply {
 export const toolModel = {
 	run,
 	call,
-	welcome: 'Direct tool mode — no AI. Type BASH ls to run a tool, or HELP to explore. Commands execute as typed and can change files. Cook away.',
+	welcome: `This is HAL 9001 Tool Protocol Server.
+
+The Tool Protocol is a happy mishmash of early Internet protocols (think SMTP, NNTP and IRC), JavaScript-compatible literals, and C-style comments.
+
+Write tool calls here and I will execute them as if a model had issued them. No AI is involved. Commands can change files.
+
+\`\`\`
+BASH "echo $(ls | wc -l) files here"
+READ README.md
+\`\`\`
+
+String literals and JavaScript objects can span multiple lines:
+
+\`\`\`
+BASH "for x in 1 2 3
+do
+  sleep 1; echo $x
+done"
+
+INSPECT {
+  scope: 'self',
+  fields: 'tab,id,name,state'
+}
+\`\`\`
+
+EDIT takes multiple lines, too. This example replaces line 1. READ the file first, then replace HASH below with the version it gives you:
+
+\`\`\`
+EDIT README.md@HASH {
+  range: '1-1',
+  lines: ['# Whee!']
+}
+\`\`\`
+
+In the spirit of Postel's law, Hal is tolerant in what it receives and strict in what it sends. Models sometimes invent tool syntax off the top of their heads, so I accept unambiguous variations while keeping validation and file-safety checks intact:
+
+\`\`\`
+BASH /* This is OK */ ls
+bash "ls" /* This is OK, too; for ls -l, quote the command */
+bash ls -l // Not OK: after the command, use an options object
+BASH { cmd: 'ls' } // Yes, even this is OK
+\`\`\`
+
+Type HELP for the directory, or HELP BASH for a tool's syntax.
+
+Ready when you are.`,
 }

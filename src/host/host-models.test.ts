@@ -232,6 +232,21 @@ test('the models command lists them for the asker only, recording nothing', asyn
 	expect(history.readSync(id).length).toBe(before)
 })
 
+test('HAL descriptions reach the shared picker without provider requests and preserve selectable IDs', () => {
+	let ids = models.known().filter((id) => id.startsWith('hal/') && id !== 'hal/ok')
+	let event = models.nameEvent(ids)!
+	expect(Object.keys(event.names).sort()).toEqual([...ids].sort())
+	expect(calls).toBe(0)
+	let st = picker.open('hal/intro', ids, event.names)
+	for (let id of ids) {
+		let i = st.tree!.rows.findIndex((row) => row.id === id)
+		expect(st.items[i]).toContain(id)
+		expect(st.values![i]!.split('\t')[1]).toBe(event.names[id])
+	}
+	st = picker.step(st, { key: 'x', text: 'no AI' }, ids, event.names).state
+	expect(picker.command('s1', st, { type: 'submit', item: st.selected, answers: {} })?.text).toBe('/model hal/tool')
+})
+
 test('/model completes model ids the host knows', async () => {
 	let a = client()
 	let id = created(a)
