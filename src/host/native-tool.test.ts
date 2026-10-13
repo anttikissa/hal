@@ -9,6 +9,7 @@ import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
 import { nativeTool } from './native-tool.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
+import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 import { edit } from './tools/edit.ts'
 
@@ -20,8 +21,10 @@ async function act(id: string, text: string): Promise<{ output: string; isError?
 }
 const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 
-test('shared help and ordinary validation do not teach purpose comments', async () => {
+test('only interactive HELP teaches purpose comments; validation never does', async () => {
 	let id = created(client(), testHome())
+	expect((await act(id, 'HELP')).output).toContain('/* <description> */')
+	sessions.open(id).interactive = false
 	for (let text of ['HELP', 'HELP BASH', 'HELP EDIT', 'BASH', 'EDIT', 'BASH "true" { unknown: 1 }']) {
 		let result = await act(id, text)
 		expect(result.output).not.toContain('/*')

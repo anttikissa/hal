@@ -2,6 +2,7 @@
 // (nativeTool.help), never from a separate list (task 3fv).
 
 import { nativeTool } from '../native-tool.ts'
+import { promptCache } from '../prompt-cache.ts'
 import { type Tool, tools } from '../tools.ts'
 
 export const tool: Tool = {
@@ -10,7 +11,7 @@ export const tool: Tool = {
 	description: 'Explain a tool: its syntax, fields, defaults and units. Without a name, list every tool with its syntax.',
 	parameters: { type: 'object', properties: { name: { type: 'string', description: 'A tool name, e.g. EDIT' } } },
 	readOnly: true,
-	async run(input) {
+	async run(input, ctx) {
 		if (input.name !== undefined && typeof input.name !== 'string') throw new Error('name must be a tool name, e.g. HELP EDIT')
 		if (input.name?.toLowerCase() === 'subagents') return [
 			'SUBAGENTS: independently running sessions, coordinated like background commands.',
@@ -27,10 +28,16 @@ export const tool: Tool = {
 		].join('\n\n')
 		if (input.name) return nativeTool.help(nativeTool.find(input.name.toLowerCase()))
 		let lines = [...tools.all().values()].flatMap((t) => nativeTool.usage(t))
+		// Purpose comments are taught only to interactive sessions (task 2bq).
+		let interactive = promptCache.interactive(ctx.sessionId)
 		return [
-			'One tool per call; make independent calls in parallel. Names are case-insensitive.',
-			'Arguments are JS string literals, { objects } or [ arrays ] (never evaluated), or bare words on the call line.',
-			'HELP <NAME> explains one tool.',
+			`Syntax: <TOOL> ${interactive ? '[ /* <description> */ ] ' : ''}[ <args>... ]`,
+			'',
+			'<args> are JS string or object literals. [ ... ] means optional.',
+			...(interactive ? ["Hal shows <description> to the user as the call's title."] : []),
+			'Run HELP <TOOL> for details.',
+			'',
+			'Tools:',
 			'',
 			...lines,
 		].join('\n')
