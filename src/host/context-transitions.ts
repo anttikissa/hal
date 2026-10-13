@@ -9,6 +9,8 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
+import { sessions } from './sessions.ts'
+import { slash } from './slash.ts'
 import { turns } from './turns.ts'
 
 function pending(id: string): ContextTransition | undefined {
@@ -22,7 +24,10 @@ function output(id: string, text: string, fields: { transition?: ContextTransiti
 
 function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): { result?: string; say?: string; error?: string } {
 	if (contextTransitions.pending(id)) return { error: 'a context transition is already pending; wait or press Escape' }
-	if (!turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') return { say: kind === 'clear' ? 'the context is already empty' : 'nothing to compact' }
+	if (!turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') {
+		let welcome = kind === 'clear' && sessions.open(id).model === 'hal/tool' ? (require('./tool-model.ts') as typeof import('./tool-model.ts')).toolModel.welcome : ''
+		return { say: `${kind === 'clear' ? 'the context is already empty' : 'nothing to compact'}${welcome ? `\n\n${welcome}` : ''}` }
+	}
 	let intent: ContextTransition = { id: crypto.randomUUID(), kind, sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }), ...(kind === 'clear' && prompt.length && { prompt }) }
 	contextTransitions.output(id, `/${kind} accepted; applying after active work settles.`, { transition: intent })
 	let running = turns.state.running.get(id)
@@ -76,6 +81,10 @@ function apply(id: string): boolean {
 	if (!boundary && !(intent.canceled && intent.kind === 'compact')) {
 		if (intent.kind === 'compact') compact.run(id, turns.state.running.has(id) || history.unfinished(id), intent.id)
 		else compact.boundary(id, { type: 'reset', transition: intent.id })
+		if (intent.kind === 'clear' && intent.prompt === undefined && sessions.open(id).model === 'hal/tool') {
+			let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')
+			slash.output(id, toolModel.welcome)
+		}
 	}
 	let record = records.find((r) => r.type === 'user' && r.command === intent.id)
 	if (intent.kind === 'clear' && intent.prompt !== undefined && !intent.canceled && !record) {

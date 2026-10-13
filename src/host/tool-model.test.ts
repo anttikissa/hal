@@ -32,6 +32,27 @@ test('direct tool mode welcomes, executes each command once and preserves parser
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 })
 
+test('clear and unchanged model selection show instructions before the next tool command', async () => {
+	let c = client(), id = created(c, testHome())
+	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
+	let welcomes = () => history.readSync(id).filter((r) => r.type === 'output' && r.text.includes(toolModel.welcome)).length
+	await until(() => welcomes() === 1)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'BASH "echo before"' })
+	await until(() => c.of('turn-end').length === 1)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
+	await until(() => welcomes() === 2)
+	let records = history.readSync(id)
+	expect(records.findLastIndex((r) => r.type === 'output' && r.text.includes(toolModel.welcome))).toBeGreaterThan(records.findLastIndex((r) => r.type === 'reset'))
+	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
+	await until(() => welcomes() === 3)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'BASH "echo ready"' })
+	await until(() => c.of('turn-end').length === 2)
+	expect(history.readSync(id).filter((r) => r.type === 'assistant' && r.block.type === 'tool_call')).toHaveLength(2)
+	expect(welcomes()).toBe(3)
+	expect(calls).toHaveLength(0)
+	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
+})
+
 test('empty direct-tool sessions get a durable welcome without consuming a command', () => {
 	let id = sessions.create({ cwd: testHome(), model: 'hal/tool' }).id
 	greetings.open(id)

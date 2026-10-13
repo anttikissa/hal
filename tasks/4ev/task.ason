@@ -1,0 +1,10 @@
+{
+	title: 'Tool welcome after clear and reselection',
+	spec: 'Invariant: an interactive hal/tool session displays its protocol-server instructions without requiring a tool call. Selecting hal/tool shows its welcome even when the model is unchanged. A promptless /clear in hal/tool shows the welcome after the new context boundary, using durable output shared by terminal and web and no provider turn. /clear with a literal prompt continues to execute that prompt normally. Cover clear, reselection, and the next tool command without duplicate execution.',
+	status: 'done',
+	notes: [
+		'The unchanged-model guard suppressed reselection instructions; /clear also removed the prior welcome without replacing it. Promptless clear now emits normal durable welcome output after its boundary; already-empty clear includes the welcome in its ordinary response. Literal continuation prompts and parser errors remain unchanged. Verified 26 focused tests, tracked-source typecheck and changed-file lint.'
+	],
+	needs: ['f70'],
+	foldInto: ['0kt']
+}
