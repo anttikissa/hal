@@ -84,11 +84,11 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 	error: (r) => r.refreshError ?? 'none',
 }
 
-const usage = () => `Usage: ${nativeTool.usage(tool).join(' | ')}`
+const usage = () => `\n\nUsage:\n${nativeTool.usage(tool).map((u) => `  ${u}`).join('\n')}`
 
 function oneOf(name: string, value: unknown, valid: string[]): string | undefined {
 	if (value === undefined) return undefined
-	if (typeof value !== 'string' || !valid.includes(value)) throw new Error(`INSPECT ${name} must be one of: ${valid.join(', ')}. ${usage()}`)
+	if (typeof value !== 'string' || !valid.includes(value)) throw new Error(`INSPECT ${name} must be one of: ${valid.join(', ')}.${usage()}`)
 	return value
 }
 
@@ -96,7 +96,7 @@ function pick(value: unknown, valid: string[]): string[] {
 	if (value === undefined) return valid
 	let names = typeof value === 'string' ? value.split(',').map((f) => f.trim()).filter(Boolean) : []
 	let bad = names.filter((f) => !valid.includes(f))
-	if (!names.length || bad.length) throw new Error(`${bad.length ? `unknown field ${bad.join(', ')}; ` : ''}fields is a comma-separated list of: ${valid.join(', ')}. ${usage()}`)
+	if (!names.length || bad.length) throw new Error(`${bad.length ? `unknown field ${bad.join(', ')}; ` : ''}fields is a comma-separated list of: ${valid.join(', ')}.${usage()}`)
 	return names
 }
 
@@ -119,7 +119,7 @@ export const tool: Tool<ToolOutput> = {
 			if (values.length === 1 && work.isTarget(values[0])) return { name: 'inspect', input: { target: values[0] } }
 			let input = nativeTool.generic(tool, raw)
 			// A lone unknown word was meant as a target or topic; say so in those terms.
-			if (values.length === 1 && typeof values[0] === 'string' && !WHATS.includes(values[0])) throw new Error(`INSPECT ${JSON.stringify(values[0])}: not a session ID, tool call ID or one of ${WHATS.join(', ')}. ${usage()}`)
+			if (values.length === 1 && typeof values[0] === 'string' && !WHATS.includes(values[0])) throw new Error(`INSPECT ${JSON.stringify(values[0])}: not a session ID, tool call ID or one of ${WHATS.join(', ')}.${usage()}`)
 			return { name: 'inspect', input }
 		},
 	},
