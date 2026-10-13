@@ -103,10 +103,12 @@ function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 		})
 	} catch { return [toolPresentations.attach(call, call)] }
 }
-// HELP indents a multi-line usage's continuation lines so it stands out.
+
+// HELP's tool list follows a multi-line usage (EDIT) with an empty row so it
+// stands out; markers must start their lines, so it is never indented.
 function shown(tool: Tool<unknown>, interactive = false): string[] {
-	let name = tool.name.toUpperCase()
-	return usage(tool, interactive).map((u) => (u === name || u.startsWith(`${name} `) ? u : `  ${u}`))
+	let lines = usage(tool, interactive), name = tool.name.toUpperCase()
+	return lines.every((u) => u === name || u.startsWith(`${name} `)) ? lines : [...lines, '']
 }
 
 // Exact syntax lines, from the module or its schema. Interactive sessions
@@ -143,7 +145,7 @@ function help(tool: Tool<unknown>, interactive = false): string {
 		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
 		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 	})
-	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...shown(tool, interactive).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
+	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...usage(tool, interactive).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
 // One line per tool the system prompt does not explain, for $tools_summary.
