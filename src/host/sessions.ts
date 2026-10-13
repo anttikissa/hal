@@ -119,8 +119,8 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
-		// Its calls are what the user typed: shown whole (task hyt).
-		...(selection.id === 'hal/tool' && { blocks: { tool: 'long' } }),
+		// Its calls are what the user typed: shown whole, failed or not (task hyt).
+		...(selection.id === 'hal/tool' && { blocks: { tool: 'long', failed: 'long' } }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
 	meta.nameVersion = 0
