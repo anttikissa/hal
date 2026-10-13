@@ -70,7 +70,12 @@ export const tool: Tool = {
 			if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs : 120_000), input.background ? undefined : ctx.onOutput)
 			launched = true
-			return { ...run, done: run.done.finally(() => fileChanges.finish(observation)) }
+			// Lines from commits.committed follow the output (task sg0).
+			let done = run.done.then(async (out) => {
+				let lines = await fileChanges.finish(observation)
+				return lines.length ? `${out}${out.endsWith('\n') ? '' : '\n'}\n${lines.join('\n')}` : out
+			}, async (e) => { await fileChanges.finish(observation); throw e })
+			return { ...run, done }
 		}
 		try {
 			// Escape does not stop a background job. Its snapshot and lock

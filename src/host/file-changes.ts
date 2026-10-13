@@ -163,15 +163,17 @@ async function begin(ctx: ToolContext, patterns: string[], literal = false): Pro
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns, literal)) before.set(path, await fileChanges.snapshot(ctx, path))
 		let log = await fileChanges.headLog(ctx.cwd)
-		let watch = log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined
+		let watch = log ? await commits.begin(ctx.sessionId, ctx.cwd, log, ctx.callId) : undefined
 		let declared = patterns.length ? neighbors.start(ctx.sessionId, ctx.cwd, patterns) : undefined
 		// Every path out of a call ends here, launched or not, so the declaration ends with it.
 		return { ctx, patterns, literal, before, commits: watch, release: () => { release(); if (declared) neighbors.end(declared) } }
 	} catch (e) { release(); throw e }
 }
 
-async function finish(observation: Observation): Promise<void> {
+// Returns the lines commits.committed gave for the call's commits (task sg0).
+async function finish(observation: Observation): Promise<string[]> {
 	let { ctx, patterns, literal, before, release } = observation
+	let lines: string[] = []
 	try {
 		let files: FileChange[] = []
 		let declared = new Set(await fileChanges.tracked(ctx.cwd, [...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns, literal)]))
@@ -188,9 +190,10 @@ async function finish(observation: Observation): Promise<void> {
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {
-		if (observation.commits) await commits.finish(observation.commits)
+		if (observation.commits) lines = await commits.finish(observation.commits)
 		release()
 	}
+	return lines
 }
 
 export const fileChanges = {

@@ -6,7 +6,7 @@
 // cross-checked against that session's own calls; never by timing.
 
 import { existsSync } from 'fs'
-import { basename } from 'path'
+import { basename, join } from 'path'
 import type { HistoryRecord } from '../common/replay.ts'
 import { open, stat } from 'fs/promises'
 import type { NoticeEvent } from '../common/notices.ts'
@@ -19,13 +19,17 @@ import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
-type Watch = { sessionId: string; cwd: string; log: string; size: number; start: number }
+type Watch = { sessionId: string; callId?: string; cwd: string; log: string; size: number; start: number }
+// What commits.committed gets: one commit a Bash call of `sessionId` made
+// (its Session trailer names that session). Paths are absolute; a binary
+// file counts -1 lines.
+export type Committed = { sessionId: string; callId?: string; cwd: string; root: string; hash: string; short: string; subject: string; amend: boolean; files: { path: string; added: number; removed: number }[] }
 type Entry = { hash: string; time: number; amend: boolean }
 
 // A missing reflog before the call counts as empty, so an initial commit shows.
-async function begin(sessionId: string, cwd: string, log: string): Promise<Watch> {
+async function begin(sessionId: string, cwd: string, log: string, callId?: string): Promise<Watch> {
 	let size = await stat(log).then((s) => s.size, (e) => { if (e.code === 'ENOENT') return 0; throw e })
-	let watch = { sessionId, cwd, log, size, start: Date.now() }
+	let watch = { sessionId, ...(callId && { callId }), cwd, log, size, start: Date.now() }
 	return watch
 }
 
@@ -108,25 +112,45 @@ function warn(id: string, short: string, subject: string): void {
 	host.broadcast(id, { type: 'output', sessionId: id, text: line, error: true, n, ts })
 }
 
-async function finish(watch: Watch): Promise<void> {
+// Lines appended to the Bash result of the call that made a commit
+// (task sg0): none by default; plugins add theirs with around.
+async function committed(_info: Committed): Promise<string[]> {
+	return []
+}
+
+// Announces this call's new commits; returns the lines commits.committed
+// gives for those whose Session trailer names the calling session.
+async function finish(watch: Watch): Promise<string[]> {
+	let lines: string[] = []
 	try {
 		let fresh = commits.parse(await commits.appended(watch.log, watch.size)).filter((e) => !commits.state.seen.includes(e.hash))
-		if (!fresh.length) return
+		if (!fresh.length) return lines
 		// Claim before awaiting: concurrent calls read the same lines.
 		commits.state.seen = [...commits.state.seen, ...fresh.map((e) => e.hash)].slice(-commits.remember)
 		let out = await fileChanges.git(watch.cwd, ['log', '--no-walk=unsorted', '-z', '--format=%H%x1f%h%x1f%s%x1f%B', ...fresh.map((e) => e.hash)])
 		if (out.code) throw new Error(out.error)
 		let info = new Map(out.text.split('\0').filter(Boolean).map((r) => { let [h, short, subject, body] = r.split('\x1f'); return [h!, { short: short!, subject: subject!, trailer: commits.trailer(body ?? '') }] }))
+		let root: string | undefined
 		for (let e of fresh) {
 			let c = info.get(e.hash)
 			if (!c) continue
 			let id = commits.attribute(c.trailer)
 			commits.announce(id, e.hash, c.short, c.subject, e.amend, basename(watch.cwd))
 			if (id) commits.verify(id, c.short, c.subject, e.time)
+			if (id !== watch.sessionId) continue
+			try {
+				root ??= (await fileChanges.git(watch.cwd, ['rev-parse', '--show-toplevel'])).text.trim()
+				let numstat = await fileChanges.git(watch.cwd, ['show', '--numstat', '--format=', '--no-renames', '-z', e.hash])
+				let files = numstat.text.split('\0').filter(Boolean).map((f) => { let [a, r, path] = f.replace(/^\n/, '').split('\t'); return { path: join(root!, path!), added: a === '-' ? -1 : Number(a), removed: r === '-' ? -1 : Number(r) } })
+				lines.push(...await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files }))
+			} catch (err: any) {
+				diag.log(`commit hook ${c.short}: ${err?.stack ?? err?.message ?? err}`)
+			}
 		}
 	} catch (e: any) {
 		diag.log(`commit notices: ${e?.message ?? e}`)
 	}
+	return lines
 }
 
 // Every client except those watching the session (they see it in its
@@ -146,5 +170,5 @@ function announce(id: string | undefined, hash: string, short: string, subject: 
 export const commits = {
 	state: { seen: [] as string[] },
 	remember: 500,
-	begin, parse, appended, trailer, attribute, check, verify, warn, finish, announce,
+	begin, parse, appended, trailer, attribute, check, verify, warn, committed, finish, announce,
 }
