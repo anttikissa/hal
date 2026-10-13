@@ -207,7 +207,9 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	}
 	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }] }
 	// Local servers answer before the model question (task vc).
-	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
+	let hello = (): Reply => (void models.warm(), { say: `${greeting}
+
+I have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
 	// Text typed while nothing was asked: the intro can't take it. Text
@@ -221,7 +223,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 			let user = run[typed] as HistoryRecord & { type: 'user' }
 			let text = user.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(' ').replace(/\s+/g, ' ').trim()
 			if (text.length > 80) text = `${text.slice(0, 79)}…`
-			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', 'Continue with the intro?') }
+			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', 'Start from the beginning?') }
 		}
 		if (go === 'No') return { say: `Okay, the intro stops here; what you answered stays saved. /model or Ctrl-M picks a model.` }
 		if (said(run, closing)) return hello()
@@ -304,7 +306,18 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	// Not signed in (environment keys aside): the close always says how.
 	if (!loggedIn.stored) now += "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
-	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; ${sendKeys.name('queue')} queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()} — /auth gives the one-time login code.\n\n${now}` })
+	return reply({ say:
+		`${closing} A few tips:
+
+Escape pauses a turn; ${sendKeys.name('queue')} queues a message for later.
+
+/help lists commands and /keys lists shortcuts; /intro runs this guide again.
+
+The web client is at ${settings.webUrl()} — /auth gives the one-time login code.
+
+Ctrl-C to quit.
+
+${now}` })
 }
 
 export const intro = { languages, restart, run, answered, accounts, choices }

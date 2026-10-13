@@ -110,7 +110,7 @@ function open(id: string, timezone = clients.timezone(id)): void {
 			? 'This is Hal, running the hal/intro model. Pick a model with /model or Ctrl-M.'
 			: `This is Hal, running the hal/intro model. No provider configured - run /login to get started.
 
-Alternatively, try the model hal/tool for something interesting.`
+Alternatively, try the model hal/tool, or one of the other internal models, for something interesting.`
 		history.append(id, { type: 'output', text, synthetic: true })
 		return
 	}

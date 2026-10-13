@@ -1,6 +1,6 @@
 {
 	title: 'Empty hal/intro tabs say what they run',
-	spec: 'A new empty interactive session running hal/intro, other than the first tab of a fresh home where the guide speaks first, shows one synthetic remark instead of a greeting: "This is Hal, running the hal/intro model." With any login or provider API key it adds "Pick a model with /model or Ctrl-M."; without one it adds "No provider configured - run /login to get started." and a paragraph suggesting the hal/tool model. Rationale: Ctrl-T in the intro tab inherits hal/intro and otherwise opens an empty box that answers Enter with a bare nudge.',
+	spec: 'A new empty interactive session running hal/intro, other than the first tab of a fresh home where the guide speaks first, shows one synthetic remark instead of a greeting: "This is Hal, running the hal/intro model." With any login or provider API key it adds "Pick a model with /model or Ctrl-M."; without one it adds "No provider configured - run /login to get started." and a paragraph suggesting hal/tool or the other internal models. Rationale: Ctrl-T in the intro tab inherits hal/intro and otherwise opens an empty box that answers Enter with a bare nudge.',
 	status: 'done',
 	notes: [
 		'The remark lives in greetings.open beside the hal/tool welcome and uses intro.accounts() (stored logins and env keys). tabs.create skips greetings.open for the first fresh-home tab, so the guide still opens alone. Invariant: the first-tab intro has no synthetic remark before its own first reply.'
