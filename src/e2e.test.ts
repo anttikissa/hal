@@ -17,41 +17,45 @@ let requests: any[][] = []
 let aborted = 0
 let holds: (() => void)[] = []
 
+// Real streams recorded by scripts/record-anthropic.ts; the fake swaps
+// in only the reply text and the tool command.
 const enc = new TextEncoder()
-const sseEvent = (e: any) => enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`)
-const textDelta = (text: string) => sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } })
-const finish = [
-	sseEvent({ type: 'content_block_stop', index: 0 }),
-	sseEvent({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 3 } }),
-	sseEvent({ type: 'message_stop' }),
-]
+const recorded = (name: string) => readFileSync(`${import.meta.dir}/fixtures/anthropic-${name}.sse`, 'utf8').split(/(?<=\n\n)/)
+const textEvents = recorded('text')
+const toolEvents = recorded('tool')
+const data = (raw: string) => JSON.parse(raw.slice(raw.indexOf('data: ') + 6))
+const isDelta = (raw: string, kind: string) => raw.startsWith('event: content_block_delta') && data(raw).delta.type === kind
+const withDelta = (raw: string, delta: object) => {
+	let e = data(raw)
+	return `event: ${e.type}\ndata: ${JSON.stringify({ ...e, delta: { ...e.delta, ...delta } })}\n\n`
+}
+const at = textEvents.findIndex((e) => isDelta(e, 'text_delta'))
+const textHead = textEvents.slice(0, at)
+const textDelta = (text: string) => withDelta(textEvents[at]!, { text })
+const textTail = textEvents.slice(at + 1)
 
-const sse = (events: Uint8Array[]) =>
+const sse = (events: string[]) =>
 	new Response(
 		new ReadableStream<Uint8Array>({
 			start(c) {
-				for (let e of events) c.enqueue(e)
+				for (let e of events) c.enqueue(enc.encode(e))
 				c.close()
 			},
 		}),
 		{ headers: { 'content-type': 'text/event-stream' } },
 	)
+const textReply = (text: string) => sse([...textHead, textDelta(text), ...textTail])
 
-// "bash <command>" asks for the bash tool; a tool result is answered
-// with SAW(<its first line>).
-const bashUse = (command: string) => [
-	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
-	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_b', name: 'tool', input: {} } }),
-	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ cmd: `BASH ${JSON.stringify(command)}` }) } }),
-	sseEvent({ type: 'content_block_stop', index: 0 }),
-	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
-	sseEvent({ type: 'message_stop' }),
-]
-const toolAnswer = (result: any) => [
-	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }),
-	textDelta(`SAW(${String(result.content).split('\n')[0]})`),
-	...finish,
-]
+// "bash <command>" asks for the bash tool, its input split over as many
+// deltas as the recording; a tool result is answered with SAW(<its
+// first line>).
+function bashUse(command: string): string[] {
+	let json = JSON.stringify({ cmd: `BASH ${JSON.stringify(command)}` })
+	let n = toolEvents.filter((e) => isDelta(e, 'input_json_delta') && data(e).delta.partial_json).length
+	let size = Math.ceil(json.length / n)
+	let k = 0
+	return toolEvents.map((e) => (isDelta(e, 'input_json_delta') && data(e).delta.partial_json ? withDelta(e, { partial_json: json.slice(size * k, size * ++k) }) : e))
+}
 
 // A prompt's own text, without the [HH:MM] line and host notes that
 // replay puts in front of it.
@@ -64,28 +68,19 @@ function reply(req: Request, body: any): Response {
 	let messages = body.messages
 	requests.push(messages)
 	let lastBlock = messages.flatMap((m: any) => m.role === 'user' ? m.content : []).findLast((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>'))
-	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
+	if (lastBlock.type === 'tool_result') return textReply(`SAW(${String(lastBlock.content).split('\n')[0]})`)
 	let assistant = messages.findLastIndex((m: any) => m.role === 'assistant')
-	if (assistant > messages.findLastIndex((m: any) => m.content.includes(lastBlock)) && messages[assistant].content.some((b: any) => b.type === 'text' && b.text === 'PART1')) return sse([textDelta(continued), ...finish])
+	if (assistant > messages.findLastIndex((m: any) => m.content.includes(lastBlock)) && messages[assistant].content.some((b: any) => b.type === 'text' && b.text === 'PART1')) return textReply(continued)
 	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
+	if (!prompt.startsWith('hold')) return textReply(`ECHO(${prompt})`)
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
-			c.enqueue(sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }))
-			c.enqueue(sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }))
-			let end = () => {
-				for (let e of finish) c.enqueue(e)
-				c.close()
-			}
-			if (!prompt.startsWith('hold')) {
-				c.enqueue(textDelta(`ECHO(${prompt})`))
-				return end()
-			}
-			c.enqueue(textDelta('PART1'))
+			for (let e of [...textHead, textDelta('PART1')]) c.enqueue(enc.encode(e))
 			req.signal.addEventListener('abort', () => aborted++)
 			holds.push(() => {
-				c.enqueue(textDelta(' PART2'))
-				end()
+				for (let e of [textDelta(' PART2'), ...textTail]) c.enqueue(enc.encode(e))
+				c.close()
 			})
 		},
 	})
