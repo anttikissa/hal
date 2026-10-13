@@ -55,11 +55,13 @@ function notice(): string | undefined {
 }
 
 // The example over the box (placeholders.follow); Tab `hal`: Hal list.
+// None for the intro or while a question waits: neither takes requests.
 const example: PromptExample = {}
 function placeholder(text: string, now: number): Shown | undefined {
-	let t = app.state.view.transcript
+	let v = app.state.view, t = v.transcript
 	let hal = !!app.state.tabs.find((tab) => tab.id === app.state.shown)?.hal
-	return placeholders.follow(example, t?.meta.id ?? '', t && (hal ? placeholders.hal : placeholders.general), text, now)
+	let list = t && t.meta.model !== 'hal/intro' && !v.form ? (hal ? placeholders.hal : placeholders.general) : undefined
+	return placeholders.follow(example, t?.meta.id ?? '', list, text, now)
 }
 
 function setView(v: ViewState): void {

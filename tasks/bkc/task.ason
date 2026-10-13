@@ -1,0 +1,10 @@
+{
+	title: 'No prompt example while a question waits',
+	spec: 'The rotating example request over an empty prompt box is hidden, in terminal and web, while the session runs hal/intro or a question form is open: neither takes requests. Rationale: the web showed an example under the intro name question.',
+	status: 'done',
+	notes: [
+		'Both clients already hold the open form (view state form), so the check is a field read. Web had shown examples in the intro too; it now follows the 8m intro rule.'
+	],
+	needs: ['8m'],
+	foldInto: ['8m']
+}

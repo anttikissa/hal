@@ -33,9 +33,9 @@ function view(): View {
 	if (st.modal) v.modal = st.modal
 	if (st.choices) v.choices = st.choices
 	// An example request over the prompt (placeholders.follow); none for
-	// the intro, which can't take requests.
+	// the intro or while a question waits: neither takes requests.
 	let t = st.transcript
-	let list = t && t.meta.model !== 'hal/intro' ? (app.focusedTab()?.hal ? placeholders.hal : placeholders.general) : undefined
+	let list = t && t.meta.model !== 'hal/intro' && !st.form ? (app.focusedTab()?.hal ? placeholders.hal : placeholders.general) : undefined
 	let example = placeholders.follow(appView.state.example, t?.meta.id ?? '', list, st.prompt.text, pulse.now())
 	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
