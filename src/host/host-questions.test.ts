@@ -286,7 +286,7 @@ test('text typed outside a question asks whether to go on; No ends the intro', (
 	]
 	let first = intro.run(records)
 	expect(first.say).toBe('I see you typed: "open the pod bay doors" — but I\'m not a language model, so I can\'t understand you.')
-	expect(first.ask?.fields[0]?.name).toBe('intro')
+	expect(first.ask).toMatchObject({ text: 'Continue with the intro?', fields: [{ name: 'intro' }] })
 	expect(intro.run([...records, { type: 'answer', question: 'q', answers: { intro: 'Yes' }, ts }]).ask?.fields[0]?.name).toBe('name')
 	let no = intro.run([...records, { type: 'answer', question: 'q', answers: { intro: 'No' }, ts }])
 	expect(no.ask).toBeUndefined()

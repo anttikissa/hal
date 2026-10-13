@@ -222,11 +222,13 @@ I have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 		if (go === undefined) {
 			let user = run[typed] as HistoryRecord & { type: 'user' }
 			let text = user.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(' ').replace(/\s+/g, ' ').trim()
+		// Yes after the close starts over; before it, the run goes on.
+		let over = said(run, closing)
 			if (text.length > 80) text = `${text.slice(0, 79)}…`
-			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', 'Start from the beginning?') }
+			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', over ? 'Start from the beginning?' : 'Continue with the intro?') }
 		}
 		if (go === 'No') return { say: `Okay, the intro stops here; what you answered stays saved. /model or Ctrl-M picks a model.` }
-		if (said(run, closing)) return hello()
+		if (over) return hello()
 	}
 	let name = profile.value(answered(run, 'name'))
 	if (answered(run, 'name') === undefined) return { ask }
