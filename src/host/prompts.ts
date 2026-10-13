@@ -71,12 +71,13 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	let asked = notify.asked(id)
 	let ownerAnswer = asked && delivery === 'soft-steer' && sender?.from !== undefined && sender.from === sessions.open(id).owner
 		&& sessions.open(id).spawn !== 'interactive' && subagents.owed(id, history.readSync(id))
-	let queue = delivery === 'queue' || (agent && !emergency && !ownerAnswer && asked)
-	let interrupt = !queue && sender?.advisory !== true
+	let waitingAnswer = agent && !emergency && !ownerAnswer && asked
+	let queue = delivery === 'queue'
+	let interrupt = !queue && !waitingAnswer && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.delivery === 'after-turn')
 	// After an asking turn (task nd6), a queued message waits for the reply's turn.
-	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || (agent && !emergency)) && state.type !== 'idle')) {
+	if (behind || waitingAnswer || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || (agent && !emergency)) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		record.delivery = queue ? 'after-turn' : delivery === 'soft-steer' || sender?.advisory ? 'next-round' : 'now'

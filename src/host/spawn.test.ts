@@ -259,7 +259,7 @@ test('automatic reports and unrelated senders do not answer a delegated question
 	// A report can come from the parent when the sessions delegate to one another.
 	prompts.submit(child, 'automatic report', undefined, 'steer', { from: p, advisory: true })
 	prompts.submit(child, 'unrelated answer', undefined, 'soft-steer', { from: 'other', advisory: true })
-	expect(status.inboxOf(child).map((m) => [m.text, (m.delivery === 'after-turn')])).toEqual([['automatic report', true], ['unrelated answer', true]])
+	expect(status.inboxOf(child).map((m) => [m.text, m.delivery])).toEqual([['automatic report', 'next-round'], ['unrelated answer', 'next-round']])
 	expect(status.stateOf(child).type).toBe('idle')
 	// A human takes over this child; later questions belong to that human.
 	c.conn.send({ type: 'open', sessionId: child })
@@ -268,6 +268,6 @@ test('automatic reports and unrelated senders do not answer a delegated question
 	calls[human]!.push({ type: 'text', text: '<question>Human choice?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => status.stateOf(child).type === 'idle')
 	prompts.submit(child, 'former parent answer', undefined, 'soft-steer', { from: p, advisory: true })
-	expect(status.inboxOf(child).at(-1)).toMatchObject({ text: 'former parent answer', delivery: 'after-turn' })
+	expect(status.inboxOf(child).at(-1)).toMatchObject({ text: 'former parent answer', delivery: 'next-round' })
 	expect(status.stateOf(child).type).toBe('idle')
 })

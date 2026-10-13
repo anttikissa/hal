@@ -167,6 +167,25 @@ test('an ordinary send respects a pause and offers explicit continuation', async
 	expect(lastText(next + 1)).toMatch(/\nfyi$/)
 })
 
+test('a default send behind a human question is read with the answer, not after the answer turn', async () => {
+	let c = client()
+	let { a, b } = pair(c)
+	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: '<question>Continue?</question>' }, { type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
+	let next = await send(c, b, { to: '1', text: 'use these references' })
+	expect(resultOf(next).output).toBe(`Waiting in ${tabs.label(a)}: it waits for the user's answer, then reads this with that answer`)
+	expect(c.views.get(a)!.inbox).toMatchObject([{ text: 'use these references', delivery: 'next-round', advisory: true }])
+	expect(calls.filter((call) => call.input.sessionId === a)).toHaveLength(1)
+	c.conn.send({ type: 'submit', sessionId: a, text: 'continue' })
+	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a)
+	await until(() => recipient() >= 0)
+	expect(lastText(recipient())).toContain('use these references')
+	expect(lastText(recipient())).toMatch(/\ncontinue$/)
+	expect(c.views.get(a)!.inbox).toEqual([])
+})
+
 test.each(['steer', 'emergency'].flatMap((delivery) => ['pause', 'failure', 'question'].map((stop) => [delivery, stop])))('%s resumes a recipient after %s instead of waiting for a human', async (delivery, stop) => {
 	let c = client()
 	let { a, b } = pair(c)

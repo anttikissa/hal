@@ -1,0 +1,10 @@
+{
+	title: 'Keep soft sends next-round behind pending questions',
+	spec: 'Default SEND and other non-queue agent messages retain next-round delivery when a human-owned text question is pending. They do not start or resume the recipient or answer that question; once the human responds, they reach the first provider request alongside the answer, before implementation begins. Explicit queue still waits until the answer turn ends. Pause, failure, login and tool-form boundaries remain unchanged; owner answers and explicit steer retain their authority. SEND reports that a message is waiting for the human answer and will be read with that answer, rather than claiming it has been sent or converting it to after-turn. Invariant restored: a pending question cannot silently downgrade a next-round reference message to after-turn and strand it throughout the subsequent work. Regression coverage includes restart durability, delivery with the human answer, explicit queue and send outcome text.',
+	status: 'done',
+	notes: [
+		'Question gating previously set delivery to after-turn even for default soft-steer. Holding the message and preserving its scheduling tier are separate decisions: next-round entries stay dormant while the human question is unanswered, survive restart, and join the human answer record. The same host path serves both clients; no polling or extra queue is added. Ownership tests preserve the distinction between observing a report and treating it as permission to resume.'
+	],
+	needs: ['zb0'],
+	foldInto: ['zb0']
+}

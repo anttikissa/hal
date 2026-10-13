@@ -36,6 +36,7 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	let held = { paused: 'paused', error: 'failed' }[state.type as string]
 	if (held) return `Waiting in ${to}: it is ${held}; this message stays pending. To resume it, SEND "${id}" "Continue your work and read pending messages" { delivery: "steer" }`
 	if (state.type === 'blocked') return `Waiting in ${to}: it waits for the user (${state.reason}); it reads this after`
+	if (notify.asked(id) && state.type === 'idle') return `Waiting in ${to}: it waits for the user's answer, then reads this with that answer`
 	if ((item.delivery === 'after-turn')) return `Queued in ${to}: it reads this after its current turn`
 	return delivery === 'steer' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
 }
@@ -45,7 +46,7 @@ export const tool: Tool = {
 	syntax: { summary: 'message to session', positional: ['to', 'text'], aliases: { session: 'to' } },
 	description:
 		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work. ' +
-		'Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed. Steer also bypasses pending text questions. emergency is a compatibility alias for steer. When a child asks you a question, use send to answer.',
+		'Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed. A pending text question holds soft-steer until the human answers; the message is read with that answer, not after its turn. Steer also bypasses pending text questions. emergency is a compatibility alias for steer. When a child asks you a question, use send to answer.',
 	parameters: {
 		type: 'object',
 		properties: {
