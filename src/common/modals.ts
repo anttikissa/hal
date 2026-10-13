@@ -41,8 +41,6 @@ export type ModalState = {
 	hint?: string
 	/** One line above the field, then a blank row (Ctrl-O, Ctrl-F). */
 	question?: string
-	/** What Enter does, below the field (Ctrl-M). */
-	status?: string
 	find?: FindDialog
 	form?: FormState
 	items: string[]

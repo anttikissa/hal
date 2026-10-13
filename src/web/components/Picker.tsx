@@ -86,7 +86,6 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					placeholder={props.modal?.form && (props.modal.compact || props.modal.tree) ? forms.example(props.modal.form, 0, 0).text : undefined}
 					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))} onFocus={() => find.focus(0)} />
 			</Show>
-			<Show when={props.modal?.status}>{(t) => <div class="blocks-hint" role="status">{t()}</div>}</Show>
 			<Show when={props.modal?.find}>{(f) => <div class={f().failed ? 'blocks-hint refused' : 'blocks-hint'} role="status">{f().status}</div>}</Show>
 			<Show when={props.modal?.blocks}>{(b) => (
 				<>

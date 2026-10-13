@@ -230,10 +230,9 @@ function selection(st: ModalState, previous?: number): ModalState {
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let fallback = cap?.levels.length ? cap.policy ?? cap.default : undefined
-	// The status line says what Enter does, with the effort it sends.
-	let effortText = chosen && chosen !== fallback ? `, ${chosen} effort` : fallback ? `, ${fallback} effort (default)` : ''
-	let status = !row ? 'No models match' : !row.id && !row.default ? 'Opens this group' : `${shownId === t.current ? 'Stays on' : 'Switches to'} ${shownId}${effortText}`
-	return { ...st, status, ...(values && { values }), hint: `${hint} · esc: close` }
+	// The title is what Enter sends: the model, with :level only off its default.
+	let title = row && (row.id || row.default) ? `Model: ${shownId}${chosen && chosen !== fallback ? `:${chosen}` : ''}` : 'Model'
+	return { ...st, title, ...(values && { values }), hint: `${hint} · esc: close` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
