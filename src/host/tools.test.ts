@@ -247,7 +247,7 @@ test('read_blob pages large text and history blocks within the result cap', asyn
 		expect(selected).not.toContain('line 20:')
 		expect((await blobRun(id, { offset: 51 })).isError).toBe(true)
 		let record = history.append('s', { type: 'user', blocks: lines.map((text) => ({ type: 'text' as const, text })) })
-		let block = (await blobRun(`#${record.n}`)).output
+		let block = (await blobRun(`t${record.n}`)).output
 		expect(block.length).toBeLessThanOrEqual(tools.maxChars)
 		expect(block).toContain('continue with offset')
 		expect((await blobRun(id, { offset: 0 })).isError).toBe(true)
@@ -260,11 +260,11 @@ test('read_blob fetches a numbered tool call and its result from history', async
 		mkdirSync(paths.sessionDir('s'), { recursive: true })
 		let call = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } } })
 		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
-		expect((await blobRun(`#${call.n}`)).output).toBe('Read example.txt')
+		expect((await blobRun(`t${call.n}`)).output).toBe('Read example.txt')
 		let spawn = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'internal-provider-call-id', name: 'spawn', input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } } } })
-		expect((await blobRun(`s#t${spawn.n}`)).output).toBe('Spawn "Benchmark search"\ntask: Find tasks\n  Preserve results\nextra: enabled:\n    true')
-		expect((await blobRun(`s#${result.n}`)).output).toContain('file contents')
-		expect((await blobRun('#999999')).isError).toBe(true)
+		expect((await blobRun(`s/${spawn.n}`)).output).toBe('Spawn "Benchmark search"\ntask: Find tasks\n  Preserve results\nextra: enabled:\n    true')
+		expect((await blobRun(`s/${result.n}`)).output).toContain('file contents')
+		expect((await blobRun('t999999')).isError).toBe(true)
 	} finally { paths.home = originalHome }
 })
 

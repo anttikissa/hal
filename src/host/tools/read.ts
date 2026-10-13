@@ -47,7 +47,7 @@ export const tool: Tool<ToolOutput> = {
 		'An http(s) URL gives readable text from HTML; images are attached; other files are saved under /tmp.',
 	syntax: {
 		summary: false,
-		usage: ['READ "<path>"', 'READ "<path>:<start>-<end>"', 'READ "<path>:<start>-<end>" "<other-path>:<start>-<end>"', 'READ "<path>:<start>-"', 'READ "<path>:<line>"', 'READ "<http(s) URL>"'],
+		usage: ['READ "<path>[:<start>[-<end>]]" ...   // one or more; :5 reads line 5, :5- to the end', 'READ "<url>"'],
 		resolve: resolveCall,
 	},
 	parameters: {
