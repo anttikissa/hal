@@ -24,6 +24,7 @@ const leaseOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 test('only interactive HELP teaches purpose comments; validation never does', async () => {
 	let id = created(client(), testHome())
 	expect((await act(id, 'HELP')).output).toContain('/* <description> */')
+	expect((await act(id, 'HELP')).output).toContain('BASH /* <description> */ "<command>"')
 	expect((await act(id, 'HELP bash')).output).toContain('BASH /* <description> */ "<command>"')
 	sessions.open(id).interactive = false
 	for (let text of ['HELP', 'HELP BASH', 'HELP EDIT', 'BASH', 'EDIT', 'BASH "true" { unknown: 1 }']) {
@@ -168,7 +169,7 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	let help = (await act(id, 'HELP bash')).output
 	expect(help).toContain('BASH /* <description> */ "<command>"')
 	expect(help).toContain('timeout (number): Seconds')
-	expect((await act(id, 'HELP')).output).toContain('EDIT "<path>@<hash>"')
+	expect((await act(id, 'HELP')).output).toContain('EDIT /* <description> */ "<path>@<hash>"')
 	let summary = nativeTool.summary()
 	for (let name of ['SPAWN', 'WAIT', 'STOP', 'BASH']) expect(summary).not.toContain(name)
 	expect(summary).toContain('SEND')

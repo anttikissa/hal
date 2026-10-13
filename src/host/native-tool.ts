@@ -104,8 +104,10 @@ function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 	} catch { return [toolPresentations.attach(call, call)] }
 }
 
-// Exact syntax lines, from the module or its schema.
-function usage(tool: Tool<unknown>): string[] {
+// Exact syntax lines, from the module or its schema. Interactive sessions
+// also see where the purpose comment goes, for tools that keep it (task 2bq).
+function usage(tool: Tool<unknown>, interactive = false): string[] {
+	if (interactive && Object.hasOwn(schema(tool).properties ?? {}, 'description')) return usage(tool).map((u) => (u.includes('/*') ? u : u.replace(/^\S+/, '$& /* <description> */')))
 	if (tool.syntax?.usage) return tool.syntax.usage
 	let { properties = {}, required = [] } = schema(tool)
 	let positional = tool.syntax?.positional ?? required
@@ -124,7 +126,6 @@ function usage(tool: Tool<unknown>): string[] {
 
 // HELP for one tool: description, syntax, every documented field. A field
 // without a description is internal, e.g. one a tool's own parser fills.
-// Interactive sessions also see where the purpose comment goes (task 2bq).
 function help(tool: Tool<unknown>, interactive = false): string {
 	let { properties = {}, required = [] } = schema(tool)
 	let fields = Object.entries(properties).filter(([, p]) => p.description).map(([key, p]) => {
@@ -133,9 +134,7 @@ function help(tool: Tool<unknown>, interactive = false): string {
 		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
 		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 	})
-	let purpose = interactive && Object.hasOwn(properties, 'description')
-	let lines = nativeTool.usage(tool).map((u) => (purpose && !u.includes('/*') ? u.replace(/^\S+/, '$& /* <description> */') : u))
-	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...lines.map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
+	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...nativeTool.usage(tool, interactive).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
 // One line per tool the system prompt does not explain, for $tools_summary.
