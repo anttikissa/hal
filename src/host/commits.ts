@@ -6,7 +6,8 @@
 // cross-checked against that session's own calls; never by timing.
 
 import { existsSync } from 'fs'
-import { basename, join } from 'path'
+import { basename, join, relative } from 'path'
+import type { CommitBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { open, stat } from 'fs/promises'
 import type { NoticeEvent } from '../common/notices.ts'
@@ -120,11 +121,11 @@ async function committed(_info: Committed): Promise<string[]> {
 
 // Announces this call's new commits; returns the lines commits.committed
 // gives for those whose Session trailer names the calling session.
-async function finish(watch: Watch): Promise<string[]> {
-	let lines: string[] = []
+async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitBlock[] }> {
+	let lines: string[] = [], found: CommitBlock[] = []
 	try {
 		let fresh = commits.parse(await commits.appended(watch.log, watch.size)).filter((e) => !commits.state.seen.includes(e.hash))
-		if (!fresh.length) return lines
+		if (!fresh.length) return { lines, commits: found }
 		// Claim before awaiting: concurrent calls read the same lines.
 		commits.state.seen = [...commits.state.seen, ...fresh.map((e) => e.hash)].slice(-commits.remember)
 		let out = await fileChanges.git(watch.cwd, ['log', '--no-walk=unsorted', '-z', '--format=%H%x1f%h%x1f%s%x1f%B', ...fresh.map((e) => e.hash)])
@@ -142,7 +143,11 @@ async function finish(watch: Watch): Promise<string[]> {
 				root ??= (await fileChanges.git(watch.cwd, ['rev-parse', '--show-toplevel'])).text.trim()
 				let numstat = await fileChanges.git(watch.cwd, ['show', '--numstat', '--format=', '--no-renames', '-z', e.hash])
 				let files = numstat.text.split('\0').filter(Boolean).map((f) => { let [a, r, path] = f.replace(/^\n/, '').split('\t'); return { path: join(root!, path!), added: a === '-' ? -1 : Number(a), removed: r === '-' ? -1 : Number(r) } })
-				lines.push(...await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files }))
+				let block: CommitBlock = { hash: e.hash, short: c.short, subject: c.subject, ...(e.amend && { amend: true as const }), files: files.map((f) => ({ ...f, path: relative(root!, f.path) })) }
+				found.push(block)
+				let added = await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files })
+				if (added.length) block.lines = added
+				lines.push(...added)
 			} catch (err: any) {
 				diag.log(`commit hook ${c.short}: ${err?.stack ?? err?.message ?? err}`)
 			}
@@ -150,7 +155,7 @@ async function finish(watch: Watch): Promise<string[]> {
 	} catch (e: any) {
 		diag.log(`commit notices: ${e?.message ?? e}`)
 	}
-	return lines
+	return { lines, commits: found }
 }
 
 // Every client except those watching the session (they see it in its

@@ -103,6 +103,7 @@ function verbosityRows(): Setting[] {
 		['Failed', 'Failed tool cards', 'glimpse', 'Tool calls that failed, so the error shows'],
 		['Message', 'Message cards', 'glimpse', 'Messages between sessions, sent and received'],
 		['Notice', 'Notice cards', 'short', "Hal's notices: background command reports, prompt-file changes"],
+		['Commit', 'Commit cards', 'short', 'Commits your Bash calls make'],
 	]
 	return kinds.map(([key, label, value, what]) => ({
 		name: `cardVerbosity${key}`,

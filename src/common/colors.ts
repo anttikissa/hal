@@ -141,8 +141,10 @@ export const colors = {
 		// A mid-turn update (task py) asks nothing: neutral.
 		updateFg: [0.9, 0, 0],
 		// Commits (task hy): violet, apart from the session outcomes.
-		commitFg: [0.8, 0.16, 300],
+		commitFg: colors.commitCard().fg!,
 	}),
+	// A commit card (task 179), web class .commit-card.
+	commitCard: (): Style => ({ fg: [0.8, 0.16, 300] }),
 	// Help bar: keys stand out from descriptions; the web's update reload
 	// hint (task 7t) is amber, a special case only when new code waits.
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0], update: [0.82, 0.17, 70] }),

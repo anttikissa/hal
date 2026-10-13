@@ -6,6 +6,7 @@ import { realpath, stat, mkdir, writeFile } from 'fs/promises'
 import { dirname, basename, resolve, relative, isAbsolute, normalize } from 'path'
 import { createHash } from 'crypto'
 import type { FileChange, FileSnapshot } from '../common/replay.ts'
+import type { CommitBlock } from '../common/blocks.ts'
 import { approval } from './approval.ts'
 import { paths } from './paths.ts'
 import { history } from './history.ts'
@@ -170,10 +171,11 @@ async function begin(ctx: ToolContext, patterns: string[], literal = false): Pro
 	} catch (e) { release(); throw e }
 }
 
-// Returns the lines commits.committed gave for the call's commits (task sg0).
-async function finish(observation: Observation): Promise<string[]> {
+// Returns the call's commits and the lines commits.committed gave for
+// them (tasks sg0, 179).
+async function finish(observation: Observation): Promise<{ lines: string[]; commits: CommitBlock[] }> {
 	let { ctx, patterns, literal, before, release } = observation
-	let lines: string[] = []
+	let found: { lines: string[]; commits: CommitBlock[] } = { lines: [], commits: [] }
 	try {
 		let files: FileChange[] = []
 		let declared = new Set(await fileChanges.tracked(ctx.cwd, [...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns, literal)]))
@@ -190,10 +192,10 @@ async function finish(observation: Observation): Promise<string[]> {
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {
-		if (observation.commits) lines = await commits.finish(observation.commits)
+		if (observation.commits) found = await commits.finish(observation.commits)
 		release()
 	}
-	return lines
+	return found
 }
 
 export const fileChanges = {

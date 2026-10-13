@@ -4,7 +4,7 @@
 // Provider input comes from host history; items omit provider-only fields.
 // Tasks: ca, nvm, 6eq, rqq.
 
-import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type ToolDisplay, type Usage } from './blocks.ts'
+import { blocks, type AssistantBlock, type CommitBlock, type ImageBlock, type Sender, type ToolResultBlock, type ToolDisplay, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
@@ -35,7 +35,8 @@ export type Shown = { originSession?: string; canceledReference?: true } & (
 	// A slash command: origin identifies Hal; from identifies another session.
 	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
-	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string }
+	// `commit`: a commit a Bash call made (task 179), its own card.
+	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared.'.
 	| { type: 'divider'; text: string; ts?: string }
@@ -129,6 +130,18 @@ function imageItem(b: ImageBlock, ts?: string): Shown {
 	if (ts !== undefined) item.ts = ts
 	return item
 }
+// A result, its images, then its commits (task 179): one record, so
+// they share its number, the later ones keyed n.1, n.2.
+function resultItems(b: ToolResultBlock, ts?: string): Shown[] {
+	return [transcript.resultItem(b, ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, ts)), ...(b.commits ?? []).map((c) => transcript.commitItem(c, ts))]
+}
+// '<short> <subject>', a row per file ('+3 -1 src/a.ts'), then the
+// hook's lines.
+function commitItem(c: CommitBlock, ts?: string): Shown {
+	let count = (n: number, sign: string) => n < 0 ? 'bin' : `${sign}${n}`
+	let text = [`${c.short} ${c.subject}`, ...c.files.map((f) => `${count(f.added, '+')} ${count(f.removed, '-')} ${f.path}`), ...(c.lines ?? [])].join('\n')
+	return { type: 'output', text, commit: c, ...(ts !== undefined && { ts }) }
+}
 function resultItem(b: ToolResultBlock, ts?: string): Shown {
 	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
@@ -156,7 +169,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r), ts: r.ts }]
-	if (r.type === 'user') return r.blocks.flatMap((b): Shown[] => b.type === 'text' ? [transcript.promptItem(b.text, b, r.ts)] : b.type === 'image' ? [transcript.imageItem(b, r.ts)] : [transcript.resultItem(b, r.ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, r.ts))])
+	if (r.type === 'user') return r.blocks.flatMap((b): Shown[] => b.type === 'text' ? [transcript.promptItem(b.text, b, r.ts)] : b.type === 'image' ? [transcript.imageItem(b, r.ts)] : transcript.resultItems(b, r.ts))
 	return [transcript.endItem(r)]
 }
 function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
@@ -364,7 +377,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
 		let done = transcript.settle(t.items, t.live).map((item): Item => item.type === 'tool' && event.results.some((r) => r.id === item.id) ? { ...item, partial: undefined } : item)
-		let items = [...done, ...transcript.keyed(event.results.flatMap((b) => [transcript.resultItem(b, event.ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, event.ts))]), event.n, done.length)]
+		let items = [...done, ...transcript.keyed(event.results.flatMap((b) => transcript.resultItems(b, event.ts)), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	// Attachments, notices and other session events are not turn ends.
@@ -390,4 +403,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, href, keyed, imageItem, resultItems, commitItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

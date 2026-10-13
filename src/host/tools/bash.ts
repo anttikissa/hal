@@ -5,7 +5,8 @@
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
-import type { Tool } from '../tools.ts'
+import type { Tool, ToolOutput } from '../tools.ts'
+import type { CommitBlock } from '../../common/blocks.ts'
 
 // The command without a leading `cd <cwd> &&`: it runs in cwd anyway,
 // and the repeat crowds the call's one-line title.
@@ -54,13 +55,18 @@ export const tool: Tool = {
 		let given = input.timeout === undefined ? undefined : Math.round((input.timeout as number) * 1000)
 		let observation = await fileChanges.begin(ctx, patterns)
 		let launched = false
+		// The call's commits (task 179); a background job finishing after
+		// its result has none to give.
+		let found: CommitBlock[] = []
+		let withCommits = (text: string): ToolOutput => found.length ? { text, commits: found } : text
 		let launch = () => {
 			if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs : 120_000), input.background ? undefined : ctx.onOutput)
 			launched = true
 			// Lines from commits.committed follow the output (task sg0).
 			let done = run.done.then(async (out) => {
-				let lines = await fileChanges.finish(observation)
+				let { lines, commits } = await fileChanges.finish(observation)
+				found = commits
 				return lines.length ? `${out}${out.endsWith('\n') ? '' : '\n'}\n${lines.join('\n')}` : out
 			}, async (e) => { await fileChanges.finish(observation); throw e })
 			return { ...run, done }
@@ -68,11 +74,11 @@ export const tool: Tool = {
 		try {
 			// Escape does not stop a background job. Its snapshot and lock
 			// last until actual exit, not until the early tool result.
-			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch, input.unsafeToStop === true ? input : undefined)
+			if (input.background) return withCommits(await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch, input.unsafeToStop === true ? input : undefined))
 			let run = launch()
 			let stop = () => run.stop(jobs.why(ctx.signal, 'stopped'))
 			ctx.signal.addEventListener('abort', stop, { once: true })
-			try { return await run.done } finally { ctx.signal.removeEventListener('abort', stop) }
+			try { return withCommits(await run.done) } finally { ctx.signal.removeEventListener('abort', stop) }
 		} finally {
 			if (!launched) observation.release()
 		}

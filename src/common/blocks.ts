@@ -25,7 +25,13 @@ export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name:
 // or stopped it running (task ker); not a failure.
 // `diff`: a numbered diff of what the call changed (EDIT), for display;
 // providers never see it.
-export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; output: string; outputBlob?: string; isError?: boolean; image?: ImageBlock; images?: ImageBlock[]; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped' }
+// `commits`: commits the call made for its own session (task 179), each
+// shown as its own card after the result; providers never see them.
+export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; output: string; outputBlob?: string; isError?: boolean; image?: ImageBlock; images?: ImageBlock[]; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; commits?: CommitBlock[] }
+
+// A commit (task 179): paths relative to the repository root; a binary
+// file counts -1 lines; `lines` are those commits.committed gave.
+export type CommitBlock = { hash: string; short: string; subject: string; amend?: true; files: { path: string; added: number; removed: number }[]; lines?: string[] }
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:

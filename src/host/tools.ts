@@ -14,7 +14,7 @@
 
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
-import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
+import type { CommitBlock, ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { toolPresentations } from './tool-presentation.ts'
 import { nativeTool } from './native-tool.ts'
@@ -32,7 +32,7 @@ import { edit } from './tools/edit.ts'
 export type CallContext = { cwd: string; sessionId: string; model?: string }
 export type ToolContext = CallContext & { signal: AbortSignal; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
 // `diff`: what the call changed, for display only; providers never see it.
-export type ToolOutput = string | { text: string; image?: { mediaType: string; data: string; source?: string }; images?: { mediaType: string; data: string; source?: string }[]; diff?: string; isError?: boolean }
+export type ToolOutput = string | { text: string; image?: { mediaType: string; data: string; source?: string }; images?: { mediaType: string; data: string; source?: string }[]; diff?: string; isError?: boolean; commits?: CommitBlock[] }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.
@@ -128,7 +128,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
 		else {
-			result = { type: 'tool_result', id: call.id, output: out.text, ...(out.isError && { isError: true }), ...(out.diff !== undefined && { diff: out.diff }) }
+			result = { type: 'tool_result', id: call.id, output: out.text, ...(out.isError && { isError: true }), ...(out.diff !== undefined && { diff: out.diff }), ...(out.commits?.length && { commits: out.commits }) }
 			let images = []
 			for (let image of [...(out.image ? [out.image] : []), ...(out.images ?? [])]) {
 				try {

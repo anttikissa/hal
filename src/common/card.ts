@@ -11,9 +11,9 @@ import type { Fold } from './toggle.ts'
 // How much of a block shows (task hyt): its title row, a glimpse, or all.
 export type Verbosity = 'short' | 'glimpse' | 'long'
 // What config.ason and /blocks set a start state for.
-export type Kind = 'prompt' | 'text' | 'thinking' | 'tool' | 'failed' | 'message' | 'notice'
+export type Kind = 'prompt' | 'text' | 'thinking' | 'tool' | 'failed' | 'message' | 'notice' | 'commit'
 
-const kinds: Kind[] = ['prompt', 'text', 'thinking', 'tool', 'failed', 'message', 'notice']
+const kinds: Kind[] = ['prompt', 'text', 'thinking', 'tool', 'failed', 'message', 'notice', 'commit']
 const levels: Verbosity[] = ['short', 'glimpse', 'long']
 
 // Tool calls that carry a message to another session.
@@ -29,7 +29,7 @@ function kind(item: Shown, failed = false): Kind | undefined {
 		case 'tool':
 			return failed ? 'failed' : messaging.has(item.name) ? 'message' : 'tool'
 		case 'output':
-			return item.change ? 'notice' : undefined
+			return item.commit ? 'commit' : item.change ? 'notice' : undefined
 		case 'prompt':
 			if (bashResult.background(item) || (item.from === undefined && item.origin === 'model')) return 'notice'
 			return item.from === undefined ? 'prompt' : 'message'
@@ -80,7 +80,7 @@ function text(item: Shown & { type: 'prompt' | 'text' | 'thinking' }): string {
 }
 
 function markdown(item: Shown): boolean {
-	return item.type === 'text' || item.type === 'thinking' || item.type === 'output' || (item.type === 'prompt' && !!item.from && !bashResult.background(item))
+	return item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && !item.commit) || (item.type === 'prompt' && !!item.from && !bashResult.background(item))
 }
 
 export const card = { kinds, levels, kind, toggles, setting, verbosity, failed, initial, signature, text, markdown }

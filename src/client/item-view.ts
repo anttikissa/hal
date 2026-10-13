@@ -64,7 +64,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.log().fg! }
+			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.log().fg! }
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}
@@ -167,6 +167,13 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output': {
+			// A commit (task 179): 'HH:MM Committed <short> <subject>';
+			// open, its files and the hook's lines.
+			if (item.commit) {
+				if (fold === 'short') return itemView.closedRow(item, item.text, hw)
+				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
+				return itemView.headed(item, fold === 'glimpse' ? blockView.glimpse(body, width, false, itemView.itemStyle(item)) : body, width)
+			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
 			if (item.change) {

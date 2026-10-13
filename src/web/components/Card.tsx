@@ -183,6 +183,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)
 		if (headsWho()) return titles.who(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
+		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${lines()[0]}`
 		return item.type === 'tool' ? presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
 	// Folded cards name their kind with an icon: thinking, another

@@ -209,6 +209,7 @@ test('a commit in a bash call notifies other tabs once; a reset does not; an ame
 
 // Task sg0: plugins hook commits.committed; its lines follow the output
 // of the call whose own-session commit it describes, and only that one.
+// Task 179: the commit rides on that result, shown as card n.1.
 test('commit hook lines follow the result of the call that made the commit', async () => {
 	let seen: any[] = []
 	let original = commits.committed
@@ -217,9 +218,14 @@ test('commit hook lines follow the result of the call that made the commit', asy
 		let git = 'git -c user.name=t -c user.email=t@example.com'
 		let plain = await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
 		expect(plain.output).not.toContain('hooked')
+		expect(plain.commits).toBeUndefined()
 		let made = await bash(`printf 'a\\nb\\n' > a && ${git} add a && ${git} commit -qm first -m 'Session: ${id}'`)
 		let short = (await fileChanges.git(cwd, ['rev-parse', '--short', 'HEAD'])).text.trim()
 		expect(made.output).toEndWith(`\n\nhooked ${short}`)
 		expect(seen).toMatchObject([{ sessionId: id, subject: 'first', files: [{ path: expect.stringMatching(/\/repo\/a$/), added: 2, removed: 0 }] }])
+		expect(made.commits).toEqual([{ hash: expect.any(String), short, subject: 'first', files: [{ path: 'a', added: 2, removed: 0 }], lines: [`hooked ${short}`] }])
+		let items = transcript.recordItems({ type: 'user', n: 7, ts: '', blocks: [made] }, 0)
+		expect(items.map((i) => [i.type, i.key])).toEqual([['tool-result', '7'], ['output', '7.1']])
+		expect(items[1]).toMatchObject({ text: `${short} first\n+2 -0 a\nhooked ${short}` })
 	} finally { commits.committed = original }
 })
