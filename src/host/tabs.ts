@@ -158,7 +158,7 @@ function create(cwd: string, after?: string, autoclose = false, noUser = false, 
 		interactive,
 		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
 	}).id
-	greetings.open(id, timezone)
+	if (!first) greetings.open(id, timezone)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
 	// The guide speaks first: no prompt needed to start it.
 	if (first && !status.transition(id, { type: 'submit' })) turns.start(id)

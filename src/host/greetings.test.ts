@@ -118,6 +118,7 @@ test('restored empty sessions and task-bearing, forked or subagent sessions rece
 	let fork = subagents.spawn(restored, { ...base, fork: true })
 	// A fork has its ordinary provenance output, but no arrival.
 	expect(history.readSync(fork).filter((r) => r.type === 'output')).toHaveLength(1)
+	// A blank intro tab gets only the remark naming its model.
 	let intro = subagents.spawn(restored, { ...base, model: 'hal/intro' })
-	expect(history.readSync(intro)).toEqual([])
+	expect(history.readSync(intro)).toMatchObject([{ type: 'output', synthetic: true }])
 })
