@@ -125,11 +125,7 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
 	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `[ "<${k}>" ]`))
 	if (rest.length) {
-		let fields = rest.map((k) => {
-			let p = properties[k]!
-			let value = p.default !== undefined ? JSON.stringify(p.default) : `"<${k}>"`
-			return `${k}: ${p.type === 'array' && p.default === undefined ? `[${value}]` : value}`
-		}).join(', ')
+		let fields = rest.join(', ')
 		args.push(rest.some((k) => required.includes(k)) ? `{ ${fields} }` : `[ { ${fields} } ]`)
 	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
