@@ -269,6 +269,10 @@ function onKeys(events: KeyEvent[]): void {
 			if (action) app.send(forms.command(st.transcript.meta.id, state, action))
 			continue
 		}
+		if (k.key === 'escape' && !k.shift && !k.alt && !k.ctrl && !k.cmd && st.notice) {
+			st.notice = undefined
+			continue
+		}
 		if (promptKeys.edit(st, k, app.send)) continue
 		let shown = st.transcript?.meta.id
 		if (promptKeys.clip(st, k, (r) => app.pasted(shown, r))) continue

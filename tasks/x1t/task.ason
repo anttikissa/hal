@@ -1,0 +1,9 @@
+{
+	title: 'Dismiss action notices with Escape',
+	spec: 'Terminal and web passing action notices show a right-aligned (esc to clear) hint. Plain Escape clears the passing notice and consumes that key, preserving the draft and avoiding pause; a later Escape retains normal behavior. Open dialogs, forms and completion menus retain their Escape handling. Ongoing session failure reasons, queue editing hints and version mismatch status are not cleared or labeled dismissible. Card targeting error sentences start with capitals; shortcut hints stay lowercase. Restore the invariant that one-time action feedback can be cleared without sending a message or stopping the model.',
+	status: 'done',
+	notes: [
+		'Passing notices live separately from session failure reasons and queue/version hints. Only the passing notice gets the clear hint. Modal/form/completion Escape routing remains first. Terminal hint formatting lives in notice-view to preserve the 400-line frame module limit. Typecheck reported errors outside changed files; focused tests and changed-file lint are used for verification.'
+	],
+	needs: []
+}

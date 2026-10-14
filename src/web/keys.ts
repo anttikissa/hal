@@ -127,6 +127,10 @@ function key(e: KeyInput, target: Target): boolean {
 		let choice = menuKey[e.key as keyof typeof menuKey]
 		if (choice && app.menuKey(choice)) return true
 	}
+	if (plain && e.key === 'Escape' && st.view.notice) {
+		app.setNotice(undefined)
+		return true
+	}
 	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
 	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active) return queuedPrompt.cancel()
 	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()

@@ -218,7 +218,8 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	return (
 		<footer class="Composer">
 			<div id="notice" class="log">
-				{props.notice ?? ''}
+				<Show when={props.notice}><span>{props.notice}</span></Show>
+				<Show when={props.view.notice}><button type="button" class="clear-notice" onClick={() => app.setNotice(undefined)}>(esc to clear)</button></Show>
 			</div>
 			<Show when={chips().length}>
 				<ul class="chips" aria-label="Attachments">

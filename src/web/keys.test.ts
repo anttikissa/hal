@@ -38,6 +38,19 @@ const press = (key: string, target: Target, mods: Partial<KeyInput> = {}) =>
 const other: Target = { kind: 'other' }
 const clip = (text: string) => ({ items: [], getData: (t: string) => (t === 'text/plain' ? text : '') })
 
+test('Escape clears action feedback before pausing, preserving the draft', () => {
+	app.onEvent({ type: 'state', sessionId, state: { type: 'running', phase: 'streaming' } })
+	app.input('draft')
+	app.setNotice('Card 1938 does not expand or collapse')
+	sent = []
+	expect(press('Escape', other)).toBe(true)
+	expect(app.state.view.notice).toBeUndefined()
+	expect(app.state.text).toBe('draft')
+	expect(sent).toEqual([])
+	press('Escape', other)
+	expect(sent.some((c) => c.type === 'pause')).toBe(true)
+})
+
 test('on a touch keyboard Enter is a newline and the Send button sends', () => {
 	let touch: Target = { kind: 'message', text: 'hi', cursor: 2, coarse: true }
 	expect(press('Enter', touch)).toBe(false)

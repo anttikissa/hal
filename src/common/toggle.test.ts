@@ -28,10 +28,10 @@ test('targets: lists, kinds, ranges and * leave user and assistant blocks alone 
 	expect(keys('t*')).toEqual(['14', '16'])
 	expect(keys('r*, 14')).toEqual(['11', '14', '17'])
 	expect(keys('')).toEqual(['16'])
-	expect(keys('x*')).toBe('unknown kind x in x* (kinds: t r a u m s q)')
-	expect(keys('15')).toBe('card 15 does not expand or collapse')
-	expect(keys('18', 'expand')).toBe('no card 18 to expand')
-	expect(keys('q*')).toBe('nothing to toggle in q*')
+	expect(keys('x*')).toBe('Unknown kind x in x* (kinds: t r a u m s q)')
+	expect(keys('15')).toBe('Card 15 does not expand or collapse')
+	expect(keys('18', 'expand')).toBe('No card 18 to expand')
+	expect(keys('q*')).toBe('Nothing to toggle in q*')
 })
 
 test('one named block steps short, glimpse, long (inline); more go long while most are not, else short', () => {

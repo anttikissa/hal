@@ -33,10 +33,10 @@ function parse(args: string): Target | string {
 	let parts: Part[] = []
 	for (let text of args.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)) {
 		let m = /^#?([a-z]*)(?:(\d+)(?:-#?[a-z]*(\d+))?|(\*))$/i.exec(text)
-		if (!m) return `not a card, range or kind: ${text}`
+		if (!m) return `Not a card, range or kind: ${text}`
 		let letters = m[1]!.toLowerCase()
 		let bad = [...letters].find((c) => !kinds[c])
-		if (bad) return `unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`
+		if (bad) return `Unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`
 		if (m[4]) parts.push({ kinds: letters, from: 0, to: Infinity, one: false, text })
 		else {
 			let a = Number(m[2]), b = m[3] === undefined ? a : Number(m[3])
@@ -57,14 +57,14 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 	let numbered = items.filter((i) => /^\d+$/.test(i.key))
 	if (!target.length) {
 		let tool = items.findLast((i) => i.type === 'tool')
-		return tool ? [tool] : `no tool card to ${verb}`
+		return tool ? [tool] : `No tool card to ${verb}`
 	}
 	let found = new Set<Item>()
 	for (let part of target) {
 		if (part.one) {
 			let item = numbered.find((i) => Number(i.key) === part.from)
-			if (!item) return `no card ${part.from} to ${verb}`
-			if (!toggle.toggles(item)) return `card ${part.from} does not expand or collapse`
+			if (!item) return `No card ${part.from} to ${verb}`
+			if (!toggle.toggles(item)) return `Card ${part.from} does not expand or collapse`
 			found.add(item)
 			continue
 		}
@@ -73,7 +73,7 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 			if (toggle.toggles(i) && Number(i.key) >= part.from && Number(i.key) <= part.to && letters.includes(titles.letter(i))) found.add(i)
 		}
 	}
-	if (!found.size) return `nothing to ${verb} in ${target.map((p) => p.text).join(' ')}`
+	if (!found.size) return `Nothing to ${verb} in ${target.map((p) => p.text).join(' ')}`
 	return numbered.filter((i) => found.has(i))
 }
 

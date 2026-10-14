@@ -61,6 +61,17 @@ function open(state: SessionState, text: string, cursor: number, anchor?: number
 	effects = []
 }
 
+test('Escape clears action feedback without pausing or changing the draft', () => {
+	open({ type: 'running', phase: 'streaming' }, 'draft', 3)
+	app.state.notice = 'Card 1938 does not expand or collapse'
+	app.onKeys([{ key: 'escape', shift: false, alt: false, ctrl: false, cmd: false }])
+	expect(app.state.notice).toBeUndefined()
+	expect(app.state.prompt.text).toBe('draft')
+	expect(effects).toEqual([])
+	app.onKeys([{ key: 'escape', shift: false, alt: false, ctrl: false, cmd: false }])
+	expect(effects).toContain('pause')
+})
+
 // Situations a key can matter in: editing mid-text, with a selection,
 // and an empty prompt while the model works.
 const situations: (() => void)[] = [

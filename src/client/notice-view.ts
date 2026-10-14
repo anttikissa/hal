@@ -45,4 +45,15 @@ function overlay(lines: string[], stack: Folded, anchor: number, cols: number): 
 	return grow
 }
 
-export const noticeView = { width, rows, overlay }
+function messages(why: string | undefined, notice: string | undefined, clearable: boolean | undefined, w: number): string[] {
+	let told = [why, notice].filter((t) => t).map((t) => ansi.wrap(t!, w))
+	if (notice && clearable) {
+		let rows = told[told.length - 1]!, hint = '(esc to clear)'
+		let last = rows[rows.length - 1]!
+		if (strings.visLen(last) + hint.length + 1 > w) rows.push(...ansi.wrap(hint, w).map((r) => ' '.repeat(Math.max(0, w - strings.visLen(r))) + r))
+		else rows[rows.length - 1] = last + ' '.repeat(w - strings.visLen(last) - hint.length) + hint
+	}
+	return told.flatMap((rows, i) => (i ? ['─'.repeat(w), ...rows] : rows))
+}
+
+export const noticeView = { width, rows, overlay, messages }
