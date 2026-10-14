@@ -108,7 +108,7 @@ function unsafe(row: string, item: Item & { type: 'tool' }, width: number): stri
 // `text` in the exit color, then back to `style`'s.
 function exitColor(text: string, style: Style | undefined): string {
 	if (ansi.mono()) return text
-	return ansi.sgr({ fg: colors.exit().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
+	return ansi.sgr({ fg: text === 'exit 1' ? colors.exit().neutralFg! : colors.exit().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 }
 
 // The status after a tool card's title (task wm0), quiet: a nonzero

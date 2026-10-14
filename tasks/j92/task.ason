@@ -1,0 +1,10 @@
+{
+	title: 'Neutral exit-one status color',
+	spec: 'In terminal and web, foreground and background Bash exit 1 headers use the existing neutral gray from colors.log().fg to signal not dangerous. Other nonzero exits retain colors.exit coral; exit 0 remains unlabeled. This replaces wm0’s shared coral rule for exit 1 only. Status text, output, history, model input and failure/folding behavior remain unchanged.',
+	status: 'done',
+	notes: [
+		'Implemented as a colors.exit neutralFg derived from colors.log, selected only for the exact exit 1 status in both header renderers. Shared Bash status rendering covers foreground and background results. Focused color, frame and item-view tests passed (51); explicit exit 0/1/2/123 rendering checks, changed-module lint, full typecheck and the web bundle build passed. No browser rendering was exercised.'
+	],
+	needs: ['wm0'],
+	foldInto: ['wm0']
+}

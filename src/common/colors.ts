@@ -159,9 +159,8 @@ export const colors = {
 	// selected row's popupCurrent background (L 0.42).
 	popupNote: (): Style => ({ fg: [0.8, 0, 0] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
-	// A nonzero exit status (task wm0): coral, beside bash's magenta.
-	// Exit 1 is often harmless.
-	exit: (): Style => ({ fg: [0.75, 0.17, 15] }),
+	// Exit 1 is neutral; other nonzero statuses are coral (tasks wm0, j92).
+	exit: (): Style => ({ fg: [0.75, 0.17, 15], neutralFg: colors.log().fg! }),
 	// Edit diffs: soft pastels, easy on the eyes.
 	diff: (): Style => ({ addFg: [0.8, 0.16, 146], removeFg: [0.72, 0.16, 28] }),
 	// The web page's own surfaces (custom properties on .page): canvas

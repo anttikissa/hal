@@ -28,7 +28,7 @@ export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.
 				<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.label}</span>{props.children}</span>
 			</span>
 			{props.actions}
-			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class="exit">{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>
+			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class="exit" style={s() === 'exit 1' ? { color: 'var(--neutral-fg)' } : undefined}>{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>
 			<Show when={stats()}>{(s) => <span class="status diff">(<Show when={s().added}><span class="add">+{s().added}</span></Show>{s().added && s().removed ? ' ' : ''}<Show when={s().removed}><span class="del">−{s().removed}</span></Show>, {s().lines}{rest() ? `, ${rest()}` : ''})</span>}</Show>
 			{props.activity}
 			{props.reference}
