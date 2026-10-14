@@ -1,0 +1,10 @@
+{
+	title: 'Terminal Up recalls slash commands for correction',
+	spec: 'In the terminal, input history includes human slash commands as well as prompts in transcript order, including commands whose arguments failed validation. Up on an empty input recalls the latest human command instead of amending an earlier prompt while Hal works; recalling a command does not pause or amend that prompt. Re-sending the corrected command is an ordinary submit. Commands sent by a model or another session and canceled references stay excluded. Unknown commands refused before recording retain the existing draft restoration. Web behavior remains unchanged pending user confirmation.',
+	status: 'done',
+	notes: [
+		'Slash commands are separate transcript items, not prompts. Terminal recall opts into these items; web keeps its existing list until scope is confirmed. Model commands are already omitted by transcript projection. The running-prompt edit path yields to a later human command, while inbox and pending-prompt edit precedence stays intact. Focused app, recall and amend tests pass (77 tests); changed-file lint passes. Repository typecheck is blocked by unrelated ToolOutput return-type mismatch in src/host/tools/bash.ts. Recall scans the loaded transcript on arrow keys only and adds no timers or persistent state.'
+	],
+	needs: ['91', 'dg'],
+	foldInto: ['91', 'dg']
+}

@@ -27,6 +27,9 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 	if (k.key === 'up' && !st.editing) {
 		let begun = amend.begin(st.transcript, st.prompt.text)
 		if (!begun) return false
+		let target = begun.editing.target
+		let after = target && st.transcript.items.slice(st.transcript.items.findIndex((i) => i.key === target) + 1)
+		if (after && after.some((i) => i.type === 'command' && i.from === undefined && !i.canceledReference)) return false
 		st.editing = begun.editing
 		let { anchor: _, ...rest } = st.prompt
 		st.prompt = { ...rest, text: begun.editing.original, cursor: begun.editing.original.length }
@@ -63,7 +66,7 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	}
 	let id = t.meta.id
 	let { text, cursor } = st.prompt
-	let shown = recall.step(id, recall.entries(t), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))
+	let shown = recall.step(id, recall.entries(t, true), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))
 	if (!shown) return false
 	let { goal: _, anchor: _a, typed: _t, ...rest } = st.prompt
 	st.prompt = { ...rest, ...shown }

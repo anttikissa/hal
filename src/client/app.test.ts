@@ -244,6 +244,26 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	expect(appView.view().editing).toBeUndefined()
 })
 
+test('Up recalls an invalid slash command instead of amending the earlier running prompt', () => {
+	for (let state of [{ type: 'running', phase: 'streaming' }, { type: 'paused' }, { type: 'idle' }] as SessionState[]) {
+		app.reset()
+		sent = []
+		app.onEvent(snapshot('s1', state))
+		app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['fix the bug'], n: 1 })
+		app.onEvent({ type: 'command', sessionId: 's1', text: '/autoclose sdf', n: 2 })
+		app.onEvent({ type: 'output', sessionId: 's1', text: 'usage: /autoclose [on|off]', error: true, n: 3 })
+		up()
+		expect(appView.view().prompt.text).toBe('/autoclose sdf')
+		expect(appView.view().editing).toBeUndefined()
+		expect(sent).toEqual([])
+		app.onKeys([key('backspace'), key('backspace'), key('backspace')])
+		type('on')
+		enter()
+		expect(sent.at(-1)).toMatchObject({ type: 'submit', sessionId: 's1', text: '/autoclose on' })
+		expect(sent.at(-1)).not.toHaveProperty('amend')
+	}
+})
+
 test('Up does nothing with text typed or when nothing works', () => {
 	working()
 	type('x')
