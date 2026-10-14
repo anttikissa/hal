@@ -1,0 +1,10 @@
+{
+	title: 'Bare card kinds and one-line dialog hints',
+	spec: 'In both terminal and web, bare known kind letters select the same cards as the kind wildcard: t equals t*, r equals r*, and combined kinds such as au equal au*. Existing starred forms remain accepted; bare * and empty input keep their current behavior. The shared selector supplies this behavior to Ctrl-O and /toggle, /expand and /collapse. Unknown kinds and malformed ranges remain errors; selecting a group retains existing majority expand/collapse semantics. Ctrl-O help replaces the previous two-column hint layout: each key-and-description hint has its own row at every width, with long descriptions wrapping, and no aligned multi-hint columns or paste-specific layout exception. Help and placeholders teach bare kinds. Terminal and web match; completion retains its existing behavior. Preserve accessible labels, status, warning colors, focus and keyboard handling.',
+	status: 'done',
+	notes: [
+		'Bare-kind selection extends the shared wildcard branch, not client-specific syntax. Terminal help removes width calculations, two-column packing and the paste-only branch; web uses ordinary block rows with inline term/description pairs, removing the grid and narrow-screen exception. Completion behavior is unchanged. Verified ./test toggle modal-view: 13 pass. Typecheck and changed-file lint passed. Plain terminal output inspected at widths 76 and 32. A temporary Chromium test passed: actual Ctrl-O dialog had seven vertically separated hints at 1200x900 and 390x900; bare t produced the Expand 2 tool cards hint and Enter closed the dialog. Screenshots at both sizes were inspected. The temporary UI test was removed per experimental-UI policy; real touch devices and software keyboards were not tested. One initial test incorrectly compared empty-selection error strings for s and s*; corrected expectations preserve the typed target in each error. No new state, timers or background work.'
+	],
+	needs: ['0wb'],
+	foldInto: ['v8y']
+}

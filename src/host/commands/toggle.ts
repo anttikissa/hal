@@ -12,7 +12,7 @@ import { host } from '../host.ts'
 import { sessionBlocks } from '../session-blocks.ts'
 import { status } from '../status.ts'
 
-const syntax = 'Targets:\nt24 or 24: one card\n10-24: a range\nt14,r2-9: a list\nt*: every tool card\nau10-40: user and assistant cards in 10-40\nempty: the latest tool card\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant cards alone unless named.'
+const syntax = 'Targets:\nt24 or 24: one card\n10-24: a range\nt14,r2-9: a list\nt: every tool card (t* also works)\n*: all cards except user and assistant cards\nau: every user and assistant card\nau10-40: user and assistant cards in 10-40\nempty: the latest tool card\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant cards alone unless named.'
 const help: Record<Mode, string> = {
 	toggle: '/toggle [target] expands or collapses cards: one named card flips; more expand when more than half are collapsed, else collapse.',
 	expand: '/expand [target] expands cards.',

@@ -169,20 +169,7 @@ function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
 	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + UNCOLOR : r)
-	let pairs = m.blocks!.help.filter(([k]) => k !== 'p')
-	let kw = (from: number) => Math.max(...pairs.filter((_, i) => i % 2 === from).map(([k]) => k.length)) + 2
-	let left = kw(0) + Math.max(...pairs.filter((_, i) => i % 2 === 0).map(([, d]) => d.length)) + 2
-	let two = left + kw(1) + Math.max(...pairs.filter((_, i) => i % 2 === 1).map(([, d]) => d.length)) <= width
-	let cell = ([k, d]: [string, string], w: number) => key + k.padEnd(w) + desc + d
-	let rows: string[] = []
-	if (two) for (let i = 0; i < pairs.length; i += 2) rows.push(cell(pairs[i]!, kw(0)).padEnd(left + key.length + desc.length) + (pairs[i + 1] ? cell(pairs[i + 1]!, kw(1)) : '') + UNCOLOR)
-	else {
-		// Narrow: one pair per row, a long description wrapped under itself.
-		let w = Math.max(kw(0), kw(1))
-		for (let [k, d] of pairs) strings.wordWrap(d, Math.max(1, width - w)).forEach((line, i) => rows.push(cell([i ? '' : k, line], w) + UNCOLOR))
-	}
-	let paste = m.blocks!.help.find(([k]) => k === 'p')
-	if (paste) strings.wordWrap(paste[1], Math.max(1, width - 3)).forEach((line, i) => rows.push(cell([i ? '' : 'p', line], 3) + UNCOLOR))
+	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - k.length - 2)).map((line, i) => key + (i ? ' '.repeat(k.length + 2) : k + '  ') + desc + line + UNCOLOR))
 	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')

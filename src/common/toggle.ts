@@ -49,7 +49,7 @@ function parse(args: string): Target | string {
 	for (let text of args.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)) {
 		let ends = text.split('-').map(reference)
 		let first = ends[0]!, last = ends.at(-1)!
-		let star = ends.length === 1 && first.key === '*'
+		let star = ends.length === 1 && (first.key === '*' || !first.key && !!first.kinds)
 		if (ends.length > 2 || (!star && ends.some((e) => !transcript.addressable(e.key)))) return `Not a card, range or kind: ${text}`
 		let bad = ends.flatMap((e) => [...e.kinds]).find((c) => !kinds[c])
 		if (bad) return `Unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`

@@ -10,16 +10,19 @@ import { titles } from './titles.ts'
 import { toggle, type Fold } from './toggle.ts'
 import type { Item } from './transcript.ts'
 
-// The help area: key and description pairs, row by row in two columns,
+// The help area: one key and description pair per row,
 // then a note and the kinds (each word's first letter is its kind letter).
 // The examples use the session's latest tool block ids when it has two.
 function help(items: Item[] = []): [string, string][] {
 	let tools = toggle.addressed(items).filter((i) => i.type === 'tool' && toggle.toggles(i)).map((i) => i.key)
 	let [a, b, c] = tools.length > 1 ? [tools.at(-3) ?? tools.at(-2)!, tools.at(-2)!, tools.at(-1)!] : ['10', '14', '24']
 	return [
-		[`t${c}, ${c}`, 'one card'], ['*', 'all cards'],
-		[`${a}-${c}`, 'a range'], ['t*, r*', 'all of a kind'],
-		[`t${b}, t${c}`, 'a list'], ['empty', 'latest tool card'],
+		[`t${c}, ${c}`, 'one card'],
+		[`${a}-${c}`, 'a range'],
+		[`t${b}, t${c}`, 'a list'],
+		['t, r', 'all of a kind'],
+		['*', 'all cards'],
+		['empty', 'latest tool card'],
 		['p', "expand paste markers in the prompt you're writing"],
 	]
 }
@@ -27,7 +30,7 @@ const note = 'User and assistant cards change only when you name them (a, u).'
 const kinds = ['tool', 'reasoning', 'assistant', 'user', 'message', 'system', 'question']
 
 function open(): ModalState {
-	let m = modals.open({ title: 'Expand or collapse cards', hint: 'enter: toggle · tab: complete · esc: close', form: { text: 'Expand or collapse cards', fields: [{ type: 'text', name: 'target', placeholder: '24, 10-24 or t*' }] } })
+	let m = modals.open({ title: 'Expand or collapse cards', hint: 'enter: toggle · tab: complete · esc: close', form: { text: 'Expand or collapse cards', fields: [{ type: 'text', name: 'target', placeholder: '24, 10-24 or t' }] } })
 	return { ...m, compact: true, question: 'Which cards to expand or collapse?', blocks: { hint: '', help: help() } }
 }
 
