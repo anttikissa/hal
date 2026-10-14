@@ -150,7 +150,7 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	parts[mine] = { type: 'text', text: literal.strip(text) }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)
-	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true, ...(target === undefined ? {} : { amends: target }) }
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true, amends: old!.n! }
 	if (command !== undefined) record.command = command
 	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
 	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))

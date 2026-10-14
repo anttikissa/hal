@@ -223,10 +223,9 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 		{ type: 'turn-start', sessionId, provider: 'fake' },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'Fixed' }, n: 8, ts },
 	])!
-	expect(t.items.slice(before.length).filter((i) => i.canceledReference)).toHaveLength(4)
-	expect(t.items.slice(before.length).filter((i) => !i.canceledReference)).toEqual([
-		{ type: 'prompt', text: 'one', ts, key: '7' },
-		{ type: 'prompt', text: 'fix it', ts, key: '7.1' },
+	expect(t.items.slice(before.length)).toEqual([
+		{ type: 'prompt', text: 'one', edited: true, ts, key: '7' },
+		{ type: 'prompt', text: 'fix it', edited: true, ts, key: '7.1' },
 		{ type: 'text', text: 'Fixed', ts, key: '8' },
 	])
 	let edited = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix it' }], replaces: true as const, ts, n: 7 }
@@ -236,7 +235,7 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 	let again: Event = { type: 'prompt', sessionId, texts: ['fix it!'], replaces: true, n: 10, ts }
 	let end: Event = { type: 'turn-end', sessionId, status: 'paused', n: 9, ts }
 	let t2 = fold([end, again], t)!
-	expect(t2.items.slice(before.length).filter((i) => !i.canceledReference)).toEqual([{ type: 'prompt', text: 'fix it!', ts, key: '10' }])
+	expect(t2.items.slice(before.length)).toEqual([{ type: 'prompt', text: 'fix it!', edited: true, ts, key: '10' }])
 	let late2 = fold([snap({ history: [...history, edited, said({ type: 'text', text: 'Fixed' }, 8), paused(9), { ...edited, blocks: [{ type: 'text', text: 'fix it!' }], n: 10 }] })])!
 	expect(late2).toEqual(t2)
 })

@@ -51,7 +51,7 @@ function counted<T>(fn: () => T): { value: T; bytes: number } {
 	return { value, bytes: pages.state.bytesRead - before }
 }
 
-test('older amendments retain canceled references across pages and keep state active', () => {
+test('older amendments drop the replaced turn from pages and keep state active', () => {
 	let id = newSession()
 	turn(id, 0, 1000)
 	let target = history.readSync(id)[0]!.n!
@@ -59,8 +59,7 @@ test('older amendments retain canceled references across pages and keep state ac
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'changed' }], replaces: true, amends: target })
 	let tail = pages.snapshot(id, 100)
 	let older = pages.page(id, tail.older, 10000)
-	expect(older.records.some((r) => r.n === target && r.canceledReference)).toBe(true)
-	expect(pages.essentials(id).some((r) => r.canceledReference)).toBe(false)
+	expect(older.records.some((r) => r.n === target)).toBe(false)
 	expect(pages.essentials(id).filter((r) => r.type === 'user')).toHaveLength(1)
 })
 

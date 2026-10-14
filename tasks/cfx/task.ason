@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Canceled references reuse records already in the history file; only the display projection retains them. Active replay and session essentials exclude them. Older safe amendments store an amends record number rather than a destructive rebase, preserving lazy paging. Cached display and active maps remain separate; no timer, new dependency, or additional output copies on disk. Disclosure state resets when a card becomes canceled so old open states cannot keep it open.',
-		'Focused verification uncovered a stale app status assertion from r92 expecting b3 instead of the existing three-slot braille marker. The fixture now sets slots:3 explicitly and asserts the current marker. Full-suite unrelated failures are reported separately.'
+		'Focused verification uncovered a stale app status assertion from r92 expecting b3 instead of the existing three-slot braille marker. The fixture now sets slots:3 explicitly and asserts the current marker. Full-suite unrelated failures are reported separately.',
+		'Task 6ch replaces the canceled references: amended prompts replace the original on screen and show (edited).'
 	],
 	needs: ['dg', '26q'],
 	foldInto: ['dg', '26q']

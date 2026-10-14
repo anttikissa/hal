@@ -32,7 +32,7 @@ function hinted(m: ModalState, items: Item[], at: (i: Item) => Fold) {
 }
 
 // Session → block key → state; paste name → its text, or why none.
-const state = { folds: new Map<string, Map<string, Fold>>(), canceled: new Map<string, Set<string>>(), pastes: new Map<string, { text?: string; error?: string }>() }
+const state = { folds: new Map<string, Map<string, Fold>>(), pastes: new Map<string, { text?: string; error?: string }>() }
 
 // The states of session `id`'s blocks.
 function of(id: string): Map<string, Fold> {
@@ -47,12 +47,6 @@ function at(id: string): (item: Item) => Fold {
 	let t = folds.transcriptOf(id)
 	let start = t ? toggle.starts(t) : () => 'long' as Fold
 	let states = folds.of(id)
-	let canceled = state.canceled.get(id)
-	if (!canceled) state.canceled.set(id, canceled = new Set())
-	for (let item of t?.items ?? []) if (item.canceledReference && !canceled.has(item.key)) {
-		canceled.add(item.key)
-		states.set(item.key, 'short')
-	}
 	return (item) => states.get(item.key) ?? start(item)
 }
 

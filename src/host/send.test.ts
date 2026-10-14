@@ -146,7 +146,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	expect(body(lastText(next + 2))).toBe(body(delivered.replace('hury', 'hurry')))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
 		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
-		{ type: 'prompt', text: 'and hurry' },
+		{ type: 'prompt', text: 'and hurry', edited: true },
 	])
 })
 

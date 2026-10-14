@@ -92,7 +92,6 @@ test('recall excludes agent and model-generated prompts, not human continuations
 		{ type: 'prompt', key: '4', text: 'human continuation', generatingCommand: 'clear' },
 		{ type: 'command', key: '5', text: '/autoclose sdf' },
 		{ type: 'command', key: '6', text: '/rename From peer', from: 'other' },
-		{ type: 'command', key: '7', text: '/autoclose off', canceledReference: true },
 	)
 	expect(recall.entries(t)).toEqual(['human', 'human continuation'])
 	expect(recall.entries(t, true)).toEqual(['human', 'human continuation', '/autoclose sdf'])

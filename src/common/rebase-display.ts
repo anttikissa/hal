@@ -8,7 +8,7 @@ function current(raw: HistoryRecord[]): HistoryRecord[] {
 	let projected = replay.current(raw), active = new Set(projected), byNumber = new Map(projected.filter((r) => r.n !== undefined).map((r) => [r.n, r]))
 	let candidates: HistoryRecord[] = raw.filter((r) => r.type !== 'rebase')
 	for (let r of rebase.latest(raw)) if (r.type === 'rebase') candidates = rebase.apply(candidates, r)
-	return [...candidates.map((r) => active.has(r) ? r : byNumber.get(r.n) ?? { ...r, canceledReference: true as const }), ...rebase.latest(raw).filter((r) => r.type === 'rebase')]
+	return [...candidates.flatMap((r) => active.has(r) ? [r] : byNumber.has(r.n) ? [byNumber.get(r.n)!] : []), ...rebase.latest(raw).filter((r) => r.type === 'rebase')]
 }
 
 function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): string {

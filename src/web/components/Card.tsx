@@ -70,7 +70,7 @@ const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv r
 const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
-	let id = () => `${props.session}#${props.row.item.key}${props.row.item.canceledReference ? ':canceled' : ''}`
+	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
 	let prose: HTMLDivElement | undefined
 	let proseObserver: ResizeObserver | undefined

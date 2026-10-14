@@ -95,14 +95,13 @@ function receipt(item: Shown): 0 | 1 | 2 {
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
 	if (item.type === 'prompt' && item.report && item.summary) label = `${label} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}`
-	if (label !== undefined && item.canceledReference) label += ' (canceled)'
 	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
 }
 
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return tagged(item.from !== undefined && /^bash #?t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5).replace(/^#/, '')}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && !item.advisory && (item.waiting ? 'soft-steering' : 'soft-steered'), item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued'])
+			return tagged(item.from !== undefined && /^bash #?t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5).replace(/^#/, '')}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.edited && 'edited', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && !item.advisory && (item.waiting ? 'soft-steering' : 'soft-steered'), item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued'])
 		// Another session's command is headed as the prompt it was sent
 		// as; the human's by itself, over what it said (none alone).
 		case 'command':

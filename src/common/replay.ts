@@ -35,7 +35,7 @@ export type FileChange =
 // records may be written out of number order. Records of old histories
 // have no `n` on disk and get their byte offset + 1 when read (pages.ts),
 // which no later number reuses. Absent only in records built by hand.
-export type HistoryRecord = Numbered & { canceledReference?: true } &
+export type HistoryRecord = Numbered &
 	(
 	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
 	// messages it delivers, which are its first text blocks. `replaces`:
@@ -285,12 +285,13 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 		if (r.type === 'user' && r.replaces) {
 			let target = r.amends
 			let at = target === undefined ? replay.lastPrompt(out) : out.findIndex((x) => x.n === target)
+			let { replaces: _replaces, ...projected } = r
 			if (at >= 0) {
+				if (target === undefined && out[at]!.n !== undefined) projected.amends = out[at]!.n
 				let delivered = new Set(out.slice(at).flatMap((x) => (x.type === 'user' ? (x.inbox ?? []) : [])))
 				out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
 				if (delivered.size) out = out.filter((x) => x.type !== 'inbox' || !delivered.has(x.id))
 			}
-			let { replaces: _replaces, ...projected } = r
 			r = projected
 		}
 		out.push(r)

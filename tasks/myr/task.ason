@@ -1,0 +1,6 @@
+{
+	title: 'View a prompt edit history',
+	spec: 'The web offers a control on an edited prompt to show its earlier versions, found by following amends links in the session history. The terminal offers an equivalent way. Earlier versions are display-only and never reach the model.',
+	status: 'planned',
+	needs: ['6ch']
+}

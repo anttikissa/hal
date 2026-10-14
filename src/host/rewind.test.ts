@@ -35,9 +35,8 @@ test('rewind drops the prompt and everything after it, then sends the edit once'
 	await until(() => a.views.get(id)!.state.type === 'idle' && a.of('turn-end').length === 3)
 	expect(calls).toHaveLength(3)
 	expect(history.readSync(id).filter((r) => r.type === 'user' && r.amends === n)).toHaveLength(1)
-	expect(a.views.get(id)!.items.some((i) => i.canceledReference)).toBe(true)
-	expect(shown(a.views.get(id)!.items.filter((i) => !i.canceledReference && (i.type === 'prompt' || i.type === 'text')))).toEqual([
-		{ type: 'prompt', text: 'uno' },
+	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt' || i.type === 'text'))).toEqual([
+		{ type: 'prompt', text: 'uno', edited: true },
 		{ type: 'text', text: 're uno' },
 	])
 })

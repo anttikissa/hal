@@ -26,7 +26,7 @@ import type { Item, Transcript } from './transcript.ts'
 // tools with side effects ran since.
 export type Editing = { sessionId: string; original: string; target?: string; inbox?: string; aside?: true; paused?: boolean; rewind?: number; later?: number; changed?: boolean; queueEdit?: string }
 
-const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' && !i.canceledReference && i.from === undefined && i.origin !== 'model'
+const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' && i.from === undefined && i.origin !== 'model'
 
 // Keys of the prompts the human sent since the latest compaction (a
 // clear leaves no items before it): each has an Edit button. A record
@@ -52,7 +52,7 @@ function at(t: Transcript, key: string): { editing: Editing; command?: unknown }
 	let command = states.busy(t.state) ? { type: 'pause', sessionId } : undefined
 	let editing: Editing = { sessionId, original: literal.escape(item.text), target: key, aside: true, paused: !!command }
 	let after = t.items.slice(i + 1)
-	editing.changed = after.some((x) => !x.canceledReference && x.type === 'tool' && !toolDetails.harmless(x.name, x.input))
+	editing.changed = after.some((x) => x.type === 'tool' && !toolDetails.harmless(x.name, x.input))
 	if (t.items.findLast(mine) !== item) {
 		editing.rewind = Number(key)
 		editing.later = after.filter((x) => !['turn-end', 'divider', 'tool-result', 'image'].includes(x.type)).length
@@ -83,7 +83,7 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 	if (!states.busy(t.state)) return undefined
 	let last = t.items.findLast(mine)
 	if (!last) return undefined
-	let changed = t.items.slice(t.items.indexOf(last) + 1).some((i) => !i.canceledReference && i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
+	let changed = t.items.slice(t.items.indexOf(last) + 1).some((i) => i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
 	return { editing: { sessionId, original: literal.escape(last.text), target: last.key, changed, paused: true }, command: { type: 'pause', sessionId } }
 }
 

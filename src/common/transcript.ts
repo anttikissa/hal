@@ -15,10 +15,11 @@ import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
 // An item as shown; Item adds its key.
-export type Shown = { originSession?: string; canceledReference?: true } & (
+export type Shown = { originSession?: string } & (
 	// `from`: the session that sent it, `label` naming it; without it,
-	// the human. `ts`: when it was sent (task hp).
-	| ({ type: 'prompt'; text: string; waiting?: true; ts?: string } & Sender)
+	// the human. `ts`: when it was sent (task hp). `edited`: the human
+	// amended it (task 6ch).
+	| ({ type: 'prompt'; text: string; waiting?: true; edited?: true; ts?: string } & Sender)
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number; ts?: string }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
@@ -102,9 +103,10 @@ function turnItems(turn: LiveTurn, at: number): Item[] {
 }
 
 // A prompt text as shown, saying who sent it if not the human.
-function promptItem(text: string, s?: Sender, ts?: string): Shown & { type: 'prompt' } {
+function promptItem(text: string, s?: Sender, ts?: string, edited?: boolean): Shown & { type: 'prompt' } {
 	let item: Shown & { type: 'prompt' } = { type: 'prompt', text, ...inbox.sender(s ?? {}) }
 	if (ts !== undefined) item.ts = ts
+	if (edited && item.from === undefined && item.origin !== 'model') item.edited = true
 	return item
 }
 
@@ -168,7 +170,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 	let items = r.type === 'assistant'
 		? transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts], interrupted: r.interrupted })
 		: transcript.keyed(transcript.recordShown(r), r.n, at)
-	return items.map((item) => ({ ...item, ...(r.originSession === undefined ? {} : { originSession: r.originSession }), ...(r.canceledReference ? { canceledReference: true as const } : {}) }))
+	return r.originSession === undefined ? items : items.map((item) => ({ ...item, originSession: r.originSession }))
 }
 function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'rate_limit') return [{ type: 'output', text: r.text, ts: r.ts }]
@@ -178,7 +180,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r), ts: r.ts }]
-	if (r.type === 'user') return r.blocks.flatMap((b): Shown[] => b.type === 'text' ? [transcript.promptItem(b.text, b, r.ts)] : b.type === 'image' ? [transcript.imageItem(b, r.ts)] : transcript.resultItems(b, r.ts))
+	if (r.type === 'user') return r.blocks.flatMap((b): Shown[] => b.type === 'text' ? [transcript.promptItem(b.text, b, r.ts, r.replaces || r.amends !== undefined)] : b.type === 'image' ? [transcript.imageItem(b, r.ts)] : transcript.resultItems(b, r.ts))
 	return [transcript.endItem(r)]
 }
 function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
@@ -258,7 +260,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (cleared >= 0) history = history.slice(cleared)
 	let early = cleared >= 0 ? [] : transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	for (let r of [...early, ...history]) {
-		if (!r.canceledReference && replay.isPrompt(r)) prompt = items.length
+		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
 		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history), ts: r.ts }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
@@ -433,9 +435,9 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 // the place of the last prompt and everything after it.
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let at = event.amends === undefined ? t.prompt : items.findIndex((i) => i.key === String(event.amends))
-	let keep = event.replaces && at !== undefined && at >= 0 ? items.map((i, index) => index < at || (i.type === 'output' && (i.change !== undefined || i.synthetic)) ? i : { ...i, canceledReference: true as const }) : items
+	let keep = event.replaces && at !== undefined && at >= 0 ? items.filter((i, index) => index < at || (i.type === 'output' && (i.change !== undefined || i.synthetic))) : items
 	let { live: _live, ...rest } = t
-	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.replaces)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 

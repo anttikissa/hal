@@ -119,8 +119,7 @@ test('image blocks show the same live and after reconnecting, and survive an edi
 	c.conn.send({ type: 'submit', sessionId: id, text: `look again at ${attached.marker}`, amend: true })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(image)
-	expect(c.views.get(id)!.items.filter((i) => i.type === 'image' && !i.canceledReference)).toHaveLength(1)
-	expect(c.views.get(id)!.items.filter((i) => i.type === 'image' && i.canceledReference)).toHaveLength(1)
+	expect(c.views.get(id)!.items.filter((i) => i.type === 'image')).toHaveLength(1)
 })
 
 test('a named image waits in /tmp under its name; its prompt copies it into the session, which outlives /tmp', async () => {

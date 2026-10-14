@@ -1,0 +1,10 @@
+{
+	title: 'Amended prompts replace the original and show (edited)',
+	spec: 'Amending a prompt (Up, last or older safe target) replaces the original prompt and everything after it in the transcript, as in model replay; no canceled references remain on screen, after reconnect or in history pages. The amending user record always stores amends: the number of the record it replaced, so each edit links to its predecessor and the full edit history stays in the session history file. The human text of an amended prompt is titled "You (edited)" in terminal and web. Prompt-file changes and synthetic output after the target stay shown, as before.',
+	status: 'done',
+	notes: [
+		'replay.current strips replaces from the projected edit, so snapshots lost the edit mark; it now sets amends on the projected record when an old history lacks it. Prompt items carry edited only for the human text (no from, not model). Canceled references were display-only, so no history records needed migration.'
+	],
+	needs: ['cfx'],
+	foldInto: ['cfx']
+}
