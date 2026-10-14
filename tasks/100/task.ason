@@ -3,7 +3,8 @@
 	spec: 'src/client/args.ts declares CLI commands and options through small readable helpers with local handlers and handwritten help strings. Help layout, aliases, value names and command grouping derive from those declarations. One parser handles missing values, duplicate aliases, unknown commands and options, mode restrictions and extra positionals; Hal-specific value and combination checks stay separate. Option values are nonempty and immediately follow their option. Parsing stays pure and runs before startup effects, preserves intended CLI forms and the Args result contract, and rejects invalid input rather than falling back to the terminal. Accidental parser quirks are not compatibility requirements. No new dependency or general-purpose framework.',
 	status: 'done',
 	notes: [
-		'The old global-option stripping accidentally accepted --port --no-user 9001 and similar split values. The user explicitly rejected preserving such quirks. All value-taking options use the same adjacent, nonempty-value rule; declarations provide handwritten help prose and generated names, grouping and layout.'
+		'The old global-option stripping accidentally accepted --port --no-user 9001 and similar split values. The user explicitly rejected preserving such quirks. All value-taking options use the same adjacent, nonempty-value rule; declarations provide handwritten help prose and generated names, grouping and layout.',
+		'Size matters as much as readability: the first rewrite grew args.ts from 101 to 171 lines and was cut to 117. Declarations live at module level; errors are thrown as UsageError and converted in parse; a command operand is stored in the field its value names (-r [host] sets host).'
 	],
 	needs: ['cb', '81y'],
 	foldInto: ['cb']

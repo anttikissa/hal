@@ -1,5 +1,5 @@
-// CLI declarations, generated help and pure validation before Hal starts.
-// Tasks: cb, 81y, 100.
+// Command-line arguments: declared once, parsed purely before Hal
+// starts, and rendered as help. Tasks: cb, 81y, 100.
 
 import type { Delivery } from '../common/protocol.ts'
 
@@ -14,158 +14,104 @@ export type Args = (
 	| { kind: 'error'; message: string }
 ) & { home?: string }
 
-type Mode = Exclude<Args['kind'], 'error'>
-type Options = {
-	home?: string
-	noUser?: true
-	port?: string
-	dir?: string
-	model?: string
-	session?: string
-	keep?: true
-	delivery?: Delivery
+type Kind = Exclude<Args['kind'], 'error'>
+type Out = { kind: Kind; home?: string; noUser?: true; port?: number; prompt?: string; host?: string; dir?: string; model?: string; session?: string; keep?: true; delivery?: Delivery }
+type Entry = { syntax: string; names: string[]; value?: string; help: string; kind?: Kind; within?: Entry; set?: (out: Out, value: string) => void }
+
+class UsageError extends Error {}
+const fail = (message: string): never => { throw new UsageError(message) }
+
+const commands: Entry[] = []
+const options: Entry[] = []
+let within: Entry | undefined
+
+function entry(syntax: string, help: string): Entry {
+	let [names, value] = syntax.split(/ (?=[<[])/)
+	return { syntax, names: names!.split(', '), value, help }
 }
-type Spelling = { syntax: string; names: string[]; value?: string; help: string }
-type Option = Spelling & { mode?: Mode; handle: (value: string) => void }
-type Command = Spelling & { mode: Mode }
-type Definitions = { commands: Command[]; options: Option[] }
 
-function declarations(values: Options): Definitions {
-	let commands: Command[] = [], options: Option[] = []
-	let scope: Mode | undefined
-
-	function spelling(syntax: string, help: string): Spelling {
-		let [names, value] = syntax.split(/ (?=[<[])/)
-		return { syntax, names: names!.split(', '), value, help }
-	}
-	function arg(syntax: string, help: string, handle: (value: string) => void): void {
-		options.push({ ...spelling(syntax, help), mode: scope, handle })
-	}
-	function flag(syntax: string, help: string, handle: () => void): void {
-		arg(syntax, help, handle)
-	}
-	function command(syntax: string, help: string, mode: Mode, configure?: () => void): void {
-		commands.push({ ...spelling(syntax, help), mode })
-		scope = mode
-		configure?.()
-		scope = undefined
-	}
-
-	arg('--home <dir>', 'Use this Hal home instead of the checkout', dir => { values.home = dir })
-	flag('--no-user', 'Omit USER.md from prompts when this process hosts Hal (terminal, serve, -p)', () => { values.noUser = true })
-
-	command('-p, --print <prompt>', 'Run one prompt and print the reply; quote prompts containing spaces', 'print', () => {
-		arg('-d, --dir <dir>', 'Working directory for a new session', dir => { values.dir = dir })
-		arg('-m, --model <model>', 'Model for the prompt', model => { values.model = model })
-		arg('-s, --session <id|tab>', 'Send to an existing session (default delivery: soft-steer)', session => { values.session = session })
-		flag('--steer', 'Interrupt the busy session at its next boundary', () => { values.delivery = 'steer' })
-		flag('--soft-steer', 'Let the busy session finish its current step', () => { values.delivery = 'soft-steer' })
-		flag('--queue', 'Wait for the busy session to finish its turn', () => { values.delivery = 'queue' })
-		flag('--keep', 'Keep a newly created tab open; not with --session', () => { values.keep = true })
-	})
-	command('-r [host]', 'Follow a remote Hal', 'remote')
-	command('serve', 'Run the foreground headless host', 'serve', () => {
-		arg('--port <1-65535>', 'Serve the web client on this port, or exit if unavailable', port => { values.port = port })
-	})
-	command('auth', 'Print a one-time web login code', 'auth')
-	command('-v, --version', 'Show the version, commit and checkout', 'version')
-	command('-h, --help, help', 'Show this help', 'help')
-	return { commands, options }
+// The command's operand, if any, goes to the field its value names: -r [host] sets host.
+function command(syntax: string, help: string, kind: Kind, declareOptions = () => {}): void {
+	within = { ...entry(syntax, help), kind }
+	commands.push(within)
+	declareOptions()
+	within = undefined
 }
+
+function arg(syntax: string, help: string, set: (out: Out, value: string) => void): void {
+	options.push({ ...entry(syntax, help), within, set })
+}
+
+const deliver = (delivery: Delivery) => (out: Out) => { out.delivery = out.delivery ? fail('choose one delivery flag') : delivery }
+
+command('-p, --print <prompt>', 'Run one prompt and print the reply', 'print', () => {
+	arg('-d, --dir <dir>', 'Working directory for the new tab', (out, dir) => { out.dir = dir })
+	arg('-m, --model <model>', 'Model to use', (out, model) => { out.model = model })
+	arg('-s, --session <id|tab>', 'Send to an existing session instead', (out, session) => { out.session = session })
+	arg('--steer', 'Interrupt a busy session at its next boundary', deliver('steer'))
+	arg('--soft-steer', 'Let a busy session finish its current step (default)', deliver('soft-steer'))
+	arg('--queue', 'Wait until a busy session finishes its turn', deliver('queue'))
+	arg('--keep', 'Keep the new tab open afterwards', out => { out.keep = true })
+})
+command('-r [host]', 'Follow a remote Hal', 'remote')
+command('serve', 'Run the foreground headless host', 'serve', () => {
+	arg('--port <1-65535>', 'Serve the web client on this port, or exit', (out, port) => {
+		out.port = /^\d+$/.test(port) && +port >= 1 && +port <= 65535 ? +port : fail(`--port needs 1-65535, got ${port}`)
+	})
+})
+command('auth', 'Print a one-time web login code', 'auth')
+command('-v, --version', 'Show the version, commit and checkout', 'version')
+command('-h, --help, help', 'Show this help', 'help')
+arg('--home <dir>', 'Use this Hal home instead of the checkout', (out, dir) => { out.home = dir })
+arg('--no-user', 'Leave USER.md out of prompts when this process hosts', out => { out.noUser = true })
 
 function usage(): string {
-	let { commands, options } = args.declarations({})
-	let width = Math.max(...[...commands, ...options].map(entry => entry.syntax.length))
-	let row = (entry: Spelling, indent = '  ') => `${indent}${entry.syntax.padEnd(width)}  ${entry.help}`
-	let lines = ['Usage: hal [command] [options]', '', 'With no command, start the terminal client.', '', 'Commands:']
-	for (let command of commands) {
-		lines.push(row(command))
-		for (let option of options.filter(option => option.mode === command.mode)) lines.push(row(option, '    '))
-	}
-	lines.push('', 'Shared options:', ...options.filter(option => !option.mode).map(option => row(option)))
-	return `${lines.join('\n')}\n`
+	let column = Math.max(...[...commands, ...options].map(e => e.syntax.length)) + 6
+	let rows = (list: Entry[], indent: string) => list.map(e => indent + e.syntax.padEnd(column - indent.length) + e.help)
+	return [
+		'Usage: hal [command] [options]', '', 'Without a command, hal starts the terminal client.', '', 'Commands:',
+		...commands.flatMap(c => [...rows([c], '  '), ...rows(options.filter(o => o.within === c), '    ')]),
+		'', 'Options:', ...rows(options.filter(o => !o.within), '  '), '',
+	].join('\n')
 }
 
-function error(message: string): Extract<Args, { kind: 'error' }> {
-	return { kind: 'error', message }
-}
-
-function scan(argv: string[], definitions: Definitions): { kind: Mode; operand?: string; used: Set<Option> } | Extract<Args, { kind: 'error' }> {
-	let { commands, options } = definitions
-	let selected: Command | undefined
-	let words: string[] = []
-	let used = new Set<Option>()
-
-	for (let i = 0; i < argv.length; i++) {
-		let token = argv[i]!
-		let option = options.find(option => option.names.includes(token))
-		if (option) {
-			if (used.has(option)) return args.error(`${token} given twice`)
-			let value = ''
-			if (option.value) {
-				let next = argv[++i]
-				if (!next || next.startsWith('-')) return args.error(`${token} needs ${option.value}`)
-				value = next
-			}
-			used.add(option)
-			option.handle(value)
-		} else if (token.startsWith('-') && token !== '-') {
-			let command = commands.find(command => command.names.includes(token))
-			if (!command) return args.error(`unknown option ${token}`)
-			if (selected) return args.error(`${token} conflicts with ${selected.names[0]}`)
-			selected = command
-		} else {
-			words.push(token)
-		}
-	}
-
-	// Resolve bare commands after flags: in "hal -p help", help is the prompt.
-	if (!selected && words.length) {
-		selected = commands.find(command => command.names.includes(words[0]!))
-		if (!selected) return args.error(`unknown command ${words[0]}`)
-		words.shift()
-	}
-	let kind = selected?.mode ?? 'terminal'
-	for (let option of used) {
-		if (!option.mode || option.mode === kind) continue
-		let command = commands.find(command => command.mode === option.mode)!
-		return args.error(`${option.names[0]} applies only to hal ${command.names[0]}`)
-	}
-	let operand = words[0]
-	if (words.length > (selected?.value ? 1 : 0)) return args.error(`unexpected argument ${words[selected?.value ? 1 : 0]}`)
-	if (selected?.value?.startsWith('<') && !operand?.trim()) return args.error(`${selected.names[0]} needs ${selected.value}`)
-	if (kind === 'remote' && operand?.startsWith('-')) return args.error(`unknown option ${operand}`)
-	return { kind, operand, used }
-}
-
-function finish(kind: Mode, operand: string | undefined, values: Options, used: Set<Option>): Args {
-	let { home, noUser, port, ...print } = values
-	let shared = home === undefined ? {} : { home }
-	let hosting = noUser ? { ...shared, noUser } : shared
-	if (noUser && !['terminal', 'serve', 'print'].includes(kind)) return args.error('--no-user applies only to hal, hal serve and hal -p')
-	if (kind === 'print') {
-		let deliveryFlags = [...used].filter(option => ['--steer', '--soft-steer', '--queue'].includes(option.names[0]!))
-		if (deliveryFlags.length > 1) return args.error('choose one delivery flag')
-		if (print.session && print.keep) return args.error('--keep cannot be used with --session')
-		if (print.session && print.dir) return args.error('--dir cannot be used with --session; use /cd to change its directory')
-		return { kind, prompt: operand!, ...print, ...hosting }
-	}
-	if (kind === 'serve') {
-		if (port === undefined) return { kind, ...hosting }
-		let number = Number(port)
-		if (!Number.isInteger(number) || number < 1 || number > 65535) return args.error(`--port needs an integer from 1 to 65535, got: ${port}`)
-		return { kind, port: number, ...hosting }
-	}
-	if (kind === 'remote') return operand === undefined ? { kind, ...shared } : { kind, host: operand, ...shared }
-	if (kind === 'terminal') return { kind, ...hosting }
-	return { kind, ...shared }
-}
+const find = (list: Entry[], token: string) => list.find(e => e.names.includes(token))
 
 function parse(argv: string[]): Args {
-	let values: Options = {}
-	let parsed = args.scan(argv, args.declarations(values))
-	if (parsed.kind === 'error') return parsed
-	return args.finish(parsed.kind, parsed.operand, values, parsed.used)
+	try {
+		let out: Out = { kind: 'terminal' }
+		let used = new Set<Entry>()
+		let words: string[] = []
+		let selected: Entry | undefined
+		for (let i = 0; i < argv.length; i++) {
+			let token = argv[i]!
+			let found = find(options, token) ?? (token.startsWith('-') ? find(commands, token) : undefined)
+			if (!found && token.startsWith('-')) fail(`unknown option ${token}`)
+			if (!found) { words.push(token); continue }
+			if (used.has(found)) fail(`${token} given twice`)
+			used.add(found)
+			if (found.kind) { selected = selected ? fail(`${token} conflicts with ${selected.names[0]}`) : found; continue }
+			let value = found.value ? argv[++i] : ''
+			if (found.value && (!value || value.startsWith('-'))) fail(`${token} needs ${found.value}`)
+			found.set!(out, value!)
+		}
+		// Bare command words count only without a flag command: in "hal -p help", help is the prompt.
+		let bare = selected ? undefined : words.shift()
+		if (bare) selected = find(commands, bare) ?? fail(`unknown command ${bare}`)
+		let operand = selected?.value ? words.shift() : undefined
+		if (words.length) fail(`unexpected argument ${words[0]}`)
+		if (selected?.value?.startsWith('<') && !operand?.trim()) fail(`${selected.names[0]} needs ${selected.value}`)
+		if (selected) out.kind = selected.kind!
+		if (operand) out[selected!.value!.slice(1, -1) as 'prompt' | 'host'] = operand
+		for (let e of used) if (e.within && e.within !== selected) fail(`${e.names[0]} applies only to hal ${e.within.names[0]}`)
+		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind)) fail('--no-user applies only to hal, hal serve and hal -p')
+		if (out.session && out.keep) fail('--keep cannot be used with --session')
+		if (out.session && out.dir) fail('--dir cannot be used with --session; use /cd to change its directory')
+		return out as Args
+	} catch (e) {
+		if (e instanceof UsageError) return { kind: 'error', message: e.message }
+		throw e
+	}
 }
 
-export const args = { usage, parse, declarations, scan, finish, error }
+export const args = { usage, parse }
