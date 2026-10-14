@@ -27,9 +27,9 @@ function extract(text: string): string | undefined {
 	return last(text)?.line
 }
 
-// Whether `text` ends its reply by asking the user (a <question> tag last).
+// Whether the reply contains a question tag, including before a summary.
 function asks(text: string): boolean {
-	return last(text)?.kind === 'question'
+	return [...markdownCode.mask(text).matchAll(TAGS)].some((match) => match[1] === 'question' && !!match[2]!.trim())
 }
 
 // Remove notification metadata; answers retain question content.

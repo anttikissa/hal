@@ -546,7 +546,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet .tab[aria-current] .n { font-weight: 600; }
 .Tabs .tab .n { text-box: trim-both cap alphabetic; }
 .Tabs .marker { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1ch; height: 1cap; margin-left: 0.25ch; }
-.Tabs .marker.working::before, .Tabs .marker.jobs::before { content: ''; width: 0.4em; height: 0.4em; background: currentColor; }
+.Tabs .marker.working::before, .Tabs .marker.jobs::before, .Tabs .marker.retrying::before { content: ''; width: 0.4em; height: 0.4em; background: currentColor; }
 .Tabs .strip .marker { overflow: hidden; }
 .Tabs .strip .marker:not([aria-label]) { width: 0; margin-left: 0; }
 .Tabs .strip :focus-visible { outline-offset: -2px; }
@@ -561,7 +561,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   25%, 75% { color: var(--mark-dark); }
   50% { color: var(--mark-alt, var(--mark-lit)); }
 }
-.Tabs .marker.asking, .Tabs .marker.noticed, .Tabs .marker.paused { font-weight: 600; }
+.Tabs .marker.asking, .Tabs .marker.approval, .Tabs .marker.blocked, .Tabs .marker.paused { font-weight: 600; }
 .Tabs button { flex: none; background: transparent; color: inherit; padding: 0.25lh 1ch; }
 @media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }

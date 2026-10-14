@@ -115,8 +115,8 @@ export const colors = {
 		inactiveFg: [0.68, 0, 0],
 		doneFg: [0.78, 0.14, 145],
 		warningFg: [0.86, 0.16, 95],
-		errorFg: colors.error().fg!,
-		pausedFg: [0.86, 0.16, 95],
+		errorFg: [0.76, 0.16, 25],
+		pausedFg: colors.log().fg!,
 		// Background jobs running: bash's magenta.
 		jobsFg: [colors.fgL, colors.fgC, 320],
 	}),

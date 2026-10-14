@@ -215,7 +215,7 @@ export type CommandType = Command['type']
 // `color`: the project color index (colors.project, task 22), only while
 // open tabs span two or more projects.
 // `jobs`: background commands still running.
-export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; hal?: true; color?: number; jobs?: number }
+export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; question?: 'ordinary' | 'approval'; hal?: true; color?: number; jobs?: number }
 
 // ── Events (host → client) ──
 

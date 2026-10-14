@@ -63,6 +63,8 @@ test('a question tag is hidden and extracted like a summary, and marks the reply
 	for (let n = 'Two options.'.length; n <= full.length; n++) expect(summary.strip(full.slice(0, n))).toBe('Two options.')
 	expect(summary.asks('Done.\n<summary>Done.</summary>')).toBe(false)
 	expect(summary.asks('Asking `<question>x</question>` in code.')).toBe(false)
+	expect(summary.asks(`${full}\n<summary>Waiting for a decision.</summary>`)).toBe(true)
+	expect(summary.asks('```\n<question>Example?</question>\n```\n<summary>Done.</summary>')).toBe(false)
 })
 
 test('notification-only answers stay visible without duplicating normal answers', () => {

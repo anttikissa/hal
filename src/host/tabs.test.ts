@@ -11,6 +11,7 @@ import { status } from './status.ts'
 import { history } from './history.ts'
 import { tabs } from './tabs.ts'
 import { config } from './config.ts'
+import { protocol } from '../common/protocol.ts'
 
 useHost()
 
@@ -149,6 +150,7 @@ test('closing a tab blocked on a question cancels it instead of restarting the t
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'git reset --hard', description: 'Reset work' } }, { type: 'done', reason: 'tool_use' })
 	await until(() => a.of('question').length)
+	expect(tabsOf(a)!.find((t) => t.id === id)!.question).toBe('approval')
 	send(a, { type: 'tab-close', sessionId: id })
 	expect(status.stateOf(id).type).toBe('paused')
 	expect(history.readSync(id).some((r) => r.type === 'answer' && r.canceled)).toBe(true)
@@ -209,6 +211,35 @@ test('a tab wants attention when its turn ends until a client has seen it', asyn
 	expect(tab().state.type).toBe('idle')
 	send(b, { type: 'tab-seen', sessionId: x })
 	expect(tabsOf(a)!.find((t) => t.id === x)!.attention).toBeUndefined()
+})
+
+test('tab question metadata accepts known kinds and rejects other wire values', () => {
+	let tab = { id: 'x', name: 'x', cwd: '/' }
+	for (let question of [undefined, 'ordinary', 'approval']) expect(protocol.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBeUndefined()
+	for (let question of [true, 'danger', {}]) expect(protocol.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBe('tabs: invalid question kind')
+})
+
+test('final questions stay distinct from unread completions through viewing and restart, until answered', async () => {
+	let a = client()
+	let id = newTab(a)
+	sessions.open(id).model = 'fake/m1'
+	a.conn.send({ type: 'open', sessionId: id })
+	send(a, { type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: '<question>Proceed?</question>\n<summary>Waiting.</summary>' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+	expect(tabsOf(a)!.find((t) => t.id === id)!.state.type).toBe('idle')
+	expect(tabsOf(a)!.find((t) => t.id === id)!.question).toBe('ordinary')
+	send(a, { type: 'tab-seen', sessionId: id })
+	expect(tabsOf(a)!.find((t) => t.id === id)!.question).toBe('ordinary')
+	restartHost()
+	let b = client()
+	expect(tabsOf(b)!.find((t) => t.id === id)!.question).toBe('ordinary')
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.of('snapshot').length)
+	send(b, { type: 'submit', sessionId: id, text: 'yes' })
+	await until(() => tabsOf(b)!.find((t) => t.id === id)!.state.type === 'running')
+	expect(tabsOf(b)!.find((t) => t.id === id)!.question).toBeUndefined()
 })
 
 test('a tab marked unread while shown keeps its mark until its client shows another', () => {

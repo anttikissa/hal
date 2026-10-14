@@ -10,6 +10,7 @@
 import { mkdirSync } from 'fs'
 import { resolve } from 'path'
 import type { Command, Event, Tab } from '../common/protocol.ts'
+import { forms } from '../common/forms.ts'
 import { usage } from './usage.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
@@ -52,9 +53,18 @@ function file(): TabsFile {
 // is left out rather than failing the rest.
 function list(): Tab[] {
 	let f = tabs.file()
+	for (let id of questions.keys()) if (!f.open.includes(id)) questions.delete(id)
 	let list = f.open.map((id) => {
 		let meta = sessions.open(id)
 		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
+		if (tab.state.type !== 'error') {
+			try {
+				let question = questionOf(id)
+				if (question) tab.question = question
+			} catch (e: any) {
+				tab.state = { type: 'error', message: String(e?.message ?? e) }
+			}
+		}
 		if (f.attention.includes(id)) tab.attention = true
 		if (meta.background?.length) tab.jobs = meta.background.length
 		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
@@ -62,6 +72,18 @@ function list(): Tab[] {
 	})
 	projects.paint(list)
 	return list
+}
+
+const questions = new Map<string, { size: number; question: Tab['question'] }>()
+
+function questionOf(id: string): Tab['question'] {
+	let size = pages.marks(id).size
+	let cached = questions.get(id)
+	if (cached?.size === size) return cached.question
+	let open = forms.open(pages.essentials(id))
+	let question: Tab['question'] = open ? open.call ? 'approval' : 'ordinary' : notify.asked(id) ? 'ordinary' : undefined
+	questions.set(id, { size, question })
+	return question
 }
 
 // Sends the tabs, then the model names they show, to a new client
@@ -237,7 +259,7 @@ function act(c: TabCommand, timezone?: string): Outcome {
 // its turn ends or fails or asks a question, and the tab bar shows its
 // state and name.
 function observe(id: string, event: Event): void {
-	if (!['state', 'turn-end', 'question', 'meta'].includes(event.type)) return
+	if (!['state', 'turn-start', 'prompt', 'turn-end', 'question', 'answer', 'meta'].includes(event.type)) return
 	let f: TabsFile
 	try {
 		f = tabs.file()
@@ -274,6 +296,7 @@ function reset(): void {
 	if (tabs.state.file) liveFiles.close(tabs.state.file)
 	tabs.state.file = null
 	tabs.state.kept.clear()
+	questions.clear()
 }
 
 export const tabs = {

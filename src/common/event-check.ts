@@ -96,6 +96,7 @@ function invalidEvent(value: unknown): string | undefined {
 	if ((value.type === 'command' || value.type === 'output') && value.origin !== undefined && value.origin !== 'model') return `${value.type}: origin must be model`
 	if (value.type === 'completions' && value.descriptions !== undefined && (value.descriptions as string[]).length !== (value.items as string[]).length) return 'completions: descriptions must align with items'
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
+	if (value.type === 'tabs' && (value.tabs as Record<string, unknown>[]).some((t) => t.question !== undefined && t.question !== 'ordinary' && t.question !== 'approval')) return 'tabs: invalid question kind'
 	if (value.type === 'plugin-sync') return pluginSyncWire.invalidEvent(value)
 	if (value.type === 'find-results') {
 		let tiers = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']

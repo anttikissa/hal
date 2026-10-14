@@ -32,7 +32,7 @@ const indicator = (tab: Tab): Part | undefined => {
 function markPart(m: Mark): Part {
 	let c = colors.tab()
 	let hal = colors.assistant()
-	let fg: Oklch = { asking: c.warningFg!, noticed: c.warningFg!, working: hal.cursor!, jobs: c.jobsFg!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
+	let fg: Oklch = { asking: colors.question().fg!, approval: c.warningFg!, blocked: c.warningFg!, retrying: c.warningFg!, working: hal.cursor!, jobs: c.jobsFg!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
 	if (!m.blinks) return { text: m.glyph, fg }
 	return { text: m.glyph, fg, dim: m.kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg), ...(m.jobs && { alt: c.jobsFg! }) }
 }

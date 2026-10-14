@@ -45,7 +45,7 @@ test('an edge carries its side’s most urgent mark; finished ones do not count'
 	let done: [SessionState, boolean] = [{ type: 'idle' }, true]
 	expect(urgent(done)).toBeUndefined()
 	expect(urgent(done, working)).toBe('working')
-	expect(urgent(working, noticed, working)).toBe('noticed')
+	expect(urgent(working, noticed, working)).toBe('working')
 	expect(urgent(noticed, asking)).toBe('asking')
 	expect(urgent(asking, failed, noticed)).toBe('failed')
 	let list = [tab(...failed), ...tabs(20)]

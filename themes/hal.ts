@@ -83,8 +83,8 @@ export const look: Look = {
 		inactiveFg: [0.68, 0, 0],
 		doneFg: [0.78, 0.14, 145],
 		warningFg: [0.86, 0.16, 95],
-		errorFg: colors.error().fg!,
-		pausedFg: [0.86, 0.16, 95],
+		errorFg: [0.76, 0.16, 25],
+		pausedFg: colors.log().fg!,
 	}),
 	// The notice stack (task qm): a bar in the event's color on a faint
 	// neutral gray, lighter than the screen so its shape shows; never slate.

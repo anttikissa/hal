@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import type { Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
+import { colors } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { tabBar } from './tab-bar.ts'
@@ -31,8 +32,16 @@ test('each tab shows at most one indicator for what it needs', () => {
 		tab('f', { type: 'paused' }),
 		tab('g', { type: 'idle' }, true),
 		tab('h', { type: 'idle' }),
+		{ ...tab('i', { type: 'blocked', reason: 'question' }), question: 'approval' as const },
+		{ ...tab('j'), question: 'ordinary' as const },
+		tab('k', { type: 'blocked', reason: 'log in' }),
 	]
-	expect(bar(list, 'h', 200)).toStartWith(' 1▪ 2◆ 3! 4✗ 5✗ 6! 7✓ 8  ')
+	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5✗  6Ⅱ  7✓  8   9? 10? 11! ')
+	expect(tabBar.indicator(list[0]!)?.fg).toEqual(colors.assistant().cursor)
+	expect(tabBar.indicator(list[2]!)?.fg).toEqual(colors.question().fg)
+	expect(tabBar.indicator(list[3]!)?.fg).toEqual(colors.tab().warningFg)
+	expect(tabBar.indicator(list[5]!)?.fg).toEqual(colors.log().fg)
+	expect(tabBar.indicator(list[8]!)?.fg).toEqual(colors.tab().warningFg)
 })
 
 // A tab's indicator as drawn: its glyph and SGR, lit or dark.
@@ -41,16 +50,16 @@ const mark = (state: SessionState, attention: boolean, lit: boolean) => {
 	return row.slice(row.indexOf('1\x1b]8;;\x07') + 7).split('\x1b[')[1]!
 }
 
-test('working and failing indicators blink; the others stay', () => {
+test('working and retrying indicators blink; completed and failed ones stay', () => {
 	saved.mono = ansi.mono
 	ansi.mono = () => false
 	let blinking: [SessionState, boolean][] = [
 		[{ type: 'running', phase: 'streaming' }, false],
 		[{ type: 'running', phase: 'requesting' }, true],
 		[{ type: 'retrying', at: '', reason: 'x' }, false],
-		[{ type: 'error', message: 'x' }, false],
 	]
 	let steady: [SessionState, boolean][] = [
+		[{ type: 'error', message: 'x' }, false],
 		[{ type: 'blocked', reason: 'question' }, false],
 		[{ type: 'paused' }, false],
 		[{ type: 'idle' }, true],
@@ -70,9 +79,9 @@ test('without colors a blinking indicator comes and goes', () => {
 	saved.mono = ansi.mono
 	ansi.mono = () => true
 	let list = [tab('a', { type: 'running', phase: 'streaming' }), tab('b', { type: 'paused' })]
-	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' 1▪ 2! ')
+	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' 1▪ 2Ⅱ ')
 	// The same width dark, so nothing after it moves.
-	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' 1  2! ')
+	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' 1  2Ⅱ ')
 	// The focused number is underlined even without colors.
 	expect(tabBar.row(list, 'b', 80)).toContain('\x1b[4m\x1b]8;;')
 })
