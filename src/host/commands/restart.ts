@@ -22,6 +22,8 @@ import { host } from '../host.ts'
 import { jobs } from '../jobs.ts'
 import { restartNote } from '../restart-note.ts'
 import { tabs } from '../tabs.ts'
+import { clients } from '../clients.ts'
+import { serverLog } from '../server-log.ts'
 import { turns } from '../turns.ts'
 
 const scopes = ['all', 'host', 'both', 'local']
@@ -97,6 +99,8 @@ export const command: SlashCommand = {
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })
 		else if (scope !== 'host' && scope !== 'both') return { error: scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }
 		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`)
+		let asker = clients.state.senders.get(ctx.sessionId)
+		serverLog.log(`restart ${scope} requested in ${ctx.sessionId} by ${model ? 'the model' : asker ? serverLog.client(asker) : 'a client'}`)
 		later()
 		return { say: scope === 'all' ? 'restarting the host and every client' : 'restarting the host' }
 	},

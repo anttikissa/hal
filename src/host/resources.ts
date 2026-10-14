@@ -10,6 +10,7 @@ import { readFileSync, statfsSync } from 'fs'
 import { freemem, totalmem } from 'os'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { serverLog } from './server-log.ts'
 import { turns } from './turns.ts'
 import { warnings } from './warnings.ts'
 
@@ -78,6 +79,7 @@ function check(sample = resources.measure()): void {
 		catch (e) { process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
 	}
 	if (st.level === before) return
+	serverLog.log(`resources ${st.level === 'ok' ? 'recovered' : st.level}`, { disk: gb(sample.disk), memory: gb(sample.memory), host: serverLog.mb(process.memoryUsage().rss) })
 	warnings.set('resources', resources.warning())
 	if (st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available. Paused sessions remain paused; choose Continue or press Enter to resume.` })
 }

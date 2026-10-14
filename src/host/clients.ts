@@ -5,6 +5,7 @@
 // /clients draws them (src/host/commands/clients.ts).
 
 import { hostname } from 'os'
+import { serverLog } from './server-log.ts'
 
 export type Kind = 'own' | 'peer' | 'remote' | 'web'
 export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
@@ -33,6 +34,7 @@ function hello(rec: ClientRecord, pid: number, version?: string, newCode?: true)
 	if (version) rec.version = version
 	if (newCode) rec.newCode = newCode
 	for (let old of clients.state.records) if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
+	serverLog.hello(rec)
 	return {}
 }
 
@@ -79,11 +81,14 @@ function leave(rec: ClientRecord): void {
 }
 
 // The connection's kind and address from a WebSocket upgrade: a remote
-// terminal names itself in its user agent. Behind a proxy the address
-// is the first X-Forwarded-For entry.
+// terminal names itself in its user agent. Behind a local proxy (the
+// connection comes from loopback) the address is the first
+// X-Forwarded-For entry; from anywhere else that header could be forged.
 function fromRequest(req: Request, ip?: string): ClientInfo {
 	let userAgent = req.headers.get('user-agent') ?? undefined
-	let address = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || ip?.replace(/^::ffff:/, '')
+	let direct = ip?.replace(/^::ffff:/, '')
+	let proxied = !direct || direct === '127.0.0.1' || direct === '::1'
+	let address = (proxied && req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()) || direct
 	let info: ClientInfo = { kind: userAgent?.startsWith('hal-terminal') ? 'remote' : 'web' }
 	if (address) info.address = address
 	if (userAgent) info.userAgent = userAgent

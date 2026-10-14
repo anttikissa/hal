@@ -8,7 +8,7 @@ export type Args =
 	| { kind: 'help' }
 	| { kind: 'version' }
 	| { kind: 'auth' }
-	| { kind: 'serve'; noUser?: true }
+	| { kind: 'serve'; noUser?: true; port?: number }
 	| { kind: 'remote'; host?: string }
 	| { kind: 'print'; prompt: string; dir?: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
 	| { kind: 'error'; message: string }
@@ -20,7 +20,8 @@ const usage = `Usage:
     --steer | --soft-steer | --queue      delivery to a busy session
     --keep                                keep a newly created tab open
   hal -r [host]                           follow a remote Hal
-  hal serve                               run the foreground headless host
+  hal serve [--port <n>]                  run the foreground headless host;
+                                          --port: web only on port n, else exit
   hal auth                                print a one-time web login code
   hal -v, --version                       show the version, commit and checkout
   hal -h, --help                          show this help
@@ -44,7 +45,12 @@ function parseRest(argv: string[]): Args {
 	if (first === undefined) return { kind: 'terminal' }
 	if (argv.length === 1 && ['-h', '--help', 'help'].includes(first)) return { kind: 'help' }
 	if (argv.length === 1 && ['-v', '--version'].includes(first)) return { kind: 'version' }
-	if (first === 'serve' && !rest.length) return { kind: 'serve' }
+	if (first === 'serve') {
+		if (!rest.length) return { kind: 'serve' }
+		let n = Number(rest[1])
+		if (rest[0] !== '--port' || rest.length !== 2 || !Number.isInteger(n) || n < 1 || n > 65535) return { kind: 'error', message: `hal serve takes only --port <1-65535>, got: ${rest.join(' ')}` }
+		return { kind: 'serve', port: n }
+	}
 	if (first === 'auth' && !rest.length) return { kind: 'auth' }
 	if (first === '-r' && rest.length <= 1) return rest[0] === undefined ? { kind: 'remote' } : rest[0].startsWith('-') ? { kind: 'error', message: `-r: unexpected ${rest[0]}` } : { kind: 'remote', host: rest[0] }
 	if (!argv.includes('-p') && !argv.includes('--print')) return { kind: 'error', message: `unknown arguments: ${argv.join(' ')}` }

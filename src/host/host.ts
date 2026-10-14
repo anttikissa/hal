@@ -32,6 +32,7 @@ import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
+import { serverLog } from './server-log.ts'
 import { warnings } from './warnings.ts'
 import { wire } from './wire.ts'
 import { rebaseRows } from '../common/rebase-rows.ts'
@@ -62,6 +63,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	let open = new Set<string>()
 	let client: Client = { deliver: (e) => deliver(wire.event(e)), open, held: new Map(), record: clients.join(open, info) }
 	host.state.clients.add(client)
+	serverLog.joined(client.record)
 	warnings.send(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	if (process.env.HOME) client.deliver({ type: 'home', path: process.env.HOME })
@@ -82,6 +84,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 			queueEdits.disconnect(client)
 			if (client.visible) void recap.prepare(client.visible)
 			clients.leave(client.record)
+			serverLog.left(client.record)
 			webLinks.drop(client)
 			find.cancel(client)
 		},
@@ -310,6 +313,7 @@ function broadcast(id: string, event: Event): void {
 	if (event.type === 'turn-end') void recap.prepare(id)
 	notify.route(host.state.clients, id, event)
 	work.changed(id, event)
+	serverLog.event(id, event)
 }
 
 // Whenever this process exits while it is host (quit, restart, SIGTERM,

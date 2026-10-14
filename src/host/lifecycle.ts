@@ -8,6 +8,7 @@ import { providers } from './providers.ts'
 import { paths } from './paths.ts'
 import { promptFiles } from './prompt-files.ts'
 import { server } from './server.ts'
+import { serverLog } from './server-log.ts'
 import { version } from './version.ts'
 
 // What any process that may host needs, terminal or not.
@@ -35,21 +36,23 @@ function mayHost(): boolean {
 async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
 	process.on('SIGHUP', () => {})
 	let stopping = false
-	let stop = () => {
+	let stop = (signal: string) => {
 		if (stopping) return
 		stopping = true
+		serverLog.log(`stopping (${signal})`)
 		void server.stop().then(() => process.exit(0), (e) => {
 			process.stderr.write(`hal: ${e?.stack ?? e}\n`)
 			process.exit(1)
 		})
 	}
-	process.on('SIGTERM', stop)
-	process.on('SIGINT', stop)
-	process.on('SIGUSR1', () => restartProcess.run())
+	process.on('SIGTERM', () => stop('SIGTERM'))
+	process.on('SIGINT', () => stop('SIGINT'))
+	process.on('SIGUSR1', () => (serverLog.log('restarting (SIGUSR1)'), restartProcess.run()))
 	if (!(await becomeHost())) {
 		process.stderr.write('hal: another host owns this HAL_HOME; stop it before starting hal serve\n')
 		process.exit(1)
 	}
+	serverLog.log(`listening on ${server.socketPath()} ${serverLog.ms()}`)
 	version.found = (loaded) => host.announce(loaded)
 	void version.init()
 }

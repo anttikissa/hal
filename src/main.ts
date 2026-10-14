@@ -45,6 +45,7 @@ import { pluginReports } from './host/plugin-reports.ts'
 import { pluginSyncClient } from './host/plugin-sync-client.ts'
 import { pluginSyncReview } from './host/plugin-sync-review.ts'
 import { server } from './host/server.ts'
+import { serverLog } from './host/server-log.ts'
 import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
@@ -343,7 +344,7 @@ async function start(): Promise<void> {
 	perf.mark('local.ts')
 	await main.loadPlugins()
 	perf.mark('plugins')
-	if (parsed.kind === 'serve') return main.serve()
+	if (parsed.kind === 'serve') return main.serve(parsed.port)
 	if (parsed.kind === 'print') return main.printMode(parsed)
 	if (parsed.kind === 'remote') {
 		if (!terminal.available()) {
@@ -380,11 +381,29 @@ export const main = {
 	onEvent,
 	becomeHost,
 	mayHost: lifecycle.mayHost,
-	serve: async () => {
+	// hal serve (tasks fd1, kp0): the headless host, logging to stdout.
+	serve: async (port?: number) => {
 		main.state.headless = true
+		serverLog.start(() => ({
+			clients: [...host.state.clients].length,
+			running: turns.state.running.size,
+			host: serverLog.mb(process.memoryUsage().rss),
+			...(resources.state.sample && { memory: `${serverLog.gb(resources.state.sample.memory)} available`, disk: `${serverLog.gb(resources.state.sample.disk)} free` }),
+		}))
 		main.initHost()
+		serverLog.log('hal serve', { home: paths.home(), state: paths.stateDir(), pid: process.pid, ...(process.argv.length > 3 && { args: process.argv.slice(3) }) })
+		void version.current().then(async ({ loaded }) => serverLog.log(`version ${await (await import('./host/release.ts')).release.line(loaded)}`))
+		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
+		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)
+		web.state.fixedPort = port
 		await lifecycle.serve(main.becomeHost)
 		main.shown()
+		// After becomeHost's web.start: --port allows no other port.
+		if (port) main.later(() => {
+			if (web.state.server) return
+			process.stderr.write(`hal: web ${web.state.error ?? `cannot listen on port ${port}`}\n`)
+			process.exit(1)
+		})
 	},
 	refreshModels,
 	later,

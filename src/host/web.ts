@@ -56,6 +56,7 @@ import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { webLinks } from './web-links.ts'
+import { serverLog } from './server-log.ts'
 
 const cookieName = 'hal'
 
@@ -79,9 +80,15 @@ function sameOrigin(req: Request): boolean {
 
 // Swaps a code for a session cookie: Secure unless the browser is on
 // this machine over plain HTTP; or why not.
-function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wrong' | 'limited' } {
-	let out = webAuth.redeem(code, clients.shortAgent(req.headers.get('user-agent') ?? undefined))
-	if ('refused' in out) return out
+function redeem(code: unknown, req: Request, ip?: string): { cookie?: string; refused?: 'wrong' | 'limited' } {
+	let agent = clients.shortAgent(req.headers.get('user-agent') ?? undefined)
+	let out = webAuth.redeem(code, agent)
+	let address = clients.fromRequest(req, ip).address
+	if ('refused' in out) {
+		serverLog.log(`web login refused (${out.refused})`, { ...(address && { ip: address }), agent })
+		return out
+	}
+	serverLog.log('web login', { ...(address && { ip: address }), agent })
 	webLinks.used(webAuth.normalize(code as string))
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
 	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
@@ -202,14 +209,14 @@ async function gate(): Promise<Response> {
 	return new Response(res.body, { status: 401, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
-async function login(req: Request): Promise<Response> {
+async function login(req: Request, ip?: string): Promise<Response> {
 	let code: unknown
 	try {
 		code = (await req.formData()).get('code')
 	} catch {
 		return new Response('expected a form with a code field\n', { status: 400 })
 	}
-	let { cookie, refused } = web.redeem(code, req)
+	let { cookie, refused } = web.redeem(code, req, ip)
 	if (refused === 'limited') return new Response('too many wrong codes; try again in a minute\n', { status: 429 })
 	if (!cookie) return new Response('wrong or expired code\n', { status: 401 })
 	return new Response(null, { status: 204, headers: { 'set-cookie': cookie } })
@@ -217,8 +224,8 @@ async function login(req: Request): Promise<Response> {
 
 // A page address with ?auth=<code>: redeemed, then sent to the same
 // address without it, logged in if the code was right.
-function linkLogin(url: URL, req: Request): Response {
-	let { cookie } = web.redeem(url.searchParams.get('auth'), req)
+function linkLogin(url: URL, req: Request, ip?: string): Response {
+	let { cookie } = web.redeem(url.searchParams.get('auth'), req, ip)
 	url.searchParams.delete('auth')
 	let headers: Record<string, string> = { location: url.pathname + url.search, 'cache-control': 'no-store' }
 	if (cookie) headers['set-cookie'] = cookie
@@ -230,13 +237,13 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let { pathname } = url
 	let get = req.method === 'GET'
 	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname) || changesPage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
-	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req)
+	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req, srv.requestIP(req)?.address)
 	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
 	if (get && pathname === '/budget') return new Response('Spawn budget\n\nbN means N spawn slots left in this session. Each subagent spawn, fresh or forked, costs one slot from its owner and every owner ancestor. A zero count anywhere in that chain prevents spawning. Slots are not returned.\n\nSPAWN limit sets the child’s budget, at most its owner’s slots left minus one. Promised slots are not paid upfront: siblings compete for their ancestors’ remaining slots.\n\n/budget shows this session’s count. /budget N sets only this count; ancestors still limit spending. Only the user may change it.\n\nNew sessions and model-opened interactive tabs start with config.ason subagentSlots (default 3); interactive tabs are free. /fork copies the current count and starts an independent tree sharing its origin’s history.\n', { headers: { 'content-type': 'text/plain; charset=utf-8' } })
 	if (get && pathname === '/manifest.webmanifest') return new Response(JSON.stringify({ name: 'Hal', short_name: 'Hal', start_url: '/', scope: '/', display: 'standalone', background_color: '#141a26', theme_color: '#141a26', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
 	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } })
 	if (get && pathname === '/sw.js') return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'service-worker-allowed': '/' } })
-	if (pathname === '/login' && req.method === 'POST') return web.login(req)
+	if (pathname === '/login' && req.method === 'POST') return web.login(req, srv.requestIP(req)?.address)
 	if (pathname === '/logout' && req.method === 'POST') {
 		if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
@@ -332,19 +339,25 @@ function watchSource(): FSWatcher | null {
 
 // Try the preferred port and the next free port through 9100. Other
 // failures (and an exhausted range) leave socket clients available.
+// `hal serve --port` (web.state.fixedPort) tries only that port.
 function start(): void {
 	if (web.state.server) return
-	let preferred = web.port()
-	for (let port = preferred; port <= Math.max(preferred, 9100); port++) {
+	let preferred = web.state.fixedPort ?? web.port()
+	let last = web.state.fixedPort ?? Math.max(preferred, 9100)
+	for (let port = preferred; port <= last; port++) {
 		try {
 			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
 			web.state.watcher = watchSource()
 			settings.state.listeningPort = web.state.server.port
 			webLinks.moved()
+			let url = settings.value('webUrl')
+			serverLog.log(`web on http://127.0.0.1:${port}/${url ? ` - public ${url}` : ''} ${serverLog.ms()}`)
 			return
 		} catch (e: any) {
-			if (e?.code === 'EADDRINUSE' && port < 9100) continue
-			diag.log(`web: cannot listen on 127.0.0.1:${port}: ${e?.message ?? e}`)
+			if (e?.code === 'EADDRINUSE' && port < last) continue
+			web.state.error = `cannot listen on 127.0.0.1:${port}: ${e?.message ?? e}`
+			diag.log(`web: ${web.state.error}`)
+			serverLog.log(`web: ${web.state.error}`)
 			return
 		}
 	}
@@ -378,7 +391,7 @@ function revoke(id = 'all'): number {
 }
 
 export const web = {
-	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>(), watcher: null as FSWatcher | null },
+	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>(), watcher: null as FSWatcher | null, fixedPort: undefined as number | undefined, error: undefined as string | undefined },
 	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),
 	authorized,
