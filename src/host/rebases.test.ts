@@ -17,18 +17,18 @@ import { systemPrompt } from './system-prompt.ts'
 import { slash } from './slash.ts'
 import { liveFiles } from './live-file.ts'
 
-let savedHome = process.env.HAL_HOME, home = '', id = ''
+let savedHome = paths.state.home, home = '', id = ''
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-rebase-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	id = sessions.create({ cwd: '/', model: 'fake/m' }).id
 })
 afterEach(() => {
 	findIndex.state.db?.close(); findIndex.state.db = undefined
 	host.reset(); sessions.closeAll()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 function seed() {

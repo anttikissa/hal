@@ -4,12 +4,13 @@ import { tmpdir } from 'os'
 import type { Message, StreamEvent } from '../common/blocks.ts'
 import { openaiCompat } from './openai-compat.ts'
 import { provider } from './provider.ts'
+import { paths } from './paths.ts'
 
 // A local fake Chat Completions server: records each request and
 // answers with the scripted response.
 type Seen = { path: string; auth: string | null; body: any }
 let home = ''
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 let seen: Seen[] = []
 let reply: () => Response = () => new Response('')
 let server: ReturnType<typeof Bun.serve>
@@ -24,7 +25,7 @@ const originalKey = process.env.FAKE_COMPAT_KEY
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-compat-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	seen = []
 	server = Bun.serve({
 		port: 0,
@@ -47,8 +48,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 	server.stop(true)
 	openaiCompat.endpoints = originalEndpoints

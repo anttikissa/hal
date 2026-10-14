@@ -79,7 +79,7 @@ async function serve(): Promise<boolean> {
 // holds 104 bytes on macOS (108 on Linux), NUL included.
 function pathProblem(path = server.socketPath()): string | undefined {
 	let bytes = Buffer.byteLength(path)
-	if (bytes > 103) return `the socket path ${path} is ${bytes} bytes, over the 103-byte limit for Unix sockets; use a shorter HAL_HOME`
+	if (bytes > 103) return `the socket path ${path} is ${bytes} bytes, over the 103-byte limit for Unix sockets; use a shorter --home`
 	return undefined
 }
 

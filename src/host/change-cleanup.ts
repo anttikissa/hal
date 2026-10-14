@@ -159,9 +159,11 @@ async function run(id: string, apply = false, live?: () => void): Promise<Result
 
 async function main(args: string[]): Promise<void> {
 	if (args.length === 1 && args[0] === '--help') {
-		console.log(`Usage: bun src/host/change-cleanup.ts [--apply] <session-id>\n\nPreview excluded file-change metadata by default; --apply approves replacement.\nHome: ${paths.home()}\nWith Hal running, use /changes cleanup [apply] <session-id> instead; never stop\nor suspend the host for this. Offline, the home lock excludes a running host.\nMemory is bounded by one history record, not the whole conversation.\nOnly excluded per-file audit metadata is removed. Cleanup preserves all\nconversation records and numbers, useful entries, and snapshot blobs.\nIt retains history.asonl.before-cleanup-<id>, validates before atomic replacement,\nand rebuilds byte-offset marks.\nTo recover: stop the host, copy the reported backup over history.asonl, remove\nthat session's marks.ason, then restart. No blob garbage collection is performed.`)
+		console.log(`Usage: bun src/host/change-cleanup.ts [--home <dir>] [--apply] <session-id>\n\nPreview excluded file-change metadata by default; --apply approves replacement.\nHome: ${paths.home()}\nWith Hal running, use /changes cleanup [apply] <session-id> instead; never stop\nor suspend the host for this. Offline, the home lock excludes a running host.\nMemory is bounded by one history record, not the whole conversation.\nOnly excluded per-file audit metadata is removed. Cleanup preserves all\nconversation records and numbers, useful entries, and snapshot blobs.\nIt retains history.asonl.before-cleanup-<id>, validates before atomic replacement,\nand rebuilds byte-offset marks.\nTo recover: stop the host, copy the reported backup over history.asonl, remove\nthat session's marks.ason, then restart. No blob garbage collection is performed.`)
 		return
 	}
+	let at = args.indexOf('--home')
+	if (at >= 0) paths.state.home = args.splice(at, 2)[1]
 	let apply = args[0] === '--apply'
 	if (apply) args = args.slice(1)
 	if (args.length !== 1 || args[0]!.startsWith('-')) throw new Error('usage: bun src/host/change-cleanup.ts [--apply] <session-id>; see --help')

@@ -10,10 +10,10 @@ import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 
 let home = '', id = ''
-let saved = process.env.HAL_HOME
+let saved = paths.state.home
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-context-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	id = sessions.create({ cwd: home }).id
 })
@@ -21,8 +21,8 @@ afterEach(async () => {
 	await web.stop()
 	host.reset()
 	sessions.closeAll()
-	if (saved === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved
+	if (saved === undefined) paths.state.home = undefined
+	else paths.state.home = saved
 	rmSync(home, { recursive: true, force: true })
 })
 

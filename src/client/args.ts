@@ -3,7 +3,7 @@
 
 import type { Delivery } from '../common/protocol.ts'
 
-export type Args =
+export type Args = (
 	| { kind: 'terminal'; noUser?: true }
 	| { kind: 'help' }
 	| { kind: 'version' }
@@ -12,6 +12,7 @@ export type Args =
 	| { kind: 'remote'; host?: string }
 	| { kind: 'print'; prompt: string; dir?: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
 	| { kind: 'error'; message: string }
+) & { home?: string }
 
 const usage = `Usage:
   hal                                     start the terminal client
@@ -26,12 +27,25 @@ const usage = `Usage:
   hal -v, --version                       show the version, commit and checkout
   hal -h, --help                          show this help
 
-Host options (hal, hal serve, hal -p; used only by the process that hosts):
-  --no-user                               leave your notes (USER.md) out of every tab's prompt
+Options:
+  --home <dir>                            use this Hal home instead of the checkout
+  --no-user                               leave your notes (USER.md) out of every tab's prompt;
+                                          only for hal, hal serve and hal -p, used by the process that hosts
 `
 
-// --no-user belongs to the process, which uses it only if it hosts.
+// --home <dir> picks this process's Hal home, for any command.
 function parse(argv: string[]): Args {
+	let at = argv.indexOf('--home')
+	if (at < 0) return args.parseUser(argv)
+	let dir = argv[at + 1]
+	if (!dir || dir.startsWith('-')) return { kind: 'error', message: '--home needs a directory' }
+	if (argv.indexOf('--home', at + 2) >= 0) return { kind: 'error', message: '--home given twice' }
+	let out = args.parseUser(argv.toSpliced(at, 2))
+	return out.kind === 'error' ? out : { ...out, home: dir }
+}
+
+// --no-user belongs to the process, which uses it only if it hosts.
+function parseUser(argv: string[]): Args {
 	let at = argv.indexOf('--no-user')
 	if (at < 0) return args.parseRest(argv)
 	if (argv.indexOf('--no-user', at + 1) >= 0) return { kind: 'error', message: '--no-user given twice' }
@@ -84,4 +98,4 @@ function parseRest(argv: string[]): Args {
 	return { kind: 'print', ...job, prompt: opts.prompt }
 }
 
-export const args = { usage: () => usage, parse, parseRest }
+export const args = { usage: () => usage, parse, parseUser, parseRest }

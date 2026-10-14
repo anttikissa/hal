@@ -17,8 +17,9 @@ import { sessions } from './sessions.ts'
 import { naming } from './naming.ts'
 import { turns } from './turns.ts'
 import { recap } from './recap.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origStream = turns.stream
 const origOnError = liveFiles.onError
 const origPrepare = naming.prepare
@@ -74,7 +75,7 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 export function useHost(withNaming = false, withGreetings = false, withRecaps = false): void {
 	beforeEach(() => {
 		home = mkdtempSync(`${tmpdir()}/hal-host-`)
-		process.env.HAL_HOME = home
+		paths.state.home = home
 		// Unset, the default model is the intro; tests that want it remove this.
 		writeFileSync(`${home}/config.ason`, "{ model: 'anthropic/claude-opus-5-5' }\n")
 		config.init()
@@ -100,8 +101,8 @@ export function useHost(withNaming = false, withGreetings = false, withRecaps = 
 		greetings.open = origGreeting
 		Object.assign(recap, origRecap)
 		liveFiles.onError = origOnError
-		if (savedHome === undefined) delete process.env.HAL_HOME
-		else process.env.HAL_HOME = savedHome
+		if (savedHome === undefined) paths.state.home = undefined
+		else paths.state.home = savedHome
 		rmSync(home, { recursive: true, force: true })
 	})
 }

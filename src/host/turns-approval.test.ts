@@ -11,8 +11,9 @@ import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origStream = turns.stream
 const origOnError = liveFiles.onError
 const origRun = tools.run
@@ -44,7 +45,7 @@ function fakeStream(_model: string, input: any, signal?: AbortSignal): AsyncIter
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-approval-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	turns.stream = fakeStream
 	calls = []
@@ -62,8 +63,8 @@ afterEach(() => {
 	tools.run = origRun
 	settings.state.raw = {}
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

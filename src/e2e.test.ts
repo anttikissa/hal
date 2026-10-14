@@ -140,10 +140,10 @@ afterEach(async () => {
 })
 
 function run(): Proc {
-	let sub = Bun.spawn(['./run'], {
+	let sub = Bun.spawn(['./run', '--home', home], {
 		cwd: `${import.meta.dir}/..`,
 		// SIGKILL skips ./run's trap, so its tab file goes in the home.
-		env: { ...process.env, HAL_HOME: home, TMPDIR: home },
+		env: { ...process.env, TMPDIR: home },
 		// Its own process group, so afterEach can kill ./run with its child.
 		detached: true,
 		stdin: 'pipe',

@@ -50,13 +50,13 @@ function sse(...events: StreamEvent[]): string {
 }
 
 const originalFetch = provider.fetch
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origNow = clock.now
 let home = ''
 let now = 1_800_000_000_000
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-provider-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	now = 1_800_000_000_000
 	clock.now = () => now
@@ -68,8 +68,8 @@ afterEach(() => {
 	usage.close()
 	clock.now = origNow
 	clock.state.listeners.clear()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

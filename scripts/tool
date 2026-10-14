@@ -13,9 +13,9 @@ import { createInterface } from 'readline/promises'
 import { paths } from '../src/host/paths.ts'
 
 const config = paths.configFile()
-process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-tool-`)
+paths.state.home = mkdtempSync(`${tmpdir()}/hal-tool-`)
 if (existsSync(config)) copyFileSync(config, paths.configFile())
-process.on('exit', () => rmSync(process.env.HAL_HOME!, { recursive: true, force: true }))
+process.on('exit', () => rmSync(paths.state.home!, { recursive: true, force: true }))
 
 // host.ts first: loading auth.ts first trips the host's import cycle.
 await import('../src/host/host.ts')

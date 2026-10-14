@@ -11,11 +11,12 @@ import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
 import { client, until } from './host-fixture.test.ts'
 import { picker } from '../common/picker.ts'
+import { paths } from './paths.ts'
 
 // /model and the model list: the host lists every configured
 // provider's models, and switching is an ordinary command.
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 const origModels = synthetic.models
 const origProviders = provider.state.providers
@@ -34,7 +35,7 @@ const fake = (ids: string[] | Error): Provider => ({
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-models-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	mkdirSync(`${home}/state`)
 	liveFiles.onError = () => {}
 	calls = 0
@@ -54,8 +55,8 @@ afterEach(() => {
 	models.state.lists.clear()
 	modelsDev.state.catalog = null
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

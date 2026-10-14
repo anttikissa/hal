@@ -5,7 +5,7 @@ import { clock } from './clock.ts'
 import { paths } from './paths.ts'
 import { usage } from './usage.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origNow = clock.now
 let home = ''
 let now = 1_800_000_000_000
@@ -14,7 +14,7 @@ const at = (ms: number) => new Date(Math.floor(ms / 1000) * 1000).toISOString()
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-usage-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	clock.now = () => now
 })
@@ -22,8 +22,8 @@ beforeEach(() => {
 afterEach(() => {
 	usage.close()
 	clock.now = origNow
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

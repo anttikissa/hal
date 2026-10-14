@@ -9,19 +9,19 @@ import { pruning } from './pruning.ts'
 import { tokenCalibration } from './token-calibration.ts'
 
 let home = ''
-let savedHome = process.env.HAL_HOME
+let savedHome = paths.state.home
 let savedFetch = provider.fetch
 let savedProviders = provider.state.providers
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-calibration-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 })
 afterEach(() => {
 	provider.fetch = savedFetch
 	provider.state.providers = savedProviders
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

@@ -13,10 +13,11 @@ import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient } from './plugin-sync-client.ts'
 import { pluginSyncReview } from './plugin-sync-review.ts'
 import { plugins, type Loaded } from './plugins.ts'
+import { paths } from './paths.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
-const saved = { hist: pluginHistory.state, files: plugins.state.files, home: process.env.HAL_HOME, send: pluginSyncClient.send, report: plugins.report, deliver: pluginReports.deliver, onChange: pluginSyncClient.onChange, onReview: pluginSyncClient.onReview, show: pluginSyncReview.show }
+const saved = { hist: pluginHistory.state, files: plugins.state.files, home: paths.state.home, send: pluginSyncClient.send, report: plugins.report, deliver: pluginReports.deliver, onChange: pluginSyncClient.onChange, onReview: pluginSyncClient.onReview, show: pluginSyncReview.show }
 let root = '', client: Side, server: Side
 let sent: any[] = [], steps: any[] = [], notices: any[] = [], shown: (string | undefined)[] = []
 
@@ -32,7 +33,7 @@ function makeSide(name: string): Side {
 function use(s: Side): void {
 	pluginHistory.state = s.hist
 	plugins.state.files = s.files
-	process.env.HAL_HOME = s.home
+	paths.state.home = s.home
 }
 
 function on<T>(s: Side, fn: () => T): T {
@@ -92,8 +93,8 @@ afterAll(() => {
 	pluginSyncReview.show = saved.show
 	pluginHistory.state = saved.hist
 	plugins.state.files = saved.files
-	if (saved.home === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved.home
+	if (saved.home === undefined) paths.state.home = undefined
+	else paths.state.home = saved.home
 	plugins.report = saved.report
 })
 

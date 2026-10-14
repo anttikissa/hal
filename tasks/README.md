@@ -198,8 +198,8 @@ minimize those exceptions and report the reason through render.clear.
   none that restates a one-line function, repeats a constant, or
   checks the test file's own helper; delete such a test rather than
   keep it. A test run leaves nothing in the temp dir: tests delete the
-  homes they make, and a test that spawns ./run sets HAL_HOME and
-  TMPDIR to such a home (SIGKILL skips ./run's cleanup trap).
+  homes they make, and a test that spawns ./run passes --home and
+  sets TMPDIR to such a home (SIGKILL skips ./run's cleanup trap).
 - Importing a module does no I/O, timers, watchers or signal setup.
   Startup work lives in an idempotent `init()`; `main.start()` calls
   them in order, and runs only when main.ts is the entry point.

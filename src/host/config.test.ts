@@ -9,14 +9,14 @@ import { paths } from './paths.ts'
 import { models } from './models.ts'
 import { sessions } from './sessions.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 let home = ''
 let changes = 0
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-config-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	changes = 0
 })
@@ -25,8 +25,8 @@ afterEach(() => {
 	config.reset()
 	sessions.closeAll()
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

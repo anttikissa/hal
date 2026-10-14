@@ -10,10 +10,11 @@ import { pluginHistory } from './plugin-history.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError } from './plugin-sync-client.ts'
 import { plugins, type Loaded } from './plugins.ts'
+import { paths } from './paths.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
-const saved = { hist: pluginHistory.state, files: plugins.state.files, home: process.env.HAL_HOME, send: pluginSyncClient.send, report: plugins.report }
+const saved = { hist: pluginHistory.state, files: plugins.state.files, home: paths.state.home, send: pluginSyncClient.send, report: plugins.report }
 let root = '', client: Side, server: Side
 let sent: any[] = []
 // Drops the host's answers while true, as a lost connection would.
@@ -31,7 +32,7 @@ function makeSide(name: string, home = join(root, name)): Side {
 function use(s: Side): void {
 	pluginHistory.state = s.hist
 	plugins.state.files = s.files
-	process.env.HAL_HOME = s.home
+	paths.state.home = s.home
 }
 
 function on<T>(s: Side, fn: () => T): T {
@@ -93,8 +94,8 @@ afterEach(() => {
 afterAll(() => {
 	pluginHistory.state = saved.hist
 	plugins.state.files = saved.files
-	if (saved.home === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved.home
+	if (saved.home === undefined) paths.state.home = undefined
+	else paths.state.home = saved.home
 	pluginSyncClient.send = saved.send
 	plugins.report = saved.report
 })

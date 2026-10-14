@@ -133,8 +133,7 @@ function resultStatus(item: { output: string; diff?: string; ms?: number; isErro
 function fullAt(output: string, session: string | undefined, key = ''): string {
 	let cut = /cat (\S+)\]\s*$/.exec(output)?.[1]
 	if (cut) return cut
-	let home = process.env.HAL_HOME ?? resolve(import.meta.dir, '../..')
-	let path = `${home}/sessions/${session ?? '?'}/history.asonl`
+	let path = `${toolView.home}/sessions/${session ?? '?'}/history.asonl`
 	if (process.env.HOME && path.startsWith(process.env.HOME + '/')) path = '~' + path.slice(process.env.HOME.length)
 	return `${path} line ${/^\d+/.exec(key)?.[0] ?? '?'}`
 }
@@ -142,6 +141,8 @@ function fullAt(output: string, session: string | undefined, key = ''): string {
 export const toolView = {
 	// Rows of an open result before its cut marker.
 	openRows: 200,
+	// The Hal home for paths shown; main.ts sets hal --home.
+	home: resolve(import.meta.dir, '../..'),
 	call,
 	result,
 	unsafe,

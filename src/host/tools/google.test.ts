@@ -3,9 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { auth } from '../auth.ts'
 import { tool } from './google.ts'
+import { paths } from '../paths.ts'
 
 let home = ''
-let saved = { HAL_HOME: process.env.HAL_HOME, SERPER_API_KEY: process.env.SERPER_API_KEY }
+const savedHome = paths.state.home
+let saved = { SERPER_API_KEY: process.env.SERPER_API_KEY }
 let origUrl = tool.url
 let server: ReturnType<typeof Bun.serve>
 let seen: { key: string | null; body: any }[] = []
@@ -15,7 +17,7 @@ const ctx = () => ({ cwd: home, signal: new AbortController().signal, sessionId:
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-google-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	delete process.env.SERPER_API_KEY
 	seen = []
 	server = Bun.serve({
@@ -32,6 +34,7 @@ afterEach(() => {
 	auth.close()
 	server.stop(true)
 	tool.url = origUrl
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

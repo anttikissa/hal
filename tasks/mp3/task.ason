@@ -1,6 +1,6 @@
 {
 	title: 'Restore unset test homes without string coercion',
-	spec: 'The plugin-sync and plugin-sync-review test suites restore HAL_HOME to its original value after running. If HAL_HOME was absent, cleanup deletes the environment key instead of assigning undefined. This preserves the invariant that tests cannot redirect later state writes into a relative undefined directory.',
+	spec: 'The plugin-sync and plugin-sync-review test suites restore paths.state.home to its original value after running. If it was unset, cleanup unsets it; formerly the environment key instead of assigning undefined. This preserves the invariant that tests cannot redirect later state writes into a relative undefined directory.',
 	status: 'done',
 	notes: [
 		'Bun coerces assignment of an undefined environment value into the literal string undefined. The existing state/ ignore rule also matches nested state directories, concealing this test pollution. Focused plugin-sync, review and plugin tests pass with HAL_HOME initially absent (24 tests).'

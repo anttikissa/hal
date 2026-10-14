@@ -7,20 +7,21 @@ import { sessions } from './sessions.ts'
 import { pruning } from './pruning.ts'
 import { tools } from './tools.ts'
 import { anthropic } from './anthropic.ts'
+import { paths } from './paths.ts'
 
 let home = ''
-let priorHome = process.env.HAL_HOME
+let priorHome = paths.state.home
 const oldPressure = pruning.pressureTokens
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-pruning-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 })
 afterEach(() => {
 	sessions.closeAll()
 	history.state.running.clear()
 	pruning.pressureTokens = oldPressure
-	if (priorHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = priorHome
+	if (priorHome === undefined) paths.state.home = undefined
+	else paths.state.home = priorHome
 	rmSync(home, { recursive: true, force: true })
 })
 async function round(id: string, events: StreamEvent[]) {

@@ -17,8 +17,9 @@ import { synthetic } from './synthetic.ts'
 import { chatgptLogin } from './login-chatgpt.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 const saved = { dir: commands.dir, home: commands.home }
 const origModels = synthetic.models
@@ -34,7 +35,7 @@ beforeEach(() => {
 	mkdirSync(`${work}/projection`)
 	mkdirSync(`${work}/.hidden`)
 	writeFileSync(`${work}/project.txt`, '')
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	commands.home = () => work
 	synthetic.models = { ...origModels }
@@ -50,8 +51,8 @@ afterEach(() => {
 	synthetic.pauseMs = origPause
 	turns.stream = origStream
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

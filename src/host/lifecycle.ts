@@ -49,7 +49,7 @@ async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
 	process.on('SIGINT', () => stop('SIGINT'))
 	process.on('SIGUSR1', () => (serverLog.log('restarting (SIGUSR1)'), restartProcess.run()))
 	if (!(await becomeHost())) {
-		process.stderr.write('hal: another host owns this HAL_HOME; stop it before starting hal serve\n')
+		process.stderr.write('hal: another host owns this home; stop it before starting hal serve\n')
 		process.exit(1)
 	}
 	serverLog.log(`listening on ${server.socketPath()} ${serverLog.ms()}`)

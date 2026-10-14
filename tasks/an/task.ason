@@ -2,7 +2,7 @@
 	title: 'Plugins: owned, hot-reloaded function hooks',
 	spec: `Plugins: hot-reloaded files that hook functions on module objects, owned per file.
 
-Files: every \`plugins/*.ts\` in the Hal home (HAL_HOME or the repo root, beside local.ts) is a plugin. Each Hal process (host, and a terminal peer) loads them at startup, after modules are imported and after local.ts, and watches the directory with fs.watch. Web is out of scope. A plugin exports \`default (plugin) => { ... }\`; importing the file must do nothing else operational. Optional \`export const expires = '2026-09-29T16:00:00Z'\`: an absolute UTC ISO timestamp; anything else is a load error.
+Files: every \`plugins/*.ts\` in the Hal home (hal --home <dir> or the repo root, beside local.ts) is a plugin. Each Hal process (host, and a terminal peer) loads them at startup, after modules are imported and after local.ts, and watches the directory with fs.watch. Web is out of scope. A plugin exports \`default (plugin) => { ... }\`; importing the file must do nothing else operational. Optional \`export const expires = '2026-09-29T16:00:00Z'\`: an absolute UTC ISO timestamp; anything else is a load error.
 
 API on \`plugin\` (the registration function's argument), target = module object + key, typechecked:
 - plugin.before(obj, 'key', (...args) => void): observes the arguments; its return value is ignored.

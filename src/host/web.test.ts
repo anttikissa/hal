@@ -19,7 +19,7 @@ import { status } from './status.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origPort = web.port
 const origStream = turns.stream
 const origBudget = pages.budget
@@ -28,7 +28,7 @@ let sockets: WebSocket[] = []
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-web-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	web.port = () => 0
 })
@@ -42,8 +42,8 @@ afterEach(async () => {
 	web.port = origPort
 	turns.stream = origStream
 	pages.budget = origBudget
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

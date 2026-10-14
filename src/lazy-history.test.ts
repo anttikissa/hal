@@ -17,14 +17,15 @@ import { host } from './host/host.ts'
 import { liveFiles } from './host/live-file.ts'
 import { pages } from './host/pages.ts'
 import { sessions } from './host/sessions.ts'
+import { paths } from './host/paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const saved = { send: app.send, show: render.show, budget: pages.budget, draftSend: drafts.send, onError: liveFiles.onError }
 let home = ''
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-lazy-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	render.show = () => {}
 	drafts.send = () => {}
@@ -40,8 +41,8 @@ afterEach(() => {
 	Object.assign(drafts, { send: saved.draftSend })
 	render.show = saved.show
 	liveFiles.onError = saved.onError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

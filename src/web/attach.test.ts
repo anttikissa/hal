@@ -150,9 +150,9 @@ async function loadPage(): Promise<void> {
 }
 
 test('pasteLines from config.ason reaches the page and decides which paste attaches', async () => {
-	let savedHome = process.env.HAL_HOME
+	let savedHome = paths.state.home
 	let home = mkdtempSync(`${tmpdir()}/hal-attach-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	try {
 		let three = 'a\nb\nc'
 		config.init()
@@ -166,8 +166,8 @@ test('pasteLines from config.ason reaches the page and decides which paste attac
 		expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe(three)
 	} finally {
 		config.reset()
-		if (savedHome === undefined) delete process.env.HAL_HOME
-		else process.env.HAL_HOME = savedHome
+		if (savedHome === undefined) paths.state.home = undefined
+		else paths.state.home = savedHome
 		rmSync(home, { recursive: true, force: true })
 	}
 })

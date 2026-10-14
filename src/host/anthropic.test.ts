@@ -8,6 +8,7 @@ import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
 import { provider } from './provider.ts'
 import { tool as bash } from './tools/bash.ts'
+import { paths } from './paths.ts'
 
 // A local fake Messages server and fake credentials in a temp home:
 // neither the real ./auth.ason nor the real API is ever touched.
@@ -18,7 +19,7 @@ let reply: () => Response = () => new Response('')
 let models: () => Response = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
 let server: ReturnType<typeof Bun.serve>
 let home = ''
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const originalUrl = anthropic.apiUrl
 const originalTokenUrl = auth.tokenUrl
 
@@ -43,7 +44,7 @@ beforeEach(() => {
 	models = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
 	home = mkdtempSync(`${tmpdir()}/hal-anthropic-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	writeAuth({ accessToken: 'fake-oauth-token', refreshToken: 'r', expires: Date.now() + 3_600_000 })
 	server = Bun.serve({
 		port: 0,
@@ -70,8 +71,8 @@ afterEach(() => {
 	auth.tokenUrl = originalTokenUrl
 	provider.state.providers = {}
 	settings.state.raw = {}
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

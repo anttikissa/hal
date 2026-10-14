@@ -12,9 +12,9 @@ import { webDiagnostics } from './web-diagnostics.ts'
 const report = () => ({ page: '01234567abcdef89', version: 'abc123', at: Date.now(), context: { tab: 2, tabs: 3, live: true }, entries: [{ at: Date.now(), kind: 'error', detail: 'TypeError', line: 4, column: 12 }] })
 
 test('browser diagnostics enforce auth/origin, filter private data and rotate bounded owner-only logs', async () => {
-	let saved = process.env.HAL_HOME, port = web.port
+	let saved = paths.state.home, port = web.port
 	let home = mkdtempSync(`${tmpdir()}/hal-web-diag-`)
-	process.env.HAL_HOME = home; paths.init(); web.port = () => 0
+	paths.state.home = home; paths.init(); web.port = () => 0
 	try {
 		await server.serve(); web.start()
 		let base = `http://127.0.0.1:${web.state.server!.port}`
@@ -49,7 +49,7 @@ test('browser diagnostics enforce auth/origin, filter private data and rotate bo
 		expect((await post(body, headers)).status).toBe(429)
 	} finally {
 		await server.stop(); host.reset(); web.port = port; settings.state.raw = {}
-		if (saved === undefined) delete process.env.HAL_HOME; else process.env.HAL_HOME = saved
+		if (saved === undefined) paths.state.home = undefined; else paths.state.home = saved
 		rmSync(home, { recursive: true, force: true })
 	}
 })

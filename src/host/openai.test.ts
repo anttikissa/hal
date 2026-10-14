@@ -17,8 +17,10 @@ import { usage } from './usage.ts'
 import { tools } from './tools.ts'
 import { nativeTool } from './native-tool.ts'
 import { replay } from '../common/replay.ts'
+import { paths } from './paths.ts'
 
-const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
+const savedHome = paths.state.home
+const saved = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
 const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
@@ -47,7 +49,7 @@ const bodyOf = async (req: Request) => {
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-openai-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	mkdirSync(`${home}/state`)
 	delete process.env.OPENAI_API_KEY
 	delete process.env.SERPER_API_KEY
@@ -99,6 +101,7 @@ afterEach(() => {
 	for (let id of openaiWs.state.sockets.keys()) openaiWs.close(id)
 	openaiWs.state.httpUntil = 0
 	openaiWs.state.httpSessions.clear()
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

@@ -13,7 +13,7 @@ test('headless host survives hangup, rejects competitors, and server peers never
 	let reports: string[] = []
 	let readers: Promise<void>[] = []
 	let spawn = (argv: string[]) => {
-		let p = Bun.spawn(argv, { cwd: root, env: { ...process.env, HAL_HOME: home }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+		let p = Bun.spawn([...argv, '--home', home], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 		procs.push(p)
 		return p
 	}
@@ -65,7 +65,7 @@ await main.joinHost(() => {}, (s) => process.stdout.write(s.type === 'connected'
 		expect(host.exitCode).toBeNull()
 		let competitor = spawn(['bun', 'src/main.ts', 'serve'])
 		expect(await competitor.exited).toBe(1)
-		expect(await new Response(competitor.stderr).text()).toContain('another host owns this HAL_HOME')
+		expect(await new Response(competitor.stderr).text()).toContain('another host owns this home')
 		host.kill('SIGUSR1')
 		expect(await host.exited).toBe(100)
 		await until(() => reports.at(-1) === 'disconnected')
@@ -111,7 +111,7 @@ test('invalid host mode refuses promotion instead of falling back to auto', asyn
 	try {
 		for (let text of ["{ hostMode: 'servre' }", "{ hostMode: 'server'"]) {
 			writeFileSync(join(home, 'config.ason'), text)
-			let p = Bun.spawn(['bun', 'src/main.ts', '-p', 'do not run'], { cwd: root, env: { ...process.env, HAL_HOME: home }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+			let p = Bun.spawn(['bun', 'src/main.ts', '-p', 'do not run', '--home', home], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 			expect(await p.exited).not.toBe(0)
 			expect(await new Response(p.stderr).text()).toContain('config.ason')
 			expect(existsSync(join(home, 'state/host.sock'))).toBe(false)

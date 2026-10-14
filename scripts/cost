@@ -1,8 +1,13 @@
 #!/usr/bin/env bun
 // API-equivalent cost at model list prices from this home's usage.
+// --home <dir> reads another Hal home.
 import { cost } from '../src/host/cost.ts'
+import { paths } from '../src/host/paths.ts'
+let argv = Bun.argv.slice(2)
+let at = argv.indexOf('--home')
+if (at >= 0) paths.state.home = argv.splice(at, 2)[1]
 try {
-	console.log(cost.run(Bun.argv.slice(2)))
+	console.log(cost.run(argv))
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error))
 	process.exitCode = 1

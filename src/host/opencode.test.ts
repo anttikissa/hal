@@ -1,6 +1,6 @@
 // OpenCode Go: /login opencode stores an API key; requests carry it
 // (stored first, OPENCODE_API_KEY next) and the headers OpenCode asks
-// for. A fake Chat Completions server and a temp HAL_HOME only.
+// for. A fake Chat Completions server and a temp home only.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -18,8 +18,10 @@ import { openaiCompat } from './openai-compat.ts'
 import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
+import { paths } from './paths.ts'
 
-const saved = { HAL_HOME: process.env.HAL_HOME, OPENCODE_API_KEY: process.env.OPENCODE_API_KEY }
+const savedHome = paths.state.home
+const saved = { OPENCODE_API_KEY: process.env.OPENCODE_API_KEY }
 const orig = { endpoints: openaiCompat.endpoints, pollMs: auth.pollMs, onError: liveFiles.onError }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
@@ -28,7 +30,7 @@ let seen: Headers[] = []
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-opencode-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	delete process.env.OPENCODE_API_KEY
 	seen = []
 	server = Bun.serve({
@@ -55,6 +57,7 @@ afterEach(() => {
 	Object.assign(openaiCompat, { endpoints: orig.endpoints })
 	Object.assign(auth, { pollMs: orig.pollMs })
 	liveFiles.onError = orig.onError
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

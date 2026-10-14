@@ -9,17 +9,18 @@ import { host } from './host.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { snapshots } from './snapshots.ts'
+import { paths } from './paths.ts'
 
-let savedHome = process.env.HAL_HOME, home = ''
+let savedHome = paths.state.home, home = ''
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-rebase-paging-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 })
 afterEach(() => {
 	host.reset()
 	sessions.closeAll()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

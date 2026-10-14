@@ -16,8 +16,9 @@ import { liveFiles } from './live-file.ts'
 import { login } from './login.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const orig = { stream: turns.stream, now: clock.now, sleep: clock.sleep, changed: auth.changed, onError: liveFiles.onError }
 let home = ''
 let now = 0
@@ -40,7 +41,7 @@ function fakeStream(model: string, input: any): AsyncIterable<StreamEvent> {
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-retry-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	turns.stream = fakeStream
 	now = 1_800_000_000_000
@@ -65,8 +66,8 @@ afterEach(() => {
 	Object.assign(clock, { now: orig.now, sleep: orig.sleep })
 	auth.changed = orig.changed
 	liveFiles.onError = orig.onError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

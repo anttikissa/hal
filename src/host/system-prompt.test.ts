@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { systemPrompt } from './system-prompt.ts'
 import { clients } from './clients.ts'
+import { paths } from './paths.ts'
 let root = ''
 
 beforeEach(() => {
@@ -219,9 +220,9 @@ test('SYSTEM includes are templates resolved relative to their file', () => {
 })
 
 test('the home USER.md appears in the real SYSTEM prompt when present, with no residue when absent', () => {
-	let old = process.env.HAL_HOME
+	let old = paths.state.home
 	try {
-		process.env.HAL_HOME = root
+		paths.state.home = root
 		let input = { cwd: `${root}/work`, model: 'm/x', now: at }
 		let without = systemPrompt.build(input)
 		writeFileSync(`${root}/USER.md`, '# User\n\nName: Rowan\n\nPrefers concise answers.\n')
@@ -235,8 +236,8 @@ test('the home USER.md appears in the real SYSTEM prompt when present, with no r
 		rmSync(`${root}/USER.md`)
 		expect(systemPrompt.build(input)).toBe(without)
 	} finally {
-		if (old === undefined) delete process.env.HAL_HOME
-		else process.env.HAL_HOME = old
+		if (old === undefined) paths.state.home = undefined
+		else paths.state.home = old
 	}
 })
 

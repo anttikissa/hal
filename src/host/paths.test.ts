@@ -3,26 +3,26 @@ import { chmodSync, mkdtempSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { paths } from './paths.ts'
 
-const saved = process.env.HAL_HOME
+const saved = paths.state.home
 let temps: string[] = []
 
 function tempHome(): string {
 	let dir = mkdtempSync(`${tmpdir()}/hal-paths-`)
 	temps.push(dir)
-	process.env.HAL_HOME = dir
+	paths.state.home = dir
 	return dir
 }
 
 afterEach(() => {
-	if (saved === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved
+	if (saved === undefined) paths.state.home = undefined
+	else paths.state.home = saved
 	for (let t of temps) rmSync(t, { recursive: true, force: true })
 	temps = []
 })
 
 const mode = (p: string) => statSync(p).mode & 0o777
 
-test('all paths follow HAL_HOME, read at call time', () => {
+test('all paths follow state.home, read at call time', () => {
 	let home = tempHome()
 	for (let p of [paths.sessionsDir(), paths.sessionDir('abc'), paths.stateDir(), paths.authFile()]) {
 		expect(p.startsWith(`${home}/`)).toBe(true)

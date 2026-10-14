@@ -11,14 +11,14 @@ import { blocks } from '../common/blocks.ts'
 let home: string
 let server: ReturnType<typeof Bun.serve>
 let requested: string[]
-let previous = process.env.HAL_HOME
+let previous = paths.state.home
 let response: (req: Request) => Response
 const ctx = () => ({ cwd: home, sessionId: 's', signal: new AbortController().signal })
 const url = (path = '/') => `http://127.0.0.1:${server.port}${path}`
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-url-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	mkdirSync(paths.sessionDir('s'), { recursive: true })
 	requested = []
 	response = () => new Response('ok')
@@ -26,8 +26,8 @@ beforeEach(() => {
 })
 afterEach(() => {
 	server.stop(true)
-	if (previous === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = previous
+	if (previous === undefined) paths.state.home = undefined
+	else paths.state.home = previous
 	rmSync(home, { recursive: true, force: true })
 })
 

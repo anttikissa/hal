@@ -45,7 +45,6 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=${checkout//%/%%}
-Environment=$(quote "HAL_HOME=$checkout")
 Environment=$(quote "PATH=$PATH")
 ExecStart=$(quote "${bun//\$/\$\$}") $(quote "${checkout//\$/\$\$}/src/main.ts") serve
 Restart=on-failure

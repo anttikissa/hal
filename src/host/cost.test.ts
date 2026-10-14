@@ -9,15 +9,15 @@ import { modelsDev } from './models-dev.ts'
 import { paths } from './paths.ts'
 
 let home = ''
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-cost-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 })
 afterEach(() => {
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	modelsDev.state.catalog = null
 	rmSync(home, { recursive: true, force: true })
 })
@@ -57,7 +57,7 @@ test('round usage wins over aggregate ends; resumed pauses, model switches and l
 	expect(report).toContain('unknown/model')
 	expect(report).toContain('PROVIDER anthropic  $0.0091')
 	expect(report).toContain('total incomplete')
-	let cli = Bun.spawnSync([process.execPath, `${paths.repoRoot()}/scripts/cost`, '01-abc'], { env: { ...process.env, HAL_HOME: home } })
+	let cli = Bun.spawnSync([process.execPath, `${paths.repoRoot()}/scripts/cost`, '--home', home, '01-abc'])
 	expect(cli.exitCode).toBe(0)
 	expect(cli.stdout.toString()).toContain('TOTAL  $0.0079 + UNPRICED')
 })

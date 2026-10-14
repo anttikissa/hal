@@ -11,8 +11,9 @@ import { liveFiles } from './live-file.ts'
 import type { ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { until } from './host-fixture.test.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 const origStream = turns.stream
 let home = ''
@@ -25,7 +26,7 @@ beforeEach(() => {
 	mkdirSync(`${work}/sub`, { recursive: true })
 	writeFileSync(`${work}/AGENTS.md`, 'WORK RULE')
 	writeFileSync(`${work}/sub/AGENTS.md`, 'SUB RULE')
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	requests = []
 	turns.stream = (_model, input) => {
@@ -43,8 +44,8 @@ afterEach(() => {
 	history.state.running.clear()
 	turns.stream = origStream
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

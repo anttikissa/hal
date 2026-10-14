@@ -9,6 +9,7 @@ function isolated(body: string): void {
 		let script = `
 			const assert = require('node:assert/strict');
 			globalThis.fetch = async () => { throw new Error('Network forbidden'); };
+			require('./src/host/paths.ts').paths.state.home = ${JSON.stringify(home)};
 			require('./src/main.ts');
 			const { providers } = require('./src/host/providers.ts');
 			const { provider } = require('./src/host/provider.ts');
@@ -21,7 +22,7 @@ function isolated(body: string): void {
 			${body}
 			process.exit(0);
 		`
-		let result = Bun.spawnSync([process.execPath, '-e', script], { cwd: `${import.meta.dir}/../..`, env: { ...env, HAL_HOME: home, TMPDIR: home }, stdout: 'pipe', stderr: 'pipe' })
+		let result = Bun.spawnSync([process.execPath, '-e', script], { cwd: `${import.meta.dir}/../..`, env: { ...env, TMPDIR: home }, stdout: 'pipe', stderr: 'pipe' })
 		expect(result.stderr.toString()).toBe('')
 		expect(result.exitCode).toBe(0)
 	} finally { rmSync(home, { recursive: true, force: true }) }

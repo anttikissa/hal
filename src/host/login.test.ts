@@ -1,5 +1,5 @@
 // /login claude and API keys from the environment. Fake token and
-// profile endpoints, a temp HAL_HOME; never the real credentials file.
+// profile endpoints, a temp home; never the real credentials file.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -17,8 +17,10 @@ import { login } from './login.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { turns } from './turns.ts'
+import { paths } from './paths.ts'
 
-const saved = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY }
+const savedHome = paths.state.home
+const saved = { HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY }
 const orig = { tokenUrl: auth.tokenUrl, profileUrl: login.profileUrl, pollMs: auth.pollMs, stream: turns.stream, onError: liveFiles.onError }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
@@ -29,7 +31,7 @@ let profileEmail: string | undefined
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-login-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	process.env.HOME = `${home}/user`
 	delete process.env.ANTHROPIC_API_KEY
 	tokenRequests = []
@@ -61,6 +63,7 @@ afterEach(() => {
 	Object.assign(login, { profileUrl: orig.profileUrl })
 	Object.assign(turns, { stream: orig.stream })
 	liveFiles.onError = orig.onError
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

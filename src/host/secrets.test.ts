@@ -5,19 +5,19 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { secrets } from './secrets.ts'
 
-const saved = process.env.HAL_HOME
+const saved = paths.state.home
 let home = ''
 
 afterEach(() => {
-	if (saved === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved
+	if (saved === undefined) paths.state.home = undefined
+	else paths.state.home = saved
 	rmSync(home, { recursive: true, force: true })
 })
 
 const mode = (p: string) => statSync(p).mode & 0o777
 
 test('migration moves old credential files into an owner-only secrets/ and never overwrites a new one', () => {
-	home = process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-secrets-`)
+	home = paths.state.home = mkdtempSync(`${tmpdir()}/hal-secrets-`)
 	mkdirSync(`${home}/state`)
 	mkdirSync(`${home}/secrets`, { mode: 0o755 })
 	writeFileSync(`${home}/auth.ason`, "{ old: 'a' }\n", { mode: 0o644 })
@@ -39,7 +39,7 @@ test('migration moves old credential files into an owner-only secrets/ and never
 })
 
 test('secret files are written 0600 and only inside secrets/', () => {
-	home = process.env.HAL_HOME = mkdtempSync(`${tmpdir()}/hal-secrets-`)
+	home = paths.state.home = mkdtempSync(`${tmpdir()}/hal-secrets-`)
 	expect(() => secrets.file(`${home}/state/x.ason`, {})).toThrow('is not in')
 	let data = secrets.file<{ k?: string }>(`${paths.secretsDir()}/x.ason`, {}, { watch: false })
 	chmodSync(paths.secretsDir(), 0o755)

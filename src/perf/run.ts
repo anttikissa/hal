@@ -55,7 +55,7 @@ function launch(home: string, args: string[] = []): Term {
 		},
 	})
 	let root = realpathSync(`${home}/..`)
-	let proc = Bun.spawn([run, ...args], { cwd: root, env: { ...process.env, HAL_HOME: home, TMPDIR: home, HAL_STALLS: `${root}/stalls.log` }, terminal: term, detached: true })
+	let proc = Bun.spawn([run, ...args, '--home', home], { cwd: root, env: { ...process.env, TMPDIR: home, HAL_STALLS: `${root}/stalls.log` }, terminal: term, detached: true })
 	return {
 		exited: () => proc.exitCode !== null,
 		write: (s) => term.write(s),
@@ -166,7 +166,7 @@ async function freePort(): Promise<number> {
 }
 
 function code(home: string): string {
-	let out = Bun.spawnSync([run, 'auth'], { env: { ...process.env, HAL_HOME: home, TMPDIR: home } }).stdout.toString()
+	let out = Bun.spawnSync([run, 'auth', '--home', home], { env: { ...process.env, TMPDIR: home } }).stdout.toString()
 	let m = out.match(/\?auth=(\S+)/)
 	if (!m) throw new Error(`./run auth said: ${out}`)
 	return m[1]!

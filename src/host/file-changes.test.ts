@@ -9,12 +9,13 @@ import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 import type { ToolContext } from './tools.ts'
+import { paths } from './paths.ts'
 
 let home = '', cwd = '', id = ''
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 beforeEach(async () => {
 	home = mkdtempSync(`${process.cwd()}/.hal-file-changes-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	cwd = `${home}/repo`
 	mkdirSync(cwd)
 	id = sessions.create({ cwd, model: 'fake/m' }).id
@@ -23,8 +24,8 @@ beforeEach(async () => {
 afterEach(() => {
 	host.reset()
 	sessions.closeAll()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 const context = (sessionId = id): ToolContext => ({ sessionId, cwd, signal: new AbortController().signal, callId: 'c1' })

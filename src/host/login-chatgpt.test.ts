@@ -1,5 +1,5 @@
 // /login chatgpt and OpenAI token refresh. Fake device, token endpoints
-// and JWTs, a temp HAL_HOME; never the real credentials file.
+// and JWTs, a temp home; never the real credentials file.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -9,8 +9,10 @@ import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { command } from './commands/login.ts'
 import { chatgptLogin } from './login-chatgpt.ts'
+import { paths } from './paths.ts'
 
-const saved = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+const savedHome = paths.state.home
+const saved = { HOME: process.env.HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
 const orig = { tokenUrl: auth.tokenUrl, deviceUrl: chatgptLogin.deviceUrl, timeoutMs: chatgptLogin.timeoutMs, local: chatgptLogin.local, callbackPort: chatgptLogin.callbackPort }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
@@ -28,7 +30,7 @@ let issued = access()
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-chatgpt-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	process.env.HOME = `${home}/user`
 	delete process.env.OPENAI_API_KEY
 	seen = []
@@ -63,6 +65,7 @@ afterEach(() => {
 	server.stop(true)
 	Object.assign(auth, { tokenUrl: orig.tokenUrl })
 	Object.assign(chatgptLogin, { deviceUrl: orig.deviceUrl, timeoutMs: orig.timeoutMs, local: orig.local, callbackPort: orig.callbackPort })
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

@@ -38,6 +38,7 @@ import { promptCache } from './host/prompt-cache.ts'
 import { version } from './host/version.ts'
 import { marksWorker } from './host/marks-worker.ts'
 import { paths } from './host/paths.ts'
+import { toolView } from './client/tool-view.ts'
 import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
 import { theme } from './host/commands/theme.ts'
@@ -324,6 +325,7 @@ async function start(): Promise<void> {
 	if (parsed.kind === 'version') process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
 	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
 	if ('noUser' in parsed && parsed.noUser) promptCache.state.noUser = true
+	if (parsed.home) paths.state.home = toolView.home = resolve(parsed.home)
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
 	// scripts/perf sets HAL_STALLS: every event-loop block over 10 ms is

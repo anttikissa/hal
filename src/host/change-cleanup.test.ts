@@ -14,9 +14,9 @@ let id = '1-cleanup', ts = '2026-10-10T00:00:00Z'
 let originalFilter = fileTracking.filter, originalValidate = changeCleanup.validate, originalBackup = changeCleanup.backup
 
 beforeEach(() => {
-	previousHome = process.env.HAL_HOME
+	previousHome = paths.state.home
 	home = mkdtempSync(`${tmpdir()}/hal-cleanup-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	mkdirSync(paths.sessionDir(id))
 })
@@ -28,8 +28,8 @@ afterEach(() => {
 	if (server.state.lockFd !== null) { closeSync(server.state.lockFd); server.state.lockFd = null }
 	pages.reset()
 	rmSync(home, { recursive: true, force: true })
-	if (previousHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = previousHome
+	if (previousHome === undefined) paths.state.home = undefined
+	else paths.state.home = previousHome
 })
 
 function path(): string { return `${paths.sessionDir(id)}/history.asonl` }
@@ -201,7 +201,7 @@ test('exclusive host lock refuses cleanup and prevents another process taking ov
 	expect(server.tryLock()).toBe(true)
 	await expect(changeCleanup.run(id, true)).rejects.toThrow('host is running')
 	let modulePath = `${import.meta.dir}/change-cleanup.ts`
-	let child = Bun.spawnSync(['bun', modulePath, '--apply', id], { env: process.env })
+	let child = Bun.spawnSync(['bun', modulePath, '--home', home, '--apply', id])
 	expect(child.exitCode).not.toBe(0)
 	expect(child.stderr.toString()).toContain('host is running')
 	expect(readFileSync(path(), 'utf8')).toBe(fixture())
@@ -209,7 +209,7 @@ test('exclusive host lock refuses cleanup and prevents another process taking ov
 	server.state.lockFd = null
 	let tested = false
 	fileTracking.filter = async (...args) => {
-		let result = Bun.spawnSync(['bun', '-e', `let {server} = await import(${JSON.stringify(`${import.meta.dir}/server.ts`)}); process.exit(server.tryLock() ? 1 : 0)`], { env: process.env })
+		let result = Bun.spawnSync(['bun', '-e', `(await import(${JSON.stringify(`${import.meta.dir}/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}; let {server} = await import(${JSON.stringify(`${import.meta.dir}/server.ts`)}); process.exit(server.tryLock() ? 1 : 0)`])
 		expect(result.exitCode).toBe(0)
 		tested = true
 		return originalFilter(...args)

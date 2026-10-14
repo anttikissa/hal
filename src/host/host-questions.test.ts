@@ -19,7 +19,7 @@ import { paths } from './paths.ts'
 import { models } from './models.ts'
 import { client, until } from './host-fixture.test.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 const origModels = synthetic.models
 const origPause = synthetic.pauseMs
@@ -30,7 +30,7 @@ let home = ''
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-questions-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	for (let key of keyNames) delete process.env[key]
 	liveFiles.onError = () => {}
 	synthetic.models = { ...origModels }
@@ -52,8 +52,8 @@ afterEach(() => {
 		if (savedKeys[i] === undefined) delete process.env[key]
 		else process.env[key] = savedKeys[i]
 	})
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

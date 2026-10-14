@@ -13,8 +13,9 @@ import { anthropic } from './anthropic.ts'
 import { sessions } from './sessions.ts'
 import { naming } from './naming.ts'
 import { busy } from './busy.ts'
+import { paths } from './paths.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origOnError = liveFiles.onError
 const origStream = provider.stream
 const origLog = diag.log
@@ -24,7 +25,7 @@ let logged: string[] = []
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-history-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	liveFiles.onError = () => {}
 	// History contracts are independent of title reminder scheduling.
 	naming.prepare = () => {}
@@ -42,8 +43,8 @@ afterEach(() => {
 	naming.prepare = origPrepare
 	diag.log = origLog
 	liveFiles.onError = origOnError
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

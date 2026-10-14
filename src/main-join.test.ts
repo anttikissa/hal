@@ -47,8 +47,8 @@ function killQuietly(pid: number): void {
 }
 
 function spawn(): Proc {
-	let sub = Bun.spawn(['bun', '-e', script], {
-		env: { ...process.env, HAL_HOME: home },
+	let sub = Bun.spawn(['bun', '-e', `(await import(${JSON.stringify(`${import.meta.dir}/host/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}
+${script}`], {
 		stdin: 'ignore',
 		stdout: 'pipe',
 		stderr: 'pipe',

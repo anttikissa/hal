@@ -11,13 +11,13 @@ import { sessions } from './sessions.ts'
 import { webAuth } from './web-auth.ts'
 import { web } from './web.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origPort = web.port
 let home = ''
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-web-auth-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	web.port = () => 0
 })
@@ -29,8 +29,8 @@ afterEach(async () => {
 	sessions.closeAll()
 	history.state.running.clear()
 	web.port = origPort
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 
@@ -108,7 +108,7 @@ test('codes are 6 Crockford characters, fresh each time, and a token is valid on
 })
 
 const main = `${import.meta.dir}/../main.ts`
-const runAuth = () => Bun.spawn(['bun', main, 'auth'], { env: { ...process.env, HAL_HOME: home }, stdout: 'pipe', stderr: 'pipe' })
+const runAuth = () => Bun.spawn(['bun', main, 'auth', '--home', home], { stdout: 'pipe', stderr: 'pipe' })
 
 test('./run auth prints a code from the running host, or says none is running', async () => {
 	let none = runAuth()

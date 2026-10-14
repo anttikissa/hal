@@ -13,13 +13,13 @@ import { webLinks } from './web-links.ts'
 import { statusUsage } from './status-usage.ts'
 import { web } from './web.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origRenew = webLinks.renewMs
 let home = ''
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-web-links-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 })
 
@@ -30,8 +30,8 @@ afterEach(() => {
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

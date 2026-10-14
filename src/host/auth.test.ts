@@ -3,11 +3,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { auth } from './auth.ts'
+import { paths } from './paths.ts'
 
-// Fake credentials only. HAL_HOME and HOME point at temp dirs, so neither
+// Fake credentials only. The Hal home and HOME point at temp dirs, so neither
 // ./auth.ason nor ~/.hal/auth.ason can be read or written here.
 
-const savedEnv = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+const savedHome = paths.state.home
+const savedEnv = { HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
 const origTokenUrl = auth.tokenUrl
 let home = ''
 let server: ReturnType<typeof Bun.serve> | null = null
@@ -17,7 +19,7 @@ let reply: () => Response = () => new Response('{}')
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-auth-`)
 	mkdirSync(`${home}/secrets`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	process.env.HOME = `${home}/user`
 	// Real keys never reach a test, even run outside ./test.
 	delete process.env.ANTHROPIC_API_KEY
@@ -39,6 +41,7 @@ afterEach(() => {
 	auth.close()
 	server?.stop(true)
 	auth.tokenUrl = origTokenUrl
+	paths.state.home = savedHome
 	for (let [k, v] of Object.entries(savedEnv)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

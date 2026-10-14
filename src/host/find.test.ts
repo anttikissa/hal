@@ -16,16 +16,16 @@ import { sessions } from './sessions.ts'
 import { blobs } from './blobs.ts'
 import { pages } from './pages.ts'
 
-let savedHome = process.env.HAL_HOME, home = '', originalIndexed = find.indexed
+let savedHome = paths.state.home, home = '', originalIndexed = find.indexed
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-find-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 })
 afterEach(() => {
 	host.reset(); sessions.closeAll(); find.indexed = originalIndexed
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 function caughtUp(): Promise<void> {

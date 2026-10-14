@@ -4,18 +4,18 @@ import { tmpdir } from 'os'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
 
-const saved = process.env.HAL_HOME
+const saved = paths.state.home
 let home = ''
 
 afterEach(() => {
-	if (saved === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = saved
+	if (saved === undefined) paths.state.home = undefined
+	else paths.state.home = saved
 	rmSync(home, { recursive: true, force: true })
 })
 
 test('diagnostics land redacted in owner-only state/, not in sessions/', () => {
 	home = mkdtempSync(`${tmpdir()}/hal-diag-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	let token = 'sk-ant-api03-Qw3rTy0123456789abcdefXYZ'
 	diag.log(`refresh failed for ${token}`)

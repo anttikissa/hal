@@ -11,7 +11,7 @@ import { provider, type Provider } from './provider.ts'
 // models.dev (task qq): fetched in the background, cached under state/,
 // used offline; never the network in tests.
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origFetch = provider.fetch
 const origOffline = modelsDev.offline
 const origProviders = provider.state.providers
@@ -36,7 +36,7 @@ const fake = (models?: Provider['models'], known?: string[]): Provider => ({
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-models-dev-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	fetched = []
 	modelsDev.offline = () => false
@@ -55,8 +55,8 @@ afterEach(() => {
 	provider.state.providers = origProviders
 	modelsDev.state.catalog = null
 	models.state.lists.clear()
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

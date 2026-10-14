@@ -6,12 +6,12 @@ import { join } from 'path'
 test('a home too deep for a Unix socket is one clear error, not a stack', () => {
 	let home = join(mkdtempSync(join(tmpdir(), 'hal-main-')), 'x'.repeat(100))
 	try {
-		let out = Bun.spawnSync(['./run'], { cwd: `${import.meta.dir}/..`, env: { ...process.env, HAL_HOME: home } })
+		let out = Bun.spawnSync(['./run', '--home', home], { cwd: `${import.meta.dir}/..` })
 		let err = out.stderr.toString()
 		expect(out.exitCode).toBe(1)
 		expect(err).toContain(`${home}/state/host.sock`)
 		expect(err).toContain('103')
-		expect(err).toContain('HAL_HOME')
+		expect(err).toContain('--home')
 		expect(err).not.toMatch(/^\s+at /m)
 	} finally {
 		rmSync(join(home, '..'), { recursive: true, force: true })
@@ -34,7 +34,7 @@ main.keepTab({ id: 't' + n, name: '', cwd: '/c' + n, model: '', state: { type: '
 process.exit(n < 3 ? terminal.restartCode : 7)
 `
 		writeFileSync(join(home, 'local.ts'), local)
-		let run = () => Bun.spawnSync(['./run'], { cwd: `${import.meta.dir}/..`, env: { ...process.env, HAL_HOME: home } })
+		let run = () => Bun.spawnSync(['./run', '--home', home], { cwd: `${import.meta.dir}/..` })
 		expect(run().exitCode).toBe(7)
 		expect(run().exitCode).toBe(7)
 		let starts = readFileSync(join(home, 'starts'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))

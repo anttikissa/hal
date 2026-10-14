@@ -11,13 +11,13 @@ import { web } from '../host/web.ts'
 import { webAuth } from '../host/web-auth.ts'
 import { remote, type Saved } from './remote.ts'
 
-const savedHome = process.env.HAL_HOME
+const savedHome = paths.state.home
 const origPort = web.port
 let home = ''
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-remote-`)
-	process.env.HAL_HOME = home
+	paths.state.home = home
 	paths.init()
 	web.port = () => 0
 })
@@ -28,8 +28,8 @@ afterEach(async () => {
 	host.reset()
 	sessions.closeAll()
 	web.port = origPort
-	if (savedHome === undefined) delete process.env.HAL_HOME
-	else process.env.HAL_HOME = savedHome
+	if (savedHome === undefined) paths.state.home = undefined
+	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
 

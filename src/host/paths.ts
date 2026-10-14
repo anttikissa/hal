@@ -1,6 +1,6 @@
-// Where Hal reads and writes. Everything lives under the home, the repo
-// root (git clone is the only install). HAL_HOME is for tests only: it
-// points a process at a temp home so it never touches live data.
+// Where Hal reads and writes. Everything lives under the home: the repo
+// root (git clone is the only install), or state.home, set by
+// hal --home <dir> or by a test so it never touches live data.
 
 import { chmodSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
@@ -10,8 +10,8 @@ import { attachments } from '../common/attachments.ts'
 const repoRoot = resolve(import.meta.dir, '../..')
 
 function home(): string {
-	if (process.env.HAL_HOME) return process.env.HAL_HOME
-	// Belt and braces: a test that forgot HAL_HOME still gets a temp home.
+	if (paths.state.home) return paths.state.home
+	// Belt and braces: a test that forgot state.home still gets a temp home.
 	if (process.env.NODE_ENV === 'test') return `${tmpdir()}/hal-test-home-${process.pid}`
 	return repoRoot
 }
@@ -31,7 +31,7 @@ function sessionDir(id: string): string {
 // where the model's tools can read them too; inside the home under
 // test, so tests never touch /tmp/hal.
 function tmpDir(): string {
-	return process.env.HAL_HOME || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp` : '/tmp/hal'
+	return paths.state.home || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp` : '/tmp/hal'
 }
 
 function imageDir(): string {
@@ -87,4 +87,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }
+export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }
