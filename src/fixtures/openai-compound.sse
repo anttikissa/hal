@@ -1,0 +1,2 @@
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":19,"output_index":0,"item":{"type":"function_call","id":"fc_0d640632843005a7016acf38830c348191a0018c838be74470","call_id":"call_66c30b125c2c43f7b612530d842ca1dc","name":"tool","arguments":"{\"cmd\":\"READ README.md:1-1\\nBASH pwd\"}","status":"completed"}}

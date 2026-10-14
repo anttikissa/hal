@@ -19,7 +19,7 @@ type Socket = {
 	busy: boolean
 	// The last completed request: its non-input fields, full input as
 	// JSON items, and the response id that continues it.
-	last?: { fields: string; input: string[]; count: number; id: string }
+	last?: { fields: string; input: string[]; count: number; id: string; calls: string[] }
 	idle?: ReturnType<typeof setTimeout>
 }
 
@@ -85,8 +85,10 @@ function continuation(s: Socket, fields: string, full: unknown[], req: ProviderR
 	let last = s.last
 	if (!last || last.fields !== fields) return undefined
 	let reply = req.messages[last.count]
-	let replyItems = reply?.role === 'assistant' ? items({ ...req, messages: [reply] }).length : 0
-	let start = last.input.length + replyItems
+	let replyItems = reply?.role === 'assistant' ? items({ ...req, messages: [reply] }) : []
+	let calls = replyItems.filter((item: any) => item?.type === 'function_call').map((item: any) => item.call_id)
+	if (JSON.stringify(calls) !== JSON.stringify(last.calls)) return undefined
+	let start = last.input.length + replyItems.length
 	if (full.length <= start) return undefined
 	for (let i = 0; i < last.input.length; i++) if (JSON.stringify(full[i]) !== last.input[i]) return undefined
 	return { previous_response_id: last.id, input: full.slice(start) }
@@ -121,7 +123,7 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 	let fields = JSON.stringify(rest)
 	let next = continuation(socket, fields, full, req, items)
 	let body = { type: 'response.create', ...rest, ...(next ?? { input: full }) }
-	let sent = { fields, input: full.map((item) => JSON.stringify(item)), count: req.messages.length }
+	let sent = { fields, input: full.map((item) => JSON.stringify(item)), count: req.messages.length, calls: [] as string[] }
 	socket.last = undefined
 	let ws = socket.ws
 	let encoder = new TextEncoder()
@@ -163,6 +165,7 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 			active = ev.response?.id
 		}
 		else if (!active || (ev.response?.id && ev.response.id !== active)) return
+		if (ev.type === 'response.output_item.done' && ev.item?.type === 'function_call' && typeof ev.item.call_id === 'string') sent.calls.push(ev.item.call_id)
 		ctrl.enqueue(encoder.encode(`data: ${data.replace(/\n/g, '\ndata: ')}\n\n`))
 		if (ev.type === 'response.completed' && active) {
 			socket.last = { ...sent, id: active }

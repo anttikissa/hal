@@ -16,6 +16,7 @@ import { provider } from './provider.ts'
 import { usage } from './usage.ts'
 import { tools } from './tools.ts'
 import { nativeTool } from './native-tool.ts'
+import { replay } from '../common/replay.ts'
 
 const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
 const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
@@ -28,6 +29,7 @@ let catalogReply: ((req: Request) => Response) | undefined
 let wsSeen: any[] | null = null
 // Messages the fake socket sends before each response.
 let wsBefore: object[] = []
+let wsOutput: object[] = []
 
 const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
@@ -54,6 +56,7 @@ beforeEach(() => {
 	reply = () => sse(completed())
 	wsSeen = null
 	wsBefore = []
+	wsOutput = []
 	openaiWs.state.enabled = false
 	server = Bun.serve({
 		port: 0,
@@ -63,7 +66,7 @@ beforeEach(() => {
 				wsSeen!.push(body)
 				let id = `resp-${wsSeen!.length}`
 				let response = { id, previous_response_id: body.previous_response_id }
-				for (let e of [...wsBefore, { type: 'response.created', response }, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
+				for (let e of [...wsBefore, { type: 'response.created', response }, ...wsOutput, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
 			},
 		},
 		async fetch(req, srv) {
@@ -336,6 +339,30 @@ test('over a WebSocket, a request that extends the last one sends only the new i
 	expect(await text()).toBe('')
 	expect(seen.filter((r) => r.path === '/codex/responses')).toHaveLength(1)
 	expect(openaiWs.state.httpUntil).toBeGreaterThan(Date.now())
+})
+
+test.each([false, true])('WebSocket replay pairs results with backend calls when expanded=%s', async (expanded) => {
+	writeAuth({ openai: { accessToken: subscriptionToken } })
+	openaiWs.state.enabled = true
+	wsSeen = []
+	let recording = await Bun.file(`${import.meta.dir}/../fixtures/openai-compound.sse`).text()
+	wsOutput = recording.split('\n').filter((line) => line.startsWith('data: ')).map((line) => JSON.parse(line.slice(6)))
+	let messages: Message[] = [...hi]
+	let turn = blocks.collect(await run(messages, { sessionId: 'ws-calls', tools: [nativeTool.def()] }), 'openai')
+	let call = turn.blocks.find((b) => b.type === 'tool_call')!
+	expect(call.type).toBe('tool_call')
+	if (call.type !== 'tool_call') throw new Error('recording has no tool call')
+	let calls = expanded ? nativeTool.expand(call).map(replay.asNative) : [call]
+	messages.push({ role: 'assistant', blocks: calls }, { role: 'user', blocks: calls.map((c) => ({ type: 'tool_result', id: c.id, output: 'Transport probe only; command not executed.' })) })
+	wsOutput = []
+	await run(messages, { sessionId: 'ws-calls', tools: [nativeTool.def()] })
+	let sent = wsSeen[1]
+	expect(sent.previous_response_id).toBe(expanded ? undefined : 'resp-1')
+	let effective = [...(expanded ? [] : wsSeen[0].input.concat([{ type: 'function_call', call_id: call.id }])), ...sent.input]
+	let invoked = new Set(effective.filter((i: any) => i.type === 'function_call').map((i: any) => i.call_id))
+	let results = effective.filter((i: any) => i.type === 'function_call_output')
+	expect(results).toHaveLength(expanded ? 2 : 1)
+	expect(results.every((r: any) => invoked.has(r.call_id))).toBe(true)
 })
 
 test('over a WebSocket, codex.rate_limits updates the account\'s shared usage windows; a metered limit does not', async () => {
