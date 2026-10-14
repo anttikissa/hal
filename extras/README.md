@@ -20,3 +20,6 @@ extra itself take effect when the host restarts.
   `quirks` table; others get multiedit's strict errors. Each firing is
   logged to `state/diag.log` with its model, so you can delete quirks
   nobody uses. Needs `multiedit.ts`.
+- `commit-sloc.ts`: tells the model how many source lines each commit
+  added, and rejects background Bash calls containing `git commit` so
+  each commit shows in the foreground.
