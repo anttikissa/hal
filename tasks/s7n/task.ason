@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'The fix adds only a call-ID check to the existing WebSocket continuation path. Focused OpenAI and batching tests passed: 26 tests; targeted lint passed. Live subscription WebSocket requests accepted expanded-call results both with native search enabled and with it absent. The search-enabled follow-up chose another tool call, which is valid; the diagnostic initially overconstrained it to require a final text answer. Full replay of the reported failing history has no unmatched tool results.',
-		'The continuation guard compares call-ID array length and elements directly, without serializing the arrays. Order and exact IDs must match.'
+		'The continuation guard compares call-ID array length and elements directly, without serializing the arrays. Order and exact IDs must match.',
+		'Use isDeepStrictEqual from node:util for call-ID arrays instead of the hand-written comparator. Preserve order and exact IDs without JSON serialization. Verification: both call-ID replay regressions passed and targeted lint passed; the focused file had 16 passes and one model-catalog failure, Malformed_HTTP_Response from its local fake server. No retry or unrelated test changes.'
 	],
 	needs: ['ak5', 'ep8'],
 	foldInto: ['ak5', 'ep8']
