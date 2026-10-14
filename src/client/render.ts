@@ -222,7 +222,7 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 	let size = { before: prev.length, after: lines.length, screen: rows }
 	let wasFull = st.fullscreen
 	// Off the shell's output above, unless the frame fills the screen.
-	let gap = st.gap && !prev.length && lines.length < rows ? '\r\n' : ''
+	let gap = st.gap && !prev.length && lines.length < rows && Bun.stripANSI(lines[0] ?? '').trim() ? '\r\n' : ''
 	st.gap = false
 	// The last written row, where the cursor is after the body below.
 	let row: number

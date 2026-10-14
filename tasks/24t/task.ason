@@ -1,0 +1,10 @@
+{
+	title: 'Initial Hal message has one blank row',
+	spec: 'Terminal transcripts beginning with a visible Hal reply, thinking or synthetic output have one leading empty row, reusing existing card padding when present. Spacing between transcript items is unchanged. Startup shell separation reuses an existing leading blank row instead of adding another. Invariant: an initial Hal message never touches the top edge and this padding adds no consecutive empty rows. Keep rendering incremental and do not add timers or state. Web top spacing awaits user decision.',
+	status: 'done',
+	notes: [
+		'Two existing code lines changed: layout adds a gap only for an initial visible Hal item without an existing blank row; paint reuses a leading blank instead of adding shell separation. Bun.stripANSI is required: ansi.clean exposes control characters rather than stripping styling. Existing frame expectations account for the new leading row. All 66 frame/render tests passed; one-off checks verified reply, thinking, synthetic and background-padded prompt each have exactly one leading blank and no extra startup gap. Short-circuit checks inspect only initial rows; no growing state or repeated transcript scan.'
+	],
+	needs: ['hp'],
+	foldInto: ['hp']
+}

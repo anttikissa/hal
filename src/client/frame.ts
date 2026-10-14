@@ -277,7 +277,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (rows.length > natural) frame.state.padded = true
 			// An attached result's padding row replaces its call's bottom one.
 			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
-			else if (rows.length && lines.length && look.gap !== false) lines.push('')
+			else if (rows.length && look.gap !== false && (lines.length || ((item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && item.synthetic)) && Bun.stripANSI(rows[0]!).trim()))) lines.push('')
 			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)
 			if (item.type === 'tool') callCard = { id: item.id, key: item.key, start: lines.length - rows.length }

@@ -116,12 +116,12 @@ test('the same items drawn again follow a new width and color', () => {
 	let v = view([{ type: 'text', text: 'one two three four five six' }])
 	let wide = frame.build(v, 40).lines
 	expect(frame.build(v, 40).lines).toEqual(wide)
-	expect(plain(frame.build(v, 12).lines).slice(0, 5)).toEqual(['Hal', '', 'one two', 'three four', 'five six'])
+	expect(plain(frame.build(v, 12).lines).slice(0, 6)).toEqual(['', 'Hal', '', 'one two', 'three four', 'five six'])
 	let saved = colors.assistant
 	try {
 		colors.assistant = () => ({ fg: [0.5, 0.1, 30] })
 		let fg = `38;2;${oklch.toRgb([0.5, 0.1, 30]).join(';')}`
-		expect(frame.build(v, 40).lines[0]).toContain(fg)
+		expect(frame.build(v, 40).lines[1]).toContain(fg)
 	} finally {
 		colors.assistant = saved
 	}
@@ -421,8 +421,9 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		stream.transcript!.items[0]!.key = '9'
 		stream.hal = { at: 'stream', lit: true, color: colors.assistant().fg! }
 		let streamed = plain(frame.build(stream, 60).lines)
-		expect(streamed[0]).toMatch(/^Hal +a9$/)
-		expect(streamed[2]).toBe('Hel█')
+		expect(streamed[0]).toBe('')
+		expect(streamed[1]).toMatch(/^Hal +a9$/)
+		expect(streamed[3]).toBe('Hel█')
 		// A block still streaming before it has a number is not linked.
 		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
 		streaming.transcript!.items[0]!.key = '~0'
@@ -458,9 +459,10 @@ test('a narrow thinking preview keeps time and block id without a label', () => 
 	let v = view([item])
 	v.transcript!.items[0]!.key = '35'
 	let lines = plain(frame.build(v, 24).lines)
-	expect(lines[0]).toMatch(/^10:51 x +r35$/)
-	expect(lines[0]).not.toContain('high')
-	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
+	expect(lines[0]).toBe('')
+	expect(lines[1]).toMatch(/^10:51 x +r35$/)
+	expect(lines[1]).not.toContain('high')
+	expect(strings.visLen(frame.build(v, 24).lines[1]!)).toBeLessThanOrEqual(24)
 })
 
 test('tool timestamps and command-output headers match ordinary message time and spacing', () => {
