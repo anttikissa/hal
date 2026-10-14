@@ -76,6 +76,10 @@ test('clipping keeps short text and never splits a wide glyph', () => {
 	expect(visLen(clipVisual('漢字漢字', 4))).toBeLessThanOrEqual(4)
 })
 
+test('clipping keeps the escapes that close styles', () => {
+	expect(clipVisual('\x1b[9mstruck text\x1b[29m after', 4)).toBe('\x1b[9mstr…\x1b[29m')
+})
+
 test('word wrap contains OSC 8 hyperlinks within each visual line', () => {
 	let url = 'https://example.com'
 	let open = `\x1b]8;;${url}\x07`

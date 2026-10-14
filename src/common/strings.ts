@@ -237,12 +237,22 @@ function clean(s: string): string {
 	return s.replace(/(?![\n\t])\p{Cc}/gu, '\ufffd')
 }
 
-/** Clip to at most `max` columns, ending with '…' if cut. Keeps raw tabs; use expandTabs for terminal display. */
+/**
+ * Clip to at most `max` columns, ending with '…' if cut. Keeps the cut
+ * tail's escapes so styles opened before the cut still close. Keeps raw
+ * tabs; use expandTabs for terminal display.
+ */
 function clipVisual(s: string, max: number): string {
 	if (max <= 0) return ''
 	if (strings.visLen(s) <= max) return s
 	let cut = strings.walk(s, 0, (_i, w, _len, col) => col + w <= max - 1)
-	return s.slice(0, cut) + '…'
+	let escapes = ''
+	for (let i = cut; i < s.length; ) {
+		let j = strings.skipEscape(s, i)
+		if (j > i) escapes += s.slice(i, j)
+		i = Math.max(j, i + 1)
+	}
+	return s.slice(0, cut) + '…' + escapes
 }
 
 /**
