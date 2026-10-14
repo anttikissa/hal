@@ -1,6 +1,6 @@
 {
 	title: '/resume lists recently closed sessions',
-	spec: "Typed `/resume` lists the 20 most recently closed sessions, newest first, in the /tabs all row format (closing time, linked id, name); `/resume all` lists every closed session; `/resume <session id>` reopens that session and shows it (the go event). With no closed sessions it says so. Shift-Ctrl-T still reopens the last closed tab: the key sends tab-resume directly (task sa). The command list describes /resume as 'reopen a closed session', true for both the key and the typed command. Tab completes all and closed session ids. Test: the list is capped at 20, newest first, and all lifts the cap.",
+	spec: 'Typed `/resume` lists the 20 most recently closed sessions, newest first, in the /tabs all row format (closing time, linked id, name); `/resume all` lists every closed session; `/resume last` reopens the most recently closed one; `/resume <session id>` reopens that session and shows it (the go event). With no closed sessions it says so. Shift-Ctrl-T is shown as /resume last and does the same without being recorded: the key sends tab-resume directly (task sa); a client command runs locally with its own keyArgs. The command list describes /resume as reopen a closed session, true for both the key and the typed command. Tab completes all, last and closed session ids. Test: the list is capped at 20, newest first, and all lifts the cap',
 	status: 'done',
 	needs: ['sa'],
 	foldInto: ['sa']

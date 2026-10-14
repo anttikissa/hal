@@ -31,7 +31,7 @@ function run(name: string, args = ''): void {
 	if (name === 'find') return find.open()
 	if (name === 'toggle') return folds.open()
 	let local = clientCommands.all[name]
-	if (local && (!args || (name === 'restart' && args === 'local'))) return local.run()
+	if (local && (!args || args === commandList.byName(name)?.keyArgs)) return local.run()
 	let id = app.state.transcript?.meta.id
 	if (id === undefined) return
 	app.send(name === 'model' ? { type: 'models', sessionId: id } : { type: 'submit', sessionId: id, text: `/${name}${args ? ` ${args}` : ''}` })

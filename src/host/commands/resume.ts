@@ -10,8 +10,8 @@ const recent = 20
 
 export const command: SlashCommand = {
 	quiet: true,
-	help: () => `/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume <session id> reopens the session named.`,
-	complete: (args) => ['all', ...closedSessions().map((s) => s.id)].filter((v) => v.startsWith(args)),
+	help: () => `/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume last reopens the most recently closed one (Shift-Ctrl-T).\n/resume <session id> reopens the session named.`,
+	complete: (args) => ['all', 'last', ...closedSessions().map((s) => s.id)].filter((v) => v.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (!args || args === 'all') {
 			let shut = closedSessions()
@@ -21,7 +21,7 @@ export const command: SlashCommand = {
 		}
 		let outcome
 		try {
-			outcome = tabs.act({ type: 'tab-resume', sessionId: args })
+			outcome = tabs.act({ type: 'tab-resume', ...(args !== 'last' && { sessionId: args }) })
 		} catch {
 			return { error: `no session ${args}` }
 		}

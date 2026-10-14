@@ -28,7 +28,7 @@ const list: CommandInfo[] = [
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
 	{ name: 'clients', description: 'show who is connected to the host', category: 'debug' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w' },
-	{ name: 'collapse', description: 'collapse cards (t*, 10-24); not /close', category: 'session' },
+	{ name: 'collapse', description: 'collapse cards (t*, 10-24)', category: 'session' },
 	{ name: 'compact', description: 'summarize the context so far', category: 'session' },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
 	{ name: 'edit', description: 'edit a prompt and run it again (up arrow), or undo the last edit', category: 'session' },
@@ -66,7 +66,7 @@ const list: CommandInfo[] = [
 	// /restart local (Ctrl-R) runs in the client; bare (all), host and both
 	// on the host (src/host/commands/restart.ts).
 	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', bindings: [{ key: 'shift-ctrl-r', args: 'all' }], defaultArgs: 'all' },
-	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t' },
+	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t', keyArgs: 'last' },
 	{ name: 'send', description: 'send a message or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session' },
