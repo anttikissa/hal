@@ -32,7 +32,7 @@ for (let delivery of ['soft-steer', 'steer'] as const) test(`/cd interrupts with
 	expect(input).not.toContain('Later task.')
 	expect(c.views.get(id)!.inbox.map((m) => m.text)).toEqual(['Later task.'])
 	let items = c.views.get(id)!.items
-	expect(items.findIndex((i) => i.type === 'text' && i.text === 'Summer light')).toBeLessThan(items.findIndex((i) => i.type === 'output' && i.text.includes('Directory changed:')))
+	expect(items.findIndex((i) => i.type === 'text' && i.text === 'Summer light')).toBeLessThan(items.findIndex((i) => i.type === 'command' && i.text === '/cd sub'))
 	c.conn.send({ type: 'pause', sessionId: id })
 	await until(() => c.of('turn-end').length)
 	expect(await fresh(id)).toEqual(c.views.get(id)!)

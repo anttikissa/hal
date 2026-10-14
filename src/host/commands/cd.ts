@@ -35,6 +35,6 @@ export const command: SlashCommand = {
 		}
 		let previous = ctx.cwd
 		ctx.setCwd(path)
-		return { say: `Directory changed: ${previous} → ${path}` }
+		return { say: `${previous} → ${path}` }
 	},
 }

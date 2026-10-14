@@ -11,14 +11,15 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
 
-function set(id: string, value: boolean): void {
+// `typed`: by /autoclose, whose card already names the setting.
+function set(id: string, value: boolean, typed = false): void {
 	let meta = sessions.open(id)
 	let previous = meta.autoclose ?? false
 	if (previous === value) return
 	meta.autoclose = value
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', autoclose: value, previous: { autoclose: previous } })
-	let text = `Autoclose: ${previous ? 'on' : 'off'} → ${value ? 'on' : 'off'}`
+	let text = `${typed ? '' : 'Autoclose: '}${previous ? 'on' : 'off'} → ${value ? 'on' : 'off'}`
 	let { n, ts } = history.append(id, { type: 'output', text })
 	host.broadcast(id, { type: 'output', sessionId: id, text, n, ts })
 	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })

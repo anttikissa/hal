@@ -46,9 +46,9 @@ test('autoclose command records each change once, pushes metadata and persists i
 	c.conn.send({ type: 'submit', sessionId: id, text: '/autoclose' })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/autoclose nonsense' })
 	await until(() => c.of('output').some((e) => e.error))
-	expect(history.readSync(id).filter((r) => r.type === 'output' && r.text.includes('→')).map((r) => r.type === 'output' && r.text)).toEqual(['Autoclose: on → off', 'Autoclose: off → on'])
+	expect(history.readSync(id).filter((r) => r.type === 'output' && r.text.includes('→')).map((r) => r.type === 'output' && r.text)).toEqual(['on → off', 'off → on'])
 	expect(c.of('meta').at(-1)?.meta.autoclose).toBe(true)
-	expect(c.views.get(id)?.items.some((r) => r.type === 'command' && r.output === 'Autoclose: off → on')).toBe(true)
+	expect(c.views.get(id)?.items.some((r) => r.type === 'command' && r.output === 'off → on')).toBe(true)
 	let stored = sessions.load(id, false)
 	expect(stored.autoclose).toBe(true)
 	liveFiles.close(stored)
@@ -63,7 +63,7 @@ test('hidden autoclose aliases preserve canonical reports and changes', async ()
 			let outputs = c.of('output').length
 			c.conn.send({ type: 'submit', sessionId: id, text: `/autoclose ${arg}` })
 			await until(() => c.of('output').length > outputs)
-			expect(c.of('output').at(-1)?.text).toBe(`Autoclose: ${value ? 'on' : 'off'}`)
+			expect(c.of('output').at(-1)?.text).toBe(value ? 'on' : 'off')
 		}
 	}
 	expect(history.readSync(id).filter((r) => r.type === 'change').length).toBe(8)
