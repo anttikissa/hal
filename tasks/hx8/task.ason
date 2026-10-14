@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Undo while the edited turn ran used to fail with the generic rebase refusal (Pause the session and answer or dismiss its question). host.ts now pauses the turn for /edit undo and reuses the wait-for-stopped-work path of edits. Invariant: /edit undo works whenever /edit could have run.',
-		'Undo drops every non-surviving record after the edit rebase, including the go-back line, and says Edit undone: prompt u<n> and its partial output are back.'
+		'Undo drops every non-surviving record after the edit rebase, including the go-back line, and says Edit undone: prompt u<n> and its partial output are back.',
+		'An edited prompt header says how to go back: You (edited; /edit undo to go back). The edit writes no separate line, so it adds nothing to history beyond its rebase and prompt (user, 2026-10-15). Older edited prompts keep the hint; /edit undo explains why it refuses there.'
 	],
 	needs: ['ky7']
 }

@@ -361,7 +361,6 @@ test('an edit after only reading replaces the prompt: the model sees it as if wr
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
 	expect(shown(view.items.slice(3))).toEqual([
-		{ type: 'output', text: 'Prompt u4 edited. `/edit undo` to go back.' },
 		{ type: 'prompt', text: 'what did I note?', edited: true },
 		{ type: 'text', text: 'Milk.' },
 		{ type: 'turn-end', status: 'completed' },
@@ -416,10 +415,9 @@ test('an edit sent while the paused turn is still stopping waits for it to end',
 	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('right') }] }])
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
-	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'rebase', 'output', 'user', 'assistant', 'turn_end'])
+	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'rebase', 'user', 'assistant', 'turn_end'])
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
 	expect(shown(a.views.get(id)!.items)).toEqual([
-		{ type: 'output', text: 'Prompt u1 edited. `/edit undo` to go back.' },
 		{ type: 'prompt', text: 'right', edited: true },
 		{ type: 'text', text: 'ok' },
 		{ type: 'turn-end', status: 'completed' },
