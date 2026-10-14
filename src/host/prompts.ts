@@ -151,7 +151,7 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
 	// Before the edited prompt, so it never counts as output after it.
-	slash.output(id, `Prompt u${old!.n} edited; "/edit undo" to go back`)
+	slash.output(id, `Prompt u${old!.n} edited. \`/edit undo\` to go back.`)
 	parts[mine] = { type: 'text', text: literal.strip(text) }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)

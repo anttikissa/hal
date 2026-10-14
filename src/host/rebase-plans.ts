@@ -101,7 +101,7 @@ function unamend(id: string): string {
 	if (edited?.type !== 'user') throw new Error('Nothing to undo: the edited prompt is gone.')
 	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0, { quiet: true })
 	rebasePlans.broadcast(id, edited.amends!)
-	return `Edit undone: prompt u${edited.amends} and its partial output are back`
+	return `Edit undone: prompt u${edited.amends} and its partial output are back.`
 }
 
 // Edits prompt #n and rewinds there (task 26q), as one command: a
