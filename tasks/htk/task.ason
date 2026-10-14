@@ -1,0 +1,7 @@
+{
+	title: 'Hidden autoclose boolean aliases',
+	spec: '/autoclose accepts true/false, 1/0, yes/no and y/n as hidden aliases for on/off. Help and completion continue to advertise only on/off. Reports and persisted changes use canonical on/off values; invalid arguments retain the usage error. Both terminal and web use the same host command.',
+	status: 'done',
+	needs: ['p87'],
+	foldInto: ['p87']
+}

@@ -54,6 +54,21 @@ test('autoclose command records each change once, pushes metadata and persists i
 	liveFiles.close(stored)
 })
 
+test('hidden autoclose aliases preserve canonical reports and changes', async () => {
+	let { c, id } = ordinary()
+	for (let [off, on] of [['false', 'true'], ['0', '1'], ['no', 'yes'], ['n', 'y']]) {
+		for (let [arg, value] of [[off, false], [on, true]] as const) {
+			c.conn.send({ type: 'submit', sessionId: id, text: `/autoclose ${arg}` })
+			await until(() => sessions.open(id).autoclose === value)
+			let outputs = c.of('output').length
+			c.conn.send({ type: 'submit', sessionId: id, text: `/autoclose ${arg}` })
+			await until(() => c.of('output').length > outputs)
+			expect(c.of('output').at(-1)?.text).toBe(`Autoclose: ${value ? 'on' : 'off'}`)
+		}
+	}
+	expect(history.readSync(id).filter((r) => r.type === 'change').length).toBe(8)
+})
+
 for (let delivery of ['steer', 'soft-steer'] as const) test(`human ${delivery} promotes existing work without rewriting spawn kind`, async () => {
 	let { id } = ordinary()
 	let child = subagents.spawn(id, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp', limit: 0 })

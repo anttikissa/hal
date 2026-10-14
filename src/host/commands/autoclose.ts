@@ -9,9 +9,9 @@ export const command: SlashCommand = {
 	complete: (args) => ['on', 'off'].filter((value) => value.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (!args) return { say: `Autoclose: ${sessions.open(ctx.sessionId).autoclose ? 'on' : 'off'}` }
-		if (args !== 'on' && args !== 'off') return { error: 'usage: /autoclose [on|off]' }
-		let value = args === 'on'
-		if ((sessions.open(ctx.sessionId).autoclose ?? false) === value) return { say: `Autoclose: ${args}` }
+		let value = ['on', 'true', '1', 'yes', 'y'].includes(args) ? true : ['off', 'false', '0', 'no', 'n'].includes(args) ? false : undefined
+		if (value === undefined) return { error: 'usage: /autoclose [on|off]' }
+		if ((sessions.open(ctx.sessionId).autoclose ?? false) === value) return { say: `Autoclose: ${value ? 'on' : 'off'}` }
 		autoclose.set(ctx.sessionId, value)
 		return {}
 	},
