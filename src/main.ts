@@ -132,7 +132,6 @@ function init(): void {
 function initTerminal(remote?: string): void {
 	terminal.init()
 	render.init()
-	render.state.gap = true
 	// Full mode or not is decided by the first paint (task 7j).
 	if (!remote) try { render.startTabs = (ason.parse(readFileSync(join(paths.stateDir(), 'tabs.ason'), 'utf8')) as { open: unknown[] }).open.length } catch {}
 	render.painted = (view) => {

@@ -277,7 +277,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (rows.length > natural) frame.state.padded = true
 			// An attached result's padding row replaces its call's bottom one.
 			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
-			else if (rows.length && look.gap !== false && (lines.length || ((item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && item.synthetic)) && Bun.stripANSI(rows[0]!).trim()))) lines.push('')
+			else if (rows.length && look.gap !== false && (lines.length || Bun.stripANSI(rows[0]!).trim())) lines.push('')
 			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)
 			if (item.type === 'tool') callCard = { id: item.id, key: item.key, start: lines.length - rows.length }
@@ -311,11 +311,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 function build(view: View, cols: number, rows = 24, full = false, past: Past = frame.layout(view, cols)!): Frame {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let lines: string[] = past.lines.slice()
-	// Whether something is above `lines` (the history, above the chrome).
-	let above = false
 	let block = (rows: string[], style: Style | undefined) => {
 		if (!rows.length) return
-		if (lines.length || above) lines.push('')
+		lines.push('')
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
 	let formCursor = view.form ? past.formCursor : undefined
@@ -323,7 +321,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// comes before the chrome. A question being answered has the cursor.
 	// It is the work now, so it comes before waiting messages (the future).
 	if (view.hal?.at === 'idle' && !formCursor) {
-		if (lines.length || above) lines.push('')
+		lines.push('')
 		lines.push(ansi.PAD + halCursor.glyph(view.hal))
 	}
 	// Unsent and waiting messages use the normal prompt renderer; queued
@@ -345,7 +343,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
 		let joined = edge !== undefined && stacked === edge
 		if (stacked && !joined) lines.push(stacked)
-		if (rows.length && (lines.length || above) && !joined) lines.push('')
+		if (rows.length && !joined) lines.push('')
 		if (edge && !joined) lines.push(edge)
 		stacked = edge
 		lines.push(...rows)
@@ -354,7 +352,6 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// The chrome, built apart to know its height for the padding.
 	let history = lines
 	lines = []
-	above = history.length > 0 || full
 	// Why the tab stopped, then a one-off notice, a rule between them.
 	block(noticeView.messages(view.why, view.notice, view.noticeClearable, width), { fg: colors.log().fg! })
 	// Below them, the chrome proper: tab bar, the prompt box between
@@ -365,7 +362,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	let rule = (left: string, center = '') => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center)) + ansi.UNCOLOR
 	let over = view.tabs?.list.length ? tabBar.overRow(view.tabs.list, view.tabs.focused, cols) : undefined
 	if (over !== undefined) lines.push(over)
-	else if (lines.length || above) lines.push('')
+	else lines.push('')
 	let anchor = lines.length
 	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
 	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))

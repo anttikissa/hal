@@ -84,9 +84,6 @@ interface RenderState {
 	past: { session: string | undefined; past: Past } | undefined
 	/** The next slice of that layout. */
 	slicing: ReturnType<typeof setTimeout> | null
-	/** A blank row goes above the first paint if that frame fits the
-	 * screen (task hd); main.ts sets it on a terminal. */
-	gap: boolean
 }
 
 const CSI = '\x1b['
@@ -110,7 +107,6 @@ function createState(): RenderState {
 		dirty: false,
 		past: undefined,
 		slicing: null,
-		gap: false,
 	}
 }
 
@@ -221,9 +217,6 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 	let shape: Shape = { length: lines.length, history: next.history, items: next.items, ends: next.ends }
 	let size = { before: prev.length, after: lines.length, screen: rows }
 	let wasFull = st.fullscreen
-	// Off the shell's output above, unless the frame fills the screen.
-	let gap = st.gap && !prev.length && lines.length < rows && Bun.stripANSI(lines[0] ?? '').trim() ? '\r\n' : ''
-	st.gap = false
 	// The last written row, where the cursor is after the body below.
 	let row: number
 	let body: Part[]
@@ -242,7 +235,7 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 		let reason: ClearReason = force
 			? { kind: 'down', cause: 'forced', trigger, rows: size, text: `Repainted the frame from its top (scrollback untouched) because of ${trigger}.` }
 			: { kind: 'down', cause: 'first paint', rows: size, text: 'Cleared below the cursor for the first paint.' }
-		body = [gap + '\r' + move(st.cursorRow, 0) + render.clear(reason), ...rowParts(lines)]
+		body = ['\r' + move(st.cursorRow, 0) + render.clear(reason), ...rowParts(lines)]
 		row = lines.length - 1
 	} else {
 		let first = 0

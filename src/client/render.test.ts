@@ -215,8 +215,15 @@ describe('grow mode', () => {
 		for (let seq of ['[2J', '[3J', '[H']) expect(term.written).not.toContain(seq)
 	})
 
+	test('an empty first paint and then a greeting leave one blank row under the shell', () => {
+		setup(30, 30, ['$ ./run'])
+		show([])
+		show([{ type: 'output', text: 'Hello', synthetic: true }])
+		expect(term.content().slice(0, 3).map((r) => r.trim() !== '')).toEqual([true, false, true])
+	})
+
 	test('updates in place while the frame fits: streaming, a longer and a shorter prompt', () => {
-		setup(20, 30, ['$ hal'])
+		setup(21, 30, ['$ hal'])
 		show(items(1))
 		for (let text of ['He', 'Hello', 'Hello, world, how are you doing today']) {
 			show([...items(1), { type: 'prompt', text: 'q1' }, { type: 'text', text }])
