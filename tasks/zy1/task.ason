@@ -1,0 +1,10 @@
+{
+	title: 'Render Markdown in collapsed thinking previews',
+	spec: 'Collapsed thinking previews in terminal and web show inline Markdown text without formatting markers, including unfinished emphasis while streaming. Parse before clipping so marker characters do not consume preview width. Keep one-row previews, existing timestamps, references, colors and expanded rendering. Completed unmatched markers remain literal. This restores the invariant that thinking text uses Markdown interpretation in both open and closed states.',
+	status: 'done',
+	notes: [
+		'Terminal short previews previously clipped raw Markdown; web previews parsed completed inline syntax only. Both now use the existing inline parser with streaming mode before preview clipping. Focused item-view, frame and Markdown tests pass, with one-off checks for emphasis, links, code and completed unmatched markers. Full typecheck is blocked by unrelated checkout errors; changed files pass lint. No new caches or timers.'
+	],
+	needs: ['hyt', 'fn'],
+	foldInto: ['hyt']
+}

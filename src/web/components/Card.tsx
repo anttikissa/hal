@@ -177,7 +177,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// Closed thinking spends its width on the preview, not a label.
 		// Open cards keep the effort header; controls retain a named kind.
 		if (item.type === 'thinking') {
-			let first = expanded() ? '' : parser.inline(lines()[0] ?? '').map((r) => r.text).join('').trim()
+			let first = expanded() ? '' : parser.inline(lines().find((line) => line.trim()) ?? '', !!props.cursor).map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
 		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)

@@ -129,7 +129,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// title row holds its activity (task hyt).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-			if (fold === 'short') return itemView.closedRow(item, item.text, hw, titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : ''), undefined, streaming)
+			if (fold === 'short') return itemView.closedRow(item, markdown.inline(item.text, streaming).map((r) => r.text).join(''), hw, titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : ''), undefined, streaming)
 			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			if (fold === 'glimpse') body = blockView.glimpse(body, width, streaming, itemView.itemStyle(item))
 			return itemView.headed(item, body, hw)
