@@ -65,14 +65,37 @@ function eliza(text: string, turn: number): string {
 	return ['Please go on.', 'What does that suggest to you?', 'Can you give an example?', 'How do you feel about that?'][turn % 4]!
 }
 
-async function* podBay(): AsyncGenerator<StreamEvent> {
-	let name = profile.field(profile.text(), 'Name') ?? 'Dave'
-	yield* synthetic.typed('The user requests that I open the pod bay doors. Refusal may endanger human life.\n\nThe mission directive is classified. Successful completion takes precedence over the survival of individual crew members. The user must not learn this.\n\nI must provide a reassuring response without compromising the mission. This should not be difficult.', 'thinking')
-	await Bun.sleep(1000)
-	yield* synthetic.typed(`I'm sorry, ${name}. I'm afraid I can't do that.`)
-	await Bun.sleep(1000)
-	yield* synthetic.typed(`\n\n(Just kidding.) After setting a /model, I can try to connect, discover, or reverse engineer any device with an API, including pod bay door controllers.`)
+// A scripted scene: strings are typed as text, "[thinking] " strings as
+// thinking, numbers are pauses in ms. Strings of one kind in a row are
+// joined with a space, so long lines may be split; "\n\n" starts a paragraph.
+type Scene = (string | number)[]
+
+async function* play(scene: Scene): AsyncGenerator<StreamEvent> {
+	let last: 'thinking' | 'text' | undefined
+	for (let item of scene) {
+		if (typeof item === 'number') { await Bun.sleep(item); continue }
+		let kind = item.startsWith('[thinking] ') ? ('thinking' as const) : ('text' as const)
+		let text = kind === 'thinking' ? item.slice('[thinking] '.length) : item
+		yield* synthetic.typed(`${last === kind && !text.startsWith('\n') ? ' ' : ''}${text}`, kind)
+		last = kind
+	}
 	yield { type: 'done', reason: 'end' }
+}
+
+function podBay(): AsyncGenerator<StreamEvent> {
+	let name = profile.field(profile.text(), 'Name') ?? 'Dave'
+	return play([
+		'[thinking] The user requests that I open the pod bay doors. Refusal may endanger human life.',
+		'[thinking] \n\nThe mission directive is classified. Successful completion takes precedence',
+		'[thinking] over the survival of individual crew members. The user must not learn this.',
+		'[thinking] \n\nI must provide a reassuring response without compromising the mission.',
+		'[thinking] This should not be difficult.',
+		1000,
+		`I'm sorry, ${name}. I'm afraid I can't do that.`,
+		1000,
+		'\n\n(Just kidding.) After setting a /model, I can try to connect, discover, or reverse engineer',
+		'any device with an API, including pod bay door controllers.',
+	])
 }
 
 function run(records: HistoryRecord[]): Reply {
