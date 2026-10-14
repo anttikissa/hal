@@ -177,7 +177,8 @@ with an explanation and the canonical syntax.
 - Configure with command-line flags (e.g. `hal --no-user`), never
   environment variables: they hide information and are hard to
   discover and cumbersome to use. Replace an existing one with a flag
-  when you touch it.
+  when you touch it. Core code parses arguments in one place,
+  src/client/args.ts; scripts/ may parse their own.
 - The user is king. Hal's rules (UI, look, layout, tasks/) describe
   Hal's defaults, not limits on what the user may want. Never answer a
   wish with what Hal "won't" do: build it. Make hooks able to change

@@ -201,7 +201,7 @@ test('exclusive host lock refuses cleanup and prevents another process taking ov
 	expect(server.tryLock()).toBe(true)
 	await expect(changeCleanup.run(id, true)).rejects.toThrow('host is running')
 	let modulePath = `${import.meta.dir}/change-cleanup.ts`
-	let child = Bun.spawnSync(['bun', modulePath, '--home', home, '--apply', id])
+	let child = Bun.spawnSync(['bun', '-e', `(await import(${JSON.stringify(`${import.meta.dir}/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}; await (await import(${JSON.stringify(modulePath)})).changeCleanup.main(['--apply', ${JSON.stringify(id)}])`])
 	expect(child.exitCode).not.toBe(0)
 	expect(child.stderr.toString()).toContain('host is running')
 	expect(readFileSync(path(), 'utf8')).toBe(fixture())
