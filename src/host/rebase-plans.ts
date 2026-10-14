@@ -72,6 +72,14 @@ function undo(id: string): string {
 	return 'Rebase undone.'
 }
 
+// Hides records ns and their linked records with one rebase, so
+// /rebase undo restores them. Throws when the session is busy or stale.
+function drop(id: string, ns: number[]): void {
+	let raw = history.readSync(id), groups = rebase.groups(replay.current(raw))
+	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop: ns, edit: [] })
+	rebasePlans.broadcast(id, Math.min(...ns.flatMap((n) => [...(groups.get(n) ?? [n])])))
+}
+
 // Edits prompt #n and rewinds there (task 26q), as one command: a
 // rebase dropping #n and every later record except inbox, answer and
 // change records (as a replacing prompt keeps them), then the edited
@@ -98,4 +106,4 @@ function answer(c: Command & { type: 'rebase-apply' }): Event {
 	return result
 }
 
-export const rebasePlans = { build, broadcast, apply, undo, rewind, answer }
+export const rebasePlans = { build, broadcast, apply, undo, drop, rewind, answer }
