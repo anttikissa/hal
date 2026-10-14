@@ -1,0 +1,7 @@
+{
+	title: 'Head error output cards with Error',
+	spec: 'An output card with error set (a failed command, such as /go naming no session) is headed "HH:MM Error" in terminal and web, so it never reads as an unlabeled card such as thinking. Its color stays the error style (task bks). Bug fix: s78 in a session showed only a time over the error text. Invariant restored: every error card says it is an error.',
+	status: 'done',
+	needs: [],
+	foldInto: ['bks']
+}

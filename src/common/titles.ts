@@ -113,7 +113,7 @@ function author(item: Shown): string | undefined {
 			return item.model ? `Hal (${titles.modelLabel(item.model, item.effort)})` : 'Hal'
 		// Hal's own words without a model, such as a greeting (task 8y).
 		case 'output':
-			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.synthetic ? 'Hal (synthetic)' : undefined
+			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : item.synthetic ? 'Hal (synthetic)' : undefined
 	}
 }
 
@@ -121,7 +121,7 @@ function author(item: Shown): string | undefined {
 // undefined for an item without a header.
 function title(item: Shown): string | undefined {
 	if (item.type === 'question') return stamp(item.ts, item.form.text)
-	if (item.type === 'output' && !item.synthetic && !item.commit) return titles.time(item.ts) || undefined
+	if (item.type === 'output' && !item.synthetic && !item.commit && !item.error) return titles.time(item.ts) || undefined
 	let w = titles.who(item)
 	if (w === undefined) return undefined
 	let t = titles.time((item as { ts?: string }).ts)
