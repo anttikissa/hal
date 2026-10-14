@@ -1,0 +1,9 @@
+{
+	title: 'Amend through one rebase and a new prompt',
+	spec: 'Amending prompt #n (last or older) appends one rebase plan that drops #n and every later record except inbox, answer, change, notice and prompt-file change output, then submits the new text as a normal prompt whose user record carries amends: n. New amends write no replaces field; histories holding replaces records still replay. The amended prompt keeps the (edited) title (task 6ch). The safety rule is unchanged: only when nothing with side effects ran since #n; otherwise the text is sent as a new prompt.',
+	status: 'done',
+	notes: [
+		'Rebase records gained quiet: true (rebases.apply option continuing) so the amend rebase shows no divider; continuing also skips the turn_end paused that apply adds for an unanswered prompt, since the amended prompt runs at once. rebasePlans.drop (task p3e, 174-duo) is the shared building block for /clear undo, /compact undo and amend.'
+	],
+	needs: ['6ch']
+}

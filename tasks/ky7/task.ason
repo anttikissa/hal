@@ -1,0 +1,6 @@
+{
+	title: '/amend <id> <text> command',
+	spec: '/amend <prompt id> <text> amends that prompt (task a8x); the text is everything after the id, newlines included. It is quiet (task yg9): typed by the human it records nothing on success, since the edited prompt shows the result; a failure shows as a command card. Terminal and web Up-arrow amending send this command; the submit command has no amend or rewind fields. Editing waiting and queued messages keeps its own path.',
+	status: 'planned',
+	needs: ['a8x', 'yg9']
+}

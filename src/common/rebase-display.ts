@@ -23,7 +23,7 @@ function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): stri
 function dividers(raw: HistoryRecord[]): { n: number; text: string; ts?: string; after?: number }[] {
 	let kept = new Set(replay.current(raw).map((r) => r.n)), after: number | undefined
 	return rebase.latest(raw).flatMap((r) => {
-		if (r.type === 'rebase') return [{ n: r.n!, text: rebaseDisplay.text(r, raw), ts: r.ts, after }]
+		if (r.type === 'rebase') return r.quiet ? [] : [{ n: r.n!, text: rebaseDisplay.text(r, raw), ts: r.ts, after }]
 		if (kept.has(r.n)) after = r.n
 		return []
 	})

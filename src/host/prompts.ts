@@ -31,6 +31,7 @@ import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
 import { slash } from './slash.ts'
+import { rebasePlans } from './rebase-plans.ts'
 import { status } from './status.ts'
 import { sessions } from './sessions.ts'
 import { statusUsage } from './status-usage.ts'
@@ -131,12 +132,13 @@ function senders(list: UserBlock[]): Sender[] {
 	return list.flatMap((b) => (b.type === 'text' ? [inbox.sender(b)] : []))
 }
 
-// An edit of the last prompt. If only reading happened since it, the
-// edit replaces it and the turn runs again as if it had been written
-// that way; otherwise, or while the turn is still busy, it is a prompt
-// like any other. The edit is of the human's last text in the prompt:
-// the other texts it delivered from the inbox stay. A prompt with no
-// text of the human's is not theirs to edit: the edit goes on top.
+// An edit of prompt `target`, else the last prompt. If only reading
+// happened since it, one rebase drops it and what followed (task a8x),
+// then the edit runs as a new prompt linked to it by `amends`; otherwise,
+// or while the turn is still busy, it is a prompt like any other. The
+// edit is of the human's last text in the prompt: the other texts it
+// delivered from the inbox stay. A prompt with no text of the human's
+// is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string, target?: number): string | undefined {
 	autoclose.promote(id)
 	let records = replay.current(history.readSync(id))
@@ -145,12 +147,14 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
 	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
 	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
+	let kept = (r: HistoryRecord) => r.type === 'inbox' || r.type === 'answer' || r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change !== undefined)
+	rebasePlans.drop(id, records.slice(at).flatMap((r) => r.n === undefined || kept(r) ? [] : [r.n]), { continuing: true })
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
 	parts[mine] = { type: 'text', text: literal.strip(text) }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)
-	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true, amends: old!.n! }
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, amends: old!.n! }
 	if (command !== undefined) record.command = command
 	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
 	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))

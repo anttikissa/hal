@@ -262,7 +262,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	for (let r of [...early, ...history]) {
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
-		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history), ts: r.ts }], r.n, items.length))
+		else if (r.type === 'rebase' && !r.quiet) items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history), ts: r.ts }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let promptKey = items[prompt ?? -1]?.key
@@ -437,7 +437,7 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	let at = event.amends === undefined ? t.prompt : items.findIndex((i) => i.key === String(event.amends))
 	let keep = event.replaces && at !== undefined && at >= 0 ? items.filter((i, index) => index < at || (i.type === 'output' && (i.change !== undefined || i.synthetic))) : items
 	let { live: _live, ...rest } = t
-	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.replaces)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.replaces || event.amends !== undefined)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 

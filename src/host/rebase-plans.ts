@@ -74,9 +74,9 @@ function undo(id: string): string {
 
 // Hides records ns and their linked records with one rebase, so
 // /rebase undo restores them. Throws when the session is busy or stale.
-function drop(id: string, ns: number[]): void {
+function drop(id: string, ns: number[], options: { continuing?: boolean } = {}): void {
 	let raw = history.readSync(id), groups = rebase.groups(replay.current(raw))
-	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop: ns, edit: [] })
+	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop: ns, edit: [] }, undefined, options)
 	rebasePlans.broadcast(id, Math.min(...ns.flatMap((n) => [...(groups.get(n) ?? [n])])))
 }
 

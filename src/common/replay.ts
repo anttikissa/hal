@@ -102,7 +102,7 @@ export type HistoryRecord = Numbered &
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
-	| ({ type: 'rebase'; transition?: string; contextChanged?: true; ts: string } & import('./rebase.ts').RebasePlan)
+	| ({ type: 'rebase'; transition?: string; contextChanged?: true; quiet?: true; ts: string } & import('./rebase.ts').RebasePlan)
 	| { type: 'reset'; transition?: string; ts: string }
 	)
 

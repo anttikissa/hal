@@ -392,7 +392,7 @@ test('an edit sent while the paused turn is still stopping waits for it to end',
 	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('right') }] }])
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
-	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'user', 'assistant', 'turn_end'])
+	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'rebase', 'user', 'assistant', 'turn_end'])
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
 	expect(shown(a.views.get(id)!.items)).toEqual([
 		{ type: 'prompt', text: 'right', edited: true },
