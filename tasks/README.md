@@ -334,6 +334,10 @@ Hierarchy comes from hue, lightness steps above the minimum, bold or
 position, never from dropping below it. Don't overdo testing this;
 just be careful when introducing new colors.
 
+Status lines start with a capital letter unless there is an overwhelming
+reason not to. A line after a destructive command says what happened
+and how to go back: ``Context cleared. `/clear undo` to go back.``
+
 ## Artifacts
 
 Files in a task directory are its artifacts, copied from the old Hal.

@@ -229,7 +229,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
 	// A history rewrite's divider (task z71) offers its undo.
-	let undo = () => (props.row.item.type === 'divider' && props.row.item.text.includes('"/rebase undo"'))
+	let undo = () => (props.row.item.type === 'divider' && props.row.item.text.includes('`/rebase undo`'))
 	let undoButton = () => <Show when={undo()}><button type="button" class="undo" title="Go back (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}><Icon name="undo" />Undo</button></Show>
 	let edit = () => {
 		if (!editPrompt.edit(props.row.waiting ? props.row.key : props.row.item.key)) return

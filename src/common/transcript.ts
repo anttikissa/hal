@@ -40,7 +40,7 @@ export type Shown = { originSession?: string } & (
 	// `commit`: a commit a Bash call made (task 179), its own card.
 	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
-	// shows as an output: 'HH:MM Context cleared; "/clear undo" to go back'.
+	// shows as an output: 'HH:MM Context cleared. `/clear undo` to go back.'.
 	| { type: 'divider'; text: string; ts?: string }
 )
 
@@ -200,7 +200,7 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 	})
 }
 function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
-	return r.type === 'reset' ? 'Context cleared; "/clear undo" to go back' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized); "/compact undo" to go back`
+	return r.type === 'reset' ? 'Context cleared. `/clear undo` to go back.' : `Context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized). \`/compact undo\` to go back.`
 }
 
 function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {

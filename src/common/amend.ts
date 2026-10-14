@@ -34,7 +34,7 @@ const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' &&
 function editable(items: Item[]): Set<string> {
 	let out = new Set<string>()
 	for (let i of items) {
-		if (i.type === 'divider' && i.text.startsWith('context compacted')) out.clear()
+		if (i.type === 'divider' && i.text.startsWith('Context compacted')) out.clear()
 		else if (mine(i) && /^\d+$/.test(i.key)) out.add(i.key)
 	}
 	return out

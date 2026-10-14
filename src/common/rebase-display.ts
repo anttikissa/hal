@@ -19,17 +19,17 @@ function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): stri
 	if (!r.drop.length && !r.edit.length) {
 		let undone = before.findLast((x) => x.type === 'rebase' && x.base === r.base && (x.drop.length || x.edit.length))
 		let kind = undone?.type === 'rebase' ? boundary(undone) : undefined
-		if (kind === 'reset') return 'Context cleared again; "/clear undo" to go back'
-		if (kind === 'compact') return 'Context compacted again; "/compact undo" to go back'
-		return 'History rewrite undone: the earlier history is back'
+		if (kind === 'reset') return 'Context cleared again. `/clear undo` to go back.'
+		if (kind === 'compact') return 'Context compacted again. `/compact undo` to go back.'
+		return 'History rewrite undone: the earlier history is back.'
 	}
 	let kind = boundary(r)
-	if (kind === 'reset') return 'Clear undone: the earlier context is back; "/rebase undo" to clear it again'
-	if (kind === 'compact') return 'Compaction undone: the full context is back; "/rebase undo" to compact it again'
+	if (kind === 'reset') return 'Clear undone: the earlier context is back. `/rebase undo` to clear it again.'
+	if (kind === 'compact') return 'Compaction undone: the full context is back. `/rebase undo` to compact it again.'
 	let groups = rebase.groups(records)
 	let hidden = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])])).size
 	let parts = [hidden && `${hidden} record${hidden === 1 ? '' : 's'} hidden`, r.edit.length && `${r.edit.length} edited`].filter(Boolean).join(', ')
-	return `History rewritten: ${parts}; "/rebase undo" to go back`
+	return `History rewritten: ${parts}. \`/rebase undo\` to go back.`
 }
 
 function dividers(raw: HistoryRecord[]): { n: number; text: string; ts?: string; after?: number }[] {

@@ -38,7 +38,7 @@ test('/compact: the next request holds the summary and only later records; the t
 	expect(input.slice(1).map(text).join()).not.toContain('re p5')
 	expect(input.slice(1).map(text).join()).toContain('after')
 	let view = shown(c.views.get(id)!.items)!
-	expect(view).toContainEqual({ type: 'divider', text: 'context compacted (5 prompts summarized); "/compact undo" to go back' })
+	expect(view).toContainEqual({ type: 'divider', text: 'Context compacted (5 prompts summarized). `/compact undo` to go back.' })
 	expect(view.filter((i) => i.type === 'prompt').length).toBe(6)
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	// A new host rebuilds the very same input.
@@ -74,7 +74,7 @@ test('/clear: the next request holds only later records; a compact after it summ
 	expect(text(input)).not.toContain('before')
 	let view = shown(c.views.get(id)!.items)!
 	expect(view.filter((i) => i.type === 'prompt').map((i: any) => i.text)).toEqual(['after'])
-	expect(view[0]).toMatchObject({ type: 'output', text: 'Context cleared; "/clear undo" to go back' })
+	expect(view[0]).toMatchObject({ type: 'output', text: 'Context cleared. `/clear undo` to go back.' })
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	await command(c, id, '/clear')
 	await ask(c, id, 'later')

@@ -23,7 +23,7 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	for (let c of [a, b]) {
 		expect(c.views.get(id)?.items.some((i) => i.type === 'text' && i.text === 'large answer')).toBe(false)
 		expect(c.views.get(id)?.items.some((i) => i.type === 'prompt' && i.text === 'fixed prompt')).toBe(true)
-		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({ text: 'History rewritten: 1 record hidden, 1 edited; "/rebase undo" to go back' })
+		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({ text: 'History rewritten: 1 record hidden, 1 edited. `/rebase undo` to go back.' })
 	}
 	restartHost()
 	expect((await fresh(id)).items.some((i) => i.type === 'divider')).toBe(true)
@@ -156,10 +156,10 @@ test('/clear undo restores hidden context, refuses the other kind, and /rebase u
 	await until(() => a.of('history-rewritten').length)
 	expect(context()).toContain('before')
 	let notices = () => history.readSync(id).flatMap((r) => r.type === 'notice' ? [r.text] : [])
-	expect(notices()).toEqual(['Clear undone: the earlier context is back; "/rebase undo" to clear it again'])
+	expect(notices()).toEqual(['Clear undone: the earlier context is back. `/rebase undo` to clear it again.'])
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
 	await until(() => a.of('history-rewritten').length === 2)
 	expect(context()).not.toContain('before')
-	expect(notices().at(-1)).toBe('Context cleared again; "/clear undo" to go back')
-	expect(a.views.get(id)?.items.filter((i) => i.type === 'divider').map((i: any) => i.text)).toContain('Context cleared again; "/clear undo" to go back')
+	expect(notices().at(-1)).toBe('Context cleared again. `/clear undo` to go back.')
+	expect(a.views.get(id)?.items.filter((i) => i.type === 'divider').map((i: any) => i.text)).toContain('Context cleared again. `/clear undo` to go back.')
 })

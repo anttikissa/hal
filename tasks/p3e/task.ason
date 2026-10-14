@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'drop reuses rebases.apply, so a dropped boundary returns under the usual busy and stale rules. /compact undo also undoes automatic compactions, since they are the same compact record. compact.test /clear already-empty assertion fails at baseline 2954b586, unrelated.',
-		'Every non-quiet user rebase line says what changed and how to go back with a quoted command; clear and compact boundaries name their undo. The model gets the same line as a notice, except for its own rebases (boundary option). Undo-of-undo looks up the dropped boundary in raw history, since the projection already hides it.'
+		'Every non-quiet user rebase line says what changed and how to go back with a quoted command; clear and compact boundaries name their undo. The model gets the same line as a notice, except for its own rebases (boundary option). Undo-of-undo looks up the dropped boundary in raw history, since the projection already hides it.',
+		'Line format (user, 2026-10-15): capital first letter, sentences ending in periods, commands in backticks. amend.ts editable() matches the capitalized compacted divider.'
 	],
 	needs: ['z71']
 }
