@@ -73,14 +73,14 @@ test('a changed summary edits the first line in place; changed columns or tool r
 test('todo format header reports planned savings and preserves deterministic row layout', () => {
 	let snapshot = rebaseRows.build([prompt(12, 'First line\nrest'), say(13, 'answer')])
 	let text = rebaseRows.render('157-gut', snapshot, { base: 13, drop: [13], edit: [] })
-	expect(text).toBe("# Changing or deleting a message invalidates the cache from that point onward.\n# Rebase 157-gut · 2 cards · 7 tokens → 5 after · cache rebuilds from a13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  u12  2026-10-04 09:00  prompt     5  First line\ndrop  a13  09:00             assistant  2  answer\n")
+	expect(text).toBe("# Changing or deleting a message invalidates the cache from that point onward.\n# Rebase 157-gut · 2 entries · 7 tokens → 5 after · cache rebuilds from a13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  u12  2026-10-04 09:00  prompt     5  First line\ndrop  a13  09:00             assistant  2  answer\n")
 })
 
 test('todo rejects duplicate/unknown/reordered rows, queue placement and uneditable text with line numbers', () => {
 	let snapshot = rebaseRows.build([prompt(1, 'go'), say(2, 'done'), call])
 	for (let [text, message] of [
 		['keep #1\nkeep #1', 'line 2: duplicate'], ['keep #99', 'line 1: unknown'], ['keep #2\nkeep #1', 'line 2: reordering'],
-		['queue next\nkeep #1', 'line 2: queue'], ['edit t3', 'line 1: card t3 is not editable'], ['wat #1', 'line 1: expected'], ['queue', 'line 1: expected'],
+		['queue next\nkeep #1', 'line 2: queue'], ['edit t3', 'line 1: entry t3 is not editable'], ['wat #1', 'line 1: expected'], ['queue', 'line 1: expected'],
 	]) expect(() => rebaseRows.parse(text!, snapshot)).toThrow(message!)
 	for (let text of ['', '# comments only\n', 'abort\n', 'keep #1\nabort\n']) expect(rebaseRows.parse(text, snapshot).aborted).toBe(true)
 	expect(rebaseRows.parse('pick #1\nkeep #2\nkeep #3', snapshot).plan.drop).toEqual([])
@@ -101,7 +101,7 @@ test('multi-result rows edit one output through its call number and expose paire
 
 test('deleting one row of a signed drop group refuses another edited row with its todo line', () => {
 	let snapshot = rebaseRows.build([prompt(1, 'go'), { type: 'assistant', n: 2, ts, block: { type: 'thinking', text: 'reason', signature: 'sig' } }, say(3, 'answer')])
-	expect(() => rebaseRows.parse('keep u1\nedit a3', snapshot)).toThrow('line 2: edited card a3 belongs to a dropped group')
+	expect(() => rebaseRows.parse('keep u1\nedit a3', snapshot)).toThrow('line 2: edited entry a3 belongs to a dropped group')
 })
 
 test('waiting messages are editable rows; dropping removes all revisions and undo restores the inbox', () => {

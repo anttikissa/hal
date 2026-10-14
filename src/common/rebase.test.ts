@@ -75,7 +75,7 @@ test('edits preserve numbers, never mutate raw records, replace blobs and undo r
 
 test('invalid, missing, uneditable and conflicting grouped targets fail loudly', () => {
 	let raw = [prompt(1, 'go'), call(2, 'a'), result(3, 'a')]
-	expect(() => rebase.apply(raw, { base: 3, drop: [99], edit: [] })).toThrow('record 99')
+	expect(() => rebase.apply(raw, { base: 3, drop: [99], edit: [] })).toThrow('entry 99')
 	expect(() => rebase.apply(raw, { base: 3, drop: [2], edit: [{ n: 3, text: 'x' }] })).toThrow('group is dropped')
 	expect(() => rebase.apply(raw.slice(0, 2), { base: 2, drop: [], edit: [{ n: 2, text: 'x' }] })).toThrow('not editable')
 	expect(rebase.invalid({ base: 3, drop: [1, 1], edit: [] })).toContain('duplicate')

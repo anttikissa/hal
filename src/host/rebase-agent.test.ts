@@ -46,7 +46,7 @@ test('self-removed paused rebase keeps a durable report with drop ranges and edi
 	let report = current.find((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))
 	expect(report).toBeDefined()
 	if (report?.type !== 'output') throw new Error('Missing surviving report')
-	expect(report.text.split('\n')[0]).toMatch(/^Rebase applied \(dropped \d+ cards?, edited 1\)$/)
+	expect(report.text.split('\n')[0]).toMatch(/^Rebase applied \(dropped \d+ entr(y|ies), edited 1\)$/)
 	expect(report.text).toMatch(new RegExp(`Edited [a-z]${n} \\(`))
 	expect(report.text).toContain('--paused')
 	expect(report.text).toMatch(new RegExp(`[ :][a-z]?${tail}\\b`))

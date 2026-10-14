@@ -23,7 +23,7 @@ const size = (n: number) => n < 1000 ? `${n} B` : n < 1e6 ? `${Math.round(n / 10
 const kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`
 // Rows whose summary is their editable text's first line, maybe after a sender label.
 const inlineKinds = new Set(['prompt', 'assistant', 'queued', 'advisory', 'interjecting', 'steering', 'note', 'instructions', 'settings'])
-// A row is one card; it reads as its card id, u12 (task ap2).
+// An entry reads as the id of the card it shows, u12 (task ap2).
 const id = (row: RebaseRow) => rebaseSparse.letter(row) + row.n
 // The card id of the row holding record n, or the bare number.
 const cardOf = (rows: RebaseRow[], n: number) => { let row = rows.find((r) => r.ns.includes(n)); return row ? id(row) : String(n) }
@@ -144,7 +144,7 @@ function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { ba
 	let sums = rebaseRows.totals(snapshot, plan)
 	let edits = new Set(plan.edit.map((e) => e.n)), drops = new Set(plan.drop)
 	let widths = [4, ...['n', 'time', 'kind'].map((key) => Math.max(...snapshot.rows.map((row) => String(row[key as 'n' | 'time' | 'kind']).length + (key === 'n' ? 1 : 0)), 0)), Math.max(...snapshot.rows.map((row) => kilo(row.tokens).length), 0)]
-	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} cards · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from ${cardOf(snapshot.rows, sums.cacheFrom)}`}`
+	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} entries · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from ${cardOf(snapshot.rows, sums.cacheFrom)}`}`
 	return ['# Changing or deleting a message invalidates the cache from that point onward.', header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
 		let action = row.ns.some((n) => drops.has(n)) ? 'drop' : row.ns.some((n) => edits.has(n)) ? 'edit' : 'keep'
 		return [action, ...columns(row)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  ${carried(row)}` : ''}`
@@ -180,8 +180,8 @@ function parse(text: string, snapshot: RebaseRows, replacements: Record<number, 
 		let match = /^(keep|pick|drop|edit)\s+#?[traumsq]?([1-9]\d*)(?:\s|$)/i.exec(line)
 		if (!match) fail('expected keep, pick, drop, edit or queue')
 		let key = Number(match![2]), entry = rows.get(key)
-		if (!entry) fail(`unknown card ${key}`)
-		if (seen.has(key)) fail(`duplicate card ${id(entry!.row)}`)
+		if (!entry) fail(`unknown entry ${key}`)
+		if (seen.has(key)) fail(`duplicate entry ${id(entry!.row)}`)
 		if (entry!.i < last) fail('reordering history is refused')
 		seen.add(key); last = entry!.i
 		let row = entry!.row, changed: string | undefined
@@ -189,7 +189,7 @@ function parse(text: string, snapshot: RebaseRows, replacements: Record<number, 
 		try { changed = inline(row, line.slice(match![1]!.length).trim()) } catch (error) { fail((error as Error).message) }
 		if (changed !== undefined) out.inline[key] = changed
 		if (match![1] === 'edit') {
-			if (!row.editable || row.editN === undefined) fail(`card ${id(row)} is not editable`)
+			if (!row.editable || row.editN === undefined) fail(`entry ${id(row)} is not editable`)
 			if (Object.hasOwn(replacements, key) && typeof replacements[key] !== 'string') fail('replacement must be text')
 			if (Object.hasOwn(replacements, key)) out.plan.edit.push({ n: row.editN!, text: replacements[key]! })
 			else out.edits.push(key)
@@ -202,7 +202,7 @@ function parse(text: string, snapshot: RebaseRows, replacements: Record<number, 
 		let row = rows.get(n)!.row
 		if (dropped.has(row.editN!)) {
 			let line = active.find((a) => new RegExp(`^edit\\s+#?[traumsq]?${n}(?:\\s|$)`, 'i').test(a.line))!
-			throw new Error(`Rebase line ${line.n}: edited card ${id(row)} belongs to a dropped group: ${line.line}`)
+			throw new Error(`Rebase line ${line.n}: edited entry ${id(row)} belongs to a dropped group: ${line.line}`)
 		}
 	}
 	return out

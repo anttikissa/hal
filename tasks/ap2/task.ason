@@ -5,7 +5,7 @@
 	notes: [
 		'Stored background labels change from "bash #t12" to "bash t12"; every reader (titles, bash-result, item-view, Card, web view, work.ts) accepts both, so old histories render and WAIT/INSPECT still find their results.',
 		'Markdown links bare t5 too, but not after # in an unknown session reference (07-qqq#u3 stays text), and only for ids older than the item, as before.',
-		'Rebase rows are cards and read as card ids too (u12, t20; ranges spanning kinds stay bare, 3-692); rebase text counts cards, not records. Plans still accept a leading #. (174-duo)'
+		'Rebase rows are cards and read as card ids too (u12, t20; ranges spanning kinds stay bare, 3-692); the rebase editor, report and errors say entries; the transcript divider counts cards. Plans still accept a leading #. (174-duo)'
 	],
 	needs: []
 }
