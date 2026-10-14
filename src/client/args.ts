@@ -23,7 +23,7 @@ const help = `Usage:
     --steer | --soft-steer | --queue
                               delivery to a busy session (default: soft-steer)
     --keep                    keep the new tab open; not with --session
-  hal -r [host]               follow a remote Hal
+  hal -r [host]               connect this terminal to a remote Hal (default: the last one)
   hal serve [--port <n>]      run the foreground headless host;
                               --port: web only on port n, else exit
   hal auth                    print a one-time web login code
