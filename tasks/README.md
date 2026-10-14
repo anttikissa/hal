@@ -141,6 +141,9 @@ minimize those exceptions and report the reason through render.clear.
   syntax on demand; calls read like terminal lines in the UI and
   history; Hal's own parser accepts clear misuse a provider schema
   would reject; one tool works across providers (README.md, Tools).
+  Provider-hosted search may sit beside `tool` for explicitly supported
+  models when Serper is unconfigured or GOOGLE is disabled (task a0z).
+  Serper failures remain visible and never trigger automatic fallback.
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.

@@ -151,10 +151,11 @@ with an explanation and the canonical syntax.
 
 ## Design checks
 
-- Add capabilities only as tools behind the one native `tool`, never
-  as new native tool descriptions, including in plugins and benchmark
-  builds. Tools disclose detail progressively (HELP) and let the tool
-  set change without busting the prompt cache.
+- Add Hal capabilities behind the native `tool`, including in plugins
+  and benchmark builds. Provider-hosted search is an exception for
+  explicitly supported models when Serper is unavailable (task a0z).
+  Tools disclose detail progressively (HELP) and let Hal's tool set
+  change without busting the prompt cache.
 - Configure with command-line flags (e.g. `hal --no-user`), never
   environment variables: they hide information and are hard to
   discover and cumbersome to use. Replace an existing one with a flag

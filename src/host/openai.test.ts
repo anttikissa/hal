@@ -14,8 +14,10 @@ import { openai } from './openai.ts'
 import { openaiWs } from './openai-ws.ts'
 import { provider } from './provider.ts'
 import { usage } from './usage.ts'
+import { tools } from './tools.ts'
+import { nativeTool } from './native-tool.ts'
 
-const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
 const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
@@ -46,6 +48,7 @@ beforeEach(() => {
 	process.env.HAL_HOME = home
 	mkdirSync(`${home}/state`)
 	delete process.env.OPENAI_API_KEY
+	delete process.env.SERPER_API_KEY
 	seen = []
 	catalogReply = undefined
 	reply = () => sse(completed())
@@ -176,6 +179,38 @@ test('history maps to Responses input, replaying only its own reasoning', async 
 	])
 	expect(body.tools).toEqual([{ type: 'function', name: 'bash', description: 'run', parameters: { type: 'object' } }])
 	expect(body.include).toEqual(['reasoning.encrypted_content'])
+})
+
+test('native search requires an allowlisted model, Hal tools, and absent or disabled Serper', () => {
+	let req = { model: 'gpt-6.1-sol', messages: hi, tools: [nativeTool.def()] }
+	for (let codex of [false, true]) expect(openai.body(req, codex).tools).toContainEqual({ type: 'web_search' })
+	expect(openai.body({ ...req, tools: [] }, true).tools).toBeUndefined()
+	expect(openai.body({ ...req, model: 'gpt-4o-mini' }, true).tools).not.toContainEqual({ type: 'web_search' })
+	writeAuth({ serper: { apiKey: 'serper-test' } })
+	expect(openai.body(req, true).tools).not.toContainEqual({ type: 'web_search' })
+	let all = tools.all
+	try {
+		tools.all = () => { let found = all(); found.delete('google'); return found }
+		expect(openai.body(req, true).tools).toContainEqual({ type: 'web_search' })
+	} finally { tools.all = all }
+	process.env.SERPER_API_KEY = 'env-serper-test'
+	rmSync(`${home}/secrets/auth.ason`)
+	auth.close()
+	expect(openai.body(req, false).tools).not.toContainEqual({ type: 'web_search' })
+})
+
+test('recorded native search becomes readable history without a local tool round or duplicate citations', async () => {
+	process.env.OPENAI_API_KEY = 'sk-test'
+	let recording = await Bun.file(`${import.meta.dir}/../fixtures/openai-search.sse`).text()
+	reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
+	let turn = blocks.collect(await run(), 'openai')
+	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
+	expect(turn.blocks.every((b) => b.type === 'text')).toBe(true)
+	let text = turn.blocks.map((b) => b.type === 'text' ? b.text : '').join('')
+	expect(text).toContain('Web search (search): VALO Hotel Helsinki official website')
+	expect(text).toContain('Official website: https://valo.fi/en/')
+	expect(text.match(/https:\/\/valo\.fi\/en\/\?utm_source=openai/g)).toHaveLength(1)
+	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: turn.blocks }] })).toContainEqual({ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] })
 })
 
 test('text, reasoning, tool calls and usage fold into a turn that ends in tool_use', async () => {

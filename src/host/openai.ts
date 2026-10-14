@@ -17,6 +17,7 @@ import { diag } from './diag.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
 import { openaiWs } from './openai-ws.ts'
+import { tools } from './tools.ts'
 
 const claims = (token: string) => catalog.claims(token)
 
@@ -74,6 +75,9 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 	if (req.system) b.instructions = req.system
 	if (req.tools?.length) {
 		b.tools = req.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.inputSchema }))
+		if (req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model) && (!auth.serperKey() || !tools.all().has('google'))) {
+			(b.tools as unknown[]).push({ type: 'web_search' })
+		}
 		b.tool_choice = 'auto'
 		b.parallel_tool_calls = true
 	}
@@ -148,6 +152,12 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			case 'response.refusal.delta':
 				if (ev.delta) yield { type: 'text', text: ev.delta }
 				break
+			case 'response.content_part.done': {
+				let part = ev.part
+				let urls = new Set<string>((part?.annotations ?? []).filter((a: any) => a.type === 'url_citation' && typeof a.url === 'string' && !part.text?.includes(a.url)).map((a: any) => a.url))
+				if (urls.size) yield { type: 'text', text: `\n\nSources:\n${[...urls].join('\n')}\n` }
+				break
+			}
 			case 'response.function_call_arguments.delta': {
 				let call = calls.get(index)
 				if (call) call.args += ev.delta ?? ''
@@ -155,6 +165,15 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			}
 			case 'response.output_item.done': {
 				let item = ev.item
+				if (item?.type === 'web_search_call') {
+					if (item.status !== 'completed') {
+						yield { type: 'error', message: `Web search ${item.status ?? 'failed'}`, body: m.data }
+						return
+					}
+					let action = item.action
+					let detail = action?.type === 'search' ? (action.queries ?? [action.query]).join('; ') : action?.type === 'open_page' ? action.url : action?.type === 'find_in_page' ? `${action.url}: ${action.pattern}` : undefined
+					if (detail) yield { type: 'text', text: `\n\nWeb search (${action.type}): ${detail}\n\n` }
+				}
 				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
 				if (item?.type !== 'function_call') break
 				let call = calls.get(index) ?? { id: item.call_id, name: item.name, args: '' }

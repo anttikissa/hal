@@ -29,10 +29,11 @@ function contextWindow(model: string): number | undefined {
 	return provider.subscription() ? Math.min(listed ?? provider.subscriptionWindow, provider.subscriptionWindow) : listed
 }
 
-export const provider: Provider & { claims: typeof claims; subscription: typeof subscription; modelsKey: typeof modelsKey; contextWindow: typeof contextWindow; subscriptionWindow: number; knownModels: string[] } = {
+export const provider: Provider & { claims: typeof claims; subscription: typeof subscription; modelsKey: typeof modelsKey; contextWindow: typeof contextWindow; subscriptionWindow: number; knownModels: string[]; webSearchModels: string[] } = {
 	claims, subscription, modelsKey, contextWindow,
 	subscriptionWindow: 272_000,
 	knownModels: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+	webSearchModels: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.3-codex'],
 	known: (): string[] => provider.knownModels,
 	effort: (_model: string): string | undefined => undefined,
 	available: () => providers.available('openai'),
