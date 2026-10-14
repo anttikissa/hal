@@ -7,6 +7,7 @@
 // synchronously, so exactly one of them wins.
 // Tasks: rqq.
 import type { Command, Event } from '../common/protocol.ts'
+import { literal } from '../common/literal.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
@@ -33,7 +34,7 @@ function acquire(id: string, owner: object, edit: string, message: string): { re
 		queueEdits.state.set(id, { owner, edit, message })
 		host.broadcast(id, { type: 'queue-hold', sessionId: id, message })
 	}
-	return { reply: { type: 'queue-edit', sessionId: id, edit, message, text: item.text } }
+	return { reply: { type: 'queue-edit', sessionId: id, edit, message, text: literal.escape(item.text) } }
 }
 
 function owns(id: string, owner: object, edit: string, message?: string): string | undefined {

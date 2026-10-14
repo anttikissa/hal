@@ -10,6 +10,7 @@
 // Browsing belongs to the session and survives switching sessions.
 
 import { promptLayout } from './prompt-layout.ts'
+import { literal } from './literal.ts'
 import type { Transcript } from './transcript.ts'
 
 // While browsing a session: the entry shown and its text.
@@ -17,9 +18,10 @@ export type Browse = { index: number; text: string; edited?: true }
 
 export type Shown = { text: string; cursor: number }
 
-// Human prompts sent to the session, oldest first.
+// Human prompts sent to the session, oldest first, escaped to send as
+// prompts again.
 function entries(t: Transcript, commands = false): string[] {
-	return t.items.flatMap((i) => ((i.type === 'prompt' && i.origin !== 'model' || commands && i.type === 'command') && !i.canceledReference && i.from === undefined ? [i.text] : []))
+	return t.items.flatMap((i) => ((i.type === 'prompt' && i.origin !== 'model' || commands && i.type === 'command') && !i.canceledReference && i.from === undefined ? [i.type === 'prompt' ? literal.escape(i.text) : i.text] : []))
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are

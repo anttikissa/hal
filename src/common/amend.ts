@@ -11,6 +11,7 @@
 // Tasks: rqq.
 
 import { drafts } from './drafts.ts'
+import { literal } from './literal.ts'
 import { states } from './states.ts'
 import { toolDetails } from './tool-details.ts'
 import type { Item, Transcript } from './transcript.ts'
@@ -49,7 +50,7 @@ function at(t: Transcript, key: string): { editing: Editing; command?: unknown }
 	if (!item || !mine(item) || !amend.editable(t.items).has(key)) return undefined
 	let sessionId = t.meta.id
 	let command = states.busy(t.state) ? { type: 'pause', sessionId } : undefined
-	let editing: Editing = { sessionId, original: item.text, target: key, aside: true, paused: !!command }
+	let editing: Editing = { sessionId, original: literal.escape(item.text), target: key, aside: true, paused: !!command }
 	let after = t.items.slice(i + 1)
 	editing.changed = after.some((x) => !x.canceledReference && x.type === 'tool' && !toolDetails.harmless(x.name, x.input))
 	if (t.items.findLast(mine) !== item) {
@@ -78,12 +79,12 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 		return states.busy(t.state) ? { editing } : { editing: { ...editing, paused: true }, command: { type: 'pause', sessionId } }
 	}
 	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
-	if (waiting) return { editing: { sessionId, original: waiting.text, inbox: waiting.id } }
+	if (waiting) return { editing: { sessionId, original: literal.escape(waiting.text), inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined
 	let last = t.items.findLast(mine)
 	if (!last) return undefined
 	let changed = t.items.slice(t.items.indexOf(last) + 1).some((i) => !i.canceledReference && i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
-	return { editing: { sessionId, original: last.text, target: last.key, changed, paused: true }, command: { type: 'pause', sessionId } }
+	return { editing: { sessionId, original: literal.escape(last.text), target: last.key, changed, paused: true }, command: { type: 'pause', sessionId } }
 }
 
 // Enter while editing. Alt-Enter (`queue`) and an emptied editor act as

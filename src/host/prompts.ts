@@ -20,6 +20,7 @@ import { forms, type Answers } from '../common/forms.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
+import { literal } from '../common/literal.ts'
 import { blobs } from './blobs.ts'
 import { commands } from './commands.ts'
 import { diag } from './diag.ts'
@@ -63,7 +64,7 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	// A command (/model, /pause) is not a prompt: the tab stays the owner's.
 	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
-	if (text.startsWith('/ ')) text = text.slice(2)
+	text = literal.strip(text)
 	let state = status.stateOf(id)
 	// Automatic reports never answer a question. A deliberate soft-steer
 	// from the owner of delegated work does (kar); emergencies bypass it (zb0).
@@ -146,7 +147,7 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
-	parts[mine] = { type: 'text', text }
+	parts[mine] = { type: 'text', text: literal.strip(text) }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true, ...(target === undefined ? {} : { amends: target }) }
@@ -169,7 +170,7 @@ function edit(id: string, message: string, text: string, command?: string, held 
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined
 	if (refused) return refused
-	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: message, text }
+	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: message, text: call ? text : literal.strip(text) }
 	if (call) record.withdrawn = true
 	else Object.assign(record, inbox.sender(waiting))
 	if (command !== undefined) record.command = command
