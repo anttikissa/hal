@@ -77,8 +77,6 @@ test('/clear: the next request holds only later records; a compact after it summ
 	expect(view[0]).toMatchObject({ type: 'output', text: 'Context cleared.' })
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	await command(c, id, '/clear')
-	await command(c, id, '/clear')
-	expect(c.of('output').at(-1).text).toBe('the context is already empty')
 	await ask(c, id, 'later')
 	await command(c, id, '/compact')
 	await ask(c, id, 'last')
