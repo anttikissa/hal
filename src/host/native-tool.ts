@@ -20,8 +20,8 @@ const schema = (tool: Tool<unknown>) => tool.parameters as Schema
 function def(): ToolDef {
 	return {
 		name,
-		description: 'Call one tool. Make independent calls in parallel.',
-		inputSchema: { type: 'object', properties: { cmd: { type: 'string', description: 'TOOL followed by its arguments, e.g. READ "src/main.ts:1-80" or BASH "ls -l". HELP <TOOL> gives the exact syntax of one.' } }, required: ['cmd'], additionalProperties: false },
+		description: 'Call tool(s). You must use parallel calls for file reading and research.',
+		inputSchema: { type: 'object', properties: { cmd: { type: 'string', description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Read-only tools are run in parallel.` } }, required: ['cmd'], additionalProperties: false },
 	}
 }
 
