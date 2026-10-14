@@ -25,22 +25,22 @@ export type ClientCommand = { run(): void }
 
 const all: Record<string, ClientCommand> = { close, new: newTab, quit, redraw, restart, resume, suspend }
 
-// Runs command `name` bare. Ctrl-M only asks for the model picker, to
+// Runs a command. Ctrl-M only asks for the model picker, to
 // this client alone and unrecorded (tasks/w4/forms.md, Provenance).
-function run(name: string): void {
+function run(name: string, args = ''): void {
 	if (name === 'find') return find.open()
 	if (name === 'toggle') return folds.open()
 	let local = clientCommands.all[name]
-	if (local) return local.run()
+	if (local && (!args || (name === 'restart' && args === 'local'))) return local.run()
 	let id = app.state.transcript?.meta.id
 	if (id === undefined) return
-	app.send(name === 'model' ? { type: 'models', sessionId: id } : { type: 'submit', sessionId: id, text: `/${name}` })
+	app.send(name === 'model' ? { type: 'models', sessionId: id } : { type: 'submit', sessionId: id, text: `/${name}${args ? ` ${args}` : ''}` })
 }
 
 // A command's key: true if `k` was one (and it ran).
 function key(k: KeyEvent): boolean {
 	let c = commandList.byKey(k)
-	if (c) clientCommands.run(c.name)
+	if (c) clientCommands.run(c.name, c.keyArgs)
 	return !!c
 }
 

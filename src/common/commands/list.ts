@@ -4,14 +4,15 @@
 // src/host/commands/<name>.ts; a `clientOnly` one runs in the client
 // from src/client/commands/<name>.ts and never reaches the host.
 // `key`: a label as common/key-help.ts writes them; pressing it runs the
-// command with no arguments, as if `/<name>` were typed and sent,
-// except the tab keys, which act unrecorded (client/commands.ts).
+// command with `keyArgs`, except the tab keys, which act unrecorded
+// (client/commands.ts). `bindings` adds keys with their own arguments.
 
 import { keyHelp, type Binding } from '../key-help.ts'
 
 // `keyArgs`: the arguments the key runs the command with, as /keys shows.
 // `defaultArgs`: Tab fills these for an exact command without arguments.
-export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; defaultArgs?: string; clientOnly?: true; hidden?: true }
+export type CommandBinding = { key: string; args?: string }
+export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; bindings?: CommandBinding[]; defaultArgs?: string; clientOnly?: true; hidden?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
@@ -63,7 +64,7 @@ const list: CommandInfo[] = [
 	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart local (Ctrl-R) runs in the client; bare (all), host and both
 	// on the host (src/host/commands/restart.ts).
-	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', defaultArgs: 'all' },
+	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', bindings: [{ key: 'shift-ctrl-r', args: 'all' }], defaultArgs: 'all' },
 	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t' },
 	{ name: 'send', description: 'send a message or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
@@ -89,10 +90,18 @@ function byName(name: string): CommandInfo | undefined {
 	return commandList.all().find((c) => c.name === name)
 }
 
+function bindings(c: CommandInfo): CommandBinding[] {
+	return [...(c.key ? [{ key: c.key, args: c.keyArgs }] : []), ...(c.bindings ?? [])]
+}
+
 // The command pressing `k` runs, if any.
 function byKey(k: Binding): CommandInfo | undefined {
 	let same = (b: Binding) => b.key === k.key && b.shift === k.shift && b.alt === k.alt && b.ctrl === k.ctrl && b.cmd === k.cmd
-	return commandList.all().find((c) => c.key !== undefined && same(keyHelp.parse(c.key)))
+	for (let c of commandList.all()) {
+		if (c.key && same(keyHelp.parse(c.key))) return c
+		let b = c.bindings?.find((b) => same(keyHelp.parse(b.key)))
+		if (b) return { ...c, key: b.key, keyArgs: b.args }
+	}
 }
 
 // Whether the browser gives key `label` to the page.
@@ -100,4 +109,4 @@ function onWeb(label: string, mac: boolean): boolean {
 	return mac || !browserKeys.includes(label)
 }
 
-export const commandList = { all, byName, byKey, onWeb }
+export const commandList = { all, byName, byKey, bindings, onWeb }

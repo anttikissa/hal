@@ -1,0 +1,10 @@
+{
+	title: 'Terminal restart-all shortcut and extra command bindings',
+	spec: 'Commands can declare extra key bindings with distinct arguments without duplicate command entries. In the terminal, Ctrl-Shift-R submits /restart all through normal command dispatch, leaves the draft intact and preserves existing restart warnings. Ctrl-R remains the synchronous emergency local restart; shifted R bypasses raw emergency detection and decoded emergency filtering. Command key dispatch honors the matched binding arguments. /keys shows both restart bindings with their arguments; /help lists both keys on one restart entry. Web shortcut behavior remains unchanged pending the user decision. Restored invariant: a binding executes its declared command arguments rather than silently running a different restart scope.',
+	status: 'done',
+	notes: [
+		'The original terminal dispatcher ignored keyArgs and always ran restart locally by name. It now passes matched arguments and sends nonlocal restart scopes through normal host submission. Extra bindings share the existing command entry; help and key help derive their labels from the same binding list. Emergency Shift-R is excluded in both raw scanning and decoded filtering; the web adapter continues its prior behavior because it does not pass Shift to emergency.action. No timers, growing state or new dependencies were added.'
+	],
+	needs: ['x0'],
+	foldInto: ['x0']
+}

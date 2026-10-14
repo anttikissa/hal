@@ -27,10 +27,10 @@ function row(keys: string, description: string, sums?: string[]): KeyRow {
 	return { keys, description, bindings: labels.map((l) => keyHelp.parse(l)) }
 }
 
-// The row of command `name`, which has a key.
-function command(name: string): KeyRow {
+// The rows of command `name`, one per binding.
+function command(name: string): KeyRow[] {
 	let c = commandList.byName(name)!
-	return { ...row(c.key!, c.description), command: c.keyArgs ? `${name} ${c.keyArgs}` : name }
+	return commandList.bindings(c).map((b) => ({ ...row(b.key, c.description), command: b.args ? `${name} ${b.args}` : name }))
 }
 
 const digits = [...'1234567890'].map((d) => `alt-${d}`)
@@ -96,7 +96,7 @@ function sections(): KeySection[] {
 				command('suspend'),
 				command('restart'),
 				command('keys'),
-			],
+			].flat(),
 		},
 	]
 }

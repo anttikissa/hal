@@ -61,7 +61,25 @@ test('each command key runs its command, the prompt left alone', () => {
 
 test('every command key shows in /keys', () => {
 	let shown = keyHelp.sections().flatMap((s) => s.rows)
-	for (let c of commandList.all().filter((c) => c.key)) expect(shown.find((r) => r.keys === c.key)?.command).toBe(c.keyArgs ? `${c.name} ${c.keyArgs}` : c.name)
+	for (let c of commandList.all()) {
+		for (let b of commandList.bindings(c)) expect(shown.find((r) => r.keys === b.key)?.command).toBe(b.args ? `${c.name} ${b.args}` : c.name)
+	}
+})
+
+test('Ctrl-Shift-R reaches restart all through terminal decoding without losing the draft', () => {
+	open()
+	app.state.prompt = { ...app.state.prompt, text: 'draft', cursor: 5 }
+	let onKeys = terminal.onKeys
+	try {
+		terminal.onKeys = app.onKeys
+		terminal.onData('\x1b[114;')
+		terminal.onData('6u')
+	} finally {
+		terminal.onKeys = onKeys
+	}
+	expect(ran).toEqual([])
+	expect(sent).toEqual([{ type: 'submit', sessionId: 'a', text: '/restart all' }])
+	expect(app.state.prompt.text).toBe('draft')
 })
 
 test('typed client-only commands run here and never reach the host', () => {

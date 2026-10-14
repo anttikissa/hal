@@ -59,6 +59,16 @@ describe('kitty CSI-u forms', () => {
 		expect(scan('\x1b[99;5:1u', '\x1b[99;5:2u')).toEqual(['quit', 'quit'])
 	})
 
+	test('Shift-R is not an emergency; shifted quit and suspend still are', () => {
+		for (let mods of [6, 70, 134]) {
+			expect(scan(`\x1b[114;${mods}u`)).toEqual([])
+		}
+		expect(scan('\x1b[114;', '6:2u')).toEqual([])
+		expect(scan('\x1b[99;6u', '\x1b[122;6u')).toEqual(['quit', 'suspend'])
+		expect(emergency.action({ key: 'r', ctrl: true, shift: true })).toBeUndefined()
+		expect(emergency.action({ key: 'r', ctrl: true })).toBe('restart')
+	})
+
 	test('releases and other modifiers are not emergencies', () => {
 		expect(scan('\x1b[99;5:3u')).toEqual([]) // release
 		expect(scan('\x1b[99u')).toEqual([]) // plain c

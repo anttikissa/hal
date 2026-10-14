@@ -20,11 +20,12 @@ export const command: SlashCommand = {
 			return { say: text }
 		}
 		let width = Math.max(...all.map((c) => c.name.length)) + 1
-		let keys = Math.max(...all.map((c) => c.key?.length ?? 0))
+		let labels = (c: typeof all[number]) => commandList.bindings(c).map((b) => b.key).join(' / ')
+		let keys = Math.max(...all.map((c) => labels(c).length))
 		let categories = [...new Set(all.map((c) => c.category))].sort()
 		let lines = categories.flatMap((category) => [
 			`${category}:`,
-			...all.filter((c) => c.category === category).map((c) => `  ${`/${c.name}`.padEnd(width + 2)}${(c.key ?? '').padEnd(keys + 2)}${c.description}`),
+			...all.filter((c) => c.category === category).map((c) => `  ${`/${c.name}`.padEnd(width + 2)}${labels(c).padEnd(keys + 2)}${c.description}`),
 		])
 		return { say: lines.join('\n') }
 	},

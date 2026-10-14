@@ -27,7 +27,7 @@ const MAX_TAIL = 32
 
 // Kitty modifiers are 1 + bitmask: shift 1, alt 2, ctrl 4, super 8,
 // hyper 16, meta 32, caps lock 64, num lock 128. Ctrl must be the only
-// command modifier; shift and the locks don't matter.
+// command modifier; locks don't matter, and Shift-R uses normal dispatch.
 function ctrlOnly(raw: string): boolean {
 	let m = Number(raw) - 1
 	return (m & 4) !== 0 && (m & (2 | 8 | 16 | 32)) === 0
@@ -60,7 +60,7 @@ function scan(st: EmergencyState, chunk: string | Uint8Array): EmergencyAction[]
 		if (m) {
 			let action = CODEPOINTS[m[1]!]
 			let event = m[3] ?? '1'
-			if (action && ctrlOnly(m[2]!) && event !== '3') out.push(action)
+			if (action && ctrlOnly(m[2]!) && !(action === 'restart' && ((Number(m[2]) - 1) & 1)) && event !== '3') out.push(action)
 			i = CSI_U.lastIndex - 1
 			continue
 		}
@@ -74,7 +74,8 @@ function scan(st: EmergencyState, chunk: string | Uint8Array): EmergencyAction[]
 }
 
 // Both input adapters resolve and dispatch emergencies here, before UI state.
-function action(k: { key: string; ctrl?: boolean; alt?: boolean; cmd?: boolean }): EmergencyAction | undefined {
+function action(k: { key: string; ctrl?: boolean; alt?: boolean; cmd?: boolean; shift?: boolean }): EmergencyAction | undefined {
+	if (k.shift && k.key.toLowerCase() === 'r') return undefined
 	return k.key.length === 1 && k.ctrl && !k.alt && !k.cmd ? CODEPOINTS[String(k.key.toLowerCase().codePointAt(0))] : undefined
 }
 
