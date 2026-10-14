@@ -8,6 +8,7 @@ import { keys, type Target } from './keys.ts'
 import { router } from './router.ts'
 import { tabs } from './tabs.ts'
 import { view } from './view.ts'
+import { folds } from './folds.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -61,6 +62,22 @@ const press = (key: string, target: Target, mods: Partial<Record<'shiftKey' | 'c
 const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
 const snapshot = (state: object, history: object[] = [], draft?: object): Event =>
 	({ type: 'snapshot', sessionId, snapshot: { meta, history, state, ...(draft ? { draft } : {}) } }) as Event
+
+test('Ctrl-O p expands draft pastes without sending the draft', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('before [paste/abcdef.txt] after')
+	folds.open()
+	folds.input('p')
+	folds.key({ key: 'enter' })
+	expect(app.state.view.modal).toBeDefined()
+	app.onEvent({ type: 'paste-text', sessionId, name: 'abcdef.txt', text: 'first\nlast' })
+	expect(app.state.view.modal?.blocks?.hint).toBe('Replace 1 paste marker with their contents (2 lines).')
+	folds.key({ key: 'enter' })
+	expect(app.state.view.modal).toBeUndefined()
+	expect(app.state.text).toBe('before first\nlast after')
+	expect(drafts.text(sessionId)).toBe(app.state.text)
+	expect(sent.some((c) => c.type === 'submit')).toBe(false)
+})
 
 test('Enter sends the message box as a prompt: it shows pending and the box empties', () => {
 	app.onEvent(snapshot({ type: 'idle' }))

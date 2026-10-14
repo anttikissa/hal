@@ -6,11 +6,30 @@
 // the host once and kept.
 
 import { blocksDialog } from '../common/blocks-dialog.ts'
-import { modals } from '../common/modals.ts'
+import { modals, type ModalState } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
 import { toggle, type Fold, type Mode } from '../common/toggle.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
+import { draftPastes } from '../common/draft-pastes.ts'
+import { drafts } from '../common/drafts.ts'
+import { prompt } from '../common/prompt.ts'
+import { promptUndo } from '../common/prompt-undo.ts'
+import { queueEdit } from '../common/queue-edit.ts'
+import { recall } from '../common/recall.ts'
+
+let draft: ReturnType<typeof draftPastes.create> | undefined
+let requested = false
+
+function hinted(m: ModalState, items: Item[], at: (i: Item) => Fold) {
+	let next = blocksDialog.update(m, items, at)
+	if (m.form!.values[0]!.trim() !== 'p' || !draft) return next
+	if (!requested) {
+		requested = true
+		for (let name of draft.names) app.send({ type: 'paste-text', sessionId: draft.sessionId, name })
+	}
+	return { ...next, blocks: { ...draft.hint(app.state.prompt.text), help: next.blocks!.help } }
+}
 
 // Session → block key → state; paste name → its text, or why none.
 const state = { folds: new Map<string, Map<string, Fold>>(), canceled: new Map<string, Set<string>>(), pastes: new Map<string, { text?: string; error?: string }>() }
@@ -83,23 +102,47 @@ function open(): void {
 	let id = t.meta.id
 	let at = folds.at(id)
 	app.close()
-	app.open(blocksDialog.update(blocksDialog.open(), toggle.items(t), at), (action) => {
+	draft = draftPastes.create(id, app.state.prompt.text)
+	requested = false
+	app.open(hinted(blocksDialog.open(), toggle.items(t), at), (action) => {
+		if (action.answers.target?.trim() === 'p' && draft && app.state.transcript?.meta.id === id) {
+			let expanded = draft.expand(app.state.prompt)
+			if (typeof expanded === 'string') app.state.notice = expanded
+			else {
+				app.state.prompt = prompt.withoutTyped(promptUndo.record(expanded, app.state.prompt))
+				if (!queueEdit.input(id, expanded.text) && recall.typed(id, expanded.text)) drafts.edit(id, expanded.text)
+			}
+			draft = undefined
+			app.show()
+			return undefined
+		}
+		draft = undefined
 		let error = folds.run(id, action.answers.target ?? '')
 		if (error) app.state.notice = error
 		return undefined
 	}, (m, k) => {
 		let t = folds.transcriptOf(id)
 		let items = t ? toggle.items(t) : []
+		if (k.key === 'escape') draft = undefined
+		if (k.key === 'enter' && m.form!.values[0]!.trim() === 'p') {
+			let next = hinted(m, items, at)
+			if (next.blocks!.invalid) return { state: next }
+		}
 		if (k.key === 'tab' && !k.shift && !k.ctrl && !k.alt) return { state: blocksDialog.complete(m, items, at) }
 		let r = modals.step(m, k)
-		return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: blocksDialog.update(r.state, items, at) } : r
+		return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: hinted(r.state, items, at) } : r
 	})
 }
 
 // The model's command, or a paste's text arriving.
 function event(e: Event & { type: 'toggle' | 'paste-text' }): void {
 	if (e.type === 'toggle') return void folds.run(e.sessionId, e.target, e.mode)
-	folds.state.pastes.set(e.name, e.text === undefined ? { error: e.error ?? 'no text' } : { text: e.text })
+	let consumed = draft?.accept(e)
+	if (consumed && app.state.modal?.blocks && app.state.transcript?.meta.id === draft!.sessionId) {
+		let t = folds.transcriptOf(draft!.sessionId)
+		if (t) app.state.modal = hinted(app.state.modal, toggle.items(t), folds.at(t.meta.id))
+	}
+	if (!consumed || folds.state.pastes.has(e.name)) folds.state.pastes.set(e.name, e.text === undefined ? { error: e.error ?? 'no text' } : { text: e.text })
 	app.show()
 }
 

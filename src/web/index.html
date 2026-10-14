@@ -504,6 +504,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker .blocks-help { flex: none; color: var(--description); }
 .Picker .blocks-help dl { display: grid; grid-template-columns: max-content max-content max-content 1fr; gap: 0 2ch; margin: 0 0 1lh; }
 .Picker .blocks-help dl > div { display: contents; }
+.Picker .blocks-help .paste-help dt { grid-column: 1; }
+.Picker .blocks-help .paste-help dd { grid-column: 2 / -1; }
 .Picker .blocks-help dt { color: var(--key); }
 .Picker .blocks-help dd { margin: 0; }
 .Picker .blocks-help p { margin: 0; }

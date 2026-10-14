@@ -168,8 +168,8 @@ function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor }
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
-	let hint = m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + m.blocks!.hint + UNCOLOR : m.blocks!.hint
-	let pairs = m.blocks!.help
+	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + UNCOLOR : r)
+	let pairs = m.blocks!.help.filter(([k]) => k !== 'p')
 	let kw = (from: number) => Math.max(...pairs.filter((_, i) => i % 2 === from).map(([k]) => k.length)) + 2
 	let left = kw(0) + Math.max(...pairs.filter((_, i) => i % 2 === 0).map(([, d]) => d.length)) + 2
 	let two = left + kw(1) + Math.max(...pairs.filter((_, i) => i % 2 === 1).map(([, d]) => d.length)) <= width
@@ -181,13 +181,15 @@ function blocksLines(m: ModalState, width: number): string[] {
 		let w = Math.max(kw(0), kw(1))
 		for (let [k, d] of pairs) strings.wordWrap(d, Math.max(1, width - w)).forEach((line, i) => rows.push(cell([i ? '' : k, line], w) + UNCOLOR))
 	}
+	let paste = m.blocks!.help.find(([k]) => k === 'p')
+	if (paste) strings.wordWrap(paste[1], Math.max(1, width - 3)).forEach((line, i) => rows.push(cell([i ? '' : 'p', line], 3) + UNCOLOR))
 	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
 	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + UNCOLOR))
 	let ids = m.blocks!.choices
 	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + UNCOLOR)
-	return [strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
+	return [...hint, '', ...rows.map((r) => strings.clipVisual(r, width))]
 }
 
 // The rows below the list: the selected item's details, wrapped, and why

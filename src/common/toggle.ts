@@ -103,7 +103,7 @@ function noun(items: Item[]): string {
 // `next` is a stepped block's next state.
 function describe(p: Plan, next: (item: Item) => Fold): string {
 	let state = p.open === undefined ? next(p.items[0]!) : p.open ? 'long' : 'short'
-	let verb = { short: 'Collapses', glimpse: 'Shows a glimpse of', long: 'Expands', inline: p.items[0]?.type === 'tool' ? 'Shows raw call and result in' : 'Shows pastes inline in' }[state]
+	let verb = { short: 'Collapse', glimpse: 'Show a glimpse of', long: 'Expand', inline: p.items[0]?.type === 'tool' ? 'Show raw call and result in' : 'Show pastes inline in' }[state]
 	let ids = p.items.map((i) => titles.blockId(i))
 	return `${verb} ${toggle.noun(p.items)}${ids.length > 1 ? ':' : ''} ${ids.length > 6 ? `${ids[0]}-${ids.at(-1)}` : ids.join(', ')}`
 }

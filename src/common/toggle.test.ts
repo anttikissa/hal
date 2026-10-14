@@ -69,8 +69,8 @@ test('canceled prompt and output start closed and remain expandable', () => {
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
-	expect(typed('t*').blocks?.hint).toBe('Expands 2 tool cards: t14, t16')
-	expect(typed('').blocks?.hint).toBe('Shows a glimpse of tool card t16')
+	expect(typed('t*').blocks?.hint).toBe('Expand 2 tool cards: t14, t16')
+	expect(typed('').blocks?.hint).toBe('Show a glimpse of tool card t16')
 	expect(typed('t1,').blocks?.invalid).toBe(true)
 	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')
@@ -91,7 +91,7 @@ test('queued inbox blocks share targeting, defaults and expansion with history',
 	expect(states.get('20')).toBe('long')
 	let dialog = blocksDialog.open()
 	dialog.form!.values[0] = 'm20'
-	expect(blocksDialog.update(dialog, all, (i) => states.get(i.key) ?? at(i)).blocks?.hint).toContain('Collapses')
+	expect(blocksDialog.update(dialog, all, (i) => states.get(i.key) ?? at(i)).blocks?.hint).toContain('Collapse')
 	toggle.apply('collapse', states, all, 'm*', at)
 	expect(states.get('20')).toBe('short')
 })
@@ -102,5 +102,5 @@ test('range expansion preserves inline detail and web hints respect native paste
 	expect(toggle.step(item, 'long', undefined, false)).toBe('short')
 	let dialog = blocksDialog.open()
 	dialog.form!.values[0] = item.key
-	expect(blocksDialog.update(dialog, items, () => 'long', false).blocks?.hint).toContain('Collapses')
+	expect(blocksDialog.update(dialog, items, () => 'long', false).blocks?.hint).toContain('Collapse')
 })

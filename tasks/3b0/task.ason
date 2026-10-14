@@ -1,0 +1,10 @@
+{
+	title: 'Ctrl-O p expands pastes in the current draft',
+	spec: 'In terminal and web Ctrl-O, p replaces all paste markers in the unsent prompt with their exact contents as editable text, once, with no reverse collapse. Images and file attachments stay unchanged. Help: p expand paste markers in the prompt you are writing. Live hint uses imperative wording: Replace 3 paste markers with their contents (123 lines). Fetch text through the existing validated paste-text route; preserve the draft on missing text, pending uploads or failures, show complete errors, and never overwrite edits or apply to another session. Keep normal draft persistence and sync. Action hints in the toggle dialog use imperative Expand, Collapse and Show. This does not change card visibility states.',
+	status: 'done',
+	notes: [
+		'Paste text is fetched only after p is typed, once per unique filename and per dialog; draft-only results do not accumulate in the terminal history-paste cache. Expansion uses the current draft and original marker offsets, so repeated markers and marker-looking text inside contents do not recursively expand. Failures and pending uploads leave every marker intact. Terminal expansion is one ordinary undo step and uses the same queue-edit/recall/draft routing as typing; web uses the composer rewrite hook.'
+	],
+	needs: ['v8y', 'zc'],
+	foldInto: ['v8y']
+}

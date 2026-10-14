@@ -15,6 +15,10 @@ import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
 import { scroll } from './scroll.ts'
+import { draftPastes } from '../common/draft-pastes.ts'
+
+let draft: ReturnType<typeof draftPastes.create> | undefined
+let requested = false
 
 const [states, setStates] = createSignal<ReadonlyMap<string, Fold>>(new Map())
 const opened = new Map<string, Fold>()
@@ -92,7 +96,11 @@ function typed(text: string): boolean {
 
 // The model's command for the session shown: true if it was one.
 function onEvent(event: Event): boolean {
-	if (event.type !== 'toggle') return event.type === 'paste-text'
+	if (event.type === 'paste-text') {
+		if (draft?.accept(event) && app.state.view.modal?.blocks && app.sessionId() === draft.sessionId) app.setView({ ...app.state.view, modal: hinted(app.state.view.modal) })
+		return true
+	}
+	if (event.type !== 'toggle') return false
 	if (event.sessionId === app.state.view.transcript?.meta.id) folds.run(event.target, event.mode)
 	return true
 }
@@ -100,12 +108,20 @@ function onEvent(event: Event): boolean {
 // The dialog `m` with the hint for the session shown.
 function hinted(m: ModalState): ModalState {
 	let t = app.state.view.transcript
-	return t ? blocksDialog.update(m, toggle.items(t), folds.at(t), false) : m
+	let next = t ? blocksDialog.update(m, toggle.items(t), folds.at(t), false) : m
+	if (m.form!.values[0]!.trim() !== 'p' || !draft) return next
+	if (!requested) {
+		requested = true
+		for (let name of draft.names) app.sendNow({ type: 'paste-text', sessionId: draft.sessionId, name })
+	}
+	return { ...next, blocks: { ...draft.hint(app.state.text), help: next.blocks!.help } }
 }
 
 // Ctrl-O: the "Expand or collapse blocks" dialog (task v8y).
 function open(): void {
 	if (!app.state.view.transcript) return
+	draft = draftPastes.create(app.sessionId()!, app.state.text)
+	requested = false
 	app.setView({ ...app.state.view, modal: folds.hinted(blocksDialog.open()) })
 }
 
@@ -130,6 +146,23 @@ function key(k: Key, cursor?: number): void {
 		return
 	}
 	if (k.key !== 'enter' && k.key !== 'escape') return
+	if (k.key === 'enter' && m.form!.values[0]!.trim() === 'p') {
+		if (!draft || app.sessionId() !== draft.sessionId) return
+		let next = hinted(m)
+		if (next.blocks!.invalid) return app.setView({ ...app.state.view, modal: next })
+		let expanded = draft.expand({ text: app.state.text, cursor: app.state.text.length })
+		if (typeof expanded === 'string') return app.setNotice(expanded)
+		app.setView({ ...app.state.view, modal: undefined })
+		flush()
+		app.rewrite((p) => {
+			let result = draft!.expand(p)
+			if (typeof result === 'string') { app.setNotice(result); return p }
+			return result
+		})
+		draft = undefined
+		return
+	}
+	draft = undefined
 	app.setView({ ...app.state.view, modal: undefined })
 	let error = k.key === 'enter' ? folds.run(m.form?.values[0] ?? '') : undefined
 	if (error) app.setNotice(error)

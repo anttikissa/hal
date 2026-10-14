@@ -20,6 +20,7 @@ function help(items: Item[] = []): [string, string][] {
 		[`t${c}, ${c}`, 'one card'], ['*', 'all cards'],
 		[`${a}-${c}`, 'a range'], ['t*, r*', 'all of a kind'],
 		[`t${b}, t${c}`, 'a list'], ['empty', 'latest tool card'],
+		['p', "expand paste markers in the prompt you're writing"],
 	]
 }
 const note = 'User and assistant cards change only when you name them (a, u).'
@@ -32,6 +33,7 @@ function open(): ModalState {
 
 // `m` with its hint for the field's text; Tab's list goes.
 function update(m: ModalState, items: Item[], fold: (item: Item) => Fold, inlinePastes = true): ModalState {
+	if (m.form!.values[0]!.trim() === 'p') return { ...m, blocks: { hint: 'No paste markers in the prompt you are writing', invalid: true, help: help(items) } }
 	let p = toggle.plan('toggle', items, m.form!.values[0]!, fold)
 	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, (i) => toggle.next(i, fold(i), inlinePastes)) }
 	return { ...m, blocks: { ...hint, help: help(items) } }
@@ -40,6 +42,7 @@ function update(m: ModalState, items: Item[], fold: (item: Item) => Fold, inline
 // Tab: the item under the cursor gets the common prefix of the block
 // ids it matches; several are listed, newest first. Never cycles.
 function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, cursor = m.form!.cursor, inlinePastes = true): ModalState {
+	if (m.form!.values[0]!.trim() === 'p') return m
 	let text = m.form!.values[0]!
 	let before = text.slice(0, cursor)
 	let token = /#?[a-z]*\d*$/i.exec(before)![0]

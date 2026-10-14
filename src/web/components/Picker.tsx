@@ -92,7 +92,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					<div class={b().invalid ? 'blocks-hint invalid' : 'blocks-hint'} role="status">{b().hint}</div>
 					<Show when={b().choices} fallback={
 						<div class="blocks-help">
-							<dl><For each={b().help}>{([k, d]) => <div><dt>{k}</dt><dd>{d}</dd></div>}</For></dl>
+							<dl><For each={b().help}>{([k, d]) => <div class={k === 'p' ? 'paste-help' : undefined}><dt>{k}</dt><dd>{d}</dd></div>}</For></dl>
 							<p>{blocksDialog.note}</p>
 							<p>Kinds: <For each={blocksDialog.kinds}>{(w, i) => <>{i() ? ', ' : ''}<b>{w[0]}</b>{w.slice(1)}</>}</For></p>
 						</div>}>
