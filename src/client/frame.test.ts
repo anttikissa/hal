@@ -149,7 +149,7 @@ test('no row is wider than the terminal, whatever the text', () => {
 	}
 })
 
-test('a tool result of megabytes is glimpsed in its first rows, each shown line wrapped, the rest counted', () => {
+test('a tool result of megabytes shows its first rows, each shown line wrapped, the rest counted', () => {
 	let long = 'w'.repeat(100)
 	let output = [long, ...Array.from({ length: 200_000 }, (_, i) => `row ${i}`)].join('\n')
 	let started = performance.now()
@@ -454,16 +454,6 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 // Local h:m today: older headers carry a date (titles.time).
 let today = (h: number, m: number) => { let d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString() }
 
-test('a narrow thinking preview keeps time and block id without a label', () => {
-	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: today(10, 51) }
-	let v = view([item])
-	v.transcript!.items[0]!.key = '35'
-	let lines = plain(frame.build(v, 24).lines)
-	expect(lines[0]).toBe('')
-	expect(lines[1]).toMatch(/^10:51 x +r35$/)
-	expect(lines[1]).not.toContain('high')
-	expect(strings.visLen(frame.build(v, 24).lines[1]!)).toBeLessThanOrEqual(24)
-})
 
 test('tool timestamps and command-output headers match ordinary message time and spacing', () => {
 	let ts = today(8, 50)
@@ -500,7 +490,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
 	])
 	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816', '1817'][i]! }))
-	v.transcript!.meta.blocks = { tool: 'glimpse' }
+	v.transcript!.meta.blocks = { tool: 'short' }
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
@@ -513,7 +503,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
 	let jobTitle = lines.find((line) => line.includes('Background command finished'))!
-	expect(plain([jobTitle])[0]).toMatch(/Background command finished 1813 missing file +\(exit 123\) s1817$/)
+	expect(plain([jobTitle])[0]).toMatch(/Background command finished 1813 +\(exit 123\) s1817$/)
 	expect(jobTitle).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
@@ -550,13 +540,6 @@ test('parallel results sit under their calls unless the batch overflows a screen
 	expect(order(false)).toBe('ta tb rb ra')
 	// Once split, a batch never flips back (that would rewrite scrollback).
 	expect(order(true)).toBe('ta tb rb ra')
-})
-
-test('a closed card is one text row inside its padding rows (task ghs)', () => {
-	let item = { type: 'prompt', text: 'first line\nsecond line', key: 'u1' } as unknown as Parameters<typeof frame.itemRows>[0]
-	let rows = frame.itemRows(item, 60, 'x', undefined, undefined, undefined, [], '', { fold: 'short' })
-	expect(rows.map(strip).map((r) => r.trim()).filter(Boolean)).toHaveLength(1)
-	expect(rows).toHaveLength(3)
 })
 
 test('interruption markers remain whole and colored at a full terminal row', () => {

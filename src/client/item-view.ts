@@ -6,7 +6,6 @@ import { interruption } from '../common/interruption.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
-import { bashResult } from '../common/bash-result.ts'
 import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
@@ -18,14 +17,13 @@ import { blockView } from './block-view.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
-import type { Fold } from '../common/toggle.ts'
+import type { Verbosity } from '../common/card.ts'
 import { toolView } from './tool-view.ts'
 
-// How a block is drawn (frame.look): its verbosity (task hyt), the paste
-// texts a prompt shown inline needs (client/folds.ts), a call's result,
-// whether it is padded and has a blank row above, its status, style,
-// and rows a plugin draws itself.
-export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
+// How a block is drawn (frame.look): its verbosity (task hyt), a call's
+// result, whether it is padded and has a blank row above, its status,
+// style, and rows a plugin draws itself.
+export type Look = { headerWidth?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -93,8 +91,8 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // Rows for one item at `width` columns, without the side padding;
 // `look.fold` is its verbosity (task hyt), `look.headerWidth` what its
 // title row leaves for the status and block id at its right.
-// `streaming`: the text is still coming: a short block shows its end, a
-// glimpse its last rows.
+// `streaming`: the text is still coming: a short block shows its last
+// rows.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = [], look: Look = {}): string[] {
 	let fold = look.fold ?? card.initial(item)
 	let key = (item as { key?: string }).key ?? ''
@@ -103,11 +101,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let source = card.text(item)
-			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
-			if (fold === 'short') return item.report ? itemView.closedRow(item, '', width) : itemView.closedRow(item, item.summary && !item.report ? item.summary : source, hw, undefined, session)
 			let body = card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
 			// Another session's message: its summary, then its text quieter.
-			if (fold === 'glimpse') body = blockView.glimpse(body, width, false, itemView.itemStyle(item))
+			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item))
 			if (item.summary && !item.report) body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
 			// Its images follow as labels packed into rows: a quick
 			// way to open those its markers name.
@@ -126,19 +122,16 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return [itemView.imageLabel(item, session)]
 		// Markdown hides trailing blanks except before interruption marks.
 		// Empty thinking draws nothing, not a bare header (tasks fn, hp, 6eq).
-		// Short, the time and its text; else headed like a reply, so the
-		// title row holds its activity (task hyt).
+		// Headed like a reply, so the title row holds its activity (task hyt).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-			if (fold === 'short') return itemView.closedRow(item, markdown.inline(item.text, streaming).map((r) => r.text).join(''), hw, titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : ''), undefined, streaming)
 			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
-			if (fold === 'glimpse') body = blockView.glimpse(body, width, streaming, itemView.itemStyle(item))
+			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
 			return itemView.headed(item, body, hw)
 		}
 		case 'text': {
 			let text = card.text(item).trimEnd()
 			if (!text.trim() && !item.interrupted) return streaming ? [''] : []
-			if (fold === 'short') return itemView.closedRow(item, text, hw, undefined, undefined, streaming)
 			let body = markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			if (item.interrupted) {
 				let tail = interruption.tail(item.text).replace(/\r\n?/g, '\n').split('\n')
@@ -146,7 +139,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (tail.length === 1 && strings.visLen(last) + strings.visLen(tail[0]!) > width) { body.push(last); last = ''; tail[0] = tail[0]!.trimStart() }
 				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.log().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
 			}
-			if (fold === 'glimpse') body = blockView.glimpse(body, width, streaming, itemView.itemStyle(item))
+			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
 			return itemView.headed(item, body, hw)
 		}
 		case 'tool':
@@ -174,9 +167,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// A commit (task 179): 'HH:MM Committed <short> <subject>';
 			// open, its files and the hook's lines.
 			if (item.commit) {
-				if (fold === 'short') return itemView.closedRow(item, item.text, hw)
 				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
-				return itemView.headed(item, fold === 'glimpse' ? blockView.glimpse(body, width, false, itemView.itemStyle(item)) : body, width)
+				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width)
 			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
@@ -196,8 +188,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					}
 					return out
 				})
-				if (fold === 'short') return blockView.glimpse(summary, width, false, style, 1)
-				if (fold === 'glimpse') return blockView.glimpse(summary, width, false, style)
+				if (fold === 'short') return blockView.short(summary, width, false, style)
 				let tone = diff.tone
 				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
@@ -255,28 +246,6 @@ function right(row: string, end: string, width: number): string {
 	return text + ' '.repeat(width - strings.visLen(text) - strings.visLen(end)) + end
 }
 
-// Text with each [paste/<name>] marker replaced by that paste's text;
-// one not here yet, or missing, keeps its marker and says so.
-function inlined(text: string, pastes: Look['pastes']): string {
-	return text.replace(/\[paste\/([0-9a-z]{6}\.[a-z0-9]{1,8})\]/g, (marker, name: string) => {
-		let got = pastes?.get(name)
-		return got?.text !== undefined ? bashResult.trim(got.text) : `${marker} (${got?.error ?? 'loading…'})`
-	})
-}
-
-// A short block's one row (tasks ghs, hyt): its title (or `head`), then
-// the start of its text, quiet; while it streams, its end.
-function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' ', session?: string, streaming = false): string[] {
-	head = ansi.clean(head)
-	let call = bashResult.background(item)
-	if (call && strings.visLen(head) >= width) head = titles.stamp(item.ts, `${call} `)
-	let first = streaming ? blockView.tail(ansi.clean(text), width - strings.visLen(head)) : ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
-	let row = strings.expandTabs(strings.clipVisual(head + first, width))
-	row = row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row
-	let href = session && call && /^t?\d+$/.test(call) && transcript.href(session, call)
-	return [href ? `\x1b]8;;${ansi.webUrl(href)}\x07${row}${ansi.LINK_OFF}` : row]
-}
-
 // The text width beside an item's id, and how to put the id on row
 // `at`, after `status` if there is one; the row is clipped to make room.
 // `head`: the room the title row has left of them.
@@ -305,8 +274,6 @@ function receipt(item: Item, style?: Style): string {
 
 export const itemView = {
 	receipt,
-	inlined,
-	closedRow,
 	toolStyle,
 	itemStyle,
 	itemLines,

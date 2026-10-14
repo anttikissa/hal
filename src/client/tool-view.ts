@@ -1,14 +1,13 @@
 // Tool calls and their results as the terminal draws them (tasks wm0,
-// ghs, 4y4, hyt): short is the title row (and a running call's latest
-// output line), glimpse adds the command and a few output rows, long
-// all of them. Pure.
+// ghs, 4y4, hyt): short is the title row, the command and a few output
+// rows, long all of them. Pure.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { diff } from '../common/diff.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
-import type { Fold } from '../common/toggle.ts'
+import type { Verbosity } from '../common/card.ts'
 import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
@@ -18,11 +17,10 @@ import { itemView, type Look } from './item-view.ts'
 import { presentationView } from './tool-presentation.ts'
 import { resolve } from 'path'
 
-const open = (fold: Fold) => fold === 'long' || fold === 'inline'
-
 // A call's rows. Its result's status and the activity cell sit at the
 // right of the first row (frame.ref), which look.headerWidth leaves.
-function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Look): string[] {
+// A command shown whole (/help), short, is its one row.
+function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, look: Look): string[] {
 	let { command } = item.input
 	let prefix = titles.stamp(item.ts, '')
 	let hw = look.headerWidth ?? width
@@ -34,20 +32,15 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 	let head = toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw)
 	if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) return presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
 	let bash = item.name === 'bash'
-	if (open(fold)) {
+	if (fold === 'long') {
 		let rows = ansi.wrap(prefix + title, hw)
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
 		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ['', ...ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width)] : [])]
 	}
-	// Short: running, its latest output line follows the title.
-	if (fold === 'short') {
-		let last = item.partial?.split('\n').findLast((l) => l.trim())
-		return [last ? toolView.unsafe(strings.expandTabs(strings.clipVisual(`${prefix}${title}  ${ansi.quiet(ansi.clean(last.trim()), itemView.itemStyle(item))}`, hw)), item, hw) : head]
-	}
-	// Running output is laid out as its result glimpse will be (a blank
-	// row, then the glimpse rows), so the card keeps its height when the
+	// Running output is laid out as its short result will be (a blank
+	// row, then the short rows), so the card keeps its height when the
 	// call finishes (task 4y4).
-	let n = settings.glimpseRows()
+	let n = settings.shortRows()
 	let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
 	if (!bash) return [head, ...live]
 	let details = toolDetails.lines(item.name, item.input)
@@ -57,16 +50,16 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 }
 
 // A result's rows: `call` the id of the bash call it answers (its output
-// is a bash display), `tool` the call's name when drawn under it. Short,
-// an attached result draws nothing; apart, its header row stays, for
-// its time, link and status.
-function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold, look: Look, session: string | undefined, call: string | undefined, tool: string | undefined): string[] {
+// is a bash display), `tool` the call's name when drawn under it. A
+// whole command's result (look.full) draws nothing under its short call;
+// apart, its header row stays, for its time, link and status.
+function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbosity, look: Look, session: string | undefined, call: string | undefined, tool: string | undefined): string[] {
 	// A canceled call's note to the model: the title says "(canceled)".
 	let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
 	let style = look.style ?? itemView.itemStyle(item, tool)
-	if (tool && (fold === 'short' || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
-	if (tool && (item.presentation || item.presentationError) && open(fold)) return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(fold === 'inline' || item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
-	let max = look.full ? Infinity : open(fold) ? toolView.openRows : settings.glimpseRows()
+	if (tool && ((fold === 'short' && look.full) || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
+	if (tool && (item.presentation || item.presentationError) && fold === 'long') return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
+	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows()
 	// An attached EDIT result shows its diff in diff colors.
 	let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
 	let rows: string[] = [], used = 0
@@ -94,7 +87,7 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold,
 		return !i && status ? itemView.right(line, status, width) : line
 	})
 	if (more) {
-		let marker = ansi.quiet(`… ${more} more lines${open(fold) ? ` in ${toolView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
+		let marker = ansi.quiet(`… ${more} more lines${fold === 'long' ? ` in ${toolView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
 		let last = res.at(-1)!
 		if (strings.visLen(last) + 2 + strings.visLen(marker) <= width) res[res.length - 1] = itemView.right(last, marker, width)
 		else res.push(marker)

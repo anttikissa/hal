@@ -8,7 +8,7 @@ import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
 
-const usage = '/cards [<kind> short|glimpse|long|default | reset]'
+const usage = '/cards [<kind> short|long|default | reset]'
 
 // 'tool long (this session), thinking short, …': each kind as it starts here.
 function describe(blocks: SessionMeta['blocks']): string {
@@ -16,7 +16,7 @@ function describe(blocks: SessionMeta['blocks']): string {
 }
 
 export const command: SlashCommand = {
-	help: () => `${usage}: show or set how cards of a kind start in this session. short is the title row, glimpse a few rows more, long everything; default follows config.ason (cardVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O steps one card.`,
+	help: () => `${usage}: show or set how cards of a kind start in this session. short is the title row and a few rows in the terminal, the title row alone on the web; long is everything; default follows config.ason (cardVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O toggles one card.`,
 	complete(args) {
 		let [kind = '', value] = args.split(/\s+/)
 		if (value === undefined) return [...card.kinds, 'reset'].filter((k) => k.startsWith(kind))

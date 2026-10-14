@@ -2,13 +2,13 @@
 // (tasks ghs, v8y, hyt): /toggle, /expand and /collapse typed here and
 // Ctrl-O change them locally, unrecorded; a toggle event (the model's
 // command) changes them too. In memory only, per session: not stored,
-// not synced to other clients. Pastes shown inline are fetched from
-// the host once and kept.
+// not synced to other clients.
 
 import { blocksDialog } from '../common/blocks-dialog.ts'
+import type { Verbosity } from '../common/card.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
-import { toggle, type Fold, type Mode } from '../common/toggle.ts'
+import { toggle, type Mode } from '../common/toggle.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
 import { draftPastes } from '../common/draft-pastes.ts'
@@ -21,7 +21,7 @@ import { recall } from '../common/recall.ts'
 let draft: ReturnType<typeof draftPastes.create> | undefined
 let requested = false
 
-function hinted(m: ModalState, items: Item[], at: (i: Item) => Fold) {
+function hinted(m: ModalState, items: Item[], at: (i: Item) => Verbosity) {
 	let next = blocksDialog.update(m, items, at)
 	if (m.form!.values[0]!.trim() !== 'p' || !draft) return next
 	if (!requested) {
@@ -31,11 +31,11 @@ function hinted(m: ModalState, items: Item[], at: (i: Item) => Fold) {
 	return { ...next, blocks: { ...draft.hint(app.state.prompt.text), help: next.blocks!.help } }
 }
 
-// Session → block key → state; paste name → its text, or why none.
-const state = { folds: new Map<string, Map<string, Fold>>(), pastes: new Map<string, { text?: string; error?: string }>() }
+// Session → block key → state.
+const state = { folds: new Map<string, Map<string, Verbosity>>() }
 
 // The states of session `id`'s blocks.
-function of(id: string): Map<string, Fold> {
+function of(id: string): Map<string, Verbosity> {
 	let m = state.folds.get(id)
 	if (!m) state.folds.set(id, (m = new Map()))
 	return m
@@ -43,9 +43,9 @@ function of(id: string): Map<string, Fold> {
 
 // Session `id`'s block states: toggled ones, the rest as they start
 // (toggle.starts). Make one per use: it scans the transcript.
-function at(id: string): (item: Item) => Fold {
+function at(id: string): (item: Item) => Verbosity {
 	let t = folds.transcriptOf(id)
-	let start = t ? toggle.starts(t) : () => 'long' as Fold
+	let start = t ? toggle.starts(t) : () => 'long' as Verbosity
 	let states = folds.of(id)
 	return (item) => states.get(item.key) ?? start(item)
 }
@@ -61,19 +61,8 @@ function transcriptOf(id: string): Transcript | undefined {
 function run(id: string, args: string, mode: Mode = 'toggle'): string | undefined {
 	let t = folds.transcriptOf(id)
 	if (!t) return undefined
-	let states = folds.of(id)
-	let items = toggle.items(t)
-	let done = toggle.apply(mode, states, items, args, toggle.starts(t))
+	let done = toggle.apply(mode, folds.of(id), toggle.items(t), args, toggle.starts(t))
 	if (typeof done === 'string') return done
-	// Pastes opened inline: their text comes from the host.
-	for (let key of done) {
-		if (states.get(key) !== 'inline') continue
-		for (let name of toggle.pastes(items.find((i) => i.key === key)!)) {
-			if (folds.state.pastes.has(name)) continue
-			folds.state.pastes.set(name, {})
-			app.send({ type: 'paste-text', sessionId: id, name })
-		}
-	}
 	app.show()
 	return undefined
 }
@@ -128,15 +117,13 @@ function open(): void {
 	})
 }
 
-// The model's command, or a paste's text arriving.
+// The model's command, or a draft paste's text arriving.
 function event(e: Event & { type: 'toggle' | 'paste-text' }): void {
 	if (e.type === 'toggle') return void folds.run(e.sessionId, e.target, e.mode)
-	let consumed = draft?.accept(e)
-	if (consumed && app.state.modal?.blocks && app.state.transcript?.meta.id === draft!.sessionId) {
-		let t = folds.transcriptOf(draft!.sessionId)
+	if (draft?.accept(e) && app.state.modal?.blocks && app.state.transcript?.meta.id === draft.sessionId) {
+		let t = folds.transcriptOf(draft.sessionId)
 		if (t) app.state.modal = hinted(app.state.modal, toggle.items(t), folds.at(t.meta.id))
 	}
-	if (!consumed || folds.state.pastes.has(e.name)) folds.state.pastes.set(e.name, e.text === undefined ? { error: e.error ?? 'no text' } : { text: e.text })
 	app.show()
 }
 

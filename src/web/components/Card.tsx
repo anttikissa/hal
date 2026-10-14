@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // Tasks: w5, 6eq, 18n, kx0, hyt, bp1. One transcript row as a card in its theme colors (view.show). A
-// card starts short, as a glimpse or long, as the session starts its
-// kind (task hyt); the header switches short and its previous open state.
+// card starts short (its title row) or long, as the session starts its
+// kind (task hyt); the header switches the two.
 // Only header taps collapse an open card. Hidden contents are inert. The height
 // animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
 // the card streams, so Hal's cursor follows its last character (in the
@@ -9,10 +9,9 @@
 // kept by its session and row key (task w5), not by its DOM, so no other
 // item's card ever shows open in its place.
 // Every card links to itself (target.ts, task 0z); `target`: the
-// address links here, so the card is marked and opens, a tool card
-// with its whole output. An open tool card shows a glimpse of its
-// result and can show all of it; the transcript holds all of it
-// (host tools cap what they keep), so nothing is fetched.
+// address links here, so the card is marked and opens. An open tool
+// card shows all of its result; the transcript holds all of it (host
+// tools cap what they keep), so nothing is fetched.
 
 import { ToolPresentation } from './ToolPresentation.tsx'
 import { ToolCommand } from './ToolCommand.tsx'
@@ -38,9 +37,9 @@ import { view, type Row } from '../view.ts'
 import { hrefs } from '../hrefs.ts'
 import { folds } from '../folds.ts'
 import { forms } from '../../common/forms.ts'
-import { toggle as blockToggle, type Fold } from '../../common/toggle.ts'
+import { toggle as blockToggle } from '../../common/toggle.ts'
+import type { Verbosity } from '../../common/card.ts'
 import type { SessionMeta } from '../../common/session.ts'
-import { settings } from '../../common/settings.ts'
 
 // A new card fades in (--fade-ms, --ease-out from the page's CSS). A
 // script animation, not a CSS one: moving the card in the list, as when
@@ -72,37 +71,14 @@ const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
-	let prose: HTMLDivElement | undefined
-	let proseObserver: ResizeObserver | undefined
-	let [proseLong, setProseLong] = createSignal(false)
-	let measureProse = () => untrack(() => {
-		if (!prose || props.row.item.type === 'tool' || !blockToggle.toggles(props.row.item)) return
-		let lineHeight = parseFloat(getComputedStyle(prose).lineHeight)
-		let inset = getComputedStyle(prose.parentElement!)
-		setProseLong(prose.getBoundingClientRect().height + parseFloat(inset.paddingTop) + parseFloat(inset.paddingBottom) > settings.glimpseRows() * lineHeight + 1)
-	})
-	let proseRef = (el: HTMLDivElement) => {
-		if (prose) proseObserver?.unobserve(prose)
-		prose = el
-		proseObserver?.observe(el)
-		queueMicrotask(measureProse)
-	}
-	onSettled(() => {
-		if (props.row.item.type === 'tool' || !blockToggle.toggles(props.row.item)) return
-		proseObserver = new ResizeObserver(measureProse)
-		if (prose) proseObserver.observe(prose)
-		measureProse()
-		return () => proseObserver?.disconnect()
-	})
-	createEffect(() => settings.glimpseRows(), () => queueMicrotask(measureProse))
 	onSettled(() => root && enter(root))
 	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
-	// Short, glimpse or long (task hyt): as the session starts its kind,
-	// until a click, /toggle or Ctrl-O steps it; a call fails with its result.
+	// Short or long (task hyt): as the session starts its kind, until a
+	// click, /toggle or Ctrl-O switches it; a call fails with its result.
 	let level = () => folds.level(id(), card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash())))
-	let open = () => level() !== 'short'
+	let open = () => level() === 'long'
 	// The setters may run in an effect: they read the state as of the call.
-	let setLevel = (fold: Fold) => untrack(() => folds.set(id(), fold, [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
+	let setLevel = (fold: Verbosity) => untrack(() => folds.set(id(), fold, [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
 	// Replies and the user's prompts read as plain cards until collapsed
 	// (task r4d); a collapsed one folds like thinking.
 	let closable = () => ['prompt', 'text'].includes(card.kind(props.row.item) ?? '')
@@ -123,7 +99,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let activity = () => <Show when={spins()}><span class="ticker"><Show when={elapsed()}>{(e) => <span class="elapsed">({e()})</span>}</Show><span class={['spinner', live() ? 'on' : '']} aria-hidden="true" /></span></Show>
 	let latest = () => { let item = props.row.item; return item.type === 'tool' && running() && !open() ? item.partial?.split('\n').findLast((l) => l.trim())?.trim() : undefined }
 	let fullCommand = () => { let item = props.row.item; return item.type === 'tool' && toolDetails.fullCommand(item.name, item.input) }
-	let full = () => fullCommand() || level() === 'long' || level() === 'inline'
+	let full = () => fullCommand() || open()
 	createEffect(
 		() => props.target,
 		(on) => {
@@ -132,8 +108,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	)
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full(), bash())
-	// Whether the result is longer than its glimpse.
-	let long = () => !fullCommand() && (props.row.result ? (props.row.result.diff ?? props.row.result.output) : props.row.item.type === 'tool' ? props.row.item.partial ?? '' : '').replace(/\n$/, '').split('\n').length > settings.glimpseRows()
 	// The link shows the block's id, t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -214,30 +188,19 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>
 		// The call once (task 8t), then its output: the result, or what
 		// has streamed so far.
-		let partial = item.partial?.replace(/\n$/, '')
-		let out = result()?.text ?? (full() ? partial : partial?.split('\n').slice(-settings.glimpseRows()).join('\n'))
+		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
 		return <><Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>{command}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
 		let hit = e.target as Element
 		let control = hit.closest('.mark, .CardHeader')
-		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .more, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
+		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		if (!control && expanded()) return
 		scroll.follow(() => {
-			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])], blockToggle.next(props.row.item, 'short', false)))
+			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
 			flush()
 		})
-	}
-	// Show all of a tool's result, or its glimpse again, keeping the
-	// button (the card's end) in view as the card shrinks.
-	let more = (e: MouseEvent) => {
-		let button = e.currentTarget as HTMLElement
-		scroll.follow(() => {
-			setLevel(full() ? 'glimpse' : 'long')
-			flush()
-		})
-		if (!full()) button.scrollIntoView({ block: 'nearest' })
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Model text and inter-tab prose are Markdown (tasks fn, sz); human
@@ -288,7 +251,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<>
 			<Show when={!closable()}><Show when={title()} fallback={link()}>{heading()}</Show></Show>
 			<div class="content">
-				<div ref={proseRef}>
+				<div>
 					<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
 						{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 					</Show>
@@ -333,7 +296,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', level() === 'glimpse' && props.row.item.type !== 'tool' && !isChange() ? 'glimpse' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} style={{ '--glimpse': settings.glimpseRows() }} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<>
@@ -353,13 +316,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<div class="contents">
 									<div class="content">
 										<Show when={props.row.item.type !== 'tool'} fallback={<>{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}<Show when={props.cursor && !md()}>{cursor()}</Show></>}>
-											<div ref={proseRef}>
+											<div>
 												<Show when={props.row.item.type === 'prompt' && !headsWho()}><div class="sender">{who()}</div></Show>
 												{md() ? markdown() : body()}
 												<Show when={props.cursor && !md()}>{cursor()}</Show>
 											</div>
 										</Show>
-										<Show when={long()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 									</div>
 								</div>
 							</div>
@@ -367,7 +329,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</>
 						)}
 					</Show>
-					<Show when={props.row.note === undefined && !isChange() && props.row.item.type !== 'tool' && blockToggle.toggles(props.row.item) && expanded() && proseLong()}><button type="button" class="more" aria-expanded={full() ? 'true' : 'false'} onClick={more}><span class="disclosure" aria-hidden="true">▸</span><span class="label">{full() ? 'Show less' : 'Show all'}</span></button></Show>
 				</article>
 			)}
 		</Show>

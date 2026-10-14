@@ -40,7 +40,7 @@ time do not invent one. Colors remain the existing theme's responsibility.
 | Queued prompt | Compact queue note until expanded | Three-line preview; expanded agent prose uses the shared header. Waiting items without time retain it in their queue note. |
 | Pending prompt | Same header/body as acknowledged prompt | Delayed pending color and reconnect status, not a different shell. |
 | Image | No invented sender/time | Linked image constrained to the content width; headless reference. |
-| Detached tool result | No invented call timestamp | Result marker and output glimpse; headless reference. |
+| Detached tool result | No invented call timestamp | Result marker and short output; headless reference. |
 | Answered/canceled question | No invented timestamp | Question/answer text, not live form controls. |
 | Turn end | No header | Completed ends absent; pause/error text remains visible. |
 | Context boundary | No header | Label between rules, deliberately not a message header. |

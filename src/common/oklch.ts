@@ -96,7 +96,7 @@ function contrast(a: Oklch, b: Oklch): number {
 	return (hi! + 0.05) / (lo! + 0.05)
 }
 
-// A quieter `fg` for secondary text on `bg` (hints, ids, glimpses):
+// A quieter `fg` for secondary text on `bg` (hints, ids, previews):
 // darker by a lightness step, but never below 4.6:1 on `bg`, so it stays
 // readable (tasks/README.md, readable text). We compute it; the
 // terminal's faint style is never used.

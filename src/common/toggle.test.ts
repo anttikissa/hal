@@ -1,8 +1,9 @@
 // Shared card selection and completion contracts across terminal and web.
 import { expect, test } from 'bun:test'
 import { blocksDialog } from './blocks-dialog.ts'
+import type { Verbosity } from './card.ts'
 import type { SessionMeta } from './session.ts'
-import { toggle, type Fold } from './toggle.ts'
+import { toggle } from './toggle.ts'
 import { transcript, type Item } from './transcript.ts'
 
 const items = [
@@ -41,27 +42,27 @@ test('targets: lists, kinds, ranges and * leave user and assistant blocks alone 
 	expect(keys('q*')).toBe('Nothing to toggle in q*')
 })
 
-test('one named block steps short, glimpse, long (inline); more go long while most are not, else short', () => {
-	let states = new Map<string, Fold>()
+test('one named block switches short and long; more go long while at least half are short, else short', () => {
+	let states = new Map<string, Verbosity>()
 	expect(toggle.apply('toggle', states, items, 't*', start)).toEqual(['14', '16'])
 	expect([states.get('14'), states.get('16')]).toEqual(['long', 'long'])
-	states.set('16', 'glimpse')
+	states.set('16', 'short')
 	toggle.apply('toggle', states, items, 't*', start)
 	expect([states.get('14'), states.get('16')]).toEqual(['long', 'long'])
 	toggle.apply('toggle', states, items, 't*', start)
 	expect([states.get('14'), states.get('16')]).toEqual(['short', 'short'])
 	toggle.apply('collapse', states, items, '10-17', start)
 	expect(states.get('11')).toBe('short')
-	let steps = [1, 2, 3, 4].map(() => (toggle.apply('toggle', states, items, '#u10', start), states.get('10')))
-	expect(steps).toEqual(['inline', 'short', 'glimpse', 'long'])
+	let steps = [1, 2, 3].map(() => (toggle.apply('toggle', states, items, '#u10', start), states.get('10')))
+	expect(steps).toEqual(['short', 'long', 'short'])
 	toggle.apply('expand', states, items, 'u10', start)
 	expect(states.get('10')).toBe('long')
 })
 
-test('blocks start as the session sets their kind, over the settings; a failed call as failed', () => {
+test('blocks start as the session sets their kind, over the settings; a failed call as failed; an unknown stored level as the setting', () => {
 	let failed = [...items.slice(0, 5), { type: 'tool-result', key: '15', id: 'a', output: 'x', isError: true }] as Item[]
-	let at = toggle.starts({ items: failed, meta: { blocks: { thinking: 'long', prompt: 'glimpse' } } as SessionMeta })
-	expect(failed.map((i) => at(i))).toEqual(['glimpse', 'long', 'long', 'glimpse', 'glimpse', 'long'])
+	let at = toggle.starts({ items: failed, meta: { blocks: { thinking: 'long', prompt: 'medium' } } as unknown as SessionMeta })
+	expect(failed.map((i) => at(i))).toEqual(['long', 'long', 'long', 'short', 'short', 'long'])
 })
 
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
@@ -69,7 +70,7 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
 	expect(typed('t*').blocks?.hint).toBe('Expand 2 tool cards: t14, t16')
 	expect(typed('t').blocks?.hint).toBe(typed('t*').blocks?.hint)
-	expect(typed('').blocks?.hint).toBe('Show a glimpse of tool card t16')
+	expect(typed('').blocks?.hint).toBe('Expand tool card t16')
 	expect(typed('t1,').blocks?.invalid).toBe(true)
 	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')
@@ -83,7 +84,7 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 
 test('queued inbox blocks share targeting, defaults and expansion with history', () => {
 	let all = toggle.items({ items, inbox: [{ id: 'queued', n: 20, text: 'First\nLast', from: 'other', delivery: 'after-turn' }] })
-	let states = new Map<string, Fold>()
+	let states = new Map<string, Verbosity>()
 	let at = toggle.starts({ items: all, meta: {} as SessionMeta })
 	expect(at(all.at(-1)!)).toBe('short')
 	expect(toggle.apply('toggle', states, all, '#m20', at)).toEqual(['20'])
@@ -94,20 +95,10 @@ test('queued inbox blocks share targeting, defaults and expansion with history',
 	toggle.apply('collapse', states, all, 'm*', at)
 	expect(states.get('20')).toBe('short')
 })
-
-test('range expansion preserves inline detail and web hints respect native paste links', () => {
-	let item = items[0]!
-	expect(toggle.step(item, 'inline', true)).toBe('inline')
-	expect(toggle.step(item, 'long', undefined, false)).toBe('short')
-	let dialog = blocksDialog.open()
-	dialog.form!.values[0] = item.key
-	expect(blocksDialog.update(dialog, items, () => 'long', false).blocks?.hint).toContain('Collapse')
-})
-
 test('completion and opening share exact card keys, including extra items', () => {
 	let commit = transcript.commitItem({ hash: 'abc123', short: 'abc123', subject: 'Fix', files: [] })
 	let all = [...items, ...['18.1', '18.10', '18.2'].map((key) => ({ ...commit, key })), { type: 'output', key: '19.1', text: 'plain output' } as Item]
-	let at = () => 'short' as Fold
+	let at = () => 'short' as Verbosity
 	let selected = (args: string) => {
 		let p = toggle.plan('expand', all, args, at)
 		return typeof p === 'string' ? p : p.items.map((i) => i.key)
@@ -130,7 +121,7 @@ test('completion and opening share exact card keys, including extra items', () =
 	expect(selected('s18.2-18.10')).toEqual(['18.10', '18.2'])
 	expect(selected('s18.10-18.2')).toEqual(['18.10', '18.2'])
 	expect(selected('#t18.2, 18.10')).toEqual(['18.10', '18.2'])
-	let states = new Map<string, Fold>()
+	let states = new Map<string, Verbosity>()
 	expect(toggle.apply('expand', states, all, '#s18.1', at)).toEqual(['18.1'])
 	expect(states.get('18.1')).toBe('long')
 	let middle = tab('#s18.2, t14')

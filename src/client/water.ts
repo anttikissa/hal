@@ -21,7 +21,7 @@ function high(peaks: Map<string, number>, rows: string[], item: Item, cols: numb
 }
 
 // A call's card, with its results, never shrinks either: a running
-// call's last output lines give way to a shorter result glimpse, and in
+// call's last output lines give way to fewer result rows, and in
 // full mode one row less clears scrollback, snapping the terminal to the
 // bottom. Blank card rows at its end keep the tallest height drawn at
 // this width and fold state until the next full redraw; folding with

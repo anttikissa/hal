@@ -56,33 +56,32 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(bash).toContain('$ echo first\n  echo second')
 	expect(bash).toContain('Edits a.ts')
 	expect(bash).toContain('Timeout 5 s')
-	expect(render('bash', { command: 'echo first\necho second', description: 'Two commands' }, 'short')).not.toContain('echo first')
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
 })
 
-test('Bash glimpse clips only the first command line, with stable live and finished height', () => {
+test('A short Bash card clips only the first command line, with stable live and finished height', () => {
 	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash' }
-	let rows = (partial?: string) => toolView.call({ ...item, partial }, 20, 'glimpse', {}).map(Bun.stripANSI)
+	let rows = (partial?: string) => toolView.call({ ...item, partial }, 20, 'short', {}).map(Bun.stripANSI)
 	expect(rows()[1]).toBe('$ echo first…')
 	expect(rows()).toHaveLength(2)
 	let output = 'first\nsecond'
-	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'glimpse', {}, undefined, '1', 'bash')
+	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'short', {}, undefined, '1', 'bash')
 	expect(rows(output).length).toBe(rows().length + 1 + finished.length)
-	let narrow = toolView.call({ ...item, input: { command: 'echo ' + 'x'.repeat(60) } }, 20, 'glimpse', {})
+	let narrow = toolView.call({ ...item, input: { command: 'echo ' + 'x'.repeat(60) } }, 20, 'short', {})
 	expect(narrow[1]?.endsWith('…')).toBe(true)
 	expect(Bun.stringWidth(narrow[1]!)).toBeLessThanOrEqual(20)
 	expect(toolView.call(item, 20, 'long', {}).join('\n')).toContain('echo later')
 })
 
-test('background reports and thinking start closed, expand fully, and SEND shows /close', () => {
+test('background reports and thinking start short, expand fully, and SEND shows /close', () => {
 	for (let label of ['bash #t19', 'bash b123abc']) {
-		let item = { type: 'prompt' as const, text: '[exit 1]\nfirst\nlast', from: 'self', label, delivery: 'next-round' as const }
+		let item = { type: 'prompt' as const, text: '[exit 1]\nfirst\nsecond\nthird\nlast', from: 'self', label, delivery: 'next-round' as const }
 		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('last')
 		expect(itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
 		expect(itemView.receipt(item)).toBe('')
 	}
-	let thinking = { type: 'thinking' as const, text: 'first\n\nlast' }
-	expect(itemView.itemLines(thinking, 80)).toHaveLength(1)
+	let thinking = { type: 'thinking' as const, text: 'first\n\nsecond\n\nlast' }
+	expect(itemView.itemLines(thinking, 80).join('\n')).not.toContain('last')
 	expect(itemView.itemLines(thinking, 80, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
 	let send = { type: 'tool' as const, id: 's', name: 'send', input: { to: '42', text: '/close' } }
 	expect(itemView.itemLines(send, 24)[0]).toContain('/close')

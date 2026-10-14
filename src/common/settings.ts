@@ -82,35 +82,36 @@ const table: Setting[] = [
 	},
 	...verbosityRows(),
 	{
-		name: 'cardVerbosityGlimpseRows',
-		label: 'Glimpse rows',
+		name: 'cardVerbosityShortRows',
+		label: 'Short card rows',
 		type: { kind: 'integer', min: 1, max: 50 },
 		default: 3,
-		description: 'Rows of text a glimpse shows below its title row.',
+		description: 'Rows of text a short terminal card shows below its title row.',
 		browser: true,
 	},
 ]
 
 // How much of each kind of transcript card shows at first (task hyt):
-// short is the title row alone, glimpse adds cardVerbosityGlimpseRows
-// rows, long shows everything. /cards overrides them per session.
+// short is the title row and cardVerbosityShortRows rows in the
+// terminal, the title row alone on the web; long shows everything.
+// /cards overrides them per session.
 function verbosityRows(): Setting[] {
 	let kinds: [string, string, string, string][] = [
 		['Prompt', 'Prompt cards', 'long', 'Your prompts'],
 		['Text', 'Reply cards', 'long', "Hal's replies"],
 		['Thinking', 'Thinking cards', 'short', "Hal's thinking"],
 		['Tool', 'Tool cards', 'short', 'Tool calls and their output'],
-		['Failed', 'Failed tool cards', 'glimpse', 'Tool calls that failed, so the error shows'],
-		['Message', 'Message cards', 'glimpse', 'Messages between sessions, sent and received'],
+		['Failed', 'Failed tool cards', 'short', 'Tool calls that failed'],
+		['Message', 'Message cards', 'short', 'Messages between sessions, sent and received'],
 		['Notice', 'Notice cards', 'short', "Hal's notices: background command reports, prompt-file changes"],
 		['Commit', 'Commit cards', 'short', 'Commits your Bash calls make'],
 	]
 	return kinds.map(([key, label, value, what]) => ({
 		name: `cardVerbosity${key}`,
 		label,
-		type: { kind: 'choice', options: ['short', 'glimpse', 'long'] },
+		type: { kind: 'choice', options: ['short', 'long'] },
 		default: value,
-		description: `${what}: short shows the title row, glimpse a few rows more, long everything. Ctrl-O steps one card; /cards changes the current session.`,
+		description: `${what}: short shows the title row and a few rows in the terminal, the title row alone on the web; long shows everything. Ctrl-O toggles one card; /cards changes the current session.`,
 		browser: true,
 	}))
 }
@@ -153,8 +154,9 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 		values[s.name] = s.default
 		let key = s.name in raw ? s.name : s.name.replace(/^cardVerbosity/, 'blockVerbosity')
 		if (!(key in raw)) continue
-		let why = settings.problem(s.type, raw[key])
-		if (!why) values[s.name] = raw[key]
+		let v = raw[key]
+		let why = settings.problem(s.type, v)
+		if (!why) values[s.name] = v
 		else warnings.push(`${key}: ${why}${s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[key]) ?? String(raw[key])}`}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
@@ -211,5 +213,5 @@ export const settings = {
 	push: (): boolean => settings.value('push') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
-	glimpseRows: (): number => settings.value('cardVerbosityGlimpseRows') as number,
+	shortRows: (): number => settings.value('cardVerbosityShortRows') as number,
 }

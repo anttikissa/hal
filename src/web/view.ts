@@ -308,7 +308,7 @@ function jobs(rows: Row[]): ReadonlySet<string> {
 	return out
 }
 
-// `full`: a tool result's whole output, not its glimpse.
+// `full`: a tool result's whole output, not its short rows.
 function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
@@ -327,10 +327,10 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		}
 		case 'tool-result': {
-			// A glimpse, like the terminal; steering's note is the header's (ker).
+			// Short rows, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
 			let rows = (item.diff ?? (item.interrupted ? bashResult.display(item.output, true) : bash ? bashResult.display(item.output) : item.output)).replace(/\n$/, '').split('\n')
-			let shown = full ? rows : rows.slice(0, settings.glimpseRows())
+			let shown = full ? rows : rows.slice(0, settings.shortRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			// An EDIT's diff: its rows as they are; Card colors each.
 			if (item.diff) return { kind: 'result log', text: shown.join('\n') }

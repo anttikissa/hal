@@ -345,7 +345,7 @@ export type Event =
 	// /collapse; tasks ghs, v8y); each client changes its own fold state.
 	// No `mode`: toggle.
 	| { type: 'toggle'; sessionId: string; target: string; mode?: 'expand' | 'collapse' }
-	// A paste's text for a prompt shown inline (task ghs), to the client
+	// A paste's text for draft expansion (Ctrl-O p), to the client
 	// that asked; `error` if there is none to show.
 	| { type: 'paste-text'; sessionId: string; name: string; text?: string; error?: string }
 	// Cached models.dev names on connect, model switch and catalog refresh.

@@ -1,6 +1,6 @@
 {
-	title: 'Keep prose glimpses fully expandable',
-	spec: 'Restore the invariant that every web prose glimpse can reveal its complete text by tapping a visible Show all control, including thinking, replies, prompts and delivered messages. Place the control outside the clipped content, so wrapped text and Markdown cannot hide it. Show less returns to glimpse; header taps retain short/open restoration, and body taps leave open cards unchanged. Tool controls and terminal behavior remain unchanged. Browser regression coverage checks visibility and full disclosure on desktop and phone widths.',
+	title: 'Keep web prose cards fully expandable',
+	spec: 'Every web prose card, including thinking, replies, prompts and delivered messages, reveals its complete text when long; nothing clips it. Header taps switch short and long, and body taps leave long cards unchanged. Tool controls and terminal behavior remain unchanged. Browser regression coverage checks full disclosure on desktop and phone widths.',
 	status: 'done',
 	notes: [
 		'The header correctly restored open state, but open defaulted to glimpse and non-tool cards had no full-text control: the existing Show all condition read only tool output. The prose control lives outside .content, whose CSS clips glimpse rows, so wrapped prose cannot clip the control. Terminal behavior already reaches long through its existing cycle.',

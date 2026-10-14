@@ -3,7 +3,7 @@
 // renderer (render.ts) decides how to get it onto the terminal.
 
 import { bashResult } from '../common/bash-result.ts'
-import { card } from '../common/card.ts'
+import { card, type Verbosity } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
@@ -14,7 +14,6 @@ import { batchOrder, type Ordering } from './batch-order.ts'
 import { formView } from './form-view.ts'
 import { itemView, type Look } from './item-view.ts'
 import { water } from './water.ts'
-import { toggle, type Fold } from '../common/toggle.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
 import type { Folded } from '../common/notices.ts'
@@ -67,9 +66,8 @@ export interface View {
 	newCode?: boolean; noUser?: boolean
 	/** The notice stack, over the rows just above the tab bar (task qm). */
 	notices?: Folded
-	/** Toggled blocks' states and inline pastes (task ghs); `sig`
-	 * changes with them. */
-	folds?: Look & { states: Map<string, Fold>; sig: string }
+	/** Toggled blocks' states (task ghs); `sig` changes with them. */
+	folds?: { states: Map<string, Verbosity>; sig: string }
 	/** The running call's elapsed time, "12s" (task wm0), and spinner (task
 	 * hyt); without `call`, the streaming last item's. */
 	tick?: { call?: string; label: string; spin: string }
@@ -106,19 +104,19 @@ function promptWidth(cols: number): number {
 // and look, not on every frame: a long history stays cheap to redraw.
 // A kept row keeps the link code it was painted with (task e3 notes).
 // `status`: after the title: a call's (task wm0), a live block's
-// elapsed time and spinner cell (task hyt). `look`: its verbosity and
-// inline pastes (tasks ghs, hyt).
+// elapsed time and spinner cell (task hyt). `look`: its verbosity
+// (tasks ghs, hyt).
 function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
 	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${settings.glimpseRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
+	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
 	let lines = look.lines?.(inner) ?? itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: head })
-	if (hal && ['long', 'inline'].includes(look.fold ?? card.initial(item))) lines = halCursor.withCursor(lines, hal, inner)
+	if (hal && (look.fold ?? card.initial(item)) === 'long') lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
 	// Closed blocks too: a card without them looks broken. look.pad decides.
@@ -183,7 +181,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let items = memo.at.out
 	let calls = new Map<string, string>()
 	let toolCalls = new Map<string, { key: string; name: string }>()
-	let callFolds = new Map<string, Fold>()
+	let callFolds = new Map<string, Verbosity>()
 	let formCursor: Frame['cursor'] | undefined
 	let tick: Past['tick']
 	// The call whose card is being laid out: its first row and fold key.
@@ -232,9 +230,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		// Toggled here, or as the session starts its kind (task hyt); a
 		// call fails with its result.
 		let res = items[i + 1], failed = item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id && card.failed(res, item.name === 'bash')
-		let fold = item.type === 'tool-result' ? callFolds.get(item.id) ?? 'glimpse' : view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed)
+		let fold = item.type === 'tool-result' ? callFolds.get(item.id) ?? 'short' : view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed)
 		if (item.type === 'tool') callFolds.set(item.id, fold)
-		let look: Look = { fold, pastes: view.folds?.pastes }
+		let look: Look = { fold }
 		if (item.type === 'tool') {
 			toolCalls.set(item.id, { key: item.key, name: item.name })
 			tools.push({ at: i, id: item.id, key: item.key, name: item.name, fold })
@@ -340,7 +338,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
-		let look: Look = { fold: view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)), pastes: view.folds?.pastes }
+		let look: Look = { fold: view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)) }
 		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session, look) : frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
 		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
 		let joined = edge !== undefined && stacked === edge
@@ -392,6 +390,6 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 }
 
 // The unchanged transcript prefix, including originating tool identities.
-type History = { look: string; items: Item[]; ends: number[]; tools: { at: number; id: string; key: string; name: string; fold: Fold }[]; lines: string[] }
+type History = { look: string; items: Item[]; ends: number[]; tools: { at: number; id: string; key: string; name: string; fold: Verbosity }[]; lines: string[] }
 
 export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, queuedRows, order: batchOrder.order, promptWidth }

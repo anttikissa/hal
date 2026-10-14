@@ -1,8 +1,7 @@
 import { toolPresentation, type ToolPresentation } from '../common/tool-presentation.ts'
 import { diff } from '../common/diff.ts'
-import { toolDetails } from '../common/tool-details.ts'
 import type { Shown as Item } from '../common/transcript.ts'
-import type { Fold } from '../common/toggle.ts'
+import type { Verbosity } from '../common/card.ts'
 import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'
 import { diffView } from './diff-view.ts'
@@ -15,14 +14,10 @@ function lines(presentation: ToolPresentation, output: string, width: number, st
 	])
 }
 
-function call(item: Item & { type: 'tool' }, head: string, width: number, fold: Fold, result: Item | undefined, style: Style | undefined): string[] {
+function call(item: Item & { type: 'tool' }, head: string, width: number, fold: Verbosity, result: Item | undefined, style: Style | undefined): string[] {
 	let rows = [head]
 	if (item.presentationError) rows.push(...ansi.wrap(ansi.clean(item.presentationError), width))
-	if (fold === 'inline') rows.push('Raw call', ...toolDetails.value(item.input).flatMap((r) => ansi.wrap(ansi.clean(r), width)))
-	else if (fold === 'long') {
-		if (!result && item.presentation) rows.push(...presentationView.lines(item.presentation, '', width, style))
-		rows.push(...ansi.wrap('Toggle again for raw call and result', width))
-	}
+	if (fold === 'long' && !result && item.presentation) rows.push(...presentationView.lines(item.presentation, '', width, style))
 	return rows
 }
 

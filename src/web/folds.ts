@@ -1,16 +1,17 @@
-// How much of each web card shows (tasks w5, r4d, v8y, hyt): short,
-// glimpse or long, kept by session and block key, not by the DOM, in
+// How much of each web card shows (tasks w5, r4d, v8y, hyt): short (the
+// title row) or long, kept by session and block key, not by the DOM, in
 // memory only. A card starts as the session sets its kind
 // (card.initial); a click, /toggle, /expand, /collapse and Ctrl-O
 // change it locally and unrecorded, as in the terminal (task ghs); the
 // model's command arrives as an event.
 
 import { createSignal, flush, untrack } from 'solid-js'
+import type { Verbosity } from '../common/card.ts'
 import type { ModalState } from '../common/modals.ts'
 import type { Key } from '../common/forms.ts'
 import { forms } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
-import { toggle, type Fold, type Mode } from '../common/toggle.ts'
+import { toggle, type Mode } from '../common/toggle.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
@@ -20,8 +21,8 @@ import { draftPastes } from '../common/draft-pastes.ts'
 let draft: ReturnType<typeof draftPastes.create> | undefined
 let requested = false
 
-const [states, setStates] = createSignal<ReadonlyMap<string, Fold>>(new Map())
-const opened = new Map<string, Fold>()
+const [states, setStates] = createSignal<ReadonlyMap<string, Verbosity>>(new Map())
+// Tool cards showing their raw call and result (the card's button).
 const [raw, setRaw] = createSignal<ReadonlySet<string>>(new Set())
 
 function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
@@ -32,16 +33,15 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
 }
 
 // Card `id`'s (`<session>#<key>`) state, `start` until changed here.
-function level(id: string, start: Fold): Fold {
+function level(id: string, start: Verbosity): Verbosity {
 	return states().get(id) ?? start
 }
 
 // Sets card `id`; collapsing the card the address names drops the
 // address's #block without a new history entry. `keys`: the blocks
 // the card shows (a call and its result).
-function set(id: string, fold: Fold, keys: string[]): void {
+function set(id: string, fold: Verbosity, keys: string[]): void {
 	// The updater sees earlier sets of the same batch (/expand t*).
-	if (fold !== 'short') opened.set(id, fold)
 	untrack(() => setStates((s) => new Map(s).set(id, fold)))
 	let hash = decodeURIComponent(location.hash.slice(1)).replace(/^[a-z](?=\d)/, '')
 	if (fold === 'short' && hash && keys.includes(hash)) {
@@ -50,14 +50,13 @@ function set(id: string, fold: Fold, keys: string[]): void {
 	}
 }
 
-function disclose(id: string, start: Fold, keys: string[], fallback: Fold): void {
-	let current = level(id, start)
-	if (current !== 'short') opened.set(id, current)
-	set(id, current === 'short' ? opened.get(id) ?? fallback : 'short', keys)
+// A click on card `id`: it switches state.
+function disclose(id: string, start: Verbosity, keys: string[]): void {
+	set(id, toggle.step(level(id, start)), keys)
 }
 
 // The states of `t`'s cards, as the shared rules see them; one per use.
-function at(t: Transcript): (item: Item) => Fold {
+function at(t: Transcript): (item: Item) => Verbosity {
 	let start = toggle.starts(t)
 	return (item) => folds.level(`${t.meta.id}#${item.key}`, start(item))
 }
@@ -73,12 +72,7 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	scroll.follow(() => {
 		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			let id = `${t.meta.id}#${item.key}`
-			let current = at(item)
-			if (current !== 'short') opened.set(id, current)
-			let next = toggle.step(item, current, p.open, false)
-			setRaw((s) => toggled(s, id, next === 'inline'))
-			folds.set(id, next, result ? [item.key, result] : [item.key])
+			folds.set(`${t.meta.id}#${item.key}`, toggle.step(at(item), p.open), result ? [item.key, result] : [item.key])
 		}
 		flush()
 	})
@@ -108,7 +102,7 @@ function onEvent(event: Event): boolean {
 // The dialog `m` with the hint for the session shown.
 function hinted(m: ModalState): ModalState {
 	let t = app.state.view.transcript
-	let next = t ? blocksDialog.update(m, toggle.items(t), folds.at(t), false) : m
+	let next = t ? blocksDialog.update(m, toggle.items(t), folds.at(t)) : m
 	if (m.form!.values[0]!.trim() !== 'p' || !draft) return next
 	if (!requested) {
 		requested = true
@@ -138,7 +132,7 @@ function key(k: Key, cursor?: number): void {
 	if (!m?.compact) return
 	if (k.key === 'tab') {
 		if (!t) return
-		let next = blocksDialog.complete(m, toggle.items(t), folds.at(t), cursor, false)
+		let next = blocksDialog.complete(m, toggle.items(t), folds.at(t), cursor)
 		app.setView({ ...app.state.view, modal: next })
 		// The caret stays after the completed id, not at the end.
 		let field = document.activeElement

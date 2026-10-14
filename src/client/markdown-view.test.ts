@@ -87,8 +87,8 @@ describe('high-water mark', () => {
 describe('tool card high-water mark', () => {
 	afterEach(() => frame.state.peaks.clear())
 	let input = { command: 'seq 9', description: 'Count' }
-	// Tool cards as a glimpse (task hyt): running output against the result glimpse.
-	let view = (items: any[], folds?: View['folds']): View => ({ transcript: { meta: { id: 'c', cwd: '/', model: 'm', createdAt: '', blocks: { tool: 'glimpse' } }, state: { type: 'idle' }, inbox: [], items }, prompt: { text: '', cursor: 0 }, folds })
+	// Tool cards short (task hyt): running output against the short result.
+	let view = (items: any[], folds?: View['folds']): View => ({ transcript: { meta: { id: 'c', cwd: '/', model: 'm', createdAt: '', blocks: { tool: 'short' } }, state: { type: 'idle' }, inbox: [], items }, prompt: { text: '', cursor: 0 }, folds })
 	let height = (v: View) => frame.build(v, 40).history
 	let output = '1\n2\n3\n4\n5\n6\n7\n8\n9\n'
 
@@ -96,7 +96,7 @@ describe('tool card high-water mark', () => {
 		let running = height(view([{ type: 'tool', id: 'x', name: 'bash', input, partial: output, key: '3' }]))
 		let done = view([{ type: 'tool', id: 'x', name: 'bash', input, key: '3' }, { type: 'tool-result', id: 'x', output: `[exit 0]\n${output}`, key: '4' }])
 		expect(height(done)).toBe(running)
-		// Not only through the mark: running output is laid out as the glimpse.
+		// Not only through the mark: running output is laid out as the short result.
 		frame.state.peaks.clear()
 		frame.state.history = undefined
 		expect(height(done)).toBe(running)

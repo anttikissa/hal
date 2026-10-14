@@ -7,7 +7,8 @@ import { completion } from './completion.ts'
 import { forms } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
 import { titles } from './titles.ts'
-import { toggle, type Fold } from './toggle.ts'
+import { toggle } from './toggle.ts'
+import type { Verbosity } from './card.ts'
 import type { Item } from './transcript.ts'
 
 // The help area: one key and description pair per row,
@@ -35,16 +36,16 @@ function open(): ModalState {
 }
 
 // `m` with its hint for the field's text; Tab's list goes.
-function update(m: ModalState, items: Item[], fold: (item: Item) => Fold, inlinePastes = true): ModalState {
+function update(m: ModalState, items: Item[], fold: (item: Item) => Verbosity): ModalState {
 	if (m.form!.values[0]!.trim() === 'p') return { ...m, blocks: { hint: 'No paste markers in the prompt you are writing', invalid: true, help: help(items) } }
 	let p = toggle.plan('toggle', items, m.form!.values[0]!, fold)
-	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, (i) => toggle.next(i, fold(i), inlinePastes)) }
+	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, fold) }
 	return { ...m, blocks: { ...hint, help: help(items) } }
 }
 
 // Tab: the item under the cursor gets the common prefix of the block
 // ids it matches; several are listed, newest first. Never cycles.
-function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, cursor = m.form!.cursor, inlinePastes = true): ModalState {
+function complete(m: ModalState, items: Item[], fold: (item: Item) => Verbosity, cursor = m.form!.cursor): ModalState {
 	if (m.form!.values[0]!.trim() === 'p') return m
 	let text = m.form!.values[0]!
 	let before = text.slice(0, cursor)
@@ -56,7 +57,7 @@ function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, curs
 	let fill = found.length === 1 ? (end ? found[0]!.key : ref.hash + titles.blockId(found[0]!)) : ref.hash + (end ? '' : ref.kinds) + completion.common(found.map((i) => i.key))
 	let value = before.slice(0, before.length - token.length) + fill + text.slice(cursor)
 	let form = { ...forms.set(m.form!, 0, value), cursor: cursor - token.length + fill.length }
-	let next = blocksDialog.update({ ...m, form }, items, fold, inlinePastes)
+	let next = blocksDialog.update({ ...m, form }, items, fold)
 	return found.length > 1 ? { ...next, blocks: { ...next.blocks!, choices: found.map((i) => titles.blockId(i)) } } : next
 }
 

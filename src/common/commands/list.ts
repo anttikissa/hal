@@ -20,7 +20,7 @@ const list: CommandInfo[] = [
 	{ name: 'amend', description: 'edit a prompt and run it again, or undo the last amend', category: 'session' },
 	{ name: 'autoclose', description: 'show or set automatic tab closure', category: 'session' },
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
-	{ name: 'cards', description: 'show or set how cards of a kind start: short, glimpse or long', category: 'session' },
+	{ name: 'cards', description: 'show or set how cards of a kind start: short or long', category: 'session' },
 	{ name: 'blocks', description: 'alias for /cards', category: 'session', hidden: true },
 	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },

@@ -52,7 +52,7 @@ function view(): View {
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
 	let states = t && folds.state.folds.get(t.meta.id)
-	if (states?.size) v.folds = { states, pastes: folds.state.pastes, sig: `${[...states].join()} ${[...folds.state.pastes.values()].filter((p) => p.text !== undefined || p.error).length}` }
+	if (states?.size) v.folds = { states, sig: [...states].join() }
 	let tick = t && appView.tick(t, Date.now())
 	if (tick) v.tick = tick
 	if (t) v.status = appView.status(t)

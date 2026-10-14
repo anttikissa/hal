@@ -1,6 +1,6 @@
 {
-	title: 'Hide ineffective prose disclosure controls',
-	spec: 'Web prose Show all and Show less controls appear only when rendered content exceeds the configured glimpse height, including wrapped single-source-line text and Markdown. Recompute when content or available width changes. Keep the control outside clipped content, align its disclosure with the normal body inset, and preserve the normal card bottom inset below it. Short prose retains header collapse but has no ineffective full/glimpse control. Tool and terminal behavior remain unchanged; this is a web clipping and spacing repair.',
+	title: 'Web prose cards have no partial disclosure control',
+	spec: 'Web prose cards have no Show all or Show less control: short is the title row, long the complete rendered text, including wrapped single-source-line text and Markdown. The header collapses and expands them. Tool and terminal behavior remain unchanged.',
 	status: 'done',
 	notes: [
 		'Rendered prose height is observed with ResizeObserver, including wrapping, Markdown and the clipping box padding. The control stays outside the clipped body; card padding, not an escaping bottom margin, preserves the background below it. Two focused browser tests passed with 54 assertions; scoped lint passed. Inspected the phone screenshot. No terminal change: this repairs web-only clipping and spacing.'

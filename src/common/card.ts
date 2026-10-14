@@ -6,15 +6,15 @@ import type { SessionMeta } from './session.ts'
 import { settings } from './settings.ts'
 import { summary } from './summary.ts'
 import type { Shown } from './transcript.ts'
-import type { Fold } from './toggle.ts'
 
-// How much of a block shows (task hyt): its title row, a glimpse, or all.
-export type Verbosity = 'short' | 'glimpse' | 'long'
+// How much of a block shows (task hyt): short is the title row and a
+// few rows in the terminal, the title row alone on the web; long is all.
+export type Verbosity = 'short' | 'long'
 // What config.ason and /blocks set a start state for.
 export type Kind = 'prompt' | 'text' | 'thinking' | 'tool' | 'failed' | 'message' | 'notice' | 'commit'
 
 const kinds: Kind[] = ['prompt', 'text', 'thinking', 'tool', 'failed', 'message', 'notice', 'commit']
-const levels: Verbosity[] = ['short', 'glimpse', 'long']
+const levels: Verbosity[] = ['short', 'long']
 
 // Tool calls that carry a message to another session.
 const messaging = new Set(['send', 'spawn'])
@@ -47,9 +47,11 @@ function setting(kind: Kind): string {
 }
 
 // How `kind` starts in a session with overrides `blocks`: its
-// override, else this client's setting.
+// override, else this client's setting. An unknown stored value reads
+// as the setting, and an unknown setting as short.
 function verbosity(kind: Kind, blocks?: SessionMeta['blocks']): Verbosity {
-	return blocks?.[kind] ?? (settings.value(card.setting(kind)) as Verbosity)
+	let own = blocks?.[kind]
+	return (card.levels.includes(own!) ? own : settings.value(card.setting(kind))) === 'long' ? 'long' : 'short'
 }
 
 // Whether a call failed: its result is an error, or a bash call's
@@ -60,16 +62,16 @@ function failed(result: { output: string; isError?: boolean; interrupted?: 'canc
 
 // How `item` starts. A message queued for the turn end is its queue
 // card's one row.
-function initial(item: Shown, blocks?: SessionMeta['blocks'], failed = false): Fold {
+function initial(item: Shown, blocks?: SessionMeta['blocks'], failed = false): Verbosity {
 	if (item.type === 'prompt' && item.waiting && item.delivery === 'after-turn') return 'short'
 	let k = card.kind(item, failed)
 	return k ? card.verbosity(k, blocks) : 'long'
 }
 
-// What every kind starts as, and the glimpse rows: a layout made under
+// What every kind starts as, and the short rows: a layout made under
 // another signature is stale.
 function signature(blocks?: SessionMeta['blocks']): string {
-	return `${card.kinds.map((k) => card.verbosity(k, blocks)[0]).join('')}${settings.glimpseRows()}`
+	return `${card.kinds.map((k) => card.verbosity(k, blocks)[0]).join('')}${settings.shortRows()}`
 }
 
 function text(item: Shown & { type: 'prompt' | 'text' | 'thinking' }): string {

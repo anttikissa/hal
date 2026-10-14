@@ -71,14 +71,14 @@ test('choice options form a column: arrows move down it and past its ends to oth
 })
 
 test('inline choices: left/right change the value, up/down move between rows; cards preview the values', () => {
-	let row = (name: string, cards: string): Field => ({ type: 'choice', name, options: ['short', 'glimpse', 'long'], initial: 1, inline: true, cards })
+	let row = (name: string, cards: string): Field => ({ type: 'choice', name, options: ['short', 'medium', 'long'], initial: 1, inline: true, cards })
 	let st = forms.start('q', { text: 'How verbose?', fields: [row('tool', 'tool'), row('thinking', 'thinking')] })
-	expect(press(st, [k('right'), k('right')]).st.values).toEqual(['long', 'glimpse'])
-	expect(press(st, [k('left'), k('left')]).st.values).toEqual(['short', 'glimpse'])
+	expect(press(st, [k('right'), k('right')]).st.values).toEqual(['long', 'medium'])
+	expect(press(st, [k('left'), k('left')]).st.values).toEqual(['short', 'medium'])
 	let down = press(st, [k('down'), k('left')]).st
-	expect(down).toMatchObject({ focus: 1, values: ['glimpse', 'short'] })
+	expect(down).toMatchObject({ focus: 1, values: ['medium', 'short'] })
 	expect(press(down, [k('up')]).st.focus).toBe(0)
-	expect(forms.cards<Record<string, string>>(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'glimpse', thinking: 'short' })
+	expect(forms.cards<Record<string, string>>(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'medium', thinking: 'short' })
 	expect(forms.cards(undefined, { bash: 'long' })).toEqual({ bash: 'long' })
 })
 

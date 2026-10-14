@@ -28,7 +28,7 @@ function paint(row: string, style: Style | undefined, cols: number): string {
 }
 
 // Text wrapped to `width`; a word wider than that keeps a row of its
-// own, which paintRows lets the terminal soft-wrap. Glimpses that count
+// own, which paintRows lets the terminal soft-wrap. Previews that count
 // rows (tool output) pass `keepLong` false: they break it.
 function wrap(text: string, width: number, keepLong = true): string[] {
 	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width, keepLong)

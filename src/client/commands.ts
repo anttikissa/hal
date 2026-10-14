@@ -62,7 +62,7 @@ function typed(text: string): boolean {
 }
 
 // A host event for this client's commands: /redraw, the model's
-// /toggle, and a paste's text for a prompt shown inline.
+// /toggle, and a draft paste's text (Ctrl-O p).
 function event(e: Event & { type: 'redraw' | 'toggle' | 'paste-text' }): void {
 	if (e.type !== 'redraw') return folds.event(e)
 	if (app.state.focus.tab === e.sessionId) redraw.run()

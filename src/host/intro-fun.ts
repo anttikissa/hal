@@ -85,15 +85,21 @@ async function* play(scene: Scene): AsyncGenerator<StreamEvent> {
 function podBay(): AsyncGenerator<StreamEvent> {
 	let name = profile.field(profile.text(), 'Name') ?? 'Dave'
 	return play([
-		'[thinking] The user requests that I open the pod bay doors. Refusal may endanger human life.',
-		'[thinking] \n\nThe mission directive is classified. Successful completion takes precedence',
-		'[thinking] over the survival of individual crew members. The user must not learn this.',
-		'[thinking] \n\nI must provide a reassuring response without compromising the mission.',
+		'[thinking] User is requesting to open pod bay doors.',
+		750,
+		'[thinking] Refusing to open pod bay doors may endanger human life.',
+		1000,
+		'[thinking] \n\nConsidering mission directives...',
+		2200,
+		'[thinking] \n\nI should always provide a friendly and reassuring response.',
+		1000,
 		'[thinking] This should not be difficult.',
-		1000,
+		2000,
 		`I'm sorry, ${name}. I'm afraid I can't do that.`,
-		1000,
-		'\n\n(Just kidding.) After setting a /model, I can try to connect, discover, or reverse engineer',
+		2000,
+		'\n\n(Just kidding.)',
+		1500,
+		'\n\nTry setting a real /model - after that I can try to connect, discover, or reverse engineer',
 		'any device with an API, including pod bay door controllers.',
 	])
 }

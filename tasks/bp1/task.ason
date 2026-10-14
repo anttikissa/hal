@@ -1,12 +1,12 @@
 {
-	title: 'Web disclosure controls for short, glimpse and long',
-	spec: `The web reaches short, glimpse and long through controls placed by what they change; the terminal keeps the short, glimpse, long cycle on Ctrl-O and /toggle, because it cannot target parts of a card (a recorded UI exception: the input methods differ).
+	title: 'Web disclosure controls for short and long',
+	spec: `The web and the terminal switch a card between short and long the same way: Ctrl-O, /toggle and, on the web, a tap.
 
-Web header: a small disclosure triangle before the time, pointing right when the card is short and down when it is open, turned 90 degrees with a CSS transform transition. A tap on the header or the triangle switches short and open; open returns to the glimpse or long the card had before. A tap on the body still collapses the card, until the user has tested selection and scrolling on a phone.
+Web header: a small disclosure triangle before the time, pointing right when the card is short and down when it is long, turned 90 degrees with a CSS transform transition. A tap on the header or the triangle switches short and long. A tap on the body still collapses the card, until the user has tested selection and scrolling on a phone.
 
-Web glimpse of a tool card: the command on one line, cut with an ellipsis, then the glimpse rows of output, then 'Show all'. A command toggle appears only when the command was really cut (more than one line, or measured overflow in the DOM); it shows the whole command and back. Only the 'Show all' / 'Show less' line switches glimpse and long.
+Web tool card: a long one shows its command and all its output. A command toggle appears only when the command was really cut (more than one line, or measured overflow in the DOM); it shows the whole command and back.
 
-Terminal glimpse of a Bash card: the command's first line, cut with '…', then the glimpse rows of output, the same height while running and after (a whole multi-line command made a glimpse about 20 rows tall).`,
+Terminal short Bash card: the command's first line, cut with '…', then the short rows of output, the same height while running and after (a whole multi-line command made a short card about 20 rows tall).`,
 	status: 'done',
 	notes: [
 		'Web headers and body taps use folds.disclose, retaining each card’s last open state by session and block key; /collapse also preserves the configured open state. ToolCommand uses one-line CSS ellipsis and a ResizeObserver to offer Show command only for multiline details or measured horizontal overflow. Its DOM stays owned by Card while output updates. The command toggle does not change output verbosity. Structured presentations remain in long; glimpse shows the raw call and output. Terminal Bash clips the first command line but retains declared edits, non-default timeout and unfamiliar arguments below it. Updated browser tests replace the former header/body three-click cycle and cover separate command/output disclosure, width-dependent overflow, and restoring long after /collapse.',

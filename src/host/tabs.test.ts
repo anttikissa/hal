@@ -200,7 +200,7 @@ test('a session with unreadable metadata fails its own tab, not the tab list', (
 	let good = newTab(a, '/tmp/p')
 	let broken = newTab(a, '/tmp/p')
 	sessions.close(broken)
-	writeFileSync(`${paths.sessionDir(broken)}/session.ason`, `{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: { tool: 'huge' } }`)
+	writeFileSync(`${paths.sessionDir(broken)}/session.ason`, `{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: 'huge' }`)
 	send(a, { type: 'tab-new', cwd: '/tmp/p' })
 	expect(tabsOf(a)?.find((t) => t.id === good)?.state.type).not.toBe('error')
 	expect(tabsOf(a)?.find((t) => t.id === broken)?.state).toEqual({ type: 'error', message: expect.stringContaining('invalid blocks') })

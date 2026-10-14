@@ -135,7 +135,7 @@ const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six']
 // The sample thinking card the card question previews on (task 5zq).
 const sample = `Thinking cards hold the model's reasoning before it acts. Here it decides to list the files in this folder, so a tool card shows up below with the command and its output.
 
-Short shows a card's title row, glimpse adds a few rows, long shows everything. The choice is only where a card starts: Ctrl-O or a click still opens or closes any card.`
+Short shows a card's title row and a few rows in the terminal, the title row alone on the web; long shows everything. The choice is only where a card starts: Ctrl-O or a click still opens or closes any card.`
 
 // The sample cards: this thinking, then `ls -l` run for real, so the
 // card question has something to preview on.
@@ -307,7 +307,7 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	// Card verbosity (task 5zq): sample cards first, then the question,
 	// whose rows preview on them while it is open (Field.cards).
 	let startsAs = (kind: Kind) => settings.value(card.setting(kind)) as string
-	let levels = ['short', 'glimpse', 'long']
+	let levels: string[] = card.levels
 	let row = (name: string, label: string, kind: Kind): Field => ({ type: 'choice', name, label, options: levels, initial: Math.max(0, levels.indexOf(startsAs(kind))), inline: true, cards: kind })
 	if (answered(run, 'toolCards') === undefined) {
 		if (sessionId && !run.some((r) => r.type === 'assistant' && r.block.type === 'thinking' && r.block.text === sample)) return { stream: samples(sessionId) }
