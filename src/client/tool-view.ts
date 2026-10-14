@@ -78,15 +78,17 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold,
 	let shown = rows.slice(0, max)
 	let more = rows.length - shown.length + lines.length - used
 	let status = tool ? '' : toolView.resultStatus(item, !!call, style)
+	let key = look.call?.key ?? call
+	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`↑ t${key}`)) {
+		let ref = session && transcript.href(session, `t${key}`)
+		let text = `↑ t${key}`
+		let link = ansi.quiet(ref ? `\x1b]8;;${ansi.webUrl(ref)}\x07${text}${ansi.LINK_OFF}` : text, style)
+		status = status ? `${status} ${link}` : link
+	}
 	let res = shown.map((l, i) => {
 		let prefix = !i && item.isError ? '✗ ' : ''
 		// Apart from its call, a result is its own block: it leads with its time.
 		if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
-		let key = look.call?.key ?? call
-		if (!i && !tool && key && transcript.addressable(key)) {
-			let ref = session && transcript.href(session, `t${key}`)
-			prefix += ref ? `\x1b]8;;${ansi.webUrl(ref)}\x07t${key}${ansi.LINK_OFF}> ` : `t${key}> `
-		}
 		let text = strings.clipVisual(prefix + l, width)
 		let line = painted ? diffView.paint(text, tones[i]!, style) : tool || look.call ? text : ansi.quiet(text, style)
 		return !i && status ? itemView.right(line, status, width) : line
