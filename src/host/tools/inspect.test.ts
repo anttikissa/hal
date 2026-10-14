@@ -21,22 +21,29 @@ const inspect = (sessionId: string, input: Record<string, unknown> = {}, model?:
 	{ cwd: '/tmp', signal: new AbortController().signal, sessionId, model },
 )
 
-// Task 3r4: who last changed each uncommitted file, and whether it still holds that change.
-test('INSPECT files names the last declared editor of each uncommitted file', async () => {
+// Task 3r4: who changed each uncommitted file since its last commit, and whether it still holds the newest change.
+test('INSPECT files names every declared editor since the last commit, newest first', async () => {
 	let dir = realpathSync(mkdtempSync(join(tmpdir(), 'hal-3r4-')))
 	try {
-		Bun.spawnSync(['git', 'init', '-q', dir])
-		for (let name of ['kept.txt', 'redone.txt', 'stray.txt']) writeFileSync(join(dir, name), name)
-		let id = created(client(), dir)
+		let git = (...args: string[]) => Bun.spawnSync(['git', '-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], { env: { ...process.env, GIT_COMMITTER_DATE: '2001-01-01T00:00:00Z' } })
+		git('init', '-q')
+		writeFileSync(join(dir, 'committed.txt'), 'v1')
+		git('add', 'committed.txt')
+		git('commit', '-q', '-m', 'c')
+		for (let name of ['kept.txt', 'redone.txt', 'stray.txt', 'committed.txt']) writeFileSync(join(dir, name), name)
+		let id = created(client(), dir), other = created(client(), dir)
 		tabs.file().open.push(id)
 		let hash = (text: string) => new Bun.CryptoHasher('sha256').update(text).digest('hex')
-		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 7, cwd: dir, files: [{ path: 'kept.txt', before: null, after: hash('kept.txt') }, { path: 'redone.txt', before: null, after: hash('old') }] })
+		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 3, cwd: dir, ts: '2000-01-01T00:00:00.000Z', files: [{ path: 'committed.txt', before: null, after: hash('v1') }] })
+		history.append(other, { type: 'file_changes', toolId: 'toolu_y', call: 5, cwd: dir, ts: '2002-01-01T00:00:00.000Z', files: [{ path: 'kept.txt', before: null, after: hash('older') }] })
+		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 7, cwd: dir, ts: '2003-01-01T00:00:00.000Z', files: [{ path: 'kept.txt', before: null, after: hash('kept.txt') }, { path: 'redone.txt', before: null, after: hash('old') }] })
 		let input = nativeTool.resolve('INSPECT "files"').input
 		let lines = (await tools.run({ type: 'tool_call', id: 'i', name: 'inspect', input }, { cwd: dir, signal: new AbortController().signal, sessionId: id })).output.split('\n').sort()
-		expect(lines).toHaveLength(3)
-		expect(lines[0]).toMatch(new RegExp(`^kept\\.txt: ${id} \\(tab \\d+, ".*"\\) t7 at .* - current$`))
-		expect(lines[1]).toMatch(/^redone\.txt: .* t7 at .* - changed since$/)
-		expect(lines[2]).toBe('stray.txt: no Hal record')
+		expect(lines).toHaveLength(4)
+		expect(lines[0]).toBe('committed.txt: no Hal record since its last commit')
+		expect(lines[1]).toMatch(new RegExp(`^kept\\.txt: ${id} \\(tab \\d+, ".*"\\) t7 at .* - current; earlier: ${other} \\(closed\\) t5 at .*$`))
+		expect(lines[2]).toMatch(/^redone\.txt: .* t7 at .* - changed since$/)
+		expect(lines[3]).toBe('stray.txt: no Hal record')
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
