@@ -64,9 +64,9 @@ function event(id: string, e: Event): void {
 	flush(id)
 	if (e.type === 'turn-start') {
 		st.started.set(id, Date.now())
-		if (e.prompt) say(`${id} ${e.sender?.from ? `from ${e.sender.from}` : 'you'}: `, e.prompt)
+		if (e.prompt) say(`${id} ${e.sender?.from ? `from ${e.sender.from}` : 'user'}: `, e.prompt)
 	} else if (e.type === 'prompt') {
-		e.texts.forEach((text, i) => say(`${id} ${e.senders?.[i]?.from ? `from ${e.senders[i]!.from}` : 'you'}: `, text))
+		e.texts.forEach((text, i) => say(`${id} ${e.senders?.[i]?.from ? `from ${e.senders[i]!.from}` : 'user'}: `, text))
 	} else if (e.type === 'command' && e.origin !== 'model') say(`${id} command: `, e.text)
 	else if (e.type === 'output' && e.error) serverLog.log(`${id} command failed: ${e.text}`)
 	else if (e.type === 'question') say(`${id} asks: `, e.form.text)

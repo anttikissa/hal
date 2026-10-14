@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Session events come from host.broadcast, so turn code is untouched. Assistant text is buffered per session until another event of that session, then written once (at most 200 chars kept). clients.fromRequest now trusts X-Forwarded-For only from a loopback connection (behind Caddy); otherwise the socket address, since the header could be forged. Verified: real hal serve on a scratch home with a hal/tool -p client, a busy --port exiting 1, SIGTERM and SIGUSR1 lines.',
-		'server-mode.test.ts fails on HEAD before this change too: Bun 1.4.2 panics (Bus error at address 0x0, exit 138) when SIGUSR1 reaches hal serve about 175 ms after start; the same signal seconds later exits 100. A Bun bug, not Hal.'
+		'server-mode.test.ts fails on HEAD before this change too: Bun 1.4.2 panics (Bus error at address 0x0, exit 138) when SIGUSR1 reaches hal serve about 175 ms after start; the same signal seconds later exits 100. A Bun bug, not Hal.',
+		'Uploads (the attach command, browser and terminal) log session, type, size and client. Prompts log as user:.'
 	],
 	needs: ['fd1', 'jjr']
 }

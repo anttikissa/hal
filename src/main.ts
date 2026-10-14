@@ -1,6 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'
 import { args, type Args } from './client/args.ts'
@@ -312,7 +312,20 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 	}
 	main.initHost()
 	let run = print.run({ ...job, cwd }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
-	await link.start({ socketPath: server.socketPath(), tryHost: async () => main.mayHost() && server.serve(), local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
+	// `hal -p` never hosts (task gw): a host needs the web and recovery. If
+	// no host answers the first dial, it starts a detached `hal serve`
+	// (logging to state/serve.log) once, and keeps dialing until it is up.
+	let tries = 0
+	let tryHost = async () => {
+		if (++tries !== 2 || !main.mayHost()) return false
+		let file = join(paths.stateDir(), 'serve.log')
+		let log = openSync(file, 'a', 0o600)
+		let serve = Bun.spawn([process.execPath, import.meta.path, '--home', paths.home(), 'serve', ...(promptCache.state.noUser ? ['--no-user'] : [])], { env: process.env, stdio: ['ignore', log, log], detached: true })
+		serve.unref()
+		void serve.exited.then((code) => code && (process.stderr.write(`hal: hal serve exited with ${code}; see ${file}\n`), process.exit(1)))
+		return false
+	}
+	await link.start({ socketPath: server.socketPath(), tryHost, local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
 	run.begin()
 	process.exit(await run.done)
 }
@@ -392,7 +405,7 @@ export const main = {
 			...(resources.state.sample && { memory: `${serverLog.gb(resources.state.sample.memory)} available`, disk: `${serverLog.gb(resources.state.sample.disk)} free` }),
 		}))
 		main.initHost()
-		serverLog.log('hal serve', { home: paths.home(), state: paths.stateDir(), pid: process.pid, ...(process.argv.length > 3 && { args: process.argv.slice(3) }) })
+		serverLog.log('hal serve', { home: paths.home(), state: paths.stateDir(), pid: process.pid, ...(process.argv.length > 3 && { args: process.argv.slice(2) }) })
 		void version.current().then(async ({ loaded }) => serverLog.log(`version ${await (await import('./host/release.ts')).release.line(loaded)}`))
 		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
 		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)

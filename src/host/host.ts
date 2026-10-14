@@ -243,6 +243,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'close') { queueEdits.disconnect(client, c.sessionId); client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
 	else if (c.type === 'attach') {
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
+		serverLog.log(`${c.sessionId} upload ${c.mediaType} ${Math.round((c.data.length * 3) / 4 / 1024)} KB by ${serverLog.client(client.record)}`)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
 	} else if (c.type === 'rebase-error') slash.output(c.sessionId, c.text, true)
 	else if (c.type === 'rebase-apply') return { reply: rebasePlans.answer(c) }
