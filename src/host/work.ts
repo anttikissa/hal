@@ -166,7 +166,7 @@ function stop(t: Target): string {
 				let running = tools.running.get(`${at.sessionId}:${at.call.id}`)
 				if (running) {
 					if (!['bash', 'wait'].includes(at.call.name)) throw new Error(`running ${at.call.name.toUpperCase()} cannot be interrupted individually; stop session ${at.sessionId} instead`)
-					running.controller.abort()
+					running.controller.abort('by the user')
 					stopped = true
 				}
 			}

@@ -219,7 +219,7 @@ async function lost(): Promise<void> {
 const steered = 'steered'
 const byMessage = 'by a new user message, which follows; read it, then carry on'
 function why(signal: AbortSignal, stopped = 'canceled'): string {
-	return `${stopped} ${signal.reason === steered ? byMessage : 'by the user'}`
+	return `${stopped} ${signal.reason === steered ? byMessage : typeof signal.reason === 'string' ? signal.reason : '(the next hal-note says why)'}`
 }
 
 export const jobs = {
