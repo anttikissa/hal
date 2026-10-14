@@ -8,6 +8,7 @@ import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
 import { provider } from './provider.ts'
 import { tool as bash } from './tools/bash.ts'
+import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
 
 // A local fake Messages server and fake credentials in a temp home:
@@ -258,6 +259,22 @@ test('stop reasons map to neutral ones; a call cut off by max_tokens is none; a 
 	expect(await run()).toEqual([{ type: 'done', reason: 'max_tokens' }])
 	reply = () => sse(start(), { type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: { explanation: 'No.' } }, usage: {} }, { type: 'message_stop' })
 	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
+})
+
+test('native search is offered to allowlisted models without Serper and becomes a hosted card with sources', async () => {
+	let search = { type: 'web_search_20250305', name: 'web_search' }
+	let req = { model: 'claude-opus-5-5', messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'hi' }] }], tools: [nativeTool.def()] }
+	expect(anthropic.body(req, true).tools).toContainEqual(search)
+	expect(anthropic.body({ ...req, model: 'claude-old-1' }, true).tools).not.toContainEqual(search)
+	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'sk-test' }, serper: { apiKey: 'serper-test' } }) + '\n', { mode: 0o600 })
+	auth.close()
+	expect(anthropic.body(req, true).tools).not.toContainEqual(search)
+	let recording = await Bun.file(`${import.meta.dir}/../fixtures/anthropic-search.sse`).text()
+	reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
+	let turn = blocks.collect(await run(), 'anthropic')
+	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
+	expect(turn.blocks[0]).toEqual({ type: 'hosted_tool', id: 'srvtoolu_01Ngy267NcSomnQgRzd2G7wD', name: 'web_search', input: { query: 'VALO Hotel Helsinki' }, output: 'Sources:\nhttps://valo.fi/en/hotel/\nhttps://valo.fi/en/' })
+	expect(turn.blocks[1]).toMatchObject({ type: 'text', text: expect.stringContaining('\n\nSources:\nhttps://valo.fi/en/\nhttps://valo.fi/en/hotel/') })
 })
 
 test('errors: HTTP status, error event mid-stream, stream cut short', async () => {
