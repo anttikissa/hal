@@ -300,7 +300,7 @@ function send(delivery: Delivery = 'steer'): void {
 	}
 	if (restart.typed(st.text) || folds.typed(st.text)) { diagnostics.record('outcome', 'client-command'); return app.input('') }
 	let { command, notice, keep } = view.submit(st.view, st.text, delivery)
-	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string; rewind?: number } | undefined
+	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string } | undefined
 	// A prompt shows at once and waits, pending, for the host.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
 	else if (c) connection.send(c)

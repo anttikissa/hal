@@ -25,7 +25,7 @@ import { sendKeys } from './send-keys.ts'
 // record it replaces, rewinding there (task 26q). `ts`: when it was
 // sent, its time until the host's record replaces it (task ta).
 // `base`: the draft rev the sent text emptied (host drafts.sent).
-export type Sending = { id: string; text: string; ts?: string; delivery?: Delivery; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string; base?: number }
+export type Sending = { id: string; text: string; ts?: string; delivery?: Delivery; amend?: boolean; edits?: string; queueEdit?: string; base?: number }
 
 export type Local = {
 	// What the editor holds.
@@ -72,7 +72,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || !!sendKeys.parse(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string') && (s.base === undefined || Number.isSafeInteger(s.base))).map((s) => (s.delivery ? { ...s, delivery: sendKeys.parse(s.delivery)! } : s))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || !!sendKeys.parse(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.queueEdit === undefined || typeof s.queueEdit === 'string') && (s.base === undefined || Number.isSafeInteger(s.base))).map((s) => (s.delivery ? { ...s, delivery: sendKeys.parse(s.delivery)! } : s))
 	let e = l.queueEdit
 	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') && (e.window === undefined || typeof e.window === 'string') ? e : undefined
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
@@ -86,9 +86,10 @@ function text(id: string): string {
 	return drafts.local(id).text
 }
 
-// Prompts shown as pending (sent, not acknowledged).
+// Prompts shown as pending (sent, not acknowledged); an /amend as the
+// edited prompt it becomes.
 function pending(id: string): Sending[] {
-	return drafts.local(id).sending.filter((s) => s.queueEdit === undefined)
+	return drafts.local(id).sending.flatMap((s) => (s.queueEdit === undefined ? [{ ...s, text: s.text.replace(/^\/amend \d+\n/, '') }] : []))
 }
 
 // The user changed the editor text.
@@ -124,7 +125,6 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 	if (how.delivery && how.delivery !== 'steer') sending.delivery = how.delivery
 	if (how.amend) sending.amend = true
 	if (how.edits !== undefined) sending.edits = how.edits
-	if (how.rewind !== undefined) sending.rewind = how.rewind
 	if (how.queueEdit !== undefined) sending.queueEdit = how.queueEdit
 	l.sending.push(sending)
 	if (!how.queueEdit && (!l.text.trim() || text.includes(l.text.trim()))) {
@@ -138,7 +138,7 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.delivery ? { delivery: s.delivery } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), ...(s.base === undefined ? {} : { base: s.base }), id: s.id }
+	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.delivery ? { delivery: s.delivery } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.base === undefined ? {} : { base: s.base }), id: s.id }
 }
 
 // Folds a host event in. True if the session's editor text changed.

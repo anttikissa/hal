@@ -1,5 +1,5 @@
-// Editing an earlier prompt rewinds there (task 26q): submit with
-// `rewind: n` drops #n on in one rebase and sends the edit.
+// Editing an earlier prompt rewinds there (task 26q): /amend <n> <text>
+// drops #n on in one rebase and sends the edit (task ky7).
 
 import { expect, test } from 'bun:test'
 import { history } from './history.ts'
@@ -8,6 +8,7 @@ import { calls, client, created, shown, stamped, until, useHost } from './host-f
 useHost()
 
 const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
+const errors = (c: ReturnType<typeof client>) => c.of('output').filter((e) => e.error).map((e) => e.text)
 
 // Two completed turns: prompts 'one' and 'two'.
 async function twoTurns(a: ReturnType<typeof client>, id: string) {
@@ -24,12 +25,12 @@ test('rewind drops the prompt and everything after it, then sends the edit once'
 	let a = client()
 	let id = created(a)
 	let n = await twoTurns(a, id)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'uno', rewind: n, id: 'r1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno`, id: 'r1' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	b.conn.send({ type: 'submit', sessionId: id, text: 'uno', rewind: n, id: 'r1' })
+	b.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno`, id: 'r1' })
 	await until(() => calls.length === 3 && b.of('ack').length)
-	expect([...a.of('rejected'), ...b.of('rejected')]).toEqual([])
+	expect([...a.of('rejected'), ...b.of('rejected'), ...errors(a)]).toEqual([])
 	expect(calls[2]!.input.messages.map(texts)).toEqual([[stamped('uno')]])
 	calls[2]!.push({ type: 'text', text: 're uno' }, { type: 'done', reason: 'end' })
 	await until(() => a.views.get(id)!.state.type === 'idle' && a.of('turn-end').length === 3)
@@ -46,24 +47,24 @@ test('rewind refuses a running session, a non-prompt and a dropped record', asyn
 	let id = created(a)
 	let n = await twoTurns(a, id)
 	let reply = history.readSync(id).find((r) => r.type === 'assistant')!.n!
-	a.conn.send({ type: 'submit', sessionId: id, text: 'x', rewind: reply, id: 'bad1' })
-	await until(() => a.of('rejected').length === 1)
-	expect(a.of('rejected')[0]!.reason).toContain('not a prompt')
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${reply} x`, id: 'bad1' })
+	await until(() => errors(a).length === 1)
+	expect(errors(a)[0]).toContain('not a prompt')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'three' })
 	await until(() => calls.length === 3)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'x', rewind: n, id: 'bad2' })
-	await until(() => a.of('rejected').length === 2)
-	expect(a.of('rejected')[1]!.reason).toContain('running')
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} x`, id: 'bad2' })
+	await until(() => errors(a).length === 2)
+	expect(errors(a)[1]).toContain('running')
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 3)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'uno', rewind: n })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno` })
 	await until(() => calls.length === 4)
 	calls[3]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 4)
 	// A stale client still offering a dropped prompt.
 	let two = history.readSync(id).find((r) => r.type === 'user' && JSON.stringify(r).includes('"two"'))!.n!
-	a.conn.send({ type: 'submit', sessionId: id, text: 'again', rewind: two, id: 'bad3' })
-	await until(() => a.of('rejected').length === 3)
-	expect(a.of('rejected')[2]!.reason).toContain('not a prompt')
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${two} again`, id: 'bad3' })
+	await until(() => errors(a).length === 3)
+	expect(errors(a)[2]).toContain('not a prompt')
 	expect(history.readSync(id).filter((r) => r.type === 'user' && r.amends !== undefined)).toHaveLength(1)
 })

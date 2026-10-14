@@ -70,10 +70,9 @@ function invalid(value: unknown): string | undefined {
 	}
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
 	if (c.type === 'paste-text') return str('sessionId') ?? str('name')
-	if (c.type === 'submit' && c.rewind !== undefined && !(Number.isSafeInteger(c.rewind) && (c.rewind as number) > 0)) return 'submit: rewind must be a record number'
 	if (c.type === 'queue-edit' || c.type === 'queue-edit-cancel') return str('sessionId') ?? str('edit') ?? (c.type === 'queue-edit' ? str('message') : undefined)
 	if (c.type === 'submit') {
-		if (c.queueEdit !== undefined && (c.amend !== true || c.edits === undefined || c.queue === true || c.delivery === 'queue' || c.rewind !== undefined)) return 'submit: queueEdit requires amend and edits, without queue, delivery queue or rewind'
+		if (c.queueEdit !== undefined && (c.amend !== true || c.edits === undefined || c.queue === true || c.delivery === 'queue')) return 'submit: queueEdit requires amend and edits, without queue or delivery queue'
 		return str('sessionId') ?? str('text') ?? str('edits', true) ?? str('queueEdit', true)
 	}
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)

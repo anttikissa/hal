@@ -5,7 +5,7 @@ import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
 import { titles } from '../common/titles.ts'
-import { calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
+import { amending, calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { prompts } from './prompts.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
@@ -313,8 +313,32 @@ test('a steer resent to the next host is not added twice', async () => {
 // Up while the model works: the client pauses the turn, then sends the edit.
 async function pauseAndEdit(a: ReturnType<typeof client>, id: string, text: string) {
 	a.conn.send({ type: 'pause', sessionId: id })
-	a.conn.send({ type: 'submit', sessionId: id, text, amend: true })
+	a.conn.send({ type: 'submit', sessionId: id, text: amending(id, text) })
 }
+
+test('/amend replaces a prompt quietly; /amend undo restores it with its partial output, paused', async () => {
+	let a = client()
+	let id = toolSession(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I ntoe?' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'You no' })
+	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
+	let n = history.readSync(id).findLast((r) => r.type === 'user')!.n
+	a.conn.send({ type: 'pause', sessionId: id })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/amend u${n}\nwhat did I note?`, id: 'edit-1' })
+	await until(() => calls.length === 2)
+	expect(a.of('prompt').at(-1)).toMatchObject({ command: 'edit-1' })
+	calls[1]!.push({ type: 'text', text: 'Milk.' }, { type: 'done', reason: 'end' })
+	await until(() => a.views.get(id)!.state.type === 'idle')
+	expect(shown((await fresh(id)).items)).toEqual([{ type: 'prompt', text: 'what did I note?', edited: true }, { type: 'text', text: 'Milk.' }, { type: 'turn-end', status: 'completed' }])
+	a.conn.send({ type: 'submit', sessionId: id, text: '/amend undo' })
+	await until(() => a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'You no'))
+	let view = await fresh(id)
+	expect(view).toEqual(a.views.get(id)!)
+	expect(shown(view.items.filter((i) => i.type !== 'divider'))).toEqual([{ type: 'prompt', text: 'what did I ntoe?', interactive: true }, { type: 'text', text: 'You no', interrupted: true }, { type: 'turn-end', status: 'paused' }])
+	expect(view.state.type).toBe('paused')
+	expect(history.readSync(id).some((r) => r.type === 'command')).toBe(false)
+})
 
 test('an edit after only reading replaces the prompt: the model sees it as if written that way', async () => {
 	let a = client()
@@ -497,11 +521,12 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	calls[0]!.push({ type: 'text', text: 'partial' })
 	await until(() => a.of('stream').length)
 	a.conn.send({ type: 'pause', sessionId: id })
-	a.conn.send({ type: 'submit', sessionId: id, text: 'right', amend: true, id: 'a1' })
+	let edit = amending(id, 'right')
+	a.conn.send({ type: 'submit', sessionId: id, text: edit, id: 'a1' })
 	// A reconnect resends it before the first is carried out.
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	b.conn.send({ type: 'submit', sessionId: id, text: 'right', amend: true, id: 'a1' })
+	b.conn.send({ type: 'submit', sessionId: id, text: edit, id: 'a1' })
 	await until(() => a.of('ack').length && b.of('ack').length)
 	expect([...a.of('rejected'), ...b.of('rejected')]).toEqual([])
 	await until(() => calls.length === 2)

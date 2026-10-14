@@ -8,6 +8,7 @@ import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import { protocol, type Event } from '../common/protocol.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import { replay } from '../common/replay.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
 import { config } from './config.ts'
@@ -146,6 +147,12 @@ export async function fresh(id: string): Promise<Transcript> {
 	c.conn.send({ type: 'open', sessionId: id })
 	await until(() => c.views.get(id))
 	return c.views.get(id)!
+}
+
+// The /amend a client sends to edit the session's last prompt (task ky7).
+export function amending(id: string, text: string): string {
+	let records = replay.current(history.readSync(id))
+	return `/amend ${records[replay.lastPrompt(records)]!.n}\n${text}`
 }
 
 // The host process goes away and a new one starts on the same home.

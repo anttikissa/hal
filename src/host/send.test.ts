@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import { amend } from '../common/amend.ts'
 import { history } from './history.ts'
-import { calls, client, created, fresh, heard, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
+import { amending, calls, client, created, fresh, heard, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
@@ -139,7 +139,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	// Up edits the human's text, not the later one from the other session.
 	expect(amend.begin(c.views.get(a)!, '')?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
-	c.conn.send({ type: 'submit', sessionId: a, text: 'and hurry', amend: true })
+	c.conn.send({ type: 'submit', sessionId: a, text: amending(a, 'and hurry') })
 	await until(() => calls.length === next + 3)
 	// The edit is a new record, so its block ids differ (task c2t).
 	let body = (t: string) => t.replace(/^\[[^\]\n]*\]$/gm, '[]')

@@ -49,7 +49,7 @@ function command(id: string, text: string, call: { name: string; args: string },
 	if (cmd.quiet && from === undefined && !origin) {
 		void (async () => {
 			let reply: Reply
-			try { reply = await slash.attempt(id, call.name, call.args, undefined, sender) } catch (e: any) { reply = { error: String(e?.message ?? e) } }
+			try { reply = await slash.attempt(id, call.name, call.args, undefined, sender, command) } catch (e: any) { reply = { error: String(e?.message ?? e) } }
 			if (Object.keys(reply).some((k) => k !== 'result')) {
 				typed()
 				reply = slash.report(id, call.name, call.args, reply, sender)
@@ -64,11 +64,12 @@ function command(id: string, text: string, call: { name: string; args: string },
 
 // What a command runs with: its session, whose cwd and model it may
 // change.
-function context(id: string, sender?: Sender): Context {
+function context(id: string, sender?: Sender, command?: string): Context {
 	let meta = sessions.open(id)
 	return {
 		sessionId: id,
 		sender,
+		command,
 		cwd: meta.cwd,
 		previousCwd: meta.previousCwd,
 		model: meta.model,
@@ -130,11 +131,11 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	return slash.report(id, name, args, reply, sender)
 }
 
-// Runs command `name`; a failure throws.
-function attempt(id: string, name: string, args: string, answers?: Answers, sender?: Sender): Reply | Promise<Reply> {
+// Runs command `name`; a failure throws. `command`: the client's id.
+function attempt(id: string, name: string, args: string, answers?: Answers, sender?: Sender, command?: string): Reply | Promise<Reply> {
 	let cmd = commands.all().get(name)
 	if (!cmd) throw new Error(`unknown command /${name}`)
-	return cmd.run(args, answers, slash.context(id, sender))
+	return cmd.run(args, answers, slash.context(id, sender, command))
 }
 
 // Records and tells what command `name` replied, and opens its question.

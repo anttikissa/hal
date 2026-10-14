@@ -3,7 +3,7 @@ import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
 import type { Command, Event } from '../common/protocol.ts'
 import { forms } from '../common/forms.ts'
-import { replay } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { readdirSync, statSync, existsSync } from 'fs'
 import { blobs } from './blobs.ts'
@@ -80,10 +80,32 @@ function drop(id: string, ns: number[], options: { continuing?: boolean } = {}):
 	rebasePlans.broadcast(id, Math.min(...ns.flatMap((n) => [...(groups.get(n) ?? [n])])))
 }
 
+// What an amend leaves in place after its prompt: messages, answers,
+// notices and setting changes stay true whatever the prompt said.
+function survives(r: HistoryRecord): boolean {
+	return r.type === 'inbox' || r.type === 'answer' || r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change !== undefined)
+}
+
+// /amend undo (task hx8): one plan on the amend's base replaces the
+// amend rebase, so the original prompt and its partial output return,
+// and drops the edited prompt and what followed. Apply pauses the
+// session, which now ends in an unanswered prompt.
+function unamend(id: string): string {
+	let raw = history.readSync(id)
+	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase')
+	if (last?.type !== 'rebase' || !last.quiet) throw new Error('Nothing to undo: the latest history rewrite is not an amend.')
+	let current = replay.current(raw), at = current.findIndex((r) => r.type === 'user' && r.amends !== undefined && r.n! > last.n!)
+	let edited = current[at]
+	if (edited?.type !== 'user') throw new Error('Nothing to undo: the amended prompt is gone.')
+	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0)
+	rebasePlans.broadcast(id, edited.amends!)
+	return 'Amend undone.'
+}
+
 // Edits prompt #n and rewinds there (task 26q), as one command: a
-// rebase dropping #n and every later record except inbox, answer and
-// change records (as a replacing prompt keeps them), then the edited
-// text sent as a new prompt. Returns why it is refused, if it is.
+// rebase dropping #n and every later record that does not survive,
+// then the edited text sent as a new prompt. Returns why it is refused,
+// if it is.
 function rewind(id: string, n: number, text: string, command?: string): string | undefined {
 	let raw = history.readSync(id), state = status.stateOf(id, raw).type
 	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
@@ -106,4 +128,4 @@ function answer(c: Command & { type: 'rebase-apply' }): Event {
 	return result
 }
 
-export const rebasePlans = { build, broadcast, apply, undo, drop, rewind, answer }
+export const rebasePlans = { build, broadcast, apply, undo, drop, survives, unamend, rewind, answer }

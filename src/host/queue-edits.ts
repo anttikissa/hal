@@ -81,14 +81,14 @@ function intercept(owner: object, c: Command): { refused?: string; reply?: Event
 	if (c.type === 'queue-edit-cancel') return { refused: queueEdits.cancel(id, owner, c.edit) }
 	if (c.type === 'submit' && c.queueEdit !== undefined) return { refused: queueEdits.save(id, owner, c.queueEdit, c.edits!, c.text, c.id) }
 	if (!queueEdits.state.has(id)) return
-	if (c.type === 'rebase-apply' || (c.type === 'submit' && c.rewind !== undefined)) return { refused: busy }
+	if (c.type === 'rebase-apply') return { refused: busy }
 	if (c.type === 'submit' && c.edits === queueEdits.held(id)) return { refused: busy }
 }
 
 // Commands that would drop or rewrite waiting messages wait for the lock.
 function refused(id: string, name: string, args = ''): string | undefined {
 	if (!queueEdits.state.has(id)) return
-	if (name === 'clear' || name === 'rebase' || (name === 'queue' && args === 'clear')) return busy
+	if (name === 'clear' || name === 'rebase' || name === 'amend' || (name === 'queue' && args === 'clear')) return busy
 }
 
 // /queue next on the locked message: it goes when the edit ends.

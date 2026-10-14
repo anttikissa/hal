@@ -147,8 +147,7 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
 	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
 	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
-	let kept = (r: HistoryRecord) => r.type === 'inbox' || r.type === 'answer' || r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change !== undefined)
-	rebasePlans.drop(id, records.slice(at).flatMap((r) => r.n === undefined || kept(r) ? [] : [r.n]), { continuing: true })
+	rebasePlans.drop(id, records.slice(at).flatMap((r) => r.n === undefined || rebasePlans.survives(r) ? [] : [r.n]), { continuing: true })
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
 	parts[mine] = { type: 'text', text: literal.strip(text) }

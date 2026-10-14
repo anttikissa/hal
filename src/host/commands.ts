@@ -26,7 +26,7 @@ export type Reply = { result?: string; say?: string; synthetic?: string; show?: 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say
 // records output while the command still runs (a login that waits).
-export type Context = { sessionId: string; sender?: Sender; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
+export type Context = { sessionId: string; sender?: Sender; command?: string; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
 
 export type Candidate = { value: string; description: string }
 

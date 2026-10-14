@@ -200,7 +200,7 @@ test('bare Enter continues a paused or failed turn, and says so', () => {
 // A session working on `prompt`, as the host would show it.
 function working(prompt = 'fix ti') {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
-	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt, provider: 'anthropic' })
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt, provider: 'anthropic', n: 5 })
 }
 const up = () => app.onKeys([key('up')])
 const down = () => app.onKeys([key('down')])
@@ -215,7 +215,7 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true, base: 0 })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 5\nfix it', base: 0 })
 	expect(appView.view().prompt.text).toBe('')
 	// The edit is over: the next prompt is a new one.
 	type('more')
@@ -237,7 +237,7 @@ test('an edit not yet acknowledged is sent again as an edit by the next client',
 		app.reset()
 		sent = []
 		app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'fix ti!', amend: true, base: 0 }])
+		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: '/amend 5\nfix ti!', base: 0 }])
 	} finally {
 		drafts.store = store
 	}

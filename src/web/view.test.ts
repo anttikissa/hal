@@ -133,14 +133,14 @@ test('the open question is filled in with browser keys and answered; afterwards 
 test('Up on an empty input while the model works edits the last prompt; Enter sends it, Down or Escape continues', () => {
 	let running = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'running', phase: 'streaming' } } },
-		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake' },
+		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake', n: 5 },
 	])
 	expect(view.editKey(running, 'up', 'draft')).toBeUndefined()
 	let up = view.editKey(running, 'up', '')!
 	expect(up).toMatchObject({ command: { type: 'pause', sessionId }, text: 'fix ti' })
 	let editing = fold([{ type: 'state', sessionId, state: { type: 'paused' } }], up.view)
 	expect(view.hints(editing, 'fix ti').some(([key]) => key === 'enter')).toBe(false)
-	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: 'fix it', amend: true }, keep: false })
+	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: '/amend 5\nfix it' }, keep: false })
 	expect(view.editKey(editing, 'down', 'fix it')).toBeUndefined()
 	let down = view.editKey(editing, 'down', 'fix ti')!
 	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })

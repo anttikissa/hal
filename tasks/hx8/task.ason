@@ -1,6 +1,6 @@
 {
 	title: '/amend undo',
-	spec: '/amend undo restores the prompt the latest amend replaced, with its partial output, and removes the edited prompt and everything after it from context and transcript. It appends one rebase plan on the amend plan base that drops the edited prompt and later records except inbox, answer, change and notice; rebase.latest makes it supersede the amend plan. The session is left paused. /rebase undo reverses it. Refused when no amend made through a rebase exists or a later rewrite happened.',
-	status: 'planned',
+	spec: '/amend undo restores the prompt the latest amend replaced, with its partial output, and removes the edited prompt and everything after it from context and transcript. It appends one rebase plan on the amend plan base that drops the edited prompt and later records except inbox, answer, change and notice; rebase.latest makes it supersede the amend plan. The session is left paused. Refused when the latest active rewrite is not an amend (a quiet rebase). /rebase undo after it leaves both versions in context, since both plans share one base.',
+	status: 'done',
 	needs: ['ky7']
 }

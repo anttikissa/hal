@@ -31,9 +31,9 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 })
 
 test('Enter sends the edit for the host to place; an emptied edit just continues', () => {
-	let editing = { sessionId: 's1', original: 'fix ti' }
+	let editing = { sessionId: 's1', original: 'fix ti', target: '5' }
 	let paused = session({ type: 'paused' })
-	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
+	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 5\nfix it' })
 	expect(amend.enter(editing, paused, '  ')).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(amend.enter(editing, paused, 'fix ti')).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(amend.hint(editing, 'fix ti')).not.toContain('enter:')
@@ -95,7 +95,7 @@ test('unchanged edits continue without sending, and older targets respect side e
 	expect(amend.hint(last, 'twoa')).toContain('enter: amend')
 	let earlier = amend.step(last, t, -1)!
 	expect(earlier.rewind).toBe(1)
-	expect(amend.enter(earlier, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: 'uno', rewind: 1 })
+	expect(amend.enter(earlier, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 1\nuno' })
 	expect(amend.step(earlier, t, 1)?.original).toBe('two')
 	t.items.push({ type: 'tool', key: '4', id: 't1', name: 'command', input: { command: '/rename Title' } })
 	expect(amend.at(t, '1')!.editing.changed).toBe(false)

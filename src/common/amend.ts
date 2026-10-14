@@ -74,7 +74,7 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 	// pause); otherwise it starts a turn, which Up pauses.
 	let sent = drafts.pending(sessionId).at(-1)
 	if (sent?.delivery === 'queue') return undefined
-	if (sent && sent.rewind === undefined && !/^\/[a-z]/i.test(sent.text.trimStart())) {
+	if (sent && !/^\/[a-z]/i.test(sent.text.trimStart())) {
 		let editing: Editing = { sessionId, original: sent.text, inbox: sent.id }
 		return states.busy(t.state) ? { editing } : { editing: { ...editing, paused: true }, command: { type: 'pause', sessionId } }
 	}
@@ -94,9 +94,8 @@ function enter(editing: Editing, t: Transcript | undefined, text: string, queue 
 	if (!queue && text === editing.original) return resume(editing, t)
 	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
 	if (editing.changed) return { type: 'submit', sessionId: editing.sessionId, text }
-	if (editing.rewind !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, rewind: editing.rewind }
-	let command = { type: 'submit', sessionId: editing.sessionId, text, amend: true }
-	return editing.inbox === undefined ? command : { ...command, edits: editing.inbox }
+	if (editing.inbox !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, amend: true, edits: editing.inbox }
+	return { type: 'submit', sessionId: editing.sessionId, text: `/amend ${parseInt(editing.target!)}\n${text}` }
 }
 
 // Leaving the edit (Down unchanged, Escape): continue the paused turn,

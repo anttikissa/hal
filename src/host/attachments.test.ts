@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { attachments } from '../common/attachments.ts'
 import { anthropic } from './anthropic.ts'
 import { blobs } from './blobs.ts'
-import { calls, client, created, fresh, until, useHost, shown } from './host-fixture.test.ts'
+import { amending, calls, client, created, fresh, until, useHost, shown } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { openaiCompat } from './openai-compat.ts'
 import { paths } from './paths.ts'
@@ -116,7 +116,7 @@ test('image blocks show the same live and after reconnecting, and survive an edi
 	expect(shown(c.views.get(id)!.items)).toContainEqual(image)
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 
-	c.conn.send({ type: 'submit', sessionId: id, text: `look again at ${attached.marker}`, amend: true })
+	c.conn.send({ type: 'submit', sessionId: id, text: amending(id, `look again at ${attached.marker}`) })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(image)
 	expect(c.views.get(id)!.items.filter((i) => i.type === 'image')).toHaveLength(1)
@@ -145,13 +145,13 @@ test('a named image waits in /tmp under its name; its prompt copies it into the 
 	// /tmp cleaned: an edit keeps the image while its marker stays, and
 	// drops it once the marker is deleted.
 	rmSync(staged)
-	c.conn.send({ type: 'submit', sessionId: id, text: `and now? [image/${name}]`, amend: true })
+	c.conn.send({ type: 'submit', sessionId: id, text: amending(id, `and now? [image/${name}]`) })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(blocks[1])
 	expect(calls[1]!.input.image(blocks[1].blob)).toBe(png64)
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 2)
-	c.conn.send({ type: 'submit', sessionId: id, text: 'never mind', amend: true })
+	c.conn.send({ type: 'submit', sessionId: id, text: amending(id, 'never mind') })
 	await until(() => calls.length === 3)
 	expect(calls[2]!.input.messages.at(-1).blocks.some((b: any) => b.type === 'image')).toBe(false)
 })

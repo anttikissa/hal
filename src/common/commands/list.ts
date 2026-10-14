@@ -17,6 +17,7 @@ export type CommandInfo = { name: string; description: string; category: string;
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'account', description: 'switch this session to another login', category: 'session' },
+	{ name: 'amend', description: 'edit a prompt and run it again, or undo the last amend', category: 'session' },
 	{ name: 'autoclose', description: 'show or set automatic tab closure', category: 'session' },
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'cards', description: 'show or set how cards of a kind start: short, glimpse or long', category: 'session' },
