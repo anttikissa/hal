@@ -135,6 +135,9 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	// Function call arguments arrive as fragments per output index.
 	let calls = new Map<number, { id: string; name: string; args: string }>()
 	let called = false
+	// Search lines join adjacent text as paragraphs, never as leading or trailing blank lines.
+	let joined = false
+	let pending = false
 	for await (let m of messages) {
 		let ev = JSON.parse(m.data)
 		let index = ev.output_index ?? 0
@@ -144,13 +147,19 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				break
 			case 'response.reasoning_summary_part.added':
 				if (ev.summary_index > 0) yield { type: 'thinking', text: '\n\n' }
+				joined = pending = false
 				break
 			case 'response.reasoning_summary_text.delta':
 				if (ev.delta) yield { type: 'thinking', text: ev.delta }
+				joined = pending = false
 				break
 			case 'response.output_text.delta':
 			case 'response.refusal.delta':
-				if (ev.delta) yield { type: 'text', text: ev.delta }
+				if (ev.delta) {
+					yield { type: 'text', text: `${pending ? '\n\n' : ''}${ev.delta}` }
+					joined = true
+					pending = false
+				}
 				break
 			case 'response.content_part.done': {
 				let part = ev.part
@@ -172,9 +181,15 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					}
 					let action = item.action
 					let detail = action?.type === 'search' ? (action.queries ?? [action.query]).join('; ') : action?.type === 'open_page' ? action.url : action?.type === 'find_in_page' ? `${action.url}: ${action.pattern}` : undefined
-					if (detail) yield { type: 'text', text: `\n\nWeb search (${action.type}): ${detail}\n\n` }
+					if (detail) {
+						yield { type: 'text', text: `${joined ? '\n\n' : ''}Web search (${action.type}): ${detail}` }
+						joined = pending = true
+					}
 				}
-				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
+				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') {
+					yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
+					joined = pending = false
+				}
 				if (item?.type !== 'function_call') break
 				let call = calls.get(index) ?? { id: item.call_id, name: item.name, args: '' }
 				let json = typeof item.arguments === 'string' ? item.arguments : call.args
@@ -187,6 +202,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					return
 				}
 				called = true
+				joined = pending = false
 				yield { type: 'tool_call', id: call.id, name: call.name, input: args as Record<string, unknown> }
 				break
 			}
