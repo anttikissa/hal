@@ -96,12 +96,12 @@ function unamend(id: string): string {
 	if (forms.open(raw)) throw new Error('Answer or dismiss the open question before undoing the edit.')
 	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase')
 	if (last?.type !== 'rebase' || !last.quiet) throw new Error('Nothing to undo: the latest history rewrite is not an edit.')
-	let current = replay.current(raw), at = current.findIndex((r) => r.type === 'user' && r.amends !== undefined && r.n! > last.n!)
-	let edited = current[at]
+	let current = replay.current(raw), at = current.findIndex((r) => r.n! > last.n!)
+	let edited = current.find((r) => r.type === 'user' && r.amends !== undefined && r.n! > last.n!)
 	if (edited?.type !== 'user') throw new Error('Nothing to undo: the edited prompt is gone.')
 	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0, { quiet: true })
 	rebasePlans.broadcast(id, edited.amends!)
-	return `Edit undone: restored u${edited.amends}.`
+	return `Edit undone: prompt u${edited.amends} and its partial output are back`
 }
 
 // Edits prompt #n and rewinds there (task 26q), as one command: a

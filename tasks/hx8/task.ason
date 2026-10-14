@@ -3,7 +3,8 @@
 	spec: '/edit undo restores the prompt the latest edit replaced, with its partial output, and removes the edited prompt and everything after it from context and transcript. It appends one quiet rebase plan (no divider) on the edit plan base that drops the edited prompt and later records except inbox, answer, change and notice; rebase.latest makes it supersede the edit plan. Its command card says Edit undone: restored u<n>. A running turn is paused first, then undone once its work settles; an open question refuses with its own message. The session is left paused. Refused when the latest active rewrite is not an edit (a quiet rebase). /rebase undo after it leaves both versions in context, since both plans share one base.',
 	status: 'done',
 	notes: [
-		'Undo while the edited turn ran used to fail with the generic rebase refusal (Pause the session and answer or dismiss its question). host.ts now pauses the turn for /edit undo and reuses the wait-for-stopped-work path of edits. Invariant: /edit undo works whenever /edit could have run.'
+		'Undo while the edited turn ran used to fail with the generic rebase refusal (Pause the session and answer or dismiss its question). host.ts now pauses the turn for /edit undo and reuses the wait-for-stopped-work path of edits. Invariant: /edit undo works whenever /edit could have run.',
+		'Undo drops every non-surviving record after the edit rebase, including the go-back line, and says Edit undone: prompt u<n> and its partial output are back.'
 	],
 	needs: ['ky7']
 }
