@@ -39,6 +39,7 @@ function parse(text: unknown): Parsed {
 	if (text.length > maxChars) throw new Error(`cmd is ${text.length} characters; the most is ${maxChars}`)
 	let i = blank(text, 0)
 	if (i >= text.length) throw new Error('empty tool call; e.g. READ "src/main.ts" or BASH "ls -l"')
+	if (/^\/[A-Za-z]/.test(text.slice(i, i + 2))) return { name: 'command', raw: ' ' + text.slice(i) }
 	let name = /^[A-Za-z_]+/.exec(text.slice(i, i + 64))?.[0]
 	if (!name) throw new Error(`expected a tool name such as READ or BASH, found ${JSON.stringify(text.slice(i, i + 40))}`)
 	let end = i + name.length

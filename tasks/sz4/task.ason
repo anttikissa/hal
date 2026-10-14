@@ -1,0 +1,7 @@
+{
+	title: 'Bare slash command calls run as COMMAND',
+	spec: 'Call text starting with a slash command (/<letter>...) resolves silently to COMMAND with the whole text as the command, e.g. /rename Fix it. Models were seen sending this form. Prompts, HELP and docs keep teaching only COMMAND (user decision 14 Oct). Covered in native-tool.test.ts.',
+	status: 'done',
+	needs: ['3fv'],
+	foldInto: ['3fv']
+}

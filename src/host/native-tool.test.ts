@@ -59,6 +59,7 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(nativeTool.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({ name: 'wait', input: { targets: ['09-ada'] } })
 	expect(nativeTool.resolve('INSPECT sessions all "tab,id"')).toEqual({ name: 'inspect', input: { what: 'sessions', scope: 'all', fields: 'tab,id' } })
 	expect(nativeTool.resolve('READ "a.ts" "b.ts:3-4"')).toEqual({ name: 'read', input: { paths: [{ path: 'a.ts' }, { path: 'b.ts', offset: 3, limit: 2 }] } })
+	expect(nativeTool.resolve('/rename System prompt token count')).toEqual({ name: 'command', input: { command: '/rename System prompt token count' } })
 	expect(() => nativeTool.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
 })
 
