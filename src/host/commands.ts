@@ -43,6 +43,10 @@ export type SlashCommand = {
 	complete?(args: string, ctx: Context): (string | Candidate)[]
 	// Optional detail for each candidate, resolved on the host.
 	describeCompletion?(args: string, ctx: Context): string
+	// Run by the human, the command records nothing unless its reply
+	// shows something: the tabs or the session's status already show
+	// what it did. `result` still answers the model's tool call.
+	quiet?: true
 	run(args: string, answers: Answers | undefined, ctx: Context): Reply | Promise<Reply>
 }
 

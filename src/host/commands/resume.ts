@@ -9,6 +9,7 @@ import { closedSessions, sessionRow } from './tabs.ts'
 const recent = 20
 
 export const command: SlashCommand = {
+	quiet: true,
 	help: () => `/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume <session id> reopens the session named.`,
 	complete: (args) => ['all', ...closedSessions().map((s) => s.id)].filter((v) => v.startsWith(args)),
 	run(args, _answers, ctx) {
@@ -26,6 +27,6 @@ export const command: SlashCommand = {
 		}
 		if (outcome.refused) return { error: outcome.refused }
 		host.broadcast(ctx.sessionId, { type: 'go', sessionId: ctx.sessionId, tab: outcome.tab! })
-		return { say: `reopened ${outcome.tab}` }
+		return { result: `reopened ${outcome.tab}` }
 	},
 }

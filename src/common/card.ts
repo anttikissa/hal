@@ -80,7 +80,7 @@ function text(item: Shown & { type: 'prompt' | 'text' | 'thinking' }): string {
 }
 
 function markdown(item: Shown): boolean {
-	return item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && !item.commit) || (item.type === 'prompt' && !!item.from && !bashResult.background(item))
+	return item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && !item.commit) || (item.type === 'prompt' && !!item.from && !bashResult.background(item)) || (item.type === 'command' && item.output !== undefined)
 }
 
 export const card = { kinds, levels, kind, toggles, setting, verbosity, failed, initial, signature, text, markdown }

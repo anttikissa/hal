@@ -302,7 +302,7 @@ test('attachment acknowledgements and picker replies cannot end a streaming turn
 	expect(next.live).toBeDefined()
 })
 
-test('a model-run command shows only as its tool card, live and restored; a typed one keeps its timestamps', () => {
+test('a model-run command shows only as its tool card, live and restored; a typed one is one card with its output', () => {
 	let model = [
 		{ type: 'command' as const, text: '/rename New title', origin: 'model' as const, ts, n: 1 },
 		{ type: 'output' as const, text: 'Session renamed: Old title → New title', origin: 'model' as const, ts, n: 2 },
@@ -311,7 +311,7 @@ test('a model-run command shows only as its tool card, live and restored; a type
 	let live = fold([snap({ history: [] }), ...[...model, ...typed].map((e) => ({ ...e, sessionId }))])!
 	let restored = fold([snap({ history: [...model, ...typed] })])!
 	expect(live.items).toEqual(restored.items)
-	expect(restored.items).toMatchObject([{ type: 'command', text: '/cd /tmp', ts }, { type: 'output', text: 'cwd: /tmp', ts }])
+	expect(restored.items).toEqual([{ type: 'command', text: '/cd /tmp', output: 'cwd: /tmp', ts, key: '3' }])
 })
 
 test('waiting and delivered steering use the same header, without labeling a following fresh prompt', () => {

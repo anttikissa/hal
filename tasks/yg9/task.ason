@@ -1,0 +1,12 @@
+{
+	title: 'Quiet navigation commands and one-card command output',
+	spec: 'A human-typed command whose effect the tabs or session status already show records nothing on success: /go, /move, /unread, /new, /close, /resume and /pause (the Paused. card that Esc also writes is its record). A failure, or any reply that says something, records the command and its output as usual. A key or tab drag that runs one of these must also record nothing. The command still answers a model tool call with its result, and commands that the model or another session runs stay recorded. Every other typed command is one card in terminal and web: its header is the time and the command text, and its body is what it said; a command that says nothing is one row (time, command). Synthetic text, prompt-file changes and commits keep their own cards. History keeps command and output records unchanged; clients join them, live and restored alike. Output text does not repeat the command name (/rename says Old → New).',
+	status: 'done',
+	notes: [
+		'SlashCommand.quiet marks a command; host/slash.ts command() runs a quiet human command first and records it (typed + report) only if its reply has keys other than result. Confirmations moved from say to result so the model tool call still gets them.',
+		'A quiet command leaves no command record, so host.submitted cannot detect a resend with the same client id: a client that crashes between submit and ack may run /new twice. Accepted: the ack follows at once, and the other quiet commands are idempotent.',
+		'Joining lives in common/transcript.ts (joins, join, joined) for fold and fromSnapshot alike; the joined item is a command with output and error. titles.author heads it by its text; a command with no output has no header and draws as one stamped row.'
+	],
+	needs: ['et'],
+	foldInto: ['et']
+}

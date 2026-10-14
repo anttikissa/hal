@@ -48,7 +48,7 @@ test('autoclose command records each change once, pushes metadata and persists i
 	await until(() => c.of('output').some((e) => e.error))
 	expect(history.readSync(id).filter((r) => r.type === 'output' && r.text.includes('→')).map((r) => r.type === 'output' && r.text)).toEqual(['Autoclose: on → off', 'Autoclose: off → on'])
 	expect(c.of('meta').at(-1)?.meta.autoclose).toBe(true)
-	expect(c.views.get(id)?.items.some((r) => r.type === 'output' && r.text === 'Autoclose: off → on')).toBe(true)
+	expect(c.views.get(id)?.items.some((r) => r.type === 'command' && r.output === 'Autoclose: off → on')).toBe(true)
 	let stored = sessions.load(id, false)
 	expect(stored.autoclose).toBe(true)
 	liveFiles.close(stored)

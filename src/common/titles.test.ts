@@ -28,7 +28,8 @@ test('old records without model, effort or time still get a header', () => {
 	expect(titles.title({ type: 'text', text: 'x' })).toBe('Hal')
 	expect(titles.title({ type: 'thinking', text: 'x' })).toBe('Thinking')
 	expect(titles.title({ type: 'prompt', text: 'x' })).toBe('You')
-	expect(titles.title({ type: 'command', text: '/help' })).toBe('You')
+	expect(titles.title({ type: 'command', text: '/help', output: 'x' })).toBe('/help')
+	expect(titles.title({ type: 'command', text: '/help' })).toBeUndefined()
 	expect(titles.title({ type: 'output', text: 'x' })).toBeUndefined()
 })
 

@@ -346,8 +346,11 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: 'question warning', text: [...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
 		case 'command':
-			// Drawn as the prompt it was typed as (Card heads it).
-			return { kind: item.from === undefined ? 'user prompt' : 'message prompt', text: item.text }
+			// Another session's: drawn as the prompt it was sent as (Card
+			// heads it). The human's heads what it said, else is one row.
+			if (item.from !== undefined) return { kind: 'message prompt', text: item.text }
+			if (item.output === undefined) return { kind: 'end log', text: titles.stamp(item.ts, item.text) }
+			return { kind: item.error ? 'output error' : 'output log', text: item.output }
 		case 'output':
 			// A prompt-file change: the summary heads its card, so the body
 			// is the diffs (task ar).

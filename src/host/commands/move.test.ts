@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { client, restartHost, until, useHost } from '../host-fixture.test.ts'
+import { client, records, restartHost, until, useHost } from '../host-fixture.test.ts'
 
 useHost()
 
@@ -9,7 +9,7 @@ const tab = (c: ReturnType<typeof client>) => {
 	return c.of('ack').at(-1).tab as string
 }
 
-test('/move changes the shared tab order at first, middle, and past the end; persists after restart', async () => {
+test('/move changes the shared tab order at first, middle, and past the end; persists after restart; only a failure is recorded', async () => {
 	let a = client()
 	let b = client()
 	let [first, middle, last] = [tab(a), tab(a), tab(a)]
@@ -29,6 +29,7 @@ test('/move changes the shared tab order at first, middle, and past the end; per
 	move('/move 0')
 	await until(() => a.of('output').at(-1)?.error)
 	expect(order(b)).toEqual([first, middle, last])
+	expect((await records(last)).flatMap((r) => r.type === 'command' || r.type === 'output' ? [r.text] : [])).toEqual(['/move 0', 'position must be a positive integer (1-based)'])
 	restartHost()
 	expect(order(client())).toEqual([first, middle, last])
 })

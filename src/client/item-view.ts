@@ -46,8 +46,10 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	}
 	switch (item.type) {
 		case 'prompt':
-		case 'command':
 			return titles.letter(item) === 'm' ? colors.message() : colors.user()
+		// The human's command reads like its output (joined).
+		case 'command':
+			return item.from !== undefined ? colors.message() : { fg: (item.error ? colors.error() : colors.log()).fg! }
 		case 'image':
 			return colors.user()
 		case 'text':
@@ -162,9 +164,12 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let said = item.canceled ? ['(canceled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			return [...ansi.wrap(titles.title(item)!, width), '', ...quote, ...(quote.length ? [''] : []), ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
-		// Drawn as the prompt it was typed as: header, then its text.
+		// Another session's: drawn as the prompt it was sent as. The
+		// human's: 'HH:MM /cmd', and under it what it said, if anything.
 		case 'command':
-			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
+			if (item.from !== undefined) return itemView.headed(item, ansi.wrap(item.text, width), width, session)
+			if (item.output === undefined) return ansi.wrap(titles.stamp(item.ts, item.text), width)
+			return itemView.headed(item, markdownView.lines(item.output.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'output': {
 			// A commit (task 179): 'HH:MM Committed <short> <subject>';
 			// open, its files and the hook's lines.

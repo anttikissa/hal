@@ -28,20 +28,37 @@ import { effort } from './effort.ts'
 // otherwise the human) and
 // runs it. `command`: the client's id for the submit. Returns why it is
 // refused: no such command, or one only a client may run (a session may
-// not quit or restart the user's terminal).
+// not quit or restart the user's terminal). A quiet command the human
+// runs is recorded only if its reply shows something, such as an error.
 function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void, origin?: 'model', sender?: Sender): string | undefined {
 	let hold = queueEdits.refused(id, call.name, call.args)
 	if (hold) return hold
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
-	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
-	text = commands.all().get(call.name)!.record?.(call.args, id) ?? text
-	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text, ...(origin && { origin }) }
-	if (from !== undefined) record.from = from
-	if (sender?.label !== undefined) record.label = sender.label
-	if (command !== undefined) record.command = command
-	let { n, ts } = history.append(id, record)
-	host.broadcast(id, { type: 'command', sessionId: id, text, ...(origin && { origin }), ...(from !== undefined && { from }), ...(sender?.label !== undefined && { label: sender.label }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
+	let cmd = commands.all().get(call.name)
+	if (!cmd) return `unknown command /${call.name} (/help lists them)`
+	text = cmd.record?.(call.args, id) ?? text
+	let typed = () => {
+		let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text, ...(origin && { origin }) }
+		if (from !== undefined) record.from = from
+		if (sender?.label !== undefined) record.label = sender.label
+		if (command !== undefined) record.command = command
+		let { n, ts } = history.append(id, record)
+		host.broadcast(id, { type: 'command', sessionId: id, text, ...(origin && { origin }), ...(from !== undefined && { from }), ...(sender?.label !== undefined && { label: sender.label }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
+	}
+	if (cmd.quiet && from === undefined && !origin) {
+		void (async () => {
+			let reply: Reply
+			try { reply = await slash.attempt(id, call.name, call.args, undefined, sender) } catch (e: any) { reply = { error: String(e?.message ?? e) } }
+			if (Object.keys(reply).some((k) => k !== 'result')) {
+				typed()
+				reply = slash.report(id, call.name, call.args, reply, sender)
+			}
+			completed?.(reply)
+		})()
+		return
+	}
+	typed()
 	void slash.runCommand(id, call.name, call.args, undefined, { ...sender, ...(from !== undefined && { from }), ...(origin && { origin }) }).then((reply) => completed?.(reply))
 }
 
@@ -109,13 +126,19 @@ function name(id: string, value?: string): void {
 // answered) and records what it said.
 async function runCommand(id: string, name: string, args: string, answers?: Answers, sender?: Sender): Promise<Reply> {
 	let reply: Reply
-	try {
-		let cmd = commands.all().get(name)
-		if (!cmd) throw new Error(`unknown command /${name}`)
-		reply = await cmd.run(args, answers, slash.context(id, sender))
-	} catch (e: any) {
-		reply = { error: String(e?.message ?? e) }
-	}
+	try { reply = await slash.attempt(id, name, args, answers, sender) } catch (e: any) { reply = { error: String(e?.message ?? e) } }
+	return slash.report(id, name, args, reply, sender)
+}
+
+// Runs command `name`; a failure throws.
+function attempt(id: string, name: string, args: string, answers?: Answers, sender?: Sender): Reply | Promise<Reply> {
+	let cmd = commands.all().get(name)
+	if (!cmd) throw new Error(`unknown command /${name}`)
+	return cmd.run(args, answers, slash.context(id, sender))
+}
+
+// Records and tells what command `name` replied, and opens its question.
+function report(id: string, name: string, args: string, reply: Reply, sender?: Sender): Reply {
 	if (reply.say !== undefined) slash.output(id, reply.say, false, sender?.origin)
 	if (reply.synthetic !== undefined) slash.output(id, reply.synthetic, false, undefined, true)
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
@@ -194,6 +217,8 @@ export const slash = {
 	change,
 	name,
 	runCommand,
+	attempt,
+	report,
 	models,
 	dismiss,
 	output,

@@ -33,7 +33,8 @@ export type Shown = { originSession?: string; canceledReference?: true } & (
 	// `command`: a slash command asked; open in any session state.
 	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; canceled?: true; command?: true; ts?: string }
 	// A slash command: origin identifies Hal; from identifies another session.
-	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
+	// `output`: what the human's command said, shown in its card (joined).
+	| { type: 'command'; text: string; from?: string; label?: string; output?: string; error?: true; ts?: string }
 	// What a command said.
 	// `commit`: a commit a Bash call made (task 179), its own card.
 	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
@@ -207,6 +208,30 @@ function aside(r: { type: 'command'; text: string; from?: string; label?: string
 	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
+// Whether output `next` joins the human's command `prev` in one card:
+// the command, then what it said, adjacent. Synthetic text, prompt-file
+// changes and commits keep their own cards.
+function joins(prev: Item, next: Item): prev is Item & { type: 'command' } {
+	return prev.type === 'command' && prev.from === undefined && next.type === 'output' && !next.synthetic && !next.change && !next.commit
+}
+
+// Command `cmd` with `out` said after it.
+function join(cmd: Item & { type: 'command' }, out: Item): Item {
+	let o = out as Item & { type: 'output' }
+	return { ...cmd, output: cmd.output === undefined ? o.text : `${cmd.output}\n\n${o.text}`, ...((cmd.error || o.error) && { error: true as const }) }
+}
+
+// `items` with each human command's adjacent output joined into it.
+function joined(items: Item[]): Item[] {
+	let out: Item[] = []
+	for (let item of items) {
+		let last = out.at(-1)
+		if (last && transcript.joins(last, item)) out[out.length - 1] = transcript.join(last, item)
+		else out.push(item)
+	}
+	return out
+}
+
 // The question waiting for an answer from this transcript, if any: a
 // command's while unanswered, a turn's while the turn waits on it.
 function question(t: Transcript | undefined): (Item & { type: 'question' }) | undefined {
@@ -239,7 +264,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let promptKey = items[prompt ?? -1]?.key
-	items = transcriptOrder.order(items)
+	items = transcript.joined(transcriptOrder.order(items))
 	items = rebaseDisplay.insert(items, snapshot.rewrites)
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = items.findIndex((item) => item.key === promptKey)
@@ -346,7 +371,10 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return { ...rest, items: transcript.keyed([transcript.aside(event)], event.n, 0) }
 	}
 	if (event.type === 'command' || event.type === 'output' || event.type === 'divider' || (event.type === 'question' && event.command)) {
-		return { ...t, items: [...t.items, ...transcript.keyed([transcript.aside(event)], event.n, t.items.length)] }
+		let added = transcript.keyed([transcript.aside(event)], event.n, t.items.length)
+		let last = t.items.at(-1)
+		if (last && transcript.joins(last, added[0]!)) return { ...t, items: [...t.items.slice(0, -1), transcript.join(last, added[0]!)] }
+		return { ...t, items: [...t.items, ...added] }
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: transcript.fresh(event) } }
@@ -411,4 +439,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, addressable, href, keyed, imageItem, resultItems, commitItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, addressable, href, keyed, imageItem, resultItems, commitItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, joins, join, joined, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
