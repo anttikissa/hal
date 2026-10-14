@@ -121,7 +121,8 @@ export const amend = {
 		let changed = text !== editing.original
 		let label = waiting ? 'editing waiting message' : 'editing prompt'
 		if (editing.rewind !== undefined) label += ` #${editing.rewind}`
-		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : 'edit'}, ` : ''
+		let edit = editing.rewind !== undefined ? 'edit and discard later prompts' : 'edit'
+		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : edit}, ` : ''
 		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'discard' : 'continue'}`
 	},
 	step(editing: Editing, t: Transcript, dir: -1 | 1) {
