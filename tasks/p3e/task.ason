@@ -1,6 +1,9 @@
 {
 	title: 'Undo /clear and /compact with a rebase',
 	spec: '/clear undo and /compact undo hide the latest context boundary (reset or compact record) with one rebase, so the earlier context returns followed by everything after the boundary. Nothing is deleted; /rebase undo reverses it. Each refuses with the reason when no boundary exists or the latest one is the other kind, and under the same busy, question and stale rules as /rebase. An exact undo tail on /clear is the undo command, not a prompt. rebasePlans.drop(id, ns) is the shared helper (also used by /amend undo): one rebase dropping ns and their linked records, broadcast from the earliest dropped record; it writes no output and does not continue the turn.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'drop reuses rebases.apply, so a dropped boundary returns under the usual busy and stale rules. /compact undo also undoes automatic compactions, since they are the same compact record. compact.test /clear already-empty assertion fails at baseline 2954b586, unrelated.'
+	],
 	needs: ['z71']
 }

@@ -6,6 +6,6 @@ import type { SlashCommand } from '../commands.ts'
 import { contextTransitions } from '../context-transitions.ts'
 
 export const command: SlashCommand = {
-	help: () => '/clear [raw prompt]: end active work safely, clear context and the screen (history stays), then optionally start a fresh attributed turn. The prompt is literal, including newlines; Escape cancels automatic continuation.\n\nAgents: later tool calls in this round do not run after /clear.',
-	run: (args, _answers, ctx) => contextTransitions.request(ctx.sessionId, 'clear', args, ctx.sender),
+	help: () => '/clear [raw prompt]: end active work safely, clear context and the screen (history stays), then optionally start a fresh attributed turn. The prompt is literal, including newlines; Escape cancels automatic continuation.\n/clear undo: restore the context hidden by the latest /clear, keeping later work; /rebase undo reverses it.\n\nAgents: later tool calls in this round do not run after /clear.',
+	run: (args, _answers, ctx) => args.trim() === 'undo' ? contextTransitions.undo(ctx.sessionId, 'clear', ctx.sender) : contextTransitions.request(ctx.sessionId, 'clear', args, ctx.sender),
 }

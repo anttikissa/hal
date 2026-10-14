@@ -7,6 +7,7 @@ import type { Sender } from '../common/blocks.ts'
 import { compact } from './compact.ts'
 import type { Reply } from './commands.ts'
 import { history } from './history.ts'
+import { replay } from '../common/replay.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
@@ -100,4 +101,17 @@ function apply(id: string): boolean {
 	return true
 }
 
-export const contextTransitions = { pending, output, request, cancel, settle, apply }
+// /clear undo and /compact undo: hide the latest boundary of that kind
+// with a rebase, so the earlier context returns (task p3e).
+function undo(id: string, kind: 'clear' | 'compact', sender: Sender = {}): Reply {
+	if (sender.from) return { error: `Run /${kind} undo in this session, not from another session.` }
+	let last = replay.current(history.readSync(id)).findLast((r) => r.type === 'reset' || r.type === 'compact')
+	if (!last) return { error: 'Nothing to undo: the context has no /clear or /compact.' }
+	let latest = last.type === 'reset' ? 'clear' : 'compact'
+	if (latest !== kind) return { error: `The latest context boundary is a /${latest}; use /${latest} undo.` }
+	let { rebasePlans } = require('./rebase-plans.ts') as typeof import('./rebase-plans.ts')
+	rebasePlans.drop(id, [last.n!])
+	return { result: `/${kind} undone; /rebase undo reverses this.` }
+}
+
+export const contextTransitions = { pending, output, request, cancel, settle, apply, undo }

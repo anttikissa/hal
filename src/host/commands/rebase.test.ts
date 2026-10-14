@@ -3,6 +3,7 @@ import { client, created, fresh, restartHost, until, useHost, calls } from '../h
 import { history } from '../history.ts'
 import { tools } from '../tools.ts'
 import { states } from '../../common/states.ts'
+import { replay } from '../../common/replay.ts'
 
 useHost()
 
@@ -139,4 +140,22 @@ test('paused rebase leaving an unanswered prompt clears cached idle state and En
 	await until(() => calls.length === 2)
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Answer this.')
 	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('Old answer.')
+})
+
+test('/clear undo restores hidden context, refuses the other kind, and /rebase undo reverses it', async () => {
+	let a = client(), id = created(a)
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'before' }] })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	history.append(id, { type: 'reset' })
+	let context = () => JSON.stringify(replay.toMessages(history.readSync(id)))
+	a.conn.send({ type: 'submit', sessionId: id, text: '/compact undo' })
+	await until(() => a.of('output').at(-1)?.error)
+	expect(a.of('output').at(-1).text).toContain('use /clear undo')
+	a.conn.send({ type: 'submit', sessionId: id, text: '/clear undo' })
+	await until(() => a.of('history-rewritten').length)
+	expect(context()).toContain('before')
+	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
+	await until(() => a.of('history-rewritten').length === 2)
+	expect(context()).not.toContain('before')
 })
