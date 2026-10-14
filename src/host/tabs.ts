@@ -23,7 +23,7 @@ import { notify } from './notify.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { projects } from './projects.ts'
-import { sessions } from './sessions.ts'
+import { sessions, type SessionMeta } from './sessions.ts'
 import { states } from '../common/states.ts'
 import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
@@ -50,12 +50,17 @@ function file(): TabsFile {
 }
 
 // Every tab as the tab bar shows it. A tab whose session can't be read
-// is left out rather than failing the rest.
+// stays, failed with the reader's error, rather than failing the rest.
 function list(): Tab[] {
 	let f = tabs.file()
 	for (let id of questions.keys()) if (!f.open.includes(id)) questions.delete(id)
 	let list = f.open.map((id) => {
-		let meta = sessions.open(id)
+		let meta: SessionMeta
+		try {
+			meta = sessions.open(id)
+		} catch (e: any) {
+			return { id, name: id, cwd: '', model: '', state: { type: 'error', message: String(e?.message ?? e) } } satisfies Tab
+		}
 		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
 		if (tab.state.type !== 'error') {
 			try {
@@ -223,7 +228,15 @@ function resume(id?: string): Outcome {
 
 function start(cwd?: string, last?: string, timezone?: string): Outcome {
 	let open = tabs.file().open
-	let inCwd = (id: string) => cwd === undefined || resolve(sessions.open(id).cwd) === resolve(cwd)
+	// An unreadable session is in no cwd; list() shows it failed.
+	let inCwd = (id: string) => {
+		if (cwd === undefined) return true
+		try {
+			return resolve(sessions.open(id).cwd) === resolve(cwd)
+		} catch {
+			return false
+		}
+	}
 	let found = last !== undefined && open.includes(last) && inCwd(last) ? last : open.find(inCwd)
 	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd(), undefined, false, true, timezone) }
 }

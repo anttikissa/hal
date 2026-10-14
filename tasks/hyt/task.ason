@@ -20,7 +20,8 @@ The web follows the same states, defaults and overrides: a click on a card's hea
 		"Bug fix (2026-10-12, session 172-mag): a running Bash card's short row showed its latest output line with raw tabs (rg output of tab-indented source). clipVisual counts a tab to the next 4-column stop but keeps it; the terminal moved to its own 8-column stop past the pad, so the row overflowed, wrapped, and every row below drew one line lower than the renderer believed (duplicated title and tab-bar rows). Invariant: no terminal row holds a raw tab; a row clipped with clipVisual passes through strings.expandTabs, as closedRow does.",
 		'strings.expandTabs documents four-column per-line stops, preserved ANSI escapes, expansion before display measurement/clipping/wrapping and padding, repaint corruption from raw terminal tabs, and retention of original text for storage/editing offsets. clipVisual explicitly documents that it preserves raw tabs and directs terminal callers to expandTabs.',
 		'New hal/tool sessions start with blocks { tool: long, failed: long }: failed calls open like the others. Existing sessions keep their stored blocks.',
-		'/model hal/tool merges sessions.toolBlocks into the session blocks, so switched tabs open calls and failures like new hal/tool sessions. Switching away keeps them.'
+		'/model hal/tool merges sessions.toolBlocks into the session blocks, so switched tabs open calls and failures like new hal/tool sessions. Switching away keeps them.',
+		"Stored session.ason blocks may still hold the retired level 'glimpse'; sessions.validate accepts it and card.verbosity reads it as short. Rejecting it emptied the tab bar (14 Oct)."
 	],
 	needs: ['c5x', 'wm0', 'ghs', 'r4d', 'v8y', 'fn', 'pc'],
 	foldInto: ['c5x']

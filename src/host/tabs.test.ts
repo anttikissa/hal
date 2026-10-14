@@ -195,6 +195,18 @@ test('an unreadable session stays a tab, failed with the error, and opening it i
 	expect(rejected(a, open).reason).toContain('malformed history')
 })
 
+test('a session with unreadable metadata fails its own tab, not the tab list', () => {
+	let a = client()
+	let good = newTab(a, '/tmp/p')
+	let broken = newTab(a, '/tmp/p')
+	sessions.close(broken)
+	writeFileSync(`${paths.sessionDir(broken)}/session.ason`, `{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: { tool: 'huge' } }`)
+	send(a, { type: 'tab-new', cwd: '/tmp/p' })
+	expect(tabsOf(a)?.find((t) => t.id === good)?.state.type).not.toBe('error')
+	expect(tabsOf(a)?.find((t) => t.id === broken)?.state).toEqual({ type: 'error', message: expect.stringContaining('invalid blocks') })
+	expect(ack(a, send(a, { type: 'tab-start', cwd: '/tmp/p', last: broken })).tab).toBe(good)
+})
+
 test('a tab wants attention when its turn ends until a client has seen it', async () => {
 	let a = client()
 	let b = client()

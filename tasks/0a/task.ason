@@ -9,7 +9,8 @@ Test with in-memory clients: two clients see the same order after new, move, clo
 		"Hal's protocol already has `open` and `close`, meaning follow and unfollow a session. Tabs are a different thing; keep the names apart.",
 		"old-tabs.ts is the old host's tab module (openSessionIds in runtime state, focus on the host). In Hal focus belongs to each client, not the host. Old features left out on purpose: fork (Ctrl-F), a tab limit, opening summaries.",
 		'main.ts sends open-newest at startup, and the web asks GET /session for the newest id. tab-start replaces the first; the web switches in task ng.',
-		'Implemented in src/host/tabs.ts. The tab a command created, reopened or picked comes back as `tab` in its ack (not a snapshot: tab commands never follow). `tabs` is sent to every client on a change, and to the starter alone on a tab-start that changed nothing; a client gets no tabs until it sends tab-start. Attention lives in tabs.ason too, set on turn-end completed/error and question (not on a user pause). main.ts still sends open-newest; the terminal switches to tab-start in task 7w.'
+		'Implemented in src/host/tabs.ts. The tab a command created, reopened or picked comes back as `tab` in its ack (not a snapshot: tab commands never follow). `tabs` is sent to every client on a change, and to the starter alone on a tab-start that changed nothing; a client gets no tabs until it sends tab-start. Attention lives in tabs.ason too, set on turn-end completed/error and question (not on a user pause). main.ts still sends open-newest; the terminal switches to tab-start in task 7w.',
+		"Bug fix 14 Oct: one session.ason that failed validation (a retired blocks level) threw out of tabs.list, so clients got zero tabs. Invariant restored: an unreadable session, metadata or history, fails only its own tab (error state with the reader's message); tab-start treats it as in no cwd."
 	],
 	needs: ['yq']
 }

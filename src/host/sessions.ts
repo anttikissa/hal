@@ -43,8 +43,9 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
 	if (data.startingState !== undefined && (!data.startingState || typeof data.startingState.cwd !== 'string' || typeof data.startingState.model !== 'string' || typeof data.startingState.autoclose !== 'boolean')) throw new Error(`${path}: invalid startingState`)
+	// 'glimpse', the retired middle level, stays valid: card.verbosity reads it as short.
 	let blocks = data.blocks
-	if (blocks !== undefined && !(blocks && typeof blocks === 'object' && Object.entries(blocks).every(([k, v]) => card.kinds.includes(k as Kind) && card.levels.includes(v as Verbosity)))) throw new Error(`${path}: invalid blocks`)
+	if (blocks !== undefined && !(blocks && typeof blocks === 'object' && Object.entries(blocks).every(([k, v]) => card.kinds.includes(k as Kind) && (v === 'glimpse' || card.levels.includes(v as Verbosity))))) throw new Error(`${path}: invalid blocks`)
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
 }
