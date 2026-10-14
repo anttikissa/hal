@@ -1,0 +1,10 @@
+{
+	title: 'Terminal detached results retain identity and regroup on rebuild',
+	spec: 'Terminal-only: detached tool results use their originating tool background and output foreground, preserve error colors, and show a visible original call ID with the existing transcript link for every tool. Keep attachment separate from styling, headers, padding and result status. Live updates preserve overflowed parallel batches as split and never clear merely to regroup. Every canonical rebuild (Ctrl-L, tab switch, resize and unavoidable automatic recovery) reunites available results with their inputs, regardless of batch height; output arriving afterward remains append-safe. Preserve complete history and report unavoidable clears through render.clear. Invariant: detachment changes placement, not tool identity, and regrouping never introduces a clear. Ask the user for visual and interaction feedback after implementation.',
+	status: 'done',
+	notes: [
+		'Attachment and identity are independent: frame layout keeps all originating tool identities in its reused prefix, while the adjacency tool argument still controls merging, headers and visibility. Canonical rebuilds snapshot available results in a WeakSet, so an oversized batch can reunite those results without moving later arrivals into scrollback. Split batches use call UUIDs rather than per-session record numbers to avoid collisions across tabs. Automatic recovery requests a grouped frame only after the existing shrink/scrollback-edit decision, preserving the original clear cause. Validation: 82 focused terminal tests passed, TypeScript and focused lint passed; a temporary executable check verified READ and Bash colors/links, error and status coloring, append safety after a mid-batch Ctrl-L, regrouping after collapse recovery, tab switch and resize. The existing color-repaint fixture used exit 1, now intentionally neutral on HEAD; it uses exit 2 to test the original mutable exit-color invariant.'
+	],
+	needs: ['wm0', 'cc'],
+	foldInto: ['wm0']
+}

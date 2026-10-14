@@ -541,7 +541,7 @@ describe('terminal.redraw', () => {
 			setup(10, 40)
 			// The exit status color is painted inside the row, not part
 			// of the item's own style.
-			show([{ type: 'prompt', label: 'bash #1', text: '[exit 1] failed' }])
+			show([{ type: 'prompt', label: 'bash #1', text: '[exit 2] failed' }])
 			let coral = ansi.sgr({ fg: colors.exit().fg! })
 			let green = ansi.sgr({ fg: [0.8, 0.15, 145] })
 			expect(term.written).toContain(coral)

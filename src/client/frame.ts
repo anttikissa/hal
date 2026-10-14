@@ -113,7 +113,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${settings.glimpseRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
+	let key = `${cols} ${settings.glimpseRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
@@ -182,7 +182,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	if (memo.at.i < memo.grouped.length) return undefined
 	let items = memo.at.out
 	let calls = new Map<string, string>()
-	// A result opens and closes with its call (task ghs).
+	let toolCalls = new Map<string, { key: string; name: string }>()
 	let callFolds = new Map<string, Fold>()
 	let formCursor: Frame['cursor'] | undefined
 	let tick: Past['tick']
@@ -209,11 +209,15 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	while (start > 0 && items[start]?.type === 'tool-result') start--
 	let lines = start ? kept!.lines.slice(0, kept!.ends[start - 1]) : []
 	let ends = kept && start ? kept.ends.slice(0, start) : []
-	let bash = kept && start ? kept.bash.filter((b) => b.at < start) : []
-	for (let b of bash) calls.set(b.id, b.key)
+	let tools = kept && start ? kept.tools.filter((b) => b.at < start) : []
+	for (let b of tools) {
+		toolCalls.set(b.id, b)
+		callFolds.set(b.id, b.fold)
+		if (b.name === 'bash') calls.set(b.id, b.key)
+	}
 	let stable = start
 	let keep = () => {
-		if (save) frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), bash, lines }
+		if (save) frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), tools, lines }
 	}
 	let imageStart = start
 	while (imageStart > 0 && items[imageStart - 1]?.type === 'image') imageStart--
@@ -231,9 +235,13 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let fold = item.type === 'tool-result' ? callFolds.get(item.id) ?? 'glimpse' : view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed)
 		if (item.type === 'tool') callFolds.set(item.id, fold)
 		let look: Look = { fold, pastes: view.folds?.pastes }
-		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) {
-			calls.set(item.id, item.key)
-			bash.push({ at: i, id: item.id, key: item.key })
+		if (item.type === 'tool') {
+			toolCalls.set(item.id, { key: item.key, name: item.name })
+			tools.push({ at: i, id: item.id, key: item.key, name: item.name, fold })
+			if (item.name === 'bash') calls.set(item.id, item.key)
+		} else if (item.type === 'tool-result') {
+			look.call = toolCalls.get(item.id)
+			if (look.call) look.style = itemView.itemStyle(item, look.call.name)
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let { inner, mark } = itemView.place(item, cols, session, itemView.itemStyle(item)) // its id, like every block's
@@ -246,23 +254,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
-			// A result right under its call (or another of its results)
-			// continues the call's card: no #<call> link, and its padding
-			// row stands where the call's bottom one and the gap were.
+			// Adjacent results continue their call's card without a reference or gap.
 			let tool: string | undefined
 			if (item.type === 'tool-result') for (let j = i - 1; j >= 0; j--) {
 				let prev = items[j]!
 				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
 				if (prev.type === 'tool') { tool = prev.name; if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true }
 			}
-			// A prompt's images join its card; they draw nothing alone.
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
 			let merged = item.type === 'image' && imagePrompt
-			// A call shows its attached result's status, or while it
-			// runs, its elapsed time (task wm0); so does streaming text.
-			// Thinking, replies and calls keep a cell for the spinner,
-			// blank once done, so nothing shifts (task hyt).
+			// Status and the reserved spinner cell keep call headers stable (task hyt).
 			let ticks = item.type === 'tool' && item.id === view.tick?.call
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
 			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : ' ') : ''
@@ -389,9 +391,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
-// `history`: the last frame's transcript rows (lines), where each of its
-// first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
-// `padded`: some block is drawn taller than it is (water.ts).
-type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
+// The unchanged transcript prefix, including originating tool identities.
+type History = { look: string; items: Item[]; ends: number[]; tools: { at: number; id: string; key: string; name: string; fold: Fold }[]; lines: string[] }
 
 export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, queuedRows, order: batchOrder.order, promptWidth }

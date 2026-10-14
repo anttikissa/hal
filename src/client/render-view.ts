@@ -1,6 +1,17 @@
+// Builds terminal frames and schedules incremental paints and canonical rebuilds.
 import { frame, type View } from './frame.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
+import { batchOrder } from './batch-order.ts'
+
+function rebuild(view: View): void {
+	batchOrder.state.split.clear()
+	batchOrder.state.joined = new WeakSet(view.transcript?.items.filter((item) => item.type === 'tool-result'))
+	frame.state.rows = new WeakMap()
+	frame.state.peaks.clear()
+	frame.state.history = undefined
+	frame.state.ordered = undefined
+}
 
 function draw(force = false, trigger?: string): void {
 	let st = render.state
@@ -20,13 +31,11 @@ function draw(force = false, trigger?: string): void {
 		st.tab = tab
 	}
 	if (force) {
-		frame.state.rows = new WeakMap()
-		frame.state.peaks.clear()
-		frame.state.history = undefined
+		rebuild(st.view)
 		st.past = undefined
 	}
 	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)
+	let past = frame.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
 	if (!past) {
 		render.later()
 		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
@@ -37,7 +46,12 @@ function draw(force = false, trigger?: string): void {
 	st.view.prompt.scroll = next.promptScroll
 	let out = st.out
 	let pending = ''
-	for (let p of render.paintParts(next, rows, force, trigger)) {
+	for (let p of render.paintParts(next, rows, force, trigger, () => {
+		rebuild(st.view)
+		past = frame.layout(st.view, cols, Infinity, true, rows)!
+		st.past = { session, past }
+		return frame.build(st.view, cols, rows, st.fullscreen, past)
+	})) {
 		if (typeof p === 'string') pending += p
 		else if (out.defer) {
 			if (pending) out.write(pending)

@@ -63,7 +63,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Fold, look: Lo
 function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold, look: Look, session: string | undefined, call: string | undefined, tool: string | undefined): string[] {
 	// A canceled call's note to the model: the title says "(canceled)".
 	let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
-	let style = itemView.itemStyle(item, tool)
+	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (tool && (fold === 'short' || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
 	if (tool && (item.presentation || item.presentationError) && open(fold)) return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(fold === 'inline' || item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
 	let max = look.full ? Infinity : open(fold) ? toolView.openRows : settings.glimpseRows()
@@ -82,10 +82,13 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Fold,
 		let prefix = !i && item.isError ? '✗ ' : ''
 		// Apart from its call, a result is its own block: it leads with its time.
 		if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
-		let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
-		if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07t${call}${ansi.LINK_OFF}> `
+		let key = look.call?.key ?? call
+		if (!i && !tool && key && transcript.addressable(key)) {
+			let ref = session && transcript.href(session, `t${key}`)
+			prefix += ref ? `\x1b]8;;${ansi.webUrl(ref)}\x07t${key}${ansi.LINK_OFF}> ` : `t${key}> `
+		}
 		let text = strings.clipVisual(prefix + l, width)
-		let line = painted ? diffView.paint(text, tones[i]!, style) : tool ? text : ansi.quiet(text, style)
+		let line = painted ? diffView.paint(text, tones[i]!, style) : tool || look.call ? text : ansi.quiet(text, style)
 		return !i && status ? itemView.right(line, status, width) : line
 	})
 	if (more) {

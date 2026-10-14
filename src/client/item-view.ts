@@ -25,7 +25,7 @@ import { toolView } from './tool-view.ts'
 // texts a prompt shown inline needs (client/folds.ts), a call's result,
 // whether it is padded and has a blank row above, its status, style,
 // and rows a plugin draws itself.
-export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
+export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }>; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -36,9 +36,8 @@ function toolStyle(name: string): Style {
 	return typeof style === 'function' ? style() : colors.tool()
 }
 
-// `tool`: the call a tool result is drawn under (attached), whose card
-// it continues on the same background, its text darker than the call's
-// (less luminant, not less vivid) but well above 4.5:1.
+// A result keeps its originating tool's background and output color,
+// whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
 		let { fg, bg } = itemView.toolStyle(tool)

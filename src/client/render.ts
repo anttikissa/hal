@@ -210,7 +210,7 @@ function paint(next: Frame, rows: number, force = false, trigger?: string): stri
 	return text(render.paintParts(next, rows, force, trigger))
 }
 
-function paintParts(next: Frame, rows: number, force = false, trigger = 'a redraw'): Part[] {
+function paintParts(next: Frame, rows: number, force = false, trigger = 'a redraw', rebuild?: () => Frame): Part[] {
 	let st = render.state
 	let prev = st.prev
 	let lines = next.lines
@@ -263,6 +263,12 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 				first < writableTop
 					? { kind: 'all', cause: 'scrollback edit', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `Row ${first}, in ${changedBlock ?? 'an unknown block'}, changed in scrollback (rows above ${writableTop} cannot be rewritten in place)${lines.length < prev.length ? ` and the frame shrank from ${prev.length} to ${lines.length} rows` : ''}, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
 					: { kind: 'all', cause: 'shrink', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `The frame shrank from ${prev.length} to ${lines.length} rows; a terminal cannot pull scrollback back onto the screen, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
+			if (rebuild) {
+				next = rebuild()
+				lines = next.lines
+				shape = { length: lines.length, history: next.history, items: next.items, ends: next.ends }
+				size.after = lines.length
+			}
 			body = canonical(lines, reason)
 			row = lines.length - 1
 		} else if (first >= lines.length) {
