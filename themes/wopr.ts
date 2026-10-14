@@ -3,7 +3,7 @@ import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
 // WarGames (1983): one green phosphor in several brightnesses on
-// black, like a VT100.
+// black, like a VT100. Only errors get another color.
 const green = (l: number, c = 0.18): [number, number, number] => [l, c, 145]
 const tool = () => ({ fg: green(colors.fgL, colors.fgC), bg: green(colors.bgL, colors.bgC) })
 
@@ -20,7 +20,7 @@ export const look: Look = {
 	message: () => ({ fg: [0.9, 0.17, 115], bg: [0.17, 0.05, 115] }),
 	log: () => ({ fg: green(0.7, 0.08), code: green(0.78, 0.08), linkBg: green(0.26, 0.05) }),
 	warning: () => ({ fg: green(0.97, 0.1), bg: green(0.22, 0.07), code: green(0.98, 0.06), linkBg: green(0.3, 0.07) }),
-	error: () => colors.info(),
+	error: () => ({ fg: [0.7, 0.22, 28], bg: [0.17, 0.06, 28], code: [0.84, 0.14, 28], linkBg: [0.26, 0.07, 28] }),
 	info: () => ({ fg: green(0.78, 0.1), bg: green(0.14, 0.03), code: green(0.86, 0.08), linkBg: green(0.26, 0.05) }),
 	fork: () => ({ fg: green(0.88, 0.16), bg: green(0.18, 0.05) }),
 	status: () => ({ fg: green(0.7, 0.08), highlight: green(0.94, 0.14) }),
