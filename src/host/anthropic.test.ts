@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
-import { blocks, type Message, type StreamEvent } from '../common/blocks.ts'
+import { blocks, type Message, type ReplayBlock, type StreamEvent } from '../common/blocks.ts'
 import { settings } from '../common/settings.ts'
 import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
@@ -237,7 +237,7 @@ test('redacted thinking survives a round trip', async () => {
 	let turn = blocks.collect(await run(), 'anthropic')
 	expect(turn.blocks[0]).toMatchObject({ type: 'thinking', text: '' })
 	reply = endTurn
-	await run([{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }, { role: 'assistant', blocks: turn.blocks }, { role: 'user', blocks: [{ type: 'text', text: 'again' }] }])
+	await run([{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }, { role: 'assistant', blocks: turn.blocks as ReplayBlock[] }, { role: 'user', blocks: [{ type: 'text', text: 'again' }] }])
 	expect(seen[1]!.body.messages[1].content).toEqual([
 		{ type: 'redacted_thinking', data: 'OPAQUE' },
 		{ type: 'text', text: 'ok' },

@@ -81,7 +81,8 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 			}
 		} else if (r.type === 'assistant') {
 			let b = r.block
-			if (b.type === 'tool_call') {
+			if (b.type === 'hosted_tool') add(r, b.name, JSON.stringify(b.input), b.output.length).tool = true
+			else if (b.type === 'tool_call') {
 				let detail = b.input.command ?? b.input.path ?? b.input.description ?? Object.entries(b.input).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(', ')
 				let row = add(r, b.name, `${b.name === 'bash' ? '$ ' : ''}${typeof detail === 'string' ? detail : JSON.stringify(detail)}`, JSON.stringify(b.input).length)
 				row.tool = true

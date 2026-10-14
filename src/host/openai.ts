@@ -9,7 +9,7 @@
 // on OpenAI's side); its JSON is the thinking block's signature and is
 // replayed as a reasoning item whose summary is rebuilt from the text.
 
-import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
+import { blocks, type ReplayBlock, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider as catalog } from './providers/openai.ts'
 import { modelsDev } from './models-dev.ts'
@@ -53,7 +53,7 @@ function input(req: ProviderRequest): unknown[] {
 
 // Only reasoning this provider encrypted can go back; other thinking is
 // dropped, as anthropic.ts drops foreign signatures.
-function assistantItem(b: AssistantBlock): unknown {
+function assistantItem(b: ReplayBlock): unknown {
 	if (b.type === 'text') return b.text ? { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: b.text, annotations: [] }] } : undefined
 	if (b.type === 'tool_call') return { type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input) }
 	if (b.provider !== 'openai' || !b.signature) return undefined
@@ -77,6 +77,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 		b.tools = req.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.inputSchema }))
 		if (req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model) && (!auth.serperKey() || !tools.all().has('google'))) {
 			(b.tools as unknown[]).push({ type: 'web_search' })
+			b.include = ['web_search_call.action.sources']
 		}
 		b.tool_choice = 'auto'
 		b.parallel_tool_calls = true
@@ -84,7 +85,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 	if (reasons(req.model)) {
 		let effort = req.effort ?? openai.effort(req.model)
 		b.reasoning = { summary: 'auto', ...(effort && { effort }) }
-		b.include = ['reasoning.encrypted_content']
+		b.include = [...((b.include as string[] | undefined) ?? []), 'reasoning.encrypted_content']
 	}
 	Object.assign(b, effort.wire('openai', req.model, req.effort))
 	if (req.cacheId ?? req.sessionId) b.prompt_cache_key = req.cacheId ?? req.sessionId
@@ -135,9 +136,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	// Function call arguments arrive as fragments per output index.
 	let calls = new Map<number, { id: string; name: string; args: string }>()
 	let called = false
-	// Search lines join adjacent text as paragraphs, never as leading or trailing blank lines.
-	let joined = false
-	let pending = false
 	for await (let m of messages) {
 		let ev = JSON.parse(m.data)
 		let index = ev.output_index ?? 0
@@ -147,19 +145,13 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				break
 			case 'response.reasoning_summary_part.added':
 				if (ev.summary_index > 0) yield { type: 'thinking', text: '\n\n' }
-				joined = pending = false
 				break
 			case 'response.reasoning_summary_text.delta':
 				if (ev.delta) yield { type: 'thinking', text: ev.delta }
-				joined = pending = false
 				break
 			case 'response.output_text.delta':
 			case 'response.refusal.delta':
-				if (ev.delta) {
-					yield { type: 'text', text: `${pending ? '\n\n' : ''}${ev.delta}` }
-					joined = true
-					pending = false
-				}
+				if (ev.delta) yield { type: 'text', text: ev.delta }
 				break
 			case 'response.content_part.done': {
 				let part = ev.part
@@ -175,20 +167,17 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			case 'response.output_item.done': {
 				let item = ev.item
 				if (item?.type === 'web_search_call') {
-					if (item.status !== 'completed') {
-						yield { type: 'error', message: `Web search ${item.status ?? 'failed'}`, body: m.data }
-						return
-					}
-					let action = item.action
-					let detail = action?.type === 'search' ? (action.queries ?? [action.query]).join('; ') : action?.type === 'open_page' ? action.url : action?.type === 'find_in_page' ? `${action.url}: ${action.pattern}` : undefined
-					if (detail) {
-						yield { type: 'text', text: `${joined ? '\n\n' : ''}Web search (${action.type}): ${detail}` }
-						joined = pending = true
-					}
+					let action = item.action ?? {}
+					let queries: string[] = action.type === 'search' ? (action.queries ?? [action.query]).filter(Boolean) : []
+					let sources: string[] = (action.sources ?? []).map((s: any) => s?.url).filter((u: unknown) => typeof u === 'string')
+					let input = action.type === 'search' ? { query: queries.join('; ') } : { ...action }
+					let output = item.status === 'completed'
+						? [...(queries.length > 1 ? [...queries, ''] : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n').trim()
+						: `Web search ${item.status ?? 'failed'}\n${m.data}`
+					yield { type: 'hosted_tool', id: item.id ?? `ws_${index}`, name: 'web_search', input, output, ...(item.status !== 'completed' && { isError: true }) }
 				}
 				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') {
 					yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
-					joined = pending = false
 				}
 				if (item?.type !== 'function_call') break
 				let call = calls.get(index) ?? { id: item.call_id, name: item.name, args: '' }
@@ -202,7 +191,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					return
 				}
 				called = true
-				joined = pending = false
 				yield { type: 'tool_call', id: call.id, name: call.name, input: args as Record<string, unknown> }
 				break
 			}

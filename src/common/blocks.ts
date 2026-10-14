@@ -52,11 +52,16 @@ export type Sender = { interactive?: boolean; queuedAt?: string; from?: string; 
 export type UserText = TextBlock & Sender
 
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
-export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
+// A tool the provider ran itself (OpenAI web_search, task a0z): shown as a
+// finished tool card; never executed by Hal or replayed to providers.
+export type HostedToolBlock = { type: 'hosted_tool'; id: string; name: string; input: Record<string, unknown>; output: string; isError?: boolean }
+export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | HostedToolBlock
+// What providers receive: replay drops hosted tools.
+export type ReplayBlock = Exclude<AssistantBlock, HostedToolBlock>
 
 // `cache`: an earlier request's input ended after this many of the
 // message's blocks; a provider may mark it for prompt caching (task g5j).
-export type Message = ({ role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }) & { cache?: number }
+export type Message = ({ role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: ReplayBlock[] }) & { cache?: number }
 
 // Token counts. Cumulative: each usage event overwrites what it carries.
 export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
@@ -87,6 +92,7 @@ export type StreamEvent =
 	// Closes the current thinking block (or makes an empty one).
 	| { type: 'signature'; value: string }
 	| ({ type: 'tool_call' } & Omit<ToolCallBlock, 'type'>)
+	| HostedToolBlock
 	// `account`: the credentials' label that served the request.
 	| { type: 'usage'; usage: Usage; account?: string }
 	| DoneEvent
@@ -124,6 +130,9 @@ function apply(turn: Turn, event: StreamEvent): void {
 			break
 		case 'tool_call':
 			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input, ...(event.cmd !== undefined && { cmd: event.cmd }), ...(event.sequence !== undefined && { sequence: event.sequence }), ...(event.presentation !== undefined && { presentation: event.presentation }), ...(event.presentationError !== undefined && { presentationError: event.presentationError }) })
+			break
+		case 'hosted_tool':
+			turn.blocks.push({ ...event })
 			break
 		case 'usage':
 			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v

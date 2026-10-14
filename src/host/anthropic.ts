@@ -2,7 +2,7 @@
 // key credentials from src/host/auth.ts. Wire mapping:
 // tasks/7f/mapping.md; OAuth contract: tasks/ya/anthropic.ts.
 
-import { blocks, type AssistantBlock, type StopReason, type StreamEvent, type Usage, type UserBlock } from '../common/blocks.ts'
+import { blocks, type ReplayBlock, type StopReason, type StreamEvent, type Usage, type UserBlock } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
@@ -48,7 +48,7 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 
 // Only thinking signed by this provider can be sent back; foreign or
 // unsigned thinking is dropped (the API rejects it).
-function assistantBlock(b: AssistantBlock): unknown {
+function assistantBlock(b: ReplayBlock): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
 	if (b.type === 'tool_call') return { type: 'tool_use', id: b.id, name: b.name, input: b.input }
 	if (b.provider !== 'anthropic' || !b.signature) return undefined

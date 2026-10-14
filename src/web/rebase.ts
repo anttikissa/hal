@@ -179,8 +179,8 @@ function parts(st: RebaseState, row: RebaseRow): Part[] {
 		} else if (r.type === 'assistant') {
 			let b = r.block
 			// Bash's lines start with its $ command; other tools' with the rest.
-			let lines = b.type === 'tool_call' ? toolDetails.lines(b.name, b.input) : []
-			if (b.type === 'tool_call') text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))
+			let lines = b.type === 'tool_call' || b.type === 'hosted_tool' ? toolDetails.lines(b.name, b.input) : []
+			if (b.type === 'tool_call' || b.type === 'hosted_tool') text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))
 			else text('', b.text)
 		} else if (r.type === 'command' || r.type === 'output') text(r.type === 'output' ? 'output' : '', r.text)
 		else if (r.type === 'notice' || r.type === 'change') text(r.type === 'change' ? 'settings' : 'internal note', rebase.text(r)!)

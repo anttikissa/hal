@@ -200,7 +200,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			flush()
 		} else if (r.type === 'assistant') {
 			let b = r.block
-			if (b.type === 'thinking' && !b.signature) continue
+			if ((b.type === 'thinking' && !b.signature) || b.type === 'hosted_tool') continue
 			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
 			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
 			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asNative({ type: 'tool_call', id: b.id, name: b.name, input: b.input, ...(b.cmd !== undefined && { cmd: b.cmd }) }) : { ...b }] })

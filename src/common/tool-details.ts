@@ -88,6 +88,10 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'google':
 			if (str('query')) return { text: `Google "${str('query')}"`, key: 'query' }
 			break
+		case 'web_search':
+			if (str('query')) return { text: `Web search "${str('query')}"`, key: 'query' }
+			if (str('url')) return { text: `Web search ${str('pattern') ? `"${str('pattern')}" in ` : ''}${str('url')}`, key: 'url' }
+			break
 		case 'read':
 		case 'read_blob': {
 			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.length} file${input.paths.length === 1 ? '' : 's'}` }

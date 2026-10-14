@@ -76,6 +76,10 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
 		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, ...(b.presentation !== undefined && { presentation: b.presentation }), ...(b.presentationError !== undefined && { presentationError: b.presentationError }), key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
+		else if (b.type === 'hosted_tool') {
+			let ts = by.ts?.[i] !== undefined ? { ts: by.ts[i] } : {}
+			out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...ts }, { type: 'tool-result', id: b.id, output: b.output, ...(b.isError && { isError: true }), key: transcript.key(ns?.[i], 1, at + out.length + 1), ...ts })
+		}
 		else if (b.text || (b.type === 'text' && by.interrupted)) {
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
 			if (b.type === 'text' && b.naming) (item as Item & { type: 'text' }).naming = true

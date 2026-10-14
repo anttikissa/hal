@@ -211,12 +211,13 @@ test('recorded native search becomes readable history without a local tool round
 	reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
 	let turn = blocks.collect(await run(), 'openai')
 	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
-	expect(turn.blocks.every((b) => b.type === 'text')).toBe(true)
-	let text = turn.blocks.map((b) => b.type === 'text' ? b.text : '').join('')
-	expect(text).toStartWith('Web search (search): VALO Hotel Helsinki official website\n\nOfficial website')
-	expect(text).toContain('Official website: https://valo.fi/en/')
+	let [search, answer] = turn.blocks
+	expect(search).toEqual({ type: 'hosted_tool', id: 'ws_058c1f3ca83fd353016acf3141fb4087d2917c750504b6797f', name: 'web_search', input: { query: 'VALO Hotel Helsinki official website' }, output: '' })
+	if (answer?.type !== 'text') throw new Error('expected answer text')
+	let text = answer.text
+	expect(text).toStartWith('Official website: https://valo.fi/en/')
 	expect(text.match(/https:\/\/valo\.fi\/en\/\?utm_source=openai/g)).toHaveLength(1)
-	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: turn.blocks }] })).toContainEqual({ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] })
+	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: [answer] }] })).toContainEqual({ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] })
 })
 
 test('text, reasoning, tool calls and usage fold into a turn that ends in tool_use', async () => {
