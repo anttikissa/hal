@@ -1,5 +1,5 @@
-// Command-line arguments: declared once, parsed purely before Hal
-// starts, and rendered as help. Tasks: cb, 81y, 100.
+// Command-line arguments: declared once and parsed purely before Hal
+// starts; help is a handwritten string. Tasks: cb, 81y, 100.
 
 import type { Delivery } from '../common/protocol.ts'
 
@@ -14,9 +14,31 @@ export type Args = (
 	| { kind: 'error'; message: string }
 ) & { home?: string }
 
+const help = `Usage:
+  hal                         start the terminal client
+  hal -p <prompt>             run one prompt, print the reply
+    -d, --dir <dir>           working directory for the new tab
+    -m, --model <model>       model to use
+    -s, --session <id|tab>    send to an existing session instead
+    --steer | --soft-steer | --queue
+                              delivery to a busy session (default: soft-steer)
+    --keep                    keep the new tab open; not with --session
+  hal -r [host]               follow a remote Hal
+  hal serve [--port <n>]      run the foreground headless host;
+                              --port: web only on port n, else exit
+  hal auth                    print a one-time web login code
+  hal -v, --version           show the version, commit and checkout
+  hal -h, --help              show this help
+
+Options:
+  --home <dir>                use this Hal home instead of the checkout
+  --no-user                   leave your notes (USER.md) out of every tab's prompt;
+                              only for hal, hal serve and hal -p, used by the process that hosts
+`
+
 type Kind = Exclude<Args['kind'], 'error'>
 type Out = { kind: Kind; home?: string; noUser?: true; port?: number; prompt?: string; host?: string; dir?: string; model?: string; session?: string; keep?: true; delivery?: Delivery }
-type Entry = { syntax: string; names: string[]; value?: string; help: string; kind?: Kind; within?: Entry; set?: (out: Out, value: string) => void }
+type Entry = { names: string[]; value?: string; kind?: Kind; within?: Entry; set?: (out: Out, value: string) => void }
 
 class UsageError extends Error {}
 const fail = (message: string): never => { throw new UsageError(message) }
@@ -25,55 +47,45 @@ const commands: Entry[] = []
 const options: Entry[] = []
 let within: Entry | undefined
 
-function entry(syntax: string, help: string): Entry {
+function entry(syntax: string): Entry {
 	let [names, value] = syntax.split(/ (?=[<[])/)
-	return { syntax, names: names!.split(', '), value, help }
+	return { names: names!.split(', '), value }
 }
 
 // The command's operand, if any, goes to the field its value names: -r [host] sets host.
-function command(syntax: string, help: string, kind: Kind, declareOptions = () => {}): void {
-	within = { ...entry(syntax, help), kind }
+function command(syntax: string, kind: Kind, declareOptions = () => {}): void {
+	within = { ...entry(syntax), kind }
 	commands.push(within)
 	declareOptions()
 	within = undefined
 }
 
-function arg(syntax: string, help: string, set: (out: Out, value: string) => void): void {
-	options.push({ ...entry(syntax, help), within, set })
+function arg(syntax: string, set: (out: Out, value: string) => void): void {
+	options.push({ ...entry(syntax), within, set })
 }
 
 const deliver = (delivery: Delivery) => (out: Out) => { out.delivery = out.delivery ? fail('choose one delivery flag') : delivery }
 
-command('-p, --print <prompt>', 'Run one prompt and print the reply', 'print', () => {
-	arg('-d, --dir <dir>', 'Working directory for the new tab', (out, dir) => { out.dir = dir })
-	arg('-m, --model <model>', 'Model to use', (out, model) => { out.model = model })
-	arg('-s, --session <id|tab>', 'Send to an existing session instead', (out, session) => { out.session = session })
-	arg('--steer', 'Interrupt a busy session at its next boundary', deliver('steer'))
-	arg('--soft-steer', 'Let a busy session finish its current step (default)', deliver('soft-steer'))
-	arg('--queue', 'Wait until a busy session finishes its turn', deliver('queue'))
-	arg('--keep', 'Keep the new tab open afterwards', out => { out.keep = true })
+command('-p, --print <prompt>', 'print', () => {
+	arg('-d, --dir <dir>', (out, dir) => { out.dir = dir })
+	arg('-m, --model <model>', (out, model) => { out.model = model })
+	arg('-s, --session <id|tab>', (out, session) => { out.session = session })
+	arg('--steer', deliver('steer'))
+	arg('--soft-steer', deliver('soft-steer'))
+	arg('--queue', deliver('queue'))
+	arg('--keep', out => { out.keep = true })
 })
-command('-r [host]', 'Follow a remote Hal', 'remote')
-command('serve', 'Run the foreground headless host', 'serve', () => {
-	arg('--port <1-65535>', 'Serve the web client on this port, or exit', (out, port) => {
+command('-r [host]', 'remote')
+command('serve', 'serve', () => {
+	arg('--port <1-65535>', (out, port) => {
 		out.port = /^\d+$/.test(port) && +port >= 1 && +port <= 65535 ? +port : fail(`--port needs 1-65535, got ${port}`)
 	})
 })
-command('auth', 'Print a one-time web login code', 'auth')
-command('-v, --version', 'Show the version, commit and checkout', 'version')
-command('-h, --help, help', 'Show this help', 'help')
-arg('--home <dir>', 'Use this Hal home instead of the checkout', (out, dir) => { out.home = dir })
-arg('--no-user', 'Leave USER.md out of prompts when this process hosts', out => { out.noUser = true })
-
-function usage(): string {
-	let column = Math.max(...[...commands, ...options].map(e => e.syntax.length)) + 6
-	let rows = (list: Entry[], indent: string) => list.map(e => indent + e.syntax.padEnd(column - indent.length) + e.help)
-	return [
-		'Usage: hal [command] [options]', '', 'Without a command, hal starts the terminal client.', '', 'Commands:',
-		...commands.flatMap(c => [...rows([c], '  '), ...rows(options.filter(o => o.within === c), '    ')]),
-		'', 'Options:', ...rows(options.filter(o => !o.within), '  '), '',
-	].join('\n')
-}
+command('auth', 'auth')
+command('-v, --version', 'version')
+command('-h, --help, help', 'help')
+arg('--home <dir>', (out, dir) => { out.home = dir })
+arg('--no-user', out => { out.noUser = true })
 
 const find = (list: Entry[], token: string) => list.find(e => e.names.includes(token))
 
@@ -114,4 +126,4 @@ function parse(argv: string[]): Args {
 	}
 }
 
-export const args = { usage, parse }
+export const args = { usage: () => help, parse }
