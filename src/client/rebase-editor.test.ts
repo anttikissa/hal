@@ -17,7 +17,7 @@ test('editor opens full record text, keeps files until host accepts, and retains
 			paths.push(path)
 			expect(statSync(path).mode & 0o777).toBe(0o600)
 			let text = readFileSync(path, 'utf8')
-			if (path.endsWith('todo.txt')) writeFileSync(path, text.replace('keep  #1', 'edit  #1'))
+			if (path.endsWith('todo.txt')) writeFileSync(path, text.replace('keep  u1', 'edit  u1'))
 			else { expect(text).toBe('full\noriginal text'); writeFileSync(path, 'replacement') }
 		}
 		await rebaseEditor.open(event, (c) => commands.push(c), (s) => reports.push(s))

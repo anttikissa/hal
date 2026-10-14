@@ -95,7 +95,7 @@ test('the host answer: a refusal stays whole with the plan, success closes with 
 	start()
 	rebaseView.act(1, 'drop')
 	rebaseView.apply()
-	let refusal = 'Rebase is stale: base #5, latest record #7. Rebuild the plan.'
+	let refusal = 'Rebase is stale: planned at 5, history now ends at 7. Rebuild the plan.'
 	expect(rebaseView.onEvent({ type: 'rebase-result', sessionId: 's1', command: 'other', ok: false, text: 'no' })).toBe(true)
 	expect(rebaseView.state!.sending).toBe('c1')
 	rebaseView.onEvent({ type: 'rebase-result', sessionId: 's1', command: 'c1', ok: false, text: refusal })

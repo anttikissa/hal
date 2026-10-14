@@ -69,7 +69,7 @@ function edited(r: HistoryRecord, text: string): HistoryRecord {
 	if (r.type === 'inbox' || r.type === 'notice' || (r.type === 'output' && r.change)) return { ...r, text }
 	if (r.type === 'change') {
 		let value = ason.parse(text) as Record<string, unknown>
-		if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.keys(value).length || Object.entries(value).some(([key, v]) => !['cwd', 'model', 'autoclose'].includes(key) || typeof v !== (key === 'autoclose' ? 'boolean' : 'string') || (typeof v === 'string' && !v.trim()))) throw new Error(`record #${r.n}: invalid session setting change`)
+		if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.keys(value).length || Object.entries(value).some(([key, v]) => !['cwd', 'model', 'autoclose'].includes(key) || typeof v !== (key === 'autoclose' ? 'boolean' : 'string') || (typeof v === 'string' && !v.trim()))) throw new Error(`record ${r.n}: invalid session setting change`)
 		let { cwd: _cwd, model: _model, autoclose: _autoclose, ...rest } = r
 		return { ...rest, ...value } as HistoryRecord
 	}
@@ -84,7 +84,7 @@ function edited(r: HistoryRecord, text: string): HistoryRecord {
 			return { ...r, blocks: [{ ...b, output: text }] }
 		}
 	}
-	throw new Error(`record #${r.n} is not editable`)
+	throw new Error(`record ${r.n} is not editable`)
 }
 
 function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
@@ -92,12 +92,12 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 	if (problem) throw new Error(problem)
 	let byNumber = new Map(records.map((r) => [r.n, r]))
 	for (let n of [...plan.drop, ...plan.edit.map((e) => e.n)]) {
-		if (!byNumber.has(n)) throw new Error(`rebase record #${n} not found`)
-		if (byNumber.get(n)!.type === 'rebase') throw new Error(`cannot rebase control record #${n}`)
+		if (!byNumber.has(n)) throw new Error(`rebase record ${n} not found`)
+		if (byNumber.get(n)!.type === 'rebase') throw new Error(`cannot rebase control record ${n}`)
 	}
 	let groups = rebase.groups(records), dropped = new Set(plan.drop.flatMap((n) => [...(groups.get(n) ?? [n])]))
 	let edits = new Map(plan.edit.map((e) => [e.n, e.text]))
-	for (let n of edits.keys()) if (dropped.has(n)) throw new Error(`record #${n} is edited but its group is dropped`)
+	for (let n of edits.keys()) if (dropped.has(n)) throw new Error(`record ${n} is edited but its group is dropped`)
 	let results = new Map<number, Map<string, string>>()
 	for (let [n, text] of edits) {
 		let r = byNumber.get(n)!
@@ -108,8 +108,8 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 			if (next.type === 'user' && next.blocks.some((b) => b.type === 'tool_result' && b.id === id)) { target = next.n; break }
 			if ((next.type === 'user' && next.blocks.some((b) => b.type === 'text')) || (next.type === 'assistant' && next.block.type === 'tool_call' && next.block.id === id)) break
 		}
-		if (target === undefined) throw new Error(`record #${n} is not editable: no tool result`)
-		if (edits.has(target)) throw new Error(`conflicting edits of tool result #${target}`)
+		if (target === undefined) throw new Error(`t${n} is not editable: no tool result`)
+		if (edits.has(target)) throw new Error(`conflicting edits of t${n}'s tool result`)
 		let batch = results.get(target) ?? new Map<string, string>()
 		batch.set(id, text); results.set(target, batch); edits.delete(n)
 	}

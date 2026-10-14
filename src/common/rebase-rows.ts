@@ -4,6 +4,7 @@ import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'
 import { blocks as conversationBlocks, type UserBlock } from './blocks.ts'
 import { rebase, type RebasePlan } from './rebase.ts'
+import { rebaseSparse } from './rebase-sparse.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import { tokenEstimates } from './token-estimates.ts'
 
@@ -22,7 +23,11 @@ const size = (n: number) => n < 1000 ? `${n} B` : n < 1e6 ? `${Math.round(n / 10
 const kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`
 // Rows whose summary is their editable text's first line, maybe after a sender label.
 const inlineKinds = new Set(['prompt', 'assistant', 'queued', 'advisory', 'interjecting', 'steering', 'note', 'instructions', 'settings'])
-const columns = (row: RebaseRow) => [`#${row.n}`, row.time, row.kind, kilo(row.tokens)]
+// A row is one card; it reads as its card id, u12 (task ap2).
+const id = (row: RebaseRow) => rebaseSparse.letter(row) + row.n
+// The card id of the row holding record n, or the bare number.
+const cardOf = (rows: RebaseRow[], n: number) => { let row = rows.find((r) => r.ns.includes(n)); return row ? id(row) : String(n) }
+const columns = (row: RebaseRow) => [id(row), row.time, row.kind, kilo(row.tokens)]
 const carried = (row: RebaseRow) => row.carries.length ? `(${row.carries.join('; ')})` : ''
 const words = (text: string) => text.trim().split(/\s+/).join(' ')
 
@@ -117,7 +122,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 	for (let row of rows) {
 		row.time = replay.clock(row.ts, previous); previous = row.ts
 		row.group = [...new Set(row.ns.flatMap((n) => [...(groups.get(n) ?? [n])]))]
-		if (row.group.some((n) => !row.ns.includes(n) && byNumber.has(n))) row.carries.push(`drop group ${row.group.map((n) => `#${n}`).join(', ')}`)
+		if (row.group.some((n) => !row.ns.includes(n) && byNumber.has(n))) row.carries.push(`drop group ${[...new Set(row.group.map((n) => cardOf(rows, n)))].join(', ')}`)
 		if (row.ns.some((n) => options.pruned?.includes(n)) && !row.carries.includes('pruned')) row.carries.push('pruned')
 		row.tokens = tokenEstimates.estimate(row.characters, options.model, options.ratios)
 	}
@@ -139,7 +144,7 @@ function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { ba
 	let sums = rebaseRows.totals(snapshot, plan)
 	let edits = new Set(plan.edit.map((e) => e.n)), drops = new Set(plan.drop)
 	let widths = [4, ...['n', 'time', 'kind'].map((key) => Math.max(...snapshot.rows.map((row) => String(row[key as 'n' | 'time' | 'kind']).length + (key === 'n' ? 1 : 0)), 0)), Math.max(...snapshot.rows.map((row) => kilo(row.tokens).length), 0)]
-	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} rows · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from #${sums.cacheFrom}`}`
+	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} cards · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from ${cardOf(snapshot.rows, sums.cacheFrom)}`}`
 	return ['# Changing or deleting a message invalidates the cache from that point onward.', header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
 		let action = row.ns.some((n) => drops.has(n)) ? 'drop' : row.ns.some((n) => edits.has(n)) ? 'edit' : 'keep'
 		return [action, ...columns(row)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  ${carried(row)}` : ''}`
@@ -151,12 +156,12 @@ function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { ba
 // text, or undefined when the line says nothing new.
 function inline(row: RebaseRow, rest: string): string | undefined {
 	let before = [...columns(row), row.summary, carried(row)].join(' ')
-	if (!rest || words(rest) === words(before) || words(rest) === `#${row.n}`) return undefined
+	if (!rest || words(rest) === words(before) || new RegExp(`^#?[traumsq]?${row.n}$`, 'i').test(rest)) return undefined
 	let first = oneLine(row.text ?? ''), label = row.summary.slice(0, row.summary.length - first.length)
 	let head = new RegExp(`^${columns(row).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')).join('\\s+')}(?:\\s+|$)`).exec(rest)
 	let summary = head && rest.slice(head[0].length).trim()
 	if (summary !== null && carried(row) && summary.endsWith(carried(row))) summary = summary.slice(0, -carried(row).length).trim()
-	if (!row.editable || !inlineKinds.has(row.kind) || row.text === undefined || !row.summary.endsWith(first) || summary === null || !summary.startsWith(label)) throw new Error(`#${row.n} changed, but only the text after the kind and token columns of an editable text row can be edited inline; use edit for the rest`)
+	if (!row.editable || !inlineKinds.has(row.kind) || row.text === undefined || !row.summary.endsWith(first) || summary === null || !summary.startsWith(label)) throw new Error(`${id(row)} changed, but only the text after the kind and token columns of an editable text row can be edited inline; use edit for the rest`)
 	let text = summary.slice(label.length).trim()
 	return text === first ? undefined : row.text.replace(/^[^\n]*/, () => text)
 }
@@ -172,35 +177,35 @@ function parse(text: string, snapshot: RebaseRows, replacements: Record<number, 
 		let queue = /^queue\s+(.+)$/.exec(line)
 		if (queue) { out.queue.push(queue[1]!); queued = true; continue }
 		if (queued) fail('queue lines must go last')
-		let match = /^(keep|pick|drop|edit)\s+#([1-9]\d*)(?:\s|$)/.exec(line)
+		let match = /^(keep|pick|drop|edit)\s+#?[traumsq]?([1-9]\d*)(?:\s|$)/i.exec(line)
 		if (!match) fail('expected keep, pick, drop, edit or queue')
-		let id = Number(match![2]), entry = rows.get(id)
-		if (!entry) fail(`unknown record #${id}`)
-		if (seen.has(id)) fail(`duplicate record #${id}`)
+		let key = Number(match![2]), entry = rows.get(key)
+		if (!entry) fail(`unknown card ${key}`)
+		if (seen.has(key)) fail(`duplicate card ${id(entry!.row)}`)
 		if (entry!.i < last) fail('reordering history is refused')
-		seen.add(id); last = entry!.i
+		seen.add(key); last = entry!.i
 		let row = entry!.row, changed: string | undefined
 		if (match![1] === 'drop') { out.plan.drop.push(...row.ns); continue }
 		try { changed = inline(row, line.slice(match![1]!.length).trim()) } catch (error) { fail((error as Error).message) }
-		if (changed !== undefined) out.inline[id] = changed
+		if (changed !== undefined) out.inline[key] = changed
 		if (match![1] === 'edit') {
-			if (!row.editable || row.editN === undefined) fail(`record #${id} is not editable`)
-			if (Object.hasOwn(replacements, id) && typeof replacements[id] !== 'string') fail('replacement must be text')
-			if (Object.hasOwn(replacements, id)) out.plan.edit.push({ n: row.editN!, text: replacements[id]! })
-			else out.edits.push(id)
+			if (!row.editable || row.editN === undefined) fail(`card ${id(row)} is not editable`)
+			if (Object.hasOwn(replacements, key) && typeof replacements[key] !== 'string') fail('replacement must be text')
+			if (Object.hasOwn(replacements, key)) out.plan.edit.push({ n: row.editN!, text: replacements[key]! })
+			else out.edits.push(key)
 		} else if (changed !== undefined) out.plan.edit.push({ n: row.editN!, text: changed })
 	}
 	for (let row of snapshot.rows) if (!seen.has(row.n)) out.plan.drop.push(...row.ns)
 	out.plan.drop = [...new Set(out.plan.drop)]
 	let dropped = new Set(out.plan.drop.flatMap((n) => [...(rebase.groups(snapshot.records).get(n) ?? [n])]))
-	for (let id of [...out.edits, ...out.plan.edit.map((e) => snapshot.rows.find((r) => r.editN === e.n)!.n)]) {
-		let row = rows.get(id)!.row
+	for (let n of [...out.edits, ...out.plan.edit.map((e) => snapshot.rows.find((r) => r.editN === e.n)!.n)]) {
+		let row = rows.get(n)!.row
 		if (dropped.has(row.editN!)) {
-			let line = active.find((a) => new RegExp(`^edit\\s+#${id}(?:\\s|$)`).test(a.line))!
-			throw new Error(`Rebase line ${line.n}: edited record #${id} belongs to a dropped group: ${line.line}`)
+			let line = active.find((a) => new RegExp(`^edit\\s+#?[traumsq]?${n}(?:\\s|$)`, 'i').test(a.line))!
+			throw new Error(`Rebase line ${line.n}: edited card ${id(row)} belongs to a dropped group: ${line.line}`)
 		}
 	}
 	return out
 }
 
-export const rebaseRows = { build, totals, render, parse }
+export const rebaseRows = { build, totals, render, parse, id, cardOf }

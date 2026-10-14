@@ -14,7 +14,7 @@ function current(raw: HistoryRecord[]): HistoryRecord[] {
 // Each line says what changed and how to go back (task p3e).
 function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): string {
 	let before = raw.slice(0, raw.findIndex((record) => record.n === r.n))
-	let records = rebaseRows.build(before).records
+	let snapshot = rebaseRows.build(before)
 	let boundary = (plan: HistoryRecord & { type: 'rebase' }) => plan.drop.length === 1 && !plan.edit.length ? before.find((x) => x.n === plan.drop[0] && (x.type === 'reset' || x.type === 'compact'))?.type : undefined
 	if (!r.drop.length && !r.edit.length) {
 		let undone = before.findLast((x) => x.type === 'rebase' && x.base === r.base && (x.drop.length || x.edit.length))
@@ -26,9 +26,9 @@ function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): stri
 	let kind = boundary(r)
 	if (kind === 'reset') return 'Clear undone: the earlier context is back. `/rebase undo` to clear it again.'
 	if (kind === 'compact') return 'Compaction undone: the full context is back. `/rebase undo` to compact it again.'
-	let groups = rebase.groups(records)
-	let hidden = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])])).size
-	let parts = [hidden && `${hidden} record${hidden === 1 ? '' : 's'} hidden`, r.edit.length && `${r.edit.length} edited`].filter(Boolean).join(', ')
+	let groups = rebase.groups(snapshot.records), gone = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])]))
+	let hidden = snapshot.rows.filter((row) => row.ns.some((n) => gone.has(n))).length
+	let parts = [hidden && `${hidden} card${hidden === 1 ? '' : 's'} hidden`, r.edit.length && `${r.edit.length} edited`].filter(Boolean).join(', ')
 	return `History rewritten: ${parts}. \`/rebase undo\` to go back.`
 }
 

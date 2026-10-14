@@ -37,7 +37,7 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 	let snapshot = rebaseRows.build(history.readSync(c.sessionId).filter((r) => r.n! <= c.base), current.options)
 	let parsed = c.todo === undefined ? undefined : rebaseRows.parse(c.todo, snapshot, c.replacements)
 	if (parsed?.aborted) return 'Rebase aborted.'
-	if (parsed?.edits.length) throw new Error(`Rebase edits missing full text: ${parsed.edits.map((n) => `#${n}`).join(', ')}`)
+	if (parsed?.edits.length) throw new Error(`Rebase edits missing full text: ${parsed.edits.map((n) => rebaseRows.cardOf(snapshot.rows, n)).join(', ')}`)
 	let plan = parsed?.plan ?? c.plan!, queue = parsed?.queue ?? []
 	if (c.paused && queue.length) throw new Error('--paused cannot be combined with queue lines; remove the queue lines or --paused before applying.')
 	if (plan.base !== c.base) throw new Error('Rebase plan base does not match the requested base.')
@@ -113,9 +113,9 @@ function rewind(id: string, n: number, text: string, command?: string): string |
 	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
 	let current = replay.current(raw), at = current.findIndex((r) => r.n === n), target = current[at]
 	let mine = target?.type === 'user' && target.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
-	if (!mine) return `#${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
+	if (!mine) return `${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
 	let later = current.slice(at)
-	if (later.some((r) => r.type === 'compact' || r.type === 'reset')) return `#${n} is before the latest compaction or clear.`
+	if (later.some((r) => r.type === 'compact' || r.type === 'reset')) return `u${n} is before the latest compaction or clear.`
 	return prompts.amend(id, text, command, n)
 }
 

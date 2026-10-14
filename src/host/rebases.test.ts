@@ -167,7 +167,7 @@ test('committed settings recover after metadata synchronization fails without re
 	let save = liveFiles.save
 	liveFiles.save = () => { throw new Error('metadata disk full at session.ason') }
 	try {
-		expect(() => rebases.apply(id, { base: transition.n!, drop: [transition.n!], edit: [] })).toThrow(/Rebase applied as #\d+; settings synchronization failed[\s\S]*metadata disk full at session.ason/)
+		expect(() => rebases.apply(id, { base: transition.n!, drop: [transition.n!], edit: [] })).toThrow(/Rebase applied as s\d+; settings synchronization failed[\s\S]*metadata disk full at session.ason/)
 	} finally { liveFiles.save = save }
 	expect(history.readSync(id).at(-1)).toMatchObject({ type: 'rebase', contextChanged: true })
 	Object.assign(sessions.open(id), { cwd: '/new' })

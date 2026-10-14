@@ -21,7 +21,7 @@ import { status } from './status.ts'
 function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: { boundary?: boolean; transition?: string; continuing?: boolean; quiet?: boolean } = {}): HistoryRecord {
 	let raw = history.readSync(id)
 	if ((!options.boundary && (states.busy(status.stateOf(id)) || history.state.running.has(id))) || forms.open(raw)) throw new Error('Pause the session and answer or dismiss its question before rebasing.')
-	if ((raw.at(-1)?.n ?? 0) !== expectedBase) throw new Error(`Rebase is stale: base #${expectedBase}, latest record #${raw.at(-1)?.n ?? 0}. Rebuild the plan.`)
+	if ((raw.at(-1)?.n ?? 0) !== expectedBase) throw new Error(`Rebase is stale: planned at ${expectedBase}, history now ends at ${raw.at(-1)?.n ?? 0}. Rebuild the plan.`)
 	let problem = rebase.invalid(plan)
 	if (problem) throw new Error(problem)
 	if (plan.base !== expectedBase && !raw.some((r) => r.type === 'rebase' && r.base === plan.base)) throw new Error('Undo base has no earlier rebase.')
@@ -51,7 +51,7 @@ function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: 
 		if (contextChanged) promptCache.rebased(id)
 		host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 	} catch (error) {
-		throw new Error(`Rebase applied as #${record.n}; settings synchronization failed. Reopening recovers settings from history.\n${error instanceof Error ? error.message : String(error)}`)
+		throw new Error(`Rebase applied as s${record.n}; settings synchronization failed. Reopening recovers settings from history.\n${error instanceof Error ? error.message : String(error)}`)
 	}
 	// The model hears what the user changed, so it does not trust stale replies (task p3e).
 	let rewrite = record as HistoryRecord & { type: 'rebase' }

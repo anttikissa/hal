@@ -16,9 +16,9 @@ test('rebase reports sparse consecutive entries and implicit grouped drops, not 
 		{ type: 'assistant', n: 110, ts, block: { type: 'tool_call', id: 'call', name: 'bash', input: { command: 'ls' } } },
 		{ type: 'user', n: 120, ts, blocks: [{ type: 'tool_result', id: 'call', output: 'result' }] }, prompt(130)]
 	let snapshot = rebaseRows.build(records)
-	expect(rebaseReport.text(snapshot, { base: 130, drop: [43, 50, 95, 110], edit: [] })).toBe('Rebase applied (dropped 5 entries, edited 0)\nDropped 5 entries: #43-95 (3 entries), #104-110 (2 entries)')
+	expect(rebaseReport.text(snapshot, { base: 130, drop: [43, 50, 95, 110], edit: [] })).toBe('Rebase applied (dropped 5 cards, edited 0)\nDropped 5 cards: 43-95 (3 cards), 104-110 (2 cards)')
 	let many = rebaseRows.build(Array.from({ length: 1000 }, (_, n) => prompt(n + 1)))
-	expect(rebaseReport.text(many, { base: 1000, drop: many.rows.map((r) => r.n), edit: [] })).toBe('Rebase applied (dropped 1000 entries, edited 0)\nDropped 1000 entries: #1-1000 (1000 entries)')
+	expect(rebaseReport.text(many, { base: 1000, drop: many.rows.map((r) => r.n), edit: [] })).toBe('Rebase applied (dropped 1000 cards, edited 0)\nDropped 1000 cards: 1-1000 (1000 cards)')
 })
 
 test('edit diffs preserve header-like content and backticks inside a safe diff fence', () => {
@@ -37,11 +37,11 @@ test('edit diffs preserve header-like content and backticks inside a safe diff f
 test('compact report shows counts and continuation, preserving ranges, IDs and pause in full detail', () => {
 	let snapshot = rebaseRows.build([prompt(169, 'old'), ...Array.from({ length: 11 }, (_, n) => prompt(n + 170))])
 	let report = rebaseReport.text(snapshot, { base: 180, drop: snapshot.rows.slice(1).map((r) => r.n), edit: [{ n: 169, text: 'replacement' }] }, true)
-	expect(report.split('\n')[0]).toBe('Rebase applied (dropped 11 entries, edited 1)')
-	expect(report).toContain('#170-180 (11 entries)')
-	expect(report).toContain('Edited #169')
+	expect(report.split('\n')[0]).toBe('Rebase applied (dropped 11 cards, edited 1)')
+	expect(report).toContain('170-180 (11 cards)')
+	expect(report).toContain('Edited u169 (prompt)')
 	expect(report).toContain('\n--paused\n')
-	for (let continuation of ['prompt', 'unfinished'] as const) expect(rebaseReport.text(snapshot, { base: 180, drop: [], edit: [] }, false, continuation).split('\n')[0]).toBe(`Rebase applied (dropped 0 entries, edited 0; continuing ${continuation === 'prompt' ? 'after user prompt' : 'unfinished turn'})`)
+	for (let continuation of ['prompt', 'unfinished'] as const) expect(rebaseReport.text(snapshot, { base: 180, drop: [], edit: [] }, false, continuation).split('\n')[0]).toBe(`Rebase applied (dropped 0 cards, edited 0; continuing ${continuation === 'prompt' ? 'after user prompt' : 'unfinished turn'})`)
 	expect(report).toContain('-old')
 	expect(report).toContain('+replacement')
 })

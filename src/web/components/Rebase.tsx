@@ -1,13 +1,13 @@
 /// <reference lib="dom" />
 // The /rebase view (task bzf): a full-height native modal over the
-// transcript, its row list the one scroller. Each row: #n, time, kind,
+// transcript, its row list the one scroller. Each row: card id, time, kind,
 // tokens with a bar scaled to the heaviest row, summary and what it
 // carries; keep/drop/edit, shift-click (or Range on a phone) for a run.
 // Tapping a row opens its whole text, images and blobs. The footer
 // always shows tokens now → after and where the cache rebuilds; only
 // Apply sends (rebase.ts decides everything).
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
-import type { RebaseRow } from '../../common/rebase-rows.ts'
+import { rebaseRows, type RebaseRow } from '../../common/rebase-rows.ts'
 import { rebaseView, type Action, type Part, type RebaseState } from '../rebase.ts'
 import { hrefs } from '../hrefs.ts'
 import { Icon } from './Icon.tsx'
@@ -49,13 +49,13 @@ function Detail(props: { st: RebaseState; row: RebaseRow }) {
 				: <Blob session={props.st.sessionId} id={p.id} size={p.size} />
 			)}</For>
 			<Show when={!parts().length}><div class="part label">(no text)</div></Show>
-			<Show when={!first()}><button type="button" class="before" onClick={() => rebaseView.dropBefore(props.row.n)}>Drop everything before #{props.row.n}</button></Show>
+			<Show when={!first()}><button type="button" class="before" onClick={() => rebaseView.dropBefore(props.row.n)}>Drop everything before {rebaseRows.id(props.row)}</button></Show>
 		</div>
 	)
 }
 
 function Row(props: { st: RebaseState; row: RebaseRow; gone: Set<number>; max: number }) {
-	let n = props.row.n
+	let n = props.row.n, card = rebaseRows.id(props.row)
 	let state = () => rebaseView.shown(props.st, props.row, props.gone)
 	let open = () => !!props.st.open[n]
 	let pct = () => (props.max ? Math.round((props.row.tokens / props.max) * 100) : 0)
@@ -67,7 +67,7 @@ function Row(props: { st: RebaseState; row: RebaseRow; gone: Set<number>; max: n
 		<Show when={date}><li class="date" aria-hidden="true">{date}</li></Show>
 		<li class={['row', state(), { open: open() }]}>
 			<button type="button" class="info" aria-expanded={open() ? 'true' : 'false'} onClick={() => rebaseView.toggle(n)}>
-				<span class="n">#{n}</span>
+				<span class="n">{card}</span>
 				<span class="time" title={props.row.time}>{props.row.time.slice(-5)}</span>
 				<span class="kind">{props.row.kind}</span>
 				<span class="tokens" title={`≈${props.row.tokens} tokens (estimated) · ${pct()}% of the largest row`}>{rebaseView.kilo(props.row.tokens)}</span>
@@ -77,14 +77,14 @@ function Row(props: { st: RebaseState; row: RebaseRow; gone: Set<number>; max: n
 					<span class="carries">{[...props.row.carries, ...(state() === 'group' ? ['dropped with its group'] : [])].join(' · ')}</span>
 				</Show>
 			</button>
-			<div class="acts" role="group" aria-label={`Action for #${n}`}>
+			<div class="acts" role="group" aria-label={`Action for ${card}`}>
 				<For each={labels}>{(a) => (
 					<button type="button" class={a} aria-pressed={pressed(a) ? 'true' : 'false'} disabled={a === 'edit' && !props.row.editable}
 						onMouseDown={(e) => e.shiftKey && e.preventDefault()} onClick={(e) => rebaseView.act(n, a, e.shiftKey)}>{a}</button>
 				)}</For>
 			</div>
 			<Show when={state() === 'edit'}>
-				<textarea class="edit" aria-label={`New text for #${n}`} rows={Math.min(12, Math.max(3, (props.st.texts[n] ?? '').split('\n').length))}
+				<textarea class="edit" aria-label={`New text for ${card}`} rows={Math.min(12, Math.max(3, (props.st.texts[n] ?? '').split('\n').length))}
 					value={props.st.texts[n] ?? ''} onInput={(e) => rebaseView.edit(n, e.currentTarget.value)} />
 			</Show>
 			<Show when={open()}><Detail st={props.st} row={props.row} /></Show>
@@ -134,7 +134,7 @@ export function Rebase() {
 						</Show>
 						<div class="sums" role="status">
 							<span>{rebaseView.kilo(sums()?.tokens ?? 0)} → <b>{rebaseView.kilo(sums()?.after ?? 0)}</b> tokens</span>
-							<span>{sums()?.cacheFrom === undefined ? 'cache kept' : `cache rebuilds from #${sums()!.cacheFrom}`}</span>
+							<span>{sums()?.cacheFrom === undefined ? 'cache kept' : `cache rebuilds from ${rebaseRows.cardOf(s().snapshot.rows, sums()!.cacheFrom!)}`}</span>
 						</div>
 						<div class="buttons">
 							<button type="button" onClick={cancel} disabled={!!s().sending}><Icon name="close" />Cancel</button>

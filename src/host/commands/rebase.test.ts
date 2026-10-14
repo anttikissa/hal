@@ -23,7 +23,7 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	for (let c of [a, b]) {
 		expect(c.views.get(id)?.items.some((i) => i.type === 'text' && i.text === 'large answer')).toBe(false)
 		expect(c.views.get(id)?.items.some((i) => i.type === 'prompt' && i.text === 'fixed prompt')).toBe(true)
-		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({ text: 'History rewritten: 1 record hidden, 1 edited. `/rebase undo` to go back.' })
+		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({ text: 'History rewritten: 1 card hidden, 1 edited. `/rebase undo` to go back.' })
 	}
 	restartHost()
 	expect((await fresh(id)).items.some((i) => i.type === 'divider')).toBe(true)
@@ -77,7 +77,7 @@ test('todo replacement text is applied; queue prompts start in order; empty and 
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: start.todo })
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: '' })
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
-	let todo = start.todo.replace(`keep  #${user.n}`, `edit  #${user.n}`) + 'queue first\nqueue second\n'
+	let todo = start.todo.replace(`keep  u${user.n}`, `edit  u${user.n}`) + 'queue first\nqueue second\n'
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' }, paused: true })
 	expect(a.of('rebase-result').at(-1)).toMatchObject({ ok: false, text: expect.stringContaining('remove the queue lines or --paused') })
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
@@ -101,7 +101,7 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 	await until(() => a.of('rebase-plan').length)
 	let start = a.of('rebase-plan')[0]
 	expect(start.snapshot.rows.find((row: any) => row.n === message.n)).toMatchObject({ text: 'waiting message' })
-	let todo = start.todo.replace(new RegExp(`^keep\\s+#${message.n}.*\\n`, 'm'), '')
+	let todo = start.todo.replace(new RegExp(`^keep\\s+[a-z]${message.n}.*\\n`, 'm'), '')
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, paused: true })
 	expect(a.of('rebase-result').at(-1)?.ok).toBe(true)
 	expect(a.views.get(id)?.inbox).toEqual([])

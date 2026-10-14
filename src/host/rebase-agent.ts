@@ -29,14 +29,14 @@ function snapshot(id: string): RebaseRows {
 // Append-only activity does not invalidate shown IDs. A context boundary,
 // rebase or replacement prompt does, even if it happens to restore the text.
 function fresh(raw: HistoryRecord[], base: number): void {
-	if (base && !raw.some((r) => r.n === base)) throw new Error(`Rebase snapshot #${base} is missing; run /rebase show again.`)
-	if (raw.some((r) => r.n! > base && (r.type === 'rebase' || r.type === 'reset' || r.type === 'compact' || (r.type === 'user' && r.replaces)))) throw new Error(`Rebase snapshot #${base} is stale: context was rewritten. Run /rebase show again.`)
+	if (base && !raw.some((r) => r.n === base)) throw new Error(`Rebase snapshot ${base} is missing; run /rebase show again.`)
+	if (raw.some((r) => r.n! > base && (r.type === 'rebase' || r.type === 'reset' || r.type === 'compact' || (r.type === 'user' && r.replaces)))) throw new Error(`Rebase snapshot ${base} is stale: context was rewritten. Run /rebase show again.`)
 }
 
 function show(id: string): string {
 	let snapshot = rebaseAgent.snapshot(id)
 	rebaseAgent.state.shown.set(sessions.open(id), snapshot)
-	return rebaseRows.render(id, snapshot).replace(/# keep\/drop\/edit\/queue[^\n]*\n# edit[^\n]*/, '# Sparse plan: unmentioned entries stay. drop targets; edit #n "full replacement".\n# Open tails (12-, t12-, *) resolve through application, including this rebase call/result.')
+	return rebaseRows.render(id, snapshot).replace(/# keep\/drop\/edit\/queue[^\n]*\n# edit[^\n]*/, '# Sparse plan: unmentioned cards stay. drop targets; edit u12 "full replacement".\n# Open tails (12-, t12-, *) resolve through application, including this rebase call/result.')
 }
 
 function shown(id: string): RebaseRows {
