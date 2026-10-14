@@ -3,7 +3,8 @@
 	spec: 'An OpenAI WebSocket continuation may omit the last reply only when its replayed function-call IDs match the actual function-call IDs received from the backend. When Hal expands one native call into several commands, send the complete replay with all calls and matching results instead of using previous_response_id. Preserve delta-only continuations for unchanged replies. This restores the invariant that every function_call_output refers to a call present in the effective backend input. Cover ordinary and expanded call continuations and verify the expanded case live on the subscription endpoint.',
 	status: 'done',
 	notes: [
-		'The fix adds only a call-ID check to the existing WebSocket continuation path. Focused OpenAI and batching tests passed: 26 tests; targeted lint passed. Live subscription WebSocket requests accepted expanded-call results both with native search enabled and with it absent. The search-enabled follow-up chose another tool call, which is valid; the diagnostic initially overconstrained it to require a final text answer. Full replay of the reported failing history has no unmatched tool results.'
+		'The fix adds only a call-ID check to the existing WebSocket continuation path. Focused OpenAI and batching tests passed: 26 tests; targeted lint passed. Live subscription WebSocket requests accepted expanded-call results both with native search enabled and with it absent. The search-enabled follow-up chose another tool call, which is valid; the diagnostic initially overconstrained it to require a final text answer. Full replay of the reported failing history has no unmatched tool results.',
+		'The continuation guard compares call-ID array length and elements directly, without serializing the arrays. Order and exact IDs must match.'
 	],
 	needs: ['ak5', 'ep8'],
 	foldInto: ['ak5', 'ep8']

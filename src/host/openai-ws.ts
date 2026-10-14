@@ -87,7 +87,7 @@ function continuation(s: Socket, fields: string, full: unknown[], req: ProviderR
 	let reply = req.messages[last.count]
 	let replyItems = reply?.role === 'assistant' ? items({ ...req, messages: [reply] }) : []
 	let calls = replyItems.filter((item: any) => item?.type === 'function_call').map((item: any) => item.call_id)
-	if (JSON.stringify(calls) !== JSON.stringify(last.calls)) return undefined
+	if (calls.length !== last.calls.length || calls.some((id, i) => id !== last.calls[i])) return undefined
 	let start = last.input.length + replyItems.length
 	if (full.length <= start) return undefined
 	for (let i = 0; i < last.input.length; i++) if (JSON.stringify(full[i]) !== last.input[i]) return undefined
