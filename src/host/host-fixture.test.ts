@@ -149,10 +149,10 @@ export async function fresh(id: string): Promise<Transcript> {
 	return c.views.get(id)!
 }
 
-// The /amend a client sends to edit the session's last prompt (task ky7).
+// The /edit a client sends to edit the session's last prompt (task ky7).
 export function amending(id: string, text: string): string {
 	let records = replay.current(history.readSync(id))
-	return `/amend ${records[replay.lastPrompt(records)]!.n}\n${text}`
+	return `/edit ${records[replay.lastPrompt(records)]!.n}\n${text}`
 }
 
 // The host process goes away and a new one starts on the same home.

@@ -17,7 +17,7 @@ import { status } from './status.ts'
 // `continuing`: the caller sends a prompt next, which shows the change
 // (an amend, task a8x): a turn left without its end is not paused, and
 // the record is quiet, shown without a divider.
-function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: { boundary?: boolean; transition?: string; continuing?: boolean } = {}): HistoryRecord {
+function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: { boundary?: boolean; transition?: string; continuing?: boolean; quiet?: boolean } = {}): HistoryRecord {
 	let raw = history.readSync(id)
 	if ((!options.boundary && (states.busy(status.stateOf(id)) || history.state.running.has(id))) || forms.open(raw)) throw new Error('Pause the session and answer or dismiss its question before rebasing.')
 	if ((raw.at(-1)?.n ?? 0) !== expectedBase) throw new Error(`Rebase is stale: base #${expectedBase}, latest record #${raw.at(-1)?.n ?? 0}. Rebuild the plan.`)
@@ -40,7 +40,7 @@ function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: 
 	if (!history.state.running.has(id)) status.state.states.delete(id)
 	status.state.derived.delete(id)
 	let record: HistoryRecord
-	try { record = history.append(id, { type: 'rebase', ...plan, ...(contextChanged && { contextChanged: true }), ...(options.continuing && { quiet: true }), ...(options.transition && { transition: options.transition }) }) }
+	try { record = history.append(id, { type: 'rebase', ...plan, ...(contextChanged && { contextChanged: true }), ...((options.continuing || options.quiet) && { quiet: true }), ...(options.transition && { transition: options.transition }) }) }
 	catch (error) {
 		if (pausing) throw new Error(`Rebase was not applied; the session is paused.\n${error instanceof Error ? error.message : String(error)}`)
 		throw error

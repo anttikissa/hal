@@ -86,20 +86,22 @@ function survives(r: HistoryRecord): boolean {
 	return r.type === 'inbox' || r.type === 'answer' || r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change !== undefined)
 }
 
-// /amend undo (task hx8): one plan on the amend's base replaces the
-// amend rebase, so the original prompt and its partial output return,
-// and drops the edited prompt and what followed. Apply pauses the
-// session, which now ends in an unanswered prompt.
+// /edit undo (task hx8): one plan on the edit's base replaces the edit
+// rebase, so the original prompt and its partial output return, and
+// drops the edited prompt and what followed. Apply pauses the session,
+// which now ends in an unanswered prompt. The rebase is quiet: the
+// command's card reports it, not a divider.
 function unamend(id: string): string {
 	let raw = history.readSync(id)
+	if (forms.open(raw)) throw new Error('Answer or dismiss the open question before undoing the edit.')
 	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase')
-	if (last?.type !== 'rebase' || !last.quiet) throw new Error('Nothing to undo: the latest history rewrite is not an amend.')
+	if (last?.type !== 'rebase' || !last.quiet) throw new Error('Nothing to undo: the latest history rewrite is not an edit.')
 	let current = replay.current(raw), at = current.findIndex((r) => r.type === 'user' && r.amends !== undefined && r.n! > last.n!)
 	let edited = current[at]
-	if (edited?.type !== 'user') throw new Error('Nothing to undo: the amended prompt is gone.')
-	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0)
+	if (edited?.type !== 'user') throw new Error('Nothing to undo: the edited prompt is gone.')
+	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0, { quiet: true })
 	rebasePlans.broadcast(id, edited.amends!)
-	return 'Amend undone.'
+	return `Edit undone: restored u${edited.amends}.`
 }
 
 // Edits prompt #n and rewinds there (task 26q), as one command: a

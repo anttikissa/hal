@@ -1,4 +1,4 @@
-// Editing an earlier prompt rewinds there (task 26q): /amend <n> <text>
+// Editing an earlier prompt rewinds there (task 26q): /edit <n> <text>
 // drops #n on in one rebase and sends the edit (task ky7).
 
 import { expect, test } from 'bun:test'
@@ -25,10 +25,10 @@ test('rewind drops the prompt and everything after it, then sends the edit once'
 	let a = client()
 	let id = created(a)
 	let n = await twoTurns(a, id)
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno`, id: 'r1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit ${n} uno`, id: 'r1' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	b.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno`, id: 'r1' })
+	b.conn.send({ type: 'submit', sessionId: id, text: `/edit ${n} uno`, id: 'r1' })
 	await until(() => calls.length === 3 && b.of('ack').length)
 	expect([...a.of('rejected'), ...b.of('rejected'), ...errors(a)]).toEqual([])
 	expect(calls[2]!.input.messages.map(texts)).toEqual([[stamped('uno')]])
@@ -47,23 +47,23 @@ test('rewind refuses a running session, a non-prompt and a dropped record', asyn
 	let id = created(a)
 	let n = await twoTurns(a, id)
 	let reply = history.readSync(id).find((r) => r.type === 'assistant')!.n!
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${reply} x`, id: 'bad1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit ${reply} x`, id: 'bad1' })
 	await until(() => errors(a).length === 1)
 	expect(errors(a)[0]).toContain('not a prompt')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'three' })
 	await until(() => calls.length === 3)
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} x`, id: 'bad2' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit ${n} x`, id: 'bad2' })
 	await until(() => errors(a).length === 2)
 	expect(errors(a)[1]).toContain('running')
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 3)
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${n} uno` })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit ${n} uno` })
 	await until(() => calls.length === 4)
 	calls[3]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 4)
 	// A stale client still offering a dropped prompt.
 	let two = history.readSync(id).find((r) => r.type === 'user' && JSON.stringify(r).includes('"two"'))!.n!
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend ${two} again`, id: 'bad3' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit ${two} again`, id: 'bad3' })
 	await until(() => errors(a).length === 3)
 	expect(errors(a)[2]).toContain('not a prompt')
 	expect(history.readSync(id).filter((r) => r.type === 'user' && r.amends !== undefined)).toHaveLength(1)

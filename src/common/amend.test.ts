@@ -33,11 +33,11 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 test('Enter sends the edit for the host to place; an emptied edit just continues', () => {
 	let editing = { sessionId: 's1', original: 'fix ti', target: '5' }
 	let paused = session({ type: 'paused' })
-	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 5\nfix it' })
+	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix it' })
 	expect(amend.enter(editing, paused, '  ')).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(amend.enter(editing, paused, 'fix ti')).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(amend.hint(editing, 'fix ti')).not.toContain('enter:')
-	expect(amend.hint(editing, 'fix it')).toContain('enter: amend')
+	expect(amend.hint(editing, 'fix it')).toContain('enter: edit')
 	expect(amend.hint({ ...editing, changed: true }, 'fix it')).toContain('enter: send as new')
 	// Alt-Enter queues it as a new message instead.
 	expect(amend.enter(editing, paused, 'later', true)).toEqual({ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' })
@@ -92,10 +92,10 @@ test('unchanged edits continue without sending, and older targets respect side e
 	let last = { ...amend.at(t, '3')!.editing, paused: true }
 	expect(amend.enter(last, t, 'two')).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(amend.hint(last, 'two')).not.toContain('enter:')
-	expect(amend.hint(last, 'twoa')).toContain('enter: amend')
+	expect(amend.hint(last, 'twoa')).toContain('enter: edit')
 	let earlier = amend.step(last, t, -1)!
 	expect(earlier.rewind).toBe(1)
-	expect(amend.enter(earlier, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 1\nuno' })
+	expect(amend.enter(earlier, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 1\nuno' })
 	expect(amend.step(earlier, t, 1)?.original).toBe('two')
 	t.items.push({ type: 'tool', key: '4', id: 't1', name: 'command', input: { command: '/rename Title' } })
 	expect(amend.at(t, '1')!.editing.changed).toBe(false)

@@ -17,7 +17,6 @@ export type CommandInfo = { name: string; description: string; category: string;
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'account', description: 'switch this session to another login', category: 'session' },
-	{ name: 'amend', description: 'edit a prompt and run it again, or undo the last amend', category: 'session' },
 	{ name: 'autoclose', description: 'show or set automatic tab closure', category: 'session' },
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'cards', description: 'show or set how cards of a kind start: short or long', category: 'session' },
@@ -32,6 +31,7 @@ const list: CommandInfo[] = [
 	{ name: 'collapse', description: 'collapse cards (t*, 10-24); not /close', category: 'session' },
 	{ name: 'compact', description: 'summarize the context so far', category: 'session' },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
+	{ name: 'edit', description: 'edit a prompt and run it again (up arrow), or undo the last edit', category: 'session' },
 	{ name: 'effort', description: 'set the model\'s effort', category: 'session' },
 	{ name: 'expand', description: 'expand cards (t*, 10-24)', category: 'session' },
 	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f' },

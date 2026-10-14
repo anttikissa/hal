@@ -4,6 +4,8 @@
 import { protocol, type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { sendKeys } from '../common/send-keys.ts'
+import { forms } from '../common/forms.ts'
+import { states } from '../common/states.ts'
 import { commands } from './commands.ts'
 import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
@@ -234,7 +236,10 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	let queueEdit = queueEdits.intercept(client, c); if (queueEdit) return queueEdit
 	// Delivered-prompt edits wait for stopped work, then recheck dedup.
-	let stopping = c.type === 'submit' && (c.amend || commands.parse(c.text)?.name === 'amend') && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
+	// /edit undo drops the running turn anyway, so it pauses it first.
+	let parsed = c.type === 'submit' ? commands.parse(c.text) : undefined
+	if (parsed?.name === 'edit' && parsed.args === 'undo' && states.busy(status.stateOf(c.sessionId)) && !forms.open(history.readSync(c.sessionId))) turns.stop(c.sessionId)
+	let stopping = c.type === 'submit' && (c.amend || parsed?.name === 'edit') && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
 	if (stopping) {
 		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
 		return undefined

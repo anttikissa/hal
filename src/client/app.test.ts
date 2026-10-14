@@ -211,11 +211,11 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	up()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	expect(appView.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
-	expect(appView.view().editing).toContain('[amending prompt]')
+	expect(appView.view().editing).toContain('[editing prompt]')
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/amend 5\nfix it', base: 0 })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix it', base: 0 })
 	expect(appView.view().prompt.text).toBe('')
 	// The edit is over: the next prompt is a new one.
 	type('more')
@@ -237,7 +237,7 @@ test('an edit not yet acknowledged is sent again as an edit by the next client',
 		app.reset()
 		sent = []
 		app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: '/amend 5\nfix ti!', base: 0 }])
+		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: '/edit 5\nfix ti!', base: 0 }])
 	} finally {
 		drafts.store = store
 	}

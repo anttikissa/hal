@@ -316,7 +316,7 @@ async function pauseAndEdit(a: ReturnType<typeof client>, id: string, text: stri
 	a.conn.send({ type: 'submit', sessionId: id, text: amending(id, text) })
 }
 
-test('/amend replaces a prompt quietly; /amend undo restores it with its partial output, paused', async () => {
+test('/edit replaces a prompt quietly; /edit undo, even mid-turn, restores it with its partial output, paused', async () => {
 	let a = client()
 	let id = toolSession(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I ntoe?' })
@@ -325,19 +325,18 @@ test('/amend replaces a prompt quietly; /amend undo restores it with its partial
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
 	let n = history.readSync(id).findLast((r) => r.type === 'user')!.n
 	a.conn.send({ type: 'pause', sessionId: id })
-	a.conn.send({ type: 'submit', sessionId: id, text: `/amend u${n}\nwhat did I note?`, id: 'edit-1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit u${n}\nwhat did I note?`, id: 'edit-1' })
 	await until(() => calls.length === 2)
 	expect(a.of('prompt').at(-1)).toMatchObject({ command: 'edit-1' })
-	calls[1]!.push({ type: 'text', text: 'Milk.' }, { type: 'done', reason: 'end' })
-	await until(() => a.views.get(id)!.state.type === 'idle')
-	expect(shown((await fresh(id)).items)).toEqual([{ type: 'prompt', text: 'what did I note?', edited: true }, { type: 'text', text: 'Milk.' }, { type: 'turn-end', status: 'completed' }])
-	a.conn.send({ type: 'submit', sessionId: id, text: '/amend undo' })
+	expect(history.readSync(id).some((r) => r.type === 'command')).toBe(false)
+	calls[1]!.push({ type: 'text', text: 'Milk.' })
+	await until(() => a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'Milk.'))
+	a.conn.send({ type: 'submit', sessionId: id, text: '/edit undo' })
 	await until(() => a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'You no'))
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(shown(view.items.filter((i) => i.type !== 'divider'))).toEqual([{ type: 'prompt', text: 'what did I ntoe?', interactive: true }, { type: 'text', text: 'You no', interrupted: true }, { type: 'turn-end', status: 'paused' }])
+	expect(shown(view.items)).toEqual([{ type: 'prompt', text: 'what did I ntoe?', interactive: true }, { type: 'text', text: 'You no', interrupted: true }, { type: 'turn-end', status: 'paused' }, { type: 'command', text: '/edit undo', output: `Edit undone: restored u${n}.` }])
 	expect(view.state.type).toBe('paused')
-	expect(history.readSync(id).some((r) => r.type === 'command')).toBe(false)
 })
 
 test('an edit after only reading replaces the prompt: the model sees it as if written that way', async () => {

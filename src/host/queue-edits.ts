@@ -88,7 +88,7 @@ function intercept(owner: object, c: Command): { refused?: string; reply?: Event
 // Commands that would drop or rewrite waiting messages wait for the lock.
 function refused(id: string, name: string, args = ''): string | undefined {
 	if (!queueEdits.state.has(id)) return
-	if (name === 'clear' || name === 'rebase' || name === 'amend' || (name === 'queue' && args === 'clear')) return busy
+	if (name === 'clear' || name === 'rebase' || name === 'edit' || (name === 'queue' && args === 'clear')) return busy
 }
 
 // /queue next on the locked message: it goes when the edit ends.

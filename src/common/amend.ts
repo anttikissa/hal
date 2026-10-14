@@ -95,7 +95,7 @@ function enter(editing: Editing, t: Transcript | undefined, text: string, queue 
 	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
 	if (editing.changed) return { type: 'submit', sessionId: editing.sessionId, text }
 	if (editing.inbox !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, amend: true, edits: editing.inbox }
-	return { type: 'submit', sessionId: editing.sessionId, text: `/amend ${parseInt(editing.target!)}\n${text}` }
+	return { type: 'submit', sessionId: editing.sessionId, text: `/edit ${parseInt(editing.target!)}\n${text}` }
 }
 
 // Leaving the edit (Down unchanged, Escape): continue the paused turn,
@@ -119,9 +119,9 @@ export const amend = {
 		if (!editing) return ''
 		let waiting = !!editing.queueEdit || (editing.inbox !== undefined && !editing.paused)
 		let changed = text !== editing.original
-		let label = waiting ? 'editing waiting message' : editing.changed ? 'editing prompt' : 'amending prompt'
+		let label = waiting ? 'editing waiting message' : 'editing prompt'
 		if (editing.rewind !== undefined) label += ` #${editing.rewind}`
-		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : 'amend'}, ` : ''
+		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : 'edit'}, ` : ''
 		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'discard' : 'continue'}`
 	},
 	step(editing: Editing, t: Transcript, dir: -1 | 1) {

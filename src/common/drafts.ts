@@ -86,10 +86,10 @@ function text(id: string): string {
 	return drafts.local(id).text
 }
 
-// Prompts shown as pending (sent, not acknowledged); an /amend as the
+// Prompts shown as pending (sent, not acknowledged); an /edit as the
 // edited prompt it becomes.
 function pending(id: string): Sending[] {
-	return drafts.local(id).sending.flatMap((s) => (s.queueEdit === undefined ? [{ ...s, text: s.text.replace(/^\/amend \d+\n/, '') }] : []))
+	return drafts.local(id).sending.flatMap((s) => (s.queueEdit === undefined ? [{ ...s, text: s.text.replace(/^\/edit \d+\n/, '') }] : []))
 }
 
 // The user changed the editor text.

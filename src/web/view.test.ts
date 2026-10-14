@@ -140,7 +140,7 @@ test('Up on an empty input while the model works edits the last prompt; Enter se
 	expect(up).toMatchObject({ command: { type: 'pause', sessionId }, text: 'fix ti' })
 	let editing = fold([{ type: 'state', sessionId, state: { type: 'paused' } }], up.view)
 	expect(view.hints(editing, 'fix ti').some(([key]) => key === 'enter')).toBe(false)
-	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: '/amend 5\nfix it' }, keep: false })
+	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: '/edit 5\nfix it' }, keep: false })
 	expect(view.editKey(editing, 'down', 'fix it')).toBeUndefined()
 	let down = view.editKey(editing, 'down', 'fix ti')!
 	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
