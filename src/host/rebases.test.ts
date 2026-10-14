@@ -51,7 +51,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(pages.page(id, undefined, 1).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 3, 4]))
 	expect(snapshots.build(id).state.type).toBe('paused')
 	expect(pages.snapshot(id, 1).history[0]).toMatchObject({ blocks: [{ text: 'newneedle' }] })
-	expect(await readBlob.run({ id: '#2' }, { sessionId: id } as any)).toContain('dropped')
+	expect(await readBlob.run({ id: 'a2' }, { sessionId: id } as any)).toContain('dropped')
 	await findIndex.catchup(id)
 	let texts = findIndex.state.db!.query('SELECT text FROM docs WHERE sessionId=?').all(id)
 	expect(JSON.stringify(texts)).toContain('newneedle')
@@ -59,7 +59,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(JSON.stringify(texts)).not.toContain('oldanswer')
 	rebases.apply(id, { base: 4, drop: [], edit: [] }, history.readSync(id).at(-1)!.n)
 	expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
-	expect(snapshots.build(id).dropped).toEqual([])
+	expect(snapshots.build(id).dropped).toBeUndefined()
 	expect(pages.page(id, undefined, 1).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 2, 3, 4]))
 })
 

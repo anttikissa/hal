@@ -3,6 +3,7 @@
 import { forms } from '../common/forms.ts'
 import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { rebaseDisplay } from '../common/rebase-display.ts'
 import { states } from '../common/states.ts'
 import { history } from './history.ts'
 import { sessions } from './sessions.ts'
@@ -52,6 +53,9 @@ function apply(id: string, plan: RebasePlan, expectedBase = plan.base, options: 
 	} catch (error) {
 		throw new Error(`Rebase applied as #${record.n}; settings synchronization failed. Reopening recovers settings from history.\n${error instanceof Error ? error.message : String(error)}`)
 	}
+	// The model hears what the user changed, so it does not trust stale replies (task p3e).
+	let rewrite = record as HistoryRecord & { type: 'rebase' }
+	if (!rewrite.quiet && !options.boundary) history.append(id, { type: 'notice', text: rebaseDisplay.text(rewrite, history.readSync(id)) })
 	return record
 }
 

@@ -11,13 +11,25 @@ function current(raw: HistoryRecord[]): HistoryRecord[] {
 	return [...candidates.flatMap((r) => active.has(r) ? [r] : byNumber.has(r.n) ? [byNumber.get(r.n)!] : []), ...rebase.latest(raw).filter((r) => r.type === 'rebase')]
 }
 
+// Each line says what changed and how to go back (task p3e).
 function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): string {
-	if (!r.drop.length && !r.edit.length) return 'History rewrite undone.'
 	let before = raw.slice(0, raw.findIndex((record) => record.n === r.n))
-	let snapshot = rebaseRows.build(before), sums = rebaseRows.totals(snapshot, r)
-	let groups = rebase.groups(snapshot.records)
-	let dropped = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])])).size
-	return `History rewritten · /rebase undo · ${dropped} dropped, ${r.edit.length} edited · cache rebuilds from #${sums.cacheFrom}`
+	let records = rebaseRows.build(before).records
+	let boundary = (plan: HistoryRecord & { type: 'rebase' }) => plan.drop.length === 1 && !plan.edit.length ? before.find((x) => x.n === plan.drop[0] && (x.type === 'reset' || x.type === 'compact'))?.type : undefined
+	if (!r.drop.length && !r.edit.length) {
+		let undone = before.findLast((x) => x.type === 'rebase' && x.base === r.base && (x.drop.length || x.edit.length))
+		let kind = undone?.type === 'rebase' ? boundary(undone) : undefined
+		if (kind === 'reset') return 'Context cleared again; "/clear undo" to go back'
+		if (kind === 'compact') return 'Context compacted again; "/compact undo" to go back'
+		return 'History rewrite undone: the earlier history is back'
+	}
+	let kind = boundary(r)
+	if (kind === 'reset') return 'Clear undone: the earlier context is back; "/rebase undo" to clear it again'
+	if (kind === 'compact') return 'Compaction undone: the full context is back; "/rebase undo" to compact it again'
+	let groups = rebase.groups(records)
+	let hidden = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])])).size
+	let parts = [hidden && `${hidden} record${hidden === 1 ? '' : 's'} hidden`, r.edit.length && `${r.edit.length} edited`].filter(Boolean).join(', ')
+	return `History rewritten: ${parts}; "/rebase undo" to go back`
 }
 
 function dividers(raw: HistoryRecord[]): { n: number; text: string; ts?: string; after?: number }[] {
