@@ -6,10 +6,23 @@ import { toolDetails } from '../../common/tool-details.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
+import { callText } from '../../common/call-text.ts'
+import { nativeTool } from '../native-tool.ts'
+
+// READ_BLOB "id" "id" ... reads each whole first page, like READ's paths.
+function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
+	let { values } = callText.values(raw)
+	if (values.length > 1 && values.every((v) => typeof v === 'string' && v)) return { name: 'read_blob', input: { ids: values } }
+	return { name: 'read_blob', input: nativeTool.generic(tool, raw) }
+}
 
 export const tool: Tool<ToolOutput> = {
 	name: 'read_blob',
-	syntax: { summary: 'read stored output or history' },
+	syntax: {
+		summary: 'read stored output or history',
+		usage: ['READ_BLOB "<id>" [ { offset, limit, charOffset } ]', 'READ_BLOB "<id>" "<id>" ...   // several, first page of each'],
+		resolve: resolveCall,
+	},
 	description: 'Read an immutable blob or history record. Text is paged; images return as images.',
 	parameters: {
 		type: 'object',
@@ -23,6 +36,22 @@ export const tool: Tool<ToolOutput> = {
 	},
 	readOnly: true,
 	async run(input, ctx) {
+		if (Array.isArray(input.ids)) {
+			let parts: string[] = [], errors: string[] = []
+			let images: { mediaType: string; data: string; source?: string }[] = []
+			for (let id of input.ids) {
+				try {
+					let out = await tool.run({ id }, ctx)
+					if (typeof out !== 'string') images.push(...[...(out.image ? [out.image] : []), ...(out.images ?? [])].map((image) => ({ source: String(id), ...image })))
+					let text = `== READ_BLOB ${id} ==\n${typeof out === 'string' ? out : out.text}`
+					;(typeof out !== 'string' && out.isError ? errors : parts).push(text)
+				} catch (e: any) {
+					errors.push(`== READ_BLOB ${id}: ${e?.message ?? e} ==`)
+				}
+			}
+			let text = [...errors, ...parts].join('\n\n')
+			return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
+		}
 		if (typeof input.id !== 'string') throw new Error('id must be a string')
 		let reference = input.id.trim()
 		for (let key of ['offset', 'limit', 'charOffset'] as const) if (input[key] !== undefined && (typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)) throw new Error(`${key} must be a positive integer`)

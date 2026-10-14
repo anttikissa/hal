@@ -91,6 +91,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'read':
 		case 'read_blob': {
 			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.length} file${input.paths.length === 1 ? '' : 's'}` }
+			if (name === 'read_blob' && Array.isArray(input.ids)) return { text: `Read blobs ${input.ids.join(', ')}` }
 			let key = name === 'read_blob' ? 'id' : str('url') ? 'url' : 'path'
 			if (str(key)) return { text: `${name === 'read_blob' ? 'Read blob' : 'Read'} ${str(key)}`, key }
 			break

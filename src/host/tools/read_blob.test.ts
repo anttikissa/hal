@@ -7,6 +7,7 @@ import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
 import { paths } from '../paths.ts'
 import { pruning } from '../pruning.ts'
+import { nativeTool } from '../native-tool.ts'
 import { tools } from '../tools.ts'
 
 let home: string
@@ -84,4 +85,14 @@ test('rebased output replaces the original blob and drops its former image slot'
 	expect((await read(`source/${record.n}.1`)).isError).toBe(true)
 	history.append('source', { type: 'rebase', base: record.n!, drop: [record.n!], edit: [] })
 	expect((await read(`source/${record.n}`)).output).toContain('was dropped by rebase')
+})
+
+test('READ_BLOB call text with several ids reads each', async () => {
+	let a = history.append('source', { type: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'first output' }] })
+	let b = history.append('source', { type: 'user', blocks: [{ type: 'tool_result', id: 'b', output: 'second output' }] })
+	let { name, input } = nativeTool.resolve(`READ_BLOB "source/${a.n}" "source/${b.n}"`)
+	let result = await tools.run({ type: 'tool_call', id: 'both', name, input }, { sessionId: 'reader', cwd: home, signal })
+	expect(result.isError).toBeUndefined()
+	expect(result.output).toBe(`== READ_BLOB source/${a.n} ==\nfirst output\n\n== READ_BLOB source/${b.n} ==\nsecond output`)
+	expect(nativeTool.resolve('READ_BLOB "t1" { offset: 2 }').input).toEqual({ id: 't1', offset: 2 })
 })
