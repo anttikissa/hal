@@ -25,9 +25,11 @@ export const toolModel = {
 	call,
 	welcome: `Welcome. This is the HAL 9001 Tool Protocol Server.
 
-The Tool Protocol is a happy mishmash of early Internet protocols (think SMTP, NNTP and IRC), JS literals, and /* comments */.
+The Tool Protocol is a happy mishmash of early Internet protocols (think SMTP, NNTP, IRC), JS literals, and /* comments */, plus heredoc-style input for the EDIT tool.
 
-Write tool calls and I will execute them. Commands will run on your machine and change your files. Example:
+Write tool calls here and I will execute them, showing results exactly like a model would see them.
+
+**WARNING - this is not a simulator**: commands run on your actual machine. Be careful with BASH and EDIT.
 
 \`\`\`
 BASH /* Look for entry point */ "ls -l src | grep main"
@@ -35,7 +37,18 @@ READ README.md:1-5
 INSPECT { scope: 'self', fields: 'tab, id, name, state' }
 \`\`\`
 
-Hal is tolerant in what it receives and strict in what it sends. Officially, tools only accept "strings", { objects }, and /* comments */, but reasonable variations are accepted when they can be unambiguously understood.
+EDIT is the Swiss Army knife of edit operations; models love it. \`HELP edit\` for the gory details.
 
-Type HELP for more info.`,
+\`\`\`
+EDIT file.ts write
+!!NEW
+console.log('Hello world!')
+!!END
+\`\`\`
+
+Multiple tool calls per message run in parallel if safe. Tools like BASH, EDIT, or COMMAND run serially.
+
+Hal is tolerant in what it receives and strict in what it sends. Officially, arguments use "strings", { objects }, and /* comments */, but unambiguous variations are tolerated. Like, you don't have to capitalize tool names.
+
+Type \`HELP\` for more info. Help texts are terse by design: they’re for models, not humans. Sorry not sorry.`,
 }

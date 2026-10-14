@@ -1,0 +1,10 @@
+{
+	title: 'Revise direct tool model welcome',
+	spec: 'src/host/tool-model.ts holds the user-approved human-facing welcome for hal/tool: describe heredoc-style EDIT input, show a prominent real-machine warning, explain that results are what a model sees, retain the BASH/READ/INSPECT examples and add the user EDIT example. Use the concise guidance: Multiple tool calls per message run in parallel if safe. Tools like BASH, EDIT, or COMMAND run serially. Explain tolerant argument syntax with lowercase tool names as the concrete example. End with HELP and the terse-for-models, Sorry not sorry wording. Preserve the playful tone and the existing execution behavior. User supplied and approved the complete revised welcome in session 174-ess on 2026-10-14.',
+	status: 'done',
+	notes: [
+		'The user edited the welcome in place; preserve the complete supplied copy, including its intentionally concise parallelism description. Verification: three focused tool-model tests passed and changed-file lint passed.'
+	],
+	needs: ['f70'],
+	foldInto: ['f70']
+}
