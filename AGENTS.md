@@ -85,12 +85,20 @@ resolvable. Keep host-specific scripts and instructions local and
 gitignored; use reserved example domains in tracked examples. Permission
 to operate a host is not permission to publish its configuration.
 
+# Code guidelines
+
+Start each source file with a short comment explaining its purpose.
+
+Write code for humans to read. Use small, well-named abstractions that express
+intent rather than mixing all the mechanics together. For example, an argument
+parser might declare options with arg('--home <dir>', 'Set Hal home directory',
+dir => { /* handle dir */ }). Apply this principle throughout the codebase.
+
 # Tests
 
 Leave the codebase with fewer broken tests than you found. Fix failures
-in your area, including pre-existing ones. Leave failures elsewhere only
-when another active session is working on them; confirm ownership and
-report them before finishing.
+in your area, and others if nobody else is fixing them. Tests may fail
+only while active sessions are working to fix them.
 
 Run tests only for the code being developed unless changes are crosscutting.
 Use ./test <filename-pattern> for focused normal tests; patterns match filenames,
