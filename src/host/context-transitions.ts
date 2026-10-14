@@ -25,9 +25,8 @@ function output(id: string, text: string, fields: { transition?: ContextTransiti
 
 function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): Reply {
 	if (contextTransitions.pending(id)) return { error: 'a context transition is already pending; wait or press Escape' }
-	if (!turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') {
-		let welcome = kind === 'clear' && sessions.open(id).model === 'hal/tool' ? (require('./tool-model.ts') as typeof import('./tool-model.ts')).toolModel.welcome : ''
-		return { say: kind === 'clear' ? 'the context is already empty' : 'nothing to compact', ...(welcome && { synthetic: welcome }) }
+	if (kind === 'compact' && !turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') {
+		return { say: 'nothing to compact' }
 	}
 	let intent: ContextTransition = { id: crypto.randomUUID(), kind, sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }), ...(kind === 'clear' && prompt.length && { prompt }) }
 	contextTransitions.output(id, `/${kind} accepted; applying after active work settles.`, { transition: intent })

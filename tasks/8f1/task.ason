@@ -1,0 +1,10 @@
+{
+	title: 'Clear synthetic-only visible history',
+	spec: 'Invariant: /clear always writes a fresh reset boundary after active work settles, even with only synthetic output, command notices, or no provider conversation. Live terminal and web views and reopened sessions show no records from before that boundary; the append-only saved history remains intact. The existing promptless hal/tool welcome appears once after each boundary. Compact retains its empty-conversation guard; literal clear continuation and settlement safety remain unchanged. Supersede the already-empty clear shortcut in vh and 4ev. Keep regression coverage for synthetic-only and repeated clears and live/reopened parity.',
+	status: 'done',
+	notes: [
+		'compact.anything counts only provider user/assistant records, not synthetic output. Restrict its early-return guard to compact; clear always takes the existing settled reset path. Existing hal/tool welcome regeneration remains. Focused context-transition and tool-model tests: 15 passed; changed-file lint: clean. No timers or additional growing state.'
+	],
+	needs: ['vh', '4ev'],
+	foldInto: ['vh', '4ev']
+}

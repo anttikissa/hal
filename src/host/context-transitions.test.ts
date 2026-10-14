@@ -14,6 +14,21 @@ import { prompts } from './prompts.ts'
 useHost()
 const commandCall = (command: string, id = 'reset') => ({ type: 'tool_call' as const, id, name: 'command', input: { command } })
 
+test('clear resets synthetic-only and already-cleared history without a provider turn', async () => {
+	let c = client(), id = created(c)
+	let { slash } = await import('./slash.ts')
+	slash.output(id, 'synthetic greeting', false, undefined, true)
+	for (let count of [1, 2]) {
+		c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
+		await until(() => c.of('divider').length === count)
+		expect(history.readSync(id).filter((r) => r.type === 'reset')).toHaveLength(count)
+		expect(JSON.stringify(c.views.get(id)!.items)).not.toContain('synthetic greeting')
+		expect(shown((await fresh(id)).items)).toEqual(shown(c.views.get(id)!.items))
+	}
+	expect(history.readSync(id).some((r) => r.type === 'output' && r.text === 'synthetic greeting')).toBe(true)
+	expect(calls).toHaveLength(0)
+})
+
 test('self-issued clear records results for later undispatched calls, ends old turn and starts attributed literal multiline continuation', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'old prompt' })
