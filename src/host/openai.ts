@@ -172,7 +172,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					let sources: string[] = (action.sources ?? []).map((s: any) => s?.url).filter((u: unknown) => typeof u === 'string')
 					let input = action.type === 'search' ? { query: queries.join('; ') } : { ...action }
 					let output = item.status === 'completed'
-						? [...(queries.length > 1 ? [...queries, ''] : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n').trim()
+						? [...(queries.length > 1 ? queries : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n')
 						: `Web search ${item.status ?? 'failed'}\n${m.data}`
 					yield { type: 'hosted_tool', id: item.id ?? `ws_${index}`, name: 'web_search', input, output, ...(item.status !== 'completed' && { isError: true }) }
 				}
