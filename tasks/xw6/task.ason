@@ -1,0 +1,10 @@
+{
+	title: 'Terminal previews the theme under a theme question cursor',
+	spec: 'A choice field with preview: theme (the intro theme step and /theme) shows the theme its cursor is on in the terminal, live, without writing plugins/theme.ts. Closing the form (answer, skip, cancel) ends the preview: an answer leaves the chosen theme selected, a skip restores the saved one. plugins.preview runs a theme file in place of plugins/theme.ts and is never listed, saved or reported as loaded; plugins.unpreview restores theme.ts unless it reloaded meanwhile. The web ignores the flag for now.',
+	status: 'done',
+	notes: [
+		'Checked by hand in a scratch home under tmux: Down to tron repainted in tron colors; Escape restored hal and wrote nothing; /theme with wopr kept wopr after Enter. The client calls previewTheme from show(), so every repaint path follows the open form.'
+	],
+	needs: ['4c1'],
+	foldInto: ['4c1']
+}

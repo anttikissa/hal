@@ -19,7 +19,8 @@ export type Field = { help?: string } & (
 	// `inline`: options in a row; left and right change it, up and down
 	// move between fields. `cards`: a card kind (card.kinds) whose cards
 	// start as the chosen option while the form is open: a live preview.
-	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number; inline?: true; cards?: string }
+	// `preview: 'theme'`: the terminal shows the chosen theme meanwhile.
+	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number; inline?: true; cards?: string; preview?: 'theme' }
 )
 
 // `quote`: text shown as it is below the question (a command to
@@ -66,6 +67,7 @@ function invalid(value: unknown): string | undefined {
 			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string')) return `${field.name}: choices need options`
 			if (field.inline !== undefined && field.inline !== true) return `${field.name}: inline must be true`
 			if (field.cards !== undefined && typeof field.cards !== 'string') return `${field.name}: cards must be a card kind`
+			if (field.preview !== undefined && field.preview !== 'theme') return `${field.name}: preview must be 'theme'`
 		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer') return `${(field as Field).name}: unknown field type`
 		if ((field.type === 'text' || field.type === 'integer') && field.initial !== undefined && typeof field.initial !== 'string') return `${field.name}: initial must be a string`
 		if (field.help !== undefined && typeof field.help !== 'string') return `${field.name}: help must be a string`

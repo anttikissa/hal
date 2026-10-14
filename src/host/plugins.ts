@@ -324,6 +324,54 @@ async function init(d = plugins.dir()): Promise<void> {
 	})
 }
 
+// Takes `entry`'s hooks out, or puts them back, without its cleanup.
+function mute(entry: Loaded, out: boolean): void {
+	for (let h of entry.hooks) {
+		let patch = plugins.patchOf(h.obj, h.key)
+		patch.hooks = out ? patch.hooks.filter((x) => x !== h) : [...patch.hooks, h]
+		plugins.settle(h.obj, h.key, patch)
+	}
+}
+
+// Runs file `path` (none: nothing) in place of loaded plugin `hide`
+// until unpreview(): a theme shown while a question's cursor is on it.
+// Never listed, saved or reported as loaded. `hide` comes back unless
+// it was reloaded meanwhile.
+async function preview(hide: string, path?: string): Promise<void> {
+	let st = plugins.state
+	let gen = ++st.previewGen
+	let mod: any
+	try {
+		if (path) mod = await import(realpathSync(path))
+	} catch (e: any) {
+		return plugins.report(`preview ${path}: ${e?.stack ?? e}`)
+	}
+	if (gen !== st.previewGen) return
+	plugins.unpreview(false)
+	let hidden = st.files.get(hide)
+	if (hidden) plugins.mute(hidden, true)
+	let entry: Loaded = { path: path ?? hide, hash: '', hooks: [], open: true }
+	st.preview = { entry, hidden }
+	try {
+		let out = mod?.default(plugins.api(entry))
+		if (typeof out === 'function') entry.cleanup = out
+	} catch (e: any) {
+		plugins.report(`preview ${path}: ${e?.stack ?? e}`)
+	} finally {
+		delete entry.open
+	}
+}
+
+function unpreview(last = true): void {
+	let st = plugins.state
+	if (last) st.previewGen++
+	let p = st.preview
+	if (!p) return
+	st.preview = undefined
+	plugins.deactivate(p.entry)
+	if (p.hidden && st.files.get(p.hidden.path) === p.hidden) plugins.mute(p.hidden, false)
+}
+
 // Stops watching and removes every plugin's hooks.
 function close(): void {
 	plugins.state.watcher?.close()
@@ -358,6 +406,8 @@ export const plugins = {
 		latest: new Map<string, number>(),
 		gen: 0,
 		watcher: undefined as FSWatcher | undefined,
+		preview: undefined as { entry: Loaded; hidden?: Loaded } | undefined,
+		previewGen: 0,
 	},
 	dir,
 	report,
@@ -377,4 +427,7 @@ export const plugins = {
 	init,
 	close,
 	describe,
+	mute,
+	preview,
+	unpreview,
 }

@@ -45,6 +45,7 @@ import { sendKeys } from '../common/send-keys.ts'
 import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
 import { linkState } from './link-state.ts'
+import { theme } from '../host/commands/theme.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -75,6 +76,8 @@ export type AppState = {
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState, key: KeyEvent) => ReturnType<typeof modals.step>
 	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; typing?: ReturnType<typeof setTimeout>; choices?: string[] | Hint[]
+	// The theme an open form previews (previewTheme).
+	previewed?: string
 }
 
 function createState(): AppState {
@@ -85,6 +88,7 @@ function createState(): AppState {
 // A rotating example (the prompt's, or a form field's) repaints when
 // its text next changes, on the pulse's frame grid.
 function show(): void {
+	app.previewTheme()
 	let v = appView.view()
 	pulse.keep(appView.blinks(v) ? app.beat : null, v.tick?.call ? pulse.frame * 2 : pulse.ms)
 	render.show(v)
@@ -97,6 +101,17 @@ function show(): void {
 	if (next === Infinity) return
 	st.typing = setTimeout(app.show, pulse.until(next))
 	;(st.typing as { unref?: () => void }).unref?.()
+}
+
+// An open form's theme field (preview: 'theme') shows the theme its
+// cursor is on; closing the form brings the saved one back.
+function previewTheme(): void {
+	let st = app.state
+	let i = st.form?.form.fields.findIndex((f) => f.type === 'choice' && f.preview === 'theme') ?? -1
+	let name = i >= 0 ? st.form!.values[i] : undefined
+	if (name === st.previewed) return
+	st.previewed = name
+	void theme.preview(name).then(() => terminal.redraw('theme preview'))
 }
 
 // A beat of the pulse: a repaint, if a blink changed.
@@ -361,6 +376,7 @@ export const app = {
 	/** The terminal's width, which Up/Down move by. */
 	cols: (): number => render.state.out?.size().cols ?? 80,
 	show,
+	previewTheme,
 	beat,
 	onEvent,
 	backgroundStep: tabSwitch.backgroundStep,

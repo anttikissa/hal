@@ -71,7 +71,14 @@ function migrate(): void {
 	if (linked() !== undefined && now.name !== undefined) select(now.name)
 }
 
-export const theme = { names, active, select, migrate, file }
+// Shows theme `name` in this process until preview() with none; hal,
+// the built-in look, has no file.
+async function preview(name?: string): Promise<void> {
+	if (name === undefined) return plugins.unpreview()
+	await plugins.preview(file(), name === 'hal' ? undefined : join(themesDir(), `${name}.ts`))
+}
+
+export const theme = { names, active, select, migrate, file, preview }
 
 export const command: SlashCommand = {
 	help: () => '/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
@@ -84,7 +91,7 @@ export const command: SlashCommand = {
 			let text = now.own ? `${now.own}; /theme will not replace it.`
 				: all.includes(now.name ?? '') ? 'Pick the color theme.'
 				: `${file()} selects ${now.name}, which is not in ${themesDir()}. Pick the color theme.`
-			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now.name ?? '')) }] } }
+			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now.name ?? '')), preview: 'theme' }] } }
 		}
 		args ||= answers?.theme ?? ''
 		if (!all.includes(args)) return { error: `unknown theme ${args}: choose ${all.join(', ')}` }

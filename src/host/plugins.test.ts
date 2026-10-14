@@ -69,6 +69,24 @@ test('set: the last file wins, removing it reveals the earlier one, then the ori
 	expect(typeof t.f).toBe('function')
 })
 
+test('a preview replaces one plugin until unpreview, which brings it back unless it reloaded meanwhile', async () => {
+	let theme = await plugin('theme.ts', `plugin.set(t, 'value', 4)\nplugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)`)
+	let other = join(dir, 'other.ts')
+	writeFileSync(other, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.set(t, 'value', 7); return () => t.log.push('gone') }\n`)
+	await plugins.preview(theme, other)
+	expect([t.value, t.f(1)]).toEqual([7, 2])
+	// None: the original look, then the next preview replaces the first.
+	await plugins.preview(theme)
+	expect([t.value, t.log]).toEqual([3, ['f', 'gone']])
+	plugins.unpreview()
+	expect([t.value, t.f(1)]).toEqual([4, 3])
+	await plugins.preview(theme, other)
+	await plugin('theme.ts', `plugin.set(t, 'value', 5)`)
+	plugins.unpreview()
+	expect([t.value, t.f(1)]).toEqual([5, 2])
+	expect(reports).toEqual([])
+})
+
 test('befores, then arounds with the first registered outermost, then afters; file order survives a reload', async () => {
 	let a = await plugin('a.ts', `plugin.before(t, 'f', () => t.log.push('a-before'))
 plugin.around(t, 'f', (fn: any, x: number) => { t.log.push('a-around'); return fn(x) })

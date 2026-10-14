@@ -323,7 +323,7 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	// plugin loader applies at once; a rerun starts from the active one.
 	// Only the answer itself selects, so a later /theme is not undone.
 	let current = theme.active()
-	if (answered(run, 'theme') === undefined) return reply({ ask: { text: 'Which color theme? (/theme changes it later)', fields: [{ type: 'choice', name: 'theme', options: theme.names(), initial: Math.max(0, theme.names().indexOf(current.name ?? '')) }] } })
+	if (answered(run, 'theme') === undefined) return reply({ ask: { text: 'Which color theme? (/theme changes it later)', fields: [{ type: 'choice', name: 'theme', options: theme.names(), initial: Math.max(0, theme.names().indexOf(current.name ?? '')), preview: 'theme' }] } })
 	if (answers?.theme && answers.theme !== current.name) {
 		let refused = theme.select(answers.theme)
 		if (refused) say.push(refused)
