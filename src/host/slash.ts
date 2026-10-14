@@ -117,6 +117,7 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 		reply = { error: String(e?.message ?? e) }
 	}
 	if (reply.say !== undefined) slash.output(id, reply.say, false, sender?.origin)
+	if (reply.synthetic !== undefined) slash.output(id, reply.synthetic, false, undefined, true)
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
 	if (reply.error !== undefined) slash.output(id, reply.error, true, sender?.origin)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
@@ -174,9 +175,9 @@ function dismiss(id: string, question: string): void {
 
 // What a command said. `origin: model` marks a model-run command's
 // outcome, which its tool card shows instead (task 9g).
-function output(id: string, text: string, error = false, origin?: 'model'): void {
-	let { n, ts } = history.append(id, { type: 'output', text, ...(error && { error: true as const }), ...(origin && { origin }) })
-	host.broadcast(id, { type: 'output', sessionId: id, text, ...(error && { error: true as const }), ...(origin && { origin }), n, ts, ...slash.placed(id) })
+function output(id: string, text: string, error = false, origin?: 'model', synthetic = false): void {
+	let { n, ts } = history.append(id, { type: 'output', text, ...(error && { error: true as const }), ...(origin && { origin }), ...(synthetic && { synthetic: true }) })
+	host.broadcast(id, { type: 'output', sessionId: id, text, ...(error && { error: true as const }), ...(origin && { origin }), ...(synthetic && { synthetic: true }), n, ts, ...slash.placed(id) })
 }
 
 // Where a command's record landed beside a running turn: before the

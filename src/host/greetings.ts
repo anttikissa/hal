@@ -7,6 +7,7 @@ import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
+import { slash } from './slash.ts'
 import { profile } from './profile.ts'
 
 type Period = 'neutral' | 'morning' | 'afternoon' | 'evening'
@@ -101,7 +102,7 @@ function open(id: string, timezone = clients.timezone(id)): void {
 	if ((meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
 	if (meta.model === 'hal/tool') {
 		let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')
-		history.append(id, { type: 'output', text: toolModel.welcome, synthetic: true })
+		slash.output(id, toolModel.welcome, false, undefined, true)
 		return
 	}
 	if (meta.model === 'hal/intro') {
@@ -111,7 +112,7 @@ function open(id: string, timezone = clients.timezone(id)): void {
 			: `This is Hal, running the hal/intro model. No provider configured - run /login to get started.
 
 Alternatively, try the model hal/tool, or one of the other internal models, for something interesting.`
-		history.append(id, { type: 'output', text, synthetic: true })
+		slash.output(id, text, false, undefined, true)
 		return
 	}
 	if (meta.model.startsWith('hal/')) return
@@ -120,7 +121,7 @@ Alternatively, try the model hal/tool, or one of the other internal models, for 
 	try {
 		if (previous.last !== undefined && typeof previous.last !== 'string') throw new Error('greetings.ason: invalid last greeting')
 		let text = greetings.choose(profile.text(), previous.last, timezone)
-		history.append(id, { type: 'output', text, synthetic: true })
+		slash.output(id, text, false, undefined, true)
 		previous.last = text
 	} finally {
 		liveFiles.close(previous)

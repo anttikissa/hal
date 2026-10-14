@@ -5,6 +5,7 @@ import { contextTransition, type ContextTransition } from '../common/context-tra
 import { inbox } from '../common/inbox.ts'
 import type { Sender } from '../common/blocks.ts'
 import { compact } from './compact.ts'
+import type { Reply } from './commands.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
@@ -22,11 +23,11 @@ function output(id: string, text: string, fields: { transition?: ContextTransiti
 	if (!fields.transitionDone) host.broadcast(id, { type: 'output', sessionId: id, text, n: r.n, ts: r.ts })
 }
 
-function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): { result?: string; say?: string; error?: string } {
+function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): Reply {
 	if (contextTransitions.pending(id)) return { error: 'a context transition is already pending; wait or press Escape' }
 	if (!turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') {
 		let welcome = kind === 'clear' && sessions.open(id).model === 'hal/tool' ? (require('./tool-model.ts') as typeof import('./tool-model.ts')).toolModel.welcome : ''
-		return { say: `${kind === 'clear' ? 'the context is already empty' : 'nothing to compact'}${welcome ? `\n\n${welcome}` : ''}` }
+		return { say: kind === 'clear' ? 'the context is already empty' : 'nothing to compact', ...(welcome && { synthetic: welcome }) }
 	}
 	let intent: ContextTransition = { id: crypto.randomUUID(), kind, sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }), ...(kind === 'clear' && prompt.length && { prompt }) }
 	contextTransitions.output(id, `/${kind} accepted; applying after active work settles.`, { transition: intent })
@@ -83,7 +84,7 @@ function apply(id: string): boolean {
 		else compact.boundary(id, { type: 'reset', transition: intent.id })
 		if (intent.kind === 'clear' && intent.prompt === undefined && sessions.open(id).model === 'hal/tool') {
 			let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')
-			slash.output(id, toolModel.welcome)
+			slash.output(id, toolModel.welcome, false, undefined, true)
 		}
 	}
 	let record = records.find((r) => r.type === 'user' && r.command === intent.id)

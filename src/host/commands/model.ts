@@ -56,6 +56,6 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 			liveFiles.save(meta)
 			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
 		}
-		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic prompt cache for messages' : ''}${welcome ? `\n\n${welcome}` : ''}` }
+		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic prompt cache for messages' : ''}`, ...(welcome && { synthetic: welcome }) }
 	},
 }

@@ -1,0 +1,10 @@
+{
+	title: 'Tool welcomes share synthetic emission',
+	spec: 'The hal/tool welcome is a separate durable synthetic Hal output in initial sessions, after promptless clear (including already-empty clear), and after model selection or reselection. All these paths use the same emitter, recording synthetic: true and broadcasting identical provenance for live terminal and web and replay. Command confirmations such as Context cleared and Model changed remain ordinary command output, never joined to the welcome. Preserve clear with literal prompts, welcome content and once-only tool execution. Invariant: welcome provenance and styling do not depend on the lifecycle trigger.',
+	status: 'done',
+	notes: [
+		'Reuses slash.output, the existing durable/live emitter, with synthetic provenance. No new emitter, wrapper, timer or state. Command replies carry a separate synthetic welcome instead of concatenating it into ordinary say text; initial greetings and completed clear call the same emitter. Extended the existing lifecycle contract test for already-empty clear and synthetic provenance in history/live events, ordinary confirmation provenance, and fresh/live equality. All 44 focused tests across tool-model, greetings, slash, context-transitions and host-models passed; changed-file lint passed. Project typecheck remains blocked by unrelated existing errors; its tracked-source error is src/host/tools/bash.ts ToolOutput versus Promise<string>. Existing ordinary command styling stays unchanged.'
+	],
+	needs: ['4ev', 'vqn'],
+	foldInto: ['4ev']
+}
