@@ -1,4 +1,8 @@
 import { expect, test } from 'bun:test'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { history } from '../history.ts'
 import { client, created, useHost } from '../host-fixture.test.ts'
 import { tools } from '../tools.ts'
 import { tabs } from '../tabs.ts'
@@ -16,6 +20,27 @@ const inspect = (sessionId: string, input: Record<string, unknown> = {}, model?:
 	{ type: 'tool_call', id: 'i', name: 'inspect', input },
 	{ cwd: '/tmp', signal: new AbortController().signal, sessionId, model },
 )
+
+// Task 3r4: who last changed each uncommitted file, and whether it still holds that change.
+test('INSPECT files names the last declared editor of each uncommitted file', async () => {
+	let dir = realpathSync(mkdtempSync(join(tmpdir(), 'hal-3r4-')))
+	try {
+		Bun.spawnSync(['git', 'init', '-q', dir])
+		for (let name of ['kept.txt', 'redone.txt', 'stray.txt']) writeFileSync(join(dir, name), name)
+		let id = created(client(), dir)
+		tabs.file().open.push(id)
+		let hash = (text: string) => new Bun.CryptoHasher('sha256').update(text).digest('hex')
+		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 7, cwd: dir, files: [{ path: 'kept.txt', before: null, after: hash('kept.txt') }, { path: 'redone.txt', before: null, after: hash('old') }] })
+		let input = nativeTool.resolve('INSPECT "files"').input
+		let lines = (await tools.run({ type: 'tool_call', id: 'i', name: 'inspect', input }, { cwd: dir, signal: new AbortController().signal, sessionId: id })).output.split('\n').sort()
+		expect(lines).toHaveLength(3)
+		expect(lines[0]).toMatch(new RegExp(`^kept\\.txt: ${id} \\(tab \\d+, ".*"\\) t7 at .* - current$`))
+		expect(lines[1]).toMatch(/^redone\.txt: .* t7 at .* - changed since$/)
+		expect(lines[2]).toBe('stray.txt: no Hal record')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
 
 test('a bare call describes only the caller; scope widens it in tab order', async () => {
 	let a = client()

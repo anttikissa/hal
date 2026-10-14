@@ -8,6 +8,7 @@ import type { Tab } from '../../common/protocol.ts'
 import { nativeTool } from '../native-tool.ts'
 import { auth } from '../auth.ts'
 import { clients, type ClientRecord } from '../clients.ts'
+import { fileEditors } from '../file-editors.ts'
 import { host } from '../host.ts'
 import { limits } from '../limits.ts'
 import { models } from '../models.ts'
@@ -25,7 +26,7 @@ function withLimit(id: string): string {
 	return until ? `${id} (rate limited until ${new Date(until).toISOString().slice(0, 16).replace('T', ' ')} UTC)` : id
 }
 
-const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions']
+const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions', 'files']
 const SCOPES = ['self', 'project', 'all']
 
 // Compact token counts as on the status row: 950, 87k, 1000k.
@@ -123,13 +124,13 @@ export const tool: Tool<ToolOutput> = {
 			return { name: 'inspect', input }
 		},
 	},
-	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
+	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. what "files": uncommitted files of the caller\'s Git root, each with the session and call that last declared and changed it and whether the file still matches; scope "all" adds files Hal changed outside the root. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
 		properties: {
 			target: { type: 'string', description: 'Session ID or local tool-call reference (#t123, t123 or 123): status, available output and pending question. Bare numbers mean tool calls, not tabs. Cannot combine with what, scope or fields.' },
-			what: { type: 'string', enum: WHATS, description: 'sessions (default), host, models, clients or subscriptions' },
-			scope: { type: 'string', enum: SCOPES, description: 'self (default), project or all' },
+			what: { type: 'string', enum: WHATS, description: 'sessions (default), host, models, clients, subscriptions or files' },
+			scope: { type: 'string', enum: SCOPES, description: 'self (default; files: project), project or all' },
 			fields: { type: 'string', description: 'Comma-separated fields, e.g. "name,cwd,context"' },
 		},
 	},
@@ -139,7 +140,11 @@ export const tool: Tool<ToolOutput> = {
 			return work.inspect(work.target(ctx.sessionId, input.target))
 		}
 		let what = oneOf('what', input.what, WHATS) ?? 'sessions'
-		let scope = oneOf('scope', input.scope, SCOPES) ?? 'self'
+		let scope = oneOf('scope', input.scope, SCOPES) ?? (what === 'files' ? 'project' : 'self')
+		if (what === 'files') {
+			if (scope === 'self' || input.fields !== undefined) throw new Error(`INSPECT files takes scope "project" (default, uncommitted files of the Git root) or "all" (also files Hal changed outside it), and no fields.${usage()}`)
+			return fileEditors.report(ctx.cwd, scope as 'project' | 'all', clients.timezone(ctx.sessionId))
+		}
 		if (what === 'subscriptions') {
 			let fields = pick(input.fields, Object.keys(SUBSCRIPTION))
 			let rows = await statusUsage.rows(ctx.sessionId, ctx.model ?? tabs.list().find((t) => t.id === ctx.sessionId)?.model ?? '')

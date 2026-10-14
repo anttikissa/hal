@@ -1,0 +1,9 @@
+{
+	title: 'INSPECT files: last Hal editor of uncommitted files',
+	spec: 'INSPECT what "files" (also the lone word: INSPECT "files") lists files with the Hal session and call that last declared and changed each (bash modifies, EDIT, WRITE), from every session\'s file_changes records (src/host/file-editors.ts, shared with plugin failure reports, task njq). scope "project" (default for files) covers the uncommitted files of the caller\'s Git root (git status, untracked included, ignored excluded); scope "all" adds Hal-recorded files outside that root that still exist, such as /tmp. scope "self" is an error for files. Each line gives the path (relative to the caller\'s cwd, absolute outside it), the session ID, its tab number and name when open, the call (t<n>), the time in the caller\'s timezone, and whether the file still matches that call\'s after-snapshot (current) or changed since through something Hal did not record; files with no record say so. Purpose: an agent that finds uncommitted edits it did not make can name and contact their owner. Advisory activity, not ownership; /changes clear hides that session\'s earlier records. Cost: one scan of every session\'s cached change list per call, on demand only.',
+	status: 'done',
+	notes: [
+		'pluginReports.lastEditor now delegates to fileEditors.last; its private canonical() moved to file-editors.ts. git status -z lists a rename as two NUL entries (new, then source); skip the source.'
+	],
+	needs: ['qzh', 'njq']
+}
