@@ -13,9 +13,9 @@ import { toolDetails } from './tool-details.ts'
 // pastes' text in place of markers, a tool's raw call and result.
 export type Fold = Verbosity | 'inline'
 export type Mode = 'toggle' | 'expand' | 'collapse'
-// One item of a target: kind letters, then an inclusive range of block
-// numbers (`one`: a single number, any kind; '*' is 0 to Infinity).
-export type Part = { kinds: string; from: number; to: number; one: boolean; text: string }
+// One target: kind letters and exact transcript keys, an inclusive
+// range, or '*' (empty endpoints). Keys are identities, not decimals.
+export type Part = { kinds: string; from: string; to: string; one: boolean; text: string }
 // The parts; none means the latest tool block.
 export type Target = Part[]
 // Matched blocks and what happens to them: open or close all, or (one
@@ -27,21 +27,34 @@ const kinds: Record<string, string> = { t: 'tool', r: 'thinking', a: 'assistant'
 // What a range or '*' without letters matches: never user or assistant blocks.
 const unnamed = 'trmsq'
 
-// "t14,t16,t30-45", "#t14 16 30-45", "au10-40", "t*": items separated
-// by commas, spaces or both. Returns the parts or why the text is not a target.
+// References may be partial during completion; transcript.addressable
+// validates complete keys using the same grammar as card links.
+function reference(text: string): { hash: string; kinds: string; key: string } {
+	let m = /^(#?)([a-z]*)(.*)$/i.exec(text)!
+	return { hash: m[1]!, kinds: m[2]!.toLowerCase(), key: m[3]! }
+}
+
+function addressed(items: Item[]): Item[] {
+	return items.filter((i) => transcript.addressable(i.key))
+}
+
+function compare(a: string, b: string, upper = false): number {
+	let [recordA, indexA = 0] = a.split('.').map(Number)
+	let [recordB, indexB = upper ? Infinity : 0] = b.split('.').map(Number)
+	return recordA! - recordB! || indexA - indexB
+}
+
 function parse(args: string): Target | string {
 	let parts: Part[] = []
 	for (let text of args.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)) {
-		let m = /^#?([a-z]*)(?:(\d+)(?:-#?[a-z]*(\d+))?|(\*))$/i.exec(text)
-		if (!m) return `Not a card, range or kind: ${text}`
-		let letters = m[1]!.toLowerCase()
-		let bad = [...letters].find((c) => !kinds[c])
+		let ends = text.split('-').map(reference)
+		let first = ends[0]!, last = ends.at(-1)!
+		let star = ends.length === 1 && first.key === '*'
+		if (ends.length > 2 || (!star && ends.some((e) => !transcript.addressable(e.key)))) return `Not a card, range or kind: ${text}`
+		let bad = ends.flatMap((e) => [...e.kinds]).find((c) => !kinds[c])
 		if (bad) return `Unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`
-		if (m[4]) parts.push({ kinds: letters, from: 0, to: Infinity, one: false, text })
-		else {
-			let a = Number(m[2]), b = m[3] === undefined ? a : Number(m[3])
-			parts.push({ kinds: letters, from: Math.min(a, b), to: Math.max(a, b), one: m[3] === undefined, text })
-		}
+		let [from, to] = star ? ['', ''] : compare(first.key, last.key) <= 0 ? [first.key, last.key] : [last.key, first.key]
+		parts.push({ kinds: first.kinds, from: from!, to: to!, one: ends.length === 1 && !star, text })
 	}
 	return parts
 }
@@ -54,7 +67,7 @@ function toggles(item: Item): boolean {
 // The blocks `target` names in `items`, in transcript order, or why
 // none; `verb` names the command in the error.
 function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | string {
-	let numbered = items.filter((i) => /^\d+$/.test(i.key))
+	let numbered = toggle.addressed(items)
 	if (!target.length) {
 		let tool = items.findLast((i) => i.type === 'tool')
 		return tool ? [tool] : `No tool card to ${verb}`
@@ -62,7 +75,7 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 	let found = new Set<Item>()
 	for (let part of target) {
 		if (part.one) {
-			let item = numbered.find((i) => Number(i.key) === part.from)
+			let item = numbered.find((i) => i.key === part.from)
 			if (!item) return `No card ${part.from} to ${verb}`
 			if (!toggle.toggles(item)) return `Card ${part.from} does not expand or collapse`
 			found.add(item)
@@ -70,7 +83,8 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 		}
 		let letters = part.kinds || unnamed
 		for (let i of numbered) {
-			if (toggle.toggles(i) && Number(i.key) >= part.from && Number(i.key) <= part.to && letters.includes(titles.letter(i))) found.add(i)
+			let within = !part.from || compare(i.key, part.from) >= 0 && compare(i.key, part.to, true) <= 0
+			if (toggle.toggles(i) && within && letters.includes(titles.letter(i))) found.add(i)
 		}
 	}
 	if (!found.size) return `Nothing to ${verb} in ${target.map((p) => p.text).join(' ')}`
@@ -155,4 +169,4 @@ function apply(mode: Mode, states: Map<string, Fold>, items: Item[], args: strin
 	return p.items.map((i) => i.key)
 }
 
-export const toggle = { kinds, parse, toggles, resolve, plan, noun, describe, starts, pastes, next, step, items, apply }
+export const toggle = { kinds, reference, addressed, parse, toggles, resolve, plan, noun, describe, starts, pastes, next, step, items, apply }

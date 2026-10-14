@@ -113,11 +113,15 @@ function key(n: number | undefined, i: number, at: number): string {
 	return n === undefined ? `~${at}` : i ? `${n}.${i}` : `${n}`
 }
 
+function addressable(key: string): boolean {
+	return /^\d+(\.\d+)?$/.test(key)
+}
+
 // The address of block `key` of session `session`, the same in every
 // client (task 0z): /<session>#<key>, any kind letter kept (t19, 9p).
 // Undefined for any other key (`~<n>`, a waiting message's id).
 function href(session: string, key: string): string | undefined {
-	return /^[umartsq]?\d+(\.\d+)?$/.test(key) ? `/${session}#${key}` : undefined
+	return transcript.addressable(key.replace(/^[umartsq]/, '')) ? `/${session}#${key}` : undefined
 }
 
 // `shown` as the items of record (or event) number `n`, going at `at`.
@@ -403,4 +407,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, href, keyed, imageItem, resultItems, commitItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, addressable, href, keyed, imageItem, resultItems, commitItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

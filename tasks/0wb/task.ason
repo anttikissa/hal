@@ -1,0 +1,10 @@
+{
+	title: 'Share card identity in opening and completion',
+	spec: 'Restore the invariant that every displayed expandable card ID can be completed and opened unchanged. Terminal and web typed opening, Ctrl-O hints and Tab completion use the same addressable items and reference parsing, based on transcript keys rather than integer-only copies. Exact targets retain keys as strings; optional hash and known kind letters remain accepted, and letters on exact targets remain nonbinding. Commit and other extra items are ordinary cards, without plugin-specific branches. Lists, kind wildcards and inclusive ranges include addressable expandable extra items. Keys order by numeric record and numeric item index, not decimal values; an integer range endpoint includes extra items of that record. Completion preserves the full token under the cursor, including a dotted key, and each completed or offered card ID resolves to that card. Existing per-client fold state, majority behavior and web click behavior remain unchanged. Focused regression tests cover completion-to-opening, multi-digit item indices, wildcards/ranges, and rejection of malformed or nonfolding targets.',
+	status: 'done',
+	notes: [
+		'The defect was three integer-only assumptions: selector parsing, selector candidate filtering, and dialog completion. Canonical key validation now lives in transcript.addressable and also serves href; toggle.reference and toggle.addressed are shared by parsing/opening and completion. Exact keys stay strings. Range comparisons use numeric record/item tuples with an omitted upper item index meaning the end of that record; decimal comparison would conflate .1 and .10. No plugin-specific code or additional persistent state. Selection remains linear per request; completion and opening do no repeated background work. Verified: ./test toggle transcript (23 pass), tsc --noEmit, and targeted oxlint (zero warnings/errors). Browser and terminal interaction were not manually exercised.'
+	],
+	needs: ['v8y', '179'],
+	foldInto: ['v8y']
+}

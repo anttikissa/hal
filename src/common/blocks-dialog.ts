@@ -14,7 +14,7 @@ import type { Item } from './transcript.ts'
 // then a note and the kinds (each word's first letter is its kind letter).
 // The examples use the session's latest tool block ids when it has two.
 function help(items: Item[] = []): [string, string][] {
-	let tools = items.filter((i) => i.type === 'tool' && /^\d+$/.test(i.key) && toggle.toggles(i)).map((i) => i.key)
+	let tools = toggle.addressed(items).filter((i) => i.type === 'tool' && toggle.toggles(i)).map((i) => i.key)
 	let [a, b, c] = tools.length > 1 ? [tools.at(-3) ?? tools.at(-2)!, tools.at(-2)!, tools.at(-1)!] : ['10', '14', '24']
 	return [
 		[`t${c}, ${c}`, 'one card'], ['*', 'all cards'],
@@ -45,13 +45,12 @@ function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, curs
 	if (m.form!.values[0]!.trim() === 'p') return m
 	let text = m.form!.values[0]!
 	let before = text.slice(0, cursor)
-	let token = /#?[a-z]*\d*$/i.exec(before)![0]
-	let parts = /^(#?)([a-z]*)(\d*)$/i.exec(token)!
+	let token = /[^,\s-]*$/.exec(before)![0]
+	let ref = toggle.reference(token)
 	let end = before[before.length - token.length - 1] === '-'
-	let letters = parts[2]!.toLowerCase()
-	let found = items.filter((i) => /^\d+$/.test(i.key) && toggle.toggles(i) && i.key.startsWith(parts[3]!) && (!letters || letters.includes(titles.letter(i)))).reverse()
+	let found = toggle.addressed(items).filter((i) => toggle.toggles(i) && i.key.startsWith(ref.key) && (!ref.kinds || ref.kinds.includes(titles.letter(i)))).reverse()
 	if (!found.length) return { ...m, blocks: { hint: `no card matches ${token || 'here'}`, invalid: true, help: m.blocks!.help } }
-	let fill = found.length === 1 ? (end ? found[0]!.key : parts[1]! + titles.blockId(found[0]!)) : parts[1]! + (end ? '' : parts[2]!) + completion.common(found.map((i) => i.key))
+	let fill = found.length === 1 ? (end ? found[0]!.key : ref.hash + titles.blockId(found[0]!)) : ref.hash + (end ? '' : ref.kinds) + completion.common(found.map((i) => i.key))
 	let value = before.slice(0, before.length - token.length) + fill + text.slice(cursor)
 	let form = { ...forms.set(m.form!, 0, value), cursor: cursor - token.length + fill.length }
 	let next = blocksDialog.update({ ...m, form }, items, fold, inlinePastes)

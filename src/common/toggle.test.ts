@@ -1,8 +1,9 @@
+// Shared card selection and completion contracts across terminal and web.
 import { expect, test } from 'bun:test'
 import { blocksDialog } from './blocks-dialog.ts'
 import type { SessionMeta } from './session.ts'
 import { toggle, type Fold } from './toggle.ts'
-import type { Item } from './transcript.ts'
+import { transcript, type Item } from './transcript.ts'
 
 const items = [
 	{ type: 'prompt', key: '10', text: 'see [paste/abc123.txt]' },
@@ -103,4 +104,40 @@ test('range expansion preserves inline detail and web hints respect native paste
 	let dialog = blocksDialog.open()
 	dialog.form!.values[0] = item.key
 	expect(blocksDialog.update(dialog, items, () => 'long', false).blocks?.hint).toContain('Collapse')
+})
+
+test('completion and opening share exact card keys, including extra items', () => {
+	let commit = transcript.commitItem({ hash: 'abc123', short: 'abc123', subject: 'Fix', files: [] })
+	let all = [...items, ...['18.1', '18.10', '18.2'].map((key) => ({ ...commit, key })), { type: 'output', key: '19.1', text: 'plain output' } as Item]
+	let at = () => 'short' as Fold
+	let selected = (args: string) => {
+		let p = toggle.plan('expand', all, args, at)
+		return typeof p === 'string' ? p : p.items.map((i) => i.key)
+	}
+	let tab = (text: string) => {
+		let m = blocksDialog.open()
+		return blocksDialog.complete({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, all, at)
+	}
+	for (let item of all.filter(toggle.toggles)) {
+		let completed = tab(item.key).form!.values[0]!
+		expect(selected(completed)).toEqual([item.key])
+	}
+	let choices = tab('#s18.').blocks!.choices!
+	expect(choices).toEqual(['s18.2', 's18.10', 's18.1'])
+	for (let id of choices) expect(selected(id)).toEqual([id.slice(1)])
+	expect(tab('t14, #s18.2').form!.values[0]).toBe('t14, #s18.2')
+	expect(tab('s18.1-18.2').form!.values[0]).toBe('s18.1-18.2')
+	expect(selected('s*')).toEqual(['18.1', '18.10', '18.2'])
+	expect(selected('18-18')).toEqual(['18.1', '18.10', '18.2'])
+	expect(selected('s18.2-18.10')).toEqual(['18.10', '18.2'])
+	expect(selected('s18.10-18.2')).toEqual(['18.10', '18.2'])
+	expect(selected('#t18.2, 18.10')).toEqual(['18.10', '18.2'])
+	let states = new Map<string, Fold>()
+	expect(toggle.apply('expand', states, all, '#s18.1', at)).toEqual(['18.1'])
+	expect(states.get('18.1')).toBe('long')
+	let middle = tab('#s18.2, t14')
+	middle.form!.values[0] = '#s18.2, t14'
+	expect(blocksDialog.complete(middle, all, at, 6).form!.values[0]).toBe('#s18.2, t14')
+	expect(selected('19.1')).toBe('Card 19.1 does not expand or collapse')
+	for (let bad of ['18.', '18..1', '18.1.2', '18-19-20']) expect(selected(bad)).toBe(`Not a card, range or kind: ${bad}`)
 })
