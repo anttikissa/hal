@@ -1,0 +1,10 @@
+{
+	title: 'Shorten READ help using version terminology',
+	spec: 'READ tool description is exactly: Read files, images, directories, or URLs; multiple paths are accepted. Relative paths start from cwd. Text results start with == READ path@version ==, followed by numbered lines. EDIT requires that version. Ranges are 1-based and inclusive. Default: first 200 lines; path:1- reads all. Images attach directly; URLs return readable text or save other files under /tmp. This replaces the verbose READ description with the concise user-approved text and version terminology. Do not change EDIT help, other tool docs, system instructions, syntax or runtime behavior.',
+	status: 'done',
+	notes: [
+		'Rendered READ HELP inspected directly and matches the approved text; syntax and runtime code are unchanged. Changed-file lint passed. Focused read.test.ts ran: four tests passed, three READ_BLOB image-recovery assertions failed in unchanged behavior; no unrelated fixes made. EDIT help and the other pending files remain untouched.'
+	],
+	needs: ['r17', '5er'],
+	foldInto: ['r17', '5er']
+}

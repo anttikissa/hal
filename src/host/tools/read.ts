@@ -41,10 +41,10 @@ function one(path: string): { name: string; input: Record<string, unknown> } {
 export const tool: Tool<ToolOutput> = {
 	name: 'read',
 	description:
-		'Read a text file or image, or list a directory. Images are attached directly. Relative paths start from the working directory. ' +
-		'A text file comes as numbered lines under its editing lease, == READ <path>@<hash> ==; the hash covers the whole file, even when a range is shown, and EDIT needs it. ' +
-		'Ranges are 1-based and inclusive, clamped to the file; a range past the end shows [Empty range]. Without a range only the first 200 lines are shown; "path:1-" reads the whole file. Long output stops with how to continue. Several paths or URLs can be read together, including images; each text file keeps its own range and lease. ' +
-		'An http(s) URL gives readable text from HTML; images are attached; other files are saved under /tmp.',
+		'Read files, images, directories, or URLs; multiple paths are accepted. Relative paths start from cwd. ' +
+		'Text results start with == READ path@version ==, followed by numbered lines. EDIT requires that version. ' +
+		'Ranges are 1-based and inclusive. Default: first 200 lines; path:1- reads all. ' +
+		'Images attach directly; URLs return readable text or save other files under /tmp.',
 	syntax: {
 		summary: false,
 		usage: ['READ "<path>[:<start>[-<end>]]" ...   // one or more; :5 reads line 5, :5- to the end', 'READ "<url>"'],
