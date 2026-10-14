@@ -1,5 +1,5 @@
-// Which release a commit is (task jjr), for hal --version and /version.
-// Loaded only by those two, never on the startup path. Releases are
+// Which release a commit is (task jjr), for hal --version, /version and
+// the hal serve log. Never on the terminal's startup path. Releases are
 // tags v<version> on the commit that sets package.json's version.
 
 import { readFileSync } from 'fs'
@@ -15,25 +15,35 @@ async function packageVersion(commit: string | undefined): Promise<string> {
 	}
 }
 
-// "hal 0.0.1 (release)", "hal 0.0.1 +3 commits, modified", or
-// "hal 0.0.2 (unreleased; v0.0.1 +3 commits)" when package.json names a
-// version that has no tag yet.
-async function line(commit: string | undefined, modified: boolean): Promise<string> {
-	let pkg = await packageVersion(commit)
-	let mod = modified ? ', modified' : ''
-	if (!commit) return `hal ${pkg} (not a git checkout)`
+// The newest v* tag at or before `commit`, and how many commits follow it.
+async function tagged(commit: string): Promise<{ tag: string; n: number } | undefined> {
 	let m = /^v(.+)-(\d+)-g[0-9a-f]+$/.exec((await version.git('describe', '--tags', '--long', '--match', 'v*', commit)) ?? '')
-	if (!m) return `hal ${pkg} (untagged${mod})`
-	let [, tag, n] = m as unknown as [string, string, string]
-	let since = n === '0' ? '' : ` +${n} commit${n === '1' ? '' : 's'}`
-	if (tag !== pkg) return `hal ${pkg} (unreleased; v${tag}${since}${mod})`
-	return since || mod ? `hal ${pkg}${since}${mod}` : `hal ${pkg} (release)`
+	return m ? { tag: m[1]!, n: Number(m[2]) } : undefined
 }
 
-// hal --version: the release, the exact commit and the checkout, now.
+// `loaded` is version.current()'s form: "<commit>[+<diff hash>]" or
+// 'unknown'. "hal 0.0.1" exactly at a release; "hal 0.0.1 4bfdbf8c" after
+// it; "hal 0.0.1 4bfdbf8c+bf53f42" with uncommitted changes.
+async function line(loaded: string): Promise<string> {
+	if (loaded === 'unknown') return `hal ${await packageVersion(undefined)} (not a git checkout)`
+	let commit = loaded.split('+')[0]!
+	let [pkg, t] = await Promise.all([packageVersion(commit), tagged(commit)])
+	return t?.tag === pkg && t.n === 0 && !loaded.includes('+') ? `hal ${pkg}` : `hal ${pkg} ${loaded}`
+}
+
+// "683 commits since v0.0.1"; undefined at a release or outside git.
+async function since(loaded: string): Promise<string | undefined> {
+	if (loaded === 'unknown') return undefined
+	let t = await tagged(loaded.split('+')[0]!)
+	if (!t) return 'no release tagged yet'
+	return t.n ? `${t.n} commit${t.n === 1 ? '' : 's'} since v${t.tag}` : undefined
+}
+
+// hal --version: the version, commits since the release and the checkout.
 async function cli(): Promise<string> {
-	let { hash, loaded } = await version.current()
-	return `${await line(hash, loaded.includes('+'))}\ngit ${loaded}\ndir ${version.dir()}\n`
+	let { loaded } = await version.current()
+	let s = await since(loaded)
+	return `${await line(loaded)}\n${s ? `${s}\n` : ''}dir ${version.dir()}\n`
 }
 
-export const release = { line, cli }
+export const release = { line, since, cli }
