@@ -132,7 +132,7 @@ test('mixed batches retain every durable image, errors and leases across history
 	expect(responses.content.map((b: any) => b.image_url)).toEqual(expected.map((data, i) => `data:${i ? 'image/gif' : 'image/png'};base64,${data}`))
 	let chat: any = openaiCompat.toMessages(req).at(-1)
 	expect(chat.content.filter((b: any) => b.type === 'image_url').map((b: any) => b.image_url.url)).toEqual(responses.content.map((b: any) => b.image_url))
-	let recovered = await tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	let recovered = await tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `t${record.n}` } }, ctx())
 	expect(blocks.resultImages(recovered).map((b) => blobs.base64('s', b.blob))).toEqual(expected)
 	let shown = transcript.recordItems(record, 0)
 	expect(shown.filter((b) => b.type === 'image').map((b) => b.blob)).toEqual(blocks.resultImages(result).map((b) => b.blob))
@@ -147,7 +147,7 @@ test('mixed batches retain every durable image, errors and leases across history
 	expect(pruning.estimate('s', messages) - pruning.estimate('s', withoutImages)).toBeGreaterThanOrEqual(2 * pruning.maxImageTokens)
 	let missing = blocks.resultImages(result)[0]!
 	rmSync(blobs.find('s', missing.blob)!.path)
-	let partial = await tools.run({ type: 'tool_call', id: 'partial', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	let partial = await tools.run({ type: 'tool_call', id: 'partial', name: 'read_blob', input: { id: `t${record.n}` } }, ctx())
 	expect(partial.isError).toBe(true)
 	expect(partial.output).toContain(`image blob s/${missing.blob} not found`)
 	expect(blocks.resultImages(partial).map((b) => blobs.base64('s', b.blob))).toEqual([expected[1]])
@@ -165,7 +165,7 @@ test('successful image batches and legacy single-image records share replay and 
 	let record = { type: 'user' as const, n: 3, ts: '', blocks: [single] }
 	expect(transcript.recordItems(record, 0).filter((b) => b.type === 'image')).toHaveLength(1)
 	let recoveredRecord = history.append('s', record)
-	let recovered = await tools.run({ type: 'tool_call', id: 'old', name: 'read_blob', input: { id: `#${recoveredRecord.n}` } }, ctx())
+	let recovered = await tools.run({ type: 'tool_call', id: 'old', name: 'read_blob', input: { id: `t${recoveredRecord.n}` } }, ctx())
 	expect(blocks.resultImages(recovered)).toHaveLength(1)
 })
 
@@ -178,7 +178,7 @@ test('READ_BLOB recovers images from every sibling result and direct image in a 
 		{ type: 'tool_result', id: 'multi', output: 'multi output', images: images.slice(1, 3) },
 		images[3]!,
 	] })
-	let recover = () => tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `#${record.n}` } }, ctx())
+	let recover = () => tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id: `t${record.n}` } }, ctx())
 	let whole = await recover()
 	expect(whole.isError).toBeUndefined()
 	expect(blocks.resultImages(whole)).toHaveLength(4)

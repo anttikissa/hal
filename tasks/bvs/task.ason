@@ -1,0 +1,10 @@
+{
+	title: 'Repair stale READ_BLOB image recovery references',
+	spec: 'Invariant: READ image recovery tests exercise the currently supported READ_BLOB card references, not the removed # history reference form. In src/host/tools/read.test.ts use t followed by the stored record number for current-session whole-record recovery, retaining coverage of every sibling image, legacy single-image records, partial missing blobs and complete image loss. Keep runtime syntax unchanged and do not reintroduce # aliases or weaken the recovery assertions.',
+	status: 'done',
+	notes: [
+		'Commit 009e2493 removed # reference parsing but left four uses in read.test.ts. Changed those to current-session t references, rather than session/n addresses, because the latter select the first displayed item and would weaken the whole-record sibling-image coverage. All 10 focused READ and READ_BLOB tests now pass, including partial and total missing images; changed-file lint passed. Runtime code and other pending edits untouched.'
+	],
+	needs: ['3fv', '5er'],
+	foldInto: ['3fv', '5er']
+}
