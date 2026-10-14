@@ -36,15 +36,16 @@ function learn(event: { names: Record<string, string>; defaults?: Record<string,
 }
 
 // Local HH:MM of an ISO time, as '2 Oct HH:MM' if not today (local);
-// '' without one. "Today" is when rendered; nothing re-renders at
-// midnight. Parsed once per minute string and day: a long history's
-// headers share few (the startup budget, kn).
+// '' without one. Memoized per minute string for the process: a header
+// keeps its first text, so midnight rewrites no scrollback (which would
+// clear the terminal); a restart dates it. A long history's headers
+// share few parses (the startup budget, kn).
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const times = new Map<string, string>()
 function time(ts: string | undefined): string {
 	if (ts === undefined) return ''
 	let today = new Date().toDateString()
-	let key = `${today} ${ts.endsWith('Z') ? ts.slice(0, 16) : ts}`
+	let key = ts.endsWith('Z') ? ts.slice(0, 16) : ts
 	let hit = times.get(key)
 	if (hit !== undefined) return hit
 	let d = new Date(ts)

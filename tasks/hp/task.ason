@@ -13,7 +13,8 @@ The title text (time, who, model, effort) comes from one function in src/common,
 		"Web: prompt cards lose the '> ' mark and the '(sent from …)' line, both now in the head. Browser tests reading a card's textContent must skip .who.",
 		"Startup budget (kn): headers add ~3 ms to the host's first draw, so titles.time caches per minute string; the joining-UI figure flakes past 100 ms at HEAD before hp too.",
 		"The old Hal (the artifacts) drew commands and prompts with a '> ' mark; a rebuild copying it would bring the mark back. Commands keep their ts on the shown item and the live event so the header can say the time.",
-		"Dated headers: titles.time caches per today's date plus minute string, so a host running past midnight dates yesterday's new headers. Tests that build headers must use today's date (a fixed date now renders '28 Sep 10:51')."
+		"Dated headers: titles.time caches per today's date plus minute string, so a host running past midnight dates yesterday's new headers. Tests that build headers must use today's date (a fixed date now renders '28 Sep 10:51').",
+		'Header times are memoized per minute string for the client process, not per day: at midnight older headers keep their undated text until restart. Re-dating them rewrote scrollback, which forced a full terminal clear and snapped a scrolled-up view to the bottom.'
 	],
 	needs: ['wc', 'qq'],
 	foldInto: ['cc', 'wc', '4s']
