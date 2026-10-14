@@ -80,9 +80,11 @@ test('sensitive paths and symlink aliases, and large files retain metadata not b
 	writeFileSync(`${cwd}/.env`, 'private')
 	symlinkSync('.env', `${cwd}/alias`)
 	writeFileSync(`${cwd}/large`, Buffer.alloc(fileChanges.maxBytes + 1))
-	await bash('printf changed-secret > .env; printf x >> large', ['.env', 'alias', 'large'])
+	mkdirSync(`${cwd}/secrets`)
+	writeFileSync(`${cwd}/secrets/token.txt`, 'private')
+	await bash('printf changed-secret > .env; printf changed-secret > secrets/token.txt; printf x >> large', ['.env', 'alias', 'large', 'secrets/token.txt'])
 	let files = changes()[0]!.files
-	expect(files).toHaveLength(3)
+	expect(files).toHaveLength(4)
 	for (let f of files) {
 		expect(typeof f.before).toBe('object')
 		expect(typeof f.after).toBe('object')

@@ -1,8 +1,8 @@
 // Approval for dangerous tool calls (tasks/w4/forms.md, Approval).
 // Before a round's tool calls run, each bash command is checked against
-// patterns for commands that destroy work: rm -rf, git reset --hard and
-// friends. Not plain rm -f, which models overuse and which is rarely
-// dangerous. A match asks the human y/N (default No), durably, showing
+// patterns for commands that destroy work or print secrets: rm -rf,
+// git reset --hard, cat sensitive paths and friends. Plain rm -f is
+// rarely dangerous. A match asks the human y/N (default No), durably, showing
 // the command with the offending parts marked; No gives the model an
 // error result instead of running it.
 //
@@ -125,6 +125,8 @@ function marks(command: string): Mark[] {
 			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i])))) found = rm
 		}
 		for (let re of git) found ??= seg.match(re)
+		let print = seg.match(/(?<!\S)(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
+		if (print && !seg.slice(0, print.index).trim() && (print[1]!.match(/"[^"]*"|'[^']*'|[^\s<>]+/g) ?? []).some((t) => approval.sensitive(t.replace(/^['"]|['"]$/g, '')))) found ??= print
 		if (!found) continue
 		let text = found[0].trimEnd()
 		out.push([from + found.index!, from + found.index! + text.length])
@@ -178,9 +180,9 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 	return asked ? { calls, decided } : undefined
 }
 
-// Shared best-effort sensitive-path policy: snapshots never retain bytes.
+// Shared best-effort sensitive-path policy for READ, shell approval and snapshots.
 function sensitive(path: string): boolean {
-	return /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i.test(path) || /\.(?:pem|key|p12|pfx)$/i.test(path)
+	return /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i.test(path) || /\.(?:pem|key|p12|pfx)$/i.test(path)
 }
 
 export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held, sensitive }

@@ -1,11 +1,13 @@
 // read: a local image, a text file as numbered lines under its editing
 // lease (lease.ts, task 3fv), or a directory listing.
 
-import { readdirSync, statSync } from 'fs'
+import { readdirSync, realpathSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../../common/attachments.ts'
 import { callText } from '../../common/call-text.ts'
+import { settings } from '../../common/settings.ts'
+import { approval } from '../approval.ts'
 import { blobs } from '../blobs.ts'
 import { lease } from '../lease.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
@@ -44,7 +46,7 @@ export const tool: Tool<ToolOutput> = {
 		'Read files, images, directories, or URLs; multiple paths are accepted. Relative paths start from cwd. ' +
 		'Text results start with == READ path@version ==, followed by numbered lines. EDIT requires that version. ' +
 		'Ranges are 1-based and inclusive. Default: first 200 lines; path:1- reads all. ' +
-		'Images attach directly; URLs return readable text or save other files under /tmp.',
+		'Images attach directly; URLs return readable text or save other files under /tmp. Sensitive local paths are refused in best-effort mode.',
 	syntax: {
 		summary: false,
 		usage: ['READ "<path>[:<start>[-<end>]]" ...   // one or more; :5 reads line 5, :5- to the end', 'READ "<url>"'],
@@ -83,6 +85,7 @@ export const tool: Tool<ToolOutput> = {
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)
 		let path = resolve(ctx.cwd, input.path.replace(/^~(?=\/|$)/, homedir()))
+		if (settings.security() !== 'none' && (approval.sensitive(path) || approval.sensitive(realpathSync(path)))) throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
 		let st = statSync(path)
 		if (st.isDirectory()) {
 			let entries = readdirSync(path, { withFileTypes: true }).map((e) => (e.isDirectory() ? `${e.name}/` : e.name))

@@ -1,0 +1,10 @@
+{
+	title: 'Type BASH for its existing structured tool output',
+	spec: 'BASH declares Tool<ToolOutput>, matching its existing run return contract of either plain output or structured text with commit metadata. Restore the invariant that the registered tool type accepts every existing successful BASH result without changing execution or display behavior. Focused file-change tests and TypeScript verification cover the contract.',
+	status: 'done',
+	notes: [
+		'The existing BASH run function already returns ToolOutput when carrying commit metadata; only the generic declaration was incorrect. Tool<ToolOutput> restores the type contract without runtime changes. TypeScript passes and the focused file-change tests pass.'
+	],
+	needs: ['179'],
+	foldInto: ['179']
+}

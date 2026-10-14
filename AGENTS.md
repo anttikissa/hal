@@ -65,6 +65,12 @@ When changing SYSTEM.md or this project's AGENTS.md on your own
 initiative, mark each change with an adjacent
 `<!-- TODO - to be reviewed by a human -<current session id> -->` comment.
 
+# Security
+
+Hal's best-effort security must prevent models from accidentally reading
+secrets or erasing data. Protection against a determined attacker is out
+of scope.
+
 # Privacy
 
 Diagnostics and telemetry are opt-in, always: off by default, on only

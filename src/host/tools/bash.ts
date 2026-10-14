@@ -18,7 +18,7 @@ function withoutCd(command: string, cwd: string): string {
 
 export const bash = { withoutCd }
 
-export const tool: Tool = {
+export const tool: Tool<ToolOutput> = {
 	name: 'bash',
 	description:
 		'Run a command with bash -c in the working directory. Long output is cut.',

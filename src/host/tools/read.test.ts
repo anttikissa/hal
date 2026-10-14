@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { attachments } from '../../common/attachments.ts'
 import { blocks } from '../../common/blocks.ts'
 import { replay } from '../../common/replay.ts'
 import { transcript } from '../../common/transcript.ts'
+import { settings } from '../../common/settings.ts'
 import { anthropic } from '../anthropic.ts'
 import { history } from '../history.ts'
 import { openai } from '../openai.ts'
@@ -18,16 +19,19 @@ import { tools } from '../tools.ts'
 let home: string
 const originalHome = paths.home
 const originalMax = attachments.maxBytes
+const originalSecurity = settings.security
 const ctx = () => ({ cwd: home, sessionId: 's', signal: new AbortController().signal })
 const read = (path: string, extra = {}) => tools.run({ type: 'tool_call', id: 'r', name: 'read', input: { path, ...extra } }, ctx())
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-read-image-`)
 	paths.home = () => home
+	settings.security = () => 'best-effort'
 })
 afterEach(() => {
 	paths.home = originalHome
 	attachments.maxBytes = originalMax
+	settings.security = originalSecurity
 	rmSync(home, { recursive: true, force: true })
 })
 
@@ -76,6 +80,39 @@ test('a READ without a range shows the first 200 lines and how to get more; offs
 	let whole = (await read('long.txt', { offset: 1 })).output
 	expect(whole).toContain('line 300')
 	expect(whole).not.toContain('for more')
+})
+
+test('READ refuses sensitive paths and symlink targets without exposing contents or dropping safe batch siblings', async () => {
+	let secret = 'FAKE-SECRET-CONTENT'
+	for (let dir of ['.ssh', '.aws', '.gnupg', 'secrets']) mkdirSync(`${home}/${dir}`)
+	let sensitive = ['.ssh/id_rsa', '.aws/credentials', '.gnupg/private', 'secrets/token.txt', '.env', '.env.production', 'credentials.json', 'auth.ason', 'id_ed25519', 'private.pem']
+	for (let path of sensitive) writeFileSync(`${home}/${path}`, secret)
+	writeFileSync(`${home}/public.txt`, 'ordinary public content\n')
+	writeFileSync(`${home}/image.key`, Buffer.from('89504e470d0a1a0a00000000', 'hex'))
+	symlinkSync(`${home}/.ssh/id_rsa`, `${home}/alias.txt`)
+	symlinkSync(`${home}/.ssh`, `${home}/alias-dir`)
+	symlinkSync(`${home}/public.txt`, `${home}/.env.link`)
+	for (let path of [...sensitive, '.ssh', '.ssh/*', 'secrets', 'alias.txt', 'alias-dir', '.env.link', 'image.key', `${home}/.ssh/id_rsa`]) {
+		let result = await read(path, { offset: 1, limit: 1 })
+		expect(result.isError).toBe(true)
+		expect(result.output).toContain(`${path} is a sensitive path`)
+		expect(result.output).not.toContain(secret)
+		expect(result.image).toBeUndefined()
+	}
+	let batch = await tools.run({ type: 'tool_call', id: 'batch', ...nativeTool.resolve('READ "public.txt:1-1" "alias.txt" ".ssh/*"') }, ctx())
+	expect(batch.isError).toBe(true)
+	expect(batch.output).toContain('1: ordinary public content')
+	expect(batch.output).toContain('alias.txt is a sensitive path')
+	expect(batch.output).toContain('.ssh/* is a sensitive path')
+	expect(batch.output).not.toContain(secret)
+})
+
+test('security none explicitly permits READ of synthetic sensitive files', async () => {
+	writeFileSync(`${home}/.env`, 'FAKE-SECRET-CONTENT\n')
+	settings.security = () => 'none'
+	let result = await read('.env')
+	expect(result.isError).toBeUndefined()
+	expect(result.output).toContain('1: FAKE-SECRET-CONTENT')
 })
 
 test('batched ranges match individual leased reads; mixed failures preserve successes and are tool errors', async () => {

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
+import { settings } from '../common/settings.ts'
 import { approval } from './approval.ts'
 
 const bash = (command: string, id = 'c1'): ToolCallBlock => ({ type: 'tool_call', id, name: 'bash', input: { command, description: 'x' } })
@@ -17,6 +18,7 @@ test('dangerous commands are caught and their offending part marked; harmless on
 		['cd src && rm -fr node_modules && ls', ['rm -fr node_modules']],
 		['rm -r -f ~/x', ['rm -r -f ~/x']],
 		['rm --recursive --force ./out', ['rm --recursive --force ./out']],
+		['dir=; rm -rf ~/projects/$DIR', ['rm -rf ~/projects/$DIR']],
 		['git reset --hard HEAD~1', ['git reset --hard HEAD~1']],
 		['git clean -fdx', ['git clean -fdx']],
 		['git stash drop', ['git stash drop']],
@@ -55,6 +57,28 @@ test('only bash is checked, and the form asks y/N with No as default', () => {
 	let form = approval.form(bash('rm -rf build'))!
 	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }])
 	expect(form.quote!.text).toBe('rm -rf build')
+})
+
+test('secret-printing approvals are narrow, use the shared path policy and honor security none', () => {
+	let table: [string, string[]][] = [
+		['cat ~/.ssh/id_rsa', ['cat ~/.ssh/id_rsa']],
+		['head -n 5 "$HOME/.aws/credentials"', ['head -n 5 "$HOME/.aws/credentials"']],
+		["tail -f './.env.local'", ["tail -f './.env.local'"]],
+		['cat -- "/tmp/key files/id_ed25519"', ['cat -- "/tmp/key files/id_ed25519"']],
+		['printf ready | cat ~/.ssh/*', ['cat ~/.ssh/*']],
+		['/bin/cat secrets/token.txt', ['/bin/cat secrets/token.txt']],
+		['/usr/bin/head <.env', ['/usr/bin/head <.env']],
+		['cat AGENTS.md', []],
+		['head src/host/secrets.ts', []],
+		['ssh -i ~/.ssh/id_rsa example.invalid', []],
+		['echo "cat ~/.ssh/id_rsa"', []],
+	]
+	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
+	let original = settings.security
+	try {
+		settings.security = () => 'none'
+		expect(approval.form(bash('cat ~/.ssh/id_rsa'))).toBeUndefined()
+	} finally { settings.security = original }
 })
 
 const at = (r: object) => ({ ...r, ts: '2026-09-27T00:00:00Z' }) as HistoryRecord
