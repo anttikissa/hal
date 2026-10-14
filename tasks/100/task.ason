@@ -1,5 +1,5 @@
 {
-	title: 'Readable CLI declarations and derived help',
+	title: 'Readable CLI declarations and handwritten help',
 	spec: 'src/client/args.ts declares CLI commands and options through small readable helpers: syntax string, mode and a local handler, with no help text. Help is one handwritten string kept in sync with the declarations by hand. One parser handles missing values, duplicate aliases, unknown commands and options, mode restrictions and extra positionals; Hal-specific value and combination checks stay separate. Option values are nonempty and immediately follow their option. Parsing stays pure and runs before startup effects, preserves intended CLI forms and the Args result contract, and rejects invalid input rather than falling back to the terminal. Accidental parser quirks are not compatibility requirements. No new dependency or general-purpose framework.',
 	status: 'done',
 	notes: [
