@@ -1,0 +1,10 @@
+{
+	title: 'Synthetic replies use Hal reply styling',
+	spec: 'Terminal and web render output marked synthetic with exactly the assistant palette, including Markdown accents, derived at call time so themes follow it. The built-in colors.synthetic and hal theme template delegate to colors.assistant without reducing chroma. This replaces task 0pg grayer synthetic default. Keep provenance labels and error precedence. Invariant: synthetic replies have the same color styling as Hal replies.',
+	status: 'done',
+	notes: [
+		'Shared palette delegation removes the chroma reduction without adding repeated work or state. Focused colors and item-view tests passed (12 tests); one-off equality check passed for built-in and hal theme palettes. Ordinary command output remains neutral pending user clarification.'
+	],
+	needs: ['0pg'],
+	foldInto: ['0pg']
+}
