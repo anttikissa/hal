@@ -1,7 +1,7 @@
 // Host initialization, role policy and supervised lifetime (task fd1).
-import { settings } from '../common/settings.ts'
 import { config } from './config.ts'
-import { restartProcess } from './commands/restart.ts'
+import { handover, restartProcess } from './commands/restart.ts'
+import { link } from '../client/link.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { providers } from './providers.ts'
@@ -20,15 +20,14 @@ function initHost(): void {
 	promptFiles.start(host.state.clients)
 }
 
-// Role policy is checked on every join/retry, including print clients. An
-// invalid policy must never silently fall back to automatic promotion.
+// Checked on every join/retry, including print clients: a broken
+// config.ason refuses promotion, and a peer that just handed the home to
+// hal serve does not take it back.
 function mayHost(): boolean {
 	let data = config.state.data
 	let broken = data && liveFiles.brokenError(data)
 	if (broken) throw broken
-	let mode = settings.state.raw.hostMode
-	if (mode !== undefined && mode !== 'auto' && mode !== 'server') throw new Error('config.ason: hostMode must be auto or server')
-	return mode !== 'server'
+	return !handover.pending()
 }
 
 // A service supervisor owns restarts; no terminal client or daemon fork.
@@ -49,9 +48,17 @@ async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
 	process.on('SIGINT', () => stop('SIGINT'))
 	process.on('SIGUSR1', () => (serverLog.log('restarting (SIGUSR1)'), restartProcess.run()))
 	if (!(await becomeHost())) {
-		process.stderr.write('hal: another host owns this home; stop it before starting hal serve\n')
-		process.exit(1)
+		// A peer host hands over; another hal serve refuses, and the first prevails.
+		let conn = await link.dial(server.socketPath(), {
+			event: (e) => e.type === 'rejected' && e.command === 'handover' && (process.stderr.write(`hal: ${e.reason}\n`), process.exit(1)),
+			dropped: () => {},
+		})
+		conn?.send({ type: 'handover' })
+		serverLog.log('asked the host to hand over')
+		while (!(await becomeHost())) await Bun.sleep(50)
+		conn?.close()
 	}
+	handover.done()
 	serverLog.log(`listening on ${server.socketPath()} ${serverLog.ms()}`)
 	version.found = (loaded) => host.announce(loaded)
 	void version.init()

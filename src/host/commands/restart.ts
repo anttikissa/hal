@@ -15,12 +15,13 @@
 import { toolDetails } from '../../common/tool-details.ts'
 import type { FlaggedCall } from '../../common/modals.ts'
 import { transcript } from '../../common/transcript.ts'
-import { settings } from '../../common/settings.ts'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { host } from '../host.ts'
 import { jobs } from '../jobs.ts'
 import { restartNote } from '../restart-note.ts'
+import { paths } from '../paths.ts'
+import { rmSync, statSync, writeFileSync } from 'fs'
 import { tabs } from '../tabs.ts'
 import { clients } from '../clients.ts'
 import { serverLog } from '../server-log.ts'
@@ -36,6 +37,23 @@ export const restartProcess = { run: (): void => process.exit(100) }
 const refused = new Map<string, number>()
 
 export const restartGuard = { flagged, refused }
+
+// hal serve asks a peer host for the home (task kp0): it restarts as with
+// /restart host once nothing unsafe to stop runs. The marker keeps peers
+// (the restarted terminal too) from taking the role back meanwhile.
+const handoverPath = () => `${paths.stateDir()}/handover`
+export const handover = {
+	request(): void {
+		if (restartGuard.flagged().length) return void setTimeout(handover.request, 1000)
+		writeFileSync(handoverPath(), '')
+		restartNote.write('hal serve took over')
+		later()
+	},
+	pending(): boolean {
+		try { return Date.now() - statSync(handoverPath()).mtimeMs < 10_000 } catch { return false }
+	},
+	done: () => rmSync(handoverPath(), { force: true }),
+}
 
 // Long enough for the reply and the clients' restart events to leave.
 const flushMs = 200
@@ -63,9 +81,7 @@ export const command: SlashCommand = {
 	help: () =>
 		[
 			'/restart or /restart all restarts the host and every client connected to it.',
-			settings.value('hostMode') === 'server'
-				? '/restart host restarts the host; clients wait for the supervised server to return.'
-				: '/restart host restarts the host; clients reconnect, and a peer may take over.',
+			'/restart host restarts the host; clients reconnect, and a peer may take over.',
 			'/restart both restarts the host and this client.',
 			'/restart local (ctrl-r) restarts this client; the web page reloads.',
 			'',

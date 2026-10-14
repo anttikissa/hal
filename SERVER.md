@@ -24,37 +24,17 @@ cd /path/to/hal
 
 The installer never starts, enables or stops a process, changes
 `config.ason`, grants linger, or overwrites a different existing unit.
-It leaves activation to you so an existing interactive host is not
-silently replaced.
 
-Add this field to the checkout's existing `config.ason` object,
-preserving its other settings:
-
-```ason
-hostMode: 'server',
-```
-
-The default `hostMode: 'auto'` lets a local client become host when no
-host is available. Server mode makes local clients, including print
-mode, wait for the supervised host instead. `hal serve` is the explicit
-foreground host entry point; it does not attach a terminal or become a
-client of another host. An existing host for the same home makes it
-fail rather than starting a competing host. Local clients and the
+`hal serve` is the explicit foreground host: it does not attach a
+terminal. If an interactive Hal already hosts this home, `hal serve` asks
+it to hand over: that process restarts as with `/restart host` (once no
+call flagged unsafe to stop runs) and rejoins as a client, and its
+running turns continue under `hal serve`. If another `hal serve` already
+hosts, the new one exits instead; the first prevails. While no `hal
+serve` runs, terminals take the host role as usual. Local clients and the
 service must use the same checkout/home and user.
 
-Before stopping a legacy host, close or restart **all local Hal processes
-running older code**. Already-running clients that predate server mode
-ignore the new setting and can still take over; updating files alone
-does not update those processes. With the new code and configuration in
-place, `/restart all` can reload launcher-managed clients into waiting
-mode. Review active work before any restart; the installer does not do
-this for you.
-
-When you are ready to migrate, deliberately stop the existing host
-first. Quitting a peer is not stopping its host. Stopping a host can
-interrupt active work; choose a suitable time. Do not enable the service
-alongside an existing host and expect the installer to migrate it.
-Then:
+When ready:
 
 ```sh
 systemctl --user daemon-reload
@@ -173,10 +153,9 @@ user unit for that same home. Substitute your own generic paths/account:
 }
 ```
 
-Provision the checkout and dependencies as that account, set
-`hostMode: 'server'`, and resolve any existing host before activating
-the service. NixOS owns the unit and Bun runtime; the checkout remains
-editable, including by Hal. Dependency installation can use
+Provision the checkout and dependencies as that account before
+activating the service. NixOS owns the unit and Bun runtime; the
+checkout remains editable, including by Hal. Dependency installation can use
 `bun install` in the checkout without running `./install`'s shell/link
 setup. For this unit use `systemctl status|restart|stop hal.service`
 and `journalctl -u hal.service` without `--user`; linger is unnecessary.

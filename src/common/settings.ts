@@ -21,7 +21,6 @@ export type SettingType =
 export type Setting = { name: string; label: string; type: SettingType; default: unknown; description: string; browser?: true }
 
 const table: Setting[] = [
-	{ name: 'hostMode', label: 'Host mode', type: { kind: 'choice', options: ['auto', 'server'] }, default: 'auto', description: 'auto: local clients may become host. server: only hal serve hosts; local clients wait and reconnect. Changing this does not stop an existing host.' },
 	{ name: 'subagentSlots', label: 'Spawn budget', type: { kind: 'integer', min: 0, max: Number.MAX_SAFE_INTEGER }, default: 3, description: 'Spawn slots for new sessions. Each subagent costs one slot from its owner and every owner ancestor; /budget changes only the current session.', browser: true },
 	{ name: 'model', label: 'Default model', type: { kind: 'text' }, default: 'hal/intro', description: 'Default model (provider/id or alias, optional :effort) for new sessions. Unset, new tabs run the first-run guide (hal/intro), which sets it. To switch only the current session, use Ctrl-M or /model.' },
 	{

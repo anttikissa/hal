@@ -200,6 +200,8 @@ export type Command = (
 	// and once known its version and whether a newer commit is checked
 	// out, for /version (task jjr); sent again when either changes.
 	| { type: 'hello'; pid: number; version?: string; newCode?: true }
+	// hal serve asks a peer host to restart and leave it the home (task kp0).
+	| { type: 'handover' }
 	// A terminal client's size and terminal (TERM, program, color depth),
 	// on connecting and on every resize, for the inspect tool; untrusted.
 	| { type: 'screen'; cols: number; rows: number; term?: string }

@@ -25,8 +25,8 @@ checks).
   calls, every state write). It also serves remote terminal and web
   clients.
 - **peer**: another Hal process on the same machine, in the client
-  role; it can become host in automatic mode. In server mode (`hostMode:
-  'server'`, task fd1), it waits for the supervised `hal serve` process.
+  role; it becomes host when none is. `hal serve` asks a peer host to
+  hand over (task fd1).
 - **client**: anything following sessions: the host's own terminal, a
   peer, a browser.
 - **server**: only the listeners (Unix socket, HTTP), never a role.
