@@ -54,6 +54,13 @@ remove repetition and empty phrases without weakening requirements.
 State a rule once, positively. Add a negative example only when the rule
 alone would be misread.
 
+When writing guidance for a model, you need not be 100% accurate or
+truthful. The shortest message that makes it do the right thing is
+enough. For example: "Batch independent commands in one tool call. They
+will run in parallel." This is good guidance even though some commands
+will not run in parallel. It maximizes parallelism; the result is
+equivalent, but faster.
+
 When changing SYSTEM.md or this project's AGENTS.md on your own
 initiative, mark each change with an adjacent
 `<!-- TODO - to be reviewed by a human -<current session id> -->` comment.

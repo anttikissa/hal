@@ -1,0 +1,6 @@
+{
+	title: 'Prefer effective concise model guidance',
+	spec: 'AGENTS.md writing guidance says that model instructions need not be completely accurate or truthful: use the shortest wording that produces the right behavior. Preserve the example: batch independent commands in one tool call; they will run in parallel. Explain that the guidance is useful even when some commands are serialized, because it maximizes parallelism while preserving equivalent results.',
+	status: 'done',
+	needs: []
+}
