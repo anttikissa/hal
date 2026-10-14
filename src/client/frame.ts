@@ -264,6 +264,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item))
 			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item))
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
+			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status ? `${look.status} &` : '&'
 			look = frame.look(item, look)
 			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)
 			let natural = rows.length
@@ -271,8 +272,11 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			if (rows.length > natural) frame.state.padded = true
 			let region = item.type === 'tool-result' && !tool ? batchOrder.state.below.get(item) : undefined
 			if (region && below?.key !== region) below = { key: region, start: lines.length }
-			// An attached result's padding row replaces its call's bottom one.
-			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
+			// An attached result follows its call's last row: both padding rows go.
+			if (tool && rows.length && lines.length && drawn?.pad !== false) {
+				lines.pop()
+				if (!Bun.stripANSI(rows[0]!).trim()) rows = rows.slice(1)
+			}
 			else if (rows.length && look.gap !== false && (lines.length || Bun.stripANSI(rows[0]!).trim())) lines.push('')
 			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)

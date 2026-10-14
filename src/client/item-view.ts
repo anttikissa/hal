@@ -85,7 +85,7 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 		let href = transcript.href(session, call)
 		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
 	}
-	return [...rows, '', ...body]
+	return body.length ? [...rows, '', ...body] : rows
 }
 
 // Rows for one item at `width` columns, without the side padding;
@@ -101,7 +101,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let source = card.text(item)
-			let body = card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
+			let body = !source.trim() ? [] : card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
 			// Another session's message: its summary, then its text quieter.
 			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item))
 			if (item.summary && !item.report) body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]

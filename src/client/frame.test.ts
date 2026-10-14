@@ -84,8 +84,8 @@ test('EDIT line lists cannot consume the title or block reference', () => {
 	let status = '(+5 −6, lines 6, 25, 28, 31, 37, 42, 59, 71, 100, 120)'
 	for (let cols of [40, 60, 100]) {
 		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
-		let header = rows.find(r => r.includes('Edit'))!
-		expect(header).toContain('Edit src/')
+		let header = rows.find(r => r.includes('> '))!
+		expect(header).toContain('> src/')
 		expect(header).toContain(' t62')
 		expect(header).toContain('…')
 		expect(strings.visLen(header)).toBeLessThanOrEqual(cols)
@@ -470,8 +470,8 @@ test('tool timestamps and command-output headers match ordinary message time and
 	expect(lines[ordinary + 2]).toBe('Message body')
 	expect(lines[output + 1]).toBe('')
 	expect(lines[output + 2]).toBe('Command body')
-	expect(lines.some(line => line.startsWith('08:50 Bash Inspect files'))).toBe(true)
-	expect(lines.some(line => line.startsWith('08:50 Read example.txt'))).toBe(true)
+	expect(lines.some(line => line.startsWith('08:50 $ Inspect files'))).toBe(true)
+	expect(lines.some(line => line.startsWith('08:50 < example.txt'))).toBe(true)
 })
 
 test('finished thinking with no readable text draws nothing, not a bare header', () => {

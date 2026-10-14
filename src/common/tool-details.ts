@@ -7,7 +7,7 @@
 // - headline(name, input): a card's closed title and the argument it shows
 //   bash → its description; command → "/rename …"; read → "Read src/main.ts"
 // - lines(name, input): what an open card adds below the title
-//   bash → "$ <command>" ("&" when backgrounded), "Edits a.ts, b.ts",
+//   bash → its command, "Edits a.ts, b.ts",
 //   "Timeout 30 s" when not the default; other tools → "key: value"
 //   for each argument the title didn't show
 // - value(input): any argument as readable lines, not JSON
@@ -36,24 +36,32 @@ function value(input: unknown, indent = ''): string[] {
 
 let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-// A card's title: what the call does, in words (task jz). Each tool
-// reads as a verb and its object: Google words, Read <path or
-// URL>, Inspect project (tab, id), Spawn "name" (tab 3, 31-swe),
-// Wait for 31-swe, 31-bux. Bash shows the model's description, marked
-// (background) when backgrounded; its command opens below. A
-// model-run slash command reads as typed, "/rename …" (task 9g).
-// `output`: the call's result, when known, adds what only the host
-// knew (the tab and id spawn opened, whom wait waits for). `key` and
+// A card's title: its tool's mark, then what the call works on (tasks
+// jz, b3k): $ <description> for bash (its command opens below), < <paths>,
+// > <files>, => <target>, … Waiting for <targets>, ! <text>, * <id> <name>,
+// x <target>, ? Help <tool>, ? Inspect <target>. A model-run slash command
+// reads as typed, "/rename …" (task 9g); other tools keep their name,
+// Google <query>. `output`: the call's result, when known, adds what only
+// the host knew (the id spawn opened, whom wait waits for). `mark` is the
+// mark the text starts with, which the web draws as an icon; `key` and
 // `keys` name the arguments shown, which lines() then leaves out.
-function headline(name: string, input: Record<string, unknown>, output?: string): { text: string; key?: string; keys?: string[] } {
+type Headline = { text: string; mark?: string; key?: string; keys?: string[] }
+function headline(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let head = titled(name, input, output)
-	return { ...head, text: home.short(head.text) }
+	let tool = name
+	if (name === 'tool') try { tool = callText.parse(input.cmd).name } catch {}
+	let mark = marks[tool] && head.text.startsWith(`${marks[tool]} `) ? marks[tool] : undefined
+	return { ...head, text: home.short(head.text), ...(mark ? { mark } : {}) }
 }
 
-function titled(name: string, input: Record<string, unknown>, output?: string): { text: string; key?: string; keys?: string[] } {
+// Each tool's mark (task b3k); tools without one show their name.
+const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: '=>', wait: '…', notify: '!', spawn: '*', stop: 'x', help: '?', inspect: '?' }
+
+function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
 	// [tab, id] of each session the result names (tabs.label).
 	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)
+	let marked = (text: string) => `${marks[name]} ${text}`
 	switch (name) {
 		case 'tool': {
 			try {
@@ -67,20 +75,19 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 					if (Array.isArray(first) && first.length === 1) first = first[0]
 					if (first && typeof first === 'object' && !Array.isArray(first)) fields = first as Record<string, unknown>
 				} catch {}
-				return { text: purpose ? `${verb(parsed.name)} ${oneLine(purpose)}` : titled(parsed.name, fields).text }
+				return { text: purpose ? `${marks[parsed.name] ?? verb(parsed.name)} ${oneLine(purpose)}` : titled(parsed.name, fields).text }
 			} catch { break }
 		}
-		case 'bash': {
-			let text = `Bash ${str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)}`.trimEnd()
-			return { text: input.background === true ? `${text} (background)` : text, key: str('description') ? 'description' : undefined }
-		}
+		case 'bash':
+			return { text: marked(str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)).trimEnd(), key: str('description') ? 'description' : undefined }
 		case 'send': {
 			let to = str('to')
 			if (!to) break
 			let sent = output?.match(/^(?:Sent to|Queued in|Waiting in|Interrupted) (.+?)(?=: it |$)/)?.[1]
-			let target = sent ? titles.address(sent, true) : /^\d+$/.test(to) ? `tab ${to}` : to
+			let [first, sid] = sent?.split(' · ') ?? []
+			let target = sent ? /^tab \d+$/.test(first!) && sid ? `${sid} (${first})` : first! : /^\d+$/.test(to) ? `tab ${to}` : to
 			let command = typeof input.text === 'string' && /^\s*\//.test(input.text) ? str('text') : undefined
-			return { text: `${command ? `${command} → ` : 'To '}${target}${str('description') ? `: ${str('description')}` : ''}`, keys: ['to', 'description', ...(command ? ['text'] : [])] }
+			return { text: marked(`${target}${command ? ` ${command}` : ''}${str('description') ? `: ${str('description')}` : ''}`), keys: ['to', 'description', ...(command ? ['text'] : [])] }
 		}
 		case 'command':
 			if (str('command')) return { text: str('command')!, key: 'command' }
@@ -93,59 +100,67 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (str('url')) return { text: `Web search ${str('pattern') ? `"${str('pattern')}" in ` : ''}${str('url')}`, key: 'url' }
 			break
 		case 'read':
+		case 'read_url':
 		case 'read_blob': {
-			if (name === 'read' && Array.isArray(input.paths)) return { text: `Read ${input.paths.length} file${input.paths.length === 1 ? '' : 's'}` }
-			if (name === 'read_blob' && Array.isArray(input.ids)) return { text: `Read blobs ${input.ids.join(', ')}` }
+			let list = (key: string, many: unknown) => Array.isArray(many) ? many.map((p) => typeof p === 'string' ? p : p && typeof p === 'object' ? (p as Record<string, unknown>)[key] : undefined).filter((p): p is string => typeof p === 'string' && p !== '') : []
+			if (name === 'read' && Array.isArray(input.paths)) return { text: marked(list('path', input.paths).map((p) => oneLine(p)).join(', ')) }
+			if (name === 'read_blob' && Array.isArray(input.ids)) return { text: marked(list('id', input.ids).join(', ')) }
 			let key = name === 'read_blob' ? 'id' : str('url') ? 'url' : 'path'
-			if (str(key)) return { text: `${name === 'read_blob' ? 'Read blob' : 'Read'} ${str(key)}`, key }
+			if (str(key)) return { text: marked(str(key)!), key }
 			break
 		}
 		case 'notify':
-			if (str('text')) return { text: `Notify "${str('text')}"`, key: 'text' }
+			if (str('text')) return { text: marked(str('text')!), key: 'text' }
 			break
 		case 'write':
-			if (str('path')) return { text: `Write ${str('path')}`, key: 'path' }
+			if (str('path')) return { text: marked(str('path')!), key: 'path' }
 			break
-		// The file, then the purpose; the diff opens below (task ese).
-		case 'edit':
-			if (str('path')) return { text: `Edit ${str('path')}${str('description') ? `: ${str('description')}` : ''}`, keys: ['path', 'hash', 'description'] }
+		// The files it changes; the purpose and diff open below (task ese).
+		case 'edit': {
+			let files = [...new Set([input.path, ...(Array.isArray(input.edits) ? input.edits.map((e) => e && typeof e === 'object' ? (e as Record<string, unknown>).path : undefined) : [])].filter((p): p is string => typeof p === 'string' && p !== ''))]
+			if (files.length) return { text: marked(files.join(', ')), keys: ['path', 'hash'] }
 			break
+		}
+		case 'help':
+			return { text: marked(`Help${str('name') ? ` ${str('name')}` : ''}`), key: 'name' }
 		case 'inspect': {
-			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: `Inspect ${String(input.target)}`, key: 'target' } : { text: 'Inspect' }
+			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: marked(`Inspect ${String(input.target)}`), key: 'target' } : { text: marked('Inspect') }
 			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
 			let what = (input.what as string | undefined) ?? 'sessions'
 			let target = what === 'sessions' ? (input.scope as string | undefined) ?? 'self' : what
 			let fields = (input.fields as string | undefined)?.split(',').map((f) => f.trim()).filter(Boolean)
 			let text = `Inspect ${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
-			return { text, keys: ['what', 'scope', 'fields'] }
+			return { text: marked(text), keys: ['what', 'scope', 'fields'] }
 		}
+		// * <id> <name>, then how it ends: a subagent closes when done
+		// (autoclose ↧), one left open says nothing.
 		case 'spawn': {
-			let what = str('name') ? `"${str('name')}"` : input.kind === 'interactive' ? 'interactive session' : 'subagent'
-			let at = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([tab, id]) => (tab ? `tab ${tab}, ${id}` : id))[0]
-			return { text: `Spawn ${what}${at ? ` (${at})` : ''}`, keys: str('name') ? ['name'] : [] }
+			let at = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)[0]
+			let kind = input.kind === 'interactive' ? 'interactive' : input.kind === 'subagent-leave-open' ? '' : 'autoclose ↧'
+			let text = [at, str('name') ?? (at ? '' : input.kind === 'interactive' ? 'Interactive session' : 'Subagent')].filter(Boolean).join(' ')
+			return { text: marked(`${text}${kind ? ` (${kind})` : ''}`), keys: str('name') ? ['name', 'kind'] : ['kind'] }
 		}
 		case 'stop':
-			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: `Stop ${String(input.target)}`, key: 'target' } : { text: 'Stop' }
+			if (input.target !== undefined) return typeof input.target === 'string' || typeof input.target === 'number' ? { text: marked(String(input.target)), key: 'target' } : { text: marked('Stop') }
 			break
 		case 'wait': {
 			if (input.targets !== undefined) {
 				let targets = Array.isArray(input.targets) ? input.targets : [input.targets]
-				if (!targets.every((v) => typeof v === 'string' || typeof v === 'number')) return { text: 'Wait for background work' }
-				return { text: `Wait for ${targets.length ? targets.join(', ') : 'background work'}`, key: 'targets' }
+				if (!targets.every((v) => typeof v === 'string' || typeof v === 'number')) return { text: marked('Waiting for background work') }
+				return { text: marked(`Waiting for ${targets.length ? targets.join(', ') : 'background work'}`), key: 'targets' }
 			}
-			if (output?.startsWith('No owned background command or subagent') || output?.startsWith('No subagent')) return { text: 'Wait (no background work running)' }
+			if (output?.startsWith('No owned background command or subagent') || output?.startsWith('No subagent')) return { text: marked('Waiting (no background work running)') }
 			let ready = output?.match(/^Work needs attention: (.+?)\. Inspect the targets;/)?.[1]
 			let who = ids(/(?:^Waiting for |, )(?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)
-			return { text: `Wait for ${ready ?? (who.length ? who.join(', ') : 'background work')}` }
+			return { text: marked(`Waiting for ${ready ?? (who.length ? who.join(', ') : 'background work')}`) }
 		}
 	}
-	if (str('description')) return { text: `${verb(name)} ${str('description')}`, key: 'description' }
+	if (str('description')) return { text: `${marks[name] ?? verb(name)} ${str('description')}`, key: 'description' }
 	let first = Object.entries(input).find(([, v]) => typeof v === 'string' && oneLine(v))
-	return first ? { text: `${verb(name)} ${oneLine(first[1] as string)}`, key: first[0] } : { text: verb(name) }
+	return first ? { text: `${marks[name] ?? verb(name)} ${oneLine(first[1] as string)}`, key: first[0] } : { text: marks[name] ? marked(verb(name)) : verb(name) }
 }
 
-// A tool's name as the word its title starts with (task hyt): 'Bash',
-// 'Read url'.
+// A tool's name as its title word (task hyt): 'Google', 'Web search'.
 function verb(name: string): string {
 	return (name.charAt(0).toUpperCase() + name.slice(1)).replaceAll('_', ' ')
 }
@@ -163,11 +178,15 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 		for (let p of input.paths) out.push(toolDetails.headline('read', p).text, ...toolDetails.lines('read', p))
 		shown.add('paths')
 	}
+	if (name === 'send' && typeof input.text === 'string' && !shown.has('text')) {
+		out.push(...input.text.split('\n'))
+		shown.add('text')
+	}
 	if (name === 'bash') {
 		let { command, modifies, background, timeout } = input
 		if (typeof command === 'string') {
 			let [first, ...rest] = command.split('\n')
-			out.push(`${background === true ? '&' : '$'} ${first}`, ...rest.map((l) => `  ${l}`))
+			out.push(first!, ...rest)
 			shown.add('command')
 		}
 		let files = typeof modifies === 'string' ? [modifies] : Array.isArray(modifies) && modifies.every((f) => typeof f === 'string') ? modifies : undefined

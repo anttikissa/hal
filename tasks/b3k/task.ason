@@ -1,0 +1,9 @@
+{
+	title: 'Cards lead with a one-character mark instead of a verb',
+	spec: 'A tool card title starts with an ASCII mark that names its kind, followed by its object without the tool verb (toolDetails.headline returns the mark): $ <description> for BASH, with the command on the next row unprefixed and & beside the card id when backgrounded; < <paths, cut off with …> for READ and READ_BLOB; > <files> for EDIT and WRITE, + before a created file, - before a deleted one, and per-file line counts (foo.ts +2-2) only when the whole row fits; => <target> for SEND, the message below; … Waiting for <targets> for WAIT; ! <text> for NOTIFY; * <id> <name>, then (interactive) or (autoclose ↧), for SPAWN, nothing for a subagent left open; x <target> for STOP; ? Help <tool> and ? Inspect <target> for HELP and INSPECT. A slash command needs no mark: it starts with /. Other tools keep their title-case name: Google <query>. Incoming messages from other sessions and tasks read <= <sender> (tab N, delivery), with delivery steering, next round or queued; soft-steering is not shown in titles. A finished background command reads <= Background command finished (exit N) with the ↑ t<call> link of a detached output card. A Hal reply ending in a question is headed ? Hal (<model>). Prompts and commands the user typed are unchanged. The web shows an icon in place of the mark and drops the verb.',
+	status: 'planned',
+	notes: [
+		'Step 1 (terminal headers): marks, & beside the card id, unprefixed bash command and send message, SEND names id (tab N). Also: an empty message body draws no rows, and an attached result follows its call without a blank row (user hates empty lines). Remaining: incoming <=, next round label, ? Hal on questions, EDIT +/- and line counts, finished-background ↑ link, web icons.'
+	],
+	needs: ['vwh']
+}

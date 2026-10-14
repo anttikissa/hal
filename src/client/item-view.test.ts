@@ -53,7 +53,7 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(spawn).toContain('task: First instruction\n  Second instruction')
 	expect(spawn).toContain('model: fake/model')
 	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5000 })
-	expect(bash).toContain('$ echo first\n  echo second')
+	expect(bash).toContain('$ Two commands\necho first\necho second')
 	expect(bash).toContain('Edits a.ts')
 	expect(bash).toContain('Timeout 5 s')
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
@@ -62,7 +62,7 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 test('A short Bash card clips only the first command line, with stable live and finished height', () => {
 	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash' }
 	let rows = (partial?: string) => toolView.call({ ...item, partial }, 20, 'short', {}).map(Bun.stripANSI)
-	expect(rows()[1]).toBe('$ echo first…')
+	expect(rows()[1]).toBe('echo first…')
 	expect(rows()).toHaveLength(2)
 	let output = 'first\nsecond'
 	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'short', {}, undefined, '1', 'bash')
