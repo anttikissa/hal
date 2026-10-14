@@ -141,8 +141,8 @@ function imageItem(b: ImageBlock, ts?: string): Shown {
 	if (ts !== undefined) item.ts = ts
 	return item
 }
-// A result, its images, then its commits (task 179): one record, so
-// they share its number, the later ones keyed n.1, n.2.
+// A result, its images, then commits older histories stored with it
+// (task 179): one record, so they share its number, keyed n.1, n.2.
 function resultItems(b: ToolResultBlock, ts?: string): Shown[] {
 	return [transcript.resultItem(b, ts), ...blocks.resultImages(b).map((image) => transcript.imageItem(image, ts)), ...(b.commits ?? []).map((c) => transcript.commitItem(c, ts))]
 }
@@ -203,11 +203,11 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized)`
 }
 
-function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {
+function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'divider') return { type: r.clear ? 'output' : 'divider', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
-	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.ts !== undefined && { ts: r.ts }) }
+	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.commit && { commit: r.commit }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
 // Whether output `next` joins the human's command `prev` in one card:

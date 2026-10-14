@@ -7,7 +7,7 @@
 
 import { existsSync } from 'fs'
 import { basename, join, relative } from 'path'
-import type { CommitBlock } from '../common/blocks.ts'
+import type { CommitBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { open, stat } from 'fs/promises'
 import type { NoticeEvent } from '../common/notices.ts'
@@ -19,6 +19,7 @@ import { noticeHistory } from './notice-history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
+import { transcript } from '../common/transcript.ts'
 
 type Watch = { sessionId: string; callId?: string; cwd: string; log: string; size: number; start: number }
 // What commits.committed gets: one commit a Bash call of `sessionId` made
@@ -113,6 +114,21 @@ function warn(id: string, short: string, subject: string): void {
 	host.broadcast(id, { type: 'output', sessionId: id, text: line, error: true, n, ts })
 }
 
+// Takes the commits off a round's results, for commits.cards.
+function take(results: ToolResultBlock[]): CommitBlock[] {
+	return results.flatMap((r) => { let found = r.commits ?? []; delete r.commits; return found })
+}
+
+// Each commit as its own output record after the results, so its card
+// has its own number (task 179).
+function cards(id: string, found: CommitBlock[]): void {
+	for (let commit of found) {
+		let { text } = transcript.commitItem(commit) as { text: string }
+		let { n, ts } = history.append(id, { type: 'output', text, commit })
+		host.broadcast(id, { type: 'output', sessionId: id, text, commit, n, ts })
+	}
+}
+
 // Lines appended to the Bash result of the call that made a commit
 // (task sg0): none by default; plugins add theirs with around.
 async function committed(_info: Committed): Promise<string[]> {
@@ -175,5 +191,5 @@ function announce(id: string | undefined, hash: string, short: string, subject: 
 export const commits = {
 	state: { seen: [] as string[] },
 	remember: 500,
-	begin, parse, appended, trailer, attribute, check, verify, warn, committed, finish, announce,
+	begin, parse, appended, trailer, attribute, check, verify, warn, committed, finish, announce, take, cards,
 }

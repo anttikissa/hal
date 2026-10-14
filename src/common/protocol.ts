@@ -12,7 +12,7 @@
 // command resent after a reconnect never acts twice.
 // Tasks: 6, qt, svt, 6eq, zh7, rqq, 81y.
 
-import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
+import type { AssistantBlock, CommitBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { NoticeEntry, NoticeEvent } from './notices.ts'
@@ -279,7 +279,7 @@ export type Event =
 	| { type: 'command'; sessionId: string; text: string; origin?: 'model'; from?: string; label?: string; ts?: string; n?: number; command?: string; streaming?: true }
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
-	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; origin?: 'model'; change?: PromptChange; n?: number; streaming?: true }
+	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; origin?: 'model'; change?: PromptChange; commit?: CommitBlock; n?: number; streaming?: true }
 	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
 	// `clear`: a /clear; clients drop everything shown before it.
 	| { type: 'divider'; sessionId: string; text: string; ts?: string; clear?: true; n?: number; streaming?: true }

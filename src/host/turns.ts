@@ -18,6 +18,7 @@ import { compact } from './compact.ts'
 import { turnRecovery } from './turn-recovery.ts'
 import { turnPolicy } from './turn-policy.ts'
 import { diag } from './diag.ts'
+import { commits } from './commits.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
@@ -326,12 +327,15 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			let results = await tools.round(calls, ctx, runOne)
 			if (turns.state.running.get(id) !== running) return
+			let made = commits.take(results)
 			if (contextTransitions.pending(id)?.kind === 'rebase') {
 				let { stop } = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)
+				commits.cards(id, made)
 				if (stop) { last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined; break }
 			} else {
 				let r = history.results(id, results)
 				host.broadcast(id, r?.n === undefined ? { type: 'tool-results', sessionId: id, results, ts: r?.ts } : { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
+				commits.cards(id, made)
 			}
 			if (signal.aborted) continue
 			// A wait: the turn ends, done, unless steering waits to be read.

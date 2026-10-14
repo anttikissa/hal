@@ -3,7 +3,7 @@
 // these records alone, never from display state.
 // Tasks: 7, nvm, svt, 6eq, rqq.
 
-import type { AssistantBlock, Message, StopReason, ToolCallBlock, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import type { AssistantBlock, CommitBlock, Message, StopReason, ToolCallBlock, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { ason } from './ason.ts'
 import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
@@ -85,7 +85,8 @@ export type HistoryRecord = Numbered &
 	// What a command said; `error` if it failed.
 	// `change`: a system-prompt file changed (host/prompt-trail.ts); the
 	// model reads `text` as a notice on its next request.
-	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
+	// `commit`: a commit a Bash call made (task 179), its own card.
+	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; commit?: CommitBlock; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told as a notice on its next request.
 	| { type: 'change'; cwd?: string; model?: string; autoclose?: boolean; previous?: { cwd?: string; model?: string; autoclose?: boolean }; ts: string }
