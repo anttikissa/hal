@@ -11,7 +11,7 @@ const state: { mark?: 'marked' | 'gone' } = {}
 
 // Typed `text`: true if it reloads the page now (the caller empties the box).
 function typed(text: string): boolean {
-	let t = text.trim()
+	let t = text.trimEnd()
 	if (/^\/restart\s+both$/.test(t)) restart.mark()
 	if (!/^\/restart\s+local$/.test(t)) return false
 	setTimeout(() => restart.reload())

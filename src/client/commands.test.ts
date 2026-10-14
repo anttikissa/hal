@@ -74,6 +74,15 @@ test('typed client-only commands run here and never reach the host', () => {
 	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
 })
 
+test('escaped and indented commands reach the host unchanged', () => {
+	open()
+	drafts.send = (c) => { sent.push(c); return 'sent' }
+	let inputs = ['/ /quit', ' /quit', ' /restart local', ' /toggle']
+	for (let text of inputs) expect(app.submit(text)).toBe(true)
+	expect(ran).toEqual([])
+	expect(sent.filter((c) => c.type === 'submit').map((c) => c.text)).toEqual(inputs)
+})
+
 test('typed /restart local exits with the restart code, like Ctrl-R; bare goes to the host', () => {
 	Object.assign(clientCommands.all, saved.all)
 	let codes: number[] = []

@@ -83,7 +83,7 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 
 // Typed /toggle, /expand or /collapse: true if `text` was one (and it ran).
 function typed(text: string): boolean {
-	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/is.exec(text.trim())
+	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/is.exec(text.trimEnd())
 	if (!m) return false
 	let error = folds.run(m[2] ?? '', m[1]!.toLowerCase() as Mode)
 	if (error) app.setNotice(error)

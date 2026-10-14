@@ -63,6 +63,7 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	// A command (/model, /pause) is not a prompt: the tab stays the owner's.
 	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
+	if (text.startsWith('/ ')) text = text.slice(2)
 	let state = status.stateOf(id)
 	// Automatic reports never answer a question. A deliberate soft-steer
 	// from the owner of delegated work does (kar); emergencies bypass it (zb0).

@@ -1,0 +1,10 @@
+{
+	title: 'Accept irssi-style literal slash prompts',
+	spec: 'The server treats text beginning with slash followed by one ASCII space as a literal prompt: strip exactly the first two characters, once, without parsing the result as a command. Thus / hello becomes hello, / /hello becomes /hello, and /  /hello becomes a space followed by /hello. Text with leading whitespace remains unchanged and is not a slash command. Terminal and web client-only command parsing follows the same column-zero rule. Clients send the original text through the unchanged submit wire message. Restore the invariant that leading whitespace protects slash text from command execution.',
+	status: 'done',
+	notes: [
+		'Server stripping is one startsWith/slice line after command dispatch. Host parsing and client-only parsing no longer discard leading whitespace. Focused host tests cover exactly-once stripping and preserved spaces; terminal tests confirm original text reaches submit. No protocol fields, loops, or state were added.'
+	],
+	needs: ['yq'],
+	foldInto: ['yq']
+}

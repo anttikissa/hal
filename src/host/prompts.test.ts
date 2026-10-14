@@ -15,6 +15,17 @@ useHost()
 const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
 const inboxOf = (c: ReturnType<typeof client>, id: string) => c.views.get(id)!.inbox.map((m) => m.text)
 
+for (let [input, output] of [['/ hello', 'hello'], ['/ /hello world', '/hello world'], ['/  /hello', ' /hello'], ['/ / /hello', '/ /hello'], [' /hello world', ' /hello world']]) {
+	test(`literal slash prompt: ${JSON.stringify(input)}`, async () => {
+		let a = client()
+		let id = created(a)
+		a.conn.send({ type: 'submit', sessionId: id, text: input! })
+		await until(() => calls.length === 1)
+		expect(texts(calls[0]!.input.messages.at(-1))).toEqual([stamped(output!)])
+		expect(a.of('rejected')).toEqual([])
+	})
+}
+
 test('ordinary messages abort the round and coalesce before its replacement request', async () => {
 	let a = client()
 	let id = created(a)
