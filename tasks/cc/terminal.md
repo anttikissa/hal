@@ -390,10 +390,12 @@ canonical path. Automatic prompt, streaming, tool, animation, and popup updates 
 use writable-screen recovery only while frame height does not shrink and their first
 changed row remains writable.
 
-Parallel tool results may stay separate during live updates to preserve immutable
-scrollback. Detached results retain their tool colors and original call reference.
-Every canonical rebuild reunites the results already available with their calls;
-results arriving afterward remain append-safe. Never clear merely to regroup.
+Only the bottom block grows (task 5gn). A parallel batch drawn while running keeps
+each call short, marked ↓; its results, then one live block of running output, come
+after the calls, each linking to its call; detached blocks keep their tool colors.
+Every canonical rebuild reunites the
+results already available with their calls; later output stays apart. Never clear
+merely to regroup.
 
 Fullscreen growth is straightforward only for a pure append. If an existing logical
 line also changes, use the same clamped relative move to the writable-screen top,

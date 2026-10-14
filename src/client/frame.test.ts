@@ -530,16 +530,16 @@ test('legacy rename controls never appear in terminal answers without a naming f
 })
 
 
-test('parallel results sit under their calls unless the batch overflows a screen', () => {
+test('a batch seen running keeps its output and results below its calls until a rebuild', () => {
 	type Row = Parameters<typeof frame.order>[0][number]
-	let call = (id: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}` }) as Row
+	let call = (id: string, partial?: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}`, ...(partial && { partial }) }) as Row
 	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Row
-	let items = [call('a'), call('b'), result('b'), result('a')]
-	let order = (fits: boolean) => frame.order(items, () => fits).map((i) => i.key).join(' ')
-	expect(order(true)).toBe('ta ra tb rb')
-	expect(order(false)).toBe('ta tb rb ra')
-	// Once split, a batch never flips back (that would rewrite scrollback).
-	expect(order(true)).toBe('ta tb rb ra')
+	let keys = (items: Row[]) => frame.order(items).map((i) => i.key).join(' ')
+	let done = [call('a'), call('b'), result('b'), result('a')]
+	expect(keys(done)).toBe('ta ra tb rb')
+	let running = [call('c', 'out'), call('d')]
+	expect(keys(running)).toBe('tc td tc~live')
+	expect(keys([...running.map((c) => ({ ...c, partial: undefined }) as Row), result('d'), result('c')])).toBe('tc td rd rc')
 })
 
 test('interruption markers remain whole and colored at a full terminal row', () => {

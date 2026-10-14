@@ -35,10 +35,10 @@ function draw(force = false, trigger?: string): void {
 		st.past = undefined
 	}
 	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
+	let past = frame.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true)
 	if (!past) {
 		render.later()
-		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
+		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false)!
 	}
 	st.past = { session, past }
 	let next = frame.build(st.view, cols, rows, st.fullscreen, past)
@@ -48,7 +48,7 @@ function draw(force = false, trigger?: string): void {
 	let pending = ''
 	for (let p of render.paintParts(next, rows, force, trigger, () => {
 		rebuild(st.view)
-		past = frame.layout(st.view, cols, Infinity, true, rows)!
+		past = frame.layout(st.view, cols, Infinity, true)!
 		st.past = { session, past }
 		return frame.build(st.view, cols, rows, st.fullscreen, past)
 	})) {
@@ -77,7 +77,7 @@ function later(): void {
 	st.slicing = setTimeout(() => {
 		st.slicing = null
 		if (!st.out) return
-		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs, true, st.out.size().rows)) render.request()
+		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs, true)) render.request()
 		else render.later()
 	}, 0)
 }

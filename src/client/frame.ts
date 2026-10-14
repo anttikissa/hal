@@ -158,24 +158,14 @@ export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCurso
 // returns nothing; what was laid out is kept (unless `save` is false),
 // so the next call goes on from there: a long history is laid out in
 // slices (task 7j).
-function layout(view: View, cols: number, deadline = Infinity, save = true, screen = 24): Past | undefined {
+function layout(view: View, cols: number, deadline = Infinity, save = true): Past | undefined {
 	let session = view.transcript?.meta.id
-	// The batch's rows as drawn grouped: each call and its gap; each
-	// result continues its call's card, replacing the bottom padding row.
-	// A call still waiting counts a one-row result (2 rows more), so a
-	// batch rarely groups first and splits once its results arrive.
-	let height = (batch: Item[]) => batch.reduce((n, item) => {
-		if (item.type === 'tool' && !batch.some((r) => r.type === 'tool-result' && r.id === item.id)) n += 2
-		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
-		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
-	}, 0)
 	// Ordered once per transcript (updates replace its items), in slices
 	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
-	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
-	let fits = (batch: Item[]) => height(batch) <= screen
-	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src), fits) } }
+	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${session} ${src.length}`
+	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src)) } }
 	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
-	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, fits, deadline, memo.at)
+	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, deadline, memo.at)
 	if (save) frame.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
 	let items = memo.at.out
@@ -186,6 +176,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let tick: Past['tick']
 	// The call whose card is being laid out: its first row and fold key.
 	let callCard: { id: string; key: string; start: number } | undefined
+	// The output region of a split batch being laid out (task 5gn).
+	let below: { key: string; start: number } | undefined
 	// The look of the last item that drew rows.
 	let drawn: Look | undefined
 	let blocks = forms.cards(view.form, view.transcript?.meta.blocks)
@@ -229,7 +221,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		if (item.type !== 'image') imagePrompt = item.type === 'prompt'
 		// Toggled here, or as the session starts its kind (task hyt); a
 		// call fails with its result.
-		let res = items[i + 1], failed = item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id && card.failed(res, item.name === 'bash')
+		let res = batchOrder.state.apart.has(item) ? undefined : items[i + 1], failed = item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id && card.failed(res, item.name === 'bash')
 		let fold = item.type === 'tool-result' ? callFolds.get(item.id) ?? 'short' : view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed)
 		if (item.type === 'tool') callFolds.set(item.id, fold)
 		let look: Look = { fold }
@@ -257,15 +249,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (item.type === 'tool-result') for (let j = i - 1; j >= 0; j--) {
 				let prev = items[j]!
 				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
+				if (prev.type === 'tool' && batchOrder.state.apart.has(prev)) break
 				if (prev.type === 'tool') { tool = prev.name; if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true }
 			}
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
 			let merged = item.type === 'image' && imagePrompt
-			// Status and the reserved spinner cell keep call headers stable (task hyt).
+			// Status and the reserved spinner cell keep call headers stable
+			// (task hyt); a call whose output is drawn below shows ↓ there.
 			let ticks = item.type === 'tool' && item.id === view.tick?.call
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
-			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : ' ') : ''
+			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : ' ') : ''
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item))
 			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item))
@@ -275,13 +269,23 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			let natural = rows.length
 			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
 			if (rows.length > natural) frame.state.padded = true
+			let region = item.type === 'tool-result' && !tool ? batchOrder.state.below.get(item) : undefined
+			if (region && below?.key !== region) below = { key: region, start: lines.length }
 			// An attached result's padding row replaces its call's bottom one.
 			if (tool && rows.length && lines.length && drawn?.pad !== false) lines.pop()
 			else if (rows.length && look.gap !== false && (lines.length || Bun.stripANSI(rows[0]!).trim())) lines.push('')
 			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)
-			if (item.type === 'tool') callCard = { id: item.id, key: item.key, start: lines.length - rows.length }
+			if (item.type === 'tool' && !batchOrder.state.apart.has(item)) callCard = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
+			// A split batch's output region never shrinks either: its live
+			// rows give way to the results (task 5gn).
+			if (region && below && !(next && batchOrder.state.below.get(next) === region)) {
+				let natural = lines.length
+				water.card(frame.state.peaks, lines, below.start, `${cols} ${session} below ${region} ${look.fold ?? ''}`, look.style, cols)
+				if (lines.length > natural) frame.state.padded = true
+				below = undefined
+			}
 			if (callCard && (item.type === 'tool' || item.type === 'tool-result') && item.id === callCard.id && !(next?.type === 'tool-result' && next.id === callCard.id)) {
 				let natural = lines.length
 				water.card(frame.state.peaks, lines, callCard.start, `${cols} ${session} call ${callCard.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)

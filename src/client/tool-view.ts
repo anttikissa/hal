@@ -60,8 +60,10 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	if (tool && ((fold === 'short' && look.full) || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
 	if (tool && (item.presentation || item.presentationError) && fold === 'long') return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
 	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows()
-	// An attached EDIT result shows its diff in diff colors.
+	// An attached EDIT result shows its diff in diff colors; running
+	// output apart from its call (task 5gn), its last lines.
 	let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
+	if ((item as { live?: boolean }).live && max !== Infinity) lines = lines.slice(-max)
 	let rows: string[] = [], used = 0
 	while (used < lines.length && rows.length <= max) {
 		let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * width * 4), width, false)

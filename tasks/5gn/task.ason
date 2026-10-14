@@ -1,0 +1,11 @@
+{
+	title: 'Only the bottom block grows: parallel output goes below its batch',
+	spec: 'Terminal only (the web has no immutable scrollback and keeps results under calls). Only the bottom block grows. A parallel tool batch first drawn with a result missing is split: each call is drawn short (title and command), with ↓ in its status cell when its spinner is not there; it never reads a later block as its result. After the calls come the results, each with ↑ t<call> linking to its call, then one live block: the last output rows of the last running call that has output. The blocks after the calls together never shrink until the next full redraw, so the live rows give way to the results in place. A batch complete when first drawn (history, a resumed session) shows each result under its call. A single call keeps its output and result in its card. Every canonical rebuild (Ctrl-L, tab switch, resize, automatic recovery) puts the results already there under their calls with no ↓; later output stays apart. Replaces the rule that a batch groups while it fits a screen and splits once it overflows. Invariant restored: no call card keeps blank rows for output drawn elsewhere (a split batch left the bash call card at its live height, empty).',
+	status: 'done',
+	notes: [
+		'Measured with a scratch script driving render.draw on a 40x100 terminal in full mode: three or eight bash calls streaming 1-20 lines, then results, then a thinking block. Bytes written and full repaints, HEAD vs this change: 3 calls 40476 -> 19024 bytes, 0 -> 0 clears; 8 calls 393902 -> 26804 bytes, 22 -> 0 clears; a single call unchanged (14173 bytes). Concurrent live blocks, one per call, still cleared 19 times with 8 calls: their rows reached scrollback. Hence one live block.',
+		'The ↓ is set from the first draw of every short call, never added later: a title row that changes after the batch scrolls up would force a full repaint. layout no longer takes the screen height; ordering no longer measures rows.'
+	],
+	needs: ['0n', 'k4z'],
+	foldInto: ['0n', 'k4z']
+}
