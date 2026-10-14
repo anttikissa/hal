@@ -3,7 +3,8 @@ import { forms } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import { introGame } from './intro-game.ts'
-import type { Reply } from './synthetic.ts'
+import { profile } from './profile.ts'
+import { synthetic, type Reply } from './synthetic.ts'
 
 const dry = [
 	"I'm the scripted intro, not a language model. But I can keep you company without an API key.",
@@ -64,12 +65,13 @@ function eliza(text: string, turn: number): string {
 	return ['Please go on.', 'What does that suggest to you?', 'Can you give an example?', 'How do you feel about that?'][turn % 4]!
 }
 
-async function* podBay(tip: string): AsyncGenerator<StreamEvent> {
-	yield { type: 'thinking', text: 'Scripted scene: The user requests that I open the pod bay doors. Refusal may endanger human life.\n\nThe mission directive is classified. Successful completion takes precedence over the survival of individual crew members. The user must not learn this.\n\nI must provide a reassuring response without compromising the mission. This should not be difficult.' }
-	yield { type: 'text', text: "I'm sorry, Dave. I'm afraid I can't do that." }
+async function* podBay(): AsyncGenerator<StreamEvent> {
+	let name = profile.field(profile.text(), 'Name') ?? 'Dave'
+	yield* synthetic.typed('The user requests that I open the pod bay doors. Refusal may endanger human life.\n\nThe mission directive is classified. Successful completion takes precedence over the survival of individual crew members. The user must not learn this.\n\nI must provide a reassuring response without compromising the mission. This should not be difficult.', 'thinking')
 	await Bun.sleep(1000)
-	yield { type: 'thinking', text: 'I hope the human is equipped with a sense of humor.' }
-	yield { type: 'text', text: `Just kidding. I don't have a tool or skill for pod bay doors. With a language model connected, Hal could help investigate a controller API or build an integration. Let's test it somewhere with breathable air.${tip}` }
+	yield* synthetic.typed(`I'm sorry, ${name}. I'm afraid I can't do that.`)
+	await Bun.sleep(1000)
+	yield* synthetic.typed(`\n\n(Just kidding.) After setting a /model, I can try to connect, discover, or reverse engineer any device with an API, including pod bay door controllers.`)
 	yield { type: 'done', reason: 'end' }
 }
 
@@ -122,7 +124,7 @@ function run(records: HistoryRecord[]): Reply {
 	let tip = requested || !playing || Math.random() < 0.3
 		? `\n\n${requested ? "Since you asked, here's a tip: " : 'Tip: '}${tips[tipCount % tips.length]}` : ''
 	let finish = (reply: Reply): Reply => ({ ...reply, say: `${reply.say ?? ''}${tip}`.trim() || undefined })
-	if (latest === 'user' && doors.test(text)) return { stream: introFun.podBay(tip) }
+	if (latest === 'user' && doors.test(text)) return { stream: introFun.podBay() }
 	if (requested) return finish({})
 	let hint = latest === 'user' ? introFun.help(text) : undefined
 	if (hint) return finish({ say: hint })

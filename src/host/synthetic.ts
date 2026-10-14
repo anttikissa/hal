@@ -20,19 +20,25 @@ function find(model: string): Synthetic | undefined {
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
-// A reply's text as a stream, like someone typing: word by word, a
-// tenth of pauseMs apart, and paragraphs a pause apart. The turn
-// streams meanwhile, so the prompt stays free.
-async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenerator<StreamEvent> {
+// Text as a stream, like someone typing: word by word, a tenth of
+// pauseMs apart, and paragraphs a pause apart. Scripted scenes that
+// return raw events use it too, so they type like every other reply.
+async function* typed(say: string | undefined, kind: 'text' | 'thinking' = 'text', signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	for (let [i, text] of (say?.split('\n\n') ?? []).entries()) {
 		if (i) await sleep(synthetic.pauseMs)
 		for (let [j, word] of text.split(/(?<=\s)/).entries()) {
 			if (j) await sleep(synthetic.pauseMs / 10)
-			if (signal.aborted) return
-			yield { type: 'text', text: i && !j ? `\n\n${word}` : word }
+			if (signal?.aborted) return
+			if (word) yield { type: kind, text: i && !j ? `\n\n${word}` : word }
 		}
 	}
-	yield { type: 'done', reason: 'end' }
+}
+
+// A reply's text, typed, then the end of the turn. The turn streams
+// meanwhile, so the prompt stays free.
+async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenerator<StreamEvent> {
+	yield* typed(say, 'text', signal)
+	if (!signal.aborted) yield { type: 'done', reason: 'end' }
 }
 
 export const synthetic = {
@@ -45,12 +51,13 @@ export const synthetic = {
 	} as Record<string, Synthetic>,
 	descriptions: {
 		tool: 'Tool protocol server - no AI',
-		intro: 'Setup guide and offline playground',
-		'scroll-test': 'Scripted scroll testing',
+		intro: 'Intro',
+		'scroll-test': 'Test scrolling: scripted scroll',
 		'queue-test': 'Steering and queue testing',
 		'plugin-sync': 'Review and sync remote plugins',
 	} as Record<string, string>,
 	find,
+	typed,
 	paced,
 	pauseMs: 400,
 }
