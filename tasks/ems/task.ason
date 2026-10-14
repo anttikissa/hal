@@ -1,0 +1,10 @@
+{
+	title: 'Leave fewer broken tests in owned areas',
+	spec: 'AGENTS.md Tests section includes the user-approved boy-scout rule: Leave the codebase with fewer broken tests than you found. Fix failures in your area, including pre-existing ones. Leave failures elsewhere only when another active session is working on them; confirm ownership and report them before finishing. Keep the guidance concise and preserve the existing focused-testing rules.',
+	status: 'done',
+	notes: [
+		'Inserted the exact approved wording at the start of Tests. Diff reviewed and whitespace check passed; documentation-only change, no runtime tests needed. User-requested guidance needs no human-review TODO marker.'
+	],
+	needs: ['4x'],
+	foldInto: ['4x']
+}

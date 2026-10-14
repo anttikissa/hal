@@ -81,6 +81,11 @@ to operate a host is not permission to publish its configuration.
 
 # Tests
 
+Leave the codebase with fewer broken tests than you found. Fix failures
+in your area, including pre-existing ones. Leave failures elsewhere only
+when another active session is working on them; confirm ownership and
+report them before finishing.
+
 Run tests only for the code being developed unless changes are crosscutting.
 Use ./test <filename-pattern> for focused normal tests; patterns match filenames,
 not test names. ./test runs the normal suite; ./test-expensive runs web tests,
