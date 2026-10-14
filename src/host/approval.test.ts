@@ -68,6 +68,8 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 		['printf ready | cat ~/.ssh/*', ['cat ~/.ssh/*']],
 		['/bin/cat secrets/token.txt', ['/bin/cat secrets/token.txt']],
 		['/usr/bin/head <.env', ['/usr/bin/head <.env']],
+		['head wallet.dat', ['head wallet.dat']],
+		['cat ~/.config/solana/id.json', ['cat ~/.config/solana/id.json']],
 		['cat AGENTS.md', []],
 		['head src/host/secrets.ts', []],
 		['ssh -i ~/.ssh/id_rsa example.invalid', []],
@@ -79,6 +81,30 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 		settings.security = () => 'none'
 		expect(approval.form(bash('cat ~/.ssh/id_rsa'))).toBeUndefined()
 	} finally { settings.security = original }
+})
+
+test('wallet-specific paths are sensitive without banning ordinary data files or source names', () => {
+	let sensitive = [
+		'wallet.dat', 'backup/wallet.dat-journal', 'backup/wallet.dat-wal', 'backup/wallet.dat-shm',
+		'~/.electrum/wallets/default_wallet', '~/.electrum/testnet/wallets/custom', 'Electrum/wallets',
+		'~/.electron-cash/wallets/default_wallet', 'Electron Cash/wallets/custom',
+		'.ethereum/keystore/UTC--2026-10-14T12-00-00--address',
+		'~/.config/solana/id.json', 'Monero/wallets/personal.keys',
+		'Library/Application Support/Exodus/exodus.wallet', 'exodus.wallet/storage.seco',
+		'~/.sparrow/wallets/personal.mv.db', '~/.sparrow/testnet/wallets/personal.mv.db',
+		'~/.local/share/sparrow/wallets/personal.mv.db', 'Sparrow/wallets',
+		'~/.walletwasabi/client/Wallets/personal.json', 'WalletWasabi/Client/Wallets',
+		'Local Extension Settings/nkbihfbeogaeaoehlefnkodbefgpgknn/000003.ldb',
+	]
+	let ordinary = [
+		'wallet.dat.txt', 'wallet.data', 'UTC-not-a-wallet.txt', 'id.json',
+		'catalog.dat', 'config.json', 'cache.ldb', 'database.mv.db', 'wallets/config.json',
+		'.electrum/config', '.sparrow/config', '.walletwasabi/client/Config.json',
+		'src/wallet.dat.ts', 'src/key.keys.ts', 'exodus.wallet.ts',
+		'Local Extension Settings/another-extension/000003.ldb',
+	]
+	for (let path of sensitive) expect([path, approval.sensitive(path)]).toEqual([path, true])
+	for (let path of ordinary) expect([path, approval.sensitive(path)]).toEqual([path, false])
 })
 
 const at = (r: object) => ({ ...r, ts: '2026-09-27T00:00:00Z' }) as HistoryRecord

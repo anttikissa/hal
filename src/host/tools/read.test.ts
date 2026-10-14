@@ -85,7 +85,7 @@ test('a READ without a range shows the first 200 lines and how to get more; offs
 test('READ refuses sensitive paths and symlink targets without exposing contents or dropping safe batch siblings', async () => {
 	let secret = 'FAKE-SECRET-CONTENT'
 	for (let dir of ['.ssh', '.aws', '.gnupg', 'secrets']) mkdirSync(`${home}/${dir}`)
-	let sensitive = ['.ssh/id_rsa', '.aws/credentials', '.gnupg/private', 'secrets/token.txt', '.env', '.env.production', 'credentials.json', 'auth.ason', 'id_ed25519', 'private.pem']
+	let sensitive = ['.ssh/id_rsa', '.aws/credentials', '.gnupg/private', 'secrets/token.txt', '.env', '.env.production', 'credentials.json', 'auth.ason', 'id_ed25519', 'private.pem', 'wallet.dat', 'wallet.dat-journal', 'personal.keys']
 	for (let path of sensitive) writeFileSync(`${home}/${path}`, secret)
 	writeFileSync(`${home}/public.txt`, 'ordinary public content\n')
 	writeFileSync(`${home}/image.key`, Buffer.from('89504e470d0a1a0a00000000', 'hex'))

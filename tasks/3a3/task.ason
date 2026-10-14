@@ -1,0 +1,10 @@
+{
+	title: 'Recognize cryptocurrency wallet files in the shared sensitive policy',
+	spec: 'approval.sensitive keeps separately named regex constants for existing secret paths, private-key files, cryptocurrency wallet filenames and wallet-specific paths. Preserve all existing matches. Add the ten researched wallet families: Bitcoin Core wallet.dat and SQLite journal/WAL/SHM sidecars; Electrum and Electron Cash wallet directories; Geth UTC-- key files; the default .config/solana/id.json keypair; Monero .keys files; Exodus exodus.wallet directories; Sparrow wallet directories including network subdirectories and XDG data paths; Wasabi wallet directories; and Chromium MetaMask storage under its distinctive extension ID. Match path-component boundaries case-insensitively, including a directory itself and descendants. This extends the shared policy used by best-effort READ rejection, narrow BASH printer approval and metadata-only snapshots, without changing those consumers or the security none setting. Keep ordinary JSON, DAT, LDB, database and similarly named source files accessible; do not ban their extensions wholesale. Restore the invariant that recognizable wallet secrets receive the same accidental-disclosure protection as other recognizable credentials. Keep focused regressions with synthetic fixtures only.',
+	status: 'done',
+	notes: [
+		'The matcher uses separate secretPaths, privateKeyFiles, cryptoWalletFiles and cryptoWalletPaths regexes. Wallet-directory patterns cover named and network-specific wallets plus platform/XDG directory names without treating every JSON, DAT, LDB or MV.DB file as secret. Existing READ and snapshot regressions now include synthetic wallet files; BASH examples are matcher checks only and never execute. Verification: all 28 focused tests pass with 391 assertions; TypeScript, scoped lint and diff checks pass. No real wallet or secret contents were inspected.'
+	],
+	needs: ['ked'],
+	foldInto: ['ked']
+}

@@ -182,7 +182,11 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 
 // Shared best-effort sensitive-path policy for READ, shell approval and snapshots.
 function sensitive(path: string): boolean {
-	return /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i.test(path) || /\.(?:pem|key|p12|pfx)$/i.test(path)
+	const secretPaths = /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i
+	const privateKeyFiles = /\.(?:pem|key|p12|pfx)$/i
+	const cryptoWalletFiles = /(?:^|\/)(?:wallet\.dat(?:-(?:journal|wal|shm))?|UTC--[^/]+|[^/]+\.keys|exodus\.wallet|nkbihfbeogaeaoehlefnkodbefgpgknn)(?:\/|$)/i
+	const cryptoWalletPaths = /(?:^|\/)(?:(?:\.?electrum|\.electron-cash|electron cash|\.?sparrow)\/(?:[^/]+\/)*wallets|\.?walletwasabi\/client\/wallets|\.config\/solana\/id\.json)(?:\/|$)/i
+	return secretPaths.test(path) || privateKeyFiles.test(path) || cryptoWalletFiles.test(path) || cryptoWalletPaths.test(path)
 }
 
 export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held, sensitive }
