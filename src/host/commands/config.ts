@@ -11,19 +11,15 @@ function parsed(args: string): { name: string; value?: string } {
 }
 
 export const command: SlashCommand = {
-	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored. Secret values are never shown.',
+	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
-	record(args) {
-		let { name, value } = parsed(args)
-		return `/config${name ? ` ${name}` : ''}${value !== undefined ? settings.table.find((s) => s.name === name)?.type.kind === 'secret' ? ' (given)' : ` ${value}` : ''}`
-	},
 	run(args) {
 		config.init()
 		let { name, value } = parsed(args)
 		if (!name) return { open: 'settings' }
 		let s = settings.table.find((s) => s.name === name)
 		if (!s) return { error: `unknown setting '${name}'` }
-		if (value === undefined) return { say: `${name}: ${s.type.kind === 'secret' ? '(hidden)' : String(settings.value(name))}` }
+		if (value === undefined) return { say: `${name}: ${String(settings.value(name))}` }
 		let next = settings.fromText(s.type, value === '""' || value === "''" ? '' : value)
 		let why = settings.problem(s.type, next)
 		if (why) return { error: `${name}: ${why}` }
@@ -31,7 +27,7 @@ export const command: SlashCommand = {
 		if (!keys.length) return { say: 'settings unchanged' }
 		// The command line already shows the value; say only what it doesn't.
 		let shown = typeof next === 'string' ? next : ason.stringify(next, 'short')
-		let notes = [...(s.type.kind === 'secret' || shown === value.trim() ? [] : [`${name}: ${shown}`]), ...(Object.is(next, s.default) ? ['The default: removed from config.ason.'] : [])]
+		let notes = [...(shown === value.trim() ? [] : [`${name}: ${shown}`]), ...(Object.is(next, s.default) ? ['The default: removed from config.ason.'] : [])]
 		return notes.length ? { say: notes.join('\n') } : {}
 	},
 }

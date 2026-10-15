@@ -10,7 +10,6 @@
 
 export type SettingType =
 	| { kind: 'text'; url?: true }
-	| { kind: 'secret' }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
@@ -118,8 +117,6 @@ function verbosityRows(): Setting[] {
 // Why `value` doesn't fit `type`, or undefined if it does.
 function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
-		case 'secret':
-			return typeof value === 'string' && value !== '' ? undefined : 'expected a non-empty string'
 		case 'text':
 			// An empty address means the default (localhost).
 			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
@@ -156,7 +153,7 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 		let v = raw[key]
 		let why = settings.problem(s.type, v)
 		if (!why) values[s.name] = v
-		else warnings.push(`${key}: ${why}${s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[key]) ?? String(raw[key])}`}; using the default`)
+		else warnings.push(`${key}: ${why}, got ${JSON.stringify(raw[key]) ?? String(raw[key])}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
 		if (!settings.table.some((s) => s.name === key.replace(/^blockVerbosity/, 'cardVerbosity'))) warnings.push(`unknown setting '${key}', ignored`)

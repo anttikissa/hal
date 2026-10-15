@@ -39,30 +39,6 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	expect(ason.parse(text)).toEqual({ model: 'anthropic/claude-opus-5-5', extra: 'kept', webPort: 4321 })
 })
 
-test('secret settings never reach history, output, events, or warnings', async () => {
-	settings.table.push({ name: 'testSecret', label: 'Test secret', type: { kind: 'secret' }, default: 'default-secret', description: 'Test credential.' })
-	try {
-		config.update({ testSecret: 'old-secret' })
-		let c = client(), id = created(c)
-		c.conn.send({ type: 'submit', sessionId: id, text: '/config' })
-		await until(() => c.of('settings').length)
-		expect(c.of('settings')[0]).toMatchObject({ values: { testSecret: 'set' }, stored: { testSecret: 'testSecret: (hidden)' } })
-		c.conn.send({ type: 'submit', sessionId: id, text: '/config testSecret direct-secret' })
-		await until(() => settings.value('testSecret') === 'direct-secret')
-		expect(settings.value('testSecret')).toBe('direct-secret')
-		let stored = JSON.stringify(history.readSync(id))
-		let events = JSON.stringify(c.events)
-		for (let secret of ['old-secret', 'direct-secret', 'default-secret']) {
-			expect(stored).not.toContain(secret)
-			expect(events).not.toContain(secret)
-		}
-		config.state.data!.testSecret = { secret: 'bad-secret' }
-		expect(settings.warnings().join('')).not.toContain('bad-secret')
-	} finally {
-		settings.table.pop()
-	}
-})
-
 test('direct commands validate values, and a malformed config is never overwritten', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config push false' })

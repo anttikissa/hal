@@ -82,13 +82,12 @@ function point(data: Record<string, unknown>): void {
 function explain(data: Record<string, unknown>, s: Setting): void {
 	let comments = ((data as any)[ason.COMMENTS] ?? {}) as Record<string, string>
 	if (comments[s.name]?.trim()) return
-	let text = `${s.description}${s.type.kind === 'choice' ? ` One of: ${s.type.options.join(', ')}.` : ''}${s.type.kind === 'secret' ? '' : ` Default: ${ason.stringify(s.default, 'short')}.`}`
+	let text = `${s.description}${s.type.kind === 'choice' ? ` One of: ${s.type.options.join(', ')}.` : ''} Default: ${ason.stringify(s.default, 'short')}.`
 	;(data as any)[ason.COMMENTS] = { ...comments, [s.name]: strings.wordWrap(text, 70).map((l) => `// ${l}`).join('\n') }
 }
 
 // The /config modal's content (protocol `settings`): every setting's
-// effective value as text and what config.ason holds for it. Secrets
-// show only whether they are set.
+// effective value as text and what config.ason holds for it.
 function event(): Event & { type: 'settings' } {
 	config.init()
 	let raw = settings.state.raw
@@ -96,9 +95,8 @@ function event(): Event & { type: 'settings' } {
 	let values: Record<string, string> = {}
 	let stored: Record<string, string> = {}
 	for (let s of settings.table) {
-		let secret = s.type.kind === 'secret'
-		values[s.name] = secret ? (s.name in raw ? 'set' : '') : String(effective[s.name])
-		if (s.name in raw) stored[s.name] = `${s.name}: ${secret ? '(hidden)' : ason.stringify(raw[s.name], 'short')}`
+		values[s.name] = String(effective[s.name])
+		if (s.name in raw) stored[s.name] = `${s.name}: ${ason.stringify(raw[s.name], 'short')}`
 	}
 	return { type: 'settings', values, stored }
 }

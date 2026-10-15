@@ -142,7 +142,7 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 	if (!m.values) return undefined
 	if (m.edit?.index === i) {
 		let f = m.edit.form
-		let text = f.form.fields[0]?.type === 'secret' ? '•'.repeat(f.values[0]!.length) : f.values[0]!
+		let text = f.values[0]!
 		return { text, cursor: strings.visLen(text.slice(0, f.cursor)) }
 	}
 	let value = ansi.clean(m.values[i] ?? '')

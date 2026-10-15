@@ -22,11 +22,9 @@ function find(name: string | undefined): Setting | undefined {
 	return settings.table.find((s) => s.name === name)
 }
 
-// A value as the list shows it: booleans on/off, a secret only whether
-// it is set.
+// A value as the list shows it: booleans on/off.
 function shown(s: Setting, text: string): string {
 	if (s.type.kind === 'boolean') return text === 'true' ? 'on' : 'off'
-	if (s.type.kind === 'secret') return text ? 'set' : 'not set'
 	return text === '' ? '(empty)' : text
 }
 
@@ -101,7 +99,7 @@ function step(st: ModalState, key: Key, sessionId: string): Step {
 			let options = s.type.options
 			return { state: st, action: send(sessionId, s, options[(options.indexOf(now) + 1) % options.length]!) }
 		}
-		let field = s.type.kind === 'secret' ? { type: 'secret' as const, name: s.name, label: s.label } : { type: 'text' as const, name: s.name, label: s.label, initial: now }
+		let field = { type: 'text' as const, name: s.name, label: s.label, initial: now }
 		return { state: { ...st, edit: { index: st.selected, form: forms.start('setting', { text: s.label, fields: [field] }) }, hint: EDIT_HINT } }
 	}
 	let r = modals.step(st, key)

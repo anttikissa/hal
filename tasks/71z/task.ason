@@ -1,6 +1,6 @@
 {
 	title: '/config set says only what its command line does not',
-	spec: 'A user-run /config <name> <value> shows as one card headed by the command line, like model-run commands (task 9g). On success it says nothing more when the stored value reads as typed; it adds name: value only when the value was normalized (e.g. 1.0 stored as 1), and "The default: removed from config.ason." when the value equals the default. Secret values are never said. Errors and "settings unchanged" still show.',
+	spec: 'A user-run /config <name> <value> shows as one card headed by the command line, like model-run commands (task 9g). On success it says nothing more when the stored value reads as typed; it adds name: value only when the value was normalized (e.g. 1.0 stored as 1), and "The default: removed from config.ason." when the value equals the default. Errors and "settings unchanged" still show.',
 	status: 'done',
 	needs: [],
 	foldInto: ['c0h']
