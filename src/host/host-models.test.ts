@@ -203,8 +203,11 @@ test('/model <id> switches the session model for every follower and the next tur
 test('/model refuses an id no provider serves', async () => {
 	let a = client()
 	let id = created(a)
-	for (let text of ['/model nowhere/x', '/model plain', '/model hal/none']) a.conn.send({ type: 'submit', sessionId: id, text })
-	await until(() => a.views.get(id)!.items.filter((i) => i.type === 'output' && i.error).length === 3)
+	let refused = () => a.views.get(id)!.items.filter((i) => i.type === 'command' && i.error).length
+	for (let [i, text] of ['/model nowhere/x', '/model plain', '/model hal/none'].entries()) {
+		a.conn.send({ type: 'submit', sessionId: id, text })
+		await until(() => refused() === i + 1)
+	}
 	expect(sessions.open(id).model).toBe('hal/intro')
 })
 
