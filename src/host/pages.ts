@@ -276,7 +276,8 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && l.record.type !== 'rebase' && current.has(l.record.n))
 		let at = found.findIndex((l) => l.offset >= end - budget)
 		if (at < 0) at = Math.max(0, found.length - 1)
-		while (at > 0 && !turnStart(found[at]!.record)) at--
+		let turn = at > 0 ? found.findIndex((l, i) => i >= at && turnStart(l.record)) : -1
+		if (turn >= 0) at = turn
 		found = found.slice(at)
 		return { records: found.map((l) => current.get(l.record.n)!), start: found[0]?.offset ?? 0, end }
 	}

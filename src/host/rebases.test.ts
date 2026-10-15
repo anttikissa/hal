@@ -48,9 +48,9 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(readFileSync(history.file(id)).subarray(0, prefix.length)).toEqual(prefix)
 	expect(JSON.stringify(await history.messages(id))).toContain('newneedle')
 	expect(JSON.stringify(await history.messages(id))).not.toContain('oldanswer')
-	expect(pages.page(id, undefined, 1).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 3, 4]))
+	expect(pages.page(id).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 3, 4]))
 	expect(snapshots.build(id).state.type).toBe('paused')
-	expect(pages.snapshot(id, 1).history[0]).toMatchObject({ blocks: [{ text: 'newneedle' }] })
+	expect(pages.snapshot(id).history[0]).toMatchObject({ blocks: [{ text: 'newneedle' }] })
 	expect(await readBlob.run({ id: 'a2' }, { sessionId: id } as any)).toContain('dropped')
 	await findIndex.catchup(id)
 	let texts = findIndex.state.db!.query('SELECT text FROM docs WHERE sessionId=?').all(id)
@@ -60,7 +60,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	rebases.apply(id, { base: 4, drop: [], edit: [] }, history.readSync(id).at(-1)!.n)
 	expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
 	expect(snapshots.build(id).dropped).toBeUndefined()
-	expect(pages.page(id, undefined, 1).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 2, 3, 4]))
+	expect(pages.page(id).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 2, 3, 4]))
 })
 
 test('stale, running and question-bound plans are refused without appending', () => {
