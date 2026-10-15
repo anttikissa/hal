@@ -1,0 +1,10 @@
+{
+	title: 'Separate tool results name their call; long live cards stay bounded',
+	spec: 'Terminal separate tool-result cards have a Result of: heading naming the originating call, retaining its timestamp, status and link back to the call. Results attached to their call have no repeated heading. Terminal cards at long verbosity while output streams show at most max(1, floor(screen height / 2) - 10) content rows, preserving the title and the latest output; completion restores the normal long view without changing verbosity. Screen resizing updates this bound. Web rendering and rename confirmations stay unchanged. Invariants: a separate result identifies its source; long streaming output cannot occupy an unbounded terminal region.',
+	status: 'done',
+	notes: [
+		'Screen height participates in layout and live-region cache identities; otherwise resizing reused the old high-water height. Live output is cropped to its wrapped tail, retaining the title. Focused frame/item-view/render tests pass (73); full typecheck blocked only by unrelated untracked test.ts (undefined foo). No browser behavior changes.'
+	],
+	needs: ['5gn'],
+	foldInto: ['5gn']
+}

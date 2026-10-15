@@ -509,7 +509,8 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	let detached = plain(frame.build(apart, 70).lines).find(line => line.includes('M notes.md'))!
-	expect(detached).toMatch(/^M notes\.md +↑ t1813$/)
+	expect(detached).toBe('M notes.md')
+	expect(plain(frame.build(apart, 70).lines).find(line => line.includes('Result of:'))).toMatch(/^Result of: \$ Check files +↑ t1813/)
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	expect(printed).toContain('<= Background command finished ↑ t1813')
 	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {
@@ -519,6 +520,33 @@ test('Bash results link to the call; a failed status and the time go in the titl
 		expect(targets(rendered)).toContain(`${settings.webUrl()}/s#${ref}`)
 		expect(plain(rendered).join('\n')).toContain(ref)
 	}
+})
+
+test('long streaming tool cards keep a bounded tail, then expand on completion', () => {
+	let output = Array.from({ length: 100 }, (_, i) => `output ${i}`).join('\n')
+	let v = view([{ type: 'tool', id: 'bounded', name: 'bash', input: { command: './test' }, partial: output }])
+	v.transcript!.meta.blocks = { tool: 'long' }
+	let running = frame.build(v, 80, 60)
+	expect(running.history).toBeLessThanOrEqual(22)
+	let text = plain(running.lines).join('\n')
+	expect(text).toContain('output 99')
+	expect(text).not.toContain('output 0\n')
+	let resized = frame.build(v, 80, 40)
+	expect(resized.history).toBeLessThanOrEqual(12)
+	v.transcript!.items = [{ ...v.transcript!.items[0]!, partial: undefined } as Transcript['items'][number], { type: 'tool-result', id: 'bounded', output, key: '~result' }]
+	let finished = frame.build(v, 80, 60)
+	expect(finished.history).toBeGreaterThan(100)
+	expect(plain(finished.lines).join('\n')).toContain('output 0\n')
+	expect(plain(finished.lines).join('\n')).not.toContain('Result of:')
+	let parallel = view([
+		{ type: 'tool', id: 'parallel-first', name: 'bash', input: { command: './test' }, partial: output },
+		{ type: 'tool', id: 'parallel-second', name: 'read', input: { path: 'README.md' } },
+	])
+	parallel.transcript!.meta.blocks = { tool: 'long' }
+	let split = plain(frame.build(parallel, 80, 60).lines).join('\n')
+	expect(split).toContain('Result of: $ ./test')
+	expect(split).toContain('output 99')
+	expect(split).not.toContain('output 0\n')
 })
 
 test('legacy rename controls never appear in terminal answers without a naming flag', () => {

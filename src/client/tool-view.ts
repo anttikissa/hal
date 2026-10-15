@@ -40,7 +40,9 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	if (fold === 'long') {
 		let rows = ansi.wrap(prefix + title, hw)
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
-		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width) : [])]
+		let partial = item.partial?.replace(/\n$/, '')
+		if (partial && look.streamRows !== undefined) partial = partial.split('\n').slice(-look.streamRows).join('\n')
+		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])]
 	}
 	// Running output takes the rows its short result will, so the card
 	// keeps its height when the call finishes (task 4y4).
@@ -77,20 +79,23 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	}
 	// Under its short call, a result fills the rows the call leaves.
 	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows() - (tool ? look.head ?? 1 : 0)
+	if (look.streamRows !== undefined) max = Math.min(max, Math.max(1, look.streamRows - 1))
 	if (max <= 0) return []
 	// An attached EDIT result shows its diff in diff colors; running
 	// output apart from its call (task 5gn), its last lines.
 	let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
 	if ((item as { live?: boolean }).live && max !== Infinity) lines = lines.slice(-max)
+	let live = (item as { live?: boolean }).live
 	let rows: string[] = [], used = 0
-	while (used < lines.length && rows.length <= max) {
+	while (!live && used < lines.length && rows.length <= max) {
 		let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * width * 4), width, false)
 		if (fold === 'short' && !line.trim()) continue
 		rows.push(...wrapped)
 		tones.push(...wrapped.map(() => diff.tone(line)))
 	}
-	let shown = rows.slice(0, max)
-	let more = rows.length - shown.length + lines.length - used
+	let shown = live ? lines.flatMap(line => ansi.wrap(line.slice(-Math.max(1, max) * width * 4), width, false)).slice(-max) : rows.slice(0, max)
+	let more = live ? 0 : rows.length - shown.length + lines.length - used
+	let title = !tool && look.call?.title ? `Result of: ${ansi.clean(look.call.title)}` : undefined
 	let status = tool ? '' : toolView.resultStatus(item, !!call, style)
 	let key = look.call?.key ?? call
 	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`↑ t${key}`)) {
@@ -102,10 +107,10 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let res = shown.map((l, i) => {
 		let prefix = !i && item.isError ? '✗ ' : ''
 		// Apart from its call, a result is its own block: it leads with its time.
-		if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
+		if (!i && !tool && !title) prefix = titles.stamp(item.ts, prefix)
 		let text = strings.clipVisual(prefix + l, width)
 		let line = painted ? diffView.paint(text, tones[i]!, style) : tool || look.call ? text : ansi.quiet(text, style)
-		return !i && status ? itemView.right(line, status, width) : line
+		return !i && status && !title ? itemView.right(line, status, width) : line
 	})
 	if (more) {
 		let marker = ansi.quiet(`… ${more} more lines${fold === 'long' ? ` in ${toolView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
@@ -113,6 +118,7 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 		if (strings.visLen(last) + 2 + strings.visLen(marker) <= width) res[res.length - 1] = itemView.right(last, marker, width)
 		else res.push(marker)
 	}
+	if (title) res.unshift(itemView.right(strings.clipVisual(titles.stamp(item.ts, title), look.headerWidth ?? width), status, width))
 	return res
 }
 
