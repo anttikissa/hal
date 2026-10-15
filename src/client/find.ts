@@ -7,6 +7,7 @@ import type { FindBatch } from '../common/find.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
+import { tabs } from './tabs.ts'
 
 const hooks = {
 	get: () => app.state.modal,
@@ -28,7 +29,8 @@ function open(): void {
 }
 function go(r: NonNullable<typeof find.target>): void {
 	find.target = r
-	if (app.state.tabs.some((t) => t.id === r.sessionId)) app.focusOn({ tab: r.sessionId })
+	let ids = app.state.tabs.map((t) => t.id)
+	if (ids.includes(r.sessionId)) app.focusOn(tabs.focus(ids, ids, app.state.focus, r.sessionId))
 	else app.send({ type: 'tab-resume', sessionId: r.sessionId })
 	find.report()
 }
