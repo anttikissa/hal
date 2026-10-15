@@ -23,13 +23,14 @@ function change(args: string): { s: Setting; next: unknown; why?: string } | und
 export const command: SlashCommand = {
 	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
-	// Setting a default says so on the command line: one row, no echo.
+	// Setting a stored key to its default removes it; the command line
+	// says so: one row, no echo.
 	record(args) {
 		config.init()
 		let c = change(args)
 		if (!c || c.why || !Object.is(c.next, c.s.default)) return undefined
 		let stored = Object.keys(settings.state.raw).some((k) => k.replace(/^blockVerbosity/, 'cardVerbosity') === c.s.name)
-		return `/config ${args.trim()} (the default${stored ? ' - removed from config.ason' : ''})`
+		return stored ? `/config ${args.trim()} (the default - removed from config.ason)` : undefined
 	},
 	run(args) {
 		config.init()
