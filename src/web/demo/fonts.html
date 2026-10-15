@@ -18,8 +18,8 @@ body { margin: 0 auto; padding: 24px 16px; max-width: 1000px; }
 h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 16px; }
 .controls label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-.controls select, .controls input[type="number"], .controls button { font: inherit; padding: 8px; color: inherit; background: var(--canvas); border: 1px solid currentColor; }
-.controls input[type="number"] { width: 9ch; }
+.controls select, .controls input, .controls button { font: inherit; padding: 8px; color: inherit; background: var(--canvas); border: 1px solid currentColor; }
+.controls input { width: 9ch; }
 .controls button { min-height: 44px; cursor: pointer; }
 #css { display: block; white-space: pre-wrap; margin: 0 0 16px; }
 .rulers { overflow-x: auto; margin-bottom: 16px; }
@@ -37,12 +37,12 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 <h1>Italic fonts on Hal cards</h1>
 <div class="controls">
 <label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code" selected>Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option><option value="Demo Victor">Victor Mono Light - cursive</option><option value="Demo Cascadia">Cascadia Mono Light</option><option value="Demo Fragment">Fragment Mono Regular</option><option value="Demo Cousine">Cousine Regular</option></select></label>
-<label>Plex size <input id="size" type="number" min="8" max="48" step="0.1" value="14">px</label>
-<label>Italic size <input id="italicSize" type="number" min="8" max="48" step="0.01" value="14">px</label>
-<label>Italic x-height <input id="xheight" type="number" min="1" max="32" step="0.01" value="6.72">px</label>
-<label>Character stride <input id="stride" type="number" min="3" max="40" step="0.01" value="8.4">px</label>
-<label>Plex line height <input id="uprightLeading" type="number" min="8" max="96" step="0.1" value="21">px</label>
-<label>Italic line height <input id="italicLeading" type="number" min="8" max="96" step="0.1" value="21">px</label>
+<label>Plex size <input id="size" type="text" inputmode="decimal" data-min="8" data-max="48" value="14">px</label>
+<label>Italic size <input id="italicSize" type="text" inputmode="decimal" data-min="8" data-max="48" value="14">px</label>
+<label>Italic x-height <input id="xheight" type="text" inputmode="decimal" data-min="1" data-max="32" value="6.72">px</label>
+<label>Character stride <input id="stride" type="text" inputmode="decimal" data-min="3" data-max="40" value="8.4">px</label>
+<label>Plex line height <input id="uprightLeading" type="text" inputmode="decimal" data-min="8" data-max="96" value="21">px</label>
+<label>Italic line height <input id="italicLeading" type="text" inputmode="decimal" data-min="8" data-max="96" value="21">px</label>
 <button id="matchHeight" type="button">Match Plex x-height</button>
 <button id="matchStride" type="button">Match Plex stride</button>
 <button id="reset" type="button">Reset to 14px, natural spacing</button>
@@ -82,7 +82,7 @@ const uprightLeading = document.getElementById('uprightLeading'), italicLeading 
 let revision = 0
 async function update(action = '') {
  const current = ++revision, px = Number(size.value)
- if (![size, italicSize, xheight, stride, uprightLeading, italicLeading].every(input => input.checkValidity() && input.value !== '')) return
+ if (![size, italicSize, xheight, stride, uprightLeading, italicLeading].every(input => input.value.trim() !== '' && Number.isFinite(Number(input.value)) && Number(input.value) >= Number(input.dataset.min) && Number(input.value) <= Number(input.dataset.max))) return
  try {
   await Promise.all([document.fonts.load(`italic 300 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`)])
   if (current !== revision) return
@@ -95,15 +95,15 @@ async function update(action = '') {
   let adjusted = Number(italicSize.value)
   if (action === 'height' || action === 'xheight') adjusted = (action === 'height' ? plex.x : Number(xheight.value)) * 100 / unit.x
   if (action === 'reset') adjusted = 14
-  adjusted = Math.max(Number(italicSize.min), Math.min(Number(italicSize.max), adjusted))
+  adjusted = Math.max(Number(italicSize.dataset.min), Math.min(Number(italicSize.dataset.max), adjusted))
   const actual = measure(face.value, adjusted, true)
   let target = Number(stride.value)
   if (action === 'stride') target = plex.width
   if (action === 'reset' || action === 'face') target = actual.width
   const spacing = target - actual.width
-  italicSize.value = adjusted.toFixed(2)
-  xheight.value = actual.x.toFixed(2)
-  stride.value = target.toFixed(2)
+   for (const [input, value] of [[italicSize, adjusted], [xheight, actual.x], [stride, target]]) {
+    if (document.activeElement !== input) input.value = value.toFixed(2)
+   }
   for (const element of [samples, rulers]) {
    element.style.setProperty('--sample-size', `${px}px`)
    element.style.setProperty('--italic-face', `"${face.value}"`)
