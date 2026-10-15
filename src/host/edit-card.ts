@@ -12,19 +12,20 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 	const names = [...countsByPath.keys()]
 	const created = new Set(edits.filter((e) => e?.create === true).map((e) => e.path))
 	const label = names.length ? names.map((p) => created.has(p) ? `+${p}` : p).join(', ') : 'files'
+	const description = typeof call.input.description === 'string' ? call.input.description.trim() || undefined : undefined
 	const requested = (n: number) => `${n} ${n === 1 ? 'change' : 'changes'} requested`
 	if (!result) return {
-		title: `> ${label}`,
+		title: `> ${description ?? label}`,
 		blocks: names.map((path) => ({ kind: 'text', path, text: requested(countsByPath.get(path)!) }))
 	}
 	// Nothing was written: show the call as the model sent it.
 	if (result.isError) return {
-		title: `> ${label}`,
+		title: `> ${description ?? label}`,
 		blocks: call.cmd ? [{ kind: 'code', text: call.cmd }] : names.map((path) => ({ kind: 'text', path, text: requested(countsByPath.get(path)!) }))
 	}
 	const headers = [...result.output.matchAll(/^== (.+?)(@[a-z0-9]+| deleted) verified ==\n/gm)]
 	if (!headers.length || result.output.includes('[cut:')) return {
-		title: `> ${label}`,
+		title: `> ${description ?? label}`,
 		blocks: [...names.map((path) => ({ kind: 'text' as const, path, text: 'Requested edit' })), {
 			kind: 'text',
 			text: { from: 0, to: result.output.length }
@@ -51,7 +52,7 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 		return `${created.has(path) ? '+' : ''}${path}${counts ? ` ${counts}` : ''}`
 	})
 	return {
-		title: `> ${files.join(', ')}`,
+		title: `> ${description ?? files.join(', ')}`,
 		blocks: [...blocks.flatMap((block, i) => block.text.from > headers[i]!.index! + headers[i]![0].length
 			? [{ kind: 'text' as const, text: { from: headers[i]!.index!, to: block.text.from - divider.length } }, block]
 			: [block]), ...(tail < 0 ? [] : [{

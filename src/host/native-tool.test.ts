@@ -7,7 +7,9 @@ import { relative } from 'path'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
+import type { ToolResultBlock } from '../common/blocks.ts'
 import { nativeTool } from './native-tool.ts'
+import { toolPresentations } from './tool-presentation.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
@@ -32,6 +34,28 @@ test('only interactive HELP teaches purpose comments; validation never does', as
 		expect(result.output).toContain(text.startsWith('HELP') ? text.slice(5) || 'BASH' : text === 'EDIT' ? 'at least one operation' : 'Usage:')
 	}
 	expect(JSON.stringify(nativeTool.def())).not.toContain('/*')
+})
+
+test('trailing first-line comments work for EDIT, BASH and READ without changing literals', () => {
+	for (let [call, plain] of [
+		['EDIT test.ts write // TESTING\n!!NEW\n// keep this\nhttps://example.com\n!!END', 'EDIT /* TESTING */ test.ts write\n!!NEW\n// keep this\nhttps://example.com\n!!END'],
+		['BASH /* HELLO */ "ls | head -4" // world', 'BASH /* HELLO */ "ls | head -4"'],
+		['READ test.ts // test', 'READ test.ts'],
+		['READ https://example.com/x // test', 'READ https://example.com/x'],
+		['BASH "echo // literal" // comment', 'BASH /* comment */ "echo // literal"'],
+		['BASH ls // hello', 'BASH /* hello */ ls'],
+	] as const) expect(nativeTool.resolve(call)).toEqual(nativeTool.resolve(plain))
+})
+
+test('EDIT descriptions title both the call and its result', () => {
+	let call = nativeTool.arrived({ type: 'tool_call', id: 'edit-description', name: 'tool', input: { cmd: 'EDIT /* TESTING */ test.ts write\n!!NEW\nebar\nzot\n!!END' } })
+	expect(call.input.description).toBe('TESTING')
+	expect(call.presentation?.title).toBe('> TESTING')
+	for (let result of [
+		{ output: '== test.ts@abcde verified ==\n== diff ==\n-1 bar\n+1 ebar\n 2 zot\n' },
+		{ output: 'Unchanged; nothing written.' },
+		{ output: 'Error: test.ts changed', isError: true },
+	]) expect(toolPresentations.attach<ToolResultBlock>(call, { type: 'tool_result', id: call.id, ...result }).presentation?.title).toBe('> TESTING')
 })
 
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {

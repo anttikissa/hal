@@ -72,8 +72,9 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 function resolve(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
 	let parsed = callText.parse(text)
 	let tool = nativeTool.find(parsed.name)
-	if (tool.syntax?.resolve) return tool.syntax.resolve(parsed.raw, ctx)
-	return { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
+	let resolved = tool.syntax?.resolve ? tool.syntax.resolve(parsed.raw, ctx) : { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
+	if (parsed.purpose && schema(tool).properties?.description && resolved.input.description === undefined) resolved.input.description = parsed.purpose
+	return resolved
 }
 
 // A provider's native call as history keeps it: the internal call plus

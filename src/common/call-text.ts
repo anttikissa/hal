@@ -12,7 +12,7 @@
 
 import { ason } from './ason.ts'
 
-export type Parsed = { name: string; raw: string }
+export type Parsed = { name: string; raw: string; purpose?: string }
 export type Values = { values: unknown[]; purpose?: string; unclosed?: true }
 
 const maxChars = 200_000
@@ -33,10 +33,22 @@ function blank(text: string, i: number): number {
 	return i
 }
 
+function withoutLineComment(text: string): { text: string; purpose?: string } {
+	let end = lineEnd(text, 0)
+	for (let i = 0; i < end;) {
+		if (text.startsWith('//', i) && (i === 0 || /\s/.test(text[i - 1]!))) return { text: text.slice(0, i).trimEnd() + text.slice(end), purpose: text.slice(i + 2, end).trim() }
+		if ('{["\'`'.includes(text[i]!) && (i === 0 || /\s/.test(text[i - 1]!))) i = ason.parseAt(text, i).end
+		else if (text.startsWith('/*', i)) { let close = text.indexOf('*/', i + 2); i = close < 0 ? end : close + 2 }
+		else i++
+	}
+	return { text }
+}
+
 // The tool's name and the text after it.
-function parse(text: unknown): Parsed {
-	if (typeof text !== 'string') throw new Error('cmd must be a string, e.g. READ "src/main.ts"')
-	if (text.length > maxChars) throw new Error(`cmd is ${text.length} characters; the most is ${maxChars}`)
+function parse(input: unknown): Parsed {
+	if (typeof input !== 'string') throw new Error('cmd must be a string, e.g. READ "src/main.ts"')
+	if (input.length > maxChars) throw new Error(`cmd is ${input.length} characters; the most is ${maxChars}`)
+	let { text, purpose } = withoutLineComment(input)
 	let i = blank(text, 0)
 	if (i >= text.length) throw new Error('empty tool call; e.g. READ "src/main.ts" or BASH "ls -l"')
 	if (/^\/[A-Za-z]/.test(text.slice(i, i + 2))) return { name: 'command', raw: ' ' + text.slice(i) }
@@ -44,7 +56,7 @@ function parse(text: unknown): Parsed {
 	if (!name) throw new Error(`expected a tool name such as READ or BASH, found ${JSON.stringify(text.slice(i, i + 40))}`)
 	let end = i + name.length
 	if (end < text.length && !/\s/.test(text[end]!) && !text.startsWith('/*', end)) throw new Error(`expected a space after ${name}, found ${JSON.stringify(text.slice(i, i + 40))}`)
-	return { name: name.toLowerCase(), raw: text.slice(end) }
+	return { name: name.toLowerCase(), raw: text.slice(end), ...(purpose && { purpose }) }
 }
 
 // The arguments in `raw` and the purpose its comments give. An unclosed
@@ -135,4 +147,4 @@ function split(text: string): string[] {
 	return starts.map((start, i) => text.slice(start, starts[i + 1]).trim())
 }
 
-export const callText = { parse, values, split, maxChars }
+export const callText = { parse, values, split, maxChars, withoutLineComment }
