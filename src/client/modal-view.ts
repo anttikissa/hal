@@ -95,9 +95,10 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// that do not fit drop from the right.
 	let table = m.tree ? modalView.table(m, inner) : undefined
 	let column = m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
+	let labels = m.find ? findDialog.rows(m.find.results, m.find.tabs, inner - 2, m.query) : m.items
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
-		let label = ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' ')
+		let label = ansi.clean(labels[i]!).replace(/[\r\n\t]+/g, ' ')
 		if (column) label = strings.clipVisual(label, column - 2).padEnd(column - 2) + '  '
 		// The model tree's highlight alone marks the selection.
 		let row = strings.clipVisual((m.tree ? '' : i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
@@ -227,7 +228,12 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 // grows to hold it. Returns the cursor and the list's scroll.
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
 	// Find's rows are long: it grows with the screen.
-	let box = modalView.modalBox(rows, cols, m.find ? 180 : 100)
+	let box = modalView.modalBox(rows, cols)
+	if (m.find) {
+		box.width = Math.max(1, cols - 4)
+		box.left = Math.floor((cols - box.width) / 2)
+		box.height = Math.min(rows, Math.max(3, rows - 2))
+	}
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
 	if (m.compact && m.form) box.height = Math.min(box.height, 3 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
 	while (lines.length < box.height) lines.push('')

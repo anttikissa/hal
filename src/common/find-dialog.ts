@@ -62,13 +62,24 @@ function age(ms: number): string {
 // Result rows as aligned columns: tab number (blank for a closed
 // session), session id, name cut to leave the snippet room, age, kind
 // (none for session matches), snippet.
-function rows(results: FindResult[], tabs: string[]): string[] {
+function rows(results: FindResult[], tabs: string[], columns = 120, query = ''): string[] {
 	let width = (f: (r: FindResult) => string) => Math.max(0, ...results.map((r) => f(r).length))
 	let tab = (r: FindResult) => { let n = tabs.indexOf(r.sessionId); return n < 0 ? '' : String(n + 1) }
 	let kind = (r: FindResult) => (r.kind === 'metadata' ? '' : `[${r.kind}]`)
-	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
-	let w = { tab: width(tab), id: width((r) => r.sessionId), name: Math.min(24, width((r) => r.name)), age: width((r) => age(r.age)), kind: width(kind) }
-	let cells = (r: FindResult) => [w.tab && tab(r).padStart(w.tab), r.sessionId.padEnd(w.id), w.name && cut(r.name, w.name).padEnd(w.name), age(r.age).padStart(w.age), w.kind && kind(r).padEnd(w.kind), r.snippet]
+	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + (n ? '…' : '') : s)
+	let w = { tab: width(tab), id: width((r) => r.sessionId), name: 0, age: width((r) => age(r.age)), kind: width(kind) }
+	let fixed = [w.tab, w.id, w.age, w.kind].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
+	w.name = Math.min(width((r) => r.name), Math.max(0, columns - fixed - 62))
+	let textWidth = Math.max(1, columns - fixed - (w.name ? w.name + 2 : 0))
+	let leadWidth = Math.min(21, Math.max(0, Math.floor(textWidth / 4)))
+	let snippet = (r: FindResult) => {
+		let at = findDialog.marks(r.snippet, query)[0]?.[0]
+		if (at === undefined) return r.snippet.trimStart()
+		let lead = r.snippet.slice(0, at).trimStart()
+		if (lead.length > leadWidth) lead = leadWidth > 1 ? '…' + lead.slice(-(leadWidth - 1)) : '…'.slice(0, leadWidth)
+		return lead.padStart(leadWidth) + r.snippet.slice(at)
+	}
+	let cells = (r: FindResult) => [w.tab && tab(r).padStart(w.tab), r.sessionId.padEnd(w.id), w.name && cut(r.name, w.name).padEnd(w.name), age(r.age).padStart(w.age), w.kind && kind(r).padEnd(w.kind), snippet(r)]
 	return results.map((r) => cells(r).filter((c) => c !== 0).join('  '))
 }
 function batch(m: ModalState, b: FindBatch): ModalState {

@@ -3,7 +3,7 @@
 // /config, whose rows add a value column, a faint note shown on the
 // selected, hovered or focused row, an in-place edit field and the
 // selected row's details below (common/modals.ts).
-import { createEffect, createMemo, For, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import { blocksDialog } from '../../common/blocks-dialog.ts'
@@ -30,6 +30,23 @@ function Match(props: { text: string }) { return <b class="match">{props.text}</
 export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement, search: HTMLInputElement | undefined, list!: HTMLUListElement
 	let edit: HTMLInputElement | undefined
+	let [findColumns, setColumns] = createSignal(120)
+	onSettled(() => {
+		let measure = document.createElement('span')
+		measure.textContent = '0'
+		measure.style.cssText = 'position:absolute;visibility:hidden'
+		box.append(measure)
+		let observer = new ResizeObserver(() => {
+			let ch = measure.getBoundingClientRect().width
+			if (ch) setColumns(Math.max(1, Math.floor(list.clientWidth / ch) - 2))
+		})
+		observer.observe(list)
+		return () => { observer.disconnect(); measure.remove() }
+	})
+	let items = createMemo(() => {
+		let m = props.modal
+		return m?.find ? findDialog.rows(m.find.results, m.find.tabs, findColumns(), m.query) : m?.items ?? []
+	})
 	// An edit starting takes the focus; one ending gives it back.
 	createEffect(
 		createMemo(() => props.modal?.edit?.index),
@@ -116,7 +133,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			</Show>
 			<ul ref={(e) => (list = e)} hidden={props.modal?.compact} role="listbox" aria-label={props.modal?.restart ? 'Choices' : 'Results'} tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
-				<For each={props.modal?.items ?? []}>{(item, i) => (
+				<For each={items()}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
 						class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined} style={props.modal?.tree ? (props.modal.values?.[i()] ? { '--columns': columns() } : undefined) : props.modal?.values ? { '--label': width() } : undefined}
 						onClick={() => { if (!props.modal?.find) app.modalPick(i()) }}>
