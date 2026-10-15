@@ -13,7 +13,7 @@ Dialog (Ctrl-O, runs /toggle; footer "enter: toggle · tab: complete · esc: clo
 
     User and assistant cards change only when you name them (a, u).
     Kinds: tool, reasoning, assistant, user, message, system, question
-  The examples use the session's real tool card ids: the latest (one card), the third latest to the latest (range) and the two latest (list). With fewer than two tool cards they fall back to 24, 10-24 and t14, t24. In the terminal, help descriptions start in one column, two spaces after the widest key, and wrapped lines continue in that column. The kinds row separates words with commas, like the terminal's key help row; each word's first letter (the kind letter) is bright and bold. The placeholder is static ("24, 10-24 or t*").
+  The examples use the session's real tool card ids: the latest (one card), the third latest to the latest (range) and the two latest (list). With fewer than two tool cards they fall back to 24, 10-24 and t14, t24. Help descriptions start in one column, two spaces after the widest key, and wrapped lines continue in that column. The kinds row separates words with commas, like the terminal's key help row; each word's first letter (the kind letter) is bright and bold. The placeholder is static ("24, 10-24 or t*").
 
   Tab completes like /command completion: it fills the common prefix of the matching card ids for the item under the cursor; when several match it lists them in the help area, packed several per row, newest first, at least 10; more than fit end with "+N more". It never cycles.
 

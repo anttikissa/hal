@@ -498,9 +498,10 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Ctrl-O (task v8y): as tall as its field, hint and help. */
 .Picker.compact, .Picker.compact[open] { height: fit-content; max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; }
 .Picker .blocks-help { flex: none; color: var(--description); }
-.Picker .blocks-help dl { margin: 0 0 1lh; }
-.Picker .blocks-help dt { display: inline; color: var(--key); }
-.Picker .blocks-help dd { display: inline; margin: 0 0 0 2ch; }
+.Picker .blocks-help dl { margin: 0 0 1lh; display: grid; grid-template-columns: max-content 1fr; column-gap: 2ch; }
+.Picker .blocks-help dl > div { display: contents; }
+.Picker .blocks-help dt { color: var(--key); }
+.Picker .blocks-help dd { margin: 0; }
 .Picker .blocks-help p { margin: 0; }
 .Picker .blocks-help b { color: var(--key); font-weight: bold; }
 .Picker .blocks-hint { flex: none; overflow-wrap: anywhere; margin-block: 0.75lh; }
