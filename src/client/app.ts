@@ -45,7 +45,6 @@ import { sendKeys } from '../common/send-keys.ts'
 import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
 import { linkState } from './link-state.ts'
-import { theme } from '../host/commands/theme.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -111,7 +110,7 @@ function previewTheme(): void {
 	let name = i >= 0 ? st.form!.values[i] : undefined
 	if (name === st.previewed) return
 	st.previewed = name
-	void theme.preview(name).then(() => terminal.redraw('theme preview'))
+	void app.preview(name).then(() => terminal.redraw('theme preview'))
 }
 
 // A beat of the pulse: a repaint, if a blink changed.
@@ -377,6 +376,8 @@ export const app = {
 	cols: (): number => render.state.out?.size().cols ?? 80,
 	show,
 	previewTheme,
+	/** Shows theme `name` in this process, none: the saved one (main.ts sets it). */
+	preview: async (_name?: string): Promise<void> => {},
 	beat,
 	onEvent,
 	backgroundStep: tabSwitch.backgroundStep,

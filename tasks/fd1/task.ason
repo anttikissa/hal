@@ -5,7 +5,8 @@
 	notes: [
 		'Host lifetime and role policy live in host/lifecycle.ts; main.ts remains the composition root below the 400-line limit. A malformed config refuses promotion too: its default auto policy would otherwise let a broken server-mode file turn an SSH peer into host. The headless host ignores HUP, exits 0 on TERM/INT without pausing unfinished turns, and exits 100 on USR1 or /restart host; systemd invokes Bun directly rather than nesting ./run.',
 		'Validation: 25 affected tests pass, TypeScript passes, changed-file lint passes. Full suite: 1490 pass, 1 skip, 4 failures; unchanged HEAD reproduces module-size, legacy-import output, and both browser failures. Extraction fixes main.ts size; client/render.ts remains over the existing limit. Full lint also reports a pre-existing unused pages import in host.test.ts. No live host, config or service was changed.',
-		'Replaced hostMode with handover: a setting that kept peers from ever hosting conflicted with peers taking over while hal serve is down. bun -e test scripts do not parse --home; set paths.state.home, or under bun test a peer silently gets a temp home of its own (and outside tests, the live home).'
+		'Replaced hostMode with handover: a setting that kept peers from ever hosting conflicted with peers taking over while hal serve is down. bun -e test scripts do not parse --home; set paths.state.home, or under bun test a peer silently gets a temp home of its own (and outside tests, the live home).',
+		'Layer fix: lifecycle.serve receives the socket dial (client/link.ts) from main.ts instead of importing the client layer.'
 	],
 	needs: ['ja', 'pc', 'cb'],
 	foldInto: ['ja']

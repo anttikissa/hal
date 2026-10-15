@@ -147,6 +147,7 @@ function initTerminal(remote?: string): void {
 	app.state.start = { ...(remote ? {} : { cwd: process.cwd() }), ...main.lastTab() }
 	if (remote) appView.state.remote = new URL(remote).host
 	app.focused = (tab) => main.keepTab(tab)
+	app.preview = theme.preview
 	app.init()
 }
 
@@ -410,7 +411,7 @@ export const main = {
 		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
 		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)
 		web.state.fixedPort = port
-		await lifecycle.serve(main.becomeHost)
+		await lifecycle.serve(main.becomeHost, link.dial)
 		main.shown()
 		// After becomeHost's web.start: --port allows no other port.
 		if (port) main.later(() => {

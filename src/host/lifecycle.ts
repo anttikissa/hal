@@ -1,7 +1,8 @@
 // Host initialization, role policy and supervised lifetime (task fd1).
 import { config } from './config.ts'
 import { handover, restartProcess } from './commands/restart.ts'
-import { link } from '../client/link.ts'
+import type { Conn } from '../common/connection.ts'
+import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { providers } from './providers.ts'
@@ -32,7 +33,8 @@ function mayHost(): boolean {
 
 // A service supervisor owns restarts; no terminal client or daemon fork.
 // Stop preserves unfinished work for the next start, unlike terminal quit.
-async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
+// `dial`: the host socket's client (client/link.ts), to ask for handover.
+async function serve(becomeHost: () => Promise<boolean>, dial: (path: string, on: { event(event: Event): void; dropped(): void }) => Promise<Conn | null>): Promise<void> {
 	process.on('SIGHUP', () => {})
 	let stopping = false
 	let stop = (signal: string) => {
@@ -49,7 +51,7 @@ async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
 	process.on('SIGUSR1', () => (serverLog.log('restarting (SIGUSR1)'), restartProcess.run()))
 	if (!(await becomeHost())) {
 		// A peer host hands over; another hal serve refuses, and the first prevails.
-		let conn = await link.dial(server.socketPath(), {
+		let conn = await dial(server.socketPath(), {
 			event: (e) => e.type === 'rejected' && e.command === 'handover' && (process.stderr.write(`hal: ${e.reason}\n`), process.exit(1)),
 			dropped: () => {},
 		})
