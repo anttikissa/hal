@@ -87,6 +87,16 @@ html.typing .App { position: absolute; }
 .Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
 .Card.thinking .CardHeader, .Card.assistant .CardHeader { min-height: 0; }
 .Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
+.Thinking { position: relative; padding: var(--card-inset) 1ch; }
+.Thinking .preview { overflow: hidden; max-height: calc(var(--preview-rows) * 1lh); }
+.Card.open .Thinking .preview { max-height: none; }
+.Thinking .thinking-content { display: flow-root; }
+.Thinking .Markdown { font-style: italic; }
+.Thinking .Markdown > :first-child { margin-top: 0; }
+.Thinking .stamp { float: left; margin-right: 1ch; padding: 0; min-height: 0; background: none; color: inherit; font: inherit; }
+.Thinking .thinking-meta { float: right; display: flex; gap: 1ch; margin-left: 1ch; }
+.Thinking .thinking-meta .link { position: static; padding: 0; }
+.Thinking .more { position: absolute; bottom: var(--card-inset); right: 1ch; color: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
 .Card .result-text { color: var(--output, inherit); }
 .Card .result-text.error { background: none; }
 .Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }

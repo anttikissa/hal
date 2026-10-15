@@ -129,15 +129,21 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short')
 		case 'image':
 			return [itemView.imageLabel(item, session)]
-		// Markdown hides trailing blanks except before interruption marks.
-		// Empty thinking draws nothing, not a bare header (tasks fn, hp, 6eq).
-		// Headed like a reply, so the title row holds its activity (task hyt).
+		// Thinking spends its short row budget on content, not a label (6q1).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
-			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
+			let stamp = titles.time(item.ts)
+			let body = markdownView.lines(item.text.trim(), Math.max(1, width - (stamp ? strings.visLen(stamp) + 1 : 0)), streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
+			if (fold === 'short') {
+				let total = body.length
+				body = body.slice(0, settings.shortRows())
+				while (body.length > 1 && !Bun.stripANSI(body.at(-1)!).trim()) body.pop()
+				if (total > body.length) body[body.length - 1] = itemView.right(body.at(-1) ?? '', ansi.quiet(`… ${total - body.length} more lines`, itemView.itemStyle(item)), width - (body.length === 1 && stamp ? strings.visLen(stamp) + 1 : 0))
+			}
 			body = body.map((row) => `\x1b[3m${row.replaceAll('\x1b[23m', '\x1b[3m')}\x1b[23m`)
-			return itemView.headed(item, body, hw, undefined, fold !== 'short')
+			if (!body.length) body.push('')
+			body[0] = (stamp ? `${stamp} ` : '') + body[0]
+			return body
 		}
 		case 'text': {
 			let text = card.text(item).trimEnd()

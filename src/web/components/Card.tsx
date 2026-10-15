@@ -14,6 +14,7 @@
 // tools cap what they keep), so nothing is fetched.
 
 import { ToolPresentation } from './ToolPresentation.tsx'
+import { Thinking } from './Thinking.tsx'
 import { ToolCommand } from './ToolCommand.tsx'
 import { interruption } from '../../common/interruption.ts'
 import { diff } from '../../common/diff.ts'
@@ -302,6 +303,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<Show when={shown()}>
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
+					<Show when={props.row.item.type === 'thinking'} fallback={
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<>
@@ -334,6 +336,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</>
 						)}
 					</Show>
+					}><Thinking text={s().text} open={expanded()} time={time() ?? ''} metadata={<>{activity()}{link()}</>}>{markdown()}</Thinking></Show>
 				</article>
 			)}
 		</Show>
