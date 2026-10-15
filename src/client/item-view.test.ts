@@ -88,6 +88,11 @@ test('background reports and thinking start short, expand fully, and SEND shows 
 		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('last')
 		expect(itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
 		expect(itemView.receipt(item)).toBe('')
+		let spaced = { ...item, text: 'first\n\nsecond\n\nthird\nlast' }
+		let preview = itemView.itemLines(spaced, 100).map(Bun.stripANSI)
+		expect(preview.at(-1)).toContain('second')
+		expect(preview.at(-1)).toContain('more lines')
+		expect(itemView.itemLines(spaced, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).map(Bun.stripANSI)).toContain('')
 	}
 	let thinking = { type: 'thinking' as const, text: 'first\n\nsecond\n\nlast' }
 	for (let streaming of [false, true]) {

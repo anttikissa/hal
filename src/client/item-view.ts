@@ -3,6 +3,7 @@
 // Tasks: fn, hp, hr, hse, a1k, 6eq, kx0, hyt.
 
 import { interruption } from '../common/interruption.ts'
+import { bashResult } from '../common/bash-result.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
@@ -108,6 +109,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'prompt':
 			let source = card.text(item)
 			let body = !source.trim() ? [] : card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
+			if (fold === 'short' && bashResult.background(item)) body = body.filter((row) => Bun.stripANSI(row).trim())
 			// Another session's message: its summary, then its text quieter.
 			// A summary counts toward a short card's rows.
 			let summary = item.summary && !item.report ? ansi.wrap(item.summary, width) : undefined

@@ -85,6 +85,7 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let rows: string[] = [], used = 0
 	while (used < lines.length && rows.length <= max) {
 		let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * width * 4), width, false)
+		if (fold === 'short' && !line.trim()) continue
 		rows.push(...wrapped)
 		tones.push(...wrapped.map(() => diff.tone(line)))
 	}

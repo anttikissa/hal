@@ -1,0 +1,10 @@
+{
+	title: 'Fill command previews with output',
+	spec: 'Collapsed terminal command-output previews, including background completion reports and tool results, use their available body rows for nonblank output rather than a blank row carrying only the hidden-line count. The count stays beside the final visible output when it fits; expanded output preserves blank lines exactly. Other prose previews and thinking behavior are unchanged. Web command cards remain title-only when collapsed per hyt, so need no layout change. Invariant restored: a collapsed command preview does not waste a body row on a blank separator when more output is available.',
+	status: 'done',
+	notes: [
+		'Background report bodies omit blank display rows only when short; the existing row-budget helper then puts the count beside the next output line. Short tool-result rendering skips empty source lines as it fills its row budget; long output is unchanged. The web has no command body in its short state, so it is intentionally unchanged. Expanded the existing background-report check and ran a direct short/long tool-result check. 44 focused tests, full typecheck, changed-module lint and diff checks passed, including the existing large-output rendering check. No timers or growing state were added.'
+	],
+	needs: ['hyt', '778'],
+	foldInto: ['hyt']
+}
