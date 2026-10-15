@@ -18,20 +18,33 @@ body { margin: 0 auto; padding: 24px 16px; max-width: 1000px; }
 h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 16px; }
 .controls label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-.controls select { font: inherit; padding: 8px; color: inherit; background: var(--canvas); border: 1px solid currentColor; }
+.controls select, .controls input[type="number"], .controls button { font: inherit; padding: 8px; color: inherit; background: var(--canvas); border: 1px solid currentColor; }
+.controls input[type="number"] { width: 9ch; }
+.controls button { min-height: 44px; cursor: pointer; }
+#css { display: block; white-space: pre-wrap; margin: 0 0 16px; }
+.rulers { overflow-x: auto; margin-bottom: 16px; }
+.rulers p { margin: 4px 0; white-space: pre; }
+.rulers .candidate { font-family: var(--italic-face); font-size: var(--italic-size); font-style: italic; font-weight: 300; letter-spacing: var(--italic-spacing); }
 #metrics { min-height: 3lh; }
 .samples { display: grid; gap: 16px; font-size: var(--sample-size, 14px); line-height: 1.5; }
-.samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: 300; font-style: italic; font-synthesis: none; }
+.samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: 300; font-style: italic; font-synthesis: none; letter-spacing: var(--italic-spacing, 0px); }
 .samples .Thinking .Markdown { line-height: 1.5; }
 .samples button { font-size: inherit; }
 </style>
 <h1>Italic fonts on Hal cards</h1>
 <div class="controls">
-<label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code">Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option><option value="Demo Victor">Victor Mono Light - cursive</option><option value="Demo Cascadia">Cascadia Mono Light</option><option value="Demo Fragment">Fragment Mono Regular</option><option value="Demo Cousine">Cousine Regular</option></select></label>
-<label>Size <select id="size"><option>12</option><option selected>14</option><option>16</option><option>18</option></select>px</label>
-<label><input type="checkbox" id="match"> Match x-height to Plex</label>
+<label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code" selected>Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option><option value="Demo Victor">Victor Mono Light - cursive</option><option value="Demo Cascadia">Cascadia Mono Light</option><option value="Demo Fragment">Fragment Mono Regular</option><option value="Demo Cousine">Cousine Regular</option></select></label>
+<label>Plex size <input id="size" type="number" min="8" max="48" step="0.1" value="14">px</label>
+<label>Italic size <input id="italicSize" type="number" min="8" max="48" step="0.01" value="14">px</label>
+<label>Italic x-height <input id="xheight" type="number" min="1" max="32" step="0.01" value="6.72">px</label>
+<label>Character stride <input id="stride" type="number" min="3" max="40" step="0.01" value="8.4">px</label>
+<button id="matchHeight" type="button">Match Plex x-height</button>
+<button id="matchStride" type="button">Match Plex stride</button>
+<button id="reset" type="button">Reset to 14px, natural spacing</button>
 </div>
 <p id="metrics" role="status">Loading local font files...</p>
+<output id="css"></output>
+<div class="rulers" id="rulers"><p>0123456789 abcdefghij ABCDEFGHIJ</p><p class="candidate">0123456789 abcdefghij ABCDEFGHIJ</p></div>
 <main class="samples" id="samples">
 <article class="Card thinking open"><div class="Thinking" style="--preview-rows: 3"><button class="stamp mark" aria-label="Collapse reasoning" aria-expanded="true">16:06</button><div class="preview"><div class="thinking-content"><div class="Markdown"><p>I should check the relevant code before making a change. The important part is to preserve the existing behavior while making the result easier to read.</p><p>The user asked for a smaller, calmer italic. I will compare the letter shapes, apparent size and spacing without changing the card colors or layout. Look closely at <code>a f g i l r t</code>, numbers <code>0 O 1 I</code>, and punctuation.</p></div></div></div><span class="thinking-meta"><span class="link">a1</span></span><span class="more" hidden>... earlier lines</span></div></article>
 <article class="Card user open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">You</span></span></span></header><div class="content">Could you make the italic easier to read? Keep this user card in the normal Plex face.</div></article>
@@ -42,26 +55,50 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 <article class="Card error open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">Error</span></span></span></header><div class="content">example.ts:17: file changed since it was read. Read it again before retrying.</div></article>
 </main>
 <script>
-const face = document.getElementById('face'), size = document.getElementById('size'), match = document.getElementById('match'), samples = document.getElementById('samples'), metrics = document.getElementById('metrics')
+const face = document.getElementById('face'), size = document.getElementById('size'), italicSize = document.getElementById('italicSize'), xheight = document.getElementById('xheight'), stride = document.getElementById('stride'), samples = document.getElementById('samples'), metrics = document.getElementById('metrics'), rulers = document.getElementById('rulers'), css = document.getElementById('css')
 let revision = 0
-async function update() {
+async function update(action = '') {
  const current = ++revision, px = Number(size.value)
+ if (![size, italicSize, xheight, stride].every(input => input.checkValidity() && input.value !== '')) return
  try {
-  await Promise.all([document.fonts.load(`italic 300 ${px}px "${face.value}"`), document.fonts.load(`italic 300 ${px}px "IBM Plex Mono"`)])
+  await Promise.all([document.fonts.load(`italic 300 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`)])
   if (current !== revision) return
   const ctx = document.createElement('canvas').getContext('2d')
-  ctx.font = `italic 300 ${px}px "IBM Plex Mono"`
-  const baseline = ctx.measureText('x').actualBoundingBoxAscent
-  ctx.font = `italic 300 ${px}px "${face.value}"`
-  const x = ctx.measureText('x').actualBoundingBoxAscent, width = ctx.measureText('0000000000').width / 10
-  const adjusted = match.checked ? px * baseline / x : px
-  samples.style.setProperty('--sample-size', `${px}px`)
-  samples.style.setProperty('--italic-face', `"${face.value}"`)
-  samples.style.setProperty('--italic-size', `${adjusted}px`)
-  metrics.textContent = `${face.selectedOptions[0].text}: ${adjusted.toFixed(2)}px displayed; at ${px}px, character width ${width.toFixed(2)}px and x-height ${x.toFixed(2)}px (Plex ${baseline.toFixed(2)}px). Upright text is unchanged.`
+  const measure = (family, fontSize, italic) => {
+   ctx.font = `${italic ? 'italic ' : ''}300 ${fontSize}px "${family}"`
+   return { x: ctx.measureText('x').actualBoundingBoxAscent, width: ctx.measureText('0000000000').width / 10 }
+  }
+  const plex = measure('IBM Plex Mono', px, false), unit = measure(face.value, 100, true)
+  let adjusted = Number(italicSize.value)
+  if (action === 'height' || action === 'xheight') adjusted = (action === 'height' ? plex.x : Number(xheight.value)) * 100 / unit.x
+  if (action === 'reset') adjusted = 14
+  adjusted = Math.max(Number(italicSize.min), Math.min(Number(italicSize.max), adjusted))
+  const actual = measure(face.value, adjusted, true)
+  let target = Number(stride.value)
+  if (action === 'stride') target = plex.width
+  if (action === 'reset' || action === 'face') target = actual.width
+  const spacing = target - actual.width
+  italicSize.value = adjusted.toFixed(2)
+  xheight.value = actual.x.toFixed(2)
+  stride.value = target.toFixed(2)
+  for (const element of [samples, rulers]) {
+   element.style.setProperty('--sample-size', `${px}px`)
+   element.style.setProperty('--italic-face', `"${face.value}"`)
+   element.style.setProperty('--italic-size', `${adjusted}px`)
+   element.style.setProperty('--italic-spacing', `${spacing}px`)
+   element.style.fontSize = `${px}px`
+  }
+  metrics.textContent = `Plex: ${px}px, x-height ${plex.x.toFixed(2)}px, stride ${plex.width.toFixed(2)}px. Italic: ${adjusted.toFixed(2)}px, x-height ${actual.x.toFixed(2)}px, stride ${target.toFixed(2)}px. Matching x-height is optional; no vertical offset is applied.`
+  css.textContent = `font-size: ${adjusted.toFixed(4)}px; letter-spacing: ${spacing.toFixed(4)}px; font-style: italic; font-weight: 300;`
  } catch (error) { metrics.textContent = `Font load failed: ${error.message}. Fetch local candidates with: bash scripts/fonts JetBrainsMono-LightItalic SourceCodePro-LightItalic RobotoMono-Italic` }
 }
-face.onchange = size.onchange = match.onchange = update
+face.onchange = () => update('face')
+size.oninput = italicSize.oninput = () => update()
+xheight.oninput = () => update('xheight')
+stride.oninput = () => update()
+document.getElementById('matchHeight').onclick = () => update('height')
+document.getElementById('matchStride').onclick = () => update('stride')
+document.getElementById('reset').onclick = () => { size.value = 14; update('reset') }
 const thinking = document.querySelector('.Card.thinking'), stamp = thinking.querySelector('.stamp'), preview = thinking.querySelector('.preview'), more = thinking.querySelector('.more')
 stamp.onclick = () => {
  const open = thinking.classList.toggle('open')
