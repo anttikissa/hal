@@ -1,7 +1,7 @@
 {
 	title: 'Block-format EDIT is the core file tool',
 	spec: 'src/host/tools/edit.ts is the only file-writing tool: the block-format EDIT of task ybg (!!OLD/!!NEW/!!END; line ranges, same-point inserts, text replaces after line operations, create, write, delete; advisory @version; atomic across files with rollback; trailing tool calls run after a successful write). There is no WRITE tool and no range-object EDIT or same-version batching across calls. SYSTEM.md # EDIT holds the block guide with an example; there is no # WRITE section. Model-facing text names a READ result path@version a version, never a lease. HELP EDIT and the EDIT guide teach purpose comments only to interactive sessions. Core presents EDIT cards through toolPresentations.present (files with change counts, then verified diffs; task sn7). extras/edit-quirks.ts stays an opt-in extra over core EDIT.',
-	status: 'planned',
+	status: 'done',
 	needs: ['ybg', '3fv', 'sn7'],
 	foldInto: ['ybg']
 }
