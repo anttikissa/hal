@@ -115,7 +115,7 @@ function exitColor(text: string, style: Style | undefined): string {
 // exit in the exit color, then the time, out of `limit` when the call
 // has one (1.4s / 900s); '' with none of them.
 function status(exit: string | undefined, time: string | undefined, style: Style | undefined, limit?: string): string {
-	if (limit) time = `${time ?? '0s'} / ${limit}`
+	if (limit && time !== '') time = `${time ?? '0s'} / ${limit}`
 	if (!exit && !time) return ''
 	if (!exit) return ansi.quiet(`(${time})`, style)
 	return ansi.quiet('(', style) + toolView.exitColor(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
