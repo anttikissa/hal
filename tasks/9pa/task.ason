@@ -1,0 +1,7 @@
+{
+	title: 'Built-in look is Nostromo; classic keeps the old one',
+	spec: 'The built-in look hal (src/common/colors.ts, written out in themes/hal.ts) uses the Nostromo palette: amber replies, a green phosphor user card, a brown-black screen and page, warm lines and buttons. themes/classic.ts holds the earlier built-in look (orange replies, bright blue user card, blue-gray screen) as overrides of the fields that differ. themes/nostromo.ts stays, equal to hal for now, so existing selections keep working; its name is kept for a later, different theme. Rationale: the user prefers the Nostromo look as the default.',
+	status: 'done',
+	needs: ['d3'],
+	foldInto: ['d3']
+}

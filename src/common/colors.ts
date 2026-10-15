@@ -36,11 +36,11 @@ export const colors = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
 	// marks; tasks/README.md, readable text).
-	screen: [0.16, 0.01, 260] as Oklch,
+	screen: [0.15, 0.015, 85] as Oklch,
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: 0.85,
-	fgC: 0.16,
+	fgL: 0.84,
+	fgC: 0.17,
 	bgL: 0.2,
 	bgC: 0.05,
 
@@ -66,21 +66,21 @@ export const colors = {
 	// is (backdrop), and how far the busy dot pulses (pulse).
 	mix: { hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 },
 
-	// Hal's responses: warm orange.
+	// Hal's responses: amber, after Alien's (1979) Nostromo terminals.
 	assistant: (): Style => ({
-		fg: [colors.fgL, colors.fgC, 57],
-		cursor: [colors.fgL, colors.fgC, 55],
-		cursorIdle: [0.6, 0, 55],
-		bold: [0.9, 0.06, 55],
-		code: [0.86, 0.04, 55],
-		linkFg: [0.88, 0.15, 55],
-		linkBg: [0.3, 0.05, 55],
+		fg: [colors.fgL, 0.16, 75],
+		cursor: [colors.fgL, 0.16, 75],
+		cursorIdle: [0.6, 0.04, 75],
+		bold: [0.93, 0.12, 80],
+		code: [0.88, 0.1, 80],
+		linkFg: [0.9, 0.17, 80],
+		linkBg: [0.28, 0.06, 75],
 	}),
 	synthetic: (): Style => colors.assistant(),
 	// Thinking: neutral gray, distinct from replies through italic text.
 	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
-	// User messages and the prompt input: the same bright blue card.
-	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
+	// User messages and the prompt input: the same green phosphor card.
+	user: (): Style => ({ fg: [0.87, 0.2, 145], bg: [0.2, 0.05, 145] }),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
 	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
@@ -90,11 +90,11 @@ export const colors = {
 	// Log: neutral, moderately dim.
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
-	warning: (): Style => ({ fg: [0.87, 0.18, 82], bg: [0.2, 0.05, 82], code: [0.92, 0.12, 82], linkBg: [0.28, 0.06, 82] }),
+	warning: (): Style => ({ fg: [0.9, 0.17, 100], bg: [0.21, 0.05, 100], code: [0.94, 0.12, 100], linkBg: [0.28, 0.06, 100] }),
 	// Questions waiting on the user: green, apart from warnings.
 	question: (): Style => ({ fg: [colors.fgL, colors.fgC, 150], bg: [colors.bgL, colors.bgC, 150], code: [0.92, 0.1, 150], linkBg: [0.28, 0.06, 150] }),
 	// Errors: hot red.
-	error: (): Style => ({ fg: [0.72, 0.24, 25], bg: [0.2, 0.08, 25], code: [0.84, 0.16, 25], linkBg: [0.24, 0.07, 25] }),
+	error: (): Style => ({ fg: [0.7, 0.22, 30], bg: [0.2, 0.08, 30], code: [0.82, 0.15, 30], linkBg: [0.25, 0.07, 30] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
@@ -106,7 +106,7 @@ export const colors = {
 	statusHot: (): Style => ({ fg: [0.76, 0.16, 25] }),
 	// Tab labels.
 	tab: (): Style => ({
-		activeFg: [0.86, 0.16, 200],
+		activeFg: [0.87, 0.2, 145],
 		inactiveFg: [0.68, 0, 0],
 		doneFg: [0.78, 0.14, 145],
 		warningFg: [0.86, 0.16, 95],
@@ -163,14 +163,14 @@ export const colors = {
 	// and text, the focus accent, form fields, borders, and buttons (the
 	// picker's selected item too), and search matches. The terminal has its own.
 	page: (): Style => ({
-		canvas: [0.14, 0.01, 260],
+		canvas: [0.13, 0.015, 85],
 		overlayBg: [0, 0, 0],
-		text: [0.93, 0.01, 260],
-		accent: [0.86, 0.16, 200],
-		field: [0.18, 0.015, 260],
-		// No slate (tasks/README.md, look): lines and buttons are cyan.
-		border: [0.5, 0.08, 210],
-		button: [0.3, 0.08, 215],
+		text: [0.88, 0.12, 85],
+		accent: [0.86, 0.2, 145],
+		field: [0.17, 0.02, 85],
+		// Brown-black surfaces with warm lines and buttons.
+		border: [0.5, 0.07, 85],
+		button: [0.25, 0.04, 85],
 		// Search matches in the picker's list.
 		match: [0.92, 0.14, 95],
 		// Where a press or a linked card's flash starts (web/flash.ts).

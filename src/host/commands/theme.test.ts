@@ -39,21 +39,21 @@ test('/theme writes a portable selector the loader applies live; hal, the built-
 	expect(field.options[field.initial]).toBe('hal')
 	// Answering the question switches, like /theme <name>.
 	let n = a.of('output').length
-	a.conn.send({ type: 'answer', sessionId: id, question: a.of('question').at(-1)!.id, answers: { theme: 'nostromo' } })
+	a.conn.send({ type: 'answer', sessionId: id, question: a.of('question').at(-1)!.id, answers: { theme: 'classic' } })
 	await until(() => a.of('output').length > n)
 	expect(a.of('output').at(-1)!.error).toBeFalsy()
 	let text = readFileSync(file(), 'utf8')
 	expect(text).toContain('export const portable = true\n')
-	expect(text).toContain(`export { default } from '${relative(realpathSync(plugins.dir()), realpathSync(themes))}/nostromo.ts'\n`)
+	expect(text).toContain(`export { default } from '${relative(realpathSync(plugins.dir()), realpathSync(themes))}/classic.ts'\n`)
 	field = await ask()
-	expect(field.options[field.initial]).toBe('nostromo')
+	expect(field.options[field.initial]).toBe('classic')
 	await plugins.init()
 	try {
 		await until(() => colors.page().canvas?.join() !== canvas?.join())
-		let nostromo = colors.page().canvas?.join()
+		let classic = colors.page().canvas?.join()
 		await say('/theme tron')
 		expect(selected()).toBe('tron')
-		await until(() => colors.page().canvas?.join() !== nostromo)
+		await until(() => colors.page().canvas?.join() !== classic)
 		await say('/theme hal')
 		expect(existsSync(file())).toBe(false)
 		await until(() => colors.page().canvas?.join() === canvas?.join())
@@ -62,7 +62,7 @@ test('/theme writes a portable selector the loader applies live; hal, the built-
 	}
 	let nope = await say('/theme nope')
 	expect(nope.error).toBe(true)
-	expect(nope.text).toContain('nostromo')
+	expect(nope.text).toContain('classic')
 })
 
 test('a color-theme.ts link into themes/ becomes theme.ts with the same theme, leaving the target alone', async () => {
