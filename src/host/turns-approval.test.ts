@@ -12,6 +12,7 @@ import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 import { paths } from './paths.ts'
+import { until } from './host-fixture.test.ts'
 
 const savedHome = paths.state.home
 const origStream = turns.stream
@@ -80,14 +81,6 @@ function client() {
 		}
 	})
 	return { conn, events, views, of: (type: string) => events.filter((e) => e.type === type) as any[] }
-}
-
-async function until(check: () => unknown): Promise<void> {
-	for (let i = 0; i < 300; i++) {
-		if (check()) return
-		await new Promise((r) => setTimeout(r, 1))
-	}
-	throw new Error('timed out')
 }
 
 function session(c: ReturnType<typeof client>): string {
