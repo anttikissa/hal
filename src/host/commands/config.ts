@@ -29,7 +29,9 @@ export const command: SlashCommand = {
 		if (why) return { error: `${name}: ${why}` }
 		let keys = config.update({ [name]: next })
 		if (!keys.length) return { say: 'settings unchanged' }
-		if (s.type.kind === 'secret') return { say: `${name}: (given)` }
-		return { say: Object.is(next, s.default) ? `${name}: ${ason.stringify(next, 'short')} (the default: removed from config.ason)` : `${name}: ${ason.stringify(next, 'short')}` }
+		// The command line already shows the value; say only what it doesn't.
+		let shown = typeof next === 'string' ? next : ason.stringify(next, 'short')
+		let notes = [...(s.type.kind === 'secret' || shown === value.trim() ? [] : [`${name}: ${shown}`]), ...(Object.is(next, s.default) ? ['The default: removed from config.ason.'] : [])]
+		return notes.length ? { say: notes.join('\n') } : {}
 	},
 }
