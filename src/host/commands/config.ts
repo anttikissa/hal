@@ -1,7 +1,7 @@
 // /config: the settings modal (common/settings-modal.ts), or a direct
 // get/set. The modal's every change is a /config <name> <value>.
 import { ason } from '../../common/ason.ts'
-import { settings } from '../../common/settings.ts'
+import { settings, type Setting } from '../../common/settings.ts'
 import type { SlashCommand } from '../commands.ts'
 import { config } from '../config.ts'
 
@@ -10,9 +10,27 @@ function parsed(args: string): { name: string; value?: string } {
 	return { name: m?.[1] ?? '', ...(m?.[2] !== undefined && { value: m[2] }) }
 }
 
+// The setting `args` names, the value it sets and why that value is
+// refused, if it is.
+function change(args: string): { s: Setting; next: unknown; why?: string } | undefined {
+	let { name, value } = parsed(args)
+	let s = settings.table.find((s) => s.name === name)
+	if (!s || value === undefined) return undefined
+	let next = settings.fromText(s.type, value === '""' || value === "''" ? '' : value)
+	return { s, next, why: settings.problem(s.type, next) }
+}
+
 export const command: SlashCommand = {
 	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
+	// Setting a default says so on the command line: one row, no echo.
+	record(args) {
+		config.init()
+		let c = change(args)
+		if (!c || c.why || !Object.is(c.next, c.s.default)) return undefined
+		let stored = Object.keys(settings.state.raw).some((k) => k.replace(/^blockVerbosity/, 'cardVerbosity') === c.s.name)
+		return `/config ${args.trim()} (the default${stored ? ' - removed from config.ason' : ''})`
+	},
 	run(args) {
 		config.init()
 		let { name, value } = parsed(args)
@@ -20,14 +38,12 @@ export const command: SlashCommand = {
 		let s = settings.table.find((s) => s.name === name)
 		if (!s) return { error: `unknown setting '${name}'` }
 		if (value === undefined) return { say: `${name}: ${String(settings.value(name))}` }
-		let next = settings.fromText(s.type, value === '""' || value === "''" ? '' : value)
-		let why = settings.problem(s.type, next)
-		if (why) return { error: `${name}: ${why}` }
-		let keys = config.update({ [name]: next })
-		if (!keys.length) return { say: 'settings unchanged' }
+		let c = change(args)!
+		if (c.why) return { error: `${name}: ${c.why}` }
+		let keys = config.update({ [name]: c.next })
+		if (!keys.length) return Object.is(c.next, s.default) ? {} : { say: 'settings unchanged' }
 		// The command line already shows the value; say only what it doesn't.
-		let shown = typeof next === 'string' ? next : ason.stringify(next, 'short')
-		let notes = [...(shown === value.trim() ? [] : [`${name}: ${shown}`]), ...(Object.is(next, s.default) ? ['The default: removed from config.ason.'] : [])]
-		return notes.length ? { say: notes.join('\n') } : {}
+		let shown = typeof c.next === 'string' ? c.next : ason.stringify(c.next, 'short')
+		return shown === value.trim() ? {} : { say: `${name}: ${shown}` }
 	},
 }
