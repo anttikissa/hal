@@ -80,7 +80,8 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
 			then.push(chunk.join(N).trimEnd())
 			break
 		}
-		const h = /^(.+?)(?:@([A-Za-z0-9]+))? (replace|insert-before|insert-after|delete|create|write)(?: (\d+)(?:-(\d+))?)?\s*$/i.exec(line)
+		const header = line.replace(/:(\d+(?:-\d+)?)\s+(replace|delete|insert-before|insert-after)\s*$/i, ' $2 $1').replace(/\b(replace|delete|insert-before|insert-after):(\d+(?:-\d+)?)\s*$/i, '$1 $2')
+		const h = /^(.+?)(?:@([A-Za-z0-9]+))? (replace|insert-before|insert-after|delete|create|write)(?: (\d+)(?:-(\d+))?)?\s*$/i.exec(header)
 		if (!h) throw new Error(`EDIT line ${at}: expected "<path>@<version> <operation> [lines]", got ${JSON.stringify(line.slice(0, 120))}. Operations: replace A-B, insert-before N, insert-after N, delete A-B, delete (file), replace (text), create, write`)
 		const [, path, hash, operation, a, b] = h, op = operation!.toLowerCase()
 		const need = (ok: boolean, what: string) => {

@@ -202,6 +202,18 @@ test('counts reject invalid values and non-text selectors without writing', asyn
  }
 })
 
+test('colon ranges beside the path or operation keep versions and range validation', () => {
+ for (const op of ['replace', 'DELETE', 'insert-before', 'INSERT-AFTER']) {
+  const block = op.toLowerCase() === 'delete' ? '' : '\n!!NEW\ntesting\n!!END'
+  const range = op.toLowerCase().startsWith('insert-') ? '5' : '5-6'
+  for (const path of ['foo.txt', 'foo.txt@abcde']) {
+   const expected = parseBlocks(`${path} ${op} ${range}${block}`)
+   expect(parseBlocks(`${path}:${range} ${op}${block}`)).toEqual(expected)
+   expect(parseBlocks(`${path} ${op}:${range}${block}`)).toEqual(expected)
+  }
+ }
+})
+
 test('all existing range forms remain accepted; a whole-file write combines with nothing', async () => {
  for (const range of [2, '2', '2-2', '2,2', [2], [2, 2]]) {
   const a = file('a', ['first', 'second', 'third'].join(nl)), hash = fileText.hash(readFileSync(a))
