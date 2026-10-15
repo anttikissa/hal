@@ -15,7 +15,7 @@ type Out = { out(text: string): void; err(text: string): void }
 function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; done: Promise<number> } {
 	let finish!: (code: number) => void
 	let done = new Promise<number>((resolve) => (finish = resolve))
-	let id = '', session = '', modelId = '', promptId = ''
+	let id = '', session = '', modelId = '', probeId = '', promptId = ''
 	let begun = false, started = false, settled = false, noUser = false
 	let targets: { tabs: string[]; sessions: string[] } | undefined
 	let text = ''
@@ -60,12 +60,20 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 			return
 		}
 		if (e.type === 'warning') return io.err(`hal: ${e.text}\n`)
-		if (e.type === 'rejected' && e.id !== undefined && [id, modelId, promptId].includes(e.id)) return fail(e.reason, e.id === id && job.session ? 2 : 1)
+		if (e.type === 'rejected' && e.id !== undefined && [id, modelId, probeId, promptId].includes(e.id)) return fail(e.reason, e.id === id && job.session ? 2 : 1)
 		if (e.type === 'ack' && e.id === id && e.tab && !job.session) {
 			session = e.tab
 			connection.send({ type: 'open', sessionId: session })
 			return job.model ? opened() : undefined
 		}
+		// /model may say nothing, and its error follows its ack. The host
+		// answers a later command only after that error, so the probe's
+		// ack means /model succeeded.
+		if (e.type === 'ack' && e.id === modelId && !probeId) {
+			probeId = connection.nextId()
+			return connection.send({ type: 'complete', sessionId: session, text: '', id: probeId })
+		}
+		if (e.type === 'ack' && e.id === probeId && !promptId) return submit()
 		if (!('sessionId' in e) || e.sessionId !== session) return
 		if (e.type === 'snapshot' && !promptId && !modelId && (job.session || !job.model)) {
 			// Without a default model a new tab is the intro, which only asks.
@@ -73,8 +81,7 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 			connection.send({ type: 'tab-close', sessionId: session })
 			return fail('no default model yet: pass -m <model>, or run hal to choose one', 2)
 		}
-		if (e.type === 'output' && modelId && !promptId) {
-			if (!e.error) return submit()
+		if (e.type === 'output' && e.error && modelId && !promptId) {
 			if (!job.session) connection.send({ type: 'tab-close', sessionId: session })
 			return fail(e.text)
 		}

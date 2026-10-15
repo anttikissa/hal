@@ -42,6 +42,27 @@ test('print refuses a new tab running the intro', async () => {
 	})
 })
 
+// Invariant (bug fix): hal -p sends its prompt after /model even when
+// /model prints nothing, and not after a /model error.
+test('print submits after a silent /model and fails on its error', async () => {
+	for (let error of [false, true]) {
+		await harness({ prompt: 'task', cwd: '/tmp', model: 'anthropic/claude-opus-5-5' }, async ({ run, sent, event }) => {
+			run.begin()
+			event({ type: 'ack', id: sent[0].id, tab: '07-bah' })
+			let model = sent.find((s) => s.type === 'submit')
+			event({ type: 'ack', id: model.id })
+			if (error) event({ type: 'output', sessionId: '07-bah', text: 'no such model', error: true } as Event)
+			let probe = sent.at(-1)
+			event({ type: 'ack', id: probe.id })
+			let prompt = sent.find((s) => s.type === 'submit' && s.text === 'task')
+			if (error) return expect(await run.done).toBe(1), expect(prompt).toBeUndefined()
+			event({ type: 'turn-start', sessionId: '07-bah', provider: 'test', command: prompt.id })
+			event({ type: 'turn-end', sessionId: '07-bah', status: 'completed' })
+			expect(await run.done).toBe(0)
+		})
+	}
+})
+
 test('print queues a user prompt and ignores the preceding turn', async () => {
 	await harness({ prompt: 'answer', cwd: '/tmp', session: '1', delivery: 'queue' }, async ({ run, sent, event, out }) => {
 		event(tabs)
