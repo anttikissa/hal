@@ -20,7 +20,7 @@
 		'Generated usage (no syntax.usage) wraps the options object in [ ... ] when none of its fields is required, shows a field value only from a schema default (else a "<name>" placeholder, never a fake 1), and HELP fields show the schema default. GOOGLE num declares default 5 in its schema. Tested in native-tool.test.ts.',
 		'HELP lists only fields with a description; an undocumented field is internal (e.g. the multiedit plugin edits and then, filled by its own parser). Every field a user types must have a description.',
 		'READ_BLOB history references: <session id>/<n>[.<m>] or, in the current session, a kind letter plus number (t35, u35.2). The old # form (sessionId#t35.1) is gone; pruning markers emit <session id>/<n>. Blob ids from cut outputs are current, not legacy.',
-		'A provider call named for a Hal tool with a cmd string (observed: COMMAND { cmd: "/rename x" } from Opus 5.5, session 175-cub) runs as tool { cmd: "COMMAND /rename x" } (native-tool.ts renamed). Invariant: an unambiguous call never fails as an unknown tool. Its failed card had nothing more to show when opened, since the title already held its only field.'
+		'Provider calls named for a Hal tool (COMMAND { cmd } instead of tool { cmd }) stay unknown-tool errors: seen once in 15,836 calls, too rare for code (user, 15 Oct).'
 	],
 	needs: ['gr', 'asp']
 }
