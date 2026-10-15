@@ -1,0 +1,10 @@
+{
+	title: 'EDIT returns visible file versions and numbered content',
+	spec: 'Restore the invariant that successful EDIT results show the requested file path, its current content version and numbered resulting content without another READ. Reuse fileText.read and the normal READ default line and output limits, with continuation guidance. Retain verified diffs below the numbered content. The shared host presentation exposes both content and diff in terminal and web, preserves compact file/change-count titles, and uses requested paths rather than canonical absolute paths. Deletions retain an explicit deletion result and diff, without fabricating content or a version. Preserve recorded old EDIT presentations and existing errors and trailing-call output. Keep focused regression coverage of the result/presentation contract.',
+	status: 'done',
+	notes: [
+		'Use fileText.read on the already verified planned bytes, with tools.readLines and normal READ output limits and continuation guidance; no disk reread or new context-selection algorithm. Preserve the first processed requested path alongside its canonical I/O path. The result keeps the verified header, numbered content, a diff separator and the existing diff. Shared cards slice the content and diff separately while retaining old-result parsing. Focused integration checks versions, numbered content, requested paths and valid shared presentation ranges.'
+	],
+	needs: ['aaj', 'sn7'],
+	foldInto: ['aaj']
+}

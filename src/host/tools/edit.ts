@@ -13,7 +13,7 @@ import { fileText, type Change } from '../file-text.ts'
 import { textDiff } from '../text-diff.ts'
 import { paths } from '../paths.ts'
 
-type Plan = { path: string; before: Buffer | null; next: Buffer | null; ranges: Change[]; mode?: number; kind?: string; diff?: string }
+type Plan = { path: string; name: string; before: Buffer | null; next: Buffer | null; ranges: Change[]; mode?: number; kind?: string; diff?: string }
 const N = String.fromCharCode(10)
 const help = [
 	'Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:',
@@ -288,7 +288,7 @@ export const tool: Tool = {
 						const before = await load(path)
 						if (before && before.length > tools.maxFileBytes) throw new Error(`${path} is too large`)
 						if (before) fileText.text(before, path)
-						plans.set(path, p = { path, before, next: before ?? Buffer.alloc(0), ranges: [] })
+						plans.set(path, p = { path, name: e.path as string, before, next: before ?? Buffer.alloc(0), ranges: [] })
 					}
 					const kind = e.delete !== undefined ? 'whole' : e.old !== undefined ? 'text' : e.range !== undefined || e.insert !== undefined ? 'range' : 'whole'
 					if ('count' in e && (kind !== 'text' || e.range !== undefined || e.lines !== undefined || !Number.isSafeInteger(e.count) || (e.count as number) < 1)) throw new Error('count requires exact text and a positive safe integer')
@@ -393,7 +393,10 @@ export const tool: Tool = {
 					throw new Error(`${error.message}
 ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recovery}` : 'Rolled back all writes.'}`)
 				}
-				return changed.map((p) => `== ${p.path}${p.next === null ? ' deleted' : `@${fileText.hash(p.next)}`} verified ==${String.fromCharCode(10)}${p.diff}`).join(String.fromCharCode(10))
+				return changed.map((p) => [
+					p.next === null ? `== ${p.name} deleted verified ==` : fileText.read(p.name, p.next, 1, tools.readLines, true).replace(/^== READ (.*) ==/, '== $1 verified =='),
+					'== diff ==', p.diff
+				].join(N)).join(N)
 			})()
 		} catch (e) {
 			failure = e

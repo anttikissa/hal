@@ -6,6 +6,8 @@ import { fileChanges } from '../file-changes.ts'
 import { fileText } from '../file-text.ts'
 import { client, created, testHome, useHost } from '../host-fixture.test.ts'
 import { paths } from '../paths.ts'
+import { toolPresentations } from '../tool-presentation.ts'
+import { toolPresentation } from '../../common/tool-presentation.ts'
 
 useHost()
 
@@ -45,12 +47,21 @@ const file = (name: string, text: string) => { writeFileSync(`${testHome()}/${na
 
 test('text steps, version-checked ranges and creation commit together with verified feedback', async () => {
  const a = file('a', 'old'), b = file('b', ['a', 'b', 'c'].join(crlf))
- const out = await run([{ path: 'a', old: 'old', new: 'new' }, { path: 'a', old: 'new', new: 'done' }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 2, lines: ['B'] }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 3, lines: [] }, { path: 'deep/new', new: 'created' }])
+ const edits = [{ path: 'a', old: 'old', new: 'new' }, { path: 'a', old: 'new', new: 'done' }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 2, lines: ['B'] }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 3, lines: [] }, { path: 'deep/new', new: 'created' }]
+ const out = await run(edits)
  expect(readFileSync(a, 'utf8')).toBe('done')
  expect(readFileSync(b, 'utf8')).toBe(['a', 'B'].join(crlf))
  expect(readFileSync(`${testHome()}/deep/new`, 'utf8')).toBe('created')
- expect(out).toContain(`@${fileText.hash(readFileSync(a))} verified`)
+ expect(out).toContain(`== a@${fileText.hash(readFileSync(a))} verified ==\n1: done\n== diff ==`)
+ expect(out).not.toContain(testHome())
  expect(out).toContain('+1 done')
+ const card = toolPresentations.present({ type: 'tool_call', id: 'edit', name: 'edit', input: { edits } }, { type: 'tool_result', id: 'edit', output: out })!
+ toolPresentation.check(card, out)
+ expect(card.blocks.map((b) => b.kind)).toEqual(['text', 'diff', 'text', 'diff', 'text', 'diff'])
+ const at = card.blocks.findIndex((b) => b.kind === 'diff' && b.path === 'a')
+ expect(at).toBeGreaterThan(0)
+ expect(toolPresentation.text(card.blocks[at - 1]!, out)).toBe(`== a@${fileText.hash(readFileSync(a))} verified ==\n1: done`)
+ expect(toolPresentation.text(card.blocks[at]!, out)).toContain('+1 done')
 })
 
 test('failures validate before writes, including duplicate aliases and stale ranges', async () => {
@@ -198,7 +209,7 @@ test('file deletion accepts advisory versions, commits with edits and deletes em
  expect(existsSync(a)).toBe(false)
  expect(existsSync(empty)).toBe(false)
  expect(readFileSync(b, 'utf8')).toBe('new')
- expect(out).toContain(`${a} deleted verified`)
+ expect(out).toContain('== a deleted verified ==')
  expect(out).toContain('-1 remove')
 })
 

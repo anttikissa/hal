@@ -31,13 +31,18 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 		}]
 	}
 	const tail = result.output.indexOf('\n== then '), end = tail < 0 ? result.output.length : tail
-	const blocks = headers.map((m, i) => ({
-		kind: 'diff' as const,
-		path: m[1]!,
-		text: { from: m.index! + m[0].length, to: headers[i + 1]?.index ?? end }
-	}))
-	// foo.ts +2-2, +new.ts +110, -old.ts, named as the call named them.
 	const named = (path: string) => names.find((p) => path === p || path.endsWith(`/${p.replace(/^\.\//, '')}`)) ?? path
+	const divider = '\n== diff ==\n'
+	const blocks = headers.map((m, i) => {
+		const from = m.index! + m[0].length, to = headers[i + 1]?.index ?? end
+		const at = result.output.indexOf(divider, from - 1)
+		return {
+			kind: 'diff' as const,
+			path: named(m[1]!),
+			text: { from: at >= from - 1 && at < to ? at + divider.length : from, to }
+		}
+	})
+	// foo.ts +2-2, +new.ts +110, -old.ts, named as the call named them.
 	const files = headers.map((m, i) => {
 		const path = named(m[1]!)
 		if (m[2] === ' deleted') return `-${path}`
@@ -47,7 +52,9 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 	})
 	return {
 		title: `> ${files.join(', ')}`,
-		blocks: [...blocks, ...(tail < 0 ? [] : [{
+		blocks: [...blocks.flatMap((block, i) => block.text.from > headers[i]!.index! + headers[i]![0].length
+			? [{ kind: 'text' as const, text: { from: headers[i]!.index!, to: block.text.from - divider.length } }, block]
+			: [block]), ...(tail < 0 ? [] : [{
 			kind: 'text' as const,
 			text: { from: tail + 1, to: result.output.length }
 		}])]
