@@ -1,0 +1,7 @@
+{
+	title: 'Long Bash cards do not repeat an undescribed one-line command',
+	spec: 'In the terminal, a long Bash call whose title shows its single-line command does not repeat that command in its details. Description-bearing and multiline calls retain command details. Declared modified files and other controls remain visible. This restores the invariant that a fully visible command is shown once. Web rendering stays unchanged.',
+	status: 'done',
+	needs: ['gj4'],
+	foldInto: ['gj4']
+}

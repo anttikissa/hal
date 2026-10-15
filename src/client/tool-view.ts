@@ -42,7 +42,9 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
 		let partial = item.partial?.replace(/\n$/, '')
 		if (partial && look.streamRows !== undefined) partial = partial.split('\n').slice(-look.streamRows).join('\n')
-		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])]
+		let details = toolDetails.lines(item.name, item.input)
+		if (bash && !(typeof item.input.description === 'string' && item.input.description.trim()) && typeof command === 'string' && !command.includes('\n')) details = details.slice(1)
+		return [...rows, ...details.flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])]
 	}
 	// Running output takes the rows its short result will, so the card
 	// keeps its height when the call finishes (task 4y4).
