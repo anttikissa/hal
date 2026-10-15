@@ -234,20 +234,23 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	expect(sessions.open(id).model).toBe('hal/intro')
 })
 
-test('the Serper key step never traps: an empty key or Escape moves on', async () => {
-	for (let escape of [false, true]) {
+test('the Serper step never traps: Maybe later, an empty key or Escape moves on and says how to set it up later', async () => {
+	for (let skip of ['later', 'empty', 'escape']) {
 		let c = client(), id = created(c)
 		c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
 		await reply(c, id, 'name', '', 'login')
 		await reply(c, id, 'login', 'Skip', 'search')
-		await reply(c, id, 'search', 'Yes', 'key')
-		if (escape) c.conn.send({ type: 'pause', sessionId: id })
-		else await reply(c, id, 'key', '  ')
+		if (skip === 'later') await reply(c, id, 'search', 'Maybe later')
+		else {
+			await reply(c, id, 'search', 'Yes', 'key')
+			if (skip === 'escape') c.conn.send({ type: 'pause', sessionId: id })
+			else await reply(c, id, 'key', '  ')
+		}
 		await reply(c, id, 'toolCards', 'short')
 		await reply(c, id, 'theme', 'hal')
 		await reply(c, id, 'language', '')
 		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
-		expect(texts(c.views.get(id)!).join('\n')).toContain('Skipped web search')
+		expect(texts(c.views.get(id)!).join('\n').split('run /intro again to set up Serper')).toHaveLength(2)
 		// Login was skipped: the close points to /login.
 		expect(texts(c.views.get(id)!).at(-1)).toContain('/login')
 		expect(apiKeys.get('serper')).toBeUndefined()

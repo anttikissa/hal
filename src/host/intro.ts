@@ -292,17 +292,19 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	let model = chosen === undefined ? undefined : options.get(chosen) ?? [...options.values()].find((id) => id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'))
 
 	let search = answered(run, 'search')
+	let later = 'If you change your mind, run /intro again to set up Serper.'
 	if (!auth.serperKey() && search === undefined) return reply({
-		say: 'I recommend [Serper](https://serper.dev/signup), which gives all models Google search results. Its free tier goes a long way. Without a key, GPT and Claude models use their built-in web search. Run /intro again to set up Serper later.',
+		say: 'Recommended: [Serper](https://serper.dev/signup) adds uniform Google search results for all models. Its free tier goes a long way. OpenAI and Anthropic can use their native web search as a fallback.',
 		ask: { text: 'Set up a Serper web search key?', fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }] },
 	})
+	if (search === 'Maybe later' && !auth.serperKey() && !said(run, later)) say.push(later)
 	// An empty key or Escape skips: the step must never trap the user.
 	if (search === 'Yes' && !auth.serperKey()) {
 		// Secrets stay out of history: only this turn's answers hold the key.
 		let key = answers?.key ?? (replied(run, 'key') ? '' : undefined)
 		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
 		if (key.trim()) apiKeys.save('serper', key.trim())
-		else if (answers?.key !== undefined || !replied(run, 'language')) say.push('Skipped Serper for now.')
+		else if ((answers?.key !== undefined || !replied(run, 'language')) && !said(run, later)) say.push(later)
 	}
 	// Card verbosity (task 5zq): sample cards first, then the question,
 	// whose rows preview on them while it is open (Field.cards).
