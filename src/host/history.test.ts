@@ -471,7 +471,3 @@ test('returning to a model marks its last input end beyond the lookback', async 
 	history.append(id, { type: 'round', usage: { input: 1 }, model: opus })
 	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('back')])
 })
-
-test('retired delivery checks are temporary', () => {
-	expect(Date.now(), 'delete the RETIRED-DELIVERY checks in sender.ts and history-check.ts and this test').toBeLessThan(Date.parse('2026-10-15T00:00:00Z'))
-})

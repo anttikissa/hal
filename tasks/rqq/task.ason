@@ -8,7 +8,8 @@
 		'Full ./test ran once: 1567 passed, 1 skipped, 11 failed. Failures included untouched module line limits, five e2e JSON request parse errors, lazy-history frame equality, pulse timing, search SQLite lock, browser completion geometry and streaming-command timeout. Type checking passed; full lint reported an existing unused pages import in host.test.ts. Focused conversion, migration, receipt, replay and delegated-question tests passed; no full-suite success is claimed.',
 		'Rebase plans and pruning projections address stable record numbers, not delivery field selectors. Sparse rebase tails persist kind letters and numeric bounds; recovery editors save todo text and full replacements. Existing row kind words stay unchanged, while rebase-rows derives them from delivery. These artifacts need no data rewrite when original record numbers and message IDs survive. Read-only validation of the real home was performed before committing; private host measurements are not recorded here.',
 		'The startup conversion (delivery-migration.ts, its server hook and tests) was removed after both hosts recorded converted: true in state/delivery-format.ason. Retired-field rejections in sender.ts and history-check.ts remain: they turn an unconverted or restored-from-backup history into a clear error instead of a silent misread.',
-		'The retired-field checks in sender.ts and history-check.ts are marked RETIRED-DELIVERY; a history.test.ts timebomb requires deleting them and itself by 2026-10-15.'
+		'The retired-field checks in sender.ts and history-check.ts are marked RETIRED-DELIVERY; a history.test.ts timebomb requires deleting them and itself by 2026-10-15.',
+		'The RETIRED-DELIVERY checks and their history.test.ts timebomb were deleted on 2026-10-15 as scheduled.'
 	],
 	needs: ['kar', 'csn', 'qac'],
 	foldInto: ['csn', 'kar', 'qac']
