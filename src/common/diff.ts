@@ -16,7 +16,7 @@ function stats(text: string): { added: number; removed: number; lines: string } 
 	let added = 0, removed = 0, at = 1, gone = false, marks: number[] = []
 	let mark = (n: number) => { if (marks.at(-1) !== n) marks.push(n) }
 	for (let row of text.split('\n')) {
-		let m = /^([ +-]) *(\d+) /.exec(row)
+		let m = /^([ +-]) *(\d+)(?::)? /.exec(row)
 		if (!m) continue
 		let n = +m[2]!
 		if (m[1] === '-') {

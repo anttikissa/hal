@@ -99,8 +99,8 @@ test('READ shows the whole file version; ranges clamp', async () => {
 	let whole = (await act(id, 'READ a.txt')).output
 	let h = versionOf(whole)
 	expect((await act(id, 'READ "a.txt:0-15"')).output).toBe(whole)
-	expect((await act(id, 'READ "a.txt:12-"')).output).toBe(`== READ a.txt@${h} ==\n12: 12\n13: 13`)
-	expect((await act(id, 'READ "a.txt:15-14"')).output).toBe(`== READ a.txt@${h} ==\n[Empty range: the file has 13 lines]`)
+	expect((await act(id, 'READ "a.txt:12-"')).output).toBe(`== a.txt@${h} ==\n12: 12\n13: 13`)
+	expect((await act(id, 'READ "a.txt:15-14"')).output).toBe(`== a.txt@${h} ==\n[Empty range: the file has 13 lines]`)
 })
 
 test('EDIT keeps CRLF, a BOM, a missing final newline and the mode; create makes directories', async () => {

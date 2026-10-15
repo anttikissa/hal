@@ -62,8 +62,8 @@ test('only tools that change nothing count as read-only; unknown ones do not', (
 test('read returns a file relative to the session cwd, answering the call id', async () => {
 	writeFileSync(`${dir}/a.txt`, 'one\ntwo\n')
 	let content = `@${fileText.hash(Buffer.from('one\ntwo\n'))} ==\n1: one\n2: two`
-	expect(await read({ path: 'a.txt' })).toEqual({ type: 'tool_result', id: 'c1', output: `== READ a.txt${content}` })
-	expect((await read({ path: `${dir}/a.txt` })).output).toBe(`== READ ${dir}/a.txt${content}`)
+	expect(await read({ path: 'a.txt' })).toEqual({ type: 'tool_result', id: 'c1', output: `== a.txt${content}` })
+	expect((await read({ path: `${dir}/a.txt` })).output).toBe(`== ${dir}/a.txt${content}`)
 })
 
 test('read pages through a long file and says how to continue', async () => {

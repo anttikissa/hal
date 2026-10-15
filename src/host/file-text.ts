@@ -50,7 +50,7 @@ function numbered(lines: string[], shown: number[]): string {
 // the range was a default, so say how to read more when lines remain.
 function read(path: string, bytes: Uint8Array, offset = 1, limit?: number, hint = false): string {
 	let { lines } = fileText.text(bytes, path)
-	let header = `== READ ${path}@${fileText.hash(bytes)} ==`
+	let header = `== ${path}@${fileText.hash(bytes)} ==`
 	if (!lines.length) return `${header}\n[Empty file]`
 	let start = Math.max(1, offset)
 	let end = Math.min(lines.length, limit === undefined ? lines.length : offset + limit - 1)

@@ -44,7 +44,7 @@ export const tool: Tool<ToolOutput> = {
 	name: 'read',
 	description:
 		'Read files, images, directories, or URLs; multiple paths are accepted. Relative paths start from cwd. ' +
-		'Text results start with == READ path@version ==, followed by numbered lines. EDIT requires that version. ' +
+		'Text results start with == path@version ==, followed by numbered lines. EDIT requires that version. ' +
 		'Ranges are 1-based and inclusive. Default: first 200 lines; path:1- reads all. ' +
 		'Images attach directly; URLs return readable text or save other files under /tmp. Sensitive local paths are refused in best-effort mode.',
 	syntax: {

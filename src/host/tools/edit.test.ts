@@ -8,6 +8,7 @@ import { client, created, testHome, useHost } from '../host-fixture.test.ts'
 import { paths } from '../paths.ts'
 import { toolPresentations } from '../tool-presentation.ts'
 import { toolPresentation } from '../../common/tool-presentation.ts'
+import { tools } from '../tools.ts'
 
 useHost()
 
@@ -45,23 +46,33 @@ const nl = String.fromCharCode(10), crlf = String.fromCharCode(13, 10)
 const run = (edits: unknown[], signal = new AbortController().signal) => multiedit.run({ edits }, { cwd: testHome(), sessionId: created(client(), testHome()), signal, callId: 'edit' })
 const file = (name: string, text: string) => { writeFileSync(`${testHome()}/${name}`, text); return `${testHome()}/${name}` }
 
-test('text steps, version-checked ranges and creation commit together with verified feedback', async () => {
+test('text steps, version-checked ranges and creation return contents or a single diff', async () => {
  const a = file('a', 'old'), b = file('b', ['a', 'b', 'c'].join(crlf))
  const edits = [{ path: 'a', old: 'old', new: 'new' }, { path: 'a', old: 'new', new: 'done' }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 2, lines: ['B'] }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 3, lines: [] }, { path: 'deep/new', new: 'created' }]
  const out = await run(edits)
  expect(readFileSync(a, 'utf8')).toBe('done')
  expect(readFileSync(b, 'utf8')).toBe(['a', 'B'].join(crlf))
  expect(readFileSync(`${testHome()}/deep/new`, 'utf8')).toBe('created')
- expect(out).toContain(`== a@${fileText.hash(readFileSync(a))} verified ==\n1: done\n== diff ==`)
+ expect(out).toContain(`== a@${fileText.hash(readFileSync(a))} ==\n-1: old\n+1: done`)
  expect(out).not.toContain(testHome())
- expect(out).toContain('+1 done')
+ expect(out).toContain(`== deep/new@${fileText.hash(Buffer.from('created'))} ==\n1: created`)
  const card = toolPresentations.present({ type: 'tool_call', id: 'edit', name: 'edit', input: { edits } }, { type: 'tool_result', id: 'edit', output: out })!
  toolPresentation.check(card, out)
- expect(card.blocks.map((b) => b.kind)).toEqual(['text', 'diff', 'text', 'diff', 'text', 'diff'])
- const at = card.blocks.findIndex((b) => b.kind === 'diff' && b.path === 'a')
- expect(at).toBeGreaterThan(0)
- expect(toolPresentation.text(card.blocks[at - 1]!, out)).toBe(`== a@${fileText.hash(readFileSync(a))} verified ==\n1: done`)
- expect(toolPresentation.text(card.blocks[at]!, out)).toContain('+1 done')
+ expect(card.blocks).toHaveLength(1)
+ expect(toolPresentation.text(card.blocks[0]!, out)).toBe(out)
+})
+
+test('whole-file writes return READ output; uppercase operations return only a contextual diff', async () => {
+ const a = file('a', 'before'), id = created(client(), testHome())
+ const output = await run(parseBlocks('a WRITE\n!!NEW\none\ntwo\nthree\n!!END').edits)
+ const read = await tools.run({ type: 'tool_call', id: 'read', name: 'read', input: { path: 'a', offset: 1 } }, { cwd: testHome(), sessionId: id, signal: new AbortController().signal })
+ expect(output).toBe(read.output)
+ const changed = await run(parseBlocks('a REPLACE\n!!OLD\ntwo\n!!NEW\nkaksi\n2\n!!END').edits)
+ expect(changed).toBe(`== a@${fileText.hash(readFileSync(a))} ==\n 1: one\n-2: two\n+2: kaksi\n+3: 2\n 4: three`)
+ for (const operation of ['CREATE', 'DELETE', 'INSERT-BEFORE 1', 'INSERT-AFTER 1']) {
+  const block = operation === 'DELETE' ? '' : '\n!!NEW\nx\n!!END'
+  expect(parseBlocks(`b ${operation}${block}`).edits).toHaveLength(1)
+ }
 })
 
 test('failures validate before writes, including duplicate aliases and stale ranges', async () => {
@@ -209,8 +220,8 @@ test('file deletion accepts advisory versions, commits with edits and deletes em
  expect(existsSync(a)).toBe(false)
  expect(existsSync(empty)).toBe(false)
  expect(readFileSync(b, 'utf8')).toBe('new')
- expect(out).toContain('== a deleted verified ==')
- expect(out).toContain('-1 remove')
+ expect(out).toContain('== a deleted ==')
+ expect(out).toContain('-1: remove')
 })
 
 test('invalid or mixed file deletions reject the whole batch', async () => {

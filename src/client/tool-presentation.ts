@@ -1,7 +1,5 @@
 // A plugin's tool presentation as terminal rows (tasks 0hy, sn7): the
-// error once, then its blocks, then live output; short cards preview
-// them in the short row budget, open ones end with where the raw call
-// and result are.
+// error once, then its blocks and live output, within the row budget.
 
 import { toolPresentation, type ToolPresentation } from '../common/tool-presentation.ts'
 import { diff } from '../common/diff.ts'
@@ -39,9 +37,7 @@ function call(item: Item & { type: 'tool' }, head: string, width: number, fold: 
 	return fold === 'long' ? rows : [head, ...presentationView.cut(rows.slice(1), settings.shortRows() - 1, width, style)]
 }
 
-// A presented result's rows: the complete error when it failed or
-// stopped, then the blocks in normal output color (`normal`), then,
-// open, where the raw call and result are (`raw`).
+// A presented result shows complete failures followed by its blocks.
 function result(item: Item & { type: 'tool-result' }, out: string, width: number, max: number, style: Style | undefined, normal: Style | undefined, raw: string | undefined): string[] {
 	let rows = item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []
 	if (item.isError || item.interrupted || !item.presentation) rows.push(...ansi.wrap(ansi.clean((item.isError ? '✗ ' : '') + out), width))
@@ -51,7 +47,6 @@ function result(item: Item & { type: 'tool-result' }, out: string, width: number
 		let color = item.isError && normal?.fg && !ansi.mono() ? (r: string) => ansi.sgr({ fg: normal.fg! }) + r + back : (r: string) => r
 		rows.push(...blocks.map(color))
 	}
-	if (max === Infinity && raw) rows.push(ansi.quiet(strings.clipVisual(`Raw call and result: ${raw}`, width), item.isError ? normal : style))
 	return presentationView.cut(rows, max, width, style)
 }
 

@@ -1,0 +1,7 @@
+{
+	title: 'READ and EDIT share concise versioned file output',
+	spec: 'READ text output starts == path@version == without READ. Whole-file EDIT writes and creations return the same numbered contents as READ; partial edits return only changed files as == path@new-version == followed by a diff, with one unchanged line of context on each side. Diff lines use a leading space, minus or plus followed by the line number and colon: 1: for context, -2: removed, +2: added. Removed numbers refer to the old file and added/context numbers to the new file. There is no verified label, repeated full-file contents beside a diff, or repeated path between the header and diff. EDIT operation names are case-insensitive. EDIT descriptions remain titles. Pending cards add no Requested edit placeholder; unchanged edits report path: no changes. Terminal cards omit routine raw-history footers; complete errors remain visible and raw data stays in session history. Shared file feedback applies to both clients; terminal-only footer removal does not alter web UI. Invariants restored: each file result is shown once in a consistent numbered format and valid uppercase operations are accepted.',
+	status: 'done',
+	needs: ['f0h'],
+	foldInto: ['f0h']
+}

@@ -28,7 +28,7 @@ const help = [
 	'Block content is literal: no quoting or escaping. Only a content line that is itself a marker needs one extra ! ' +
 	'(write !!!END for a literal !!END line). Always submit the <version> READ gave (<path>@<version>); line numbers ' +
 	'are 1-based, inclusive and all refer to that version. Text replaces apply after a file\'s line operations. ' +
-	'Nothing is written unless every operation validates. Results show verified diffs and new versions; no ' +
+	'Nothing is written unless every operation validates. Results show file contents or diffs with new versions; no ' +
 	'confirmation READ is needed.',
 ].join(N)
 
@@ -80,9 +80,9 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
 			then.push(chunk.join(N).trimEnd())
 			break
 		}
-		const h = /^(.+?)(?:@([A-Za-z0-9]+))? (replace|insert-before|insert-after|delete|create|write)(?: (\d+)(?:-(\d+))?)?\s*$/.exec(line)
+		const h = /^(.+?)(?:@([A-Za-z0-9]+))? (replace|insert-before|insert-after|delete|create|write)(?: (\d+)(?:-(\d+))?)?\s*$/i.exec(line)
 		if (!h) throw new Error(`EDIT line ${at}: expected "<path>@<version> <operation> [lines]", got ${JSON.stringify(line.slice(0, 120))}. Operations: replace A-B, insert-before N, insert-after N, delete A-B, delete (file), replace (text), create, write`)
-		const [, path, hash, op, a, b] = h
+		const [, path, hash, operation, a, b] = h, op = operation!.toLowerCase()
 		const need = (ok: boolean, what: string) => {
 			if (!ok) throw new Error(`EDIT line ${at}: ${op} ${what}`)
 		}
@@ -355,12 +355,12 @@ export const tool: Tool = {
 				if (failures.length) throw new Error(`Nothing written: ${failures.join('; ')}`)
 				const changed = [...plans.values()].filter((p) => p.next === null || !p.before?.equals(p.next))
 				for (const p of changed) {
-					p.diff = textDiff.text(p.before?.toString() ?? '', p.next?.toString() ?? '', Infinity, true)
+					p.diff = textDiff.text(p.before?.toString() ?? '', p.next?.toString() ?? '', Infinity, true).replace(/^([ +-])\s*(\d+) /gm, '$1$2: ')
 					const now = await load(p.path)
 					if (p.before ? !now?.equals(p.before) : now !== null) throw new Error(`${p.path} changed while planning; nothing written`)
 				}
 				check(ctx)
-				if (!changed.length) return 'Unchanged; nothing written.'
+				if (!changed.length) return [...plans.values()].map((p) => `${p.name}: no changes`).join(N)
 				await mkdir(paths.tmpDir(), { recursive: true })
 				recovery = await mkdtemp(`${paths.tmpDir()}/multiedit-`)
 				await writeFile(`${recovery}/manifest.json`, JSON.stringify(changed.map((p, i) => ({
@@ -393,10 +393,9 @@ export const tool: Tool = {
 					throw new Error(`${error.message}
 ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recovery}` : 'Rolled back all writes.'}`)
 				}
-				return changed.map((p) => [
-					p.next === null ? `== ${p.name} deleted verified ==` : fileText.read(p.name, p.next, 1, tools.readLines, true).replace(/^== READ (.*) ==/, '== $1 verified =='),
-					'== diff ==', p.diff
-				].join(N)).join(N)
+				return changed.map((p) => p.next === null ? `== ${p.name} deleted ==\n${p.diff}`
+					: p.kind === 'whole' ? fileText.read(p.name, p.next, 1, tools.readLines, true)
+					: `== ${p.name}@${fileText.hash(p.next)} ==\n${p.diff}`).join(N)
 			})()
 		} catch (e) {
 			failure = e
@@ -412,7 +411,7 @@ ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recove
 		} catch (e: any) {
 			cleanup.push(e.message)
 		}
-		if (cleanup.length) throw new Error(`${failure ?? 'Writes verified'}; cleanup: ${cleanup.join('; ')}`)
+		if (cleanup.length) throw new Error(`${failure ?? 'Files written'}; cleanup: ${cleanup.join('; ')}`)
 		if (failure) throw failure
 		let out = result!
 		const then = Array.isArray(input.then) ? input.then as string[] : []
