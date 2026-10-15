@@ -56,6 +56,8 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 			liveFiles.save(meta)
 			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
 		}
-		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.note ? `; ${choice.note}` : ''}${cacheChanged ? '; changing request effort invalidates the Anthropic prompt cache for messages' : ''}`, ...(welcome && { synthetic: welcome }) }
+		// The command line already names the model; say only what it doesn't.
+		let said = [...(previous === next || args.trim() === next ? [] : [`model: ${next}`]), ...(choice.note ? [choice.note] : []), ...(cacheChanged ? ['changing request effort invalidates the Anthropic prompt cache for messages'] : [])]
+		return { ...(said.length && { say: said.join('; ') }), ...(welcome && { synthetic: welcome }) }
 	},
 }

@@ -1,6 +1,6 @@
 {
-	title: '/config set says only what its command line does not',
-	spec: 'A user-run /config <name> <value> shows as one row: the command line, like model-run commands (task 9g). On success it says nothing more when the stored value reads as typed, and adds name: value only when the value was normalized (e.g. 1.0 stored as 1). Setting a stored key to its default says so on the command line itself: "/config <name> <value> (the default - removed from config.ason)". A no-op says nothing. Errors and "settings unchanged" for a non-default value still show. Bare /config only opens the modal and leaves no history record: a command whose record() returns null is run but not recorded.',
+	title: '/config and /model say only what their command line does not',
+	spec: 'A user-run /config <name> <value> shows as one row: the command line, like model-run commands (task 9g). On success it says nothing more when the stored value reads as typed, and adds name: value only when the value was normalized (e.g. 1.0 stored as 1). Setting a stored key to its default says so on the command line itself: "/config <name> <value> (the default - removed from config.ason)". A no-op says nothing. Errors and "settings unchanged" for a non-default value still show. Bare /config only opens the modal and leaves no history record: a command whose record() returns null is run but not recorded. Likewise /model <name> says nothing when the line names the new model exactly or nothing changed; an alias adds model: <resolved id>, and notes (such as a prompt-cache warning) still show.',
 	status: 'done',
 	needs: [],
 	foldInto: ['c0h']
