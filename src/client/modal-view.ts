@@ -169,7 +169,8 @@ function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
 	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + UNCOLOR : r)
-	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - k.length - 2)).map((line, i) => key + (i ? ' '.repeat(k.length + 2) : k + '  ') + desc + line + UNCOLOR))
+	let col = Math.max(...m.blocks!.help.map(([k]) => k.length)) + 2
+	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - col)).map((line, i) => key + (i ? '' : k).padEnd(col) + desc + line + UNCOLOR))
 	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
