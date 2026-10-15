@@ -91,7 +91,19 @@ function multiple(text: string, ctx?: CallContext) {
 	return callText.split(text).map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
 }
 
+// A provider call named for a Hal tool instead of `tool`, as models were
+// seen to send: COMMAND { cmd: '/rename x' } means tool { cmd: 'COMMAND
+// /rename x' }; a cmd that already names the tool is kept as it is.
+function renamed(call: ToolCallBlock): ToolCallBlock {
+	let id = call.name.toLowerCase(), cmd = call.input.cmd
+	if (call.cmd !== undefined || call.name === name || tools.all().has(call.name) || !tools.all().has(id) || typeof cmd !== 'string') return call
+	let named = false
+	try { named = callText.parse(cmd).name === id } catch {}
+	return { ...call, name, input: { cmd: named ? cmd : `${id.toUpperCase()} ${cmd}` } }
+}
+
 function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
+	call = renamed(call)
 	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string') return [nativeTool.arrived(call, ctx)]
 	try {
 		let commands = callText.split(call.input.cmd)
