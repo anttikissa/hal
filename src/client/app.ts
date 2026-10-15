@@ -358,6 +358,7 @@ function reset(): void {
 	find.state = { filters: [...find.state.filters] }
 	find.target = undefined
 	if (app.state.timer) clearTimeout(app.state.timer)
+	clearTimeout(app.state.typing)
 	app.state = createState()
 	pulse.reset()
 	halCursor.reset()
