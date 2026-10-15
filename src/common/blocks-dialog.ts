@@ -27,7 +27,7 @@ function help(items: Item[] = []): [string, string][] {
 		['p', "expand paste markers in the prompt you're writing"],
 	]
 }
-const note = 'User and assistant cards change only when you name them (a, u).'
+const note = 'User and assistant cards toggle only when you ask for it explicitly (a, u).'
 const kinds = ['tool', 'reasoning', 'assistant', 'user', 'message', 'system', 'question']
 
 function open(): ModalState {
