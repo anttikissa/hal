@@ -122,6 +122,9 @@ function lines(text: string, width: number, streaming = false, style?: Style, li
 	let gap = (b: Block | undefined) => b?.type === 'line' && b.kind === 'p' && !b.marker && !b.runs.length
 	let closed = (b: Block | undefined) => b?.type === 'code' && b.close !== undefined
 	let rows = blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
+	// The closing fence's blank row is a gap before more text; at the end of the text
+	// it would vanish on completion, and the high-water mark would keep it as blank.
+	if (streaming && closed(blocks.at(-1))) rows.pop()
 	// Completed text has no trailing empty rows; layout supplies the gap (task fcn).
 	if (!streaming) while (rows.length && !Bun.stripANSI(rows.at(-1)!).trim()) rows.pop()
 	return rows

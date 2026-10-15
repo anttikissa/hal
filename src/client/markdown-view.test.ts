@@ -36,6 +36,11 @@ describe('terminal markdown', () => {
 		}
 	})
 
+	test('a reply ending at its closing fence is as tall streaming as finished', () => {
+		let text = 'Board:\n\n```\nA | B\n```'
+		expect(markdownView.lines(text, 40, true)).toEqual(markdownView.lines(text, 40))
+	})
+
 	test('markers are hidden, code kept as written, every row fits', () => {
 		let rows = markdownView.lines(REPLY, 24)
 		let text = rows.map(visible)

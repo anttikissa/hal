@@ -23,7 +23,8 @@ A streaming block never shrinks, only grows (the user saw the web scroll positio
 		"Reply items once passed only fg to markdownView (itemView.itemStyle), so code in the terminal stayed the text color. Invariant: the style given to markdownView carries the item style's code color.",
 		'Keeping blank rows for both fences doubled the gap around code blocks. Invariant: a code block adds no blank line beyond what surrounds it. While streaming, an empty or partial-fence last line is held back so no row appears and vanishes.',
 		'Host-relative link addresses may have several path segments (/blob/<session>/<blob>, /changes/<id>), not only /<session id>#<block id>. Invariant restored: a [label](/a/b/c) link renders as its label linking to the path; before, the regex accepted one segment, so the user saw the raw brackets and parentheses.',
-		'Bug fix (172-ink): a paused thinking block folded to one row but kept its streaming height as blank rows after Up. Invariant: a typed key releases all high-water padding (frame.state.padded gates it, so keys cost nothing when no block is padded; the history cache is dropped with the marks).'
+		'Bug fix (172-ink): a paused thinking block folded to one row but kept its streaming height as blank rows after Up. Invariant: a typed key releases all high-water padding (frame.state.padded gates it, so keys cost nothing when no block is padded; the history cache is dropped with the marks).',
+		'A reply ending exactly at its closing fence drew its blank close row while streaming; completion trimmed it and the high-water mark padded it back, leaving a stray blank row until the next full redraw (seen under the tic-tac-toe board). Invariant: a streaming text ending at a closed code block has the rows it finishes with; the close row only appears once more text follows.'
 	],
 	needs: [],
 	foldInto: ['cc', '1b']
