@@ -22,6 +22,12 @@ for face in "$@"; do
       file="$face.ttf"
       url='https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf'
       license='https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/OFL.txt' ;;
+    VictorMono-Italic|CascadiaMono-Italic|FragmentMono-Italic|Cousine-Italic)
+      file="$face.ttf"
+      family=$(printf '%s' "${face%-Italic}" | tr '[:upper:]' '[:lower:]')
+      case "$face" in VictorMono-*|CascadiaMono-*) source="$face%5Bwght%5D.ttf" ;; *) source="$file" ;; esac
+      url="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/$source"
+      license="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/OFL.txt" ;;
     *) printf 'Unknown font face: %s\n' "$face" >&2; exit 1 ;;
   esac
   target="src/web/fonts/$file"
