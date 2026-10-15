@@ -109,7 +109,7 @@ You are Hal, a coding agent.
 ::
 
 :: section "READ"
-- Use READ to read files instead of cat or sed. Text files give an editing lease, <filename>@<hash>.
+- Use READ to read files instead of cat or sed. Text files give their version, <filename>@<version>, for EDIT.
 <!-- TODO - to be reviewed by a human -10-zap -->
 - Read only needed ranges. You can read many at a time.
 	READ "src/main.ts:20-60" "src/main.test.ts:80-120"
@@ -140,17 +140,32 @@ You are Hal, a coding agent.
 ::
 
 :: section "EDIT"
-<!-- TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one official, hard-to-misuse form per job; keep the guide short even if slightly inconsistent (e.g. create shown without @version). Tolerate other plausible forms silently, without spending prompt tokens on them (extras/multiedit.ts: !!OLD closed by !!END removes the text; an empty text replace of whole lines also removes their newline). delete A-B stays the documented way to remove lines. Also review the patched multiedit system prompt (the EDIT guide extras/multiedit.ts installs in place of this section). -->
-- Use EDIT for precise changes. It must use the editing lease <filename>@<hash> returned by READ. lines: [] deletes the range.
-	EDIT "src/main.ts@4d9ej" { range: "1-2", lines: ["tic", "tac"] } { range: "5-6", lines: ["toe"] }
+<!-- TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one official, hard-to-misuse form per job; keep the guide short even if slightly inconsistent (e.g. create shown without @version). Tolerate other plausible forms silently, without spending prompt tokens on them (src/host/tools/edit.ts: !!OLD closed by !!END removes the text; an empty text replace of whole lines also removes their newline). delete A-B stays the documented way to remove lines. -->
+- Use EDIT for all file changes. Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:
+    <path>@<version> replace A-B       then !!NEW, new lines, !!END
+    <path>@<version> insert-before N   then !!NEW ... !!END
+    <path>@<version> insert-after N    then !!NEW ... !!END
+    <path>@<version> delete A-B        (no block)
+    <path>@<version> delete            (no block; deletes the file)
+    <path> replace                     then !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)
+    <path> create                      then !!NEW ... !!END (file must not exist)
+    <path>@<version> write             then !!NEW, whole new contents, !!END
+  Block content is literal: no quoting or escaping. Only a content line that is itself a marker needs one extra ! (write !!!END for a literal !!END line). Always submit the <version> READ gave (<path>@<version>); line numbers are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. Nothing is written unless every operation validates. Results show verified diffs and new versions; no confirmation READ is needed.
+Example call text (markers start their lines):
 ::: if session_interactive="true"
-- Start every EDIT with a /* purpose */ comment: EDIT /* Rename helper */ "main.ts@4d9ej" { range: 1, lines: ["..."] }
+EDIT /* Rename handler */
+::: else
+EDIT
 :::
-::
-
-:: section "WRITE"
-- Use WRITE for new files or complete rewrites.
-	WRITE src/main.ts "one\ntwo\nthree\n"
+src/main.ts@4d9ej replace 3-4
+!!NEW
+function process(x) {
+	return x + 1
+!!END
+src/main.ts@4d9ej delete 9-9
+::: if session_interactive="true"
+- Start every EDIT with a descriptive comment: EDIT /* Rename helper to actualHelper in client files */
+:::
 ::
 
 :: section "Other tools"

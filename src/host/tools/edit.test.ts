@@ -1,11 +1,11 @@
-import '../src/host/host.ts'
+import '../host.ts'
 import { expect, test, spyOn } from 'bun:test'
 import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync, chmodSync, statSync, realpathSync } from 'fs'
-import { multiedit, io, parseBlocks } from './multiedit.ts'
-import { fileChanges } from '../src/host/file-changes.ts'
-import { lease } from '../src/host/lease.ts'
-import { client, created, testHome, useHost } from '../src/host/host-fixture.test.ts'
-import { paths } from '../src/host/paths.ts'
+import { tool as multiedit, io, parseBlocks } from './edit.ts'
+import { fileChanges } from '../file-changes.ts'
+import { lease } from '../lease.ts'
+import { client, created, testHome, useHost } from '../host-fixture.test.ts'
+import { paths } from '../paths.ts'
 
 useHost()
 
@@ -79,7 +79,7 @@ test('removing whole lines by text, even with !!OLD alone, leaves no blank line;
 })
 
 test('a call after the last block runs once the edit is written; a failed edit runs none', async () => {
- const a = file('a', 'old' + nl)
+ file('a', 'old' + nl)
  const { edits, then } = parseBlocks(['', 'a replace', '!!OLD', 'old', '!!NEW', 'new', '!!END', 'BASH "cat a"'].join(nl))
  expect(then).toEqual(['BASH "cat a"'])
  const out = await multiedit.run({ edits, then }, { cwd: testHome(), sessionId: created(client(), testHome()), signal: new AbortController().signal, callId: 'edit' })

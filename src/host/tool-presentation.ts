@@ -9,8 +9,12 @@
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolPresentation, type ToolPresentation } from '../common/tool-presentation.ts'
 import { ason } from '../common/ason.ts'
+import { editCard } from './edit-card.ts'
 
-function present(_call: ToolCallBlock, _result?: ToolResultBlock): ToolPresentation | undefined { return undefined }
+// Core presents EDIT; plugins wrap this for their own tools.
+function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentation | undefined {
+	return call.name === 'edit' ? editCard.present(call, result) : undefined
+}
 
 function attach<T extends ToolCallBlock | ToolResultBlock>(call: ToolCallBlock, target: T): T {
 	let presentation: ToolPresentation | undefined

@@ -11,11 +11,11 @@ useHost()
 const expand = (cmd: string) => nativeTool.expand({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd } })
 
 test('compound calls split only between complete top-level commands', () => {
-	let commands = ['WRITE "a.txt" `first\nBASH ls\nlast`', 'EDIT /* keep\nREAD inside comment */ "a.txt@abcde" {\n range: 1, lines: ["READ b.txt"]\n}', 'bash ls', 'BASH "ls -l"']
+	let commands = ['EDIT a.txt create\n!!NEW\nfirst\nBASH ls\nlast\n!!END', 'EDIT /* keep\nREAD inside comment */\na.txt@abcde replace 1-1\n!!NEW\nREAD b.txt\n!!END', 'bash ls', 'BASH "ls -l"']
 	let members = expand(commands.join('\n'))
 	expect(members.map((c) => c.cmd)).toEqual(commands)
-	expect(members.map((c) => c.name)).toEqual(['write', 'edit', 'bash', 'bash'])
-	expect(members[0]!.input.content).toBe('first\nBASH ls\nlast')
+	expect(members.map((c) => c.name)).toEqual(['edit', 'edit', 'bash', 'bash'])
+	expect(members[0]!.input.edits).toEqual([{ path: 'a.txt', new: 'first\nBASH ls\nlast\n', create: true }])
 	expect(new Set(members.map((c) => c.id)).size).toBe(4)
 	expect(members.every((c) => c.sequence === 'compound')).toBe(true)
 	for (let tail of ['NO_SUCH_TOOL x', 'BASH "ls" { evil: true }', 'BASH "unclosed']) {
@@ -37,12 +37,12 @@ test('provider compound calls run sequentially and replay every result with its 
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd: 'WRITE "order.txt" "first\\n"\nBASH "printf second >> order.txt"\nBASH "printf third >> order.txt"\nREAD order.txt' } }, { type: 'done', reason: 'tool_use' })
+		calls[0]!.push({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd: 'EDIT order.txt create\n!!NEW\nfirst\n!!END\nBASH "printf second >> order.txt"\nBASH "printf third >> order.txt"\nREAD order.txt' } }, { type: 'done', reason: 'tool_use' })
 		await until(() => started.length > 0)
-		expect(started).toEqual(['write'])
+		expect(started).toEqual(['edit'])
 		gate.resolve()
 		await until(() => calls.length === 2)
-		expect(started).toEqual(['write', 'bash', 'bash', 'read'])
+		expect(started).toEqual(['edit', 'bash', 'bash', 'read'])
 		expect(readFileSync(`${testHome()}/order.txt`, 'utf8')).toBe('first\nsecondthird')
 		let messages = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 		let invoked = messages.filter((b: any) => b.type === 'tool_call')
@@ -63,7 +63,7 @@ test('direct mode accepts multiple EDITs and preserves runtime errors without dr
 	await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
 	for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, 'old\n')
 	let hash = lease.hash(Buffer.from('old\n'))
-	let cmd = `EDIT "a.txt@${hash}" { range: 1, lines: ["new a"] }\nEDIT "b.txt@${hash}" { range: 1, lines: ["new b"] }\nREAD missing.txt\nREAD a.txt`
+	let cmd = `EDIT\na.txt@${hash} replace 1-1\n!!NEW\nnew a\n!!END\nEDIT\nb.txt@${hash} replace 1-1\n!!NEW\nnew b\n!!END\nREAD missing.txt\nREAD a.txt`
 	c.conn.send({ type: 'submit', sessionId: id, text: cmd })
 	await until(() => c.of('turn-end').length)
 	expect(readFileSync(`${testHome()}/a.txt`, 'utf8')).toBe('new a\n')

@@ -22,7 +22,6 @@ import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { history } from './history.ts'
-import { edit } from './tools/edit.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
@@ -166,9 +165,8 @@ async function round(calls: ToolCallBlock[], ctx: CallContext, runOne: (call: To
 	}
 	let batches = [...groups.values()].flatMap((group) => group.length > 1 && group.every((c) => c.name !== 'command' && tools.readOnly(c.name, c.input)) ? group.map((c) => [c]) : [group])
 	let settled = new Map<string, ToolResultBlock>()
-	let run = await edit.batch(calls.filter((c) => !c.sequence), ctx.cwd, ctx.sessionId, runOne)
 	let dispatch = async (group: ToolCallBlock[]) => {
-		for (let call of group) settled.set(call.id, await run(call))
+		for (let call of group) settled.set(call.id, await runOne(call))
 	}
 	let early = batches.filter((g) => g[0]!.name !== 'wait')
 	await Promise.all(early.map(dispatch))

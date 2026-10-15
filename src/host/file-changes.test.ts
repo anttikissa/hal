@@ -166,7 +166,7 @@ test('generated trees and ignored files are not captured; tracked ignored files 
 	let previous = changes().length
 	await bash('printf again > ignored.txt; printf again > node_modules/pkg/index.js', ['ignored.txt', 'node_modules/pkg/index.js'])
 	expect(changes()).toHaveLength(previous)
-	let write = await tools.run({ type: 'tool_call', id: 'write-ignored', name: 'write', input: { path: 'ignored.txt', content: 'written' } }, context())
+	let write = await tools.run({ type: 'tool_call', id: 'write-ignored', name: 'edit', input: { edits: [{ path: 'ignored.txt', new: 'written' }] } }, context())
 	expect(write.isError).toBeUndefined()
 	expect(readFileSync(`${cwd}/ignored.txt`, 'utf8')).toBe('written')
 	expect(changes()).toHaveLength(previous)

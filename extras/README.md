@@ -14,12 +14,10 @@ Ready-made plugins (task ybg), off until you select one. To enable
 `export { default } from …` has no body for them to edit. Changes to an
 extra itself take effect when the host restarts.
 
-- `multiedit.ts`: block-format EDIT (`!!OLD`/`!!NEW`/`!!END`) that
-  replaces core EDIT and WRITE with one atomic batch. Strict parser.
 - `edit-quirks.ts`: EDIT parser leniency for the models listed in its
-  `quirks` table; others get multiedit's strict errors. Each firing is
+  `quirks` table; others get EDIT's strict errors. Each firing is
   logged to `state/diag.log` with its model, so you can delete quirks
-  nobody uses. Needs `multiedit.ts`.
+  nobody uses.
 - `commit-sloc.ts`: tells the model how many source lines each commit
   added, and rejects background Bash calls containing `git commit` so
   each commit shows in the foreground.

@@ -2,7 +2,6 @@ import '../src/host/host.ts'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, readFileSync } from 'fs'
 import { dirname } from 'path'
-import multiedit from './multiedit.ts'
 import quirks from './edit-quirks.ts'
 import { plugins, type Loaded } from '../src/host/plugins.ts'
 import { nativeTool } from '../src/host/native-tool.ts'
@@ -12,7 +11,7 @@ import { testHome, useHost } from '../src/host/host-fixture.test.ts'
 useHost()
 let entries: Loaded[] = []
 beforeEach(() => {
-	entries = [multiedit, quirks].map((load, i) => { const entry: Loaded = { path: `p${i}.ts`, hash: '', hooks: [], open: true }; load(plugins.api(entry)); delete entry.open; return entry })
+	entries = [quirks].map((load, i) => { const entry: Loaded = { path: `p${i}.ts`, hash: '', hooks: [], open: true }; load(plugins.api(entry)); delete entry.open; return entry })
 })
 afterEach(() => { for (const e of entries.reverse()) plugins.deactivate(e) })
 
