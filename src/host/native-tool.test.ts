@@ -39,7 +39,8 @@ test('only interactive HELP teaches purpose comments; validation never does', as
 test('trailing first-line comments work for EDIT, BASH and READ without changing literals', () => {
 	for (let [call, plain] of [
 		['EDIT test.ts write // TESTING\n!!NEW\n// keep this\nhttps://example.com\n!!END', 'EDIT /* TESTING */ test.ts write\n!!NEW\n// keep this\nhttps://example.com\n!!END'],
-		['BASH /* HELLO */ "ls | head -4" // world', 'BASH /* HELLO */ "ls | head -4"'],
+		['BASH /* HELLO */ "ls | head -4" // world', 'BASH /* HELLO world */ "ls | head -4"'],
+		['EDIT /* Writing foo */ foo.txt write // BARF\n!!NEW\none\n!!END', 'EDIT /* Writing foo BARF */ foo.txt write\n!!NEW\none\n!!END'],
 		['READ test.ts // test', 'READ test.ts'],
 		['READ https://example.com/x // test', 'READ https://example.com/x'],
 		['BASH "echo // literal" // comment', 'BASH /* comment */ "echo // literal"'],

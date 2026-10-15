@@ -73,7 +73,7 @@ function resolve(text: unknown, ctx?: CallContext): { name: string; input: Recor
 	let parsed = callText.parse(text)
 	let tool = nativeTool.find(parsed.name)
 	let resolved = tool.syntax?.resolve ? tool.syntax.resolve(parsed.raw, ctx) : { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
-	if (parsed.purpose && schema(tool).properties?.description && resolved.input.description === undefined) resolved.input.description = parsed.purpose
+	if (parsed.purpose && schema(tool).properties?.description) resolved.input.description = [resolved.input.description, parsed.purpose].filter(Boolean).join(' ')
 	return resolved
 }
 
