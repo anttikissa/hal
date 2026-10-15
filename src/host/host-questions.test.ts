@@ -35,7 +35,7 @@ beforeEach(() => {
 	liveFiles.onError = () => {}
 	synthetic.models = { ...origModels }
 	synthetic.pauseMs = 0
-	models.known = () => ['anthropic/test-claude', 'openai/test-gpt', 'opencode-go/test-go']
+	models.known = () => ['anthropic/claude-opus-5-5', 'openai/gpt-6-sol', 'opencode-go/test-go']
 })
 
 afterEach(() => {
