@@ -413,10 +413,13 @@ html.typing .App { position: absolute; }
 .entry > button:disabled > *, .entry .actions button:disabled > * { opacity: 0.4; transition-duration: var(--back-ms); }
 .entry .actions button.toggle > * { transition-duration: var(--back-ms); }
 .entry .actions button.toggle:disabled > * { transition-duration: var(--snap-ms); }
-.help { display: flex; flex-wrap: wrap; gap: 0 1ch; padding-top: 0.25lh; color: var(--description); }
+.help { display: flex; gap: 0 1ch; padding-top: 0.25lh; color: var(--description); white-space: nowrap; overflow: hidden; }
+.help-hints { display: flex; flex-wrap: wrap; gap: 0 1ch; flex: 1; min-width: 0; height: 1lh; overflow: hidden; }
+.help-hints::before { content: ''; flex: none; width: 0; height: 1lh; margin-right: -1ch; }
+.help-hints > * { flex: none; }
 /* 'key: description, …' as in the terminal's help row; /keys sits right. */
-.help > :not(:nth-last-child(-n + 2))::after { content: ','; color: var(--description); }
-.help .keys { margin-left: auto; }
+.help-hints > :not(:last-child)::after { content: ','; color: var(--description); }
+.help .keys, .help .update { flex: none; }
 .help b { color: var(--key); font-weight: 600; }
 /* Reads as a hint, acts as a button: the update reload (task 7t). */
 .help .update { padding: 0; border: 0; background: none; font: inherit; color: var(--update); cursor: pointer; }

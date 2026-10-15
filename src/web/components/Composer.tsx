@@ -297,14 +297,16 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 				<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
 			</div>
 			<div class="help">
-				<Show when={props.view.editing && !props.view.editing.aside && props.view.editing}>{(e) => <span style={{ color: 'var(--attention-fg)' }}>{amend.hint(e(), props.text).split(']')[0]}]</span>}</Show>
-				<For each={view.hints(props.view, props.text, props.menu)}>
-					{(h) => (
-						<span>
-							<b>{h[0]}</b>: {h[1]}
-						</span>
-					)}
-				</For>
+				<div class="help-hints">
+					<Show when={props.view.editing && !props.view.editing.aside && props.view.editing}>{(e) => <span style={{ color: 'var(--attention-fg)' }}>{amend.hint(e(), props.text).split(']')[0]}]</span>}</Show>
+					<For each={view.hints(props.view, props.text, props.menu)}>
+						{(h) => (
+							<span>
+								<b>{h[0]}</b>: {h[1]}
+							</span>
+						)}
+					</For>
+				</div>
 				{/* A newer Hal is served (task 7t): the last hint; Ctrl-R reloads too. Phones
 				    have no help row and keep the badge over the transcript. */}
 				<Show when={props.update}>

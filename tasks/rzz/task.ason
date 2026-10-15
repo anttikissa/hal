@@ -1,0 +1,10 @@
+{
+	title: 'Keep web composer hints on one line',
+	spec: 'The web composer help row always occupies at most one text line. Omit whole lower-priority hints that do not fit, retaining hint order, the shortcuts hint and any available reload control. Resize and font changes use the actual available width without polling or growing state. This replaces wrapping web hints; terminal behavior stays unchanged pending user confirmation.',
+	status: 'done',
+	notes: [
+		'The help row reserves space for shortcuts and reload. A flex-wrapped inner region has exactly one line of height and clips subsequent rows; a zero-width first flex item forces even an oversized first hint onto a hidden row. Native CSS handles resizing and font changes with no observers, timers or added state. A one-off direct Chromium geometry check passed widths 320/600/700/900/1400 at font sizes 14/20/28, including absence of partially visible hints. Component lint and git diff --check passed. The existing web harness could not launch Chromium through its watchdog; its host event expectation also lacks host-mode. Existing view tests have unrelated Bash-header and command-heading expectations failing. No permanent UI test was added.'
+	],
+	needs: ['7t'],
+	foldInto: ['7t']
+}
