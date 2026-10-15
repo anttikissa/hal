@@ -1,7 +1,5 @@
-// Where a plugin failure goes (task njq). A disabled plugin is reported
-// to the session whose bash call last declared and changed its file,
-// so that session can fix its own work; otherwise, naming no session,
-// to every open session and client. Activity, never a guessed writer.
+// Plugin failures go to the last declared editor for repair, or to the
+// shared notice area and history without changing unrelated sessions.
 import type { NoticeEvent } from '../common/notices.ts'
 import { basename } from 'path'
 import { diag } from './diag.ts'
@@ -12,8 +10,6 @@ import { pluginSync } from './plugin-sync.ts'
 import { paths } from './paths.ts'
 import { plugins } from './plugins.ts'
 import { prompts } from './prompts.ts'
-import { sessions } from './sessions.ts'
-import { slash } from './slash.ts'
 
 // The session and call that last declared and changed `path`.
 function lastEditor(path: string): Promise<{ id: string; call?: number; ts: string } | undefined> {
@@ -22,13 +18,14 @@ function lastEditor(path: string): Promise<{ id: string; call?: number; ts: stri
 
 // To every client of this host; a remote terminal (task zh7), whose
 // process loads its own home's plugins, shows them itself instead.
-function deliver(event: NoticeEvent | { type: 'warning'; text: string }): void {
+function deliver(event: NoticeEvent): void {
 	for (let client of host.state.clients) client.deliver(event)
 }
 
 function everyone(text: string): void {
-	for (let id of sessions.openIds()) slash.output(id, text, true)
-	pluginReports.deliver({ type: 'warning', text })
+	let notice: NoticeEvent = { type: 'notice', session: '', name: 'Plugins', kind: 'failed', line: text, key: 'plugin:failure' }
+	noticeHistory.record({ session: '', name: notice.name, kind: notice.kind, line: text })
+	pluginReports.deliver(notice)
 }
 
 // `path`: the plugin file, when the failure disabled it.
