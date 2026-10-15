@@ -1,0 +1,17 @@
+{
+	title: 'Consistent plugin tool cards in terminal and web',
+	spec: `Plugins define tool-card content for terminal and web through the existing host-side toolPresentations.present(call, result?) callback, returning {title, blocks} or undefined for ordinary rendering. One ordered list of text, code and diff blocks serves both clients. Content may differ for running, successful, failed and interrupted calls. Keep the existing owned hook mechanism and schema; separate compact views, state callbacks and registration helpers are outside this task. The plugin surface and renderer implementation remain small, with a concise documented example of outcome-dependent content.
+
+Restore this invariant: expanding a tool card reveals its presentation blocks even when execution failed; a presentation never removes access to the complete diagnostic or original call/result. Core owns authoritative execution status, timing, errors and expansion. Plugin titles identify the work without repeating core status; plugin blocks may explain an outcome without repeating its complete diagnostic. Successful presentations remain file-oriented rather than argument trees.
+
+Short terminal cards use the configured total row budget, including the title: available body rows preview presentation blocks instead of raw result output, with the error taking priority on failure. Short web cards remain title-only. Expanded cards on both surfaces show the complete error, if any, followed by all presentation blocks. Live output follows the blocks while a call runs. Preserve access to full content beyond any existing display limit. Interrupted calls retain their stopped or canceled status and available content without being mislabeled successful. Presentation failures retain the existing complete-error and ordinary-rendering fallback behavior.
+
+Original call and result inspection is a secondary fold available in both clients, after the designed content. Prefer the original stored command when present, preserving its text; otherwise format scalars as key: value and nested lists with consistent indentation, without the sparse argument tree. The full result remains inspectable even if the designed view summarizes it. Do not repeat raw content in the normal expanded view merely to provide inspection access.
+
+The tracked multiedit extra exercises this contract: pending blocks describe requested work, failed blocks show attempted operations using the stored command when available, and successful blocks show verified changes. Titles omit redundant failed and pending labels while preserving file names and verified change counts. A failed atomic edit must not appear as an applied change. Promoting multiedit into core and changing EDIT validation or diagnostic wording are outside scope.
+
+Preserve recorded presentations, output slices, provider-input isolation, validation and old-record fallback from 0hy. Generate presentation data when calls/results change, not on redraw; historical content remains stored while renderer and theme changes can improve its display. Avoid copying large outputs or eagerly rendering hidden detail. Verify both clients with representative running, successful, failed and interrupted EDIT cards, short and expanded, including narrow widths, long commands, raw inspection, keyboard expansion and complete errors. Keep focused contract regressions for failed-card detail access; visually check both clients rather than demanding identical layouts.`,
+	status: 'planned',
+	needs: ['0hy', 'ybg'],
+	foldInto: ['0hy']
+}
