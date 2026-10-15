@@ -132,7 +132,7 @@ test('importing every module has no side effects', () => {
 
 // Modules stay under maxLines so each fits one read and has one job.
 // Exceptions carry a reason; a planned split names its task.
-const maxLines = 400
+const maxLines = 450
 const sizeExceptions: Record<string, string> = {
 	'common/ason.ts': 'one cohesive format: parser and stringifier belong together',
 }

@@ -187,7 +187,7 @@ minimize those exceptions and report the reason through render.clear.
 - `src/conventions.test.ts` enforces the import rules and that
   importing every module (main.ts included) prints nothing, registers
   no signal handlers and leaves no timers or watchers running.
-- Non-test modules under src/ stay at or under 400 lines (`wc -l`), so
+- Non-test modules under src/ stay at or under 450 lines (`wc -l`), so
   each fits one read and has one job. conventions.test.ts enforces it;
   its short exception list gives each entry a reason (ason.ts is one
   cohesive format; others name the task that splits them) and fails
