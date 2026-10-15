@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		"src/host/plugin-reports.ts: plugins.report(text, path) on the host. lastEditor scans every existing session's changes.list (after pages catch-up) for the newest declared step on the plugin's canonical path (directory realpath + name, since the file is already renamed). Found: a model-visible message from 'plugin loader' via prompts.submit, else (or if refused) the old notice to every open session and client. A /changes clear in that session hides its edits from the search.",
-		'The fallback previously called slash.output for every open session as well as sending a warning. Unknown-source plugin failures now use a shared failed notice and durable notice history only; editor-directed model messages are unchanged.'
+		'The fallback previously called slash.output for every open session as well as sending a warning. Unknown-source plugin failures now use a shared failed notice and durable notice history only; editor-directed model messages are unchanged.',
+		'Keep pluginReports.deliver compatible with warning events: plugin-sync-client uses that transport for comparison failures. Only unattributed loader reports switch to shared notice events.'
 	],
 	needs: ['90v', 'c4x'],
 	foldInto: ['90v']

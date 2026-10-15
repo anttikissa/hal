@@ -18,7 +18,7 @@ function lastEditor(path: string): Promise<{ id: string; call?: number; ts: stri
 
 // To every client of this host; a remote terminal (task zh7), whose
 // process loads its own home's plugins, shows them itself instead.
-function deliver(event: NoticeEvent): void {
+function deliver(event: NoticeEvent | { type: 'warning'; text: string }): void {
 	for (let client of host.state.clients) client.deliver(event)
 }
 
