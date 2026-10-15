@@ -43,7 +43,7 @@ const glob = (p: string) => /[*?[\]{}]/.test(p)
 // Declared files in `cwd` whose mtime is within recentMs of now.
 function recent(cwd: string, patterns: string[], now: number): string[] {
 	let found = new Set<string>()
-	for (let p of patterns) for (let name of glob(p) ? new Bun.Glob(p).scanSync({ cwd, dot: true, onlyFiles: true }) : [p]) {
+	for (let p of patterns) for (let name of glob(p) ? [...new Bun.Glob(p).scanSync({ cwd, dot: true, onlyFiles: true })].sort() : [p]) {
 		let mtime = statSync(resolve(cwd, name), { throwIfNoEntry: false })?.mtimeMs
 		if (mtime !== undefined && now - mtime < neighbors.recentMs) found.add(name)
 	}
