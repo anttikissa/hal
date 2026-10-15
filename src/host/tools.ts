@@ -124,7 +124,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 			throw new Error('the tool call did not resolve when it arrived; send it again')
 		}
 		let tool = tools.all().get(call.name)
-		if (!tool) throw new Error(`unknown tool '${call.name}'`)
+		if (!tool) throw new Error(`unknown tool '${call.name}'; Hal tools run inside the native tool: tool { cmd: "<TOOL> <args...>" }, e.g. tool { cmd: "COMMAND /rename x" }. tool { cmd: "HELP" } lists them.`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
 		else {

@@ -32,7 +32,7 @@ test('presentation survives live and persisted replay but never enters provider 
 test('a broken presentation keeps the execution outcome and reaches model and user', async () => {
 	toolPresentations.present = () => { throw new Error('renderer exploded with full details') }
 	let result = await tools.run({ ...call, name: 'missing-tool' }, { cwd: '/tmp', sessionId: 'test', signal: new AbortController().signal })
-	expect(result).toMatchObject({ isError: true, output: "Error: unknown tool 'missing-tool'" })
+	expect(result).toMatchObject({ isError: true, output: expect.stringMatching(/^Error: unknown tool 'missing-tool'/) })
 	expect(result.presentationError).toContain('renderer exploded with full details')
 	expect(result.presentationError).toContain('Input:')
 	expect(transcript.resultItem(result)).toMatchObject({ presentationError: result.presentationError })
