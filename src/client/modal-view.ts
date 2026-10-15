@@ -218,7 +218,7 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 	let gap = left > 0 ? ' '.repeat(left - strings.visLen(before)) : ''
 	let right = left + width + 1
 	let after = right < cols ? strings.sliceVisual(line, right, cols) : ''
-	return before + RESET + gap + row + RESET + (left + width < cols ? ' ' : '') + after
+	return before + RESET + gap + row + RESET + (left + width < cols ? ' ' : '') + after + RESET
 }
 
 // Draws modal `m` over `lines`, centered on the screen (the last `rows`
