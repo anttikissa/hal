@@ -13,3 +13,4 @@ secrets/
 !/benchmarks/AGENTS.md
 !/benchmarks/README.md
 !/benchmarks/fetch
+/src/web/fonts/*.woff2

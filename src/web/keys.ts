@@ -64,8 +64,14 @@ const arrows: Record<string, 'up' | 'down' | 'escape'> = { ArrowUp: 'up', ArrowD
 // prevents the browser's default).
 function key(e: KeyInput, target: Target): boolean {
 	let st = app.state
-	let action = emergency.action({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
-	if (action === 'restart' && target.kind === 'message' && target.text !== st.text) app.input(target.text)
+	let action = emergency.action({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey, shift: e.shiftKey })
+	let restartAll = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'r'
+	if ((action === 'restart' || restartAll) && target.kind === 'message' && target.text !== st.text) app.input(target.text)
+	if (restartAll) {
+		let sessionId = st.view.transcript?.meta.id ?? st.shown
+		if (sessionId) connection.send({ type: 'submit', sessionId, text: '/restart all' })
+		return true
+	}
 	if (emergency.handle(action, { restart: restart.reload })) return true
 	// The rebase view is a native modal: its own keys, Escape cancels it.
 	if (rebaseView.state) return false

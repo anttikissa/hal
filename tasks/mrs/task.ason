@@ -1,0 +1,7 @@
+{
+	title: 'Web Ctrl-Shift-R restarts all like terminal',
+	spec: 'Web Ctrl-Shift-R submits /restart all to the shown session, while Ctrl-R only reloads the current page. Both save unsaved composer text before acting and work through open forms and modals. Other modifiers retain browser behavior. No Ctrl-Shift-L shortcut is added.',
+	status: 'done',
+	needs: ['33j'],
+	foldInto: ['33j']
+}

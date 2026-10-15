@@ -118,7 +118,8 @@ test('Ctrl-R reloads only this page in every view and saves the composer draft f
 		expect(sent.filter((c) => c.type !== 'draft')).toEqual([])
 		for (let mods of [{ metaKey: true }, { ctrlKey: true, altKey: true }]) expect(press('r', other, mods)).toBe(false)
 		expect(press('R', other, { ctrlKey: true, shiftKey: true })).toBe(true)
-		expect(reloaded).toHaveLength(4)
+		expect(reloaded).toHaveLength(3)
+		expect(sent).toContainEqual({ type: 'submit', sessionId, text: '/restart all' })
 	} finally {
 		restart.reload = original
 	}

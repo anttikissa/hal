@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Download local IBM Plex Mono faces without storing binaries in Git.
+set -eu
+cd "$(dirname "$0")/.."
+mkdir -p src/web/fonts
+if [ "$#" -eq 0 ]; then set -- Regular Italic Bold BoldItalic; fi
+for face in "$@"; do
+  case "$face" in
+    Regular|Italic|Bold|BoldItalic|Light|LightItalic|Medium|MediumItalic) ;;
+    *) printf 'Unknown Plex face: %s\n' "$face" >&2; exit 1 ;;
+  esac
+  target="src/web/fonts/IBMPlexMono-$face.woff2"
+  trap 'rm -f "$target.download"' EXIT
+  curl --fail --location --output "$target.download" \
+    "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/woff2/IBMPlexMono-$face.woff2"
+  mv "$target.download" "$target"
+done
