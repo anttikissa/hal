@@ -174,6 +174,32 @@ test('family aliases and picker defaults advance versions without changing prefe
 	}
 })
 
+test('reseller aliases and picker defaults rank versions before general-purpose tiers', () => {
+	let key = process.env.OPENROUTER_API_KEY
+	try {
+		process.env.OPENROUTER_API_KEY = 'test-key'
+		let groups = {
+			glm: ['z-ai/glm-5.3', 'z-ai/glm-5.3-prime', 'z-ai/glm-5.3-flash'],
+			qwen: ['qwen/qwen3.8-max-0902', 'qwen/qwen3.8-max-prime', 'qwen/qwen3.8-flash', 'qwen/qwen3.8-omni-flash', 'qwen/qwen3.7-max'],
+			kimi: ['moonshotai/kimi-k3', 'moonshotai/kimi-k2.7-code', 'moonshotai/kimi-k2.6'],
+			deepseek: ['deepseek/deepseek-v4.1-flash', 'deepseek/deepseek-v4-pro'],
+			minimax: ['minimax/minimax-m3', 'minimax/minimax-m2.7'],
+		}
+		let ids = Object.values(groups).flat().map((id) => `openrouter/${id}`).reverse()
+		provider.state.providers = { openrouter: fake(ids) }
+		models.state.lists.set('openrouter', { at: Date.now(), ids })
+		for (let [alias, variants] of Object.entries(groups)) {
+			let expected = `openrouter/${variants[0]}`
+			expect(models.resolve(alias).id).toBe(expected)
+			let st = picker.step(picker.open('hal/intro', ids), { key: 'x', text: alias }, ids).state
+			expect(picker.command('s1', st, { type: 'submit', item: st.selected, answers: {} })?.text).toBe(`/model ${expected}`)
+		}
+	} finally {
+		if (key === undefined) delete process.env.OPENROUTER_API_KEY
+		else process.env.OPENROUTER_API_KEY = key
+	}
+})
+
 test('a provider that never answers does not hold up the list', async () => {
 	models.state.lists.clear()
 	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }

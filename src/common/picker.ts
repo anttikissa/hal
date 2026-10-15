@@ -115,7 +115,7 @@ function tree(ids: string[], keep = ''): Node {
 		let inner = n.nodes.filter((c) => !bucket(c)).flatMap(finish)
 		let later = n.nodes.filter(bucket).flatMap(finish)
 		n.all = [...inner, ...n.ids.map((i) => i.id), ...later]
-		let preferred = modelAliases.select(n.name, n.all)
+		let preferred = modelAliases.select(({ 'z-ai': 'glm', moonshotai: 'kimi' } as Record<string, string>)[n.name] ?? n.name, n.all)
 		// A provider has a default only through an alias (anthropic: opus);
 		// a bucket has none, so Enter opens it.
 		n.default = bucket(n) ? undefined : preferred ?? (!modelAliases.families[n.name] && n.path.includes('/') ? n.all[0] : undefined)

@@ -168,7 +168,7 @@ function resolve(input: string): { id?: string; login?: string } {
 			? !!(auth.envKey(name as Kind) || (existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length))
 			: !!(apiKeys.get(name === 'opencode-go' ? 'opencode' : name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
 		if (!available) continue
-		let found = candidates.find((id) => id.startsWith(`${name}/`))
+		let found = version ? candidates.find((id) => id.startsWith(`${name}/`)) : modelAliases.select(family, candidates.filter((id) => id.startsWith(`${name}/`)))
 		if (found) return { id: found }
 	}
 	return { login: own === 'openai' ? '/login chatgpt' : own === 'anthropic' ? '/login claude' : '/login opencode or /login openrouter' }
