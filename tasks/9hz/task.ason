@@ -1,0 +1,10 @@
+{
+	title: 'Neutral italic thinking text',
+	spec: 'Thinking text uses the existing neutral gray from colors.log().fg instead of blue-gray in terminal and web. Thinking Markdown code, bold and link surfaces stay neutral using the log palette. Thinking body text and collapsed previews are italic in both clients, including streaming and wrapped text; headers, timestamps, block references and subsequent items retain their ordinary typography. Nested Markdown emphasis must not turn off the base italic. Existing folding, content and layout behavior stays unchanged.',
+	status: 'done',
+	notes: [
+		'Thinking derives its neutral colors from colors.log. Terminal rows reopen the base italic after nested Markdown emphasis and close it at each row; CSS applies italic only to thinking content and the collapsed preview label. Focused palette/frame/item-view tests passed (49), along with typecheck, changed-module lint, web bundle build and one-off checks for short/long, streaming, wrapping, nested emphasis and italic reset. Browser appearance was not visually checked. Rendering remains one linear pass over new thinking rows, with no timers or retained state.'
+	],
+	needs: ['1w', 'hp'],
+	foldInto: ['1w', 'hp']
+}

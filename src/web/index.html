@@ -86,6 +86,7 @@ html.typing .App { position: absolute; }
    the same gap (the user's choice, over the 44px header row). */
 .Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
 .Card.thinking .CardHeader, .Card.assistant .CardHeader { min-height: 0; }
+.Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
 .Card .result-text { color: var(--output, inherit); }
 .Card .result-text.error { background: none; }
 .Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }

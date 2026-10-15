@@ -136,6 +136,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (!item.text.trim() && !streaming) return []
 			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
+			body = body.map((row) => `\x1b[3m${row.replaceAll('\x1b[23m', '\x1b[3m')}\x1b[23m`)
 			return itemView.headed(item, body, hw, undefined, fold !== 'short')
 		}
 		case 'text': {

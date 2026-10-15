@@ -77,13 +77,8 @@ export const colors = {
 		linkBg: [0.3, 0.05, 55],
 	}),
 	synthetic: (): Style => colors.assistant(),
-	// Thinking: muted blue-gray, recedes.
-	thinking: (): Style => ({
-		fg: [0.72, 0.03, 250],
-		bold: [0.85, 0.02, 250],
-		code: [0.78, 0.03, 250],
-		linkBg: [0.2, 0.02, 250],
-	}),
+	// Thinking: neutral gray, distinct from replies through italic text.
+	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
 	// User messages and the prompt input: the same bright blue card.
 	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
 	// Messages and commands from another session (task 9p): hot pink,
