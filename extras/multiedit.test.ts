@@ -1,6 +1,6 @@
 import '../src/host/host.ts'
 import { expect, test, spyOn } from 'bun:test'
-import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync, chmodSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync, chmodSync, statSync, realpathSync } from 'fs'
 import { multiedit, io, parseBlocks } from './multiedit.ts'
 import { fileChanges } from '../src/host/file-changes.ts'
 import { lease } from '../src/host/lease.ts'
@@ -221,7 +221,7 @@ for (const external of [false, true]) test(`failed batch restores deleted file a
  const a = file('a', 'original'), b = file('b', 'before'), original = io.save
  chmodSync(a, 0o751)
  const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-  if (args[0] === b) { if (external) writeFileSync(a, 'external'); throw new Error('injected failure') }
+  if (args[0] === realpathSync(b)) { if (external) writeFileSync(a, 'external'); throw new Error('injected failure') }
   await original(...args)
  })
  try {
