@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" class="page">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hal font comparison</title>
+<style>
+/*APP_STYLES*/
+/*COLORS*/
+@font-face { font-family: 'Demo JetBrains'; src: url('/fonts/JetBrainsMono-LightItalic.woff2'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Source Code'; src: url('/fonts/SourceCodePro-LightItalic.woff2'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Roboto'; src: url('/fonts/RobotoMono-Italic.ttf'); font-weight: 100 700; font-style: italic; font-display: swap; }
+html, body { height: auto; overflow: auto; }
+body { margin: 0 auto; padding: 24px 16px; max-width: 1000px; }
+h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 16px; }
+.controls label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.controls select { font: inherit; padding: 8px; color: inherit; background: var(--canvas); border: 1px solid currentColor; }
+#metrics { min-height: 3lh; }
+.samples { display: grid; gap: 16px; font-size: var(--sample-size, 14px); line-height: 1.5; }
+.samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: 300; font-style: italic; font-synthesis: none; }
+.samples .Thinking .Markdown { line-height: 1.5; }
+.samples button { font-size: inherit; }
+</style>
+<h1>Italic fonts on Hal cards</h1>
+<div class="controls">
+<label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code">Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option></select></label>
+<label>Size <select id="size"><option>12</option><option selected>14</option><option>16</option><option>18</option></select>px</label>
+<label><input type="checkbox" id="match"> Match x-height to Plex</label>
+</div>
+<p id="metrics" role="status">Loading local font files...</p>
+<main class="samples" id="samples">
+<article class="Card thinking open"><div class="Thinking" style="--preview-rows: 3"><button class="stamp mark" aria-label="Collapse reasoning" aria-expanded="true">16:06</button><div class="preview"><div class="thinking-content"><div class="Markdown"><p>I should check the relevant code before making a change. The important part is to preserve the existing behavior while making the result easier to read.</p><p>The user asked for a smaller, calmer italic. I will compare the letter shapes, apparent size and spacing without changing the card colors or layout. Look closely at <code>a f g i l r t</code>, numbers <code>0 O 1 I</code>, and punctuation.</p></div></div></div><span class="thinking-meta"><span class="link">a1</span></span><span class="more" hidden>... earlier lines</span></div></article>
+<article class="Card user open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">You</span></span></span></header><div class="content">Could you make the italic easier to read? Keep this user card in the normal Plex face.</div></article>
+<article class="Card assistant open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">Hal</span></span></span></header><div class="content Markdown"><p>This is an ordinary reply. <span class="b">Bold stays in Plex Medium.</span> Here is <span class="i">inline emphasis in the selected italic face</span>, and <code>some_code("example")</code>.</p></div></article>
+<article class="Card tool tool-bash open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">$ ls -l</span></span></span><span class="status">(0.2s)</span></header><div class="content result-text">-rw-r--r--  1 user  staff  128 README.md
+-rw-r--r--  1 user  staff  512 example.ts</div></article>
+<article class="Card tool tool-edit diff open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">&gt; Update the greeting</span></span></span></header><div class="content edit-diff"><div>== example.ts@abcde ==</div><div class="del">-1: const greeting = "hello"</div><div class="add">+1: const greeting = "Hello, world!"</div></div></article>
+<article class="Card error open"><header class="CardHeader"><span class="flow"><span class="stamp">16:06</span> <span class="title"><span class="label">Error</span></span></span></header><div class="content">example.ts:17: file changed since it was read. Read it again before retrying.</div></article>
+</main>
+<script>
+const face = document.getElementById('face'), size = document.getElementById('size'), match = document.getElementById('match'), samples = document.getElementById('samples'), metrics = document.getElementById('metrics')
+let revision = 0
+async function update() {
+ const current = ++revision, px = Number(size.value)
+ try {
+  await Promise.all([document.fonts.load(`italic 300 ${px}px "${face.value}"`), document.fonts.load(`italic 300 ${px}px "IBM Plex Mono"`)])
+  if (current !== revision) return
+  const ctx = document.createElement('canvas').getContext('2d')
+  ctx.font = `italic 300 ${px}px "IBM Plex Mono"`
+  const baseline = ctx.measureText('x').actualBoundingBoxAscent
+  ctx.font = `italic 300 ${px}px "${face.value}"`
+  const x = ctx.measureText('x').actualBoundingBoxAscent, width = ctx.measureText('0000000000').width / 10
+  const adjusted = match.checked ? px * baseline / x : px
+  samples.style.setProperty('--sample-size', `${px}px`)
+  samples.style.setProperty('--italic-face', `"${face.value}"`)
+  samples.style.setProperty('--italic-size', `${adjusted}px`)
+  metrics.textContent = `${face.selectedOptions[0].text}: ${adjusted.toFixed(2)}px displayed; at ${px}px, character width ${width.toFixed(2)}px and x-height ${x.toFixed(2)}px (Plex ${baseline.toFixed(2)}px). Upright text is unchanged.`
+ } catch (error) { metrics.textContent = `Font load failed: ${error.message}. Fetch local candidates with: bash scripts/fonts JetBrainsMono-LightItalic SourceCodePro-LightItalic RobotoMono-Italic` }
+}
+face.onchange = size.onchange = match.onchange = update
+const thinking = document.querySelector('.Card.thinking'), stamp = thinking.querySelector('.stamp'), preview = thinking.querySelector('.preview'), more = thinking.querySelector('.more')
+stamp.onclick = () => {
+ const open = thinking.classList.toggle('open')
+ stamp.setAttribute('aria-expanded', String(open))
+ stamp.setAttribute('aria-label', open ? 'Collapse reasoning' : 'Expand reasoning')
+ more.hidden = open
+ if (!open) preview.scrollTop = preview.scrollHeight
+}
+update()
+</script>
+</html>

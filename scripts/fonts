@@ -1,17 +1,32 @@
 #!/usr/bin/env bash
-# Download local IBM Plex Mono faces without storing binaries in Git.
+# Download local web font faces and licenses without storing binaries in Git.
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p src/web/fonts
 if [ "$#" -eq 0 ]; then set -- Regular Italic Bold BoldItalic; fi
 for face in "$@"; do
   case "$face" in
-    Regular|Italic|Bold|BoldItalic|Light|LightItalic|Medium|MediumItalic) ;;
-    *) printf 'Unknown Plex face: %s\n' "$face" >&2; exit 1 ;;
+    Regular|Italic|Bold|BoldItalic|Light|LightItalic|Medium|MediumItalic)
+      file="IBMPlexMono-$face.woff2"
+      url="https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/woff2/$file"
+      license='https://raw.githubusercontent.com/IBM/plex/master/LICENSE.txt' ;;
+    JetBrainsMono-LightItalic)
+      file="$face.woff2"
+      url="https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/webfonts/$file"
+      license='https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt' ;;
+    SourceCodePro-LightItalic)
+      file="$face.woff2"
+      url='https://raw.githubusercontent.com/adobe-fonts/source-code-pro/release/WOFF2/TTF/SourceCodePro-LightIt.ttf.woff2'
+      license='https://raw.githubusercontent.com/adobe-fonts/source-code-pro/release/LICENSE.md' ;;
+    RobotoMono-Italic)
+      file="$face.ttf"
+      url='https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf'
+      license='https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/OFL.txt' ;;
+    *) printf 'Unknown font face: %s\n' "$face" >&2; exit 1 ;;
   esac
-  target="src/web/fonts/IBMPlexMono-$face.woff2"
+  target="src/web/fonts/$file"
   trap 'rm -f "$target.download"' EXIT
-  curl --fail --location --output "$target.download" \
-    "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/woff2/IBMPlexMono-$face.woff2"
+  curl --fail --location --output "$target.LICENSE" "$license"
+  curl --fail --location --output "$target.download" "$url"
   mv "$target.download" "$target"
 done

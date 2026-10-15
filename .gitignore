@@ -14,3 +14,5 @@ secrets/
 !/benchmarks/README.md
 !/benchmarks/fetch
 /src/web/fonts/*.woff2
+/src/web/fonts/*.ttf
+/src/web/fonts/*.LICENSE
