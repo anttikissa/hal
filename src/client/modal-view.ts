@@ -17,12 +17,13 @@ type Cursor = { row: number; col: number }
 
 /**
  * Where a modal goes on a terminal of `rows` × `cols`: a fixed height
- * (80% of the rows, at most 36) and width, centered across. Outside it
- * on each side: at least one blank column and one of transcript.
+ * (80% of the rows, at most 36) and width (at most `max`), centered
+ * across. Outside it on each side: at least one blank column and one of
+ * transcript.
  */
-function modalBox(rows: number, cols: number): { height: number; width: number; left: number } {
+function modalBox(rows: number, cols: number, max = 100): { height: number; width: number; left: number } {
 	let height = Math.min(rows, Math.max(3, Math.min(36, Math.floor(rows * 0.8))))
-	let width = cols < 10 ? cols : Math.min(100, cols - 2 * Math.max(2, Math.round(cols * 0.1)))
+	let width = cols < 10 ? cols : Math.min(max, cols - 2 * Math.max(2, Math.round(cols * 0.1)))
 	return { height, width, left: Math.floor((cols - width) / 2) }
 }
 
@@ -225,7 +226,8 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 // of them), so that it never reaches into scrollback. A short frame
 // grows to hold it. Returns the cursor and the list's scroll.
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
-	let box = modalView.modalBox(rows, cols)
+	// Find's rows are long: it grows with the screen.
+	let box = modalView.modalBox(rows, cols, m.find ? 180 : 100)
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
 	if (m.compact && m.form) box.height = Math.min(box.height, 3 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
 	while (lines.length < box.height) lines.push('')

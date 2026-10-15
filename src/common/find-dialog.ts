@@ -59,13 +59,17 @@ function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 function age(ms: number): string {
 	return ms < 60000 ? 'now' : ms < 3600000 ? `${Math.floor(ms / 60000)}m` : ms < 86400000 ? `${Math.floor(ms / 3600000)}h` : `${Math.floor(ms / 86400000)}d`
 }
-// A result row: the tab number (blank for a closed session, then named by
-// its id), name, age, then the kind and snippet.
-function row(r: FindResult, tabs: string[]): string {
-	let n = tabs.indexOf(r.sessionId)
-	let width = String(tabs.length).length
-	let name = `${r.name || r.sessionId}${n < 0 && r.name ? ` (${r.sessionId})` : ''}`
-	return `${(n < 0 ? '' : String(n + 1)).padStart(width)}  ${name} · ${age(r.age)} · ${r.kind === 'metadata' ? '' : `[${r.kind}] `}${r.snippet}`
+// Result rows as aligned columns: tab number (blank for a closed
+// session), session id, name cut to leave the snippet room, age, kind
+// (none for session matches), snippet.
+function rows(results: FindResult[], tabs: string[]): string[] {
+	let width = (f: (r: FindResult) => string) => Math.max(0, ...results.map((r) => f(r).length))
+	let tab = (r: FindResult) => { let n = tabs.indexOf(r.sessionId); return n < 0 ? '' : String(n + 1) }
+	let kind = (r: FindResult) => (r.kind === 'metadata' ? '' : `[${r.kind}]`)
+	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+	let w = { tab: width(tab), id: width((r) => r.sessionId), name: Math.min(24, width((r) => r.name)), age: width((r) => age(r.age)), kind: width(kind) }
+	let cells = (r: FindResult) => [w.tab && tab(r).padStart(w.tab), r.sessionId.padEnd(w.id), w.name && cut(r.name, w.name).padEnd(w.name), age(r.age).padStart(w.age), w.kind && kind(r).padEnd(w.kind), r.snippet]
+	return results.map((r) => cells(r).filter((c) => c !== 0).join('  '))
 }
 function batch(m: ModalState, b: FindBatch): ModalState {
 	let f = m.find!
@@ -82,7 +86,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 	let query = !!m.form!.values[0]!.trim()
 	let count = `${results.length} result${results.length === 1 ? '' : 's'}`
 	let status = b.error ? `Find failed: ${b.error}` : !query ? recent : b.done ? (results.length ? `Showing ${count}` : 'No results') : b.scanning ? `Showing ${count}, scanning ${b.scanning.toLocaleString()} histories…` : `Showing ${count}, searching ${b.tier}…`
-	return { ...m, items: results.map((r) => findDialog.row(r, f.tabs)), find: { ...f, results, done: b.done, status, ...(b.error ? { failed: true as const } : { failed: undefined }) } }
+	return { ...m, items: findDialog.rows(results, f.tabs), find: { ...f, results, done: b.done, status, ...(b.error ? { failed: true as const } : { failed: undefined }) } }
 }
 function marks(text: string, query: string): [number, number][] {
 	let lower = text.toLocaleLowerCase(), ranges: [number, number][] = []
@@ -97,4 +101,4 @@ function marks(text: string, query: string): [number, number][] {
 	}
 	return out
 }
-export const findDialog = { filters, labels, question, open, input, toggle, focus, step, words, row, batch, marks }
+export const findDialog = { filters, labels, question, open, input, toggle, focus, step, words, rows, batch, marks }

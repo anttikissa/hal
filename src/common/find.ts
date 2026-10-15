@@ -51,8 +51,13 @@ function match(text: string, words: string[], age: number): { score: number; sni
 		if (!best) return undefined
 		quality += best
 	}
-	let from = Math.max(0, at - 45), to = Math.min(text.length, from + 180)
-	return { score: quality * Math.pow(0.5, age / 259200000), snippet: (from ? '…' : '') + text.slice(from, to).replace(/\s+/g, ' ') + (to < text.length ? '…' : '') }
+	// A short lead, from a word start, padded so every match starts at the
+	// same column: the highlights line up and clipped rows still show them.
+	let flat = (s: string) => s.replace(/\s+/g, ' ')
+	let lead = flat(text.slice(Math.max(0, at - 20), at)).trimStart()
+	if (at > 20) lead = '…' + lead.slice(lead.indexOf(' ') + 1)
+	let to = Math.min(text.length, at + 160)
+	return { score: quality * Math.pow(0.5, age / 259200000), snippet: (words.length ? lead.padStart(21) : lead) + flat(text.slice(at, to)) + (to < text.length ? '…' : '') }
 }
 
 export const findQuery = { tiers, groups, parse, match }

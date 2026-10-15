@@ -74,7 +74,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) cancel(e)
 	}
 	return (
-		<dialog ref={(e) => (box = e)} class={props.modal?.compact ? 'Picker compact' : 'Picker'} aria-label={props.modal?.title ?? 'Picker'} onCancel={cancel} onClick={outside}>
+		<dialog ref={(e) => (box = e)} class={props.modal?.compact ? 'Picker compact' : props.modal?.find ? 'Picker find' : 'Picker'} aria-label={props.modal?.title ?? 'Picker'} onCancel={cancel} onClick={outside}>
 			<div class="top">
 				<div class="title">{props.modal?.title ?? ''}</div>
 				<button type="button" class="close" aria-label="Close" onClick={cancel}><Icon name="close" /></button>
