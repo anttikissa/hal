@@ -1,0 +1,10 @@
+{
+	title: 'Ten cinematic and retro theme plugins with distinct user palettes',
+	spec: 'Ten complete selectable themes live in themes/: arrakis, fury-road, replicant, discovery, atlantis, ghost-shell, win95, solarized-night, moonbase and aurora. Each exports its look, including a standalone user style usable by a color-only preview. A shared theme builder supplies coherent screen, reply, user, tool, status, menu, error and web surface colors from each palette rather than duplicating registration code. User foreground/background pairs are in sRGB and meet 4.5:1 contrast. Themes use science-fiction, cinema, retro desktop and solarized inspirations without copying a restrictive prior prompt. Existing themes remain unchanged.',
+	status: 'done',
+	notes: [
+		'Measured each user foreground/background through the terminal sRGB conversion: all ten fit unchanged; contrast ranges from 8.19:1 to 10.50:1. Existing theme/color tests pass (9 tests). Palette definitions share registration and semantic roles rather than copying whole theme files.'
+	],
+	needs: ['d3'],
+	foldInto: ['d3']
+}
