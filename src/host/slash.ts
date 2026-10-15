@@ -37,8 +37,10 @@ function command(id: string, text: string, call: { name: string; args: string },
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	let cmd = commands.all().get(call.name)
 	if (!cmd) return `unknown command /${call.name} (/help lists them)`
-	text = cmd.record?.(call.args, id) ?? text
+	let shown = cmd.record?.(call.args, id)
+	text = shown ?? text
 	let typed = () => {
+		if (shown === null) return
 		let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text, ...(origin && { origin }) }
 		if (from !== undefined) record.from = from
 		if (sender?.label !== undefined) record.label = sender.label

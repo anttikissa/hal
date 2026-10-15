@@ -25,8 +25,10 @@ export const command: SlashCommand = {
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
 	// Setting a stored key to its default removes it; the command line
 	// says so: one row, no echo.
+	// Bare /config only opens the modal: nothing to keep in history.
 	record(args) {
 		config.init()
+		if (!parsed(args).name) return null
 		let c = change(args)
 		if (!c || c.why || !Object.is(c.next, c.s.default)) return undefined
 		let stored = Object.keys(settings.state.raw).some((k) => k.replace(/^blockVerbosity/, 'cardVerbosity') === c.s.name)

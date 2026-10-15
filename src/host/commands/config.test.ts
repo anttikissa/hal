@@ -22,7 +22,7 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	expect(opened.sessionId).toBe(id)
 	expect(opened.values.push).toBe('false')
 	expect(opened.stored).toEqual({ model: "model: 'anthropic/claude-opus-5-5'", push: 'push: false' })
-	expect(history.readSync(id).some((r) => r.type === 'question')).toBe(false)
+	expect(history.readSync(id).some((r) => r.type === 'question' || r.type === 'command')).toBe(false)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config webPort 4321' })
 	await until(() => c.of('settings').length === 2)
 	expect(c.of('settings')[1]).toMatchObject({ refresh: true, stored: { push: 'push: false', webPort: 'webPort: 4321' } })
