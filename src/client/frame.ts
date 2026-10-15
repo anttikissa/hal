@@ -14,6 +14,7 @@ import { batchOrder, type Ordering } from './batch-order.ts'
 import { formView } from './form-view.ts'
 import { itemView, type Look } from './item-view.ts'
 import { water } from './water.ts'
+import { bashCard } from './bash-card.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
 import type { Folded } from '../common/notices.ts'
@@ -71,6 +72,8 @@ export interface View {
 	/** The running call's elapsed time, "12s" (task wm0), and spinner (task
 	 * hyt); without `call`, the streaming last item's. */
 	tick?: { call?: string; label: string; spin: string }
+	/** The clock while a Bash command scrolls (bash-card.ts). */
+	now?: number
 }
 
 export interface Frame {
@@ -111,7 +114,8 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''}`
+	let scroll = frame.scrolls(item, look.now) ? look.now : ''
+	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${scroll}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
@@ -191,7 +195,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) {
 		let item = items[start]!
 		if (item.type === 'question' && item.id === view.form?.id) break
-		if (item.type === 'tool' && (item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1])) break
+		if (item.type === 'tool' && (item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1] || frame.scrolls(item, view.now))) break
 		if (item.type === 'tool-result' && items[start + 1] !== kept.items[start + 1]) break
 		start++
 	}
@@ -250,7 +254,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 				let prev = items[j]!
 				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
 				if (prev.type === 'tool' && batchOrder.state.apart.has(prev)) break
-				if (prev.type === 'tool') { tool = prev.name; if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true }
+				if (prev.type === 'tool') { tool = prev.name; look.head = toolView.heads.get(prev); if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true }
 			}
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
@@ -263,7 +267,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)
-			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit)
+			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)
+			if (item.type === 'tool' && item.name === 'bash' && view.now !== undefined) look.now = view.now
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
 			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status ? `${look.status} &` : '&'
 			look = frame.look(item, look)
@@ -304,7 +309,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			}
 			// A streaming block, a ticking call or a question being
 			// answered is redrawn every frame; so is everything after it.
-			if (stable === i && !streams && !ticks) stable++
+			if (stable === i && !streams && !ticks && !frame.scrolls(item, view.now)) stable++
 		}
 		ends.push(lines.length)
 	}
@@ -401,4 +406,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // The unchanged transcript prefix, including originating tool identities.
 type History = { look: string; items: Item[]; ends: number[]; tools: { at: number; id: string; key: string; name: string; fold: Verbosity }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, queuedRows, order: batchOrder.order, promptWidth }
+// A Bash call whose command still scrolls at `now`: redrawn every frame.
+const scrolls = (item: Item, now: number | undefined): boolean => now !== undefined && item.type === 'tool' && item.name === 'bash' && bashCard.scrolling(item.input.command, now - Date.parse(item.ts ?? ''))
+
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, queuedRows, order: batchOrder.order, promptWidth, scrolls }

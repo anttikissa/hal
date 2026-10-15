@@ -9,6 +9,7 @@ import { attachments } from '../common/attachments.ts'
 import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
+import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
@@ -22,8 +23,10 @@ import { toolView } from './tool-view.ts'
 
 // How a block is drawn (frame.look): its verbosity (task hyt), a call's
 // result, whether it is padded and has a blank row above, its status,
-// style, and rows a plugin draws itself.
-export type Look = { headerWidth?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
+// style, and rows a plugin draws itself. `head`: a short call's rows
+// before its output, for its attached result; `now`: the clock a Bash
+// command scrolls by (bash-card.ts).
+export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string }; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -74,7 +77,10 @@ function imageLabel(item: Item & { type: 'image' }, session?: string): string {
 	let label = attachments.label(item)
 	return session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${label}${ansi.LINK_OFF}` : label
 }
-function headed(item: Item, body: string[], width: number, session?: string): string[] {
+
+// `gap`: a blank row between the title and the body; a short card
+// spends none.
+function headed(item: Item, body: string[], width: number, session?: string, gap = true): string[] {
 	let title = titles.title(item)
 	if (title === undefined) return body
 	// Wrapped, a header continues at the left edge, under its time (task 77f).
@@ -85,7 +91,7 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 		let href = transcript.href(session, call)
 		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
 	}
-	return body.length ? [...rows, '', ...body] : rows
+	return body.length ? [...rows, ...(gap ? [''] : []), ...body] : rows
 }
 
 // Rows for one item at `width` columns, without the side padding;
@@ -103,8 +109,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let source = card.text(item)
 			let body = !source.trim() ? [] : card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
 			// Another session's message: its summary, then its text quieter.
-			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item))
-			if (item.summary && !item.report) body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
+			// A summary counts toward a short card's rows.
+			let summary = item.summary && !item.report ? ansi.wrap(item.summary, width) : undefined
+			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item), settings.shortRows() - 1 - (summary?.length ?? 0))
+			if (summary) body = [...summary, ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
+			if (fold === 'short') body = body.slice(0, Math.max(0, settings.shortRows() - 1))
 			// Its images follow as labels packed into rows: a quick
 			// way to open those its markers name.
 			let rows: string[] = []
@@ -117,7 +126,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fits) rows[rows.length - 1] += ' ' + linked
 				else rows.push(linked)
 			}
-			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session)
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short')
 		case 'image':
 			return [itemView.imageLabel(item, session)]
 		// Markdown hides trailing blanks except before interruption marks.
@@ -127,7 +136,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (!item.text.trim() && !streaming) return []
 			let body = markdownView.lines(item.text.trim(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
-			return itemView.headed(item, body, hw)
+			return itemView.headed(item, body, hw, undefined, fold !== 'short')
 		}
 		case 'text': {
 			let text = card.text(item).trimEnd()
@@ -140,7 +149,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.log().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
 			}
 			if (fold === 'short') body = blockView.short(body, width, streaming, itemView.itemStyle(item))
-			return itemView.headed(item, body, hw)
+			return itemView.headed(item, body, hw, undefined, fold !== 'short')
 		}
 		case 'tool':
 			return toolView.call(item, width, fold, look)
@@ -168,7 +177,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// open, its files and the hook's lines.
 			if (item.commit) {
 				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
-				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width)
+				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width, undefined, fold !== 'short')
 			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
@@ -188,7 +197,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					}
 					return out
 				})
-				if (fold === 'short') return blockView.short(summary, width, false, style)
+				if (fold === 'short') return blockView.short(summary, width, false, style, settings.shortRows())
 				let tone = diff.tone
 				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}

@@ -84,7 +84,7 @@ const table: Setting[] = [
 		label: 'Short card rows',
 		type: { kind: 'integer', min: 1, max: 50 },
 		default: 3,
-		description: 'Rows of text a short terminal card shows below its title row.',
+		description: 'Rows a short terminal card shows, its title row included.',
 		browser: true,
 	},
 ]

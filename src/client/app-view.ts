@@ -22,6 +22,7 @@ import { tabBar } from './tab-bar.ts'
 import { versions } from './versions.ts'
 import { folds } from './folds.ts'
 import { blockView } from './block-view.ts'
+import { bashCard } from './bash-card.ts'
 
 function view(): View {
 	let st = app.state
@@ -55,6 +56,8 @@ function view(): View {
 	if (states?.size) v.folds = { states, sig: [...states].join() }
 	let tick = t && appView.tick(t, Date.now())
 	if (tick) v.tick = tick
+	let now = pulse.now()
+	if (t?.items.slice(-20).some((i) => i.type === 'tool' && i.name === 'bash' && bashCard.scrolling(i.input.command, now - Date.parse(i.ts ?? '')))) v.now = now
 	if (t) v.status = appView.status(t)
 	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
 	return v
@@ -117,7 +120,7 @@ function tick(t: Transcript, now: number, beat = pulse.beat()): View['tick'] {
 // a ticking time counts.
 function blinks(view: View): string {
 	let lit = view.tabs?.lit
-	return view.hal || lit !== undefined || view.tick ? JSON.stringify([view.hal, lit, view.tabs?.alt, view.tick]) : ''
+	return view.hal || lit !== undefined || view.tick || view.now !== undefined ? JSON.stringify([view.hal, lit, view.tabs?.alt, view.tick, view.now]) : ''
 }
 
 export const appView = {

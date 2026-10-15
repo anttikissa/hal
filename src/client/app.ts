@@ -89,7 +89,7 @@ function createState(): AppState {
 function show(): void {
 	app.previewTheme()
 	let v = appView.view()
-	pulse.keep(appView.blinks(v) ? app.beat : null, v.tick?.call ? pulse.frame * 2 : pulse.ms)
+	keepPulse(v)
 	render.show(v)
 	let st = app.state
 	clearTimeout(st.typing)
@@ -113,9 +113,16 @@ function previewTheme(): void {
 	void app.preview(name).then(() => terminal.redraw('theme preview'))
 }
 
+// The pulse beats while something in `v` blinks: every frame while a
+// Bash command scrolls, every other while a call's spinner turns.
+function keepPulse(v: ReturnType<typeof appView.view>): void {
+	pulse.keep(appView.blinks(v) ? app.beat : null, v.now !== undefined ? pulse.frame : v.tick?.call ? pulse.frame * 2 : pulse.ms)
+}
+
 // A beat of the pulse: a repaint, if a blink changed.
 function beat(): void {
 	let v = appView.view()
+	keepPulse(v)
 	if (appView.blinks(v) !== appView.blinks(render.state.view)) render.show(v)
 }
 

@@ -59,17 +59,26 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
 })
 
-test('A short Bash card clips only the first command line, with stable live and finished height', () => {
-	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash' }
-	let rows = (partial?: string) => toolView.call({ ...item, partial }, 20, 'short', {}).map(Bun.stripANSI)
-	expect(rows()[1]).toBe('echo first…')
+test('A short Bash card shows its command in its rows, with stable live and finished height', () => {
+	let ts = '2026-10-15T07:00:00.000Z'
+	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash', ts }
+	let rows = (partial?: string) => toolView.call({ ...item, partial }, 40, 'short', {}).map(Bun.stripANSI)
+	expect(rows()[1]).toBe('echo first ↵ … ↵ echo later')
 	expect(rows()).toHaveLength(2)
 	let output = 'first\nsecond'
-	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'short', {}, undefined, '1', 'bash')
+	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 40, 'short', { head: 2 }, undefined, '1', 'bash')
 	expect(rows(output).length).toBe(rows().length + finished.length)
-	let narrow = toolView.call({ ...item, input: { command: 'echo ' + 'x'.repeat(60) } }, 20, 'short', {})
-	expect(narrow[1]?.endsWith('…')).toBe(true)
-	expect(Bun.stringWidth(narrow[1]!)).toBeLessThanOrEqual(20)
+	// A short one-line command goes after the title; a long one scrolls
+	// from its start to its end, then stays there.
+	expect(toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/List {3}ls$/)])
+	expect(toolView.call({ ...item, input: { command: 'ls' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/\$ ls$/)])
+	let long = { ...item, input: { command: 'echo ' + 'x'.repeat(60) + ' end', description: 'Echo' } }
+	let at = (ms: number) => Bun.stripANSI(toolView.call(long, 20, 'short', { now: Date.parse(ts) + ms })[1]!)
+	expect(at(0)).toMatch(/^echo x+…$/)
+	expect(at(100)).toMatch(/^…x+…$/)
+	expect(at(10_000)).toMatch(/^…x+ end$/)
+	expect(Bun.stripANSI(toolView.call(long, 20, 'short', {})[1]!)).toBe(at(10_000))
+	expect(Bun.stringWidth(at(100))).toBe(20)
 	expect(toolView.call(item, 20, 'long', {}).join('\n')).toContain('echo later')
 })
 

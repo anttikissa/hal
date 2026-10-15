@@ -18,8 +18,10 @@ function spin(beat: number, tool = false): string {
 
 // The first `n` rows of `body`, or while it streams its last: its
 // height grows to `n` and stays there. Done, the last row says how
-// many rows follow, at its right.
-function short(body: string[], width: number, streaming: boolean, style: Style | undefined, n = settings.shortRows()): string[] {
+// many rows follow, at its right. `n` defaults to the rows a short card
+// leaves under its title row.
+function short(body: string[], width: number, streaming: boolean, style: Style | undefined, n = settings.shortRows() - 1): string[] {
+	if (n <= 0) return []
 	if (body.length <= n) return body
 	if (streaming) return body.slice(-n)
 	let shown = body.slice(0, n)

@@ -1,6 +1,6 @@
 // Tool calls and their results as the terminal draws them (tasks wm0,
-// ghs, 4y4, hyt): short is the title row, the command and a few output
-// rows, long all of them. Pure.
+// ghs, 4y4, hyt): short is settings.shortRows() rows, title included
+// (bash-card.ts for Bash's), long all of them. Pure.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
@@ -12,6 +12,7 @@ import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
+import { bashCard } from './bash-card.ts'
 import { diffView } from './diff-view.ts'
 import { itemView, type Look } from './item-view.ts'
 import { presentationView } from './tool-presentation.ts'
@@ -37,16 +38,23 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
 		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width) : [])]
 	}
-	// Running output is laid out as its short result will be (a blank
-	// row, then the short rows), so the card keeps its height when the
-	// call finishes (task 4y4).
+	// Running output takes the rows its short result will, so the card
+	// keeps its height when the call finishes (task 4y4).
 	let n = settings.shortRows()
-	let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
-	if (!bash) return [head, ...live]
-	let details = toolDetails.lines(item.name, item.input)
-	let commandRows = typeof command === 'string' ? command.split('\n').length : 0
-	let preview = commandRows ? [strings.expandTabs(strings.clipVisual(ansi.clean(details[0]!) + (commandRows > 1 ? '…' : ''), width))] : []
-	return [head, ...preview, ...details.slice(commandRows).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...live]
+	let top = [head]
+	if (bash) {
+		let ms = look.now === undefined || !item.ts ? Infinity : look.now - Date.parse(item.ts)
+		let described = typeof item.input.description === 'string' && item.input.description.trim() !== ''
+		let shown = described || (typeof command === 'string' && command.trim().includes('\n')) ? command : undefined
+		top = bashCard.head(head, shown, width, hw, n, ms, itemView.itemStyle(item))
+		let commandRows = typeof command === 'string' ? command.split('\n').length : 0
+		// Declared files and other details while a row stays for output.
+		for (let line of toolDetails.lines(item.name, item.input).slice(commandRows)) if (top.length < n - 1) top.push(strings.expandTabs(strings.clipVisual(ansi.clean(line), width)))
+	}
+	toolView.heads.set(item, top.length)
+	let room = n - top.length
+	let live = room > 0 && item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-room).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-room) : []
+	return [...top, ...live]
 }
 
 // A result's rows: `call` the id of the bash call it answers (its output
@@ -59,7 +67,9 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (tool && ((fold === 'short' && look.full) || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
 	if (tool && (item.presentation || item.presentationError) && fold === 'long') return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
-	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows()
+	// Under its short call, a result fills the rows the call leaves.
+	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows() - (tool ? look.head ?? 1 : 0)
+	if (max <= 0) return []
 	// An attached EDIT result shows its diff in diff colors; running
 	// output apart from its call (task 5gn), its last lines.
 	let painted = tool && item.diff, lines = (painted || out).split('\n'), tones: ReturnType<typeof diff.tone>[] = []
@@ -112,22 +122,26 @@ function exitColor(text: string, style: Style | undefined): string {
 }
 
 // The status after a tool card's title (task wm0), quiet: a nonzero
-// exit in the exit color, then the time, out of `limit` when the call
-// has one (1.4s / 900s); '' with none of them.
-function status(exit: string | undefined, time: string | undefined, style: Style | undefined, limit?: string): string {
+// exit in the exit color, then the output's `lines` when the card hides
+// them all, then the time, out of `limit` when the call has one
+// (1.4s / 900s); '' with none of them.
+function status(exit: string | undefined, time: string | undefined, style: Style | undefined, limit?: string, lines = 0): string {
 	if (limit && time !== '') time = `${time ?? '0s'} / ${limit}`
-	if (!exit && !time) return ''
-	if (!exit) return ansi.quiet(`(${time})`, style)
-	return ansi.quiet('(', style) + toolView.exitColor(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
+	let rest = [lines ? `${lines} line${lines === 1 ? '' : 's'}` : '', time].filter(Boolean).join(', ')
+	if (!exit && !rest) return ''
+	if (!exit) return ansi.quiet(`(${rest})`, style)
+	return ansi.quiet('(', style) + toolView.exitColor(exit, style) + ansi.quiet(rest ? `, ${rest})` : ')', style)
 }
 
 // A finished call's status from its result; `bash`: a bash call's.
 // Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined, limit?: string): string {
+// `hidden`: its card shows no output, so the status counts its lines.
+function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined, limit?: string, hidden = false): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)
 	if (item.diff && !item.isError) return diffView.status(item.diff, style, bashResult.duration(item.ms))
-	return toolView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style, limit)
+	let out = hidden ? (bash ? bashResult.display(item.output) : bashResult.trim(item.output)).replace(/\n$/, '') : ''
+	return toolView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style, limit, out ? out.split('\n').length : 0)
 }
 
 // Where an open result's whole output is: the file its cut note names,
@@ -143,6 +157,8 @@ function fullAt(output: string, session: string | undefined, key = ''): string {
 export const toolView = {
 	// Rows of an open result before its cut marker.
 	openRows: 200,
+	// A short call's rows before its output, for its result (frame.ts).
+	heads: new WeakMap<object, number>(),
 	// The Hal home for paths shown; main.ts sets hal --home.
 	home: resolve(import.meta.dir, '../..'),
 	call,

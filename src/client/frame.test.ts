@@ -498,7 +498,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).toContain('\nM notes.md')
 	expect(printed).not.toContain('#1813>')
 	let title = lines.find((line) => line.includes('Read missing'))!
-	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\)   t1815$/)
+	expect(plain([title])[0]).toMatch(/Read missing   cat nope +\(exit 123, 3\.2s\)   t1815$/)
 	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
