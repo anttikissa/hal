@@ -197,10 +197,8 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 		if (typeof background === 'boolean') shown.add('background')
 		// The title's "unsafe to stop" label shows it (toolDetails.unsafe).
 		if (typeof input.unsafeToStop === 'boolean') shown.add('unsafeToStop')
-		if (typeof timeout === 'number') {
-			if (timeout !== (background === true ? 600 : 120)) out.push(`Timeout ${timeout} s`)
-			shown.add('timeout')
-		}
+		// The title's status shows a timeout off the default (toolDetails.limit).
+		if (typeof timeout === 'number') shown.add('timeout')
 	}
 	for (let [key, v] of Object.entries(input)) {
 		if (shown.has(key)) continue
@@ -213,6 +211,14 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 // A bash call flagged unsafeToStop: its title says "unsafe to stop" (task ker).
 const unsafe = (name: string, input: Record<string, unknown>): boolean => name === 'bash' && input.unsafeToStop === true
 
+// A bash call's timeout off the default, '900s', for its title's
+// status: (1.4s / 900s) (task b3k).
+function limit(name: string, input: Record<string, unknown>): string | undefined {
+	let { timeout } = input
+	if (name !== 'bash' || typeof timeout !== 'number' || timeout === (input.background === true ? 600 : 120)) return undefined
+	return `${timeout}s`
+}
+
 // Built-in tools that change nothing (host tools.readOnly): an edit of
 // a prompt before them leaves the world as it was.
 const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'help'])
@@ -222,4 +228,4 @@ const fullCommand = (name: string, input: Record<string, unknown>): boolean => n
 
 const harmless = (name: string, input: Record<string, unknown>): boolean => readOnly.has(name) || (name === 'command' && typeof input.command === 'string' && /^\s*\/(?:rename|help)(?:\s|$)/.test(input.command))
 
-export const toolDetails = { fullCommand, value, headline, lines, unsafe, readOnly, harmless }
+export const toolDetails = { fullCommand, value, headline, lines, unsafe, limit, readOnly, harmless }

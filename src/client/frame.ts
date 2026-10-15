@@ -261,8 +261,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
 			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : ' ') : ''
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
-			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item))
-			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item))
+			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
+			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)
+			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit)
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
 			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status ? `${look.status} &` : '&'
 			look = frame.look(item, look)

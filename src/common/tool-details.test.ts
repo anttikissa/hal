@@ -4,7 +4,9 @@ import { toolDetails } from './tool-details.ts'
 test('bash reads like the terminal; odd arguments show once, plumbing never', () => {
 	let input = { command: 'cat <<EOF\nhi\nEOF', description: 'Say hi', modifies: ['a.ts', 'src/*.ts'], background: true, timeout: 600, extra: 'x' }
 	expect(toolDetails.lines('bash', input)).toEqual(['cat <<EOF', 'hi', 'EOF', 'Edits a.ts, src/*.ts', 'extra: x'])
-	expect(toolDetails.lines('bash', { command: 'ls', description: 'List', timeout: 5, background: 'yes' })).toEqual(['ls', 'Timeout 5 s', 'background: yes'])
+	expect(toolDetails.lines('bash', { command: 'ls', description: 'List', timeout: 5, background: 'yes' })).toEqual(['ls', 'background: yes'])
+	expect(toolDetails.limit('bash', { command: 'ls', timeout: 900 })).toBe('900s')
+	expect(toolDetails.limit('bash', { command: 'ls', timeout: 600, background: true })).toBeUndefined()
 	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: '! Done', key: 'text', mark: '!' })
 	expect(toolDetails.lines('notify', { text: 'Done' })).toEqual([])
 })

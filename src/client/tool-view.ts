@@ -112,8 +112,10 @@ function exitColor(text: string, style: Style | undefined): string {
 }
 
 // The status after a tool card's title (task wm0), quiet: a nonzero
-// exit in the exit color, then the time; '' with neither.
-function status(exit: string | undefined, time: string | undefined, style: Style | undefined): string {
+// exit in the exit color, then the time, out of `limit` when the call
+// has one (1.4s / 900s); '' with none of them.
+function status(exit: string | undefined, time: string | undefined, style: Style | undefined, limit?: string): string {
+	if (limit) time = `${time ?? '0s'} / ${limit}`
 	if (!exit && !time) return ''
 	if (!exit) return ansi.quiet(`(${time})`, style)
 	return ansi.quiet('(', style) + toolView.exitColor(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
@@ -121,11 +123,11 @@ function status(exit: string | undefined, time: string | undefined, style: Style
 
 // A finished call's status from its result; `bash`: a bash call's.
 // Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
+function resultStatus(item: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined, limit?: string): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)
 	if (item.diff && !item.isError) return diffView.status(item.diff, style, bashResult.duration(item.ms))
-	return toolView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style)
+	return toolView.status(bashResult.failure(item, bash), bashResult.duration(item.ms), style, limit)
 }
 
 // Where an open result's whole output is: the file its cut note names,

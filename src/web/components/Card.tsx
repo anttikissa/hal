@@ -98,7 +98,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	})
 	let elapsed = () => { let ts = Date.parse((running() ? props.running?.since : undefined) ?? (props.row.item as { ts?: string }).ts ?? ''); return live() && Number.isFinite(ts) ? bashResult.duration(now() - ts, true) : undefined }
 	let spins = () => ['thinking', 'text', 'tool'].includes(props.row.item.type)
-	let activity = () => <Show when={spins()}><span class="ticker"><Show when={elapsed()}>{(e) => <span class="elapsed">({e()})</span>}</Show><span class={['spinner', live() ? 'on' : '']} aria-hidden="true" /></span></Show>
+	let limit = () => { let item = props.row.item; return item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined }
+	let activity = () => <Show when={spins()}><span class="ticker"><Show when={elapsed()}>{(e) => <span class="elapsed">({e()}{limit() ? ` / ${limit()}` : ''})</span>}</Show><span class={['spinner', live() ? 'on' : '']} aria-hidden="true" /></span></Show>
 	let latest = () => { let item = props.row.item; return item.type === 'tool' && running() && !open() ? item.partial?.split('\n').findLast((l) => l.trim())?.trim() : undefined }
 	let fullCommand = () => { let item = props.row.item; return item.type === 'tool' && toolDetails.fullCommand(item.name, item.input) }
 	let full = () => fullCommand() || open()
@@ -306,7 +307,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						<Show when={closable() && title()}>{heading()}</Show>
 						<Show when={folding()} fallback={plain(s)}>
 							<Show when={!closable()}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} activity={activity()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={link()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<Show when={headsWho()} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>

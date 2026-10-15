@@ -55,7 +55,7 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5 })
 	expect(bash).toContain('$ Two commands\necho first\necho second')
 	expect(bash).toContain('Edits a.ts')
-	expect(bash).toContain('Timeout 5 s')
+	expect(bash).not.toContain('Timeout')
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
 })
 
