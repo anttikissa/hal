@@ -18,7 +18,6 @@
 
 import { callText } from './call-text.ts'
 import { home } from './home.ts'
-import { titles } from './titles.ts'
 
 // A value in readable text rather than wire syntax.
 function value(input: unknown, indent = ''): string[] {

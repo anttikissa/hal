@@ -6,7 +6,6 @@
 // Tasks: gj, p87.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
-import { card, type Kind, type Verbosity } from '../common/card.ts'
 import { session, type SessionMeta } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { names } from '../common/names.ts'
