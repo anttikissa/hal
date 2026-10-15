@@ -24,7 +24,9 @@ function order(items: Item[], deadline?: number, at: Ordering = { i: 0, out: [] 
 	for (let first = true; i < items.length; first = false) {
 		if (!first && deadline !== undefined && performance.now() > deadline) break
 		let j = i
-		while (j < items.length && items[j]!.type === 'tool') j++
+		// One round's calls are consecutive records; a gap starts another batch.
+		let next = (a: Item, b: Item) => !/^\d+$/.test(a.key) || !/^\d+$/.test(b.key) || Number(b.key) === Number(a.key) + 1
+		while (j < items.length && items[j]!.type === 'tool' && (j === i || next(items[j - 1]!, items[j]!))) j++
 		let k = j
 		while (k < items.length && items[k]!.type === 'tool-result') k++
 		let calls = items.slice(i, j) as (Item & { type: 'tool' })[]
