@@ -21,6 +21,7 @@ import { markdownView } from './markdown-view.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Verbosity } from '../common/card.ts'
 import { toolView } from './tool-view.ts'
+import { bashCard } from './bash-card.ts'
 
 // How a block is drawn (frame.look): its verbosity (task hyt), a call's
 // result, whether it is padded and has a blank row above, its status,
@@ -116,6 +117,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item), settings.shortRows() - 1 - (summary?.length ?? 0))
 			if (summary) body = [...summary, ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
 			if (fold === 'short') body = body.slice(0, Math.max(0, settings.shortRows() - 1))
+			if (bashResult.background(item)) body = body.map((row) => bashCard.paint(row, itemView.itemStyle(item)))
 			// Its images follow as labels packed into rows: a quick
 			// way to open those its markers name.
 			let rows: string[] = []

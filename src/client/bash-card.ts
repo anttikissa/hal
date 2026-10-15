@@ -85,4 +85,4 @@ function head(head: string, command: unknown, width: number, hw: number, rows: n
 // Whether `command` may still be scrolling `ms` after its call appeared.
 const scrolling = (command: unknown, ms: number): boolean => typeof command === 'string' && ms >= 0 && ms < (strings.visLen(command) * 1000) / SPEED && !command.trim().includes('\n')
 
-export const bashCard = { head, scrolling }
+export const bashCard = { head, scrolling, paint }

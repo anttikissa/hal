@@ -37,7 +37,9 @@ function withoutLineComment(text: string): { text: string; purpose?: string } {
 	let end = lineEnd(text, 0)
 	for (let i = 0; i < end;) {
 		if (text.startsWith('//', i) && (i === 0 || /\s/.test(text[i - 1]!))) return { text: text.slice(0, i).trimEnd() + text.slice(end), purpose: text.slice(i + 2, end).trim() }
-		if ('{["\'`'.includes(text[i]!) && (i === 0 || /\s/.test(text[i - 1]!))) i = ason.parseAt(text, i).end
+		if ('{["\'`'.includes(text[i]!) && (i === 0 || /\s/.test(text[i - 1]!))) {
+			try { i = ason.parseAt(text, i).end } catch { return { text } }
+		}
 		else if (text.startsWith('/*', i)) { let close = text.indexOf('*/', i + 2); i = close < 0 ? end : close + 2 }
 		else i++
 	}

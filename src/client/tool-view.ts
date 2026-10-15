@@ -44,7 +44,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		if (partial && look.streamRows !== undefined) partial = partial.split('\n').slice(-look.streamRows).join('\n')
 		let details = toolDetails.lines(item.name, item.input)
 		if (bash && !(typeof item.input.description === 'string' && item.input.description.trim()) && typeof command === 'string' && !command.includes('\n')) details = details.slice(1)
-		return [...rows, ...details.flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])]
+		return [...rows, ...details.flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])].map((row, i) => i < rows.length ? row : bashCard.paint(row, itemView.itemStyle(item)))
 	}
 	// Running output takes the rows its short result will, so the card
 	// keeps its height when the call finishes (task 4y4).
@@ -62,7 +62,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	toolView.heads.set(item, top.length)
 	let room = n - top.length
 	let live = room > 0 && item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-room).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-room) : []
-	return [...top, ...live]
+	return [...top, ...live.map((row) => bashCard.paint(row, itemView.itemStyle(item)))]
 }
 
 // A result's rows: `call` the id of the bash call it answers (its output

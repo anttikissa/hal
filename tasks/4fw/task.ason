@@ -1,0 +1,7 @@
+{
+	title: 'Terminal live and background output shares the command body painter',
+	spec: 'Terminal command details, streaming tool output and background Bash completion bodies use the same quieter output-color painter as Bash command rows (bashCard.paint, colors.toolOutput), leaving titles brighter. Existing final tool-result colors remain unchanged. The shared painter preserves monochrome mode and card color restoration. Web behavior is unchanged. Invariant restored: background completion and streaming bodies do not inherit bright title colors.',
+	status: 'done',
+	needs: ['hyt'],
+	foldInto: ['hyt']
+}

@@ -2,6 +2,9 @@
 	title: 'EDIT operation headers accept trailing line comments',
 	spec: 'The shared native-call parser extracts a trailing first-line // comment as a purpose, without changing quoted arguments, URLs, block comments or later lines. All tools accept it; tools with a description field append it to an existing description or block-comment purpose, separated by a space. EDIT first-line headers accept it while literal old/new blocks remain untouched. EDIT cards honor a supplied description in call, success, unchanged and error titles; without one, filenames and change counts remain the title. Invariants restored: line comments can describe calls consistently, literal arguments remain data, and supplied EDIT descriptions stay visible.',
 	status: 'done',
+	notes: [
+		'Comment extraction leaves malformed literal arguments unchanged so validation still rejects them and expanded cards show the complete raw input. The existing item-view malformed-call regression covers this boundary.'
+	],
 	needs: ['ybg'],
 	foldInto: ['ybg']
 }
