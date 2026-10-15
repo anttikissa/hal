@@ -128,7 +128,7 @@ test('cross-session clear inherits host sender through execution and fresh promp
 	prompts.submit(id, '/clear forwarded', undefined, 'steer', { from: '02-abc', label: 'tab 2 · Other session' })
 	await until(() => calls.length === 1)
 	let prompt = c.views.get(id)!.items.find((i) => i.type === 'prompt')!
-	expect(titles.author(prompt)).toBe('Message from tab 2 · Other session (/clear continuation)')
+	expect(titles.author(prompt)).toBe('<= 02-abc (tab 2, /clear continuation)')
 	expect(JSON.stringify(calls[0]!.input.messages)).toContain('; message from tab 2 (Other session); /clear continuation]')
 	expect(titles.author({ type: 'command', text: '/clear', from: '02-abc' })).toBe('Command from 02-abc')
 	calls[0]!.push({ type: 'done', reason: 'end' })

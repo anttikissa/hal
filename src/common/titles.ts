@@ -83,8 +83,14 @@ function address(label: string, short = false): string {
 }
 
 function messageHead(item: Shown & { type: 'prompt' }): string {
-	let who = titles.who(item.from === undefined ? item : { ...item, report: undefined, ...(item.report ? { summary: undefined } : {}), label: titles.address(item.label ?? item.from, true) })
+	let who = titles.who(item.from === undefined ? item : { ...item, report: undefined, ...(item.report ? { summary: undefined } : {}) })
 	return item.report ? `${who} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}` : `${who}: ${item.summary}`
+}
+
+// "tab 2 · 12-xyz · Name" → ['12-xyz', 'tab 2']: the session, then its tab.
+function sender(label: string): [string, string | undefined] {
+	let [first, id] = label.split(' · ')
+	return /^tab \d+$/.test(first!) && id ? [id, first] : [first!, undefined]
 }
 
 // Receipts describe model delivery, not transport acknowledgement of normal prompts.
@@ -101,8 +107,14 @@ function who(item: Shown): string | undefined {
 
 function author(item: Shown): string | undefined {
 	switch (item.type) {
-		case 'prompt':
-			return tagged(item.from !== undefined && /^bash #?t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5).replace(/^#/, '')}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.edited && 'edited; /edit undo to go back', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && !item.advisory && (item.waiting ? 'soft-steering' : 'soft-steered'), item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued'])
+		case 'prompt': {
+			let call = item.from !== undefined && /^bash #?(t?\d+)$/.exec(item.label ?? '')?.[1]
+			let delivery = [item.edited && 'edited; /edit undo to go back', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && 'next round', item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued']
+			if (call) return `<= Background command finished ↑ ${call.startsWith('t') ? call : `t${call}`}`
+			if (item.from === undefined) return tagged(item.origin === 'model' ? 'Hal' : 'You', delivery)
+			let [id, tab] = sender(item.label ?? item.from)
+			return tagged(`<= ${item.from || id}`, [tab, ...delivery])
+		}
 		// Another session's command is headed as the prompt it was sent
 		// as; the human's by itself, over what it said (none alone).
 		case 'command':
@@ -111,7 +123,7 @@ function author(item: Shown): string | undefined {
 		case 'thinking':
 			return 'Thinking'
 		case 'text':
-			return item.model ? `Hal (${titles.modelLabel(item.model, item.effort)})` : 'Hal'
+			return `${/<question>/.test(item.text) ? '? ' : ''}${item.model ? `Hal (${titles.modelLabel(item.model, item.effort)})` : 'Hal'}`
 		// Hal's own words without a model, such as a greeting (task 8y).
 		case 'output':
 			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : item.synthetic ? 'Hal (synthetic)' : undefined

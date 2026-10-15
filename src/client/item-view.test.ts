@@ -52,7 +52,7 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 	expect(spawn.replace(/\n/g, ' ')).toContain('must not be clipped')
 	expect(spawn).toContain('task: First instruction\n  Second instruction')
 	expect(spawn).toContain('model: fake/model')
-	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5000 })
+	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5 })
 	expect(bash).toContain('$ Two commands\necho first\necho second')
 	expect(bash).toContain('Edits a.ts')
 	expect(bash).toContain('Timeout 5 s')
@@ -66,7 +66,7 @@ test('A short Bash card clips only the first command line, with stable live and 
 	expect(rows()).toHaveLength(2)
 	let output = 'first\nsecond'
 	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 20, 'short', {}, undefined, '1', 'bash')
-	expect(rows(output).length).toBe(rows().length + 1 + finished.length)
+	expect(rows(output).length).toBe(rows().length + finished.length)
 	let narrow = toolView.call({ ...item, input: { command: 'echo ' + 'x'.repeat(60) } }, 20, 'short', {})
 	expect(narrow[1]?.endsWith('…')).toBe(true)
 	expect(Bun.stringWidth(narrow[1]!)).toBeLessThanOrEqual(20)

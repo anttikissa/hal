@@ -503,7 +503,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
 	let jobTitle = lines.find((line) => line.includes('Background command finished'))!
-	expect(plain([jobTitle])[0]).toMatch(/Background command finished 1813 +\(exit 123\) s1817$/)
+	expect(plain([jobTitle])[0]).toMatch(/<= Background command finished ↑ t1813 +\(exit 123\) s1817$/)
 	expect(jobTitle).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
@@ -511,7 +511,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	let detached = plain(frame.build(apart, 70).lines).find(line => line.includes('M notes.md'))!
 	expect(detached).toMatch(/^M notes\.md +↑ t1813$/)
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
-	expect(printed).toContain('Background command finished 1813')
+	expect(printed).toContain('<= Background command finished ↑ t1813')
 	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {
 		let job = view([{ type: 'prompt', text: '[exit 123]\nmissing file', from: 's', label }])
 		let rendered = frame.build(job, width).lines

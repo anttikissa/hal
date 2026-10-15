@@ -12,8 +12,9 @@ test('headers: time and who wrote the block, the short model name (else its id) 
 	titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5', 'openai/gpt-6.1-sol': 'GPT-6.1 Sol', 'openai/gpt-5.5': 'GPT-5.5' }
 	titles.defaults = { 'anthropic/claude-opus-5-5': 'medium' }
 	expect(titles.title({ type: 'prompt', text: 'hi', ts: at(10, 49) })).toBe('10:49 You')
-	expect(titles.title({ type: 'prompt', text: 'hi', from: '12-abc', label: 'tab 3: Review', ts: at(9, 5) })).toBe('09:05 Message from tab 3: Review')
+	expect(titles.title({ type: 'prompt', text: 'hi', from: '12-abc', label: 'tab 3 · 12-abc · Review', delivery: 'now', ts: at(9, 5) })).toBe('09:05 <= 12-abc (tab 3, steering)')
 	expect(titles.title({ type: 'text', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'medium', ts: at(10, 52) })).toBe('10:52 Hal (Opus 5.5)')
+	expect(titles.title({ type: 'text', text: 'Agree? <question>Agree?</question>', model: 'anthropic/claude-opus-5-5', effort: 'medium', ts: at(10, 52) })).toBe('10:52 ? Hal (Opus 5.5)')
 	expect(titles.title({ type: 'text', text: 'x', model: 'openai/gpt-6.1-sol', effort: 'high', ts: at(10, 52) })).toBe('10:52 Hal (Sol 6.1 high)')
 	expect(titles.title({ type: 'text', text: 'x', model: 'openai/gpt-5.5', ts: at(10, 52) })).toBe('10:52 Hal (GPT-5.5)')
 	expect(titles.title({ type: 'thinking', text: 'x', model: 'openai/gpt-5.5', effort: 'high', ts: at(23, 0) })).toBe('23:00 Thinking')
@@ -35,17 +36,17 @@ test('old records without model, effort or time still get a header', () => {
 
 test('folded messages identify the sender before the summary, keeping full attribution in details', () => {
 	let item = { type: 'prompt' as const, text: 'Done', from: '163-gad', label: 'tab 4 · 163-gad · Review', summary: 'Report completion', advisory: true as const }
-	expect(titles.messageHead(item)).toBe('From tab 4 (163-gad): Report completion')
-	expect(titles.who(item)).toBe('From tab 4 (163-gad), Review')
-	expect(titles.messageHead({ ...item, label: undefined })).toBe('From 163-gad: Report completion')
+	expect(titles.messageHead(item)).toBe('<= 163-gad (tab 4): Report completion')
+	expect(titles.who(item)).toBe('<= 163-gad (tab 4)')
+	expect(titles.messageHead({ ...item, label: undefined })).toBe('<= 163-gad: Report completion')
 })
 
 test('subagent reports show their outcome after sender identity; ordinary chatter is unchanged', () => {
 	let item = { type: 'prompt' as const, text: '<question>Which format?</question>', from: '07-kim', label: 'tab 124 · 07-kim · Review', summary: 'Which format?', report: 'question' as const, ts: at(19, 12) }
-	expect(titles.messageHead(item)).toBe('Message from tab 124 (07-kim) · Needs info: Which format?')
-	expect(titles.title(item)).toBe('19:12 Message from tab 124 (07-kim), Review · Needs info: Which format?')
-	expect(titles.messageHead({ ...item, report: 'summary', summary: 'Import added' })).toBe('Message from tab 124 (07-kim) · Finished: Import added')
-	expect(titles.messageHead({ ...item, report: undefined })).toBe('From tab 124 (07-kim): Which format?')
+	expect(titles.messageHead(item)).toBe('<= 07-kim (tab 124) · Needs info: Which format?')
+	expect(titles.title(item)).toBe('19:12 <= 07-kim (tab 124) · Needs info: Which format?')
+	expect(titles.messageHead({ ...item, report: 'summary', summary: 'Import added' })).toBe('<= 07-kim (tab 124) · Finished: Import added')
+	expect(titles.messageHead({ ...item, report: undefined })).toBe('<= 07-kim (tab 124): Which format?')
 })
 
 test('receipts distinguish inbox delivery from model history without marking immediate messages', () => {
@@ -56,8 +57,8 @@ test('receipts distinguish inbox delivery from model history without marking imm
 	}
 	expect(titles.receipt(prompt)).toBe(0)
 	expect(titles.receipt({ ...prompt, delivery: 'now' })).toBe(0)
-	expect(titles.title({ ...prompt, delivery: 'next-round', waiting: true })).toBe('You (soft-steering)')
-	expect(titles.title({ ...prompt, delivery: 'next-round' })).toBe('You (soft-steered)')
+	expect(titles.title({ ...prompt, delivery: 'next-round', waiting: true })).toBe('You (next round)')
+	expect(titles.title({ ...prompt, delivery: 'after-turn' })).toBe('You (queued)')
 })
 
 test('background reports carry command status rather than message receipts', () => {

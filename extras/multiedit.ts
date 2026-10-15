@@ -442,21 +442,20 @@ export default function (plugin: Plugin) {
 		const countsByPath = new Map<string, number>()
 		for (const e of edits) if (e && typeof e.path === 'string') countsByPath.set(e.path, (countsByPath.get(e.path) ?? 0) + 1)
 		const names = [...countsByPath.keys()]
-		const label = names.length ? names.join(', ') : 'files'
-		const purpose = typeof call.input.description === 'string' ? call.input.description.trim().replace(/\s+/g, ' ') : ''
-		const title = purpose ? `Edit: ${purpose}` : `Edit ${label}`
+		const created = new Set(edits.filter((e) => e?.create === true).map((e) => e.path))
+		const label = names.length ? names.map((p) => created.has(p) ? `+${p}` : p).join(', ') : 'files'
 		const pending = (n: number) => `${n} ${n === 1 ? 'change' : 'changes'} pending`
 		if (!result) return {
-			title: `${title} (${pending(edits.length)})`,
+			title: `> ${label} (${pending(edits.length)})`,
 			blocks: names.map((path) => ({ kind: 'text', path, text: pending(countsByPath.get(path)!) }))
 		}
 		if (result.isError) return {
-			title: purpose ? `Edit failed: ${purpose}` : `Edit failed: ${label}`,
+			title: `> ${label} (failed)`,
 			blocks: names.map((path) => ({ kind: 'text', path, text: 'Requested edit' }))
 		}
-		const headers = [...result.output.matchAll(/^== (.+)(?:@[a-z0-9]+| deleted) verified ==\n/gm)]
+		const headers = [...result.output.matchAll(/^== (.+?)(@[a-z0-9]+| deleted) verified ==\n/gm)]
 		if (!headers.length || result.output.includes('[cut:')) return {
-			title,
+			title: `> ${label}`,
 			blocks: [...names.map((path) => ({ kind: 'text' as const, path, text: 'Requested edit' })), {
 				kind: 'text',
 				text: { from: 0, to: result.output.length }
@@ -468,12 +467,17 @@ export default function (plugin: Plugin) {
 			path: m[1]!,
 			text: { from: m.index! + m[0].length, to: headers[i + 1]?.index ?? end }
 		}))
-		const counts = blocks.reduce((n, b) => {
-			const s = diff.stats(result.output.slice(b.text.from, b.text.to));
-			return { added: n.added + s.added, removed: n.removed + s.removed }
-		}, { added: 0, removed: 0 })
+		// foo.ts +2-2, +new.ts +110, -old.ts, named as the call named them.
+		const named = (path: string) => names.find((p) => path === p || path.endsWith(`/${p.replace(/^\.\//, '')}`)) ?? path
+		const files = headers.map((m, i) => {
+			const path = named(m[1]!)
+			if (m[2] === ' deleted') return `-${path}`
+			const s = diff.stats(result.output.slice(blocks[i]!.text.from, blocks[i]!.text.to))
+			const counts = `${s.added ? `+${s.added}` : ''}${s.removed ? `-${s.removed}` : ''}`
+			return `${created.has(path) ? '+' : ''}${path}${counts ? ` ${counts}` : ''}`
+		})
 		return {
-			title: `${title} (+${counts.added} −${counts.removed})`,
+			title: `> ${files.join(', ')}`,
 			blocks: [...blocks, ...(tail < 0 ? [] : [{
 				kind: 'text' as const,
 				text: { from: tail + 1, to: result.output.length }

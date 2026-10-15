@@ -35,7 +35,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	if (fold === 'long') {
 		let rows = ansi.wrap(prefix + title, hw)
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
-		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ['', ...ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width)] : [])]
+		return [...rows, ...toolDetails.lines(item.name, item.input).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(item.partial ? ansi.wrap(ansi.clean(item.partial.replace(/\n$/, '')), width) : [])]
 	}
 	// Running output is laid out as its short result will be (a blank
 	// row, then the short rows), so the card keeps its height when the
@@ -46,7 +46,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	let details = toolDetails.lines(item.name, item.input)
 	let commandRows = typeof command === 'string' ? command.split('\n').length : 0
 	let preview = commandRows ? [strings.expandTabs(strings.clipVisual(ansi.clean(details[0]!) + (commandRows > 1 ? '…' : ''), width))] : []
-	return [head, ...preview, ...details.slice(commandRows).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(live.length ? ['', ...live] : [])]
+	return [head, ...preview, ...details.slice(commandRows).flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...live]
 }
 
 // A result's rows: `call` the id of the bash call it answers (its output

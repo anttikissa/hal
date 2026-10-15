@@ -66,7 +66,9 @@ function enter(el: HTMLElement): void {
 // after ; & | ( $( ), optionally behind env assignments or a wrapper.
 const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
-const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
+const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
+// A title without its leading mark ($, <, =>, …): the icon shows it.
+const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!*x?]) /, '') as T
 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}`
@@ -138,6 +140,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// A question is headed by its text, its addresses links.
 		if (item.type === 'question') return <For each={hrefs.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 		let ref = source(), t = titles.who(item)
+		if (titles.letter(item) === 'm') t = unmark(t)
 		return ref && t?.endsWith(ref) ? <>{t.slice(0, -ref.length)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">{ref}</a></> : t
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
@@ -154,11 +157,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			let first = expanded() ? '' : parser.inline(lines().find((line) => line.trim()) ?? '', !!props.cursor).map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
-		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)
-		if (headsWho()) return titles.who(item)
+		if (item.type === 'prompt' && item.summary) return unmark(titles.messageHead(item))
+		if (headsWho()) return titles.letter(item) === 'm' ? unmark(titles.who(item)) : titles.who(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${lines()[0]}`
-		return item.type === 'tool' ? presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
+		return item.type === 'tool' ? unmark(presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text) : lines()[0]
 	}
 	// Folded cards name their kind with an icon: thinking, another
 	// session's message or command (the send tool's bubble, which

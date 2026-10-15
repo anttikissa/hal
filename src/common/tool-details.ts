@@ -198,7 +198,7 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 		// The title's "unsafe to stop" label shows it (toolDetails.unsafe).
 		if (typeof input.unsafeToStop === 'boolean') shown.add('unsafeToStop')
 		if (typeof timeout === 'number') {
-			if (timeout !== (background === true ? 600_000 : 120_000)) out.push(`Timeout ${timeout / 1000} s`)
+			if (timeout !== (background === true ? 600 : 120)) out.push(`Timeout ${timeout} s`)
 			shown.add('timeout')
 		}
 	}
