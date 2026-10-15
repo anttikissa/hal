@@ -51,7 +51,7 @@ function result(item: Item & { type: 'tool-result' }, out: string, width: number
 		let color = item.isError && normal?.fg && !ansi.mono() ? (r: string) => ansi.sgr({ fg: normal.fg! }) + r + back : (r: string) => r
 		rows.push(...blocks.map(color))
 	}
-	if (max === Infinity && raw) rows.push(ansi.quiet(strings.clipVisual(`Raw call and result: ${raw}`, width), style))
+	if (max === Infinity && raw) rows.push(ansi.quiet(strings.clipVisual(`Raw call and result: ${raw}`, width), item.isError ? normal : style))
 	return presentationView.cut(rows, max, width, style)
 }
 
