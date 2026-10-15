@@ -6,7 +6,7 @@ import { nativeTool } from './native-tool.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
 import { calls, client, created, fakeStream, testHome, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
-import { lease } from './lease.ts'
+import { fileText } from './file-text.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
@@ -101,7 +101,7 @@ test('a stream that throws still ends the turn and frees the session', async () 
 	await until(() => calls.length === 1)
 })
 
-const milk = `== READ notes.txt@${lease.hash(Buffer.from('remember the milk\n'))} ==\n1: remember the milk`
+const milk = `== READ notes.txt@${fileText.hash(Buffer.from('remember the milk\n'))} ==\n1: remember the milk`
 
 test('a tool call runs on the host and the turn continues with its result', async () => {
 	let a = client()

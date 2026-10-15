@@ -115,7 +115,7 @@ test('security none explicitly permits READ of synthetic sensitive files', async
 	expect(result.output).toContain('1: FAKE-SECRET-CONTENT')
 })
 
-test('batched ranges match individual leased reads; mixed failures preserve successes and are tool errors', async () => {
+test('batched ranges match individual versioned reads; mixed failures preserve successes and are tool errors', async () => {
 	writeFileSync(`${home}/a.txt`, 'first\nsecond\nthird\n')
 	writeFileSync(`${home}/b.txt`, 'other\ntail\n')
 	let next = 0
@@ -137,7 +137,7 @@ test('batched ranges match individual leased reads; mixed failures preserve succ
 	expect(failed.output).toContain('binary.bin looks like a binary file')
 })
 
-test('mixed batches retain every durable image, errors and leases across history and providers', async () => {
+test('mixed batches retain every durable image, error and file version across history and providers', async () => {
 	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
 	let gif = Buffer.from('GIF89a\0\0')
 	writeFileSync(`${home}/one.png`, png)

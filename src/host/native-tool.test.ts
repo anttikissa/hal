@@ -146,4 +146,4 @@ test('HELP comes from the tool modules; $tools_summary lists only tools the prom
 	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets } ]'])
 })
 
-const version = (path: string) => require('./lease.ts').lease.hash(readFileSync(path)) as string
+const version = (path: string) => require('./file-text.ts').fileText.hash(readFileSync(path)) as string

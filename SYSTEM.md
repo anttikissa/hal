@@ -164,7 +164,7 @@ function process(x) {
 !!END
 src/main.ts@4d9ej delete 9-9
 ::: if session_interactive="true"
-- Start every EDIT with a descriptive comment: EDIT /* Rename helper to actualHelper in client files */
+- A descriptive /* comment */ is mandatory at the start of every EDIT: EDIT /* Rename helper to actualHelper in client files */
 :::
 ::
 

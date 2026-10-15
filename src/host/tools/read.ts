@@ -1,5 +1,5 @@
-// read: a local image, a text file as numbered lines under its editing
-// lease (lease.ts, task 3fv), or a directory listing.
+// READ: local images, versioned text with numbered lines (task 3fv),
+// directory listings and URLs.
 
 import { readdirSync, realpathSync, statSync } from 'fs'
 import { homedir } from 'os'
@@ -9,7 +9,7 @@ import { callText } from '../../common/call-text.ts'
 import { settings } from '../../common/settings.ts'
 import { approval } from '../approval.ts'
 import { blobs } from '../blobs.ts'
-import { lease } from '../lease.ts'
+import { fileText } from '../file-text.ts'
 import { type Tool, type ToolOutput, tools } from '../tools.ts'
 import { webRead } from '../web-read.ts'
 
@@ -22,7 +22,7 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 
 // READ "path" (the first tools.readLines lines), "path:10" (line 10),
 // "path:10-20", "path:1-" (to the end); an http(s) URL is fetched (web-read.ts).
-// Several paths read each range under its own lease, retaining images.
+// Several paths retain each file's version, ranges and images.
 function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = callText.values(raw)
 	if (values.length > 1 && values.every((v) => typeof v === 'string' && v)) return { name: 'read', input: { paths: values.map((v) => /^https?:\/\//i.test(v as string) ? { url: v } : one(v as string).input) } }
@@ -103,6 +103,6 @@ export const tool: Tool<ToolOutput> = {
 		}
 		if (bytes.subarray(0, 8192).includes(0)) throw new Error(`${input.path} looks like a binary file`)
 		let capped = offset === undefined && limit === undefined
-		return lease.read(input.path, bytes, offset, capped ? tools.readLines : limit, capped)
+		return fileText.read(input.path, bytes, offset, capped ? tools.readLines : limit, capped)
 	},
 }

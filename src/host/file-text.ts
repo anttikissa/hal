@@ -1,12 +1,7 @@
-// Editing leases (task 3fv): READ shows a text file as numbered lines
-// under `path@hash`, the hash covering the whole file; EDIT names that
-// lease and changes line ranges of exactly that version, all at once.
-// The hash is a stale-file check, not a security boundary: five
-// Crockford base32 characters, the first 25 bits of SHA-256.
-
-import { createHash, randomUUID } from 'crypto'
-import { chmod, open, readFile, realpath, rename, stat, unlink } from 'fs/promises'
-import { basename, dirname } from 'path'
+// File text and versions (task 3fv): numbered READ output and line edits
+// that preserve existing line endings. The five-character version is
+// the first 25 bits of SHA-256, a stale-file check, not a security boundary.
+import { createHash } from 'crypto'
 import { tools } from './tools.ts'
 
 const alphabet = '0123456789abcdefghjkmnpqrstvwxyz'
@@ -54,8 +49,8 @@ function numbered(lines: string[], shown: number[]): string {
 // clamped to the file, within tools.maxLines and tools.maxChars. `hint`:
 // the range was a default, so say how to read more when lines remain.
 function read(path: string, bytes: Uint8Array, offset = 1, limit?: number, hint = false): string {
-	let { lines } = lease.text(bytes, path)
-	let header = `== READ ${path}@${lease.hash(bytes)} ==`
+	let { lines } = fileText.text(bytes, path)
+	let header = `== READ ${path}@${fileText.hash(bytes)} ==`
 	if (!lines.length) return `${header}\n[Empty file]`
 	let start = Math.max(1, offset)
 	let end = Math.min(lines.length, limit === undefined ? lines.length : offset + limit - 1)
@@ -64,7 +59,7 @@ function read(path: string, bytes: Uint8Array, offset = 1, limit?: number, hint 
 	let size = header.length
 	let n = start
 	for (; n <= end; n++) {
-		let line = lease.numbered(lines, [n])
+		let line = fileText.numbered(lines, [n])
 		if ((size + line.length > tools.maxChars - 200 || n - start >= tools.maxLines) && n > start) break
 		out.push(line)
 		size += line.length + 1
@@ -124,38 +119,4 @@ function apply(before: Text, changes: Change[]): { after: string; shown: number[
 	return { after: before.bom + lines.join(''), shown: [...shown].sort((a, b) => a - b), lines }
 }
 
-// Lines around each requested endpoint (±2) of the current file, for a
-// failed EDIT to show what is there now.
-function around(current: Text, changes: Change[]): string {
-	let n = current.lines.length
-	let shown = new Set<number>()
-	for (let c of changes) for (let at of [c.start, c.end]) {
-		let p = Math.max(1, Math.min(n, at))
-		for (let k = Math.max(1, p - 2); k <= Math.min(n, p + 2); k++) shown.add(k)
-	}
-	return n ? lease.numbered(current.lines, [...shown].sort((a, b) => a - b)) : '[Empty file]'
-}
-
-// Replaces `path` (through symlinks, keeping its mode) with `bytes`
-// atomically: a temp file beside it, renamed over it. `expected`: the
-// bytes it must still hold just before the rename; another process
-// that changed it since makes this throw, writing nothing.
-async function commit(path: string, bytes: Uint8Array, expected?: Uint8Array): Promise<void> {
-	let target = await realpath(path).catch((e) => { if (e.code === 'ENOENT' && !expected) return path; throw e })
-	let mode = await stat(target).then((s) => s.mode & 0o7777, (e) => { if (e.code === 'ENOENT') return 0o666 & ~process.umask(); throw e })
-	let temp = `${dirname(target)}/.${basename(target)}.hal-${randomUUID().slice(0, 8)}`
-	let file = await open(temp, 'wx', mode)
-	try {
-		try { await file.writeFile(bytes) } finally { await file.close() }
-		await chmod(temp, mode)
-		if (expected) {
-			let now = await readFile(target)
-			if (!now.equals(expected)) throw new Error(`${path} changed outside Hal while the edit ran (now ${lease.hash(now)}); nothing was written. READ it again.`)
-		}
-		await rename(temp, target)
-	} finally {
-		await unlink(temp).catch((e) => { if (e.code !== 'ENOENT') throw e })
-	}
-}
-
-export const lease = { hash, text, numbered, read, range, apply, around, commit }
+export const fileText = { hash, text, numbered, read, range, apply }

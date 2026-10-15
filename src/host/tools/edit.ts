@@ -9,7 +9,7 @@ import { tools, type Tool, type ToolContext } from '../tools.ts'
 import { nativeTool } from '../native-tool.ts'
 import { approval } from '../approval.ts'
 import { fileChanges } from '../file-changes.ts'
-import { lease, type Change } from '../lease.ts'
+import { fileText, type Change } from '../file-text.ts'
 import { textDiff } from '../text-diff.ts'
 import { paths } from '../paths.ts'
 
@@ -287,13 +287,13 @@ export const tool: Tool = {
 					if (!p) {
 						const before = await load(path)
 						if (before && before.length > tools.maxFileBytes) throw new Error(`${path} is too large`)
-						if (before) lease.text(before, path)
+						if (before) fileText.text(before, path)
 						plans.set(path, p = { path, before, next: before ?? Buffer.alloc(0), ranges: [] })
 					}
 					const kind = e.delete !== undefined ? 'whole' : e.old !== undefined ? 'text' : e.range !== undefined || e.insert !== undefined ? 'range' : 'whole'
 					if ('count' in e && (kind !== 'text' || e.range !== undefined || e.lines !== undefined || !Number.isSafeInteger(e.count) || (e.count as number) < 1)) throw new Error('count requires exact text and a positive safe integer')
 					if (p.kind && (p.kind === 'whole' || kind === 'whole')) throw new Error('a whole-file write cannot be combined with other edits of the same file (including deletion)')
-					if (e.hash !== undefined && (typeof e.hash !== 'string' || !p.before || lease.hash(p.before) !== e.hash)) throw new Error(`${e.path}: stale version; READ again`)
+					if (e.hash !== undefined && (typeof e.hash !== 'string' || !p.before || fileText.hash(p.before) !== e.hash)) throw new Error(`${e.path}: stale version; READ again`)
 					if (e.delete !== undefined) {
 						if (e.delete !== true || !p.before || Object.keys(e).some((k) => !['path', 'hash', 'delete'].includes(k))) throw new Error('file deletion requires an existing file, without other selectors')
 						p.mode = (await lstat(path)).mode & 0o7777
@@ -314,15 +314,15 @@ export const tool: Tool = {
 							else same.lines = [...c.lines, ...same.lines]
 						}
 						if (e.insert !== undefined) {
-							const n = lease.text(p.before, path).lines.length
+							const n = fileText.text(p.before, path).lines.length
 							if (!Number.isSafeInteger(e.insert) || (e.insert as number) < 1 || (e.insert as number) > n + 1) throw new Error(`insert point outside the file's ${n} lines`)
 							add({
 								start: e.insert as number,
 								end: (e.insert as number) - 1,
 								lines: e.lines as string[]
 							})
-						} else add({ ...lease.range(e.range), lines: e.lines as string[] })
-						p.next = Buffer.from(lease.apply(lease.text(p.before, path), p.ranges).after)
+						} else add({ ...fileText.range(e.range), lines: e.lines as string[] })
+						p.next = Buffer.from(fileText.apply(fileText.text(p.before, path), p.ranges).after)
 					} else {
 						if (e.range !== undefined || e.lines !== undefined || typeof e.new !== 'string') throw new Error('text/whole-file edits require new text, without range or lines')
 						if (kind === 'text') {
@@ -335,8 +335,8 @@ export const tool: Tool = {
 								if (matches.length < 2) matches.push(text.slice(0, pos).split(String.fromCharCode(10)).length)
 							}
 							if (count !== expected) {
-								const lines = lease.text(p.next!, path).lines.map((l) => l.length > 300 ? l.slice(0, 300) + '… [line cut]' : l)
-								const contexts = matches.map((n) => lease.numbered(lines, Array.from({ length: Math.min(lines.length, n + 2) - Math.max(1, n - 2) + 1 }, (_, j) => Math.max(1, n - 2) + j)))
+								const lines = fileText.text(p.next!, path).lines.map((l) => l.length > 300 ? l.slice(0, 300) + '… [line cut]' : l)
+								const contexts = matches.map((n) => fileText.numbered(lines, Array.from({ length: Math.min(lines.length, n + 2) - Math.max(1, n - 2) + 1 }, (_, j) => Math.max(1, n - 2) + j)))
 								throw new Error(`old matched ${count} times; count requires ${expected}. Set count to the exact intended number, extend old with surrounding context, or use version-checked ranges. First two matches in planned text after earlier steps (not a READ version):${String.fromCharCode(10)}${contexts.join(String.fromCharCode(10) + '…' + String.fromCharCode(10))}`)
 							}
 							// Removing whole lines also removes their newline, leaving no blank line.
@@ -393,7 +393,7 @@ export const tool: Tool = {
 					throw new Error(`${error.message}
 ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recovery}` : 'Rolled back all writes.'}`)
 				}
-				return changed.map((p) => `== ${p.path}${p.next === null ? ' deleted' : `@${lease.hash(p.next)}`} verified ==${String.fromCharCode(10)}${p.diff}`).join(String.fromCharCode(10))
+				return changed.map((p) => `== ${p.path}${p.next === null ? ' deleted' : `@${fileText.hash(p.next)}`} verified ==${String.fromCharCode(10)}${p.diff}`).join(String.fromCharCode(10))
 			})()
 		} catch (e) {
 			failure = e

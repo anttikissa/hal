@@ -1,7 +1,10 @@
 {
 	title: 'Block-format EDIT is the core file tool',
-	spec: 'src/host/tools/edit.ts is the only file-writing tool: the block-format EDIT of task ybg (!!OLD/!!NEW/!!END; line ranges, same-point inserts, text replaces after line operations, create, write, delete; advisory @version; atomic across files with rollback; trailing tool calls run after a successful write). There is no WRITE tool and no range-object EDIT or same-version batching across calls. SYSTEM.md # EDIT holds the block guide with an example; there is no # WRITE section. Model-facing text names a READ result path@version a version, never a lease. HELP EDIT and the EDIT guide teach purpose comments only to interactive sessions. Core presents EDIT cards through toolPresentations.present (files with change counts, then verified diffs; task sn7). extras/edit-quirks.ts stays an opt-in extra over core EDIT.',
+	spec: 'src/host/tools/edit.ts is the only file-writing tool: the block-format EDIT of task ybg (!!OLD/!!NEW/!!END; line ranges, same-point inserts, text replaces after line operations, create, write, delete; advisory @version; atomic across files with rollback; trailing tool calls run after a successful write). There is no WRITE tool and no range-object EDIT or same-version batching across calls. SYSTEM.md # EDIT holds the block guide with an example; there is no # WRITE section. The code, tests, prompts and task records use file versions consistently. src/host/file-text.ts exports fileText for content hashes, text decoding, numbered reads and line operations; remove the obsolete editing module and its unused around and commit functions. Interactive SYSTEM.md # EDIT explicitly makes the descriptive purpose comment mandatory; unattended guides omit that requirement. Core presents EDIT cards through toolPresentations.present (files with change counts, then verified diffs; task sn7). extras/edit-quirks.ts stays an opt-in extra over core EDIT.',
 	status: 'done',
+	notes: [
+		'The previous promotion left internal editing terminology and unused old-EDIT helpers behind. File versions describe the actual content-hash check; rename imports and task terminology too. Purpose-comment guidance is explicit in SYSTEM.md, where models see it, rather than relying on HELP.'
+	],
 	needs: ['ybg', '3fv', 'sn7'],
 	foldInto: ['ybg']
 }

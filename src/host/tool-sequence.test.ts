@@ -2,7 +2,7 @@ import { expect, spyOn, test } from 'bun:test'
 import { readFileSync, writeFileSync } from 'fs'
 import { nativeTool } from './native-tool.ts'
 import { history } from './history.ts'
-import { lease } from './lease.ts'
+import { fileText } from './file-text.ts'
 import { tools } from './tools.ts'
 import { calls, client, created, fresh, testHome, until, useHost } from './host-fixture.test.ts'
 
@@ -62,7 +62,7 @@ test('direct mode accepts multiple EDITs and preserves runtime errors without dr
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
 	await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
 	for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, 'old\n')
-	let hash = lease.hash(Buffer.from('old\n'))
+	let hash = fileText.hash(Buffer.from('old\n'))
 	let cmd = `EDIT\na.txt@${hash} replace 1-1\n!!NEW\nnew a\n!!END\nEDIT\nb.txt@${hash} replace 1-1\n!!NEW\nnew b\n!!END\nREAD missing.txt\nREAD a.txt`
 	c.conn.send({ type: 'submit', sessionId: id, text: cmd })
 	await until(() => c.of('turn-end').length)

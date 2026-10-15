@@ -3,7 +3,7 @@ import { expect, test, spyOn } from 'bun:test'
 import { readFileSync, writeFileSync, existsSync, symlinkSync, readdirSync, unlinkSync, chmodSync, statSync, realpathSync } from 'fs'
 import { tool as multiedit, io, parseBlocks } from './edit.ts'
 import { fileChanges } from '../file-changes.ts'
-import { lease } from '../lease.ts'
+import { fileText } from '../file-text.ts'
 import { client, created, testHome, useHost } from '../host-fixture.test.ts'
 import { paths } from '../paths.ts'
 
@@ -45,18 +45,18 @@ const file = (name: string, text: string) => { writeFileSync(`${testHome()}/${na
 
 test('text steps, version-checked ranges and creation commit together with verified feedback', async () => {
  const a = file('a', 'old'), b = file('b', ['a', 'b', 'c'].join(crlf))
- const out = await run([{ path: 'a', old: 'old', new: 'new' }, { path: 'a', old: 'new', new: 'done' }, { path: 'b', hash: lease.hash(readFileSync(b)), range: 2, lines: ['B'] }, { path: 'b', hash: lease.hash(readFileSync(b)), range: 3, lines: [] }, { path: 'deep/new', new: 'created' }])
+ const out = await run([{ path: 'a', old: 'old', new: 'new' }, { path: 'a', old: 'new', new: 'done' }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 2, lines: ['B'] }, { path: 'b', hash: fileText.hash(readFileSync(b)), range: 3, lines: [] }, { path: 'deep/new', new: 'created' }])
  expect(readFileSync(a, 'utf8')).toBe('done')
  expect(readFileSync(b, 'utf8')).toBe(['a', 'B'].join(crlf))
  expect(readFileSync(`${testHome()}/deep/new`, 'utf8')).toBe('created')
- expect(out).toContain(`@${lease.hash(readFileSync(a))} verified`)
+ expect(out).toContain(`@${fileText.hash(readFileSync(a))} verified`)
  expect(out).toContain('+1 done')
 })
 
 test('failures validate before writes, including duplicate aliases and stale ranges', async () => {
  const a = file('a', 'one' + nl + 'two' + nl), b = file('b', 'same same')
  symlinkSync('a', `${testHome()}/alias`)
- await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), range: 1, lines: ['A'] }, { path: 'alias', hash: lease.hash(readFileSync(a)), range: 1, lines: ['X'] }, { path: 'b', old: 'same', new: 'other' }, { path: 'new', new: 'new' }])).rejects.toThrow('step 2 (alias):')
+ await expect(run([{ path: 'a', hash: fileText.hash(readFileSync(a)), range: 1, lines: ['A'] }, { path: 'alias', hash: fileText.hash(readFileSync(a)), range: 1, lines: ['X'] }, { path: 'b', old: 'same', new: 'other' }, { path: 'new', new: 'new' }])).rejects.toThrow('step 2 (alias):')
  expect(readFileSync(a, 'utf8')).toBe('one' + nl + 'two' + nl)
  expect(readFileSync(b, 'utf8')).toBe('same same')
  expect(existsSync(`${testHome()}/new`)).toBe(false)
@@ -148,7 +148,7 @@ test('ambiguity context is bounded even when matching lines are long', async () 
 })
 
 test('explicit counts replace exactly the nonoverlapping literal matches in planned text', async () => {
- const a = file('a', 'same same'), b = file('b', 'aaaaa $&'), hash = lease.hash(readFileSync(a))
+ const a = file('a', 'same same'), b = file('b', 'aaaaa $&'), hash = fileText.hash(readFileSync(a))
  await run([{ path: 'a', old: 'same', new: 'same!', count: 2, hash }, { path: 'a', old: 'same!', new: '$&', count: 2 }, { path: 'b', old: 'aa', new: 'x', count: 2 }])
  expect(readFileSync(a, 'utf8')).toBe('$& $&')
  expect(readFileSync(b, 'utf8')).toBe('xxa $&')
@@ -167,7 +167,7 @@ test('wrong counts and the default uniqueness guard reject the whole batch', asy
 })
 
 test('counts reject invalid values and non-text selectors without writing', async () => {
- const a = file('a', 'same'), hash = lease.hash(readFileSync(a))
+ const a = file('a', 'same'), hash = fileText.hash(readFileSync(a))
  const selectors = [
   ...[0, -1, 1.5, '1', null, undefined, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, true].map((count) => ({ old: 'same', new: 'changed', count })),
   { hash, range: 1, lines: ['changed'], count: 1 }, { hash, new: 'changed', count: 1 },
@@ -182,18 +182,18 @@ test('counts reject invalid values and non-text selectors without writing', asyn
 
 test('all existing range forms remain accepted; a whole-file write combines with nothing', async () => {
  for (const range of [2, '2', '2-2', '2,2', [2], [2, 2]]) {
-  const a = file('a', ['first', 'second', 'third'].join(nl)), hash = lease.hash(readFileSync(a))
+  const a = file('a', ['first', 'second', 'third'].join(nl)), hash = fileText.hash(readFileSync(a))
   await run([{ path: 'a', hash, range, lines: ['changed'] }])
   expect(readFileSync(a, 'utf8')).toBe(['first', 'changed', 'third'].join(nl))
  }
- const a = file('a', 'original'), hash = lease.hash(readFileSync(a))
+ const a = file('a', 'original'), hash = fileText.hash(readFileSync(a))
  await expect(run([{ path: 'a', hash, new: 'planned' }, { path: 'a', hash, range: 1, lines: ['other'] }])).rejects.toThrow('step 1 (a): a whole-file write cannot be combined')
  expect(readFileSync(a, 'utf8')).toBe('original')
 })
 
 test('file deletion accepts advisory versions, commits with edits and deletes empty files', async () => {
  const a = file('a', 'remove\n'), empty = file('empty', ''), b = file('b', 'old')
- const parsed = parseBlocks(`a@${lease.hash(readFileSync(a))} delete\nempty delete`)
+ const parsed = parseBlocks(`a@${fileText.hash(readFileSync(a))} delete\nempty delete`)
  const out = await run([...parsed.edits, { path: 'b', old: 'old', new: 'new' }])
  expect(existsSync(a)).toBe(false)
  expect(existsSync(empty)).toBe(false)
@@ -203,7 +203,7 @@ test('file deletion accepts advisory versions, commits with edits and deletes em
 })
 
 test('invalid or mixed file deletions reject the whole batch', async () => {
- const a = file('a', 'original'), hash = lease.hash(readFileSync(a))
+ const a = file('a', 'original'), hash = fileText.hash(readFileSync(a))
  for (const edits of [
   [{ path: 'a', hash: 'stale', delete: true }], [{ path: 'a', hash: '', delete: true }],
   [{ path: 'missing', delete: true }], [{ path: 'a', hash, delete: false }],
@@ -225,7 +225,7 @@ for (const external of [false, true]) test(`failed batch restores deleted file a
   await original(...args)
  })
  try {
-  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }, { path: 'b', old: 'before', new: 'after' }])).rejects.toThrow(external ? 'Recovery copies:' : 'Rolled back all writes')
+  await expect(run([{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true }, { path: 'b', old: 'before', new: 'after' }])).rejects.toThrow(external ? 'Recovery copies:' : 'Rolled back all writes')
   expect(readFileSync(a, 'utf8')).toBe(external ? 'external' : 'original')
   expect(readFileSync(b, 'utf8')).toBe('before')
   if (!external) expect(statSync(a).mode & 0o7777).toBe(0o751)
@@ -240,7 +240,7 @@ test('cancellation after deletion restores the file; a changed target is never d
  const a = file('a', 'original'), b = file('b', 'original'), original = io.save, controller = new AbortController()
  let mock = spyOn(io, 'save').mockImplementation(async (...args) => { await original(...args); controller.abort() })
  try {
-  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }], controller.signal)).rejects.toThrow('Rolled back all writes')
+  await expect(run([{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true }], controller.signal)).rejects.toThrow('Rolled back all writes')
   expect(readFileSync(a, 'utf8')).toBe('original')
  } finally { mock.mockRestore() }
  mock = spyOn(io, 'save').mockImplementation(async (...args) => { writeFileSync(a, 'external'); await original(...args) })
@@ -250,7 +250,7 @@ test('cancellation after deletion restores the file; a changed target is never d
  } finally { mock.mockRestore() }
  mock = spyOn(io, 'save').mockImplementation(async (...args) => { unlinkSync(a); symlinkSync(b, a); await original(...args) })
  try {
-  await expect(run([{ path: 'a', hash: lease.hash(readFileSync(a)), delete: true }])).rejects.toThrow('target identity changed')
+  await expect(run([{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true }])).rejects.toThrow('target identity changed')
   expect(readFileSync(b, 'utf8')).toBe('original')
  } finally { mock.mockRestore() }
 })
