@@ -27,7 +27,7 @@ function def(): ToolDef {
 
 function find(id: string): Tool<unknown> {
 	let tool = tools.all().get(id)
-	if (!tool) throw new Error(`unknown tool ${id.toUpperCase()}; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`)
+	if (!tool) throw new Error(`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`)
 	return tool
 }
 
