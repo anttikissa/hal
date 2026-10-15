@@ -10,6 +10,8 @@ test('tool cards use shared title and diffs and expose full failures', () => {
 	expect(text(call, 'short')).toContain('Edited a.ts')
 	expect(text(call, 'short')).not.toContain('old:')
 	expect(text(result, 'long')).toContain('a.ts\n-1 before\n+1 after')
-	let failure = { ...result, isError: true, output: 'Failure details\n'.repeat(300), presentation: { title: 'Failed', blocks: [] } }
+	let failure = { ...result, isError: true, output: 'Failure details\n'.repeat(300), presentation: { title: 'Failed', blocks: [{ kind: 'code' as const, text: 'EDIT attempted' }] } }
 	expect(text(failure, 'long').split('Failure details')).toHaveLength(301)
+	expect(text(failure, 'long')).toContain('EDIT attempted')
+	expect(text(failure, 'short')).toContain('Failure details')
 })

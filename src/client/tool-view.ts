@@ -31,7 +31,11 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	}
 	let title = ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)
 	let head = toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw)
-	if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) return presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
+	if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) {
+		let rows = presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
+		toolView.heads.set(item, rows.length)
+		return rows
+	}
 	let bash = item.name === 'bash'
 	if (fold === 'long') {
 		let rows = ansi.wrap(prefix + title, hw)
@@ -66,7 +70,11 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
 	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (tool && ((fold === 'short' && look.full) || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
-	if (tool && (item.presentation || item.presentationError) && fold === 'long') return [...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []), ...(item.isError || !item.presentation ? ansi.wrap(ansi.clean(out), width) : presentationView.lines(item.presentation, item.output, width, style))]
+	if (tool && (item.presentation || item.presentationError)) {
+		let max = fold === 'long' ? Infinity : settings.shortRows() - (look.head ?? 1)
+		let raw = fold === 'long' ? toolView.fullAt('', session, look.call?.key) : undefined
+		return presentationView.result(item, out, width, max, style, itemView.itemStyle({ ...item, isError: false }, tool), raw)
+	}
 	// Under its short call, a result fills the rows the call leaves.
 	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows() - (tool ? look.head ?? 1 : 0)
 	if (max <= 0) return []

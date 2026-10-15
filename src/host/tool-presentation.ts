@@ -1,3 +1,11 @@
+// Plugin-authored tool cards for terminal and web (tasks 0hy, sn7).
+// Wrap present(call, result?): return { title, blocks } or undefined for
+// the ordinary card. Core shows status, time and the complete error;
+// titles name the work, blocks show content for each outcome:
+//   plugin.around(toolPresentations, 'present', (next, call, result) =>
+//     call.name !== 'deploy' ? next(call, result)
+//     : { title: `Deploy ${call.input.target}`, blocks: [{ kind: 'code',
+//         text: result?.isError ? call.cmd ?? '' : result?.output ?? 'Waiting' }] })
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolPresentation, type ToolPresentation } from '../common/tool-presentation.ts'
 import { ason } from '../common/ason.ts'

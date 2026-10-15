@@ -183,10 +183,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type !== 'tool') return lines().join('\n')
 		if ((presentation() || presentationError()) && full()) return <>
 			<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
-			<Show when={presentation()}>{(p) => <Show when={!props.row.result?.isError} fallback={<div class="error">{props.row.result?.output}</div>}><ToolPresentation presentation={p()} output={props.row.result?.output} /></Show>}</Show>
-			<Show when={!presentation()}><div>{toolDetails.lines(item.name, item.input).join('\n')}{'\n'}{props.row.result?.output}</div></Show>
+			<Show when={!presentation()}>{command}</Show>
+			<Show when={props.row.result && (props.row.result.isError || props.row.result.interrupted || !presentation()) && props.row.result.output}>{(output) => <div class={props.row.result?.isError ? 'error' : ''}>{output()}</div>}</Show>
+			<Show when={presentation()}>{(p) => <ToolPresentation presentation={p()} output={props.row.result?.output} />}</Show>
 			<Show when={!props.row.result && item.partial}>{(output) => <div>{output()}</div>}</Show>
-			<div class="raw-tool"><button type="button" aria-expanded={folds.raw().has(id()) ? 'true' : 'false'} onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}>Raw call and result</button><Show when={folds.raw().has(id())}><pre>{toolDetails.value(item.input).join('\n')}{'\n\n'}{props.row.result?.output ?? item.partial ?? ''}</pre></Show></div>
+			<div class="raw-tool"><button type="button" aria-expanded={folds.raw().has(id()) ? 'true' : 'false'} onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}>Raw call and result</button><Show when={folds.raw().has(id())}><pre>{item.cmd ?? toolDetails.value(item.input).join('\n')}{'\n\n'}{props.row.result?.output ?? item.partial ?? ''}</pre></Show></div>
 		</>
 		// An EDIT's diff shows its edits, so it stands alone, in diff colors.
 		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>

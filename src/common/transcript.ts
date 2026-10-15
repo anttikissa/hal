@@ -26,7 +26,7 @@ export type Shown = { originSession?: string } & (
 	// (task hp). Records from before hp have none of them.
 	| { type: 'text'; text: string; naming?: true; interrupted?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
-	| (ToolDisplay & { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string })
+	| (ToolDisplay & { type: 'tool'; id: string; name: string; input: Record<string, unknown>; cmd?: string; partial?: string; ts?: string })
 	| (ToolDisplay & { type: 'tool-result'; id: string; output: string; isError?: boolean; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string })
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
@@ -77,7 +77,8 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	let out: Item[] = []
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
-		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, ...(b.presentation !== undefined && { presentation: b.presentation }), ...(b.presentationError !== undefined && { presentationError: b.presentationError }), key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
+		// A presented call keeps its command text for raw inspection (task sn7).
+		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, ...(b.presentation !== undefined && { presentation: b.presentation }), ...(b.presentationError !== undefined && { presentationError: b.presentationError }), ...((b.presentation || b.presentationError) && b.cmd !== undefined && { cmd: b.cmd }), key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
 		else if (b.type === 'hosted_tool') {
 			let ts = by.ts?.[i] !== undefined ? { ts: by.ts[i] } : {}
 			out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...ts }, { type: 'tool-result', id: b.id, output: b.output, ...(b.isError && { isError: true }), key: transcript.key(ns?.[i], 1, at + out.length + 1), ...ts })

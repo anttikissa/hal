@@ -19,17 +19,19 @@
 import { callText } from './call-text.ts'
 import { home } from './home.ts'
 
-// A value in readable text rather than wire syntax.
-function value(input: unknown, indent = ''): string[] {
+// A value in readable text rather than wire syntax: a scalar beside its
+// key, lists numbered, nested values indented once per level.
+function value(input: unknown): string[] {
 	if (typeof input === 'string') return input === '' ? ['(empty string)'] : input.split('\n')
 	if (input === null) return ['(null)']
 	if (Array.isArray(input)) return input.length ? input.flatMap((v, i) => {
-		let lines = toolDetails.value(v, indent + '  ')
-		return [`${indent}${i + 1}. ${lines[0]}`, ...lines.slice(1).map((l) => `${indent}   ${l}`)]
+		let lines = toolDetails.value(v)
+		return [`${i + 1}. ${lines[0]}`, ...lines.slice(1).map((l) => `   ${l}`)]
 	}) : ['(empty list)']
-	if (typeof input === 'object') return Object.entries(input).length ? Object.entries(input).flatMap(([key, v]) => [
-		`${indent}${key}:`, ...toolDetails.value(v, indent + '  ').map((l) => `  ${l}`),
-	]) : ['(empty object)']
+	if (typeof input === 'object') return Object.entries(input).length ? Object.entries(input).flatMap(([key, v]) => {
+		let lines = toolDetails.value(v)
+		return lines.length === 1 && (v === null || typeof v !== 'object') ? [`${key}: ${lines[0]}`] : [`${key}:`, ...lines.map((l) => `  ${l}`)]
+	}) : ['(empty object)']
 	return [String(input)]
 }
 
@@ -202,7 +204,8 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 	for (let [key, v] of Object.entries(input)) {
 		if (shown.has(key)) continue
 		let [first, ...rest] = toolDetails.value(v)
-		out.push(`${key}: ${first}`, ...rest.map((l) => `  ${l}`))
+		if (v && typeof v === 'object' && !Array.isArray(v)) out.push(`${key}:`, `  ${first}`, ...rest.map((l) => `  ${l}`))
+		else out.push(`${key}: ${first}`, ...rest.map((l) => `  ${l}`))
 	}
 	return out
 }
