@@ -1,0 +1,10 @@
+{
+	title: 'Tail-following thinking previews',
+	spec: 'Collapsed terminal thinking shows the last configured short rows both while streaming and after completion, not a fixed first-lines preview. The inline count says X earlier lines, referring to hidden content above. Preserve content-first layout, italic neutral text, upright metadata, no empty overflow footer and full expansion. On the web, the collapsed viewport follows the end of the text while timestamp, block link and activity remain fixed beside it; expansion shows all text from the beginning. Web layout may reserve a metadata gutter rather than copying terminal row mechanics. This supersedes 6q1’s first-rows decision.',
+	status: 'done',
+	notes: [
+		'Terminal takes the tail, drops edge blank rows and labels omitted content earlier lines. Updated the existing short-thinking check for streaming and finished states. Web uses a native clipped scroll viewport set to its bottom after content/layout changes, with fixed metadata in grid gutters and full content on expansion; ResizeObserver avoids polling and disconnects on unmount. 44 focused tests, full typecheck, changed-module lint, web build and manual terminal preview checks passed. Browser appearance remains unverified because the preceding attempt could not launch Chrome.'
+	],
+	needs: ['6q1'],
+	foldInto: ['6q1']
+}

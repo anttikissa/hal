@@ -90,7 +90,12 @@ test('background reports and thinking start short, expand fully, and SEND shows 
 		expect(itemView.receipt(item)).toBe('')
 	}
 	let thinking = { type: 'thinking' as const, text: 'first\n\nsecond\n\nlast' }
-	expect(itemView.itemLines(thinking, 80).join('\n')).not.toContain('last')
+	for (let streaming of [false, true]) {
+		let preview = itemView.itemLines(thinking, 80, streaming).join('\n')
+		expect(preview).toContain('last')
+		expect(preview).not.toContain('first')
+		expect(preview).toContain('earlier lines')
+	}
 	expect(itemView.itemLines(thinking, 80, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
 	let send = { type: 'tool' as const, id: 's', name: 'send', input: { to: '42', text: '/close' } }
 	expect(itemView.itemLines(send, 24)[0]).toContain('/close')
