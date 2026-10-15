@@ -30,8 +30,10 @@ async function gitPath(root: string, path: string): Promise<string> {
 
 async function filter(cwd: string, names: string[], patterns = false): Promise<string[]> {
 	let candidates: { name: string; paths: string[] }[] = []
+	// Git reports its root through symlinks (/var -> /private/var on macOS).
+	let base = await fileChanges.canonical(resolve(cwd))
 	for (let name of names) {
-		let absolute = resolve(cwd, name)
+		let absolute = resolve(base, name)
 		if (fileTracking.excluded(absolute)) continue
 		let canonical = await fileChanges.canonical(absolute)
 		if (!fileTracking.excluded(canonical)) candidates.push({ name, paths: [...new Set([absolute, canonical])] })
