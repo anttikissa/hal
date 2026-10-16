@@ -219,7 +219,7 @@ html.typing .App { position: absolute; }
 .Card .command-toggle { display: block; position: relative; margin: 0.25lh 0 0 2ch; padding: 0; background: none; color: inherit; font: inherit; }
 .Card .command-toggle .label { text-decoration: underline; text-underline-offset: 0.2em; }
 @media (pointer: coarse) { .Card .command-toggle::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
-.ToolCommand { margin-bottom: 1lh; }
+.ToolCommand { margin-bottom: 0.5lh; }
 .ToolCommand .command.clipped { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
@@ -250,6 +250,9 @@ html.typing .App { position: absolute; }
 .Markdown .line.tail { display: inline; }
 =======
 .Card:not(.thinking) .Markdown .line.p:has(> span:empty) { height: 0.5lh; min-height: 0; }
+.Prose { display: block; }
+.Prose .row { display: block; min-height: 1lh; }
+.Prose .row.blank { height: 0.5lh; min-height: 0; }
 .Markdown .line:has(+ .cursor), .Markdown .line:has(+ .interrupted) { display: inline; }
 >>>>>>> 3c598cd3 (Use width-responsive transcript leading and half-line paragraph gaps)
 .Markdown .interrupted { background: transparent; white-space: pre-wrap; }

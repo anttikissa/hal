@@ -15,6 +15,7 @@
 
 import { ToolPresentation } from './ToolPresentation.tsx'
 import { Thinking } from './Thinking.tsx'
+import { Prose } from './Prose.tsx'
 import { ToolCommand } from './ToolCommand.tsx'
 import { interruption } from '../../common/interruption.ts'
 import { diff } from '../../common/diff.ts'
@@ -181,7 +182,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let command = <Show when={call().length}><ToolCommand lines={call()} compact={!full()} /></Show>
 	let body = () => {
 		let item = props.row.item
-		if (item.type !== 'tool') return lines().join('\n')
+		if (item.type !== 'tool') return prose() ? parts() : lines().join('\n')
 		if ((presentation() || presentationError()) && full()) return <>
 			<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
 			<Show when={!presentation()}>{command}</Show>
@@ -222,8 +223,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// when its text changes, not when a snapshot brings a new row object.
 	let text = createMemo(() => shown()?.text ?? '')
 	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
+	let prose = () => props.row.item.type === 'prompt' && !md() && !bashResult.background(props.row.item) && props.row.item.origin !== 'model'
 	let parts = () => {
 		let item = props.row.item
+		if (prose()) return <Prose text={text()} />
 		// A past question keeps its quote's marks, as the open form showed them.
 		if (item.type === 'question' && item.form.quote?.marks?.length) {
 			let q = item.form.quote
@@ -289,11 +292,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// header, one line until a click (or its link) opens it.
 	let queued = () => {
 		let all = `${props.row.note} ${text()}`
-		return expanded() ? all : all.split('\n')[0]
+		return expanded() ? all : (all.split('\n')[0] ?? '')
 	}
 	let compact = () => (
 		<>
-			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{sendButton()}{discardButton()}<div class={['content', expanded() ? '' : 'line']}>{queued()}</div></>}>
+			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{sendButton()}{discardButton()}<div class={['content', expanded() ? '' : 'line']}>{expanded() && prose() ? <Prose text={queued()} /> : queued()}</div></>}>
 				{heading()}
 				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
 			</Show>

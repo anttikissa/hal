@@ -1,0 +1,10 @@
+{
+	title: 'Extend half-line gaps to user prose and tool separators',
+	spec: 'Web human prompt prose uses half-line blank rows at the existing responsive 20/22px leading, including expanded queued prompts. Preserve literal text, attachment links, fenced and indented code whitespace, raw logs, tool output and diffs. Tool command-to-output spacing is half a line. Existing Hal Markdown and thinking spacing remain unchanged. Terminal typography remains unchanged as in task 043.',
+	status: 'done',
+	notes: [
+		'Chrome rendered the actual Prose component at 20px and 22px leading: prose blanks and tool separators measured 10px and 11px. Fenced and indented code blanks stayed full-height; textContent matched the original exactly and attachment links remained valid. The actual browser client bundles successfully. Typecheck reports only the pre-existing ebar/zot errors in the unrelated root test.ts scratch file.'
+	],
+	needs: ['043'],
+	foldInto: ['043']
+}
