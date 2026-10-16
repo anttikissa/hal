@@ -1,0 +1,7 @@
+{
+	title: 'Use terminal dollar glyph for web Bash cards',
+	spec: 'Web BASH cards use a plain unboxed $ glyph in the transcript font instead of a terminal-window outline, matching the terminal convention. READ keeps its folded-corner document and EDIT its pencil so their silhouettes differ. Preserve current tool colors, sizing, accessibility, Python-specific icon selection and all terminal behavior. This replaces the upstream Bash SVG requirement in 19m; Bash is a font glyph rather than a generated upstream shape.',
+	status: 'done',
+	needs: ['19m'],
+	foldInto: ['19m']
+}
