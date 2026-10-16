@@ -96,8 +96,8 @@ export const colors = {
 	warning: (): Style => ({ fg: [0.9, 0.17, 100], bg: [0.21, 0.05, 100], code: [0.94, 0.12, 100], linkBg: [0.28, 0.06, 100] }),
 	// Questions waiting on the user: neutral, like the user's own card.
 	question: (): Style => colors.plain(),
-	// Errors: the diff's removal red.
-	error: (): Style => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
+	// Errors: the diff's removal red, under a clearly brighter title.
+	error: (): Style => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], title: [0.9, 0.08, 28], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),

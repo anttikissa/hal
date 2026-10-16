@@ -17,7 +17,8 @@
 		'Hal cards use their own title [0.9, 0.14, 80], brighter and more saturated than the amber text, at the user request.',
 		'Gray cards (commit, question, command output) use a bright title 0.95 over quieter body text 0.78: the shared +0.04 step left gray title and text nearly identical, since gray has no chroma to differ.',
 		'Terminal matches the web: a one-row closed reply or prompt draws time and sender in the title color and the preview in the body color (item-view.ts).',
-		'Command cards and plain output cards use the plain title (0.95) over plain text (0.78), with no background, in both clients; web uses the .plain class.'
+		'Command cards and plain output cards use the plain title (0.95) over plain text (0.78), with no background, in both clients; web uses the .plain class.',
+		'Error cards (commands, output) were titled +0.04 over their red text, nearly identical. Invariant restored: every card title is clearly brighter than its text; colors.error has its own title [0.9, 0.08, 28], used by both clients.'
 	],
 	needs: ['3r3', '4fw'],
 	foldInto: ['3r3', '4fw']

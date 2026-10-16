@@ -39,6 +39,11 @@ function toolStyle(name: string): Style {
 	return typeof style === 'function' ? style() : colors.tool()
 }
 
+// A style's text and title colors, without its background.
+function bare({ fg, title }: Style): Style {
+	return { fg, title }
+}
+
 // A result keeps its originating tool's background and output color,
 // whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
@@ -51,9 +56,9 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'prompt':
 			if (bashResult.background(item)) return itemView.toolStyle('bash')
 			return titles.letter(item) === 'm' ? colors.message() : colors.user()
-		// The human's command reads like its output (joined): bright title, normal text.
+		// The human's command reads like its output (joined).
 		case 'command':
-			return item.from !== undefined ? colors.message() : item.error ? { fg: colors.error().fg! } : { fg: colors.plain().fg!, title: colors.plain().title! }
+			return item.from !== undefined ? colors.message() : bare(item.error ? colors.error() : colors.plain())
 		case 'image':
 			return colors.user()
 		case 'text':
@@ -69,7 +74,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.assistant() : { fg: colors.plain().fg!, title: colors.plain().title! }
+			return item.commit ? colors.commitCard() : item.synthetic && !item.error ? colors.assistant() : bare(item.error ? colors.error() : colors.plain())
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}
