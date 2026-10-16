@@ -258,15 +258,11 @@ html.typing .App { position: absolute; }
    table too wide scrolls sideways in its own box, and while more of it
    is off to the right, that edge fades (a scroll-driven --fade). */
 .Markdown .line { min-height: 1lh; }
-<<<<<<< HEAD
 .Markdown .line.tail { display: inline; }
-=======
 .Card:not(.thinking) .Markdown .line.p:has(> span:empty) { height: 0.5lh; min-height: 0; }
 .Prose { display: block; }
 .Prose .row { display: block; min-height: 1lh; }
 .Prose .row.blank { height: 0.5lh; min-height: 0; }
-.Markdown .line:has(+ .cursor), .Markdown .line:has(+ .interrupted) { display: inline; }
->>>>>>> 3c598cd3 (Use width-responsive transcript leading and half-line paragraph gaps)
 .Markdown .interrupted { background: transparent; white-space: pre-wrap; }
 .Markdown .interrupted::after { content: attr(data-tail); }
 .Markdown .h { margin-top: 0.25lh; }
