@@ -148,7 +148,8 @@ html.typing .App { position: absolute; }
 .CardHeader.inline .title { min-width: 0; padding-block: var(--card-inset); }
 .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: start; background: var(--card-bg, var(--canvas)); }
 .CardHeader.inline .stamp { padding-block: var(--card-inset); }
-.CardHeader .flow, .CardHeader .link { padding-block: var(--card-inset); }
+.CardHeader .flow, .CardHeader .link, .CardHeader > .call { padding-block: var(--card-inset); }
+.CardHeader > .call { white-space: nowrap; }
 .CardHeader .flow { min-width: 0; }
 .CardHeader .stamp { padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
 .CardHeader .mark { position: relative; }
