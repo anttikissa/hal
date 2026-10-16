@@ -28,6 +28,8 @@ import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { external, Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
+import { CardReference } from './CardReference.tsx'
+import { Disclosure } from './Disclosure.tsx'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 import { promptChanges } from '../../common/prompt-changes.ts'
@@ -129,13 +131,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return output === undefined ? undefined : output ? output.replace(/\n$/, '').split('\n').length : 0
 	})
 	let reference = () => <><Show when={outputLines() !== undefined}><span class="status line-count">({outputLines()} {outputLines() === 1 ? 'line' : 'lines'})</span></Show>{link()}</>
-	let link = () => (
-		<Show when={href()} fallback={ticks()}>
-			{(h) => (
-				<a class="link" href={h()} data-ref={blockId()} title="Link to this card" aria-label={`Link to card ${blockId()}`}>{ticks()}</a>
-			)}
-		</Show>
-	)
+	let link = () => <CardReference href={href()} id={blockId()}>{ticks()}</CardReference>
 
 	// Another session's message with a summary folds under it.
 	// Prompt-file changes fold under their summary (task ar).
@@ -144,7 +140,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
 	// (task hp).
-	let title = () => titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #?(t?\d+)$/)?.[1]
 	let who = () => {
 		let item = props.row.item
@@ -210,7 +205,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			<Show when={props.row.result && (props.row.result.isError || props.row.result.interrupted || !presentation()) && props.row.result.output}>{(output) => <div class={props.row.result?.isError ? 'error' : ''}>{output()}</div>}</Show>
 			<Show when={presentation()}>{(p) => <ToolPresentation presentation={p()} output={props.row.result?.output} />}</Show>
 			<Show when={!props.row.result && item.partial}>{(output) => <div>{output()}</div>}</Show>
-			<div class="raw-tool"><button type="button" aria-expanded={folds.raw().has(id()) ? 'true' : 'false'} onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}>Raw call and result</button><Show when={folds.raw().has(id())}><pre>{item.cmd ?? toolDetails.value(item.input).join('\n')}{'\n\n'}{props.row.result?.output ?? item.partial ?? ''}</pre></Show></div>
+			<div class="raw-tool"><Disclosure name="Raw call and result" open={folds.raw().has(id())} onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}>Raw call and result</Disclosure><Show when={folds.raw().has(id())}><pre>{item.cmd ?? toolDetails.value(item.input).join('\n')}{'\n\n'}{props.row.result?.output ?? item.partial ?? ''}</pre></Show></div>
 		</>
 		// An EDIT's diff shows its edits, so it stands alone, in diff colors.
 		if (props.row.result?.diff) return <div class="edit-diff diff"><For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div>
@@ -227,8 +222,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		clearTimeout(pending)
 		if (e.detail > 1) return
 		let hit = e.target as Element
-		let control = hit.closest('.mark, .CardHeader')
-		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
+		let control = hit.closest('.mark, .CardHeader:not(.inline)')
+		if (!canToggle() || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		if (!control && expanded()) return
 		let flip = () => scroll.follow(() => {
 			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
@@ -280,94 +275,54 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let sendButton = () => <Show when={props.discard}><button type="button" class="send" aria-label="Send queued message now" title="Send now; it keeps its sender and arrival time" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue next ${props.row.key}` })}><Icon name="send" /></button></Show>
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop --id ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
-	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><Show when={compactParts()} fallback={linkedParts(headerParts())}>{(c) => <>{c().who} <span class="secondary">{linkedParts(c().text)}</span></>}</Show></Show>} result={statusResult()} bash={bash()} reference={reference()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
-	)
-	// Content branches share the shell, header and normal body inset.
-	let plain = (s: () => { kind: string; text: string }) => (
-		<>
-			<Show when={!closable()}><Show when={title()} fallback={link()}>{heading()}</Show></Show>
-			<div class="content">
-				<div>
-					<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
-						{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
-					</Show>
-					<Show when={props.cursor && !md()}>{cursor()}</Show>
-					{undoButton()}
-				</div>
-			</div>
-		</>
-	)
-	// A prompt-file change (task ar): the terminal's rows in its diff
-	// colors, no header; open, each change's line and whole diff.
-	let tone = diff.tone
-	// An item never turns into a change or out of one.
-	let isChange = () => props.row.item.type === 'output' && !!props.row.item.change
-	let change = () => (
-		<>
-			{link()}
-			<div class="content diff change">
-				<For each={expanded() ? promptChanges.rows(props.row.item) : promptChanges.rows(props.row.item).slice(0, 1)}>{(r, i) => <Show when={i() === 0} fallback={<div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}><button type="button" class="row head mark" aria-label={r.text} aria-expanded={expanded() ? 'true' : 'false'}>{r.text}</button></Show>}</For>
-				<Show when={expanded()}>
-					<For each={promptChanges.run(props.row.item)}>
-						{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></div></>}
-					</For>
-				</Show>
-			</div>
-		</>
-	)
-	// A queued message's compact row (task 16): its note and text, no
-	// header, one line until a click (or its link) opens it.
-	let queued = () => {
-		let all = `${props.row.note} ${text()}`
-		return expanded() ? all : (all.split('\n')[0] ?? '')
+	let thinking = createMemo(() => props.row.item.type === 'thinking')
+	let isChange = createMemo(() => props.row.item.type === 'output' && !!props.row.item.change)
+	let queued = createMemo(() => props.row.note !== undefined)
+	let changes = createMemo(() => isChange() ? promptChanges.rows(props.row.item) : [])
+	let unstamp = (text: string) => time() && text.startsWith(time()!) ? text.slice(time()!.length).trimStart() : text
+	let oneRow = createMemo(() => ['turn-end', 'divider'].includes(props.row.item.type) || (props.row.item.type === 'command' && props.row.item.from === undefined && props.row.item.output === undefined))
+	let canToggle = () => blockToggle.toggles(props.row.item) || props.row.note !== undefined || closable()
+	let headerLabel = () => {
+		if (thinking()) return <Thinking text={text()} open={expanded()}>{markdown()}</Thinking>
+		if (isChange()) return unstamp(changes()[0]?.text ?? '')
+		if (props.row.note !== undefined) return <>{unstamp(props.row.note)}<Show when={!expanded()}> <span class="secondary">{titles.preview(text())}</span></Show></>
+		if (oneRow()) return linkedParts(hrefs.urlParts(unstamp(text())))
+		if (closable()) return <Show when={!expanded()} fallback={who()}><Show when={compactParts()} fallback={linkedParts(headerParts())}>{(c) => <>{c().who} <span class="secondary">{linkedParts(c().text)}</span></>}</Show></Show>
+		if (!folding()) return who()
+		if (headsWho()) return who()
+		return <Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>
 	}
-	let compact = () => (
-		<>
-			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{sendButton()}{discardButton()}<div class={['content', expanded() ? '' : 'line']}>{expanded() && prose() ? <Prose text={queued()} /> : queued()}</div></>}>
-				{heading()}
-				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
-			</Show>
-		</>
-	)
+	let changeBody = () => <div class="content diff change">
+		<For each={changes().slice(1)}>{(r) => <div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}</For>
+		<For each={promptChanges.run(props.row.item)}>{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div></>}</For>
+	</div>
+	let content = (s: () => { kind: string; text: string }) => {
+		if (thinking() || oneRow()) return null
+		if (isChange()) return <Show when={expanded()}>{changeBody()}</Show>
+		if (queued()) return <Show when={expanded()}><div class="content">{md() ? markdown() : parts()}</div></Show>
+		return <Show when={folding()} fallback={<div class="content"><div>
+			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}</Show>
+			<Show when={props.cursor && !md()}>{cursor()}</Show>
+		</div></div>}>
+			<div class="body" inert={!expanded()}><div class="contents"><div class="content">
+				<Show when={props.row.item.type !== 'tool'} fallback={<>{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}<Show when={props.cursor && !md()}>{cursor()}</Show></>}>
+					<div><Show when={props.row.item.type === 'prompt' && !headsWho()}><div class="sender">{who()}</div></Show>{md() ? markdown() : body()}<Show when={props.cursor && !md()}>{cursor()}</Show></div>
+				</Show>
+			</div></div></div>
+		</Show>
+	}
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} style={{ '--ref-width': `${blockId().length}ch` }} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
-					<Show when={props.row.item.type === 'thinking'} fallback={
-					<Show when={props.row.note === undefined} fallback={compact()}>
-						{isChange() ? change() : (
-						<>
-						<Show when={closable() && title()}>{heading()}</Show>
-						<Show when={folding()} fallback={plain(s)}>
-							<Show when={!closable()}>
-							<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
-								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
-								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
-								<Show when={props.cursor && !open()}>{cursor()}</Show>
-								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
-								<Show when={failed()}><span class="error">✗</span></Show>
-								<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
-							</CardHeader>
-							</Show>
-							<div class="body" inert={!expanded()}>
-								<div class="contents">
-									<div class="content">
-										<Show when={props.row.item.type !== 'tool'} fallback={<>{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}<Show when={props.cursor && !md()}>{cursor()}</Show></>}>
-											<div>
-												<Show when={props.row.item.type === 'prompt' && !headsWho()}><div class="sender">{who()}</div></Show>
-												{md() ? markdown() : body()}
-												<Show when={props.cursor && !md()}>{cursor()}</Show>
-											</div>
-										</Show>
-									</div>
-								</div>
-							</div>
-						</Show>
-						</>
-						)}
-					</Show>
-					}><Thinking text={s().text} open={expanded()} time={time() ?? ''} metadata={<>{activity()}{link()}</>}>{markdown()}</Thinking></Show>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
+					<CardHeader inline={thinking()} icon={thinking() ? undefined : kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
+						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
+						<Show when={props.cursor && !open() && !thinking()}>{cursor()}</Show>
+						<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
+						<Show when={failed()}><span class="error">✗</span></Show>
+						<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
+					</CardHeader>
+					{content(s)}
 				</article>
 			)}
 		</Show>

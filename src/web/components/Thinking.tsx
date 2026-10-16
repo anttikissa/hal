@@ -3,19 +3,16 @@
 import { createEffect, createSignal, onSettled, Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 
-export function Thinking(props: { text: string; open: boolean; time: string; metadata: JSX.Element; children: JSX.Element }) {
+export function Thinking(props: { text: string; open: boolean; children: JSX.Element }) {
 	let content: HTMLDivElement | undefined
 	let preview: HTMLDivElement | undefined
-	let [rows, setRows] = createSignal(1)
 	let [hidden, setHidden] = createSignal(0)
 	let measure = () => {
 		if (!content) return
 		let line = parseFloat(getComputedStyle(content).lineHeight)
 		let box = content.getBoundingClientRect()
 		let total = Math.ceil(box.height / line)
-		let visible = Math.min(total, 1)
-		setRows(Math.max(1, visible))
-		setHidden(Math.max(0, total - visible))
+		setHidden(Math.max(0, total - 1))
 		onSettled(() => { if (preview) preview.scrollTop = props.open ? 0 : preview.scrollHeight })
 	}
 	onSettled(measure)
@@ -26,12 +23,10 @@ export function Thinking(props: { text: string; open: boolean; time: string; met
 		observer.observe(content)
 		return () => observer.disconnect()
 	})
-	return <div class="Thinking" style={{ '--preview-rows': String(rows()) }}>
-		<button type="button" class="stamp mark" aria-label={props.open ? 'Collapse reasoning' : 'Expand reasoning'} aria-expanded={props.open ? 'true' : 'false'}>{props.time}</button>
+	return <div class="Thinking">
 		<div class="preview" ref={(e) => { preview = e }}>
 			<div class="thinking-content" ref={(e) => { content = e }}>{props.children}</div>
 		</div>
-		<span class="thinking-meta">{props.metadata}</span>
 		<Show when={!props.open && hidden() > 0}><span class="more">… {hidden()} earlier lines</span></Show>
 	</div>
 }

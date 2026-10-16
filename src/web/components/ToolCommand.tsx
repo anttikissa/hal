@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { createEffect, createSignal, flush, onSettled, Show, untrack } from 'solid-js'
 import { scroll } from '../scroll.ts'
+import { Disclosure } from './Disclosure.tsx'
 
 export function ToolCommand(props: { lines: string[]; compact: boolean }) {
 	let line: HTMLDivElement | undefined
@@ -20,7 +21,7 @@ export function ToolCommand(props: { lines: string[]; compact: boolean }) {
 	return (
 		<div class="ToolCommand">
 			<div ref={(el) => (line = el)} class={whole() ? 'command' : 'command clipped'}>{whole() ? props.lines.join('\n') : (props.lines[0] ?? '') + (props.lines.length > 1 ? '…' : '')}</div>
-			<Show when={props.compact && clipped()}><button type="button" class="command-toggle" aria-expanded={expanded() ? 'true' : 'false'} onClick={toggle}><span class="label">{expanded() ? 'Hide command' : 'Show command'}</span></button></Show>
+			<Show when={props.compact && clipped()}><Disclosure class="command-toggle" name={expanded() ? 'Hide command' : 'Show command'} open={expanded()} onClick={toggle}><span class="label">{expanded() ? 'Hide command' : 'Show command'}</span></Disclosure></Show>
 		</div>
 	)
 }

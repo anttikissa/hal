@@ -17,6 +17,7 @@ import { Icon } from './Icon.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { titles } from '../../common/titles.ts'
 import { target } from '../target.ts'
+import { CardReference } from './CardReference.tsx'
 
 export function Question(props: { item: Item & { type: 'question' } & { key: string }; form: FormState; session: string }) {
 	let fields: HTMLElement[] = []
@@ -57,10 +58,7 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 	}
 	return (
 		<form class="Question question" onSubmit={submit}>
-			<CardHeader time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<Show when={target.href(props.session, titles.blockId(props.item))}>{(h) => <a class="link" href={h()} data-ref={`#${titles.blockId(props.item)}`} title="Link to this card" aria-label={`Link to card ${titles.blockId(props.item)}`} />}</Show>} />
-			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
-				<Icon name="close" />
-			</button>
+			<CardHeader time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<CardReference href={target.href(props.session, titles.blockId(props.item))} id={titles.blockId(props.item)} />} actions={<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}><Icon name="close" /></button>} />
 			<Show when={form().quote}>
 				{(quote) => (
 					<pre class="quote">
