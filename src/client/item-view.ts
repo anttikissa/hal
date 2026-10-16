@@ -114,7 +114,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// color it has open, as on the web (task 3d3).
 		let row = title && strings.expandTabs(strings.clipVisual(ansi.clean(titles.stamp(item.ts, title)), hw))
 		let head = titles.stamp(item.ts, `${titles.who(item)}:`)
-		if (row) return [row.startsWith(head) ? ansi.heading(head, itemView.itemStyle(item)) + row.slice(head.length) : ansi.heading(row, itemView.itemStyle(item))]
+		let more = titles.hidden(item)
+		if (row) {
+			let shown = row.startsWith(head) ? ansi.heading(head, itemView.itemStyle(item)) + row.slice(head.length) : ansi.heading(row, itemView.itemStyle(item))
+			return [more ? itemView.right(shown, ansi.quiet(`… ${more} more line${more === 1 ? '' : 's'}`, itemView.itemStyle(item)), hw) : shown]
+		}
 	}
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.

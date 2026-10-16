@@ -1,0 +1,10 @@
+{
+	title: 'Closed replies and prompts show hidden line count',
+	spec: 'A closed Hal reply or user prompt whose one-row compact header leaves text out ends its header with a quiet "… N more lines" ("line" for one), as short cards and tool output do. N counts the text lines after the previewed one, or all of them when a summary heads the prompt. Web: a status before the block link (CardHeader hidden). Terminal: right-aligned on the one-row card (item-view.ts). Shared count: titles.hidden.',
+	status: 'done',
+	notes: [
+		'Invariant restored: a closed card never hides text without saying so. The web header ellipsis showed only when the first line overflowed, so short first lines hid the rest silently. Verified with tsc, item-view/titles tests and a one-off titles.hidden check; not yet seen in a browser.'
+	],
+	needs: ['3d3'],
+	foldInto: ['3d3']
+}

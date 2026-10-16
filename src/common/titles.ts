@@ -146,6 +146,14 @@ function compact(item: Shown): string | undefined {
 	return text ? `${who}: ${text}` : who
 }
 
+// The text lines a closed card's compact title leaves out.
+function hidden(item: Shown): number {
+	if (item.type !== 'prompt' && item.type !== 'text') return 0
+	let text = card.text(item).trim()
+	let n = text ? text.split('\n').length : 0
+	return item.type === 'prompt' && item.summary ? n : Math.max(0, n - 1)
+}
+
 // '10:52 Hal (Opus 5.5)', '10:52 Run this command? …' for a question;
 // undefined for an item without a header.
 function title(item: Shown): string | undefined {
@@ -190,4 +198,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, resultTime, stamp, ended, address, receipt, messageHead, preview, compact, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, resultTime, stamp, ended, address, receipt, messageHead, preview, compact, hidden, author, who, title, letter, blockId }
