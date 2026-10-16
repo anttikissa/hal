@@ -358,7 +358,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'output':
 			// A prompt-file change or commit: its first line heads the card,
 			// so the body is the rest (tasks ar, 179).
-			return { kind: item.commit ? 'output commit-card' : item.error ? 'output error' : item.synthetic ? 'output synthetic' : 'output plain', text: item.change || item.commit ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
+			return { kind: item.commit ? 'output commit-card' : item.error ? 'output error' : item.synthetic ? 'output assistant' : 'output plain', text: item.change || item.commit ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
 		case 'divider':
 			return { kind: 'divider log', text: titles.stamp(item.ts, item.text) }
 	}

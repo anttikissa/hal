@@ -1,0 +1,10 @@
+{
+	title: 'All Hal speech uses the assistant style',
+	spec: 'Synthetic Hal output and model replies use the same assistant color style in terminal and web, for every theme and override. There is no separate synthetic theme color. Synthetic remains a history/source flag, not a palette category. This replaces the neutral synthetic rule in task 9pa. Themes define Hal speech through assistant only; the built-in template and shared cinematic palettes follow the same rule.',
+	status: 'done',
+	notes: [
+		'Removed the synthetic palette field rather than aliasing it: terminal synthetic output and model text call colors.assistant(), and web synthetic output uses the assistant CSS class. This prevents per-theme synthetic overrides from diverging. Verified shared style equality for the built-in and all 16 shipped themes, 40 focused terminal/palette tests, 20 web view tests, and tsc --noEmit.'
+	],
+	needs: ['9pa'],
+	foldInto: ['9pa']
+}

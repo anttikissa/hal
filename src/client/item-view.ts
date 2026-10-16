@@ -57,7 +57,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'image':
 			return colors.user()
 		case 'text':
-			return { fg: colors.assistant().fg!, code: colors.assistant().code! }
+			return colors.assistant()
 		case 'thinking':
 			return { fg: colors.thinking().fg! }
 		case 'tool':
@@ -69,7 +69,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.plain().fg!, title: colors.plain().title! }
+			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.assistant() : { fg: colors.plain().fg!, title: colors.plain().title! }
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}

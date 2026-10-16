@@ -15,7 +15,7 @@ export function palette(p: Palette): Look {
   screen: p.screen, fgL: 0.8, fgC: 0.1, bgL: 0.2, bgC: p.screen[1],
   user: () => card(...p.user),
   assistant: () => ({ ...text(p.reply), cursor: p.reply, cursorIdle: gray }),
-  thinking: () => text(gray), synthetic: () => text(p.reply),
+  thinking: () => text(gray),
   message: () => card(p.accent), question: () => card(p.accent), info: () => card(gray),
   error: () => card(red), warning: () => card(yellow), exit: () => ({ fg: red, neutralFg: gray }),
   diff: () => ({ addFg: green, removeFg: red }),

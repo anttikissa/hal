@@ -47,10 +47,8 @@ export const look: Look = {
 		linkFg: [0.9, 0.17, 80],
 		linkBg: [0.28, 0.06, 75],
 	}),
-	// Neutral gray cards: the user's, Hal's own remarks, questions,
-	// commits and command responses.
+	// Neutral gray cards: questions, commits and command responses.
 	plain: () => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
-	synthetic: () => colors.plain(),
 	// Thinking: muted blue-gray, recedes.
 	thinking: () => ({
 		fg: [0.72, 0.03, 250],
