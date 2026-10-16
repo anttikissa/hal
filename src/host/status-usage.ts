@@ -22,7 +22,7 @@ const reset = (at: string, now = clock.now(), zone?: string): string => usageWin
 function bar(percent: number): string {
 	let eighths = Math.ceil(Math.max(0, Math.min(100, percent)) * 14 * 8 / 100)
 	let part = eighths % 8
-	return ('█'.repeat(Math.floor(eighths / 8)) + (part ? '▏▎▍▌▋▊▉'[part - 1] : '')).padEnd(14)
+	return ('█'.repeat(Math.floor(eighths / 8)) + (part ? '▁▂▃▄▅▆▇'[part - 1] : '')).padEnd(14)
 }
 
 function table(rows: UsageRow[], zone?: string): string {
