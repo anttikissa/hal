@@ -222,7 +222,7 @@ a { color: inherit; }
 <section class="item" data-title="Focus style">
 <div class="chrome"><h2>5. Focus style</h2>
 <p>There are six different focus styles now. Every sample is drawn as if it had focus; press Tab to see the real ones.</p></div>
-<template id="t-focus"><div class="focus-samples"><a class="ftab tab" href="#paste" onclick="return false">3</a><button type="button" class="fhead assistant">▸ Thinking</button><span class="input"><button type="button" class="fsend">SEND</button></span><span class="warning"><button type="button" class="opt" aria-pressed="false">Option</button></span></div></template>
+<template id="t-focus"><div class="focus-samples"><a class="ftab tab" href="#paste" onclick="return false">3</a><button type="button" class="fhead assistant">Thinking</button><span class="input"><button type="button" class="fsend">SEND</button></span><span class="warning"><button type="button" class="opt" aria-pressed="false">Option</button></span></div></template>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="focus" value="A · as is (mixed)"><span><b>A</b> · Mixed (current)</span></label><div class="preview fv-a" data-template="t-focus"></div></div>
 <div class="variant"><label><input type="radio" name="focus" value="B · 2px accent, inside the control"><span><b>B</b> · 2px accent, inside</span></label><div class="preview fv-b" data-template="t-focus"></div></div>
@@ -263,9 +263,9 @@ a { color: inherit; }
 <section class="item" data-title="Card fold motion">
 <div class="chrome"><h2>8. Opening and closing cards</h2>
 <p>Cards animate their height when they open, but tasks/README.md says animate only opacity, color and transform. Click a card to try it.</p></div>
-<template id="t-fold"><div class="Card thinking fold"><button type="button" class="head" aria-expanded="false">▸ Thinking</button><div class="body" inert><div class="contents">The strip centers its pages; each cell is (digits + 2)ch wide.
+<template id="t-fold"><div class="Card thinking fold"><button type="button" class="head" aria-expanded="false">Thinking</button><div class="body" inert><div class="contents">The strip centers its pages; each cell is (digits + 2)ch wide.
 Centering the label inside the cell keeps the width, so nothing reflows.
-The marker slot stays reserved so the number never jumps.</div></div></div><div class="Card tool-bash fold"><button type="button" class="head" aria-expanded="false">▸ $ ./test</button><div class="body" inert><div class="contents">1204 pass
+The marker slot stays reserved so the number never jumps.</div></div></div><div class="Card tool-bash fold"><button type="button" class="head" aria-expanded="false">$ ./test</button><div class="body" inert><div class="contents">1204 pass
 0 fail</div></div></div><div class="Card assistant">A card below, to see how it moves.</div></template>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="fold" value="A · keep the height animation (and change the README rule to allow it)"><span><b>A</b> · Height animation (current; README changes)</span></label><div class="preview fo-a" data-template="t-fold"></div></div>

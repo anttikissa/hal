@@ -36,7 +36,7 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ kind: 'user prompt', text: 'go' },
 		{ kind: 'thinking', text: 'hm' },
 		{ kind: 'assistant', text: 'hello' },
-		{ kind: 'tool tool-bash', text: '▸ $ List files' },
+		{ kind: 'tool tool-bash', text: '$ List files' },
 		{ kind: 'result log', text: 'a\nb' },
 		{ kind: 'end log', text: 'Paused.' },
 		{ kind: 'user prompt', text: 'again' },

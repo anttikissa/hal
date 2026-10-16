@@ -1,0 +1,10 @@
+{
+	title: 'Remove remaining card disclosure triangles',
+	spec: 'No transcript card or nested command disclosure shows a triangle or reserves glyph indentation. Remove remaining prompt-change and nested command triangles, synthetic tool headline prefixes and their stripping logic, and triangle-bearing card demo examples. Delete unused disclosure CSS. Preserve buttons, labels, aria-expanded, keyboard and pointer toggles, touch targets, and independent nested command state. Terminal cards remain triangle-free. Picker and status controls outside transcript cards are unchanged. Restores the triangle-free card invariant in 5tf; shared chrome consolidation remains in gwr.',
+	status: 'done',
+	notes: [
+		'Removed prompt-change and nested command disclosure spans, synthetic tool headline prefix and its stripping, obsolete disclosure spacing/rotation CSS, and triangle-bearing demo examples. Buttons, aria-expanded and event handlers are unchanged. Audit finds only the StatusRow triangle outside cards; terminal card rendering has none. Verification: 20 focused web view tests pass, TypeScript and focused lint pass. Browser card-header and change-disclosure checks could not run: Chrome launch timed out before either test body.'
+	],
+	needs: ['5tf'],
+	foldInto: ['5tf']
+}

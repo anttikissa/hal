@@ -154,7 +154,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (titles.letter(item) === 'm') t = unmark(t)
 		return ref && t?.endsWith(ref) ? <>{t.slice(0, -ref.length)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">{ref}</a></> : t
 	}
-	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
+	let lines = () => (shown()?.text ?? '').split('\n')
 	let presentation = () => props.row.result?.presentationError ? undefined : props.row.result?.presentation ?? (props.row.item.type === 'tool' ? props.row.item.presentation : undefined)
 	let presentationError = () => props.row.result?.presentationError ?? (props.row.item.type === 'tool' ? props.row.item.presentationError : undefined)
 	// An open message without a summary is headed by its sender, as in
@@ -307,7 +307,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<>
 			{link()}
 			<div class="content diff change">
-				<For each={expanded() ? promptChanges.rows(props.row.item) : promptChanges.rows(props.row.item).slice(0, 1)}>{(r, i) => <Show when={i() === 0} fallback={<div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}><button type="button" class="row head mark" aria-label={r.text} aria-expanded={expanded() ? 'true' : 'false'}><span class="disclosure" aria-hidden="true">▸</span>{r.text}</button></Show>}</For>
+				<For each={expanded() ? promptChanges.rows(props.row.item) : promptChanges.rows(props.row.item).slice(0, 1)}>{(r, i) => <Show when={i() === 0} fallback={<div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}><button type="button" class="row head mark" aria-label={r.text} aria-expanded={expanded() ? 'true' : 'false'}>{r.text}</button></Show>}</For>
 				<Show when={expanded()}>
 					<For each={promptChanges.run(props.row.item)}>
 						{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></div></>}
