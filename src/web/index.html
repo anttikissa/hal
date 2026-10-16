@@ -68,6 +68,11 @@ html.typing .App { position: absolute; }
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
 .Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
+.Transcript { container: transcript / inline-size; }
+.Transcript :is(.Card, .Question) { line-height: 20px; }
+@container transcript (width > calc(102ch + 3px)) {
+  .Transcript :is(.Card, .Question) { line-height: 22px; }
+}
 .Transcript > * { margin: 0 0 0.5lh; }
 /* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
    it shares the cards' left edge; a 52px target from the screen edge
@@ -241,7 +246,12 @@ html.typing .App { position: absolute; }
    table too wide scrolls sideways in its own box, and while more of it
    is off to the right, that edge fades (a scroll-driven --fade). */
 .Markdown .line { min-height: 1lh; }
+<<<<<<< HEAD
 .Markdown .line.tail { display: inline; }
+=======
+.Card:not(.thinking) .Markdown .line.p:has(> span:empty) { height: 0.5lh; min-height: 0; }
+.Markdown .line:has(+ .cursor), .Markdown .line:has(+ .interrupted) { display: inline; }
+>>>>>>> 3c598cd3 (Use width-responsive transcript leading and half-line paragraph gaps)
 .Markdown .interrupted { background: transparent; white-space: pre-wrap; }
 .Markdown .interrupted::after { content: attr(data-tail); }
 .Markdown .h { margin-top: 0.25lh; }

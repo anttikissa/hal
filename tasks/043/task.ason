@@ -1,0 +1,10 @@
+{
+	title: 'Web transcript uses 20 or 22px leading with half-line paragraph gaps',
+	spec: 'Ordinary web transcript cards use 20px line height while usable text width is at most 100ch and 22px above 100ch, based on transcript container width minus card border and horizontal content padding, not device type. Empty Markdown paragraph separators occupy half a line (10 or 11px), replacing full blank-line gaps; no paragraph indent is added. Thinking retains its independent 19px leading and existing paragraph spacing. Composer and terminal typography remain unchanged. Use CSS container queries so resizing reacts without JavaScript or per-frame computation.',
+	status: 'done',
+	notes: [
+		'Chrome verified usable text widths 826.61px -> 20px lines/10px gaps and 846.61px -> 22px lines/11px gaps. Thinking stayed 19px at all widths; composer retained its existing responsive spacing. The 102ch+3px container threshold accounts for two content-padding characters and the card border.'
+	],
+	needs: ['xd0'],
+	foldInto: ['xd0']
+}
