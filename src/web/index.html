@@ -68,7 +68,7 @@ html.typing .App { position: absolute; }
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
+.Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(1ch, env(safe-area-inset-left)); padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
 .Transcript { container: transcript / inline-size; }
 .Transcript :is(.Card, .Question) { --leading: 20px; line-height: var(--leading); }
 @container transcript (width > calc(102ch + 3px)) {
@@ -172,12 +172,12 @@ html.typing .App { position: absolute; }
 @media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
 .CardHeader:has(.receipt) .discard { padding-inline: 0; }
 .CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss) { position: static; align-self: start; min-width: 44px; min-height: 44px; margin: 0; }
-.EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
+.EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(1ch, env(safe-area-inset-right)) 0 max(1ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
 .EditBar .text { flex: 1; min-width: 0; }
 .EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
 @media (pointer: coarse) { .EditBar .keys { display: none; } .EditBar button { min-height: 44px; min-width: 44px; } }
 @media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
-.CardHeader .link { position: relative; min-width: 44px; text-align: right; }
+.CardHeader .link { position: relative; text-align: right; }
 .CardHeader .title a { padding-block: var(--card-inset); }
 /* Context boundaries retain their rule above the shared card header. */
 .Card.divider > .CardHeader { border-top: 1px solid currentColor; }
@@ -262,7 +262,7 @@ html.typing .App { position: absolute; }
 @keyframes blink { 50% { opacity: 0; } }
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
-.Notices { --gl: max(2ch, env(safe-area-inset-left)); --gr: max(2ch, env(safe-area-inset-right)); }
+.Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); }
 @media (max-width: 40rem) { .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); } }
 .Notices .stack { position: absolute; right: var(--gr); bottom: 0.5lh; width: min(24rem, calc(100% - var(--gl) - var(--gr))); display: flex; flex-direction: column; gap: 0.25lh; }
 .Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 4px color-mix(in oklab, var(--overlay-bg) 75%, transparent); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
@@ -280,7 +280,7 @@ html.typing .App { position: absolute; }
 /* --gutter: the composer's side padding in its own font, as a length, so
    the smaller status row lines up with it (the cwd strip, task 22). */
 @property --gutter { syntax: '<length>'; inherits: true; initial-value: 0px; }
-.Chat { --gutter: 2ch; }
+.Chat { --gutter: 1ch; }
 .StatusRow { flex: none; padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left)); font-size: 12px; }
 .StatusRow .overview { position: relative; display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
 .StatusRow .details-target { position: absolute; inset: 0; width: 100%; height: 100%; background: none; }
@@ -332,7 +332,7 @@ html.typing .App { position: absolute; }
 .TouchHistory h2 { flex-basis: 100%; margin: 0; font: inherit; }
 .TouchHistory button { flex: none; white-space: nowrap; }
 .TouchHistory pre { min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
+.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(1ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(1ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer > #notice { display: flex; flex-wrap: wrap; gap: 0 1ch; align-items: baseline; }
 .Composer > #notice > span { min-width: 0; overflow-wrap: anywhere; }

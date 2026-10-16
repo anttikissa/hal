@@ -2,5 +2,8 @@
 	title: 'One space between card text and its reference',
 	spec: 'On the web, every card reference (body, header and thinking card) is as wide as its text and sits one space (1ch) from the text beside it, whatever its length; a body sets --ref-width from its id to reserve exactly that room. An invisible ::after layer keeps each reference a 44px tap target. The terminal already reserves the reference length plus one column.',
 	status: 'done',
+	notes: [
+		'Invariant restored: .CardHeader .link has no min-width. Commit 9ad36a76 (task gwr) re-added min-width: 44px, padding short references like r48 by about 3ch; the ::after layer already gives the 44px target.'
+	],
 	needs: ['0z']
 }
