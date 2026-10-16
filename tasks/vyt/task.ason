@@ -1,6 +1,6 @@
 {
 	title: 'One space between card text and its reference',
-	spec: 'On the web, a card body and a thinking card leave exactly one space (1ch) between the text and the block reference at the top right, whatever the reference length (each card sets --ref-width from its id). The reference keeps a 44px tap target, which may overlap that gap.',
+	spec: 'On the web, every card reference (body, header and thinking card) is as wide as its text and sits one space (1ch) from the text beside it, whatever its length; a body sets --ref-width from its id to reserve exactly that room. An invisible ::after layer keeps each reference a 44px tap target. The terminal already reserves the reference length plus one column.',
 	status: 'done',
 	needs: ['0z']
 }

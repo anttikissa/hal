@@ -107,7 +107,7 @@ html.typing .App { position: absolute; }
 .Thinking .Markdown > :first-child { margin-top: 0; }
 .Thinking .stamp { padding: 0; min-height: 0; background: none; color: inherit; font: inherit; }
 .Thinking .thinking-meta { display: flex; gap: 1ch; }
-.Thinking .thinking-meta .link { position: static; padding: 0; --tap-extra: max(0px, 44px - var(--ref-width, 4ch)); min-width: 0; padding-left: var(--tap-extra); margin-left: calc(-1 * var(--tap-extra)); }
+.Thinking .thinking-meta .link { position: relative; padding: 0; }
 .Thinking .more { position: absolute; bottom: var(--card-inset); right: 1ch; color: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
 .Card .result-text { color: var(--output, inherit); }
 .Card .result-text.error { background: none; }
@@ -193,7 +193,7 @@ html.typing .App { position: absolute; }
 .EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
 @media (pointer: coarse) { .EditBar .keys { display: none; } .EditBar button { min-height: 44px; min-width: 44px; } }
 @media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
-.CardHeader .link { min-width: 44px; }
+.CardHeader .link { position: relative; }
 .CardHeader .title a { padding-block: var(--card-inset); }
 /* A context boundary (tasks bc, vh): its text centered in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
@@ -220,7 +220,10 @@ html.typing .App { position: absolute; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card flashes (flash.ts). */
 .Card .link { color: var(--title-fg); text-decoration: none; user-select: none; white-space: nowrap; }
-.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
+.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); }
+/* A ref is as wide as its text, one space from the text beside it; an
+   invisible layer keeps its 44px tap target. */
+.Card .link::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
 /* One space between the text and the reference, right: 1ch. */
 .Card:has(> .link) > .content { padding-right: calc(2ch + var(--ref-width, 4ch) + var(--receipt-space, 0ch)); }
 .Card .link::before { content: attr(data-ref); }
