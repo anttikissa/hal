@@ -15,7 +15,8 @@
 		'User rule: a title and its text must never be nearly the same color. Titles darker than text plus 3/4 chroma looked identical to text, so titles are 0.04 brighter than the shown text, at 3/4 of its chroma.',
 		'A style may set its own title color (style.title), used by both clients instead of colors.title(fg). User cards use [0.92, 0.09, 215]: the shared +0.04 step left the cyan title nearly the same as its text. Read and Bash titles are approved as they are.',
 		'Hal cards use their own title [0.9, 0.14, 80], brighter and more saturated than the amber text, at the user request.',
-		'Gray cards (commit, question, command output) use a bright title 0.95 over quieter body text 0.78: the shared +0.04 step left gray title and text nearly identical, since gray has no chroma to differ.'
+		'Gray cards (commit, question, command output) use a bright title 0.95 over quieter body text 0.78: the shared +0.04 step left gray title and text nearly identical, since gray has no chroma to differ.',
+		'Terminal matches the web: a one-row closed reply or prompt draws time and sender in the title color and the preview in the body color (item-view.ts).'
 	],
 	needs: ['3r3', '4fw'],
 	foldInto: ['3r3', '4fw']

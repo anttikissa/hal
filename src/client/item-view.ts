@@ -109,7 +109,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	let hw = look.headerWidth ?? width
 	if (fold === 'short' && settings.shortRows() === 1 && !bashResult.background(item) && (item.type === 'prompt' || (item.type === 'text' && card.text(item).trim()))) {
 		let title = titles.compact(item)
-		if (title) return [ansi.heading(strings.expandTabs(strings.clipVisual(ansi.clean(titles.stamp(item.ts, title)), hw)), itemView.itemStyle(item))]
+		// Time and sender in the title color, the preview in the body
+		// color it has open, as on the web (task 3d3).
+		let row = title && strings.expandTabs(strings.clipVisual(ansi.clean(titles.stamp(item.ts, title)), hw))
+		let head = titles.stamp(item.ts, `${titles.who(item)}:`)
+		if (row) return [row.startsWith(head) ? ansi.heading(head, itemView.itemStyle(item)) + row.slice(head.length) : ansi.heading(row, itemView.itemStyle(item))]
 	}
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
