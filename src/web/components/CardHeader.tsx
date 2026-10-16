@@ -12,8 +12,9 @@ import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 import { Disclosure } from './Disclosure.tsx'
 
-// `hidden`: the text lines a closed card leaves out.
-export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: string; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; lines?: number; hidden?: number; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean; allExits?: boolean }) {
+// `hidden`: the text lines a closed card leaves out. `peek`: a closed
+// card's line count, shown faintly on hover.
+export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: string; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; lines?: number; hidden?: number; peek?: number; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean; allExits?: boolean }) {
 	let exit = () => props.result ? props.allExits ? bashResult.exit(props.result.output) : bashResult.failure(props.result, props.bash) : undefined
 	let label = createMemo(() => props.label)
 	let rest = () => props.result && (bashResult.interrupted(props.result) ?? (props.limit ? `${bashResult.duration(props.result.ms) ?? '0s'} / ${props.limit}` : bashResult.duration(props.result.ms)))
@@ -39,6 +40,7 @@ export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: 
 			<Show when={stats()}>{(s) => <span class="status diff">(<Show when={s().added}><span class="add">+{s().added}</span></Show>{s().added && s().removed ? ' ' : ''}<Show when={s().removed}><span class="del">−{s().removed}</span></Show>, {s().lines}{rest() ? `, ${rest()}` : ''})</span>}</Show>
 			{props.activity}
 			<Show when={stats() && count()}>{(c) => <span class="status line-count">({c()})</span>}</Show>
+			<Show when={props.peek}>{(n) => <span class="peek"><span class="status">(+{n()} line{n() === 1 ? '' : 's'})</span></span>}</Show>
 			{props.reference}
 		</header>
 	)

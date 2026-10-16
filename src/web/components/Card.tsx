@@ -70,6 +70,16 @@ function enter(el: HTMLElement): void {
 // after ; & | ( $( ), optionally behind env assignments or a wrapper.
 const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
+// Rows `text` wraps to in `cols` monospace columns, as in a terminal.
+const rows = (text: string, cols: number) => text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / cols)), 0)
+// Body columns: the header's inner width over the font's character width.
+let canvas: CanvasRenderingContext2D | null | undefined
+const columns = (header: HTMLElement) => {
+	let style = getComputedStyle(header)
+	canvas ??= document.createElement('canvas').getContext('2d')
+	canvas!.font = style.font
+	return Math.max(1, Math.floor((header.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / canvas!.measureText('0').width))
+}
 const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
@@ -128,12 +138,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let receipt = () => props.row.pending ? 0 : titles.receipt(props.row.item)
 	let receiptLabel = () => receipt() === 1 ? 'Delivered, not read yet' : `Read by Hal${time() ? ` at ${time()}` : ''}`
 	let ticks = () => <Show when={receipt()}><span class="receipt" role="img" aria-label={receiptLabel()} title={receiptLabel()}><Icon name={receipt() === 1 ? 'check' : 'checks'} /></span></Show>
-	let outputLines = createMemo(() => {
-		if (!expanded()) return undefined
+	let bodyLines = () => {
 		let item = props.row.item
 		let output = item.type === 'tool' ? result()?.text ?? item.partial ?? '' : bashResult.background(item) && item.type === 'prompt' ? bashResult.display(item.text) : undefined
 		return output === undefined ? undefined : output ? output.replace(/\n$/, '').split('\n').length : 0
-	})
+	}
+	let outputLines = createMemo(() => expanded() ? bodyLines() : undefined)
 	let reference = () => link()
 	let link = () => <CardReference href={href()} id={blockId()}>{ticks()}</CardReference>
 
@@ -262,6 +272,29 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// when its text changes, not when a snapshot brings a new row object.
 	let text = createMemo(() => shown()?.text ?? '')
 	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
+	// Body columns, measured when the pointer enters the card; until then
+	// a 14px monospace estimate.
+	let [cols, setCols] = createSignal(Math.max(20, Math.floor(innerWidth / 8.4)))
+	let measure = () => { let header = root?.querySelector<HTMLElement>(':scope > .CardHeader'); if (header) setCols(columns(header)) }
+	// The rows opening a closed card adds, shown faintly on hover: a tool's
+	// command, a blank row, then its whole output, wrapped like the
+	// terminal; a closed thinking card already shows its first line. A
+	// presented tool result has no count, rather than a wrong one.
+	let peek = createMemo(() => {
+		if (expanded() || !folding() || closable()) return undefined
+		let item = props.row.item
+		if (item.type === 'tool') {
+			if (presentation() || presentationError()) return undefined
+			let r = props.row.result
+			let output = (r ? view.show(r, true, bash())?.text ?? '' : item.partial ?? '').replace(/\n$/, '')
+			let command = call().length ? rows(call().join('\n'), cols()) : 0
+			return command + (command && output ? 1 : 0) + (output ? rows(output, cols()) : 0)
+		}
+		let body = bashResult.background(item) && item.type === 'prompt' ? bashResult.display(item.text).replace(/\n$/, '') : text().trim()
+		return body ? rows(body, cols()) - (item.type === 'thinking' ? 1 : 0) : 0
+	})
+	// Headers stick only on cards over 10 rows.
+	let tall = createMemo(() => rows(`${text()}\n${result()?.text ?? ''}`, cols()) > 10)
 	let prose = () => props.row.item.type === 'prompt' && !md() && !bashResult.background(props.row.item) && props.row.item.origin !== 'model'
 	let parts = () => {
 		let item = props.row.item
@@ -329,8 +362,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
-					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} hidden={closable() && !expanded() ? titles.hidden(props.row.item) : 0} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', tall() ? 'tall' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle} onPointerEnter={measure}>
+					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} hidden={closable() && !expanded() ? titles.hidden(props.row.item) : 0} peek={peek()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
 						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
 						<Show when={props.cursor && !open()}>{cursor()}</Show>
 						<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>

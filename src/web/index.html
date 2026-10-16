@@ -135,11 +135,17 @@ html.typing .App { position: absolute; }
    every slot shares one top inset that centers a single line in 44px,
    so a wrapped label grows down from the timestamp's line. */
 .CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
-.CardHeader { position: sticky; top: 0; z-index: 1; background: var(--card-bg, var(--canvas)); }
+.Transcript > :is(.Card, .Question) { view-timeline: --sticky-card block; }
+.CardHeader { position: sticky; top: 0; z-index: 1; --sticky-bg: var(--card-bg, var(--canvas)); background: color-mix(in oklab, var(--sticky-bg) 65%, transparent); }
+@supports (animation-timeline: --sticky-card) {
+  .CardHeader:not(.inline), .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { animation: sticky-shade linear both; animation-timeline: --sticky-card; animation-range: exit-crossing 20px exit-crossing 40px; }
+}
+@keyframes sticky-shade { to { background-color: color-mix(in oklab, color-mix(in oklab, var(--sticky-bg) 80%, var(--overlay-bg)) 65%, transparent); } }
 .CardHeader.inline { position: static; background: none; grid-template-columns: auto minmax(0, 1fr); }
 .CardHeader.inline .flow { display: contents; }
 .CardHeader.inline .title { min-width: 0; padding-block: var(--card-inset); }
-.CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: start; background: var(--card-bg, var(--canvas)); }
+.CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: start; background: color-mix(in oklab, var(--sticky-bg) 65%, transparent); }
+.Card:not(.tall) :is(.CardHeader, .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow)) { position: static; }
 .CardHeader.inline .stamp { padding-block: var(--card-inset); }
 .CardHeader .flow, .CardHeader .link, .CardHeader > .call { padding-block: var(--card-inset); }
 .CardHeader > .call { white-space: nowrap; }
@@ -150,6 +156,13 @@ html.typing .App { position: absolute; }
 /* A flowing header (a question): time and label are one text, wrapping to the left edge. */
 .CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; vertical-align: top; opacity: 0.8; }
 .Card.folds:not(.open) .CardHeader .flow { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
+.CardHeader.head:not(.inline) .flow { overflow-x: clip; }
+.CardHeader.head:not(.inline) .title::after { content: '   open'; display: inline-block; width: 0; white-space: pre; opacity: 0; transition: opacity 250ms ease; }
+.Card.open > .CardHeader.head:not(.inline) .title::after { content: '   close'; }
+@media (hover: hover) and (pointer: fine) { .CardHeader.head:not(.inline):hover .title::after { opacity: 0.5; transition-duration: 100ms; } }
+.CardHeader > .peek { width: 0; display: flex; justify-content: flex-end; opacity: 0; transition: opacity 250ms ease; }
+.CardHeader > .peek > .status { padding-left: 1ch; background: var(--sticky-bg); }
+@media (hover: hover) and (pointer: fine) { .CardHeader:hover > .peek { opacity: 0.5; transition-duration: 100ms; } }
 /* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
 .CardHeader .error { background: none; margin-left: 1ch; }
 /* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
