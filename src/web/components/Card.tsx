@@ -37,6 +37,7 @@ import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
 import { hrefs } from '../hrefs.ts'
+import { router } from '../router.ts'
 import { folds } from '../folds.ts'
 import { forms } from '../../common/forms.ts'
 import { toggle as blockToggle } from '../../common/toggle.ts'
@@ -72,7 +73,8 @@ const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write:
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
+// `describe`: a short title for a job (t248) or session id a wait names.
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string }; describe?: (ref: string) => string | undefined }) {
 	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
@@ -185,8 +187,24 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return pythonBash() ? 'python' : toolIcons[item.name]
 	}
 	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
-	let headerParts = createMemo(() => hrefs.urlParts(head() ?? ''))
-	let linkedParts = (parts: ReturnType<typeof hrefs.urlParts>) => <For each={parts}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
+	// A wait names what it waits for: each job or session links to its
+	// card or tab, with its title when known.
+	let waitParts = () => {
+		let item = props.row.item, h = head() ?? ''
+		if (item.type !== 'tool' || presentation()?.title || toolDetails.headline(item.name, item.input).mark !== '…' || !h.startsWith('Waiting for ')) return undefined
+		let parts: ReturnType<typeof hrefs.urlParts> = ['Waiting for ']
+		h.slice('Waiting for '.length).split(', ').forEach((ref, i) => {
+			if (i) parts.push(', ')
+			let job = ref.match(/^#?t(\d+)$/)?.[1]
+			let href = job ? transcript.href(props.session, `t${job}`) : /^\d+-[a-z]+$/.test(ref) ? router.format(ref) : undefined
+			let about = href && props.describe?.(ref)
+			parts.push(href ? { href, text: ref } : ref)
+			if (about) parts.push(` (${about})`)
+		})
+		return parts
+	}
+	let headerParts = createMemo(() => waitParts() ?? hrefs.urlParts(head() ?? ''))
+	let linkedParts = (parts: ReturnType<typeof hrefs.urlParts>) => <For each={parts}>{(part) => typeof part === 'string' ? part : part.href.startsWith('/') ? <a href={part.href}>{part.text}</a> : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 	// A closed reply or prompt: its sender in the title color, its text
 	// in the body color it has open, as a closed Bash card shows output.
 	let compactParts = createMemo(() => {
@@ -330,7 +348,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 							<Show when={!closable()}>
 							<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
-								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
+								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
