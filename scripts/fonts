@@ -28,6 +28,10 @@ for face in "$@"; do
       case "$face" in VictorMono-*|CascadiaMono-*) source="$face%5Bwght%5D.ttf" ;; *) source="$file" ;; esac
       url="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/$source"
       license="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/OFL.txt" ;;
+    IntelOneMono-Regular|IntelOneMono-Italic|IntelOneMono-Light|IntelOneMono-LightItalic|IntelOneMono-Medium|IntelOneMono-MediumItalic|IntelOneMono-Bold|IntelOneMono-BoldItalic)
+      file="$face.woff2"
+      url="https://raw.githubusercontent.com/intel/intel-one-mono/main/fonts/woff2/$file"
+      license='https://raw.githubusercontent.com/intel/intel-one-mono/main/fonts/woff2/OFL.txt' ;;
     *) printf 'Unknown font face: %s\n' "$face" >&2; exit 1 ;;
   esac
   target="src/web/fonts/$file"

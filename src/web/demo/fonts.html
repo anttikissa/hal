@@ -13,6 +13,10 @@
 @font-face { font-family: 'Demo Cascadia'; src: url('/fonts/CascadiaMono-Italic.ttf'); font-weight: 200 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Demo Fragment'; src: url('/fonts/FragmentMono-Italic.ttf'); font-weight: 300; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Demo Cousine'; src: url('/fonts/Cousine-Italic.ttf'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Intel Light'; src: url('/fonts/IntelOneMono-LightItalic.woff2'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Intel Regular'; src: url('/fonts/IntelOneMono-Italic.woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Intel Medium'; src: url('/fonts/IntelOneMono-MediumItalic.woff2'); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Demo Intel Bold'; src: url('/fonts/IntelOneMono-BoldItalic.woff2'); font-weight: 700; font-style: italic; font-display: swap; }
 html, body { height: auto; overflow: auto; }
 body { margin: 0 auto; padding: 24px 16px; max-width: 1000px; }
 h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
@@ -28,16 +32,16 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 .rulers .vertical { margin: 12px 0; }
 .rulers { line-height: var(--upright-leading, 21px); }
 .rulers .italic-line { line-height: var(--italic-leading, 21px); }
-.rulers .candidate { font-family: var(--italic-face); font-size: var(--italic-size); font-style: italic; font-weight: 300; letter-spacing: var(--italic-spacing); line-height: var(--italic-leading, 21px); }
+.rulers .candidate { font-family: var(--italic-face); font-size: var(--italic-size); font-style: italic; font-weight: var(--italic-weight, 300); letter-spacing: var(--italic-spacing); line-height: var(--italic-leading, 21px); }
 .rulers .plex-italic { font-family: 'IBM Plex Mono', monospace; font-size: var(--sample-size, 14px); font-weight: 300; font-style: italic; letter-spacing: normal; line-height: var(--upright-leading, 21px); }
 #metrics { min-height: 3lh; }
 .samples { display: grid; gap: 16px; font-size: var(--sample-size, 14px); line-height: var(--upright-leading, 21px); }
-.samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: 300; font-style: italic; font-synthesis: none; letter-spacing: var(--italic-spacing, 0px); line-height: var(--italic-leading, 21px); }
+.samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: var(--italic-weight, 300); font-style: italic; font-synthesis: none; letter-spacing: var(--italic-spacing, 0px); line-height: var(--italic-leading, 21px); }
 .samples button { font-size: inherit; }
 </style>
 <h1>Italic fonts on Hal cards</h1>
 <div class="controls">
-<label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code" selected>Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option><option value="Demo Victor">Victor Mono Light - cursive</option><option value="Demo Cascadia">Cascadia Mono Light</option><option value="Demo Fragment">Fragment Mono Regular</option><option value="Demo Cousine">Cousine Regular</option></select></label>
+<label>Italic face <select id="face"><option value="IBM Plex Mono">IBM Plex Mono (current)</option><option value="Demo JetBrains">JetBrains Mono Light</option><option value="Demo Source Code" selected>Source Code Pro Light</option><option value="Demo Roboto">Roboto Mono Light</option><option value="Demo Victor">Victor Mono Light - cursive</option><option value="Demo Cascadia">Cascadia Mono Light</option><option value="Demo Fragment">Fragment Mono Regular</option><option value="Demo Cousine">Cousine Regular</option><option value="Demo Intel Light">Intel One Mono Light Italic</option><option value="Demo Intel Regular" data-weight="400">Intel One Mono Regular Italic</option><option value="Demo Intel Medium" data-weight="500">Intel One Mono Medium Italic</option><option value="Demo Intel Bold" data-weight="700">Intel One Mono Bold Italic</option></select></label>
 <label>Plex size <input id="size" type="text" inputmode="decimal" data-min="8" data-max="48" value="14">px</label>
 <label>Italic size <input id="italicSize" type="text" inputmode="decimal" data-min="8" data-max="48" value="14">px</label>
 <label>Italic x-height <input id="xheight" type="text" inputmode="decimal" data-min="1" data-max="32" value="6.72">px</label>
@@ -85,14 +89,14 @@ const face = document.getElementById('face'), size = document.getElementById('si
 const uprightLeading = document.getElementById('uprightLeading'), italicLeading = document.getElementById('italicLeading')
 let revision = 0
 async function update(action = '') {
- const current = ++revision, px = Number(size.value)
+ const current = ++revision, px = Number(size.value), weight = face.selectedOptions[0].dataset.weight ?? '300'
  if (![size, italicSize, xheight, stride, uprightLeading, italicLeading].every(input => input.value.trim() !== '' && Number.isFinite(Number(input.value)) && Number(input.value) >= Number(input.dataset.min) && Number(input.value) <= Number(input.dataset.max))) return
  try {
-  await Promise.all([document.fonts.load(`italic 300 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`), document.fonts.load(`italic 300 ${px}px "IBM Plex Mono"`)])
+  await Promise.all([document.fonts.load(`italic ${weight} 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`), document.fonts.load(`italic 300 ${px}px "IBM Plex Mono"`)])
   if (current !== revision) return
   const ctx = document.createElement('canvas').getContext('2d')
   const measure = (family, fontSize, italic) => {
-   ctx.font = `${italic ? 'italic ' : ''}300 ${fontSize}px "${family}"`
+   ctx.font = `${italic ? 'italic ' : ''}${italic ? weight : 300} ${fontSize}px "${family}"`
    return { x: ctx.measureText('x').actualBoundingBoxAscent, width: ctx.measureText('0000000000').width / 10 }
   }
   const plex = measure('IBM Plex Mono', px, false), unit = measure(face.value, 100, true)
@@ -111,6 +115,7 @@ async function update(action = '') {
   for (const element of [samples, rulers]) {
    element.style.setProperty('--sample-size', `${px}px`)
    element.style.setProperty('--italic-face', `"${face.value}"`)
+   element.style.setProperty('--italic-weight', weight)
    element.style.setProperty('--italic-size', `${adjusted}px`)
    element.style.setProperty('--upright-leading', `${uprightLeading.value}px`)
    element.style.setProperty('--italic-leading', `${italicLeading.value}px`)
@@ -118,7 +123,7 @@ async function update(action = '') {
    element.style.fontSize = `${px}px`
   }
   metrics.textContent = `Plex: ${px}px, x-height ${plex.x.toFixed(2)}px, stride ${plex.width.toFixed(2)}px. Italic: ${adjusted.toFixed(2)}px, x-height ${actual.x.toFixed(2)}px, stride ${target.toFixed(2)}px. Matching x-height is optional; no vertical offset is applied.`
-  css.textContent = `font-size: ${adjusted.toFixed(4)}px; line-height: ${italicLeading.value}px; letter-spacing: ${spacing.toFixed(4)}px; font-style: italic; font-weight: 300;`
+  css.textContent = `font-size: ${adjusted.toFixed(4)}px; line-height: ${italicLeading.value}px; letter-spacing: ${spacing.toFixed(4)}px; font-style: italic; font-weight: ${weight};`
  } catch (error) { metrics.textContent = `Font load failed: ${error.message}. Fetch local candidates with: bash scripts/fonts JetBrainsMono-LightItalic SourceCodePro-LightItalic RobotoMono-Italic` }
   const lines = document.querySelectorAll('#longRulers span')
    const uprightWidth = lines[0].getBoundingClientRect().width - 1, italicWidth = lines[1].getBoundingClientRect().width - 1, plexItalicWidth = lines[2].getBoundingClientRect().width - 1
