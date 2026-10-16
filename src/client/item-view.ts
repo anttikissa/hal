@@ -32,11 +32,18 @@ export type Look = { headerWidth?: number; head?: number; now?: number; full?: b
 
 const { INVERSE, UNINVERSE } = ansi
 
+// The style of a tool's name: toolBash for bash, tool for one without its own.
+function toolStyle(name: string): Style {
+	let key = 'tool' + name.charAt(0).toUpperCase() + name.slice(1)
+	let style = (colors as Record<string, unknown>)[key]
+	return typeof style === 'function' ? style() : colors.tool()
+}
+
 // A result keeps its originating tool's background and output color,
 // whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
-		let { fg, bg } = tool === 'send' ? colors.send() : colors.tool()
+		let { fg, bg } = itemView.toolStyle(tool)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg }
 	}
@@ -53,7 +60,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'thinking':
 			return { fg: colors.thinking().fg! }
 		case 'tool':
-			return item.name === 'send' ? colors.send() : colors.tool()
+			return itemView.toolStyle(item.name)
 		case 'tool-result':
 			return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		case 'turn-end':
@@ -294,6 +301,7 @@ function receipt(item: Item, style?: Style): string {
 
 export const itemView = {
 	receipt,
+	toolStyle,
 	itemStyle,
 	itemLines,
 	headed,

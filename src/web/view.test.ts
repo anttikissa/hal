@@ -36,7 +36,7 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ kind: 'user prompt', text: 'go' },
 		{ kind: 'thinking', text: 'hm' },
 		{ kind: 'assistant', text: 'hello' },
-		{ kind: 'tool', text: '▸ $ List files' },
+		{ kind: 'tool tool-bash', text: '▸ $ List files' },
 		{ kind: 'result log', text: 'a\nb' },
 		{ kind: 'end log', text: 'Paused.' },
 		{ kind: 'user prompt', text: 'again' },
@@ -105,10 +105,10 @@ test('idle Continue still nudges after a directory command following the final a
 	}
 })
 
-test('tool names cannot change the shared card color class', () => {
-	for (let name of ['bash', 'edit', 'read', 'My Tool"><x']) {
-		expect(view.show({ type: 'tool', id: 't', name, input: {} })!.kind).toBe('tool')
-	}
+test('a tool gets a class for its name that no name can break out of', () => {
+	let kind = view.show({ type: 'tool', id: 't', name: 'My Tool"><x', input: {} })!.kind
+	expect(kind.split(' ')[0]).toBe('tool')
+	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })
 
 test('the open question is filled in with browser keys and answered; afterwards it shows its quote and the answer', () => {

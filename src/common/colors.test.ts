@@ -20,17 +20,27 @@ test('every style is a set of OKLCH colors', () => {
 test('overriding a shared value moves every style derived from it, at call time', () => {
 	let saved = colors.fgL
 	try {
-		let before = { assistant: colors.assistant().fg, tool: colors.tool().fg }
+		let before = { assistant: colors.assistant().fg, bash: colors.toolBash().fg, grep: colors.toolGrep().fg }
 		colors.fgL = 0.9
 		expect(colors.assistant().fg![0]).toBe(0.9)
-		expect(colors.tool().fg![0]).toBe(0.9)
+		expect(colors.toolBash().fg![0]).toBe(0.9)
+		expect(colors.toolGrep().fg).toEqual(colors.toolRead().fg!)
 		expect(colors.assistant().fg).not.toEqual(before.assistant!)
-		expect(colors.tool().fg).not.toEqual(before.tool!)
+		expect(colors.toolGrep().fg).not.toEqual(before.grep!)
 	} finally {
 		colors.fgL = saved
 	}
 })
 
+test('overriding one style is seen by styles built on it', () => {
+	let saved = colors.toolRead
+	try {
+		colors.toolRead = () => ({ fg: [0.5, 0.1, 10] })
+		expect(colors.toolLs().fg).toEqual([0.5, 0.1, 10])
+	} finally {
+		colors.toolRead = saved
+	}
+})
 
 // tasks/README.md, readable text: WCAG AA against the background each
 // color sits on, its style's own bg or else the screen we design for.

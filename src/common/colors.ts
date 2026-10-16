@@ -10,7 +10,8 @@
 //
 // The terminal turns styles into escape codes (client/ansi.ts); the
 // host turns them into CSS for the web page (host/web.ts), which never
-// sees these functions. A style key becomes a CSS class in kebab case.
+// sees these functions. A style key becomes a CSS class in kebab case:
+// toolBash is .tool-bash.
 
 import { oklch, type Oklch } from './oklch.ts'
 
@@ -179,8 +180,17 @@ export const colors = {
 		// Where a press or a linked card's flash starts (web/flash.ts).
 		flash: [1, 0, 0],
 	}),
-	// All tool cards share Bash purple; red is kept for real failures.
-	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
-	send: (): Style => colors.message(),
+	// Tools: each kind its own hue. Red is kept for real failures. A
+	// tool without its own entry (tool + capitalized name) uses `tool`.
+	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
+	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
+	toolEdit: (): Style => colors.toolBash(),
+	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
+	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
+	toolGrep: (): Style => colors.toolRead(),
+	toolGlob: (): Style => colors.toolRead(),
+	toolLs: (): Style => colors.toolRead(),
+	// Inter-tab messages, both directions, in the message pink.
+	toolSend: (): Style => colors.message(),
 }
 

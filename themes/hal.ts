@@ -132,8 +132,6 @@ export const look: Look = {
 		// Where a press or a linked card's flash starts (web/flash.ts).
 		flash: [1, 0, 0],
 	}),
-	// All tool cards share Bash purple; red is kept for real failures.
-	tool: () => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 }
 
 // A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.

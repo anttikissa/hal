@@ -322,8 +322,10 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: 'assistant', text: card.text(item) }
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
-		case 'tool':
-			return { kind: item.name === 'send' ? 'tool send' : 'tool', text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
+		case 'tool': {
+			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
+		}
 		case 'tool-result': {
 			// Short rows, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
