@@ -6,7 +6,8 @@
 		'Verified the main-app stylesheet in Chrome, without demo overrides: Source Code Pro 14px, thinking content line-height 19px, three-row collapsed viewport 57px, ordinary text 21px, timestamp still IBM Plex Mono. The earlier local Light/Medium Plex weight experiment remains uncommitted.',
 		'Thinking block identifiers use the same minimum 44px-wide slot as ordinary card-header identifiers, aligning their text start and end gutters instead of letting short IDs drift toward the screen edge.',
 		'Bold thinking text rendered in Plex Medium Italic because Source Code Pro had no heavier face and the font stack fell back. Invariant: every italic weight the app uses has a Source Code Pro face.',
-		'Thinking text (19px) is centered on the transcript leading (--leading: 20px narrow, 22px wide), so its first line shares the timestamp baseline at every width.'
+		'Thinking text (19px) is centered on the transcript leading (--leading: 20px narrow, 22px wide), so its first line shares the timestamp baseline at every width.',
+		'The /demo/fonts comparison page and its candidate italic faces were removed once Source Code Pro was chosen; only Plex Light/Medium and Source Code Pro Light/Medium Italic are served and fetched by scripts/fonts.'
 	],
 	needs: ['6q1'],
 	foldInto: ['6q1']
