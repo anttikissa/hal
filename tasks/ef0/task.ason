@@ -1,0 +1,10 @@
+{
+	title: 'Match collapsed web card row budgets',
+	spec: 'Collapsed web cards use one visible content row; terminal cards retain the configured short-row budget. Prompt-file change cards reuse the shared promptChanges rows, showing only the heading when collapsed and all summary rows and full diffs when expanded. Collapsed web reasoning shows one content row with its existing hidden-earlier-lines count. Preserve expansion, streaming, colors, and terminal behavior. This replaces the shared configured web reasoning budget in 6q1 and the unbounded collapsed web change rows in ar.',
+	status: 'done',
+	notes: [
+		'Invariant restored: collapsed web prompt-change cards cannot expose an unbounded list of change rows, and web reasoning cannot inherit the terminal row budget. Shared promptChanges.rows still owns change content. Terminal code is unchanged. Typecheck, lint of both components, web build, 27 normal view-related tests and 22 web view/viewport tests passed. Browser appearance remains for user review; no visual browser check was run.'
+	],
+	needs: ['ar', '6q1'],
+	foldInto: ['ar', '6q1']
+}

@@ -2,23 +2,18 @@
 // Content-first thinking with a measured short preview (task 6q1).
 import { createEffect, createSignal, onSettled, Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
-import { settings } from '../../common/settings.ts'
 
 export function Thinking(props: { text: string; open: boolean; time: string; metadata: JSX.Element; children: JSX.Element }) {
 	let content: HTMLDivElement | undefined
 	let preview: HTMLDivElement | undefined
-	let [rows, setRows] = createSignal(settings.shortRows())
+	let [rows, setRows] = createSignal(1)
 	let [hidden, setHidden] = createSignal(0)
 	let measure = () => {
 		if (!content) return
 		let line = parseFloat(getComputedStyle(content).lineHeight)
 		let box = content.getBoundingClientRect()
 		let total = Math.ceil(box.height / line)
-		let blocks = [...(content.querySelector('.Markdown') ?? content).children].map((e) => e.getBoundingClientRect())
-		let blankAt = (y: number) => !blocks.some((b) => b.top - box.top <= y && y < b.bottom - box.top)
-		let visible = Math.min(total, settings.shortRows())
-		// A cut preview never starts on a blank row, like the terminal's.
-		while (visible > 1 && visible < total && blankAt(box.height - visible * line + 1)) visible--
+		let visible = Math.min(total, 1)
 		setRows(Math.max(1, visible))
 		setHidden(Math.max(0, total - visible))
 		onSettled(() => { if (preview) preview.scrollTop = props.open ? 0 : preview.scrollHeight })
