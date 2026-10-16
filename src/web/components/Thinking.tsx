@@ -12,8 +12,13 @@ export function Thinking(props: { text: string; open: boolean; time: string; met
 	let measure = () => {
 		if (!content) return
 		let line = parseFloat(getComputedStyle(content).lineHeight)
-		let total = Math.ceil(content.getBoundingClientRect().height / line)
+		let box = content.getBoundingClientRect()
+		let total = Math.ceil(box.height / line)
+		let blocks = [...(content.querySelector('.Markdown') ?? content).children].map((e) => e.getBoundingClientRect())
+		let blankAt = (y: number) => !blocks.some((b) => b.top - box.top <= y && y < b.bottom - box.top)
 		let visible = Math.min(total, settings.shortRows())
+		// A cut preview never starts on a blank row, like the terminal's.
+		while (visible > 1 && visible < total && blankAt(box.height - visible * line + 1)) visible--
 		setRows(Math.max(1, visible))
 		setHidden(Math.max(0, total - visible))
 		onSettled(() => { if (preview) preview.scrollTop = props.open ? 0 : preview.scrollHeight })
