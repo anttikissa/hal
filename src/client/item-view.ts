@@ -209,7 +209,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width, undefined, false)
 			}
 			// A prompt-file change (task ar): a head row and short colored
-			// rows, no header; open, each change's line and whole diff.
+			// rows, no header; open, the head row, then each change's diff
+			// (after its own line when the card holds several).
 			if (item.change) {
 				let style = itemView.itemStyle(item as unknown as Item)
 				let paint = (text: string, tone: Parameters<typeof diffView.paint>[1]) => diffView.paint(text, tone, style ?? colors.log(), true)
@@ -227,8 +228,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					return out
 				})
 				if (fold === 'short') return blockView.short(summary, width, false, style, settings.shortRows())
-				let tone = diff.tone
-				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
+				let tone = diff.tone, run = promptChanges.run(item as Keyed)
+				return [summary[0]!, ...run.flatMap((o) => [...(run.length > 1 ? ['', ansi.quiet(promptChanges.line(o), style)] : []), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width, undefined, !!item.synthetic)
 		}

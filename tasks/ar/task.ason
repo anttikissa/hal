@@ -9,7 +9,8 @@
 		"Prompt-file change cards open and close in both clients by /toggle and Ctrl-O too (common toggle.toggles), closed at first; the terminal's open card adds each change's line and whole diff, like the web. A merged run folds under its first block number.",
 		'Bug fix (2026-10-09): text a plugin adds to or removes from the system prompt (around systemPrompt.assemble) was never reported. Invariant restored: every change to the prompt the model gets reaches the session, plugin-made ones included. prompt-trail records the lines plugins add (and removed ones, marked) as a pseudo-file plugins/, by comparing the hooked prompt with the unhooked original; prompt-files re-checks open tabs when the assemble hooks change.',
 		'Plugin prompt changes are named per plugin file, plugins/<file>: the prompt is rebuilt adding one file’s assemble hooks at a time, innermost first, and each step’s added or removed lines belong to that file. A plugin rewriting text an earlier one added is credited with the rewrite.',
-		'Bug fix: strings.clipVisual dropped escapes after the cut, so a clipped struck row lost its closing SGR 29 and the strikethrough leaked into later rows and tabs. Invariant: clipVisual keeps every escape of the cut tail, so a clipped string leaves the same SGR state as the whole one.'
+		'Bug fix: strings.clipVisual dropped escapes after the cut, so a clipped struck row lost its closing SGR 29 and the strikethrough leaked into later rows and tabs. Invariant: clipVisual keeps every escape of the cut tail, so a clipped string leaves the same SGR state as the whole one.',
+		'Terminal open change card shows the head row once, then each diff; a run adds each change line before its diff. Keeping the closed rows above the diffs repeated the time, name and counts (176-roe).'
 	],
 	needs: ['48']
 }
