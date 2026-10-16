@@ -1,6 +1,7 @@
 # Git
 
-Commit automatically. Wrap commit messages at 72 columns. End with these
+Commit automatically, except while iterating on colors: commit once the
+user settles on one. Wrap commit messages at 72 columns. End with these
 trailers (Task only when applicable):
 
     Task: <id>
