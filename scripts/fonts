@@ -3,10 +3,10 @@
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p src/web/fonts
-if [ "$#" -eq 0 ]; then set -- Regular Italic Bold BoldItalic; fi
+if [ "$#" -eq 0 ]; then set -- Light LightItalic Medium MediumItalic SourceCodePro-LightItalic; fi
 for face in "$@"; do
   case "$face" in
-    Regular|Italic|Bold|BoldItalic|Light|LightItalic|Medium|MediumItalic)
+    Light|LightItalic|Medium|MediumItalic)
       file="IBMPlexMono-$face.woff2"
       url="https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/woff2/$file"
       license='https://raw.githubusercontent.com/IBM/plex/master/LICENSE.txt' ;;
@@ -28,7 +28,7 @@ for face in "$@"; do
       case "$face" in VictorMono-*|CascadiaMono-*) source="$face%5Bwght%5D.ttf" ;; *) source="$file" ;; esac
       url="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/$source"
       license="https://raw.githubusercontent.com/google/fonts/main/ofl/$family/OFL.txt" ;;
-    IntelOneMono-Regular|IntelOneMono-Italic|IntelOneMono-Light|IntelOneMono-LightItalic|IntelOneMono-Medium|IntelOneMono-MediumItalic|IntelOneMono-Bold|IntelOneMono-BoldItalic)
+    IntelOneMono-Italic|IntelOneMono-LightItalic|IntelOneMono-MediumItalic|IntelOneMono-BoldItalic)
       file="$face.woff2"
       url="https://raw.githubusercontent.com/intel/intel-one-mono/main/fonts/woff2/$file"
       license='https://raw.githubusercontent.com/intel/intel-one-mono/main/fonts/woff2/OFL.txt' ;;
