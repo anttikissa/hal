@@ -142,10 +142,10 @@ html.typing .App { position: absolute; }
    so a wrapped label grows down from the timestamp's line. */
 .CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
 .CardHeader { position: sticky; top: 0; z-index: 1; background: var(--card-bg, var(--canvas)); }
-.CardHeader.inline { position: static; background: none; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; }
+.CardHeader.inline { position: static; background: none; grid-template-columns: auto minmax(0, 1fr); }
 .CardHeader.inline .flow { display: contents; }
 .CardHeader.inline .title { min-width: 0; padding-block: var(--card-inset); }
-.CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: baseline; background: var(--card-bg, var(--canvas)); }
+.CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: start; background: var(--card-bg, var(--canvas)); }
 .CardHeader.inline .stamp { padding-block: var(--card-inset); }
 .CardHeader .flow, .CardHeader .link { padding-block: var(--card-inset); }
 .CardHeader .flow { min-width: 0; }
