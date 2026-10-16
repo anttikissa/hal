@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Stored as ToolResultBlock.commits (CommitBlock: paths root-relative, hook lines kept), so items come from transcript.resultItems: result, images, then commits, keyed n.1, n.2. Shown as output items with commit (letter s), kind commit, cardVerbosityCommit default short; header Committed/Amended. Color key commitCard (web class .commit-card): a plain .commit class would recolor commit notice cards. A background job ending after its early result gets no card: its report is a message, not a tool_result; the hook lines still reach the model there.',
-		'Since s398.1 confused the user (the result record s398 never shows: its call card shows t395), tools still return ToolResultBlock.commits, but turns.ts takes them off with commits.take before writing the results and commits.cards writes each as an output record { commit } with its own n, broadcast as an output event. Output records are not provider input. transcript.resultItems still reads commits from old results.'
+		'Since s398.1 confused the user (the result record s398 never shows: its call card shows t395), tools still return ToolResultBlock.commits, but turns.ts takes them off with commits.take before writing the results and commits.cards writes each as an output record { commit } with its own n, broadcast as an output event. Output records are not provider input. transcript.resultItems still reads commits from old results.',
+		'Bug fix: the open web commit card repeated its first line (short hash and subject) as the body first row under the header that already showed it. Invariant: the header shows that line once and the body holds only the files and hook lines (176-roe).'
 	],
 	needs: ['hy', 'hyt', '9p', 'sg0'],
 	foldInto: ['hy']

@@ -156,6 +156,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return ref && t?.endsWith(ref) ? <>{t.slice(0, -ref.length)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">{ref}</a></> : t
 	}
 	let lines = () => (shown()?.text ?? '').split('\n')
+	// A commit's first line heads its card; the body omits it.
+	let firstLine = () => { let item = props.row.item; return item.type === 'output' ? item.text.split('\n')[0] : '' }
 	let presentation = () => props.row.result?.presentationError ? undefined : props.row.result?.presentation ?? (props.row.item.type === 'tool' ? props.row.item.presentation : undefined)
 	let presentationError = () => props.row.result?.presentationError ?? (props.row.item.type === 'tool' ? props.row.item.presentationError : undefined)
 	// An open message without a summary is headed by its sender, as in
@@ -172,7 +174,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		}
 		if (item.type === 'prompt' || item.type === 'text') return expanded() && !(item.type === 'prompt' && item.summary) ? titles.who(item) : titles.compact(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
-		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${lines()[0]}`
+		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${firstLine()}`
 		return item.type === 'tool' ? unmark(presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text) : lines()[0]
 	}
 	// Folded cards name their kind with an icon: thinking, another
@@ -304,7 +306,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (closable()) return <Show when={!expanded()} fallback={who()}><Show when={compactParts()} fallback={linkedParts(headerParts())}>{(c) => <>{c().who} <span class="secondary">{linkedParts(c().text)}</span></>}</Show></Show>
 		if (!folding()) return who()
 		if (headsWho()) return who()
-		return <Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>
+		return <Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>{titles.who(props.row.item)} <span class="secondary">{firstLine()}</span></Show>
 	}
 	let changeBody = () => <div class="content diff change">
 		<For each={changes().slice(1)}>{(r) => <div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}</For>
