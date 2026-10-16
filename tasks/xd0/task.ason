@@ -1,10 +1,11 @@
 {
 	title: 'Web thinking uses Source Code Pro Light Italic with 19px leading',
-	spec: 'Web thinking text uses locally served Source Code Pro Light Italic at the current 14px size with natural character spacing, no x-height scaling and 19px line height. The thinking container, clipped preview and measured content share 19px line height so collapsed row counts agree. Upright timestamp and metadata retain Plex. Ordinary text retains its existing Plex typeface and line spacing. The terminal is unchanged. Font binaries stay local and gitignored, fetched using bash scripts/fonts SourceCodePro-LightItalic.',
+	spec: 'Web thinking text uses locally served Source Code Pro Light Italic, and Medium Italic for bold, at the current 14px size with natural character spacing, no x-height scaling and 19px line height. The thinking container, clipped preview and measured content share 19px line height so collapsed row counts agree. Upright timestamp and metadata retain Plex. Ordinary text retains its existing Plex typeface and line spacing. The terminal is unchanged. Font binaries stay local and gitignored, fetched using bash scripts/fonts.',
 	status: 'done',
 	notes: [
 		'Verified the main-app stylesheet in Chrome, without demo overrides: Source Code Pro 14px, thinking content line-height 19px, three-row collapsed viewport 57px, ordinary text 21px, timestamp still IBM Plex Mono. The earlier local Light/Medium Plex weight experiment remains uncommitted.',
-		'Thinking block identifiers use the same minimum 44px-wide slot as ordinary card-header identifiers, aligning their text start and end gutters instead of letting short IDs drift toward the screen edge.'
+		'Thinking block identifiers use the same minimum 44px-wide slot as ordinary card-header identifiers, aligning their text start and end gutters instead of letting short IDs drift toward the screen edge.',
+		'Bold thinking text rendered in Plex Medium Italic because Source Code Pro had no heavier face and the font stack fell back. Invariant: every italic weight the app uses has a Source Code Pro face.'
 	],
 	needs: ['6q1'],
 	foldInto: ['6q1']
