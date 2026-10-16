@@ -143,7 +143,7 @@ html.typing .App { position: absolute; }
    every slot shares one top inset that centers a single line in 44px,
    so a wrapped label grows down from the timestamp's line. */
 .CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
-.Card.tool.open > .CardHeader { position: sticky; top: 0; z-index: 1; background: inherit; }
+.Card.open:is(.tool, .background-result) > .CardHeader { position: sticky; top: 0; z-index: 1; background: inherit; }
 .CardHeader .flow, .CardHeader .link { padding-block: var(--card-inset); }
 .CardHeader .flow { min-width: 0; }
 .CardHeader .stamp { padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
