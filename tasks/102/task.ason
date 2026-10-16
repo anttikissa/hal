@@ -1,0 +1,10 @@
+{
+	title: 'Keep expanded web tool headers within reach',
+	spec: 'Expanded web tool cards keep their existing header at the transcript top while their output scrolls beneath it. The sticky header retains the card background, covers output, stays within its own card, and preserves timestamp collapse, keyboard activation, links and other header actions. Collapsed tools and non-tool cards retain their current layout. Use native CSS sticky positioning without scroll listeners. Terminal behavior is unchanged: this is a web scrolling control.',
+	status: 'done',
+	notes: [
+		'Real Card component smoke checks in headless Chrome at actual viewport widths 500px and 1200px verified: header remains at the transcript padding edge while its card top is above view, inherits the opaque card background, receives hit testing over output, stays bounded by the card bottom, and preserves link clicks without folding. Timestamp click collapses the card, updates aria-expanded to false and restores static header positioning. Implemented with one CSS rule; no per-scroll JavaScript or growing state.'
+	],
+	needs: ['hyt'],
+	foldInto: ['hyt']
+}
