@@ -19,7 +19,9 @@ Dialog (Ctrl-O, runs /toggle; footer "enter: toggle · tab: complete · esc: clo
 
 Size: the terminal dialog is as tall as its content (field, hint, help or completions); the web dialog is as tall as its content too, not the full picker height.
 
-Typed by the user (or Ctrl-O), the client runs the command itself, unrecorded. Run by the model through the command tool, the host resolves the target against history, tells the following clients to apply it, and returns the matched cards, each with its model and effort where history records them ("Expanded 3 thinking cards: r12 (opus-5-5, xhigh), r40 (opus-5-5, xhigh), r77 (opus-5-5, high)"), so the model can narrow a request such as "expand the xhigh thinking cards" into a list. /toggle's result says "Toggled" with the same list, since the outcome depends on each client's state.`,
+Typed by the user (or Ctrl-O), the client runs the command itself, unrecorded. Run by the model through the command tool, the host resolves the target against history, tells the following clients to apply it, and returns the matched cards, each with its model and effort where history records them ("Expanded 3 thinking cards: r12 (opus-5-5, xhigh), r40 (opus-5-5, xhigh), r77 (opus-5-5, high)"), so the model can narrow a request such as "expand the xhigh thinking cards" into a list. /toggle's result says "Toggled" with the same list, since the outcome depends on each client's state.
+
+With an empty or whitespace-only target, the live hint names the default explicitly: "Collapse latest tool card t127 (the default)", or Expand when collapsed, using the actual latest tool card ID. Explicit targets keep their existing hints; errors stay unchanged.`,
 	status: 'done',
 	notes: [
 		"The parser and dialog logic live in src/common (toggle.ts: parse, resolve, majority rule; blocks-dialog.ts: live hint, Tab completion, packed id rows) so both clients share them; the host's src/host/session-blocks.ts gives /go and /toggle the same block list. Tab reuses completion.common from the /command completer rather than a copy.",

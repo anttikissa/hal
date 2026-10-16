@@ -40,6 +40,7 @@ function update(m: ModalState, items: Item[], fold: (item: Item) => Verbosity): 
 	if (m.form!.values[0]!.trim() === 'p') return { ...m, blocks: { hint: 'No paste markers in the prompt you are writing', invalid: true, help: help(items) } }
 	let p = toggle.plan('toggle', items, m.form!.values[0]!, fold)
 	let hint = typeof p === 'string' ? { hint: p, invalid: true as const } : { hint: toggle.describe(p, fold) }
+	if (typeof p !== 'string' && !m.form!.values[0]!.trim()) hint.hint = `${hint.hint.replace('tool card', 'latest tool card')} (the default)`
 	return { ...m, blocks: { ...hint, help: help(items) } }
 }
 

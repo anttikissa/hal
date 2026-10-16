@@ -1834,7 +1834,7 @@ browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes 
 			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 			await b.waitFor(`document.querySelectorAll('.Card.folds').length >= 3`)
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'o', code: 'KeyO', windowsVirtualKeyCode: 79, modifiers: 2 })
-			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent?.startsWith('Expand tool card t${calls[2]}')`)
+			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Expand latest tool card t${calls[2]} (the default)'`)
 			let box = await b.evaluate(`(() => { let d = document.querySelector('.Picker.compact'), r = d.getBoundingClientRect(); return { left: r.left, right: r.right, height: r.height, fits: d.scrollHeight <= d.clientHeight && d.scrollWidth <= d.clientWidth, width: innerWidth } })()`)
 			expect(box.left).toBeGreaterThanOrEqual(0)
 			expect(box.right).toBeLessThanOrEqual(box.width)

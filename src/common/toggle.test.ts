@@ -70,7 +70,7 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
 	expect(typed('t*').blocks?.hint).toBe('Expand 2 tool cards: t14, t16')
 	expect(typed('t').blocks?.hint).toBe(typed('t*').blocks?.hint)
-	expect(typed('').blocks?.hint).toBe('Expand tool card t16')
+	expect(typed('').blocks?.hint).toBe('Expand latest tool card t16 (the default)')
 	expect(typed('t1,').blocks?.invalid).toBe(true)
 	let tab = (text: string) => blocksDialog.complete(typed(text), items, start)
 	expect(tab('r').form!.values[0]).toBe('r1')
