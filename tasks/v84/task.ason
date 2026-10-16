@@ -1,0 +1,7 @@
+{
+	title: 'READ and EDIT share versioned headers and nonduplicated file feedback',
+	spec: 'READ text headers are == path@version == without READ. EDIT whole-file write/create returns the same numbered contents as READ; partial edits return == path@version == followed only by a numbered diff with one unchanged context line on each side. Diff rows use sign, line number, colon and space; removed numbers refer to the old file and added/context numbers to the new file. No verified label, repeated contents, repeated path block, Requested edit placeholder or raw-history footer appears in terminal EDIT cards. No-change feedback names the file and says no changes. Keep complete failures, version checks, atomic writes and rollback. Operation keywords accept any case. Shared tool result text and EDIT presentations follow this contract in both clients; remove only the terminal raw-history footer, keeping the web raw inspector. Prior persisted results remain readable.',
+	status: 'planned',
+	needs: ['eht'],
+	foldInto: ['eht']
+}
