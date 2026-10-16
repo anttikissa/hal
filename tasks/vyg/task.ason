@@ -1,0 +1,10 @@
+{
+	title: 'Open commit cards and always show source totals',
+	spec: 'Commit cards default to long in both terminal and web, replacing task 179 default short; explicit user settings and manual folding remain supported. The commit source-line extra appends a final Total line with signed net source LOC using its existing scripts/sloc counting rules, excluding blank lines, comments and tests. Invariant: every observed commit processed by the extra has a total, including +0 when none of its files qualify; preserve existing hook lines before the total and avoid Git reads when no source files qualify.',
+	status: 'done',
+	notes: [
+		'Reused the existing source counter: its early return omitted totals for commits without eligible source files. Removing that return adds zero totals without extra Git reads. Verified with ./test settings toggle (17 passing) and a one-off hook check for zero totals, final-line order, source/test filtering, blank/comment exclusion and the shared open default. Existing stored commit text is unchanged; the extra takes effect after host restart.'
+	],
+	needs: ['179', 'na4'],
+	foldInto: ['179', 'na4']
+}

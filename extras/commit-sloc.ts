@@ -38,9 +38,8 @@ export default (plugin: Plugin) => {
 	plugin.around(commits, 'committed', async (next, info) => {
 		let lines = await next(info)
 		let paths = info.files.map((f) => f.path.slice(info.root.length + 1)).filter(source)
-		if (!paths.length) return lines
 		let net = 0
 		for (let p of paths) net += await at(info.root, info.hash, p) - await at(info.root, `${info.hash}~1`, p)
-		return [...lines, `Commit ${info.short}: ${net >= 0 ? '+' : ''}${net} source lines (scripts/sloc rules, ${paths.length} file${paths.length === 1 ? "" : "s"}).`]
+		return [...lines, `Total: ${net >= 0 ? '+' : ''}${net} source LOC (net; excludes blanks, comments and tests).`]
 	})
 }
