@@ -18,6 +18,6 @@ extra itself take effect when the host restarts.
   `quirks` table; others get EDIT's strict errors. Each firing is
   logged to `state/diag.log` with its model, so you can delete quirks
   nobody uses.
-- `commit-sloc.ts`: tells the model how many source lines each commit
-  added, and rejects background Bash calls containing `git commit` so
-  each commit shows in the foreground.
+- `commit-sloc.ts`: tells the model how many non-blank, non-comment
+  lines each commit added net, and rejects background Bash calls
+  containing `git commit` so each commit shows in the foreground.

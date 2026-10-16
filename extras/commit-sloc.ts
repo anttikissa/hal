@@ -1,6 +1,6 @@
-// Tells the model and the commit card title how many source lines each
-// of its commits added, by the rules of scripts/sloc (non-blank,
-// non-comment lines in non-test .ts/.tsx files). Counts only the
+// Tells the model and the commit card title how many lines each of its
+// commits added net: non-blank, non-comment lines in every text file of
+// the commit, tests included; binary files are skipped. Counts only the
 // commit's own files, so it stays fast.
 // Enable with plugins/commit-sloc.ts (see extras/README.md).
 //
@@ -12,8 +12,9 @@ import { fileChanges } from '../src/host/file-changes.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 import { tool as bashTool } from '../src/host/tools/bash.ts'
 
-const source = (path: string) => /\.(ts|tsx)$/.test(path) && !/(\.test\.tsx?$|\/tests?\/|test-|\.d\.ts$|^tasks\/|^docs\/)/.test(path)
-
+// Tested once, then the tests were deleted. If you change this code, first
+// write tests for: blank lines, // and /* */ comment lines, tests and tasks
+// counted, binary files skipped, files added or deleted.
 function count(text: string): number {
 	let n = 0, inblock = false
 	for (let raw of text.split('\n')) {
@@ -38,7 +39,7 @@ export default (plugin: Plugin) => {
 	})
 	plugin.around(commits, 'committed', async (next, info) => {
 		let lines = await next(info)
-		let paths = info.files.map((f) => f.path.slice(info.root.length + 1)).filter(source)
+		let paths = info.files.filter((f) => f.added !== -1).map((f) => f.path.slice(info.root.length + 1))
 		let net = 0
 		for (let p of paths) net += await at(info.root, info.hash, p) - await at(info.root, `${info.hash}~1`, p)
 		info.tags.push(`${net >= 0 ? '+' : ''}${net} LOC`)
