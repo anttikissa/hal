@@ -157,7 +157,7 @@ html.typing .App { position: absolute; }
 .CardHeader > .receipt { padding-block: var(--card-inset); }
 .Card .link:has(.receipt) { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5ch; }
 .Card .link:has(.receipt)::before { order: 1; }
-.CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
+.CardHeader .status { padding-block: var(--card-inset); --quiet: inherit; color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
 .CardHeader .status.diff { min-width: 0; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; }
 .Card.open .CardHeader:has(> .status.diff) { grid-template-columns: minmax(0, 1fr) auto auto; }
 .Card.open .CardHeader:has(> .status.diff) > .ticker { grid-column: 2; grid-row: 1; }

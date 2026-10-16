@@ -1,0 +1,10 @@
+{
+	title: 'Keep collapsed sticky card titles visible',
+	spec: 'When a web header collapse would leave the closed header entirely above the transcript viewport, scroll the card start to the transcript top, where its sticky title was. Use native smooth scrolling, immediate under reduced motion, and release bottom-following for this deliberate navigation. Leave visible headers and expansion scroll behavior unchanged. Align as far as available scroll range permits. Keep the implementation under five added source lines. Terminal unchanged: this is a web sticky-header interaction.',
+	status: 'done',
+	notes: [
+		'Four added source lines use the existing scroller and scroll.leave, native scrollTo smooth, and instant for reduced motion. Chrome verified collapse from 600px into a tall thinking card with sufficient following content, under both motion preferences: closed title returns within one pixel of the transcript top. Temporary UI probe removed. Changed-file lint passed. Full typecheck is blocked by unrelated src/client/item-view.ts line 44 Oklch-or-undefined assignments; the new DOM scroller type errors were fixed.'
+	],
+	needs: [],
+	foldInto: ['4s']
+}

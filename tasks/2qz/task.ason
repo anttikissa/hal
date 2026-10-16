@@ -1,0 +1,11 @@
+{
+	title: 'Card-colored header metadata',
+	spec: 'Web card header metadata (successful exits, counts, durations, limits and hidden-line hints) uses the containing card quiet hue, matching terminal ansi.quiet, instead of the global gray status palette. Preserve nonzero-exit and diff semantic colors. Restore the invariant that metadata inherits its card palette despite sharing the status class with global UI. Terminal already uses card-colored metadata. Hover timing belongs to the separate hover-hint task.',
+	status: 'done',
+	notes: [
+		'Root cause: generated .status theme rules assign a gray --quiet on metadata elements, overriding the card inheritance. The scoped card-header status rule now inherits --quiet; terminal toolView.status already derives it from the card style. A temporary Chrome probe passed computed metadata hue and zero-delay/zero-duration hover assertions at 390px and 1200px. Screenshots inspected at both widths show purple successful exits, counts and durations. Removed the experimental UI probe afterward. The first probe incorrectly expected a standalone line-count element for a non-diff card; corrected it to the shared combined status. Narrow hover hints can clip within the existing header flow; no geometry change was made.',
+		'Hover timing was subsequently assigned to the concurrent hover-hint work under a newer user request; this task owns only metadata palette inheritance.'
+	],
+	needs: [],
+	foldInto: ['1w']
+}
