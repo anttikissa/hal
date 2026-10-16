@@ -80,7 +80,7 @@ export const colors = {
 	}),
 	// Neutral gray cards: Hal's own remarks, questions, commits and
 	// command responses, so color marks only tools, replies and the user.
-	plain: (): Style => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
+	plain: (): Style => ({ fg: [0.78, 0, 0], bg: [colors.bgL, 0, 0], title: [0.95, 0, 0] }),
 	synthetic: (): Style => colors.plain(),
 	// Thinking: neutral gray, distinct from replies through italic text.
 	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
