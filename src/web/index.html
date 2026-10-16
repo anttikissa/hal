@@ -248,9 +248,10 @@ html.typing .App { position: absolute; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
 .CardHeader .cursor { vertical-align: top; }
-/* Task hyt: a live block's elapsed time and spinner, one cell kept for it. */
-.CardHeader .ticker { display: flex; gap: 0.5ch; padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
+/* Task hyt: a live block's elapsed time and spinner. */
+.CardHeader .ticker { display: flex; gap: 1ch; padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
 .CardHeader .spinner { display: inline-block; width: 1ch; }
+.CardHeader .spinner:not(.on) { display: none; }
 .CardHeader .spinner.on::after { content: '⠁'; animation: spin 2s steps(1, end) infinite; }
 @keyframes spin { 0% { content: '⠁'; } 12.5% { content: '⠈'; } 25% { content: '⠐'; } 37.5% { content: '⠠'; } 50% { content: '⢀'; } 62.5% { content: '⡀'; } 75% { content: '⠄'; } 87.5% { content: '⠂'; } }
 .CardHeader .latest { margin-left: 1ch; color: var(--quiet); }

@@ -265,7 +265,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			// (task hyt); a call whose output is drawn below shows ↓ there.
 			let ticks = item.type === 'tool' && item.id === view.tick?.call
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
-			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : ' ') : ''
+			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : '') : ''
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)

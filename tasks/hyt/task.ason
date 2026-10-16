@@ -10,7 +10,7 @@ Kinds and their config.ason defaults (common/settings.ts, flat keys so /config l
 
 Nothing jumps: a short card keeps its height while it streams and when it ends: it shows the last rows while streaming and the first once done. A running tool's short card lays out running output as its short result will be (task 4y4). A running web tool card keeps its state. Long cards grow as text streams; only they have the Hal cursor. Thinking has a title row like replies ('15:41 Thinking', then its text).
 
-Activity: a streaming thinking or reply card and a running tool call show, before the card id, their elapsed time from 1 s, '(12s)', and a one-cell spinner (frames ⠁⠈⠐⠠⢀⡀⠄⠂, one per pulse beat in the terminal, so no extra timer; a CSS animation on the web, a still dot under reduced motion). Thinking, reply and tool title rows always keep that cell, blank once done, so nothing shifts.
+Activity: a streaming thinking or reply card and a running tool call show, before the card id, their elapsed time from 1 s, '(12s)', and a one-cell spinner (frames ⠁⠈⠐⠠⢀⡀⠄⠂, one per pulse beat in the terminal, so no extra timer; a CSS animation on the web, a still dot under reduced motion). Once done the cell goes, so the id sits one space after the status.
 
 Tool titles start with the tool as a word: 'Bash <purpose>'; headlines that start with their verb (Read, Edit, Write) keep it.
 
