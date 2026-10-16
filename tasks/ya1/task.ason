@@ -1,9 +1,10 @@
 {
 	title: 'Use terminal dollar glyph for web Bash cards',
-	spec: 'Web BASH card headers start with the terminal prompt as plain selectable text, "$ ", inside the title label, so selecting and copying the header yields "$ <title>". It is text, not an SVG icon. Python bash cards keep the Python logo. READ keeps its folded-corner document and EDIT its pencil. Preserve current tool colors, sizing, accessibility and all terminal behavior. This replaces the upstream Bash SVG in 19m.',
+	spec: 'Web BASH card headers start with the terminal prompt as plain selectable text, "$ ", inside the title label, so selecting and copying the header yields "$ <title>". It is text, not an SVG icon, and applies to every bash command, including ones running Python (user: simplicity). READ keeps its folded-corner document and EDIT its pencil. Preserve current tool colors, sizing, accessibility and all terminal behavior. This replaces the Bash SVG and the Python logo in 19m.',
 	status: 'done',
 	notes: [
-		'First attempt drew $ as SVG <text>: it looked right but could not be selected or copied. Header prefix text (CardHeader prefix) fixes that.'
+		'First attempt drew $ as SVG <text>: it looked right but could not be selected or copied. Header prefix text (CardHeader prefix) fixes that.',
+		'User 2026-10-17: Python bash cards dropped the Tabler Python logo and show $ like other bash; runsPython and the python icon were removed.'
 	],
 	needs: ['19m'],
 	foldInto: ['19m']

@@ -1,6 +1,5 @@
 // Inline SVG icons for the web client (task 19m): Phosphor Regular on a
-// 256 grid, except steer (Tabler arrow-ramp-right) and python (Tabler
-// brand-python) on a 24 grid. Shapes
+// 256 grid, except steer (Tabler arrow-ramp-right) on a 24 grid. Shapes
 // with class "s" are strokes, the rest fill; index.html sets one stroke
 // width for all grids. Regenerate from the upstream SVGs, never by hand.
 //
@@ -62,7 +61,6 @@ const phosphor = {
 
 const grid24 = {
 	steer: '<path class="s" d="M7 3l0 8.707"/><path class="s" d="M11 7l-4 -4l-4 4"/><path class="s" d="M17 14l4 -4l-4 -4"/><path class="s" d="M7 21a11 11 0 0 1 11 -11h3"/>',
-	python: '<path class="s" d="M12 9h-7a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h3"/><path class="s" d="M12 15h7a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-3"/><path class="s" d="M8 9v-4a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-4a2 2 0 0 0 -2 2v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2 -2v-4"/><path class="s" d="M11 6l0 .01"/><path class="s" d="M13 18l0 .01"/>',
 }
 
 export type IconName = keyof typeof phosphor | keyof typeof grid24

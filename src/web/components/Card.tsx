@@ -134,7 +134,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		let output = item.type === 'tool' ? result()?.text ?? item.partial ?? '' : bashResult.background(item) && item.type === 'prompt' ? bashResult.display(item.text) : undefined
 		return output === undefined ? undefined : output ? output.replace(/\n$/, '').split('\n').length : 0
 	})
-	let reference = () => <><Show when={outputLines() !== undefined}><span class="status line-count">({outputLines()} {outputLines() === 1 ? 'line' : 'lines'})</span></Show>{link()}</>
+	let reference = () => link()
 	let link = () => <CardReference href={href()} id={blockId()}>{ticks()}</CardReference>
 
 	// Another session's message with a summary folds under it.
@@ -326,7 +326,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<Show when={shown()}>
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
-					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
+					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
 						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
 						<Show when={props.cursor && !open()}>{cursor()}</Show>
 						<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>

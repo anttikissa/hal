@@ -14,7 +14,8 @@ Fold: a closed result shows its first lines (itemView.resultRows). Leading and t
 		'Blank lines: in those 366 calls, trimming changes 3 empty outputs and 5 leading blank lines; no folded view has trailing blanks or blank-line runs, so run-collapsing was not built (user decision: build only what changes real output).',
 		"The host stores ms only when 1 s or more, so history records and exact-output test fixtures stay unchanged for fast calls. The running call reaches clients as optional call/since fields on the running state ('tools' phase), not a new event.",
 		'Batch display order moved from frame.ts to src/client/batch-order.ts to keep frame.ts within the 400-line module limit.',
-		'Task hyt: tool cards start short (title row and status) by default; the compact glimpse is the glimpse state, its rows the blockVerbosityGlimpseRows setting. Running calls show elapsed time and a spinner cell before the block id.'
+		'Task hyt: tool cards start short (title row and status) by default; the compact glimpse is the glimpse state, its rows the blockVerbosityGlimpseRows setting. Running calls show elapsed time and a spinner cell before the block id.',
+		'The web header folds an open card output line count into the same parentheses: (2 lines, 0s / 180s); an EDIT diff status keeps its own (N lines).'
 	],
 	needs: ['1r'],
 	foldInto: ['x1']
