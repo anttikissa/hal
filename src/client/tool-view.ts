@@ -26,11 +26,11 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	let prefix = titles.stamp(item.ts, '')
 	let hw = look.headerWidth ?? width
 	if (toolDetails.fullCommand(item.name, item.input)) {
-		if (fold === 'short') return [strings.expandTabs(strings.clipVisual(prefix + ansi.clean(String(command)), hw))]
-		return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
+		if (fold === 'short') return [ansi.heading(strings.expandTabs(strings.clipVisual(prefix + ansi.clean(String(command)), hw)), itemView.itemStyle(item))]
+		return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line, i) => ansi.wrap(line, width).map((row) => i ? bashCard.paint(row, itemView.itemStyle(item)) : ansi.heading(row, itemView.itemStyle(item))))
 	}
 	let title = ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)
-	let head = toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw)
+	let head = ansi.heading(toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw), itemView.itemStyle(item))
 	if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) {
 		let rows = presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
 		toolView.heads.set(item, rows.length)
@@ -44,7 +44,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		if (partial && look.streamRows !== undefined) partial = partial.split('\n').slice(-look.streamRows).join('\n')
 		let details = toolDetails.lines(item.name, item.input)
 		if (bash && !(typeof item.input.description === 'string' && item.input.description.trim()) && typeof command === 'string' && !command.includes('\n')) details = details.slice(1)
-		return [...rows, ...details.flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])].map((row, i) => i < rows.length ? row : bashCard.paint(row, itemView.itemStyle(item)))
+		return [...rows, ...details.flatMap((line) => ansi.wrap(ansi.clean(line), width)), ...(partial ? ansi.wrap(ansi.clean(partial), width) : [])].map((row, i) => i < rows.length ? ansi.heading(row, itemView.itemStyle(item)) : bashCard.paint(row, itemView.itemStyle(item)))
 	}
 	// Running output takes the rows its short result will, so the card
 	// keeps its height when the call finishes (task 4y4).
@@ -57,7 +57,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		top = bashCard.head(head, shown, width, hw, n, ms, itemView.itemStyle(item))
 		let commandRows = typeof command === 'string' ? command.split('\n').length : 0
 		// Declared files and other details while a row stays for output.
-		for (let line of toolDetails.lines(item.name, item.input).slice(commandRows)) if (top.length < n - 1) top.push(strings.expandTabs(strings.clipVisual(ansi.clean(line), width)))
+		for (let line of toolDetails.lines(item.name, item.input).slice(commandRows)) if (top.length < n - 1) top.push(bashCard.paint(strings.expandTabs(strings.clipVisual(ansi.clean(line), width)), itemView.itemStyle(item)))
 	}
 	toolView.heads.set(item, top.length)
 	let room = n - top.length

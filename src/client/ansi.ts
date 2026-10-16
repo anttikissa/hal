@@ -90,6 +90,10 @@ function quiet(text: string, style: Style | undefined): string {
 	return ansi.sgr({ fg: colors.quiet(fg, style?.bg ?? colors.screen) }) + text + back
 }
 
+function heading(text: string, style: Style | undefined): string {
+	return !style?.fg || ansi.mono() ? text : ansi.sgr({ fg: colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
+}
+
 export const ansi = {
 	// The host's web address and this client's link code, from its
 	// latest `auth` event (task e3); empty until one came.
@@ -117,6 +121,7 @@ export const ansi = {
 	fades: (): boolean => !ansi.mono() && (/^(truecolor|24bit)$/.test(process.env.COLORTERM ?? '') || /^(xterm-ghostty|xterm-kitty|wezterm)$/.test(process.env.TERM ?? '')),
 	sgr,
 	quiet,
+	heading,
 	paint,
 	paintRows,
 	clean: (s: string): string => strings.clean(s),

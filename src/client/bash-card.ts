@@ -10,7 +10,7 @@ import { ansi } from './ansi.ts'
 
 // Columns per second a long command scrolls.
 const SPEED = 200
-const GAP = '   '
+const GAP = ': '
 // Columns kept for the title row's status, so where the command goes is
 // the same while the call runs and after it ends (task 4y4).
 const STATUS = 16
@@ -74,7 +74,7 @@ function head(head: string, command: unknown, width: number, hw: number, rows: n
 		let room = hw - strings.visLen(head) - GAP.length
 		if (room < MIN && !(fits && strings.visLen(lines[0]!) <= room)) return [head]
 		let text = lines.length === 1 ? scrolled(lines[0]!, room, ms) : joined(lines, room)
-		return [head + GAP + paint(text, style)]
+		return [head + ansi.heading(GAP, style) + paint(text, style)]
 	}
 	if (lines.length === 1) return [head, paint(scrolled(lines[0]!, width, ms), style)]
 	if (rows < 6) return [head, paint(joined(lines, width), style)]

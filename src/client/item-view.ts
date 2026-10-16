@@ -73,6 +73,7 @@ function imageLabel(item: Item & { type: 'image' }, session?: string): string {
 	return session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${label}${ansi.LINK_OFF}` : label
 }
 
+
 // `gap`: a blank row between the title and the body; a short card
 // spends none.
 function headed(item: Item, body: string[], width: number, session?: string, gap = true): string[] {
@@ -84,8 +85,9 @@ function headed(item: Item, body: string[], width: number, session?: string, gap
 	let call = item.type === 'prompt' && item.label?.match(/^bash #?(t?\d+)$/)?.[1]
 	if (call && session && last.endsWith(call)) {
 		let href = transcript.href(session, call)
-		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
+		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length)}\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`
 	}
+	rows = rows.map((row) => ansi.heading(row, itemView.itemStyle(item)))
 	return body.length ? [...rows, ...(gap ? [''] : []), ...body] : rows
 }
 
@@ -123,7 +125,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fits) rows[rows.length - 1] += ' ' + linked
 				else rows.push(linked)
 			}
-			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short')
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short' && !bashResult.background(item))
 		case 'image':
 			return [itemView.imageLabel(item, session)]
 		// Thinking spends its short row budget on content, not a label (6q1).
@@ -140,7 +142,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			}
 			body = body.map((row) => `\x1b[3m${row.replaceAll('\x1b[23m', '\x1b[3m')}\x1b[23m`)
 			if (!body.length) body.push('')
-			body[0] = (stamp ? `${stamp} ` : '') + body[0]
+			body[0] = (stamp ? `${ansi.heading(stamp, itemView.itemStyle(item))} ` : '') + body[0]
 			return body
 		}
 		case 'text': {
@@ -169,20 +171,20 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// the quote and the answer, as the open form draws them.
 			let quote = itemView.quoteLines(item.form.quote, width)
 			let said = item.canceled ? ['(canceled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
-			return [...ansi.wrap(titles.title(item)!, width), '', ...quote, ...(quote.length ? [''] : []), ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
+			return [...ansi.wrap(titles.title(item)!, width).map((row) => ansi.heading(row, itemView.itemStyle(item))), '', ...quote, ...(quote.length ? [''] : []), ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
 		// Another session's: drawn as the prompt it was sent as. The
 		// human's: 'HH:MM /cmd', and under it what it said, if anything.
 		case 'command':
 			if (item.from !== undefined) return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 			if (item.output === undefined) return ansi.wrap(titles.stamp(item.ts, item.text), width)
-			return itemView.headed(item, markdownView.lines(item.output.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+			return itemView.headed(item, markdownView.lines(item.output.trimEnd(), width, streaming, itemView.itemStyle(item)), width, undefined, false)
 		case 'output': {
 			// A commit (task 179): 'HH:MM Committed <short> <subject>';
 			// open, its files and the hook's lines.
 			if (item.commit) {
 				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
-				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width, undefined, fold !== 'short')
+				return itemView.headed(item, fold === 'short' ? blockView.short(body, width, false, itemView.itemStyle(item)) : body, width, undefined, false)
 			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
@@ -206,7 +208,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let tone = diff.tone
 				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
-			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width, undefined, !!item.synthetic)
 		}
 		// One row: the text centered in a rule across the width.
 		case 'divider': {
@@ -273,7 +275,7 @@ function place(item: Keyed, cols: number, session: string | undefined, style: St
 	if (item.type === 'tool' && item.name === 'edit') status = strings.clipVisual(status, Math.floor(inner / 3))
 	let mark = (lines: string[], at: number) => {
 		if ((!ref && !status) || lines.length <= at) return
-		let link = ref ? ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
+		let link = ref ? ansi.heading(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
 		let end = status && link ? `${status} ${link}` : status || link
 		if (status) lines[at] = itemView.right(lines[at]!, end, width)
 		else lines[at] += ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref!.text))) + link

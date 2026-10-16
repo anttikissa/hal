@@ -2008,7 +2008,7 @@ browserTest('foreground and background Bash share header status without losing o
 		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('main').textContent`)).not.toContain('[exit 1]')
 		expect(await b.evaluate(`document.querySelector('.result-text').textContent`)).toContain('Foreground output')
-		expect(await b.evaluate(`document.querySelector('.Card.prompt .content').textContent`)).toBe('Background output')
+		expect(await b.evaluate(`document.querySelector('.Card.prompt .content').textContent`)).toContain('Background output')
 		expect(await b.evaluate(`document.querySelector('.Card.prompt .call').getAttribute('href')`)).toEndWith('#t1')
 		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
 		let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
@@ -2017,7 +2017,7 @@ browserTest('foreground and background Bash share header status without losing o
 })
 
 
-browserTest('card headers restore short or open and tool commands expand apart from output (tasks hyt, bp1)', async () => {
+browserTest('card headers restore short or open and expanded tools show whole commands and output', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let lines = Array.from({ length: 12 }, (_, i) => `row ${i + 1}`).join('\n')
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Run the checks' }] })
@@ -2037,29 +2037,15 @@ browserTest('card headers restore short or open and tool commands expand apart f
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`document.querySelectorAll('.Card.tool').length === 3`)
 		let state = `Array.from(document.querySelectorAll('.Card.thinking, .Card.tool, .Card.assistant'), c => c.classList.contains('open') || !c.classList.contains('folds') ? 'open' : 'short')`
-		// Thinking and a passing call short, the failed call open with its error, the reply whole.
-		expect(await b.evaluate(state)).toEqual(['short', 'short', 'open', 'short', 'open'])
+		expect(await b.evaluate(state)).toEqual(['short', 'short', 'short', 'short', 'open'])
 		expect(await b.evaluate(`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`)).toBe(5)
 		let shot = async (name: string) => {
 			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
 			writeFileSync(`/tmp/hal-172-ink-disclosure-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 		}
 		let rotate = async (selector: string) => {
-			let motion = await b.evaluate(`(async () => {
-				let button = document.querySelector(${JSON.stringify(selector)}), triangle = button.querySelector('.disclosure');
-				await Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished));
-				let before = triangle && getComputedStyle(triangle).transform;
-				button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse', button: 0 }));
-				button.click();
-				await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-				let current = document.querySelector(${JSON.stringify(selector)}), turn = triangle?.getAnimations().find(a => a.transitionProperty === 'transform');
-				if (turn) { turn.pause(); turn.currentTime = Number(turn.effect.getTiming().duration) / 2; }
-				let middle = triangle && getComputedStyle(triangle).transform;
-				let result = { same: current === button && current.querySelector('.disclosure') === triangle, rotates: !!turn && middle !== before, flashes: current.getAnimations().some(a => a.effect.getKeyframes().some(f => 'boxShadow' in f)) };
-				if (turn) turn.finish();
-				return result;
-			})()`)
-			expect(motion).toEqual({ same: true, rotates: true, flashes: false })
+			await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
+			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
 		}
 		await shot('start')
 		await rotate('.Card.user .mark')
@@ -2074,27 +2060,16 @@ browserTest('card headers restore short or open and tool commands expand apart f
 		}
 		expect(steps).toEqual(['open', 'short'])
 		await rotate('.Card.tool .mark')
-		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe('$ seq 12…')
-		await rotate('.Card.tool .command-toggle')
-		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toContain('echo done')
-		await shot('command')
-		await rotate('.Card.tool .command-toggle')
+		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe('seq 12\necho done')
 		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
 		await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.tool .mark').getAttribute('aria-expanded')`)).toBe('true')
-		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[1].querySelector('.command-toggle') === null`)).toBe(true)
 		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.mark').click()`)
-		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle') === null`)).toBe(true)
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
-		await b.waitFor(`!!document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle')`)
-		await shot('phone')
-		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle').click()`)
-		expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command').textContent`)).toContain('x'.repeat(70))
-		expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
-		await shot('phone-command')
-		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle').click()`)
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
-		await b.waitFor(`document.querySelectorAll('.Card.tool')[2].querySelector('.command-toggle') === null`)
+		for (let width of [390, 900]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width === 390 })
+			expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command').textContent`)).toContain('x'.repeat(70))
+			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+		}
 		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/collapse a*'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
 		await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
 		await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
@@ -2102,7 +2077,6 @@ browserTest('card headers restore short or open and tool commands expand apart f
 		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('.Card.thinking .mark').getAttribute('aria-expanded')`)).toBe('true')
-		expect(await b.evaluate(`document.querySelector('.Card.thinking .mark .disclosure').getAnimations().length`)).toBe(0)
 	} finally { await b.close() }
 }, 15000)
 

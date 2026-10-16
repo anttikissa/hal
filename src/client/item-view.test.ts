@@ -70,7 +70,7 @@ test('A short Bash card shows its command in its rows, with stable live and fini
 	expect(rows(output).length).toBe(rows().length + finished.length)
 	// A short one-line command goes after the title; a long one scrolls
 	// from its start to its end, then stays there.
-	expect(toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/List {3}ls$/)])
+	expect(toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/List: ls$/)])
 	expect(toolView.call({ ...item, input: { command: 'ls' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/\$ ls$/)])
 	let long = { ...item, input: { command: 'echo ' + 'x'.repeat(60) + ' end', description: 'Echo' } }
 	let at = (ms: number) => Bun.stripANSI(toolView.call(long, 20, 'short', { now: Date.parse(ts) + ms })[1]!)

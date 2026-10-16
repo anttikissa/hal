@@ -272,7 +272,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)
 			if (item.type === 'tool' && item.name === 'bash' && view.now !== undefined) look.now = view.now
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
-			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status ? `${look.status} &` : '&'
+			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
 			if (fold === 'long' && ((item.type === 'tool' && item.partial !== undefined && !look.result) || (item.type === 'tool-result' && (item as Item & { live?: boolean }).live))) look.streamRows = Math.max(1, Math.floor(screenRows / 2) - 10)
 			look = frame.look(item, look)
 			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)

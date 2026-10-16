@@ -455,7 +455,7 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 let today = (h: number, m: number) => { let d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString() }
 
 
-test('tool timestamps and command-output headers match ordinary message time and spacing', () => {
+test('tool and command-output timestamps match prose while machine output stays compact', () => {
 	let ts = today(8, 50)
 	let f = frame.build(view([
 		{ type: 'text', text: 'Message body', ts },
@@ -468,8 +468,7 @@ test('tool timestamps and command-output headers match ordinary message time and
 	let output = lines.findIndex(line => line === '08:50')
 	expect(lines[ordinary + 1]).toBe('')
 	expect(lines[ordinary + 2]).toBe('Message body')
-	expect(lines[output + 1]).toBe('')
-	expect(lines[output + 2]).toBe('Command body')
+	expect(lines[output + 1]).toBe('Command body')
 	expect(lines.some(line => line.startsWith('08:50 $ Inspect files'))).toBe(true)
 	expect(lines.some(line => line.startsWith('08:50 < example.txt'))).toBe(true)
 })
@@ -498,7 +497,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).toContain('\nM notes.md')
 	expect(printed).not.toContain('#1813>')
 	let title = lines.find((line) => line.includes('Read missing'))!
-	expect(plain([title])[0]).toMatch(/Read missing   cat nope +\(exit 123, 3\.2s\)   t1815$/)
+	expect(plain([title])[0]).toMatch(/Read missing: cat nope +\(exit 123, 3\.2s\)   t1815$/)
 	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')

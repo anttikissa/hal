@@ -25,7 +25,7 @@ export type Look = { [K in keyof Colors]?: Colors[K] extends (...args: any[]) =>
 // Fields that derive a color from others, so take arguments; every
 // other field is a plain value (fgL, screen, mix) or a style, a function
 // read with no arguments.
-export const DERIVED = ['quiet', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent'] as const
+export const DERIVED = ['quiet', 'title', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent'] as const
 
 // Plain names for colors.project() p0..p7, so a model can answer "which
 // is the cyan project" (task jm).
@@ -48,11 +48,12 @@ export const colors = {
 	// command lines, table rules), darker than fg but never below 4.6:1
 	// on bg. blinkDim: a blinking tab mark in its dark phase.
 	quiet: (fg: Oklch, bg: Oklch): Oklch => oklch.quiet(fg, bg),
+	title: (fg: Oklch): Oklch => [Math.min(0.96, fg[0] + 0.12), fg[1] / 2, fg[2]],
 	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
 	// toolOutput: a tool's output text under its call, from the call's
 	// fg: darker at full chroma, so it reads below the command without
 	// turning gray (task hr).
-	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.23, fg[1], fg[2]],
+	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.22, fg[1], fg[2]],
 	// A percentage used (context, quota) as one continuous color: green
 	// when little is used, through yellow and orange, to red when all is.
 	// The web gets it as classes .heat-0 to .heat-100 (host/web.ts).

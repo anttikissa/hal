@@ -305,7 +305,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.item.type === 'thinking'} fallback={
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
@@ -315,7 +315,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 							<Show when={!closable()}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={link()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
-								label={<Show when={headsWho()} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{who()}</Show>}>
+								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 								<Show when={failed()}><span class="error">✗</span></Show>

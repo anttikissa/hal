@@ -92,6 +92,7 @@ html.typing .App { position: absolute; }
    card's top and bottom whitespace match. */
 .Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
+.Card.tool .content, .Card.background-result .content { color: var(--output); }
 /* Thinking and model text have no tint, so half the inset reads as
    the same gap (the user's choice, over the 44px header row). */
 .Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
@@ -112,7 +113,7 @@ html.typing .App { position: absolute; }
 .Card .result-text.error { background: none; }
 .Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }
 .Card .sender { color: var(--quiet); margin-bottom: 0.25lh; }
-.Card .who { color: var(--quiet); }
+.Card .who { color: var(--title-fg); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 .Card .change > :not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
@@ -210,7 +211,7 @@ html.typing .App { position: absolute; }
 .Card.folds { cursor: pointer; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card flashes (flash.ts). */
-.Card .link { color: var(--quiet); text-decoration: none; user-select: none; white-space: nowrap; }
+.Card .link { color: var(--title-fg); text-decoration: none; user-select: none; white-space: nowrap; }
 .Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
 .Card:has(> .link) > .content { padding-right: calc(7ch + var(--receipt-space, 0ch)); }
 .Card .link::before { content: attr(data-ref); }
@@ -241,6 +242,8 @@ html.typing .App { position: absolute; }
 .CardHeader .spinner.on::after { content: '⠁'; animation: spin 2s steps(1, end) infinite; }
 @keyframes spin { 0% { content: '⠁'; } 12.5% { content: '⠈'; } 25% { content: '⠐'; } 37.5% { content: '⠠'; } 50% { content: '⢀'; } 62.5% { content: '⡀'; } 75% { content: '⠄'; } 87.5% { content: '⠂'; } }
 .CardHeader .latest { margin-left: 1ch; color: var(--quiet); }
+.CardHeader .secondary { color: var(--fg); }
+.CardHeader, .Thinking .stamp { color: var(--title-fg); }
 @media (prefers-reduced-motion: reduce) { .CardHeader .spinner.on::after { animation: none; content: '·'; } }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
