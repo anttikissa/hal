@@ -330,8 +330,11 @@ exceptions, the user's choice: the example request in an empty prompt
 needed and stays visibly distinct from typed text; and disabled web
 composer buttons, whose icon and label fade to 40% opacity so they
 read as disabled (2026-10-12).
-Hierarchy comes from hue, lightness steps above the minimum, bold or
-position, never from dropping below it. Don't overdo testing this;
+Hierarchy comes from hue, lightness steps above the minimum or position,
+never from dropping below it. Avoid redundant boldface in app UI unless
+expressly approved by the user (task sq0). Use slightly brighter color
+instead, including for help keys. This does not change explicit bold
+formatting in user or model content. Don't overdo testing contrast;
 just be careful when introducing new colors.
 
 Status lines start with a capital letter unless there is an overwhelming
