@@ -49,7 +49,7 @@ export const colors = {
 	// command lines, table rules), darker than fg but never below 4.6:1
 	// on bg. blinkDim: a blinking tab mark in its dark phase.
 	quiet: (fg: Oklch, bg: Oklch): Oklch => oklch.quiet(fg, bg),
-	title: (fg: Oklch): Oklch => [Math.min(0.96, fg[0] + 0.12), fg[1] / 2, fg[2]],
+	title: (fg: Oklch): Oklch => [Math.min(0.96, fg[0] + 0.09), fg[1] / 2, fg[2]],
 	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
 	// toolOutput: a tool's output text under its call, from the call's
 	// fg: darker at full chroma, so it reads below the command without
