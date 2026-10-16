@@ -1,0 +1,10 @@
+{
+	title: 'Reload plugins after literal dependency edits',
+	spec: 'Plugins track transitive relative or absolute literal imports and re-exports of local JS/TS/JSON files. Changes reload affected plugins and invalidate changed modules plus importing ancestors, preserving unchanged modules and shared Hal src/ and node_modules identities. Computed imports and bare package imports are outside tracking. Share directory watchers, filter unrelated events and duplicate unchanged content, release unused watches on removal and close. No polling. Existing plugin error handling applies, with complete errors reported. Host and terminal use the same loader; web page reload sees new theme CSS without host restart. This does not hot-reload Hal core defaults or auto-refresh open browser pages. Verify transitive edits, shared dependencies, cleanup, and unchanged core identity; measure added code and watchers.',
+	status: 'done',
+	notes: [
+		'Bun 1.4.2 supports invalidating canonical real-path ESM cache entries through require.cache. Real paths matter on macOS symlinked temp directories. Clear changed modules and their importing ancestors across all affected graphs before loading any owner; unchanged target objects retain identity. Root and dependency watcher events share a serialized queue with a close-generation guard. Dependency graphs store hashes, not source text. Ten plugins sharing two dependency files used two fs.watch instances total (root and dependency directory); a single edit reloaded all ten in 15.83 ms in an isolated local probe. Existing cache-busted plugin entry modules still accumulate per reload as before; dependencies do not introduce per-version cache keys. Bare imports and computed dynamic imports are not tracked. Missing or invalid dependencies use the existing broken-plugin policy; fix and re-enable the plugin. Not a core-module hot reloader.'
+	],
+	needs: ['an'],
+	foldInto: ['an']
+}
