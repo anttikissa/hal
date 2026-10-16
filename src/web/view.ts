@@ -323,7 +323,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool':
-			return { kind: 'tool', text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
+			return { kind: item.name === 'send' ? 'tool send' : 'tool', text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		case 'tool-result': {
 			// Short rows, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }

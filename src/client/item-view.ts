@@ -36,7 +36,7 @@ const { INVERSE, UNINVERSE } = ansi
 // whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
-		let { fg, bg } = colors.tool()
+		let { fg, bg } = tool === 'send' ? colors.send() : colors.tool()
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg }
 	}
@@ -53,7 +53,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'thinking':
 			return { fg: colors.thinking().fg! }
 		case 'tool':
-			return colors.tool()
+			return item.name === 'send' ? colors.send() : colors.tool()
 		case 'tool-result':
 			return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		case 'turn-end':

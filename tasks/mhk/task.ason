@@ -1,0 +1,7 @@
+{
+	title: 'Match incoming and outgoing message colors',
+	spec: 'Incoming messages and outgoing SEND cards use the same pink message palette in web and terminal, open or closed. SEND result bodies retain that card background and the normal output foreground derivation; failures stay red. Other tools remain purple. Title brightness is unchanged. This replaces hfm outgoing purple with pink and restores a single color role for inter-tab talk.',
+	status: 'done',
+	needs: ['hfm'],
+	foldInto: ['hfm']
+}

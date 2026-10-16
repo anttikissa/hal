@@ -178,5 +178,6 @@ export const colors = {
 	}),
 	// All tool cards share Bash purple; red is kept for real failures.
 	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
+	send: (): Style => colors.message(),
 }
 
