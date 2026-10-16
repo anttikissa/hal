@@ -1,0 +1,7 @@
+{
+	title: 'Web card timestamps toggle without disclosure triangles',
+	spec: 'Web card headers show no disclosure triangle or its indentation, on mobile or desktop. Timestamp buttons retain expansion/collapse, accessible labels, aria-expanded and existing touch targets. Toggle buttons remain excluded from action flashes by aria-expanded rather than the removed glyph. Thinking identifiers keep the same minimum 44px slot as other header identifiers. Invariant: header timestamp and identifier geometry is consistent without space-consuming triangle markers.',
+	status: 'done',
+	needs: ['6q1'],
+	foldInto: ['6q1']
+}

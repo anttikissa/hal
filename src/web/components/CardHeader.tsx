@@ -21,7 +21,7 @@ export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.
 			<span class="flow">
 				<Show when={props.time || props.name}>
 					<Show when={props.name !== undefined} fallback={<span class="stamp">{props.time}</span>}>
-						<button type="button" class="stamp mark" aria-label={props.name} aria-expanded={props.open ? 'true' : 'false'}><span class="disclosure" aria-hidden="true">▸</span>{props.time}</button>
+						<button type="button" class="stamp mark" aria-label={props.name} aria-expanded={props.open ? 'true' : 'false'}>{props.time}</button>
 					</Show>
 					<Show when={props.label}>{' '}</Show>
 				</Show>

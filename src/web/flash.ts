@@ -24,7 +24,7 @@ function on(el: Element, ms: number): void {
 
 const button = (e: Event) => {
 	let b = e.target instanceof Element ? e.target.closest('button') : null
-	return b?.querySelector('.disclosure') ? null : b
+	return b?.hasAttribute('aria-expanded') ? null : b
 }
 
 // Flashes action buttons as they are pressed: a mouse on pointerdown; a
