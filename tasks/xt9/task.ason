@@ -1,0 +1,10 @@
+{
+	title: 'Bottom-filled usage blocks in both clients',
+	spec: '/status usage bars in web and terminal use the same 14-character row of lower block characters, filling every character upward as usage increases: ▁▂▃▄▅▆▇█. Zero usage is blank; positive usage rounds up to an eighth so low usage stays visible; percentages clamp to 0..100. This replaces task ab horizontal left-to-right fill and shaded unused cells. Numeric percentages, reset labels, tables and all other behavior remain unchanged. Wider web presentation changes are out of scope.',
+	status: 'done',
+	notes: [
+		'Shared status-usage.ts emits identical Markdown bars for both clients, so no web CSS or terminal renderer changes are needed. One-off boundary checks covered negative, zero, low positive, eighth boundaries, full and overfull usage; ./test status-usage markdown-view markdown passed 25 tests. Browser appearance was not visually verified. The change adds no timers, dependencies or growing state.'
+	],
+	needs: ['ab'],
+	foldInto: ['ab']
+}
