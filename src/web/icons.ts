@@ -1,8 +1,8 @@
 // Inline SVG icons for the web client (task 19m): Phosphor Regular on a
 // 256 grid, except steer (Tabler arrow-ramp-right) and python (Tabler
-// brand-python) on a 24 grid. Bash uses the transcript font's $ glyph
-// (task ya1). Shapes with class "s" are strokes, the rest fill; index.html
-// sets one stroke width for all grids. Regenerate shapes from upstream SVGs.
+// brand-python) on a 24 grid. Shapes
+// with class "s" are strokes, the rest fill; index.html sets one stroke
+// width for all grids. Regenerate from the upstream SVGs, never by hand.
 //
 // Phosphor Icons: MIT License, Copyright (c) 2023 Phosphor Icons.
 // Tabler Icons: MIT License, Copyright (c) 2020-2026 Paweł Kuna.
@@ -42,7 +42,6 @@ const phosphor = {
 	reload: '<polyline points="184 104 232 104 232 56" class="s"/><path d="M188.4,192a88,88,0,1,1,1.83-126.23L232,104" class="s"/>',
 	logout: '<polyline points="112 40 48 40 48 216 112 216" class="s"/><line x1="112" y1="128" x2="224" y2="128" class="s"/><polyline points="184 88 224 128 184 168" class="s"/>',
 	bug: '<circle cx="156" cy="92" r="12"/><circle cx="100" cy="92" r="12"/><line x1="128" y1="128" x2="128" y2="224" class="s"/><path d="M208,144a80,80,0,0,1-160,0V112a80,80,0,0,1,160,0Z" class="s"/><line x1="232" y1="184" x2="203.18" y2="171.41" class="s"/><line x1="232" y1="72" x2="203.18" y2="84.59" class="s"/><line x1="24" y1="72" x2="52.82" y2="84.59" class="s"/><line x1="24" y1="184" x2="52.82" y2="171.41" class="s"/><line x1="16" y1="128" x2="240" y2="128" class="s"/>',
-	bash: '<text x="128" y="128" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="224">$</text>',
 	read: '<path d="M200,224H56a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h96l56,56V216A8,8,0,0,1,200,224Z" class="s"/><polyline points="152 32 152 88 208 88" class="s"/><line x1="96" y1="136" x2="160" y2="136" class="s"/><line x1="96" y1="168" x2="160" y2="168" class="s"/>',
 	web: '<circle cx="128" cy="128" r="96" class="s"/><path d="M168,128c0,64-40,96-40,96s-40-32-40-96,40-96,40-96S168,64,168,128Z" class="s"/><line x1="37.46" y1="96" x2="218.54" y2="96" class="s"/><line x1="37.46" y1="160" x2="218.54" y2="160" class="s"/>',
 	google: '<circle cx="112" cy="112" r="80" class="s"/><line x1="168.57" y1="168.57" x2="224" y2="224" class="s"/>',

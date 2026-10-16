@@ -68,7 +68,7 @@ function enter(el: HTMLElement): void {
 // after ; & | ( $( ), optionally behind env assignments or a wrapper.
 const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
-const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
+const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!*x?]) /, '') as T
 
@@ -174,15 +174,17 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	// Folded cards name their kind with an icon: thinking, another
 	// session's message or command (the send tool's bubble, which
-	// unfolded ones show too), or the tool.
+	// unfolded ones show too), or the tool. Bash shows the terminal's
+	// `$ ` as copyable text instead (task ya1); Python bash, its logo.
+	let pythonBash = () => { let item = props.row.item; return item.type === 'tool' && item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command) }
 	let kindIcon = (): IconName | undefined => {
 		let item = props.row.item
 		if (item.type === 'thinking') return 'thinking'
 		if (titles.letter(item) === 'm') return 'message'
 		if (item.type !== 'tool') return undefined
-		if (item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command)) return 'python'
-		return toolIcons[item.name]
+		return pythonBash() ? 'python' : toolIcons[item.name]
 	}
+	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
 	let headerParts = createMemo(() => hrefs.urlParts(head() ?? ''))
 	let call = createMemo(() => { let item = props.row.item; return item.type === 'tool' ? toolDetails.lines(item.name, item.input) : [] })
 	let command = <Show when={call().length}><ToolCommand lines={call()} compact={!full()} /></Show>
@@ -319,7 +321,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						<Show when={closable() && title()}>{heading()}</Show>
 						<Show when={folding()} fallback={plain(s)}>
 							<Show when={!closable()}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
+							<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>

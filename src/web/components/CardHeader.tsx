@@ -11,7 +11,7 @@ import type { JSX } from '@solidjs/web'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
+export function CardHeader(props: { icon?: IconName; prefix?: string; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
 	let exit = () => props.result ? bashResult.failure(props.result, props.bash) : undefined
 	let rest = () => props.result && (bashResult.interrupted(props.result) ?? (props.limit ? `${bashResult.duration(props.result.ms) ?? '0s'} / ${props.limit}` : bashResult.duration(props.result.ms)))
 	// An EDIT's counts and changed lines, as in the terminal.
@@ -25,7 +25,7 @@ export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.
 					</Show>
 					<Show when={props.label}>{' '}</Show>
 				</Show>
-				<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.label}</span>{props.children}</span>
+				<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.prefix}{props.label}</span>{props.children}</span>
 			</span>
 			{props.actions}
 			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class="exit" style={s() === 'exit 1' ? { color: 'var(--neutral-fg)' } : undefined}>{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>

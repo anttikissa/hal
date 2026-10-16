@@ -1,7 +1,10 @@
 {
 	title: 'Use terminal dollar glyph for web Bash cards',
-	spec: 'Web BASH cards use a plain unboxed $ glyph in the transcript font instead of a terminal-window outline, matching the terminal convention. READ keeps its folded-corner document and EDIT its pencil so their silhouettes differ. Preserve current tool colors, sizing, accessibility, Python-specific icon selection and all terminal behavior. This replaces the upstream Bash SVG requirement in 19m; Bash is a font glyph rather than a generated upstream shape.',
+	spec: 'Web BASH card headers start with the terminal prompt as plain selectable text, "$ ", inside the title label, so selecting and copying the header yields "$ <title>". It is text, not an SVG icon. Python bash cards keep the Python logo. READ keeps its folded-corner document and EDIT its pencil. Preserve current tool colors, sizing, accessibility and all terminal behavior. This replaces the upstream Bash SVG in 19m.',
 	status: 'done',
+	notes: [
+		'First attempt drew $ as SVG <text>: it looked right but could not be selected or copied. Header prefix text (CardHeader prefix) fixes that.'
+	],
 	needs: ['19m'],
 	foldInto: ['19m']
 }
