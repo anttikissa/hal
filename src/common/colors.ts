@@ -72,7 +72,7 @@ export const colors = {
 		fg: [colors.fgL, 0.16, 75],
 		cursor: [colors.fgL, 0.16, 75],
 		cursorIdle: [0.6, 0.04, 75],
-		title: [0.9, 0.14, 80],
+		title: [0.9, 0.11, 82],
 		bold: [0.93, 0.12, 80],
 		code: [0.88, 0.1, 80],
 		linkFg: [0.9, 0.17, 80],
@@ -85,7 +85,7 @@ export const colors = {
 	// Thinking: neutral gray, distinct from replies through italic text.
 	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
 	// User messages and the prompt input: cyan.
-	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215], title: [0.92, 0.09, 215] }),
+	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215], title: [0.91, 0.07, 212] }),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
 	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
