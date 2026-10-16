@@ -47,7 +47,10 @@ export const look: Look = {
 		linkFg: [0.9, 0.17, 80],
 		linkBg: [0.28, 0.06, 75],
 	}),
-	synthetic: () => colors.assistant(),
+	// Neutral gray cards: the user's, Hal's own remarks, questions,
+	// commits and command responses.
+	plain: () => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
+	synthetic: () => colors.plain(),
 	// Thinking: muted blue-gray, recedes.
 	thinking: () => ({
 		fg: [0.72, 0.03, 250],
@@ -55,8 +58,8 @@ export const look: Look = {
 		code: [0.78, 0.03, 250],
 		linkBg: [0.2, 0.02, 250],
 	}),
-	// User messages and the prompt input: the same green phosphor card.
-	user: () => ({ fg: [0.87, 0.2, 145], bg: [0.2, 0.05, 145] }),
+	// User messages and the prompt input: the same neutral card.
+	user: () => colors.plain(),
 	// Messages and commands from another session: hot pink.
 	message: () => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
 	// placeholder: the example request in an empty prompt, readable but
@@ -66,8 +69,12 @@ export const look: Look = {
 	log: () => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
 	warning: () => ({ fg: [0.9, 0.17, 100], bg: [0.21, 0.05, 100], code: [0.94, 0.12, 100], linkBg: [0.28, 0.06, 100] }),
-	// Errors: hot red.
-	error: () => ({ fg: [0.7, 0.22, 30], bg: [0.2, 0.08, 30], code: [0.82, 0.15, 30], linkBg: [0.25, 0.07, 30] }),
+	// Questions: neutral, like the user's card.
+	question: () => colors.plain(),
+	commitCard: () => colors.plain(),
+	// Errors and exit statuses: the diff's removal red.
+	error: () => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
+	exit: () => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
 	info: () => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: () => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),

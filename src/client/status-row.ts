@@ -39,7 +39,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name) + (info.autoclose ? ' ↧' : ''), fg: hi }] : [{ text: info.id + (info.autoclose ? ' ↧' : '') }]]
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
-	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])
+	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : (info.color ?? hi) }])
 	out.push([{ text: ansi.clean(info.model.startsWith('hal/') ? info.model : titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: titles.budget(info.slots ?? settings.subagentSlots()).replace(/^(?=.)/, ' '), href: '/budget' }])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])

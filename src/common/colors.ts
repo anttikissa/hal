@@ -76,11 +76,14 @@ export const colors = {
 		linkFg: [0.9, 0.17, 80],
 		linkBg: [0.28, 0.06, 75],
 	}),
-	synthetic: (): Style => colors.assistant(),
+	// Neutral gray cards: the user's, Hal's own remarks, questions,
+	// commits and command responses, so color marks only tools and replies.
+	plain: (): Style => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
+	synthetic: (): Style => colors.plain(),
 	// Thinking: neutral gray, distinct from replies through italic text.
 	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
-	// User messages and the prompt input: the same green phosphor card.
-	user: (): Style => ({ fg: [0.87, 0.2, 145], bg: [0.2, 0.05, 145] }),
+	// User messages and the prompt input: the same neutral card.
+	user: (): Style => colors.plain(),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
 	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
@@ -91,10 +94,10 @@ export const colors = {
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
 	warning: (): Style => ({ fg: [0.9, 0.17, 100], bg: [0.21, 0.05, 100], code: [0.94, 0.12, 100], linkBg: [0.28, 0.06, 100] }),
-	// Questions waiting on the user: green, apart from warnings.
-	question: (): Style => ({ fg: [colors.fgL, colors.fgC, 150], bg: [colors.bgL, colors.bgC, 150], code: [0.92, 0.1, 150], linkBg: [0.28, 0.06, 150] }),
-	// Errors: hot red.
-	error: (): Style => ({ fg: [0.7, 0.22, 30], bg: [0.2, 0.08, 30], code: [0.82, 0.15, 30], linkBg: [0.25, 0.07, 30] }),
+	// Questions waiting on the user: neutral, like the user's own card.
+	question: (): Style => colors.plain(),
+	// Errors: the diff's removal red.
+	error: (): Style => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
@@ -134,8 +137,8 @@ export const colors = {
 		// Commits (task hy): violet, apart from the session outcomes.
 		commitFg: colors.commitCard().fg!,
 	}),
-	// A commit card (task 179), web class .commit-card.
-	commitCard: (): Style => ({ fg: [0.8, 0.16, 300] }),
+	// A commit card (task 179), web class .commit-card: neutral.
+	commitCard: (): Style => colors.plain(),
 	// Help bar: keys stand out from descriptions; the web's update reload
 	// hint (task 7t) is amber, a special case only when new code waits.
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0], update: [0.82, 0.17, 70] }),
@@ -154,10 +157,10 @@ export const colors = {
 	// selected row's popupCurrent background (L 0.42).
 	popupNote: (): Style => ({ fg: [0.8, 0, 0] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
-	// Exit 1 is neutral; other nonzero statuses are coral (tasks wm0, j92).
-	exit: (): Style => ({ fg: [0.75, 0.17, 15], neutralFg: colors.log().fg! }),
-	// Edit diffs: soft pastels, easy on the eyes (the error red is too
-	// harsh for so many lines).
+	// Exit 1 is neutral; other nonzero statuses use the error red (tasks wm0, j92).
+	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
+	// Edit diffs: soft pastels, easy on the eyes. Errors and exit
+	// statuses share the removal red.
 	diff: (): Style => ({ addFg: [0.8, 0.16, 146], removeFg: [0.72, 0.16, 28] }),
 	// The web page's own surfaces (custom properties on .page): canvas
 	// and text, the focus accent, form fields, borders, and buttons (the

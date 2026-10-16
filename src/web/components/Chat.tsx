@@ -191,7 +191,7 @@ export function Chat() {
 			</Show>
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />
-			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} />
+			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} hal={!!tabs().find((t) => t.id === shown())?.hal} />
 			<EditBar view={view()} />
 			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} dropping={dropping()} />
 			<Picker modal={view().modal} />

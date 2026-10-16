@@ -61,7 +61,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.log().fg! }
+			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.plain().fg! }
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}
