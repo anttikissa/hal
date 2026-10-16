@@ -214,24 +214,15 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return <><Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>{command}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
-	let flip = () => scroll.follow(() => {
-		untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
-		flush()
-	})
-	// A double-click selects a word: its second click undoes the first's
-	// toggle. A click that ends a drag selection never toggles.
-	let flipped = false
 	let toggle = (e: MouseEvent) => {
-		let undo = flipped
-		flipped = false
-		if (e.detail > 1) return void (e.detail === 2 && undo && flip())
-		if (e.detail === 1 && !getSelection()?.isCollapsed) return
 		let hit = e.target as Element
 		let control = hit.closest('.mark, .CardHeader')
 		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		if (!control && expanded()) return
-		flipped = true
-		flip()
+		scroll.follow(() => {
+			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
+			flush()
+		})
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Model text and inter-tab prose are Markdown (tasks fn, sz); human
