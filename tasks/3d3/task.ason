@@ -10,7 +10,8 @@
 		'Titles are 0.07 lighter than the fg as shown after gamut fitting (oklch.fit), not the raw fg: purple titles hit the sRGB edge, so the 0.12 to 0.09 change had no visible effect.',
 		'Web closed replies and prompts drew their whole compact header (sender: preview) in the title color. Invariant restored: the preview text keeps the body color it has when open, as a closed Bash card shows its output; only time and sender use the title color (Card.tsx compactParts).',
 		'Title step lowered to 0.05 above the shown fg (Bash title 0.84) at the user request.',
-		'Trying titles 0.04 below the shown fg (Bash title 0.75) at the user request: "Try .75".'
+		'Trying titles 0.04 below the shown fg (Bash title 0.75) at the user request: "Try .75".',
+		'Titles take 3/4 of the text chroma instead of half, at the user request for a more saturated Hal title (0.08 to 0.12).'
 	],
 	needs: ['3r3', '4fw'],
 	foldInto: ['3r3', '4fw']
