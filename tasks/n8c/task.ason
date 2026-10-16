@@ -1,6 +1,6 @@
 {
 	title: 'Pink message card background',
-	spec: 'Message cards keep the hot pink foreground (OKLCH hue 350) on a dark rose background (OKLCH [bgL, 0.06, 5]) rather than a purple one, in terminal and web. Contrast stays at least 7:1. Themes that override message keep their own shade. Replaces the message background in 9p.',
+	spec: 'Message cards (sent SEND cards and received messages) use saturated hue-350 pinks on a dark pink background (OKLCH [bgL, 0.08, 0]), in terminal and web. Titles are bright hot pink [0.82, 0.18, 350]; bodies, including SEND result text, are a darker pink at similar saturation [0.62, 0.18, 350]. Fainter means darker, never desaturated. The body reaches only 4.6:1 contrast, by user choice. Themes that override message keep their own shade. Replaces the message colors in 9p.',
 	status: 'done',
 	needs: ['9p'],
 	foldInto: ['9p']

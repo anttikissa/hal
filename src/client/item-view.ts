@@ -48,9 +48,9 @@ function bare({ fg, title }: Style): Style {
 // whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
-		let { fg, bg } = itemView.toolStyle(tool)
+		let { fg, bg, output } = itemView.toolStyle(tool)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
-		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg }
+		return { fg: item.isError ? colors.error().fg! : output ?? colors.toolOutput(fg), bg }
 	}
 	switch (item.type) {
 		case 'prompt':
