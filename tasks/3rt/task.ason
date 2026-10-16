@@ -1,0 +1,7 @@
+{
+	title: 'Adjust settings with Left and Right',
+	spec: 'In the shared terminal and web /config modal, Left decreases the selected integer by one and Right increases it by one, within the setting bounds. Left sets a boolean off and Right sets it on. Apply changes immediately through the existing /config command, keeping the modal open. At a bound or an already selected boolean value, send nothing. Plain arrows affect only integer and boolean rows outside inline editing; text cursor movement, choice rows, Enter/Space and modified keys retain their behavior. Show the shortcuts in the modal hint and document them in tasks/w4/forms.md.',
+	status: 'done',
+	needs: ['c0h'],
+	foldInto: ['c0h']
+}

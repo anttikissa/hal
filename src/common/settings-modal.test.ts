@@ -1,3 +1,4 @@
+// Settings modal key handling and inline value validation.
 import { expect, test } from 'bun:test'
 import { settingsModal } from './settings-modal.ts'
 
@@ -27,4 +28,27 @@ test('an edit sends only a valid value; Escape restores without sending', () => 
 	st = settingsModal.step(at('webPort'), key('enter'), 's').state
 	for (let k of ['backspace', '2']) st = settingsModal.step(st, key(k), 's').state
 	expect(settingsModal.step(st, key('enter'), 's').action).toMatchObject({ command: { text: '/config webPort 9002' } })
+})
+
+test('Left and Right adjust integers and booleans without crossing bounds', () => {
+	for (let [name, now, left, right] of [
+		['webPort', '9001', '9000', '9002'],
+		['webPort', '1', undefined, '2'],
+		['webPort', '65535', '65534', undefined],
+		['push', 'true', 'false', undefined],
+		['push', 'false', undefined, 'true'],
+	] as const) {
+		let st = at(name)
+		st.settings!.values = { ...data.values, [name]: now }
+		for (let [arrow, value] of [['left', left], ['right', right]] as const) {
+			let result = settingsModal.step(st, key(arrow), 's')
+			expect(result.state).toBe(st)
+			if (value === undefined) expect(result.action).toBeUndefined()
+			else expect(result.action).toMatchObject({ command: { text: `/config ${name} ${value}` } })
+		}
+	}
+	for (let st of [at('model'), at('security'), settingsModal.step(at('webPort'), key('enter'), 's').state]) {
+		expect(settingsModal.step(st, key('right'), 's').action).toBeUndefined()
+	}
+	expect(settingsModal.step(at('webPort'), { key: 'right', ctrl: true }, 's').action).toBeUndefined()
 })

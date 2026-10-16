@@ -15,7 +15,7 @@ import { settings, type Setting } from './settings.ts'
 type Data = { values: Record<string, string>; stored: Record<string, string> }
 type Step = { state: ModalState; action?: ModalAction }
 
-const HINT = 'type: search · enter/space: change · esc: close'
+const HINT = 'type: search · ←/→: adjust · enter/space: change · esc: close'
 const EDIT_HINT = 'enter: save · esc: restore'
 
 function find(name: string | undefined): Setting | undefined {
@@ -92,6 +92,13 @@ function step(st: ModalState, key: Key, sessionId: string): Step {
 		return { state: { ...rest, edit: { ...st.edit, form: forms.step(st.edit.form, key).state } } }
 	}
 	let s = find(names[st.selected])
+	if (s && plain && (key.key === 'left' || key.key === 'right')) {
+		let now = st.settings!.values[s.name] ?? ''
+		let text: string | undefined
+		if (s.type.kind === 'boolean') text = String(key.key === 'right')
+		if (s.type.kind === 'integer') text = String(Math.max(s.type.min, Math.min(s.type.max, Number(now) + (key.key === 'right' ? 1 : -1))))
+		if (text !== undefined) return { state: st, ...(text !== now && { action: send(sessionId, s, text) }) }
+	}
 	if (s && plain && (key.key === 'enter' || key.text === ' ')) {
 		let now = st.settings!.values[s.name] ?? ''
 		if (s.type.kind === 'boolean') return { state: st, action: send(sessionId, s, now === 'true' ? 'false' : 'true') }

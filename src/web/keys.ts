@@ -23,6 +23,7 @@ import { drafts } from '../common/drafts.ts'
 import type { Key } from '../common/forms.ts'
 import { prompt } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
+import { settings } from '../common/settings.ts'
 import { app } from './app.ts'
 import { attach, type Pasted } from './attach.ts'
 import { editor, type Splice } from './editor.ts'
@@ -103,8 +104,11 @@ function key(e: KeyInput, target: Target): boolean {
 		// /config: Space changes the selected setting, except in its edit field.
 		let space = !!st.view.modal.settings && !st.view.modal.edit && k?.text === ' '
 		if (!k || e.ctrlKey || e.metaKey || e.altKey || (!space && !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key))) return false
-		// The edit field and search box move their own cursors.
-		if (st.view.modal.settings && (k.key === 'left' || k.key === 'right')) return false
+		if (st.view.modal.settings && (k.key === 'left' || k.key === 'right')) {
+			let modal = st.view.modal
+			let kind = settings.table.find((s) => s.name === modal.settings!.names[modal.selected])?.type.kind
+			if (modal.edit || (kind !== 'integer' && kind !== 'boolean')) return false
+		}
 		app.modalKey(k)
 		return true
 	}

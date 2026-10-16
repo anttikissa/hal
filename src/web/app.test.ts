@@ -235,6 +235,17 @@ test('Ctrl-M asks for models; the picker takes the keys and a click picks', () =
 	expect(app.state.view.modal).toBeUndefined()
 })
 
+test('settings arrows adjust values but leave inline editing native', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.onEvent({ type: 'settings', sessionId, values: { subagentSlots: '3' }, stored: {} })
+	expect(press('ArrowRight', { kind: 'field' })).toBe(true)
+	expect(sent.at(-1)).toMatchObject({ type: 'submit', text: '/config subagentSlots 4' })
+	press('Enter', { kind: 'field' })
+	let count = sent.length
+	expect(press('ArrowLeft', { kind: 'field' })).toBe(false)
+	expect(sent).toHaveLength(count)
+})
+
 test('the link state shows as a notice until connected', () => {
 	app.onState({ type: 'disconnected', retryAt: 0 })
 	expect(app.notice()).toMatch(/reconnect/)
