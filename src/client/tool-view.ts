@@ -99,7 +99,8 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 		tones.push(...wrapped.map(() => diff.tone(line)))
 	}
 	let shown = live ? lines.flatMap(line => ansi.wrap(line.slice(-Math.max(1, max) * outputWidth * 4), outputWidth, false)).slice(-max) : rows.slice(0, max)
-	let more = live ? 0 : rows.length - shown.length + lines.length - used
+	let rest = lines.slice(used).filter(line => fold !== 'short' || line.trim()), rowsOf = (line: string) => rest.length > 1e4 ? Math.max(1, Math.ceil(strings.visLen(line) / outputWidth)) : ansi.wrap(line, outputWidth, false).length
+	let more = live ? 0 : rows.length - shown.length + rest.reduce((n, line) => n + rowsOf(line), 0)
 	let title = !tool && look.call?.title ? `Result of: ${ansi.clean(look.call.title)}` : undefined
 	let status = tool && !stamp ? '' : toolView.resultStatus(item, !!call, style)
 	let key = look.call?.key ?? call

@@ -1,0 +1,7 @@
+{
+	title: 'Terminal: hidden tool output counts terminal rows',
+	spec: "In the terminal, a tool result's '… N more lines' counts the hidden output as wrapped terminal rows at the card's output width, not as logical lines. Blank lines that short fold skips are not counted. Hidden output of up to 10,000 lines is wrapped exactly; above that, each line counts as ceil(visible length / width) rows, at least 1, so a huge output costs no full wrap on each render. The web still counts logical lines: the browser wraps its text. Invariant (bug fix): N is the number of terminal rows the hidden output fills at the current width.",
+	status: 'done',
+	needs: ['hyt'],
+	foldInto: ['hyt']
+}
