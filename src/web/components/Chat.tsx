@@ -82,6 +82,7 @@ function reveal(): void {
 	scroll.leave()
 	card.scrollIntoView({ block: 'start' })
 	scroll.moved()
+	scroll.hold(card)
 	flash.card(card)
 	away(card)
 }

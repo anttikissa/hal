@@ -25,6 +25,27 @@ const atBottom = 1
 function leave(): void {
 	scroll.state.pinned = false
 	scroll.state.intent = undefined
+	scroll.state.held = undefined
+}
+
+// The card a block link opened (task 0z) stays where it was put while
+// content above it grows, as images load, until the reader moves the
+// view: the transcript turns off the browser's scroll anchoring.
+function hold(card: Element): void {
+	scroll.state.held = { card, top: card.getBoundingClientRect().top }
+}
+
+// Puts the held card back in place; whether a card is held.
+function keep(): boolean {
+	let st = scroll.state, held = st.held, el = st.el
+	if (!held || !el) return false
+	if (!held.card.isConnected) {
+		st.held = undefined
+		return false
+	}
+	let drift = held.card.getBoundingClientRect().top - held.top
+	if (Math.abs(drift) >= 1) scroll.put(el, el.scrollTop + drift)
+	return true
 }
 
 function intent(): void {
@@ -88,6 +109,9 @@ function check(why: string, scrolled = false): void {
 	// is the reader dragging: selecting past the edge, middle-button
 	// autoscroll, or the scrollbar thumb.
 	if (scrolled && (st.pressing || st.touching) && Math.abs(el.scrollTop - st.set) > 2) st.pinned = false
+	// A move we did not make lets the held card go.
+	if (scrolled && Math.abs(el.scrollTop - st.set) > 2) st.held = undefined
+	if (scroll.keep()) return
 	let g = scroll.gap(el)
 	// Content shrinking to the bottom is not permission to follow again.
 	// Only an actual reader scroll can resume following there.
@@ -123,7 +147,7 @@ function anchor(change: () => void): void {
 	if (!el) return change()
 	let below = el.scrollHeight - el.scrollTop
 	scroll.quiet(change)
-	scroll.put(el, Math.max(0, el.scrollHeight - below))
+	if (!scroll.keep()) scroll.put(el, Math.max(0, el.scrollHeight - below))
 }
 
 // Runs `change` with new cards appearing at once: a tab's rows, or
@@ -143,6 +167,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
 	let { stop: stopReflow, capture } = reflow.watch(el, () => {
 		if (scroll.state.touching || scroll.state.pressing) return true
+		if (scroll.keep()) return true
 		// Pinned: the bottom is the anchor, whatever the reading anchor says.
 		if (scroll.state.pinned) {
 			scroll.put(el, scroll.target(el, 0))
@@ -246,12 +271,15 @@ export const scroll = {
 	// `pinned`: see the header. `pressing`: a mouse button or pen is down
 	// in the transcript. `set`: the last position this module set.
 	// `reanchor`: takes reflow's reading anchor at the current view.
-	state: { el: null as Box | null, intent: undefined as { top: number; height: number; client: number } | undefined, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
+	// `held`: the card hold() keeps in place, at `top` in the viewport.
+	state: { el: null as Box | null, intent: undefined as { top: number; height: number; client: number } | undefined, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, held: undefined as { card: Element; top: number } | undefined, places: new Map<string, { top: number } | { gap: number }>() },
 	// Called when a pinned view is pulled back to the bottom, with the
 	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
 	onPull: (_gap: number, _why: string): void => {},
 	gap,
 	leave,
+	hold,
+	keep,
 	put,
 	moved,
 	check,
