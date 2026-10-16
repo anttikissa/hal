@@ -5,7 +5,7 @@
 
 import { markdown, type Block, type Links, type Run } from '../common/markdown.ts'
 import { strings } from '../common/strings.ts'
-import type { Style } from '../common/colors.ts'
+import { colors, type Style } from '../common/colors.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { ansi } from './ansi.ts'
@@ -18,7 +18,19 @@ function code(text: string, style: Style | undefined): string {
 	return ansi.sgr({ fg: style.code }) + text + (style.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 }
 
+// A meter's empty track (░) as spaces on a dim background, which also
+// shows above a partial lower block.
+function meter(text: string, style: Style | undefined): string {
+	if (ansi.mono()) return text
+	let fg = style?.fg ?? colors.log().fg!
+	let bg = style?.bg ?? colors.screen
+	let track = ansi.sgr({ bg: [bg[0] + (fg[0] - bg[0]) * 0.25, fg[1] * 0.25, fg[2]] })
+	let back = style?.bg ? ansi.sgr({ bg: style.bg }) : '\x1b[49m'
+	return text.replace(/[▁-▇]?░*$/, (tail) => tail && track + tail.replace(/░/g, ' ') + back)
+}
+
 function styled(r: Run, text: string, style?: Style): string {
+	if (r.meter) text = markdownView.meter(text, style)
 	if (r.code) text = markdownView.code(text, style)
 	if (r.bold) text = `\x1b[1m${text}\x1b[22m`
 	if (r.italic) text = `\x1b[3m${text}\x1b[23m`
@@ -130,4 +142,4 @@ function lines(text: string, width: number, streaming = false, style?: Style, li
 	return rows
 }
 
-export const markdownView = { lines, block, table, fit, styled, code }
+export const markdownView = { lines, block, table, fit, styled, code, meter }

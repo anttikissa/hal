@@ -68,6 +68,10 @@ describe('parse', () => {
 		expect(block.type === 'table' && block.rows[1]![1]!.map((r) => r.text).join('')).toBe('▉\n95% used')
 		expect(markdown.inline('<script>alert(1)</script>').map((r) => r.text).join('')).toBe('<script>alert(1)</script>')
 	})
+	test('a usage meter is one run; lone blocks stay text', () => {
+		expect(markdown.inline('a ██▅░░ b')).toEqual([{ text: 'a ' }, { text: '██▅░░', meter: true }, { text: ' b' }])
+		expect(markdown.inline('▅ ▅▅')).toEqual([{ text: '▅ ▅▅' }])
+	})
 
 	test('an open fence is code to the end', () => {
 		expect(markdown.parse('```\nx\n**y')).toEqual([{ type: 'code', lang: '', open: '```', lines: ['x', '**y'], close: undefined }])

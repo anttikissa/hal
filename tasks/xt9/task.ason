@@ -1,11 +1,12 @@
 {
 	title: 'Left-filled usage bars in both clients',
-	spec: '/status usage bars in web and terminal use the same 14-character row that fills left to right: full blocks (█), then at most one partial block that fills from the bottom up (▁▂▃▄▅▆▇), then blank cells. Zero usage is blank; positive usage rounds up to an eighth of a cell so low usage stays visible; percentages clamp to 0..100. This replaces filling every cell upward at once (bar height showed usage) and task ab shaded unused cells. Numeric percentages, reset labels, tables and all other behavior remain unchanged.',
+	spec: '/status usage bars in web and terminal use the same 14-character meter that fills left to right: full blocks (█), then at most one partial block that fills from the bottom up (▁▂▃▄▅▆▇), then ░ for the empty track. The shared Markdown parser marks such a run (two or more characters) as a meter; both clients draw the empty track and the space above the partial block on a dim background (terminal: fg mixed 25% into bg; web: currentColor at 25%), and ░ shows as blank there. Monochrome terminals and plain text keep the ░ characters. Zero usage is an empty track; positive usage rounds up to an eighth of a cell so low usage stays visible; percentages clamp to 0..100. This replaces filling every cell upward at once (bar height showed usage). Numeric percentages, reset labels, tables and all other behavior remain unchanged.',
 	status: 'done',
 	notes: [
 		'Shared status-usage.ts emits identical Markdown bars for both clients, so no web CSS or terminal renderer changes are needed. One-off boundary checks covered negative, zero, low positive, eighth boundaries, full and overfull usage; ./test status-usage markdown-view markdown passed 25 tests. Browser appearance was not visually verified. The change adds no timers, dependencies or growing state.',
 		'User found bottom-filled bars unreadable: every bar looked full-width. One-off check of -5, 0, 0.5, 6, 41, 46, 50, 99.9, 100, 120 gave the expected left fill.',
-		'A left-partial edge block (▏..▉) was invisible against the full blocks; the user asked for a bottom-up partial instead.'
+		'A left-partial edge block (▏..▉) was invisible against the full blocks; the user asked for a bottom-up partial instead.',
+		'Blank empty cells hid the bar length, so the user asked for a background. ./test: markdown and status-usage pass; the 6 other failures (turns, conventions layer boundary in common/theme-palette.ts, item-view typecheck) are in files other sessions are editing. Web appearance not checked in a browser.'
 	],
 	needs: ['ab'],
 	foldInto: ['ab']

@@ -160,7 +160,7 @@ html.typing .App { position: absolute; }
 .CardHeader.head:not(.inline) .title::after { content: '   open'; display: inline-block; width: 0; white-space: pre; opacity: 0; transition: opacity 250ms ease; }
 .Card.open > .CardHeader.head:not(.inline) .title::after { content: '   close'; }
 @media (hover: hover) and (pointer: fine) { .CardHeader.head:not(.inline):hover .title::after { opacity: 0.5; transition-duration: 100ms; } }
-.CardHeader > .peek { width: 0; display: flex; justify-content: flex-end; opacity: 0; transition: opacity 250ms ease; }
+.CardHeader > .peek { width: 0; margin-left: -1ch; display: flex; justify-content: flex-end; opacity: 0; transition: opacity 250ms ease; }
 .CardHeader > .peek > .status { padding-left: 1ch; background: var(--sticky-bg); }
 @media (hover: hover) and (pointer: fine) { .CardHeader:hover > .peek { opacity: 0.5; transition-duration: 100ms; } }
 /* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
@@ -271,6 +271,7 @@ html.typing .App { position: absolute; }
 .Markdown table { border-collapse: collapse; }
 .Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor var(--mix-table), transparent); padding: 0 1ch; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
 .Markdown td { white-space: pre-line; }
+.Markdown .meter { background: color-mix(in oklab, currentColor 25%, transparent); }
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }

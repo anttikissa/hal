@@ -33,13 +33,13 @@ function Text(props: { value: string }) {
 export let external = (href: string) => ((navigator as { standalone?: boolean }).standalone && /^https?:/.test(href) ? `x-safari-${href}` : href)
 
 function Runs(props: { runs: Run[] }) {
-	let cls = (r: Run) => [r.bold && 'b', r.italic && 'i', r.code && 'code']
+	let cls = (r: Run) => [r.bold && 'b', r.italic && 'i', r.code && 'code', r.meter && 'meter']
 	return (
 		<For each={props.runs} keyed={false}>
 			{(r) => (
 				<Switch>
 					<Match when={!!r().href}><a class={cls(r())} href={external(r().href!)} target={r().href!.startsWith('/') ? undefined : '_blank'} rel="noopener noreferrer"><Text value={r().text} /></a></Match>
-					<Match when={!r().href}><span class={cls(r())}><Text value={r().text} /></span></Match>
+					<Match when={!r().href}><span class={cls(r())}><Text value={r().meter ? r().text.replace(/░/g, '\u00a0') : r().text} /></span></Match>
 				</Switch>
 			)}
 		</For>

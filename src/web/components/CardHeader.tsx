@@ -34,13 +34,13 @@ export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: 
 				</Show>
 				<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.prefix}{label()}</span>{props.children}</span>
 			</span>
+			<Show when={props.peek}>{(n) => <span class="peek"><span class="status">(+{n()} line{n() === 1 ? '' : 's'})</span></span>}</Show>
 			{props.actions}
 			<Show when={props.hidden}>{(n) => <span class="status">… {n()} more line{n() === 1 ? '' : 's'}</span>}</Show>
 			<Show when={!stats() && (exit() || more())}><span class="status">(<Show when={exit()}>{(s) => <span class={s() === 'exit 0' ? '' : 'exit'} style={s() === 'exit 1' ? { color: 'var(--neutral-fg)' } : undefined}>{s()}</span>}</Show>{exit() && more() ? ', ' : ''}{more()})</span></Show>
 			<Show when={stats()}>{(s) => <span class="status diff">(<Show when={s().added}><span class="add">+{s().added}</span></Show>{s().added && s().removed ? ' ' : ''}<Show when={s().removed}><span class="del">−{s().removed}</span></Show>, {s().lines}{rest() ? `, ${rest()}` : ''})</span>}</Show>
 			{props.activity}
 			<Show when={stats() && count()}>{(c) => <span class="status line-count">({c()})</span>}</Show>
-			<Show when={props.peek}>{(n) => <span class="peek"><span class="status">(+{n()} line{n() === 1 ? '' : 's'})</span></span>}</Show>
 			{props.reference}
 		</header>
 	)

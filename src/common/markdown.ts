@@ -14,6 +14,8 @@ export interface Run {
 	bold?: boolean
 	italic?: boolean
 	code?: boolean
+	// A meter: █ blocks, at most one lower block, then ░ for the empty track.
+	meter?: boolean
 	href?: string
 }
 export type Style = Omit<Run, 'text'>
@@ -34,7 +36,7 @@ const ID = /^(?:(\d+-[a-z]{3})(?:#([umartsq]\d+(?:\.\d+)?))?|#?([umartsq]\d+(?:\
 const ID_ALL = new RegExp(`${ID.source}$`)
 
 function same(a: Style, b: Style): boolean {
-	return a.bold === b.bold && a.italic === b.italic && a.code === b.code && a.href === b.href
+	return a.bold === b.bold && a.italic === b.italic && a.code === b.code && a.meter === b.meter && a.href === b.href
 }
 
 // The closer `until` at s[i]. A * that starts *** closes the italic
@@ -129,6 +131,12 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 		if (id && to) {
 			add(id[0], { ...st, href: to })
 			i += id[0].length
+			continue
+		}
+		let meter = /[█▁-▇░]/.test(c) ? /^█*[▁-▇]?░*/.exec(s.slice(i))![0] : ''
+		if (meter.length > 1) {
+			add(meter, { ...st, meter: true })
+			i += meter.length
 			continue
 		}
 		let entity = c === '&' ? /^&(nbsp|amp|lt|gt|quot);/.exec(s.slice(i)) : null
