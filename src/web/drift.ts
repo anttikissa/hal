@@ -11,11 +11,10 @@ function init(): void {
 		let st = scroll.state, el = st.el
 		if (!el) return
 		let e = diagnostics.record(kind, document.visibilityState, gap)
-		if (e) Object.assign(e, { cause: scrollCauses.find((cause) => cause === why) ?? 'other', scroll: { top: Math.max(0, el.scrollTop), height: el.scrollHeight, client: el.clientHeight, set: Math.max(0, st.set), gap: scroll.gap(el), pinned: st.pinned, held: !!st.held, intent: !!st.intent } } satisfies Partial<Breadcrumb>)
+		if (e) Object.assign(e, { cause: scrollCauses.find((cause) => cause === why) ?? 'other', scroll: { top: Math.max(0, el.scrollTop), height: el.scrollHeight, client: el.clientHeight, gap: scroll.gap(el), pinned: st.pinned, held: !!st.held, intent: !!st.intent } } satisfies Partial<Breadcrumb>)
 		diagnostics.report()
 	}
-	scroll.onTrace = trace
-	scroll.onPull = (gap, why) => trace(why, 'pulled', gap)
+	scroll.onTrace = (why, gap) => trace(why, gap === undefined ? 'scroll' : 'pulled', gap)
 	let stuck = 0, previous = ''
 	setInterval(() => {
 		let st = scroll.state, el = st.el

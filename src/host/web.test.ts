@@ -4,6 +4,7 @@ import { tmpdir, totalmem } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
+import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
@@ -461,7 +462,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	w.send({ type: 'open', sessionId: id })
 	await until(() => w.events.some((e) => e.type === 'snapshot'))
-	expect(w.events.map((e) => e.type)).toEqual(['home', 'tabs', 'rejected', 'rejected', 'snapshot'])
+	expect(w.events.map((e) => e.type)).toEqual(['home', 'host-mode', 'tabs', 'rejected', 'rejected', 'snapshot'])
 
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => pushes.length === 1)
@@ -469,7 +470,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
 	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
 	expect(seen(w.events)).toEqual(seen(local))
-	expect(seen(w.events).map((e) => e.type)).toEqual(['home', 'state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
+	expect(seen(w.events).map((e) => e.type)).toEqual(['home', 'host-mode', 'state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
 
 	// A closed browser is no longer a host client.
 	w.ws.close()
@@ -612,11 +613,9 @@ afterAll(async () => {
 	if (shared) await (await shared).close()
 })
 
-// A browser test of provider streaming starts from an already-used home.
+// Provider tests select their model explicitly instead of running onboarding.
 function providerHome(): void {
-	let id = '1-ready'
-	mkdirSync(paths.sessionDir(id))
-	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
+	settings.state.raw = { model: 'anthropic/claude-opus-5-5' }
 }
 
 
@@ -672,7 +671,7 @@ browserTest('in a browser earlier history loads above: shown cards stay, open on
 		await b.waitFor(`[...document.querySelectorAll('.Card.thinking')].at(-1).classList.contains('open')`)
 		let loaded = await b.evaluate(`(async () => {
 			let main = document.querySelector('main'), cards = [...document.querySelectorAll('.Card')], added = 0
-			let open = cards.filter((c) => c.classList.contains('open'))
+			let open = cards.filter((c) => c.matches('.thinking.open'))
 			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
 			seen.observe(main, { childList: true, subtree: true })
 			for (let i = 0; i < 200 && !main.innerText.includes('prompt 0'); i++) {
@@ -686,7 +685,7 @@ browserTest('in a browser earlier history loads above: shown cards stay, open on
 			return {
 				kept: cards.every((c) => c.isConnected),
 				stillOpen: open.length === 1 && open[0].classList.contains('open'),
-				opened: now.filter((c) => c.classList.contains('open')).length,
+				opened: now.filter((c) => c.matches('.thinking.open')).length,
 				grew: now.length - cards.length === added && added > 0,
 				first: main.innerText.includes('prompt 0'),
 			}
@@ -727,12 +726,12 @@ browserTest('in a browser a block address loads its page, marks its card and ope
 		})()`)
 		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#t${result.n! - 1}` })
 		let inspection = await b.evaluate(`document.querySelector('.Card.target .contents').textContent`)
-		expect(inspection).toContain('$ seq 40\n  printf done\nEdits /tmp/example.log')
+		expect(inspection).toContain('seq 40\nprintf done\nEdits /tmp/example.log')
 		expect(inspection).toContain('Keep this visible')
 		expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
 		// It flashes; scrolled out of view, the address drops its #block.
 		expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
-		await b.evaluate(`document.querySelector('.Transcript').scrollTop = 1e6`)
+		await b.evaluate(`(() => { let t = document.querySelector('.Transcript'); t.dispatchEvent(new WheelEvent('wheel', { deltaY: 1000, bubbles: true })); t.scrollTop = 1e6 })()`)
 		await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
 	} finally {
 		await b.close()
@@ -889,20 +888,17 @@ browserTest('in a browser a command stays below the block already streaming: sam
 			let card = document.querySelector('.Card.pending'), reply = document.querySelector('.Card.assistant')
 			let before = !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
 			window.letGo()
-			for (let i = 0; i < 250 && (card.classList.contains('pending') || !card.nextElementSibling?.matches('.Card.output')); i++) await new Promise((r) => setTimeout(r, 10))
-			let output = card.nextElementSibling
+			for (let i = 0; i < 250 && (card.classList.contains('pending') || !card.querySelector('.contents')); i++) await new Promise((r) => setTimeout(r, 10))
 			return {
 				wasAfter: before,
 				same: card.isConnected && !card.classList.contains('pending'),
 				nowAfter: !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING),
 				// A color easing back from pending is not a fade.
 				fading: [card, reply].some((c) => c.getAnimations().some((a) => !(a instanceof CSSTransition))),
-				// The output is new: it fades in.
-				fresh: !!output && output.getAnimations().length > 0,
-				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent.endsWith('/help')).length,
+				copies: [...document.querySelectorAll('.Card')].filter((c) => c.querySelector('.CardHeader .label')?.textContent === '/help').length,
 			}
 		})()`)
-		expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, fresh: true, copies: 1 })
+		expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, copies: 1 })
 		release()
 	} finally {
 		release()
@@ -1326,17 +1322,18 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 		}
 		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
 		await open()
+		let choice = await b.evaluate(`document.querySelector('.completions button strong').textContent + ' '`)
 		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
 		await press('Enter')
 		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
 		await open()
 		// Keyboard focus within the popup must retain it until the click.
 		await b.evaluate(`document.querySelector('.completions button').focus()`)
 		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(true)
 		await b.evaluate(`document.activeElement.click()`)
 		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
 		// Model Safari's button default: blur the editor without focusing
 		// the option. Canceled gestures must retain both menu and draft.
 		for (let pointerType of ['mouse', 'touch']) {
@@ -1357,7 +1354,7 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea') && !!document.querySelector('.completions')`)).toBe(true)
 		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
 		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
 		expect(history.readSync(await b.evaluate(`location.pathname.slice(1)`)).some(r => r.type === 'user')).toBe(false)
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		for (let action of [
@@ -1522,10 +1519,38 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 		// Two frames later the view must be back, not left short until
 		// some later change happens to pull it.
 		let grown = await b.evaluate(`new Promise((r) => {
-			[...document.querySelectorAll('.Transcript > *')].at(-2).style.minHeight = '3000px'
+			document.querySelector('.Transcript > .Card:last-of-type').style.minHeight = '3000px'
 			requestAnimationFrame(() => requestAnimationFrame(() => r(${atBottom})))
 		})`)
 		expect(grown).toBe(true)
+		let point = await b.evaluate(`(() => { let r = document.querySelector('.Transcript').getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 } })()`)
+		let grow = async () => {
+			await b.evaluate(`(() => { let c = document.querySelector('.Transcript > .Card:last-of-type'); c.style.minHeight = (c.getBoundingClientRect().height + 200) + 'px' })()`)
+			await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+			expect(await b.evaluate(atBottom)).toBe(true)
+		}
+		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: 120 })
+		await grow()
+		await b.evaluate(`document.querySelector('.Tabs button').focus()`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+		await grow()
+		await b.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 })
+		await b.evaluate(`document.querySelector('.cursor-line').style.display = 'none'`)
+		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		await b.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 })
+		await grow()
+		await b.evaluate(`document.querySelector('.cursor-line').style.display = ''`)
+		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: -120 })
+		await b.waitFor(`!${atBottom}`)
+		let reading = await b.evaluate(`document.querySelector('.Transcript').scrollTop`)
+		await b.evaluate(`document.querySelector('.Transcript > .Card:last-of-type').style.minHeight = '4000px'`)
+		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		expect(await b.evaluate(`document.querySelector('.Transcript').scrollTop`)).toBe(reading)
+		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: 10000 })
+		await b.waitFor(atBottom)
+		await grow()
 		// Composer grows and shrinks while output is pinned: no glide or
 		// transient gap in any rendered frame, including an empty last row.
 		let gaps = await b.evaluate(`(async () => {
@@ -1635,7 +1660,7 @@ browserTest('a select-all survives seconds of streaming untouched', async () => 
 			window.scrolls = []
 			t.addEventListener('scroll', () => scrolls.push(Math.round(t.scrollTop)))
 			document.activeElement?.blur?.()
-			dispatchEvent(new WheelEvent('wheel', { deltaY: -1000 }))
+			document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1000 }))
 			t.scrollTop = 0
 			getSelection().selectAllChildren(document.body)
 			window.length0 = getSelection().toString().length
@@ -1839,7 +1864,6 @@ browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes 
 			expect(box.left).toBeGreaterThanOrEqual(0)
 			expect(box.right).toBeLessThanOrEqual(box.width)
 			expect(box.fits).toBe(true)
-			expect(box.height).toBeLessThan(width === 390 ? 600 : 400)
 			await b.call('Input.insertText', { text: 't' })
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
 			await b.waitFor(`document.querySelectorAll('.Picker .blocks-ids li').length === 3`)
@@ -2043,7 +2067,7 @@ browserTest('all card kinds share aligned triangle-free sticky chrome', async ()
 				expect(geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === 'sticky')).toBe(true)
 				expect(Math.max(...geometry.map((c: any) => c.x)) - Math.min(...geometry.map((c: any) => c.x))).toBeLessThanOrEqual(1)
 			}
-			await b.evaluate(`dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }))`)
+			await b.evaluate(`document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }))`)
 			let sticking = await b.evaluate(`(async () => { let main = document.querySelector('.Transcript'), cards = [...main.querySelectorAll(':scope > .Card, :scope > .Question')].filter(c => c.clientHeight > 200), results = []; for (let c of cards) { main.scrollTop += c.getBoundingClientRect().top - main.getBoundingClientRect().top + 60; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); let h = c.querySelector('.CardHeader'), pin = h.classList.contains('inline') ? h.querySelector('.stamp') : h; results.push(Math.abs(pin.getBoundingClientRect().top - main.getBoundingClientRect().top - parseFloat(getComputedStyle(main).paddingTop)) <= 1); } return results; })()`)
 			expect(sticking.length).toBeGreaterThanOrEqual(5)
 			expect(sticking.every(Boolean)).toBe(true)

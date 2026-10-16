@@ -69,7 +69,7 @@ test('diagnostic validation rejects malformed collections and numeric state', ()
 })
 
 test('scroll diagnostics project structural snapshots without leaking arbitrary causes or fields', () => {
-	let entry = { at: 1, kind: 'pulled', detail: 'visible', cause: 'resize', scroll: { top: 5, height: 100, client: 80, set: 4, gap: 15, pinned: false, held: false, intent: true } } satisfies Breadcrumb
+	let entry = { at: 1, kind: 'pulled', detail: 'visible', cause: 'resize', scroll: { top: 5, height: 100, client: 80, gap: 15, pinned: false, held: false, intent: true } } satisfies Breadcrumb
 	let clean = (e: unknown) => webDiagnostics.clean({ ...report(), entries: [e] })
 	expect(clean({ ...entry, scroll: { ...entry.scroll, text: 'private' } })?.entries).toEqual([entry])
 	expect(clean({ ...entry, cause: 'private' })?.entries[0]?.cause).toBeUndefined()

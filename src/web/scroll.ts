@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // One pinned bottom: changes keep it at the bottom without animation.
-// Reader input leaves following; history and viewport changes preserve
-// reading anchors, and each tab keeps its position. Tasks: 4s, e5h.
+// Navigation away releases following; layout clamps do not. History,
+// viewport and tab changes preserve reading anchors. Tasks: 4s, 981.
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
@@ -48,37 +48,28 @@ function keep(): boolean {
 	return true
 }
 
-function intent(): void {
+function intent(event?: Event): void {
 	let el = scroll.state.el
-	if (el) scroll.state.intent = { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight }
+	if (el) { scroll.state.intent = true; if (!event) scroll.state.top = el.scrollTop }
+	if (event) scroll.onTrace(event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type)
 }
 
-function wheel(): void {
-	scroll.leave()
-	intent()
-}
-
-// A new finger gesture is deliberate, unlike leftover wheel momentum.
-// Streaming must not fight it while the finger is dragging away from
-// the bottom, even before the gap has crossed the follow threshold.
-function touchStart(): void {
-	scroll.state.touching = true
-	scroll.leave()
-	intent()
-}
-
-function touchEnd(): void {
-	scroll.state.touching = false
-	scroll.check('touchend', true)
+function navigate(): void {
+	let st = scroll.state, el = st.el
+	if (!el) return
+	// Layout can clamp the old position; only movement beyond that is navigation.
+	if (st.intent && Math.abs(el.scrollTop - Math.min(st.top, scroll.target(el, 0))) > atBottom) {
+		st.pinned = scroll.gap(el) <= atBottom
+		st.held = undefined
+		scroll.onTrace(st.pinned ? 'resume' : 'drag')
+	}
+	st.top = el.scrollTop
 }
 
 function onKey(e: KeyboardEvent): void {
 	let t = e.target as Element | null
-	// Find in page jumps to a match, from any field.
 	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
-	if (find) return scroll.leave()
-	// Tab may focus a card off screen, and the browser scrolls it into view.
-	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) { scroll.leave(); intent() }
+	if (!e.defaultPrevented && (find || ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')))) intent(e)
 }
 
 // Sets the view's position and remembers it as ours, so the scroll
@@ -95,40 +86,21 @@ function put(el: Box, top: number): void {
 function moved(): void {
 	let st = scroll.state
 	if (!st.el) return
-	st.set = st.el.scrollTop
+	st.top = st.el.scrollTop
 	st.reanchor()
 }
 
 // Runs after anything that may have moved the view or grown the
 // content: a scroll event, a DOM change, the tab shown again. `why`
-// names the trigger for diagnostics (onPull).
-function check(why: string, scrolled = false): void {
+// names the trigger for diagnostics.
+function check(why: string): void {
 	let st = scroll.state, el = st.el
 	if (!el) return
-	// A move we did not make, while a mouse button or finger is down,
-	// is the reader dragging: selecting past the edge, middle-button
-	// autoscroll, or the scrollbar thumb.
-	if (scrolled && (st.pressing || st.touching) && Math.abs(el.scrollTop - st.set) > 2) st.pinned = false
-	// A move we did not make lets the held card go.
-	if (scrolled && Math.abs(el.scrollTop - st.set) > 2) st.held = undefined
-	if (scroll.keep()) return
+	navigate()
+	if (!st.pinned) { scroll.keep(); return }
 	let g = scroll.gap(el)
-	// Content shrinking to the bottom is not permission to follow again.
-	// Only an actual reader scroll can resume following there.
-	if (g <= atBottom) {
-		let reader = st.intent
-		if (scrolled && !st.touching && reader && reader.height === el.scrollHeight && reader.client === el.clientHeight && el.scrollTop > reader.top + atBottom) {
-			st.pinned = true
-			st.intent = undefined
-		}
-		return
-	}
-	// Pinned but above the bottom:
-	// something other than the reader moved the view or grew the
-	// content. Pull back, unless a press is under way (a click or the
-	// start of a selection must not have the text slide under it).
-	if (!st.pinned || st.pressing || st.touching) return
-	scroll.onPull(g, why)
+	if (g <= atBottom) return
+	scroll.onTrace(why, g)
 	scroll.put(el, scroll.target(el, 0))
 }
 
@@ -165,19 +137,17 @@ function quiet(change: () => void): void {
 // the top.
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
+	scroll.state.top = el.scrollTop
 	let { stop: stopReflow, capture } = reflow.watch(el, () => {
-		if (scroll.state.touching || scroll.state.pressing) return true
+		navigate()
+		if (scroll.state.pinned) { scroll.put(el, scroll.target(el, 0)); return true }
 		if (scroll.keep()) return true
-		// Pinned: the bottom is the anchor, whatever the reading anchor says.
-		if (scroll.state.pinned) {
-			scroll.put(el, scroll.target(el, 0))
-			return true
-		}
+		scroll.state.intent = undefined
 		return false
 	})
 	scroll.state.reanchor = capture
 	let scrolled = () => {
-		scroll.check('scroll', true)
+		scroll.check('scroll')
 		if (scroll.atTop()) onTop()
 	}
 	el.addEventListener('scroll', scrolled, { passive: true })
@@ -199,21 +169,11 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	// Catch up after the browser suspends a background tab.
 	let shown = () => { if (!document.hidden) scroll.check('shown') }
 	document.addEventListener('visibilitychange', shown)
-	// A press inside the transcript; on the scrollbar (right of the
-	// content box) it is the reader taking the view.
-	let press = (e: PointerEvent) => {
-		scroll.state.pressing = true
-		if (e.target === el && e.offsetX >= el.clientWidth) { scroll.leave(); intent() }
-	}
-	let release = () => { scroll.state.pressing = false; scroll.check('release') }
-	el.addEventListener('pointerdown', press, { passive: true })
-	addEventListener('pointerup', release, { passive: true })
-	addEventListener('pointercancel', release, { passive: true })
-	addEventListener('wheel', wheel, { passive: true })
-	el.addEventListener('touchstart', scroll.touchStart, { passive: true })
-	el.addEventListener('touchend', scroll.touchEnd, { passive: true })
-	el.addEventListener('touchcancel', scroll.touchEnd, { passive: true })
-	addEventListener('keydown', scroll.onKey)
+	let wheel = (e: WheelEvent) => { if (!e.ctrlKey && e.deltaY) intent(e) }
+	el.addEventListener('pointerdown', intent, { passive: true })
+	el.addEventListener('touchstart', intent, { passive: true })
+	el.addEventListener('wheel', wheel, { passive: true })
+	addEventListener('keydown', onKey)
 	return () => {
 		scroll.state.el = null
 		scroll.state.reanchor = () => {}
@@ -222,16 +182,10 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		content.disconnect()
 		cards.disconnect()
 		document.removeEventListener('visibilitychange', shown)
-		el.removeEventListener('pointerdown', press)
-		removeEventListener('pointerup', release)
-		removeEventListener('pointercancel', release)
-		scroll.state.pressing = false
-		removeEventListener('wheel', wheel)
-		el.removeEventListener('touchstart', scroll.touchStart)
-		el.removeEventListener('touchend', scroll.touchEnd)
-		el.removeEventListener('touchcancel', scroll.touchEnd)
-		scroll.state.touching = false
-		removeEventListener('keydown', scroll.onKey)
+		el.removeEventListener('pointerdown', intent)
+		el.removeEventListener('touchstart', intent)
+		el.removeEventListener('wheel', wheel)
+		removeEventListener('keydown', onKey)
 	}
 }
 
@@ -239,9 +193,10 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 // and keeps a bottom reader at the bottom.
 function follow(change: () => void, force = false): void {
 	let st = scroll.state
-	if (force) st.pinned = true
+	navigate()
+	if (force) { st.pinned = true; st.held = undefined; st.intent = undefined; scroll.onTrace('force') }
 	change()
-	if (st.el && st.pinned && (force || (!st.touching && !st.pressing))) scroll.put(st.el, scroll.target(st.el, 0))
+	scroll.check('content')
 }
 
 // Each tab keeps its place: a pinned reader returns to the bottom
@@ -258,24 +213,23 @@ function save(id: string): void {
 function restore(id: string): void {
 	let el = scroll.state.el
 	if (!el) return
+	scroll.state.held = undefined
+	scroll.state.intent = undefined
 	let place = scroll.state.places.get(id) ?? { gap: 0 }
 	// A tab never shown here opens pinned at the bottom.
 	scroll.state.pinned = 'gap' in place && place.gap <= atBottom
 	scroll.put(el, 'top' in place ? place.top : scroll.target(el, place.gap))
+	scroll.onTrace('restore')
 }
 
 export const scroll = {
 	// Further above the bottom than this shows the scroll-to-bottom pill.
 	awayPx: 200,
 	nearTop: 800,
-	// `pinned`: see the header. `pressing`: a mouse button or pen is down
-	// in the transcript. `set`: the last position this module set.
 	// `reanchor`: takes reflow's reading anchor at the current view.
 	// `held`: the card hold() keeps in place, at `top` in the viewport.
-	state: { el: null as Box | null, intent: undefined as { top: number; height: number; client: number } | undefined, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, held: undefined as { card: Element; top: number } | undefined, places: new Map<string, { top: number } | { gap: number }>() },
-	// Called when a pinned view is pulled back to the bottom, with the
-	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
-	onPull: (_gap: number, _why: string): void => {},
+	state: { el: null as Box | null, top: 0, intent: undefined as true | undefined, reanchor: (): void => {}, quiet: false, pinned: true, held: undefined as { card: Element; top: number } | undefined, places: new Map<string, { top: number } | { gap: number }>() },
+	onTrace: (_why: string, _pull?: number): void => {},
 	gap,
 	leave,
 	hold,
@@ -284,9 +238,7 @@ export const scroll = {
 	moved,
 	check,
 	target,
-	touchStart,
-	touchEnd,
-	onKey,
+	intent,
 	atTop,
 	anchor,
 	quiet,

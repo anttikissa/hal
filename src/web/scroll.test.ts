@@ -46,15 +46,15 @@ test('earlier history put above keeps what the reader was reading in place', () 
 test('following is immediate; a reader leaving even 10px is not pulled back', () => {
 	let original = { ...scroll.state }
 	let el = box(1000, 600, 400)
-	Object.assign(scroll.state, { el, pinned: true, touching: false, pressing: false })
+	Object.assign(scroll.state, { el, pinned: true })
 	try {
 		scroll.follow(() => { el.scrollHeight += 100 })
 		expect(el.scrollTop).toBe(700)
-		scroll.touchStart()
+		scroll.intent()
 		el.scrollTop = 690
 		scroll.follow(() => { el.scrollHeight += 100 })
 		expect(el.scrollTop).toBe(690)
-		scroll.touchEnd()
+		scroll.check('scroll')
 		scroll.follow(() => { el.scrollHeight += 100 })
 		expect(el.scrollTop).toBe(690)
 		scroll.follow(() => {}, true)
@@ -65,13 +65,13 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 		expect(el.scrollTop).toBe(920)
 		// Reader scrolls back to bottom and resumes following.
 		scroll.leave()
-		scroll.touchStart()
+		scroll.intent()
 		el.scrollTop = 910
-		scroll.touchEnd()
+		scroll.check('scroll')
 		// Still above bottom: a new downward gesture reaches it.
-		scroll.touchStart()
+		scroll.intent()
 		el.scrollTop = 920
-		scroll.touchEnd()
+		scroll.check('scroll')
 		expect(scroll.state.pinned).toBe(true)
 		scroll.follow(() => { el.scrollHeight += 100 })
 		expect(el.scrollTop).toBe(1020)
@@ -83,12 +83,12 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 test('content shrinking to the bottom never resumes following for a reader', () => {
 	let original = { ...scroll.state }
 	let el = box(1000, 300, 400)
-	Object.assign(scroll.state, { el, pinned: false, touching: false, pressing: false, set: 300 })
+	Object.assign(scroll.state, { el, pinned: false })
 	try {
 		el.scrollHeight = 700
 		scroll.check('content')
 		expect(scroll.state.pinned).toBe(false)
-		scroll.check('scroll', true)
+		scroll.check('scroll')
 		expect(scroll.state.pinned).toBe(false)
 		scroll.check('resize')
 		scroll.follow(() => { el.scrollHeight += 500 })
@@ -97,4 +97,46 @@ test('content shrinking to the bottom never resumes following for a reader', () 
 	} finally {
 		Object.assign(scroll.state, original)
 	}
+})
+
+test('input without navigation and layout clamps preserve following', () => {
+	let original = { ...scroll.state }, el = box(1000, 600, 400)
+	Object.assign(scroll.state, { el, pinned: true, held: undefined, intent: undefined })
+	try {
+		scroll.intent()
+		scroll.follow(() => { el.scrollHeight += 200 })
+		expect(el.scrollTop).toBe(800)
+		scroll.intent()
+		el.scrollHeight -= 100
+		el.scrollTop = 700
+		scroll.check('scroll')
+		scroll.follow(() => { el.scrollHeight += 200 })
+		expect(el.scrollTop).toBe(900)
+		expect(scroll.state.pinned).toBe(true)
+	} finally { Object.assign(scroll.state, original) }
+})
+
+test('forced bottom navigation releases a linked-card anchor', () => {
+	let original = { ...scroll.state }, el = box(1000, 200, 400)
+	let card = { isConnected: true, getBoundingClientRect: () => ({ top: 200 - el.scrollTop }) } as Element
+	Object.assign(scroll.state, { el, pinned: false, held: undefined, intent: undefined })
+	try {
+		scroll.hold(card)
+		scroll.follow(() => {}, true)
+		scroll.check('content')
+		expect(el.scrollTop).toBe(600)
+		expect(scroll.state.held).toBeUndefined()
+	} finally { Object.assign(scroll.state, original) }
+})
+
+test('compositor movement before input delivery still releases following', () => {
+	let original = { ...scroll.state }, el = box(1000, 600, 400)
+	Object.assign(scroll.state, { el, top: 600, pinned: true, intent: undefined })
+	try {
+		el.scrollTop = 480
+		scroll.intent(new Event('wheel'))
+		scroll.follow(() => { el.scrollHeight += 200 })
+		expect(el.scrollTop).toBe(480)
+		expect(scroll.state.pinned).toBe(false)
+	} finally { Object.assign(scroll.state, original) }
 })
