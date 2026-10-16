@@ -1,7 +1,7 @@
 {
 	title: 'Keep background command result headers reachable',
 	spec: 'Expanded web background Bash completion cards retain a sticky header just like expanded tools. Identify these cards through bashResult.background rather than treating every prompt as a tool. Preserve collapse and links. Invariant restored: every expanded tool-output card, including asynchronous completion messages, keeps its collapse header reachable while scrolling its output. Ordinary human and inter-session messages keep their current positioning.',
-	status: 'planned',
+	status: 'done',
 	notes: [
 		'The reported card was a background completion prompt, not a foreground tool. Reused the background-result class from task 3d3. Real Card smoke checks at 500px and 1200px verify sticky position, opaque background, hit testing, card-bottom containment, link clicks without collapse and timestamp collapse with aria-expanded false. The original foreground-only check did not cover this distinct card type.'
 	],

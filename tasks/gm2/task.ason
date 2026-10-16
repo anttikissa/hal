@@ -1,0 +1,10 @@
+{
+	title: 'Target sticky controls correctly in browser touch checks',
+	spec: 'The browser completion selection/touch regression targets visible header controls after scrolling their owning card into view and uses an actual client rect for wrapped inline text rather than the empty gap inside its bounding rect. Preserve real touch hit testing and assertions that body taps never collapse cards while header taps do.',
+	status: 'done',
+	notes: [
+		'The miss was the empty gap between two wrapped label fragments: bounding-rect center hit the parent flow span, not the label. getClientRects()[0] targets rendered text. Header scrolling uses the owning card to avoid displaced sticky layout coordinates. Focused real-browser selection/touch check passed with 17 assertions at phone and desktop widths.'
+	],
+	needs: ['524'],
+	foldInto: ['524']
+}
