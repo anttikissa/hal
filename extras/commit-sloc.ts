@@ -1,6 +1,7 @@
-// Tells the model how many source lines each of its commits added, by
-// the rules of scripts/sloc (non-blank, non-comment lines in non-test
-// .ts/.tsx files). Counts only the commit's own files, so it stays fast.
+// Tells the model and the commit card title how many source lines each
+// of its commits added, by the rules of scripts/sloc (non-blank,
+// non-comment lines in non-test .ts/.tsx files). Counts only the
+// commit's own files, so it stays fast.
 // Enable with plugins/commit-sloc.ts (see extras/README.md).
 //
 // Also rejects background Bash calls that commit: only a foreground call's
@@ -40,6 +41,7 @@ export default (plugin: Plugin) => {
 		let paths = info.files.map((f) => f.path.slice(info.root.length + 1)).filter(source)
 		let net = 0
 		for (let p of paths) net += await at(info.root, info.hash, p) - await at(info.root, `${info.hash}~1`, p)
-		return [...lines, `Total: ${net >= 0 ? '+' : ''}${net} source LOC.`]
+		info.tags.push(`${net >= 0 ? '+' : ''}${net} LOC`)
+		return lines
 	})
 }

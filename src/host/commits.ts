@@ -24,8 +24,8 @@ import { transcript } from '../common/transcript.ts'
 type Watch = { sessionId: string; callId?: string; cwd: string; log: string; size: number; start: number }
 // What commits.committed gets: one commit a Bash call of `sessionId` made
 // (its Session trailer names that session). Paths are absolute; a binary
-// file counts -1 lines.
-export type Committed = { sessionId: string; callId?: string; cwd: string; root: string; hash: string; short: string; subject: string; amend: boolean; files: { path: string; added: number; removed: number }[] }
+// file counts -1 lines. Hooks may push short `tags` for the card title.
+export type Committed = { sessionId: string; callId?: string; cwd: string; root: string; hash: string; short: string; subject: string; amend: boolean; files: { path: string; added: number; removed: number }[]; tags: string[] }
 type Entry = { hash: string; time: number; amend: boolean }
 
 // A missing reflog before the call counts as empty, so an initial commit shows.
@@ -161,9 +161,11 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 				let files = numstat.text.split('\0').filter(Boolean).map((f) => { let [a, r, path] = f.replace(/^\n/, '').split('\t'); return { path: join(root!, path!), added: a === '-' ? -1 : Number(a), removed: r === '-' ? -1 : Number(r) } })
 				let block: CommitBlock = { hash: e.hash, short: c.short, subject: c.subject, ...(e.amend && { amend: true as const }), files: files.map((f) => ({ ...f, path: relative(root!, f.path) })) }
 				found.push(block)
-				let added = await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files })
+				let tags: string[] = []
+				let added = await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files, tags })
 				if (added.length) block.lines = added
-				lines.push(...added)
+				if (tags.length) block.tags = tags
+				lines.push(...added, ...tags)
 			} catch (err: any) {
 				diag.log(`commit hook ${c.short}: ${err?.stack ?? err?.message ?? err}`)
 			}

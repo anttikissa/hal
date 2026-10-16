@@ -107,7 +107,8 @@ function receipt(item: Shown): 0 | 1 | 2 {
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
-	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
+	let notes = [item.originSession !== undefined && `in ${item.originSession}`, ...(item.type === 'output' && item.commit?.tags || [])].filter(Boolean)
+	return label !== undefined && notes.length ? `${label} (${notes.join('; ')})` : label
 }
 
 function author(item: Shown): string | undefined {

@@ -31,7 +31,7 @@ export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; o
 
 // A commit (task 179): paths relative to the repository root; a binary
 // file counts -1 lines; `lines` are those commits.committed gave.
-export type CommitBlock = { hash: string; short: string; subject: string; amend?: true; files: { path: string; added: number; removed: number }[]; lines?: string[] }
+export type CommitBlock = { hash: string; short: string; subject: string; amend?: true; files: { path: string; added: number; removed: number }[]; lines?: string[]; tags?: string[] }
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:
