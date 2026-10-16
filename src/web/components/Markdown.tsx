@@ -81,7 +81,7 @@ export function Markdown(props: { text: string; streaming?: boolean; links?: Lin
 					let l = () => b() as Line, c = () => b() as Code, t = () => b() as Table
 					return <Switch>
 						<Match when={b().type === 'line'}>
-							<div class={['line', l().kind]}>
+							<div class={['line', l().kind, (props.streaming || props.interruption) && b() === blocks().at(-1) && 'tail']}>
 								<Show when={l().kind === 'li'}><span class="marker"><Text value={l().marker} /></span></Show>
 								<span><Runs runs={l().runs} /></span>
 							</div>

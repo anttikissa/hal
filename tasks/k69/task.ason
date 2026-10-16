@@ -1,0 +1,10 @@
+{
+	title: 'Keep streamed Markdown lines separated on Safari',
+	spec: 'Web Markdown preserves each source line as a separate block, including bold standalone titles followed by prose. Only the final source line is inline while a stream cursor or interruption marker follows it. The renderer assigns this inline-tail state explicitly rather than relying on CSS sibling :has invalidation as streaming appends lines. Terminal line layout stays unchanged.',
+	status: 'done',
+	notes: [
+		'Invariant: appending a source line returns every earlier line to block layout; only the final line with a cursor or interruption marker is inline. The source message retained its newline, and fresh Chromium rendered it correctly before the change. Suspected Safari sibling :has invalidation is unconfirmed without Safari. Explicit reactive tail state removes that dependency. One-off Chromium probes verified inline-to-block transitions during streaming and all-block layout on completion at desktop and phone widths; probes removed under experimental UI policy. Focused Markdown tests passed (19). Existing provider-driven browser selection test timed out during setup; the direct event probe passed. No persistent state, timers or dependencies added.'
+	],
+	needs: ['fn'],
+	foldInto: ['fn']
+}
