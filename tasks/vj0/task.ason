@@ -1,0 +1,7 @@
+{
+	title: 'INSPECT session targets show tab numbers',
+	spec: 'INSPECT <session id> heads its first line with the session ID and tab number, e.g. 12-xyz (tab 3): idle, or (no tab) when the session is not an open tab. Owned session lines show the same ID and tab form. Users find sessions by tab number, so it is the first fact an agent reports.',
+	status: 'done',
+	needs: ['m3s'],
+	foldInto: ['m3s']
+}

@@ -14,6 +14,7 @@ import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
+import { tabs } from './tabs.ts'
 
 type Target = { sessionId: string; ref: string; n?: number; call?: ToolCallBlock }
 type Listener = { ids: Set<string>; check: () => void; queued?: boolean }
@@ -109,6 +110,12 @@ async function wait(targets: Target[], signal: AbortSignal): Promise<string> {
 	})
 }
 
+// "12-xyz (tab 3)": users find sessions by tab number.
+function withTab(id: string): string {
+	let i = tabs.list().findIndex((t) => t.id === id)
+	return `${id} (${i < 0 ? 'no tab' : `tab ${i + 1}`})`
+}
+
 function inspect(t: Target): string {
 	let records = history.readSync(t.sessionId)
 	let state = status.stateOf(t.sessionId)
@@ -127,9 +134,9 @@ function inspect(t: Target): string {
 	}
 	let question = forms.open(records)
 	return [
-		`${t.ref}: ${t.call ? work.active(t) ? 'running' : 'not running' : state.type}${!t.call && state.type === 'running' ? ` (${state.phase})` : ''}`,
+		`${t.call ? t.ref : withTab(t.sessionId)}: ${t.call ? work.active(t) ? 'running' : 'not running' : state.type}${!t.call && state.type === 'running' ? ` (${state.phase})` : ''}`,
 		t.call ? `${t.call.name.toUpperCase()}: ${String(t.call.input.description ?? t.call.input.command ?? '')}` : `Name: ${sessions.open(t.sessionId).name ?? t.sessionId}`,
-		...work.children(t).map((c) => t.call ? work.inspect(c) : `Owned session: ${c.ref} (${status.stateOf(c.sessionId).type})`),
+		...work.children(t).map((c) => t.call ? work.inspect(c) : `Owned session: ${withTab(c.sessionId)}, ${status.stateOf(c.sessionId).type}`),
 		...(!t.call ? jobs.running(t.sessionId).map((id) => `Background command: ${jobs.label(t.sessionId, id)}`) : []),
 		...(question ? [`Pending question: ${question.form.text}`] : []),
 		...(output ? [`${!t.call && notify.asked(t.sessionId) ? 'Pending question' : 'Output'}:\n${output}`] : []),
