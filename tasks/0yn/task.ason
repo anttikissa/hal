@@ -1,0 +1,10 @@
+{
+	title: 'Use standard web cards for thinking',
+	spec: 'Web thinking uses the shared Card header and folding Markdown body, not a dedicated measured or scrolled preview inside the header. The header names Thinking with existing effort metadata and toggles both ways; body text supports native selection without folding. Preserve streaming, links, persisted disclosure state and italic thinking typography. Remove the Thinking component and its layout CSS. Invariant: thinking follows the same header/body interaction contract as other folding cards. This supersedes the web content-first layout in 6q1 and the thinking preview in ef0; terminal behavior is unchanged.',
+	status: 'done',
+	notes: [
+		'The shared header retains the first-text-line collapsed preview and names Thinking with effort metadata when expanded. A temporary Chrome check passed: opening through the header, native double-click text selection in the body without collapse, and closing through the header. The check was removed under the experimental UI testing policy. Twenty focused view tests, TypeScript and Card lint passed. Removed resize measurement, scrollTop writes and the dedicated thinking DOM; no per-card observer remains.'
+	],
+	needs: [],
+	foldInto: ['6q1', 'ef0']
+}

@@ -14,7 +14,6 @@
 // tools cap what they keep), so nothing is fetched.
 
 import { ToolPresentation } from './ToolPresentation.tsx'
-import { Thinking } from './Thinking.tsx'
 import { Prose } from './Prose.tsx'
 import { ToolCommand } from './ToolCommand.tsx'
 import { interruption } from '../../common/interruption.ts'
@@ -166,8 +165,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let head = () => {
 		let item = props.row.item
 		if (background()) return backgroundCommand() ?? titles.who(item)
-		// Closed thinking spends its width on the preview, not a label.
-		// Open cards keep the effort header; controls retain a named kind.
 		if (item.type === 'thinking') {
 			let first = expanded() ? '' : parser.inline(lines().find((line) => line.trim()) ?? '', !!props.cursor).map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
@@ -290,7 +287,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let sendButton = () => <Show when={props.discard}><button type="button" class="send" aria-label="Send queued message now" title="Send now; it keeps its sender and arrival time" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue next ${props.row.key}` })}><Icon name="send" /></button></Show>
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop --id ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && background() ? { output: item.text } : expanded() && resultTime() && (result()?.text || presentation()) ? undefined : props.row.result }
-	let thinking = createMemo(() => props.row.item.type === 'thinking')
 	let isChange = createMemo(() => props.row.item.type === 'output' && !!props.row.item.change)
 	let queued = createMemo(() => props.row.note !== undefined)
 	let changes = createMemo(() => isChange() ? promptChanges.rows(props.row.item) : [])
@@ -298,7 +294,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let oneRow = createMemo(() => ['turn-end', 'divider'].includes(props.row.item.type) || (props.row.item.type === 'command' && props.row.item.from === undefined && props.row.item.output === undefined))
 	let canToggle = () => blockToggle.toggles(props.row.item) || props.row.note !== undefined || closable()
 	let headerLabel = () => {
-		if (thinking()) return <Thinking text={text()} open={expanded()}>{markdown()}</Thinking>
 		if (background()) return backgroundCommand() ?? who()
 		if (isChange()) return unstamp(changes()[0]?.text ?? '')
 		if (props.row.note !== undefined) return <>{unstamp(props.row.note)}<Show when={!expanded()}> <span class="secondary">{titles.preview(text())}</span></Show></>
@@ -313,7 +308,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<For each={promptChanges.run(props.row.item)}>{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For></div></>}</For>
 	</div>
 	let content = (s: () => { kind: string; text: string }) => {
-		if (thinking() || oneRow()) return null
+		if (oneRow()) return null
 		if (isChange()) return <Show when={expanded()}>{changeBody()}</Show>
 		if (queued()) return <Show when={expanded()}><div class="content">{md() ? markdown() : parts()}</div></Show>
 		return <Show when={folding()} fallback={<div class="content"><div>
@@ -331,9 +326,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<Show when={shown()}>
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle}>
-					<CardHeader inline={thinking()} icon={thinking() ? undefined : kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
+					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
 						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
-						<Show when={props.cursor && !open() && !thinking()}>{cursor()}</Show>
+						<Show when={props.cursor && !open()}>{cursor()}</Show>
 						<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 						<Show when={failed()}><span class="error">✗</span></Show>
 						<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
