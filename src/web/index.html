@@ -70,9 +70,9 @@ html.typing .App { position: absolute; }
    corners and home indicator), so the edge rows pad themselves. */
 .Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
 .Transcript { container: transcript / inline-size; }
-.Transcript :is(.Card, .Question) { line-height: 20px; }
+.Transcript :is(.Card, .Question) { --leading: 20px; line-height: var(--leading); }
 @container transcript (width > calc(102ch + 3px)) {
-  .Transcript :is(.Card, .Question) { line-height: 22px; }
+  .Transcript :is(.Card, .Question) { --leading: 22px; }
 }
 .Transcript > * { margin: 0 0 0.5lh; }
 /* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
@@ -99,7 +99,7 @@ html.typing .App { position: absolute; }
 .Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
 .Card.thinking .CardHeader, .Card.assistant .CardHeader { min-height: 0; }
 .Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
-.Thinking { position: relative; line-height: 19px; }
+.Thinking { position: relative; top: calc((var(--leading, 19px) - 19px) / 2); line-height: 19px; }
 .Thinking .preview { overflow: hidden; max-height: 1lh; }
 .Card.open .Thinking .preview { max-height: none; }
 .Thinking .thinking-content { display: flow-root; }
