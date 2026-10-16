@@ -15,11 +15,7 @@ export const look: Look = {
 	thinking: () => ({ fg: [0.74, 0.07, 210], bold: [0.86, 0.07, 210], code: [0.8, 0.07, 210], linkBg: [0.2, 0.03, 210] }),
 	warning: () => ({ fg: [0.9, 0.17, 95], bg: [0.14, 0.03, 95], code: [0.94, 0.1, 95], linkBg: [0.24, 0.05, 95] }),
 	error: () => ({ fg: [0.7, 0.24, 25], bg: [0.15, 0.05, 25], code: [0.84, 0.15, 25], linkBg: [0.22, 0.06, 25] }),
-	// Tools stay in the grid's blues and cyans.
-	tool: () => ({ fg: [colors.fgL, colors.fgC, 235], bg: [colors.bgL, colors.bgC, 235] }),
-	toolBash: () => ({ fg: [colors.fgL, colors.fgC, 195], bg: [colors.bgL, colors.bgC, 195] }),
-	toolEval: () => ({ fg: [colors.fgL, colors.fgC, 265], bg: [colors.bgL, colors.bgC, 265] }),
-	toolRead: () => ({ fg: [colors.fgL, colors.fgC, 175], bg: [colors.bgL, colors.bgC, 175] }),
+	tool: () => ({ fg: [colors.fgL, colors.fgC, 195], bg: [colors.bgL, colors.bgC, 195] }),
 	status: (base) => ({ ...base(), highlight: [0.9, 0.15, 200] }),
 	help: (base) => ({ ...base(), key: [0.84, 0.1, 200] }),
 	page: (base) => ({ ...base(), canvas: [0.1, 0, 0], text: [0.94, 0.03, 200], accent: [0.88, 0.15, 200], field: [0.14, 0.02, 210], border: [0.62, 0.13, 205], button: [0.28, 0.08, 210] }),

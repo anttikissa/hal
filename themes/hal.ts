@@ -125,17 +125,8 @@ export const look: Look = {
 		// Where a press or a linked card's flash starts (web/flash.ts).
 		flash: [1, 0, 0],
 	}),
-	// Tools: each kind its own hue. Red is kept for real failures. A
-	// tool without its own entry (tool + capitalized name) uses `tool`.
-	tool: () => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
-	toolBash: () => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
-	toolEval: () => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
-	toolRead: () => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
-	toolGrep: () => colors.toolRead(),
-	toolGlob: () => colors.toolRead(),
-	toolLs: () => colors.toolRead(),
-	toolWrite: () => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL, 0.04, 75] }),
-	toolEdit: () => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL, 0.04, 190] }),
+	// All tool cards share Bash purple; red is kept for real failures.
+	tool: () => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 }
 
 // A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.

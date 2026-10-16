@@ -36,7 +36,7 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ kind: 'user prompt', text: 'go' },
 		{ kind: 'thinking', text: 'hm' },
 		{ kind: 'assistant', text: 'hello' },
-		{ kind: 'tool tool-bash', text: '▸ Bash List files' },
+		{ kind: 'tool', text: '▸ $ List files' },
 		{ kind: 'result log', text: 'a\nb' },
 		{ kind: 'end log', text: 'Paused.' },
 		{ kind: 'user prompt', text: 'again' },
@@ -105,10 +105,10 @@ test('idle Continue still nudges after a directory command following the final a
 	}
 })
 
-test('a tool gets a class for its name that no name can break out of', () => {
-	let kind = view.show({ type: 'tool', id: 't', name: 'My Tool"><x', input: {} })!.kind
-	expect(kind.split(' ')[0]).toBe('tool')
-	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
+test('tool names cannot change the shared card color class', () => {
+	for (let name of ['bash', 'edit', 'read', 'My Tool"><x']) {
+		expect(view.show({ type: 'tool', id: 't', name, input: {} })!.kind).toBe('tool')
+	}
 })
 
 test('the open question is filled in with browser keys and answered; afterwards it shows its quote and the answer', () => {
@@ -159,16 +159,13 @@ test('commands show who sent them, and their output; a canceled question says so
 		{ type: 'output', sessionId, text: 'nope', error: true },
 	])
 	let texts = shown(st).map((s) => s!.text)
-	expect(texts[0]).toBe('/help')
-	expect(texts[1]).toBe('Commands')
-	expect(texts[2]).toBe('/cd x')
-	// A command is drawn as the prompt it was typed as, its sender in the
-	// head; another session's in the message color (task 9p).
-	expect(shown(st)[0]!.kind).toBe('user prompt')
-	expect(shown(st)[2]!.kind).toBe('message prompt')
-	expect(titles.who(st.transcript!.items[2]!)).toBe('Command from 7-abc')
-	expect(texts[3]).toContain('(canceled)')
-	expect(shown(st)[4]!.kind).toContain('error')
+	expect(texts[0]).toBe('Commands')
+	expect(texts[1]).toBe('/cd x')
+	expect(shown(st)[0]!.kind).toBe('output log')
+	expect(shown(st)[1]!.kind).toBe('message prompt')
+	expect(titles.who(st.transcript!.items[1]!)).toBe('Command from 7-abc')
+	expect(texts[2]).toContain('(canceled)')
+	expect(shown(st)[3]!.kind).toContain('error')
 })
 
 test('Tab asks the host to complete a command; its answer fills the box only if unchanged', () => {

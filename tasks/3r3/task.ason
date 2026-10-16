@@ -1,0 +1,10 @@
+{
+	title: 'Unify tool card colors across clients',
+	spec: 'All tool cards use one shared colors.tool style, purple like the former Bash style in the built-in look, in terminal and web. Remove per-tool palette entries, name-to-style dispatch and web per-tool color classes; shipped themes customize the one tool style using their former Bash color. Preserve semantic diff and failure colors and existing output emphasis. This replaces task 1w per-tool hues and their duplicate theme definitions; reduce source lines, with no new client-specific color rules. Restore invariant: a tool name cannot change its card palette or make web disagree with terminal under the same theme. Other card hierarchy and spacing are outside this change.',
+	status: 'done',
+	notes: [
+		'Removed per-tool style fields from built-in and shipped themes, terminal name dispatch, and web per-tool class selection. Both adapters and generated CSS were checked against colors.tool for Bash, EDIT, READ, HELP and an unknown tool. Normal focused tests passed 69 cases; web view tests passed 20. Updated stale web expectations for Bash dollar headers and joined command/output records. Focused lint passed. Typecheck is blocked only by the unrelated untracked root test.ts. Rendered browser appearance remains unverified. No new dependencies, timers or state.'
+	],
+	needs: ['1w', 'd3'],
+	foldInto: ['1w', 'd3']
+}
