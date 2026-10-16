@@ -1,0 +1,10 @@
+{
+	title: 'Make sticky tool titles translucent with scroll shading',
+	spec: 'Expanded web tool and background-result headers use a translucent theme background so output remains faintly visible underneath. Replace the opaque sticky-header default from 102/524. The header stays its original shade until its natural card-top position passes 20px above the transcript top, then subtly darkens with a simple native CSS animation; scrolling back restores it. Keep sticky containment, collapse and links. Expanded headers show an output line count such as (450 lines) just before the block reference, excluding a trailing newline and using singular for one line. Terminal remains unchanged pending user decision. Avoid scroll listeners, timers and growing state.',
+	status: 'done',
+	notes: [
+		'Native view-timeline on the card (not the sticky header) uses exit-crossing 20px to 40px. Theme CSS exposes --card-bg so translucency and shading derive from each card color without changing terminal colors. One-off Chromium probe passed at 500px/1200px: unchanged shade through 20px, intermediate at 30px, full at 40px, reverse at 19px, 85% alpha, 450-line count before link, diff-count geometry and collapse removal (48 assertions). Probe removed under experimental UI policy. No scroll listeners or timers. The broad web file run exposed existing host-mode, changed-title and fixture timeouts; focused probe passes. Typecheck is blocked only by unrelated untracked root test.ts undefined ebar/zot; changed-file lint passes.'
+	],
+	needs: ['102', '524'],
+	foldInto: ['102']
+}

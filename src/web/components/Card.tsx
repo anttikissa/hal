@@ -121,6 +121,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let receipt = () => props.row.pending ? 0 : titles.receipt(props.row.item)
 	let receiptLabel = () => receipt() === 1 ? 'Delivered, not read yet' : `Read by Hal${time() ? ` at ${time()}` : ''}`
 	let ticks = () => <Show when={receipt()}><span class="receipt" role="img" aria-label={receiptLabel()} title={receiptLabel()}><Icon name={receipt() === 1 ? 'check' : 'checks'} /></span></Show>
+	let outputLines = createMemo(() => {
+		if (!expanded()) return undefined
+		let item = props.row.item
+		let output = item.type === 'tool' ? result()?.text ?? item.partial ?? '' : bashResult.background(item) && item.type === 'prompt' ? bashResult.display(item.text) : undefined
+		return output === undefined ? undefined : output ? output.replace(/\n$/, '').split('\n').length : 0
+	})
+	let reference = () => <><Show when={outputLines() !== undefined}><span class="status line-count">({outputLines()} {outputLines() === 1 ? 'line' : 'lines'})</span></Show>{link()}</>
 	let link = () => (
 		<Show when={href()} fallback={ticks()}>
 			{(h) => (
@@ -252,7 +259,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop --id ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></Show>} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></Show>} result={statusResult()} bash={bash()} reference={reference()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
@@ -312,7 +319,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						<Show when={closable() && title()}>{heading()}</Show>
 						<Show when={folding()} fallback={plain(s)}>
 							<Show when={!closable()}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={link()} activity={activity()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} limit={limit()} reference={reference()} activity={activity()}
 								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<Show when={headsWho()} fallback={<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>{titles.who(props.row.item)} <span class="secondary">{lines()[0]}</span></Show>}>{who()}</Show>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>

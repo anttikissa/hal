@@ -167,6 +167,7 @@ function css(): string {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toCss(c)}`
 		})
+		if (style.bg) decls.push(`--card-bg: ${oklch.toCss(style.bg)}`)
 		let fg = style.fg ?? style.text
 		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
 		if (fg) decls.push(`--title-fg: ${oklch.toCss(colors.title(fg))}`)
