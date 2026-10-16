@@ -96,15 +96,15 @@ function fork(parent: string, child: string): void {
 		}
 		if (r.type === 'assistant' && r.block.type === 'tool_call') pending.push(r.block.id)
 	}
-	let output = `This session is a fork of ${parent}; copied calls ran there, not here.`
+	let output = `Not run here: copied from ${parent} while it was still running there.`
 	if (pending.length) history.append(child, { type: 'user', blocks: pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output })) })
+	history.append(child, { type: 'output', text: `Forked from ${parent}. Everything above happened there.` })
 	let last = records.findLast((r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue' || r.type === 'turn_end')
 	if (last && last.type !== 'turn_end') history.append(child, { type: 'turn_end', status: 'completed', usage: {} })
 	let previous = { cwd: source.cwd, model: models.qualified(source.model, source.effort), autoclose: source.autoclose ?? false }
 	let next = { cwd: target.cwd, model: models.qualified(target.model, target.effort), autoclose: target.autoclose ?? false }
 	let changed = Object.fromEntries(Object.entries(next).filter(([key, value]) => value !== previous[key as keyof typeof previous]))
 	if (Object.keys(changed).length) history.append(child, { type: 'change', ...changed, previous })
-	history.append(child, { type: 'output', text: output })
 }
 
 // The owner's subagents still at work: what wait waits for.

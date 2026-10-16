@@ -161,7 +161,7 @@ test('commands show who sent them, and their output; a canceled question says so
 	let texts = shown(st).map((s) => s!.text)
 	expect(texts[0]).toBe('Commands')
 	expect(texts[1]).toBe('/cd x')
-	expect(shown(st)[0]!.kind).toBe('output log')
+	expect(shown(st)[0]!.kind).toBe('output plain')
 	expect(shown(st)[1]!.kind).toBe('message prompt')
 	expect(titles.who(st.transcript!.items[1]!)).toBe('Command from 7-abc')
 	expect(texts[2]).toContain('(canceled)')

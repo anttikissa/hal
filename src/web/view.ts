@@ -354,7 +354,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// heads it). The human's heads what it said, else is one row.
 			if (item.from !== undefined) return { kind: 'message prompt', text: item.text }
 			if (item.output === undefined) return { kind: 'end log', text: titles.stamp(item.ts, item.text) }
-			return { kind: item.error ? 'output error' : 'output log', text: item.output }
+			return { kind: item.error ? 'output error' : 'output plain', text: item.output }
 		case 'output':
 			// A prompt-file change or commit: its first line heads the card,
 			// so the body is the rest (tasks ar, 179).

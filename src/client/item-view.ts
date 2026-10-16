@@ -51,9 +51,9 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'prompt':
 			if (bashResult.background(item)) return itemView.toolStyle('bash')
 			return titles.letter(item) === 'm' ? colors.message() : colors.user()
-		// The human's command reads like its output (joined).
+		// The human's command reads like its output (joined): bright title, normal text.
 		case 'command':
-			return item.from !== undefined ? colors.message() : { fg: (item.error ? colors.error() : colors.log()).fg! }
+			return item.from !== undefined ? colors.message() : item.error ? { fg: colors.error().fg! } : { fg: colors.plain().fg!, title: colors.plain().title! }
 		case 'image':
 			return colors.user()
 		case 'text':
@@ -69,7 +69,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.plain().fg! }
+			return item.commit ? colors.commitCard() : item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.plain().fg!, title: colors.plain().title! }
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}
