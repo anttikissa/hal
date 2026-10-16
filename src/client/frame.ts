@@ -335,8 +335,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 // mode, where blank rows after a short history put the chrome on the
 // screen's last rows, so the prompt is always at the bottom
 // (tasks/cc/terminal.md, Height management). `past`: the items' rows
-// (layout), laid out already.
-function build(view: View, cols: number, rows = 24, full = false, past: Past = frame.layout(view, cols, Infinity, true, rows)!): Frame {
+// (layout), laid out already. `floor`: the least height in full mode,
+// padded the same way, so a shrink never clears scrollback.
+function build(view: View, cols: number, rows = 24, full = false, past: Past = frame.layout(view, cols, Infinity, true, rows)!, floor = 0): Frame {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let lines: string[] = past.lines.slice()
 	let block = (rows: string[], style: Style | undefined) => {
@@ -400,7 +401,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
 	lines.push(...helpRow.rows(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
-	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
+	let pad = full ? Math.max(0, Math.max(rows, floor) - lines.length - history.length) : 0
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)
 	let grown = view.notices ? noticeView.overlay(lines, view.notices, history.length + pad + anchor, cols) : 0

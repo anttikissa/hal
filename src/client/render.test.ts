@@ -607,23 +607,23 @@ describe('clear reasons (task e4c)', () => {
 		show(list.slice(0, -2), '', 0, true)
 		let erases = term.written.match(/\x1b\[\d*J/g)?.length ?? 0
 		expect(erases).toBe(reasons.reduce((n, r) => n + (r.kind === 'all' ? 2 : 1), 0))
-		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all scrollback edit', 'all shrink', 'all forced'])
+		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all scrollback edit', 'all forced'])
 		expect(reasons.every((r) => r.text.length > 0)).toBe(true)
 	})
 
-	test('a shrink names the block that shrank; a forced repaint its trigger', () => {
+	test('a full-mode shrink pads above the chrome instead of clearing scrollback; a forced repaint names its trigger', () => {
 		setup(20, 30)
 		let list = items(10)
 		list.push({ type: 'output', text: 'one\ntwo\nthree\nfour' })
 		show(list)
+		let height = frameText().length
 		record()
 		list = [...list.slice(0, -1), { type: 'output', text: 'one' }]
 		show(list)
-		expect(reasons[0]).toMatchObject({ kind: 'all', cause: 'shrink' })
-		expect(reasons[0]!.blocks![0]).toMatchObject({ before: 5, after: 2 })
-		expect(reasons[0]!.blocks![0]!.block).toMatch(/~20 \(output\)$/)
-		expect(reasons[0]!.text).toContain('~20 (output) 5 → 2 rows')
+		expect(reasons).toEqual([])
+		expect(frameText().length).toBe(height)
+		expect(term.content()).toEqual(frameText())
 		terminal.redraw('Ctrl-L or /redraw')
-		expect(reasons[1]).toMatchObject({ kind: 'all', cause: 'forced', trigger: 'Ctrl-L or /redraw' })
+		expect(reasons[0]).toMatchObject({ kind: 'all', cause: 'forced', trigger: 'Ctrl-L or /redraw' })
 	})
 })

@@ -41,7 +41,9 @@ function draw(force = false, trigger?: string): void {
 		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
 	}
 	st.past = { session, past }
-	let next = frame.build(st.view, cols, rows, st.fullscreen, past)
+	// Full mode never shrinks between forced paints: rows given up turn
+	// into padding above the chrome instead of clearing scrollback.
+	let next = frame.build(st.view, cols, rows, st.fullscreen, past, st.fullscreen && !force ? st.prev.length : 0)
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
 	st.view.prompt.scroll = next.promptScroll
 	let out = st.out

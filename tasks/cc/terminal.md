@@ -180,12 +180,15 @@ history and the chrome pad the frame to exactly `rows`:
 `pad = max(0, rows - chrome - history)`. A tab switch, a restart on
 any tab and a resize therefore never move the prompt off the bottom.
 
-The padding depends only on the current tab, `rows` and the chrome.
-Never derive it from what this process painted before (the old Hal's
-`peak` high-water mark): a restarted process has painted nothing, so a
-restart with several short tabs put the prompt mid-screen under the
-history. Tests must start from a fresh renderer on a short tab, not
-only switch between tabs within one run.
+The padding depends on the current tab, `rows` and the chrome, and,
+between forced paints in full mode, on a floor: the height painted
+last. Rows a frame gives up (the idle Hal cursor going away, a waiting
+message delivered, a card shrinking) become padding above the chrome,
+so a shrink never clears scrollback; later growth uses that padding
+up. Every forced paint (tab switch, resize, Ctrl-L, restart) drops the
+floor, so a restarted process with several short tabs still puts the
+prompt on the bottom rows. Tests must start from a fresh renderer on a
+short tab, not only switch between tabs within one run.
 
 ### Modals
 
@@ -360,13 +363,12 @@ row.
 
 ### 9. Fullscreen recovery respects the immutable boundary
 
-A fullscreen physical shrink moves the scrollback/writable-screen boundary upward.
-The row newly exposed by that move is already in immutable scrollback, so repainting
-the shorter writable-screen suffix would duplicate it. **Every fullscreen physical
-shrink MUST use the canonical fullscreen repaint:** clear screen and scrollback, then
-rewrite the complete frame. This may snap an inspecting user to the live bottom, but
-no in-place escape sequence can both shorten the terminal buffer and preserve its
-canonical contents.
+A fullscreen physical shrink would move the scrollback/writable-screen boundary
+upward, and no in-place escape sequence can shorten the terminal buffer while keeping
+its contents. So full-mode frames never shrink between forced paints (Height
+management): the height floor pads them instead. Should a frame shrink anyway, the
+renderer falls back to the canonical fullscreen repaint: clear screen and scrollback,
+then rewrite the complete frame.
 
 When frame height is stable and every changed old row remains on the writable screen,
 automatic repaint should avoid the canonical force path: `CSI 3J` destroys scrollback
@@ -504,8 +506,8 @@ way to selectively clear parts of it.
 ### Implications for our renderer
 
 - **Normal diff path**: only changed writable rows are rewritten. Growth may append
-  with `\r\n` and push canonical rows into scrollback. A changed immutable row or any
-  physical shrink requires a canonical fullscreen repaint.
+  with `\r\n` and push canonical rows into scrollback. Full mode pads instead of
+  shrinking; a changed immutable row requires a canonical fullscreen repaint.
 
 - **Force repaint in grow mode**: frame fits on screen. Move up, clear down,
   rewrite. Scrollback untouched.
