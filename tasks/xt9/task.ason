@@ -1,9 +1,10 @@
 {
-	title: 'Bottom-filled usage blocks in both clients',
-	spec: '/status usage bars in web and terminal use the same 14-character row of lower block characters, filling every character upward as usage increases: ▁▂▃▄▅▆▇█. Zero usage is blank; positive usage rounds up to an eighth so low usage stays visible; percentages clamp to 0..100. This replaces task ab horizontal left-to-right fill and shaded unused cells. Numeric percentages, reset labels, tables and all other behavior remain unchanged. Wider web presentation changes are out of scope.',
+	title: 'Left-filled usage bars in both clients',
+	spec: '/status usage bars in web and terminal use the same 14-character row that fills left to right: full blocks (█), then at most one partial left block (▏▎▍▌▋▊▉), then blank cells. Zero usage is blank; positive usage rounds up to an eighth of a cell so low usage stays visible; percentages clamp to 0..100. This replaces the earlier bottom-filled blocks (▁..█ repeated), which showed usage by height, and task ab shaded unused cells. Numeric percentages, reset labels, tables and all other behavior remain unchanged.',
 	status: 'done',
 	notes: [
-		'Shared status-usage.ts emits identical Markdown bars for both clients, so no web CSS or terminal renderer changes are needed. One-off boundary checks covered negative, zero, low positive, eighth boundaries, full and overfull usage; ./test status-usage markdown-view markdown passed 25 tests. Browser appearance was not visually verified. The change adds no timers, dependencies or growing state.'
+		'Shared status-usage.ts emits identical Markdown bars for both clients, so no web CSS or terminal renderer changes are needed. One-off boundary checks covered negative, zero, low positive, eighth boundaries, full and overfull usage; ./test status-usage markdown-view markdown passed 25 tests. Browser appearance was not visually verified. The change adds no timers, dependencies or growing state.',
+		'User found bottom-filled bars unreadable: every bar looked full-width. One-off check of -5, 0, 0.5, 6, 41, 46, 50, 99.9, 100, 120 gave the expected left fill.'
 	],
 	needs: ['ab'],
 	foldInto: ['ab']
