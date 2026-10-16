@@ -107,7 +107,7 @@ html.typing .App { position: absolute; }
 .Thinking .Markdown > :first-child { margin-top: 0; }
 .Thinking .stamp { padding: 0; min-height: 0; background: none; color: inherit; font: inherit; }
 .Thinking .thinking-meta { display: flex; gap: 1ch; }
-.Thinking .thinking-meta .link { position: static; padding: 0; min-width: 44px; }
+.Thinking .thinking-meta .link { position: static; padding: 0; --tap-extra: max(0px, 44px - var(--ref-width, 4ch)); min-width: 0; padding-left: var(--tap-extra); margin-left: calc(-1 * var(--tap-extra)); }
 .Thinking .more { position: absolute; bottom: var(--card-inset); right: 1ch; color: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
 .Card .result-text { color: var(--output, inherit); }
 .Card .result-text.error { background: none; }
@@ -221,7 +221,8 @@ html.typing .App { position: absolute; }
    shown on hover or focus; the linked card flashes (flash.ts). */
 .Card .link { color: var(--title-fg); text-decoration: none; user-select: none; white-space: nowrap; }
 .Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
-.Card:has(> .link) > .content { padding-right: calc(7ch + var(--receipt-space, 0ch)); }
+/* One space between the text and the reference, right: 1ch. */
+.Card:has(> .link) > .content { padding-right: calc(2ch + var(--ref-width, 4ch) + var(--receipt-space, 0ch)); }
 .Card .link::before { content: attr(data-ref); }
 .Card .link:focus-visible { color: inherit; text-decoration: underline; }
 @media (hover: hover) and (pointer: fine) { .Card .link:hover { color: inherit; text-decoration: underline; } }
