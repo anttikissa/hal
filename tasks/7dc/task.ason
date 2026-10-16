@@ -1,0 +1,10 @@
+{
+	title: 'Equal title-to-body spacing across web cards',
+	spec: 'All web transcript card kinds use the same title-to-body gap: prompt, assistant, thinking, tool and background result. Shared header and content insets own spacing; assistant and thinking do not override the shared header height or halve its inset based on tint. Restore the invariant that equal title and body line geometry has equal spacing across card kinds. Preserve body typography, content, selection and disclosure. This removes the previous untinted-card half-inset exception. Web-only pixel geometry; terminal spacing is unchanged.',
+	status: 'done',
+	notes: [
+		'Removed the thinking/assistant half-inset rule and zero-minimum-header override. Shared 44px header and content padding now own spacing for every kind. Chrome geometry probe passed at 390px and 1200px for prompt, thinking, assistant and background Bash result bodies, including wrapped narrow headers. Compare body start after the complete header plus its shared bottom inset; comparing against the first timestamp incorrectly treats a wrapped header as extra gap. Temporary UI probe removed. This deletes exceptions without adding recurring work.'
+	],
+	needs: [],
+	foldInto: ['4v']
+}

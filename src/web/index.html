@@ -94,10 +94,6 @@ html.typing .App { position: absolute; }
 .Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
 .Card.tool .content, .Card.background-result .content { color: var(--output); --sel-back: var(--output); }
-/* Thinking and model text have no tint, so half the inset reads as
-   the same gap (the user's choice, over the 44px header row). */
-.Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
-.Card.thinking .CardHeader, .Card.assistant .CardHeader { min-height: 0; }
 .Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
 .Card.thinking .Markdown { font-weight: 300; font-style: italic; }
 .Card .result-text { color: var(--output, inherit); --sel-back: var(--output, var(--fg)); }
