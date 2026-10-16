@@ -72,6 +72,7 @@ export const colors = {
 		fg: [colors.fgL, 0.16, 75],
 		cursor: [colors.fgL, 0.16, 75],
 		cursorIdle: [0.6, 0.04, 75],
+		title: [0.9, 0.14, 80],
 		bold: [0.93, 0.12, 80],
 		code: [0.88, 0.1, 80],
 		linkFg: [0.9, 0.17, 80],
