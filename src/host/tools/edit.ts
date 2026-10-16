@@ -132,6 +132,7 @@ export function parseBlocks(raw: string): { edits: Record<string, unknown>[]; th
 				new: c.length ? c.join(N) + N : '', ...(op === 'write' && v), ...(op === 'create' && { create: true })
 			})
 		}
+		if (op === 'delete' && marker(lines[i] ?? '') === 'END') i++
 	}
 	if (!edits.length) throw new Error(`EDIT needs at least one operation.${N}${help}`)
 	return { edits, ...(then.length && { then }), ...(purpose && { purpose }) }

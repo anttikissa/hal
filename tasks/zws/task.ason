@@ -1,0 +1,10 @@
+{
+	title: 'Accept an optional END after EDIT deletes',
+	spec: 'The core EDIT parser accepts one optional !!END immediately after either a line-range delete or a whole-file delete, for every model. Invariant: a redundant delete terminator does not reject an otherwise unambiguous atomic edit. It remains strict about unrelated stray markers, repeated terminators and malformed blocks; version checks, validation and atomic writes are unchanged. Keep the documented delete syntax blockless and cover the observed rejection, following operations and trailing calls with focused regression tests.',
+	status: 'done',
+	notes: [
+		'The observed Card.tsx delete with a trailing END now parses identically to its blockless form. The parser consumes only one immediately following exact END after delete; existing strict stray-marker tests remain. Focused EDIT, native-tool and tool-sequence tests: 44 pass, 0 fail. One extra marker check per operation; no new I/O or retained state.'
+	],
+	needs: ['aaj'],
+	foldInto: ['aaj']
+}

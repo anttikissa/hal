@@ -116,6 +116,31 @@ test('a file takes line operations and text replaces together; text applies afte
  expect(readFileSync(a, 'utf8')).toBe(['1', 'two', '3', 'TAIL'].join(nl) + nl)
 })
 
+test('deletes accept one optional END before another operation or trailing call', async () => {
+ for (const ending of [nl, crlf]) {
+  const a = file('a', ['keep', 'remove'].join(ending) + ending)
+  const b = file('b', 'gone')
+  const { edits, then } = parseBlocks([
+   `a@${fileText.hash(readFileSync(a))} delete 2-2`, '!!END',
+   `b@${fileText.hash(readFileSync(b))} delete`, '!!END',
+   'c create', '!!NEW', 'new', '!!END',
+   'a delete 1-1', '!!END', 'READ c',
+  ].join(ending))
+  expect(then).toEqual(['READ c'])
+  await run(edits)
+  expect(readFileSync(a, 'utf8')).toBe('')
+  expect(existsSync(b)).toBe(false)
+  expect(readFileSync(`${testHome()}/c`, 'utf8')).toBe('new' + nl)
+  unlinkSync(`${testHome()}/c`)
+ }
+ for (const operation of ['delete', 'delete 147-147']) {
+  const header = `src/web/components/Card.tsx@1e49h ${operation}`
+  expect(parseBlocks(header + nl + '!!END').edits).toEqual(parseBlocks(header).edits)
+  expect(() => parseBlocks(header + nl + '!!END' + nl + '!!END')).toThrow('EDIT line 3')
+  expect(() => parseBlocks(header + nl + '!!NEW')).toThrow('EDIT line 2')
+ }
+})
+
 test('the parser is strict: stray text after the last block is an error naming its line', () => {
  const head = ['', 'a replace', '!!OLD', 'x', '!!NEW', 'y', '!!END']
  for (const tail of [['<invoke name="tool">'], ['$ npm test'], ['approve', 'BASH "npm test"'], ['!!END'], ['some prose here']]) expect(() => parseBlocks([...head, ...tail].join(nl))).toThrow('EDIT line 8')
