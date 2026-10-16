@@ -4,7 +4,7 @@
 // right-aligned: this process's role (or the remote host) and the
 // subscription account's usage windows, after any differing
 // portable plugins (task b81). When the row is too narrow
-// the right parts go from the end, then the left is clipped. Pure.
+// the right parts go from the end, then cwd and model share the space. Pure.
 
 import { settings } from '../common/settings.ts'
 import { titles } from '../common/titles.ts'
@@ -84,7 +84,7 @@ function clip(parts: Part[], max: number): Part[] {
 
 // The row's parts in `cols` columns of content: the left, a gap, and
 // as many right groups as fit beside the whole left, at least one
-// column apart; the left clipped only when nothing is on the right.
+// column apart; compact rows retain the cwd, model and budget.
 function fit(info: StatusInfo, cols: number): Part[] {
 	let groups = statusRow.right(info)
 	// The official model name if the whole row fits, else the short one.
@@ -93,11 +93,20 @@ function fit(info: StatusInfo, cols: number): Part[] {
 	while (groups.length && width(l) + 1 + width(join(groups)) > cols) groups = groups.slice(0, -1)
 	if (!groups.length) {
 		if (width(l) <= cols) return l
-		let model = statusRow.left(info, false)[2]!
-		let budget = model.at(-1)!
-		let head = join([[{ text: info.id }], model])
+		let short = statusRow.left(info, false)
+		let cwd = short[1]![0]!
+		let model = short[2]!
+		let head = join([[{ text: info.id }], [cwd], model])
 		if (width(head) <= cols) return head
-		return [...clip([model[0]!], Math.max(0, cols - width([budget]))), ...clip([budget], cols)]
+		head = join([[cwd], model])
+		if (width(head) <= cols) return head
+		let budget = model.at(-1)!
+		let room = Math.max(1, cols - width([budget]) - SEP.length)
+		let pathRoom = Math.min(width([cwd]), Math.max(1, Math.floor(room / 2)))
+		let pathWidth = width([cwd])
+		let path = { ...cwd, text: pathWidth <= pathRoom ? cwd.text : '…' + strings.sliceVisual(cwd.text, pathWidth - pathRoom + 1, pathWidth) }
+		if (cols <= width([budget]) + SEP.length) return clip([path], cols)
+		return join([[path], [...clip([model[0]!], room - pathRoom), budget]])
 	}
 	let r = join(groups)
 	return [...l, { text: ' '.repeat(cols - width(l) - width(r)) }, ...r]

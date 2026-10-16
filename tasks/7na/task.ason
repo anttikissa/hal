@@ -1,0 +1,10 @@
+{
+	title: 'Keep the active directory visible in status',
+	spec: 'Terminal and web keep the active session cwd visible outside the transcript, updating through existing session metadata on /cd and tab switches. On narrow layouts shorten the path from the start, retaining its end, rather than omit it. This replaces the terminal fallback that kept only session ID, model and budget. Terminal drops the name and context before the directory, then the ID; share remaining space between shortened cwd and model while retaining the linked spawn budget. Web keeps its existing two-line status and start-truncated cwd, including mobile; no additional mobile row is required. Invariant: lack of status-row space must not remove the working directory.',
+	status: 'done',
+	notes: [
+		'Terminal compact fallback previously discarded cwd entirely. It now tries ID/cwd/model, then cwd/model, then shares available columns between a start-truncated path and model while preserving the budget link. Web already renders the full home-shortened path with start ellipsis in its persistent two-line status; no web changes were needed. Focused status-row tests pass. No polling or retained state added.'
+	],
+	needs: ['1g', 'a0', 'r92'],
+	foldInto: ['1g', 'a0']
+}

@@ -37,6 +37,9 @@ test('narrowing drops secondary facts but preserves the linked budget beside the
 		expect(parts.find((p) => p.text === ' 12')?.href).toBe('/budget')
 	}
 	expect(text(info, 20)).not.toContain('host')
+	expect(text(info, 60)).toContain('~/project')
+	expect(text(info, 30)).toContain('~/project')
+	expect(text(info, 20)).toContain('…roject')
 })
 
 test('the context is a heat-colored percentage of the window', () => {
