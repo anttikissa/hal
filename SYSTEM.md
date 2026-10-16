@@ -59,7 +59,7 @@ Variables:
   hal_dir, hal_home, hal_source, hal_web_url
   subagent, subagent_owner, subagent_slots
   fork, fork_parent
-  user_notes, tools_summary, agents
+  user_notes, tools_summary, skills, agents
 
 Tools: providers see one native tool, `tool` { cmd: string }; cmd is TOOL
 plus its arguments, such as READ "a.ts" or BASH "ls". README.md explains why.
@@ -214,11 +214,13 @@ Cwd: $session_cwd
 Autoclose: $session_autoclose
 ::
 
-<!-- $agents, last: the skills line (names in Hal's skills/, and in
-.agents/skills or .claude/skills of each directory below), then one
-instruction file per directory from the git root down to cwd, outermost
-first (cwd alone outside git). Each directory contributes AGENTS.md, or
-CLAUDE.md when it has no AGENTS.md. Changing cwd re-reads them. -->
+:: section "Skills" update="diff"
+$skills
+::
+
+<!-- $agents: one instruction file per directory from the git root down to
+cwd, outermost first (cwd alone outside git). Each directory contributes
+AGENTS.md, or CLAUDE.md when it has no AGENTS.md. Changing cwd re-reads them. -->
 :: section "Local instructions" update="diff"
 $agents
 ::

@@ -1,0 +1,7 @@
+{
+	title: 'Separate skills from local instructions',
+	spec: 'SYSTEM.md has a Skills section with update=diff containing $skills, preserving existing skill discovery and listing behavior. Local instructions contains $agents with only applicable AGENTS.md or CLAUDE.md files and their imports. Prompt assembly exposes skills separately from agents so their sections update independently. Document the skills template variable. This replaces the prior bundling of skills into agents.',
+	status: 'done',
+	needs: ['074', 'q5g'],
+	foldInto: ['074', 'q5g']
+}

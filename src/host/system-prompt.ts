@@ -86,8 +86,6 @@ function imports(file: string, text: string, root: string, sources?: PromptSourc
 
 function agents(cwd: string, sources?: PromptSource[]): string {
 	let parts: string[] = []
-	let skillList = skills(cwd)
-	if (skillList) parts.push(skillList)
 	let dirs = systemPrompt.candidates(cwd), root = dirs[0]!
 	try {
 		root = realpathSync(root)
@@ -122,6 +120,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		subagent_slots: String(input.slots ?? settings.subagentSlots()),
 		fork: input.parent ? 'true' : 'false', fork_parent: input.parent ?? '',
 		user_notes: input.noUser ? 'false' : 'true', tools_summary: nativeTool.summary(),
+		skills: systemPrompt.skills(input.cwd),
 		agents: systemPrompt.agents(input.cwd, sources),
 	}
 	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
@@ -157,6 +156,7 @@ function inspect(input: PromptInput): { sources: PromptSource[]; text: string; p
 export const systemPrompt = {
 	file: () => systemFile,
 	preprocess: (...args: Parameters<typeof promptTemplate.render>) => promptTemplate.render(...args),
+	skills,
 	agents,
 	candidates,
 	assemble,
