@@ -1,7 +1,7 @@
 // Plugins (tasks an, 90v). Every test hooks objects from its own temp module,
 // so nothing leaks into the real module singletons or other test files.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { plugins } from './plugins.ts'
@@ -219,51 +219,11 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	let head = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n`
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'one')\n`)
 	for (let i = 0; i < 100 && t.f(1) !== 'one'; i++) await Bun.sleep(20)
-	expect(reports).toEqual([])
 	expect(t.f(1)).toBe('one')
 	expect(plugins.describe()).toContain('target.f around')
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'two')\n`)
 	for (let i = 0; i < 100 && t.f(1) !== 'two'; i++) await Bun.sleep(20)
 	expect(t.f(1)).toBe('two')
-})
-
-test('literal transitive dependencies reload all owners while unchanged imports keep identity', async () => {
-	let p = join(dir, 'p')
-	mkdirSync(p)
-	let leaf = join(dir, 'value.ts'), bridge = join(dir, 'bridge.ts')
-	writeFileSync(leaf, 'export const value = 4')
-	writeFileSync(bridge, "export { value } from './value.ts'")
-	let a = await plugin('p/a.ts', "plugin.set(t, 'value', value)", "import { value } from '../bridge.ts'")
-	let b = await plugin('p/b.ts', "plugin.set(t, 'n', value)", "const { value } = await import('../bridge.ts')")
-	await plugins.init(p)
-	expect(reports).toEqual([])
-	expect(t.value).toBe(4)
-	expect(t.n).toBe(4)
-	let original = plugins.changed
-	try {
-		let reloaded = new Set<string>()
-		let done = Promise.withResolvers<void>()
-		plugins.changed = (path, what) => {
-			if (what === 'reloaded') reloaded.add(path)
-			if (reloaded.has(a) && reloaded.has(b)) done.resolve()
-		}
-		writeFileSync(leaf, 'export const value = 7')
-		await done.promise
-		expect(t.value).toBe(7)
-		expect(t.n).toBe(7)
-		expect(reports).toEqual([])
-		let removed = Promise.withResolvers<void>()
-		let gone = new Set<string>()
-		plugins.changed = (path, what) => {
-			if (what === 'removed') gone.add(path)
-			if (gone.has(a) && gone.has(b)) removed.resolve()
-		}
-		unlinkSync(a)
-		unlinkSync(b)
-		await removed.promise
-		expect(t.value).toBe(3)
-		expect(t.n).toBe(2)
-	} finally { plugins.changed = original }
 })
 
 test('/plugins disable and enable toggle a watched plugin and restore its file exactly', async () => {

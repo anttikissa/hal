@@ -13,7 +13,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameS
 import { basename, join, relative } from 'path'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
-import { pluginDependencies } from './plugin-dependencies.ts'
 
 type Fn = (...args: any[]) => any
 type Keys<T> = { [K in keyof T]-?: T[K] extends Fn ? K : never }[keyof T] & string
@@ -249,7 +248,6 @@ async function load(path: string): Promise<void> {
 	let entry: Loaded = { path, hash, hooks: [] }
 	let mod: any
 	try {
-		pluginDependencies.track(path)
 		// A query string makes Bun import (and run) the file afresh. The
 		// real path: through a symlinked directory (/tmp on macOS) Bun
 		// cannot find a file created after it first resolved there.
@@ -292,7 +290,6 @@ async function load(path: string): Promise<void> {
 }
 
 function remove(path: string): void {
-	pluginDependencies.remove(path)
 	let st = plugins.state
 	st.latest.set(path, ++st.gen)
 	let entry = st.files.get(path)
@@ -320,11 +317,10 @@ async function sync(d: string, name: string): Promise<void> {
 async function init(d = plugins.dir()): Promise<void> {
 	if (plugins.state.watcher) return
 	mkdirSync(d, { recursive: true })
-	pluginDependencies.init(d, async path => { if (existsSync(path)) await plugins.load(path); else plugins.remove(path) }, text => plugins.report(text))
 	pluginHistory.init(d)
 	for (let name of readdirSync(d).sort()) await plugins.sync(d, name)
 	plugins.state.watcher = watch(d, { persistent: false }, (_event, name) => {
-		if (name) void pluginDependencies.changed(join(realpathSync(d), name), () => plugins.sync(d, name))
+		if (name) void plugins.sync(d, name)
 	})
 }
 
@@ -378,7 +374,6 @@ function unpreview(last = true): void {
 
 // Stops watching and removes every plugin's hooks.
 function close(): void {
-	pluginDependencies.close()
 	plugins.state.watcher?.close()
 	plugins.state.watcher = undefined
 	pluginHistory.close()
