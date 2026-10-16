@@ -54,7 +54,7 @@ export const colors = {
 	// toolOutput: a tool's output text under its call, from the call's
 	// fg: darker at full chroma, so it reads below the command without
 	// turning gray (task hr).
-	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.22, fg[1], fg[2]],
+	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.18, fg[1], fg[2]],
 	// A percentage used (context, quota) as one continuous color: green
 	// when little is used, through yellow and orange, to red when all is.
 	// The web gets it as classes .heat-0 to .heat-100 (host/web.ts).
