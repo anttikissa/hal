@@ -12,6 +12,7 @@
 @font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/IBMPlexMono-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/IBMPlexMono-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/IBMPlexMono-BoldItalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Source Code Pro'; src: url('/fonts/SourceCodePro-LightItalic.woff2') format('woff2'); font-weight: 300; font-style: italic; font-display: swap; }
 /* The one stylesheet: layout only. Colors come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
 /* --snap-ms: a frequent change (typing starts: 3 frames at 60 Hz);
@@ -92,10 +93,11 @@ html.typing .App { position: absolute; }
 .Card.thinking .CardHeader, .Card.assistant .CardHeader { min-height: 0; }
 .Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
 .Thinking { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 1ch; padding: var(--card-inset) 1ch; }
+.Thinking { line-height: 19px; }
 .Thinking .preview { overflow: hidden; max-height: calc(var(--preview-rows) * 1lh); }
 .Card.open .Thinking .preview { max-height: none; }
 .Thinking .thinking-content { display: flow-root; }
-.Thinking .Markdown { font-style: italic; }
+.Thinking .Markdown { font-family: 'Source Code Pro', 'IBM Plex Mono', monospace; font-weight: 300; font-style: italic; }
 .Thinking .Markdown > :first-child { margin-top: 0; }
 .Thinking .stamp { padding: 0; min-height: 0; background: none; color: inherit; font: inherit; }
 .Thinking .thinking-meta { display: flex; gap: 1ch; }
