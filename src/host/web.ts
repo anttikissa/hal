@@ -170,7 +170,7 @@ function css(): string {
 		if (style.bg) decls.push(`--card-bg: ${oklch.toCss(style.bg)}`)
 		let fg = style.fg ?? style.text
 		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
-		if (fg) decls.push(`--title-fg: ${oklch.toCss(colors.title(fg))}`)
+		if (fg) decls.push(`--title-fg: ${oklch.toCss(style.title ?? colors.title(fg))}`)
 		// Selection is reverse video in the style's own color (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (fg) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)

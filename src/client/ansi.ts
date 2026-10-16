@@ -91,7 +91,7 @@ function quiet(text: string, style: Style | undefined): string {
 }
 
 function heading(text: string, style: Style | undefined): string {
-	return !style?.fg || ansi.mono() ? text : ansi.sgr({ fg: colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
+	return !style?.fg || ansi.mono() ? text : ansi.sgr({ fg: style.title ?? colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
 }
 
 export const ansi = {
