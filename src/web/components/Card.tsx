@@ -240,7 +240,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		let flip = () => scroll.follow(() => {
 			let el = scroll.state.el as HTMLElement | undefined, top = root?.getBoundingClientRect().top, edge = el?.getBoundingClientRect().top
 			if (expanded() && el && top !== undefined && edge !== undefined && top + (root?.querySelector('header')?.offsetHeight ?? 0) <= edge) {
-				scroll.leave(); el.scrollTo({ top: el.scrollTop + top - edge, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+				scroll.leave(); el.scrollTo({ top: el.scrollTop + top - edge, behavior: 'instant' }); scroll.moved()
 			}
 			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
 			flush()
