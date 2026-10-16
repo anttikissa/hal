@@ -1,0 +1,7 @@
+{
+	title: 'Tab numbers next to session ids',
+	spec: 'In interactive sessions, SYSTEM.md tells the model to add the tab number from INSPECT whenever it mentions a session id, e.g. 176-ran (tab 34): users navigate by tab number. Replaces "verify tab numbers when needed, otherwise cite IDs" in 4x for interactive sessions.',
+	status: 'done',
+	needs: ['4x'],
+	foldInto: ['4x']
+}
