@@ -1,0 +1,7 @@
+{
+	title: 'Web card header links take the card color',
+	spec: 'On the web, links inside a card header (the ↑ t<call> back-link, Waiting for t<id> targets) are drawn in the card text color and underlined, never the browser default link or visited colors. Invariant restored: no header text uses a color foreign to both cards it connects.',
+	status: 'done',
+	needs: [],
+	foldInto: ['0z']
+}

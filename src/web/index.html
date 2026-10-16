@@ -192,6 +192,7 @@ html.typing .App { position: absolute; }
 @media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
 .CardHeader .link { position: relative; text-align: right; }
 .CardHeader .title a { padding-block: var(--card-inset); }
+.CardHeader a { color: inherit; }
 /* Context boundaries retain their rule above the shared card header. */
 .Card.divider > .CardHeader { border-top: 1px solid currentColor; }
 .Card.image .content > a { display: block; width: fit-content; touch-action: pan-y; }
