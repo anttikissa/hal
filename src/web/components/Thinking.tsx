@@ -13,7 +13,9 @@ export function Thinking(props: { text: string; open: boolean; children: JSX.Ele
 		let box = content.getBoundingClientRect()
 		let total = Math.ceil(box.height / line)
 		setHidden(Math.max(0, total - 1))
-		onSettled(() => { if (preview) preview.scrollTop = props.open ? 0 : preview.scrollHeight })
+		// The last line starts one line above the content's bottom edge;
+		// scrollHeight would add inline overflow such as link padding.
+		onSettled(() => { if (preview) preview.scrollTop = props.open ? 0 : box.height - line })
 	}
 	onSettled(measure)
 	createEffect(() => [props.text, props.open], () => onSettled(measure))
