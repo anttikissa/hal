@@ -232,15 +232,22 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return <><Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>{command}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
+	// A mouse click toggles after 200 ms, so a double-click can select a
+	// word instead; keyboard activation (detail 0) toggles at once.
+	let pending: ReturnType<typeof setTimeout> | undefined
 	let toggle = (e: MouseEvent) => {
+		clearTimeout(pending)
+		if (e.detail > 1) return
 		let hit = e.target as Element
 		let control = hit.closest('.mark, .CardHeader')
 		if ((!folding() && props.row.note === undefined && !closable()) || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		if (!control && expanded()) return
-		scroll.follow(() => {
+		let flip = () => scroll.follow(() => {
 			untrack(() => folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]))
 			flush()
 		})
+		if (e.detail === 0) flip()
+		else pending = setTimeout(flip, 200)
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Model text and inter-tab prose are Markdown (tasks fn, sz); human
