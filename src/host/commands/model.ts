@@ -8,7 +8,6 @@ import { effort } from '../effort.ts'
 import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
-import { history } from '../history.ts'
 
 export const command: SlashCommand & { levels(id: string): string[] } = {
 	help: () => '/model <provider/model or family>[:level]: switch this session immediately, interrupting active work and continuing safely, keeping its effort (snapped to the nearest supported level).\n/model :level changes only the effort; :default clears it.\n/model alone opens the picker (Ctrl-M too).',
@@ -43,12 +42,10 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 		// ":high" alone changes only the effort; a bare model keeps it.
 		let choice = models.selection(args.startsWith(':') ? ctx.model + args : args, ctx.effort)
 		if (!models.valid(choice.id)) return { error: `${args}: no such model (want provider/model; /model lists them)` }
-		let previous = models.qualified(ctx.model, ctx.effort)
-		let next = models.qualified(choice.id, choice.effort)
 		let cap = effort.describe(choice.id)
 		let fallback = cap?.policy ?? cap?.default
 		let cacheChanged = ctx.model === choice.id && choice.id.startsWith('anthropic/') && (ctx.effort ?? fallback) !== (choice.effort ?? fallback)
-		ctx.setModel(next)
+		let switched = ctx.setModel(models.qualified(choice.id, choice.effort))
 		let welcome = ''
 		if (choice.id === 'hal/tool') {
 			welcome = (require('../tool-model.ts') as typeof import('../tool-model.ts')).toolModel.welcome
@@ -57,11 +54,7 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 			liveFiles.save(meta)
 			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
 		}
-		let names = models.names([ctx.model, choice.id])
-		let describe = (id: string, qualified: string) => names[id] ? `${names[id]} (${qualified})` : qualified
-		let switched = previous === next ? '' : `Switched from ${describe(ctx.model, previous)} to ${describe(choice.id, next)}.`
-		if (switched) history.append(ctx.sessionId, { type: 'notice', text: switched })
-		let said = [...(switched ? [switched] : []), ...(choice.note ? [choice.note] : []), ...(cacheChanged ? ['changing request effort invalidates the Anthropic prompt cache for messages'] : [])]
-		return { ...(said.length && { say: said.join('; ') }), ...(welcome && { synthetic: welcome }) }
+		let said = [choice.note, cacheChanged && 'changing request effort invalidates the Anthropic prompt cache for messages'].filter(Boolean).join('; ')
+		return { result: [switched, said].filter(Boolean).join('; ') || undefined, ...(said && { say: said }), ...(welcome && { synthetic: welcome }) }
 	},
 }

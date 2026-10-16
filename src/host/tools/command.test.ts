@@ -34,6 +34,10 @@ test('model commands use the same slash path as typed commands, including state,
 	await until(() => sessions.open(id).name === 'Human title')
 	expect(a.of('command').at(-1).origin).toBeUndefined()
 	expect(a.of('output').at(-1).text).toBe('Work in progress → Human title')
+	let switched = await run(id, '/model hal/intro')
+	expect(switched.output).toBe('Switched from fake/m1 to Intro (hal/intro).')
+	expect(a.of('output').at(-1)).toMatchObject({ text: switched.output, origin: 'model' })
+	expect((await run(id, '/model hal/intro')).output).toBe('/model done')
 })
 
 test('a model tool call can /go and /rename while its turn runs; results reach the next provider round', async () => {

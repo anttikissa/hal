@@ -77,7 +77,7 @@ function context(id: string, sender?: Sender, command?: string): Context {
 		model: meta.model,
 		effort: meta.effort,
 		setCwd: (cwd) => slash.change(id, { cwd }),
-		setModel: (model) => slash.change(id, { model }),
+		setModel: (model) => slash.change(id, { model }, sender?.origin),
 		setName: (name) => slash.name(id, name),
 		say: (text) => slash.output(id, text, false, sender?.origin),
 	}
@@ -86,7 +86,7 @@ function context(id: string, sender?: Sender, command?: string): Context {
 // Changes the session's cwd or model: saved, told to followers, and
 // recorded before hard steering active work. The next request rebuilds
 // its system prompt from the new context; pause and tool safety stay intact.
-function change(id: string, patch: { cwd?: string; model?: string }): void {
+function change(id: string, patch: { cwd?: string; model?: string }, origin?: 'model'): string | undefined {
 	let meta = sessions.open(id)
 	let previous = { cwd: meta.cwd, model: modelList.qualified(meta.model, meta.effort) }
 	let changed: typeof patch = {}
@@ -94,11 +94,15 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	let selection = patch.model === undefined ? undefined : modelList.selection(patch.model)
 	if (selection && (selection.id !== meta.model || selection.effort !== meta.effort)) changed.model = modelList.qualified(selection.id, selection.effort)
 	if (!Object.keys(changed).length) return
+	let names = changed.model ? modelList.nameEvent([meta.model, selection!.id]) : undefined
 	if (changed.cwd !== undefined) {
 		meta.previousCwd = meta.cwd
 		meta.cwd = changed.cwd
 	}
+	let switched = ''
 	if (changed.model !== undefined && selection) {
+		let describe = (id: string, qualified: string) => names?.names[id] ? `${names.names[id]} (${qualified})` : qualified
+		switched = `Switched from ${describe(meta.model, previous.model)} to ${describe(selection.id, changed.model)}.`
 		meta.model = selection.id
 		if (selection.effort === undefined) delete meta.effort
 		else meta.effort = selection.effort
@@ -108,17 +112,19 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed, previous })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
+	if (switched) slash.output(id, switched, false, origin)
 	let running = turns.state.running.get(id)
-	if (running && !running.controller.signal.aborted) {
-		history.append(id, { type: 'notice', text: 'The model or working directory changed during your work. Continue your unfinished response using the current context, without repeating what you already wrote or completed.' })
-		prompts.force(running)
-	}
+	let continuing = running?.controller.signal.aborted ? undefined : running
+	let notice = switched || 'The working directory changed during your work.'
+	if (continuing) notice += ' Continue your unfinished response using the current context, without repeating what you already wrote or completed.'
+	if (switched || continuing) history.append(id, { type: 'notice', text: notice })
+	if (continuing) prompts.force(continuing)
 	if (changed.model) {
 		// A turn waiting out a failure tries the new model now.
-		turns.state.running.get(id)?.rewait?.abort()
-		let names = modelList.nameEvent([selection!.id])
+		running?.rewait?.abort()
 		if (names) host.broadcast(id, names)
 	}
+	return switched || undefined
 }
 
 // Session names change tab labels but not the model's working context.

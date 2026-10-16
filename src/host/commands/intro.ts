@@ -10,9 +10,9 @@ export const command: SlashCommand = {
 		let state = status.stateOf(ctx.sessionId).type
 		if (state !== 'idle' && state !== 'paused' && state !== 'error') return { error: 'finish or pause the current turn first' }
 		let { intro } = require('../intro.ts') as typeof import('../intro.ts')
-		ctx.setModel('hal/intro')
+		let result = ctx.setModel('hal/intro')
 		ctx.say(intro.restart)
 		if (!status.transition(ctx.sessionId, { type: 'submit' })) turns.start(ctx.sessionId)
-		return {}
+		return { result: result || undefined }
 	},
 }
