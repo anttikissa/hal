@@ -1,34 +1,31 @@
 /// <reference lib="dom" />
-// Temporary probe (task s0) for the transcript leaving the bottom
-// without the reader scrolling. On while webDiagnostics is on. Task
-// 5cz deletes it after 7 days with no 'drift' entry: this file, its
-// line in main.tsx, the 'drift' and 'pulled' kinds, scroll.onPull.
-//
-// scroll.ts keeps a pinned reader at the bottom. This reports both:
-// - 'pulled': scroll.ts found a pinned view above the bottom and
-//   pulled it back, so something other than the reader moved it.
-// - 'drift': pinning failed: still pinned, above the bottom
-//   for two checks in a row (a bug in scroll.ts).
-// Each logs a breadcrumb (detail: page visibility; line: gap px).
-// Only failed pinning shows a notice.
+// Temporary opt-in scroll probe (tasks s0, 981). Structural transition
+// snapshots survive event traffic; unpinned gaps are evidence, not failures.
+import { scrollCauses, type Breadcrumb } from '../common/web-diagnostics.ts'
 import { notices } from '../common/notices.ts'
 import { diagnostics } from './diagnostics.ts'
 import { scroll } from './scroll.ts'
 
 function init(): void {
-	scroll.onPull = (gap) => {
-		diagnostics.record('pulled', document.visibilityState, gap)
+	let trace = (why: string, kind: 'scroll' | 'pulled' | 'drift' = 'scroll', gap?: number) => {
+		let st = scroll.state, el = st.el
+		if (!el) return
+		let e = diagnostics.record(kind, document.visibilityState, gap)
+		if (e) Object.assign(e, { cause: scrollCauses.find((cause) => cause === why) ?? 'other', scroll: { top: Math.max(0, el.scrollTop), height: el.scrollHeight, client: el.clientHeight, set: Math.max(0, st.set), gap: scroll.gap(el), pinned: st.pinned, held: !!st.held, intent: !!st.intent } } satisfies Partial<Breadcrumb>)
 		diagnostics.report()
 	}
-	let stuck = 0
+	scroll.onTrace = trace
+	scroll.onPull = (gap, why) => trace(why, 'pulled', gap)
+	let stuck = 0, previous = ''
 	setInterval(() => {
 		let st = scroll.state, el = st.el
-		let short = !!el && st.pinned && !st.pressing && !st.touching && scroll.gap(el) > 1
-		stuck = short ? stuck + 1 : 0
-		if (stuck !== 2) return
+		let short: 'drift' | 'scroll' | '' = el && scroll.gap(el) > 1 ? st.pinned ? 'drift' : 'scroll' : ''
+		stuck = short === previous ? stuck + 1 : 1
+		previous = short
+		if (!short || stuck !== 2) return
 		let gap = Math.round(scroll.gap(el!))
-		diagnostics.record('drift', document.visibilityState, gap)
-		diagnostics.report()
+		trace('sample', short, gap)
+		if (short !== 'drift') return
 		notices.add({ key: 'scroll-drift', kind: 'failed', title: `Scroll stuck above the bottom: ${gap}px`, line: 'Pinned, yet not pulled back. A bug in scroll.ts.' })
 	}, 250)
 }

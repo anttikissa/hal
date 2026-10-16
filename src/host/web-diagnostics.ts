@@ -1,7 +1,7 @@
 // Cookie/origin checks are web.ts's job. Bound and project untrusted reports
 // before logging; arbitrary fields, error messages and URL strings never land.
 import { appendFileSync, chmodSync, existsSync, renameSync, statSync } from 'fs'
-import { diagnosticBooleans, diagnosticDetails, diagnosticKinds, diagnosticNumbers, type BrowserReport } from '../common/web-diagnostics.ts'
+import { diagnosticBooleans, diagnosticDetails, diagnosticKinds, diagnosticNumbers, scrollBooleans, scrollCauses, scrollNumbers, type BrowserReport } from '../common/web-diagnostics.ts'
 import { paths } from './paths.ts'
 import { settings } from '../common/settings.ts'
 
@@ -23,6 +23,13 @@ function clean(v: unknown): BrowserReport | undefined {
 		for (let key of ['line', 'column', 'ms', 'bytes', 'tab'] as const) {
 			if (e[key] !== undefined && !number(e[key])) return
 			if (e[key] !== undefined) entry[key] = e[key]
+		}
+		if (scrollCauses.includes(e.cause)) entry.cause = e.cause
+		if (e.scroll !== undefined) {
+			if (!object(e.scroll)) return
+			entry.scroll = {}
+			for (let key of scrollNumbers) { if (e.scroll[key] !== undefined && !number(e.scroll[key])) return; if (e.scroll[key] !== undefined) entry.scroll[key] = e.scroll[key] }
+			for (let key of scrollBooleans) { if (e.scroll[key] !== undefined && typeof e.scroll[key] !== 'boolean') return; if (e.scroll[key] !== undefined) entry.scroll[key] = e.scroll[key] }
 		}
 		entries.push(entry)
 	}

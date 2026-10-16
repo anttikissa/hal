@@ -5,16 +5,23 @@ import type { Event as HostEvent } from '../common/protocol.ts'
 import { diagnosticDetails, type DiagnosticDetail, type Breadcrumb, type DiagnosticContext, type DiagnosticKind } from '../common/web-diagnostics.ts'
 
 let entries: Breadcrumb[] = [], read: (() => DiagnosticContext) | undefined
-let lag = 0
+let lag = 0, dropped = 0
 let page = '', timer: ReturnType<typeof setTimeout> | undefined, busy = false, last = 0
-function record(kind: DiagnosticKind, detail: string = 'other', line?: number, column?: number): void {
+const protectedEntry = (e: Breadcrumb) => e.kind === 'scroll' || e.kind === 'pulled' || e.kind === 'drift'
+export function retain(entries: Breadcrumb[]): number {
+	let before = entries.length
+	while (entries.length > 32) entries.splice(entries.filter(protectedEntry).length > 12 ? entries.findIndex(protectedEntry) : Math.max(0, entries.findIndex((e) => !protectedEntry(e))), 1)
+	return before - entries.length
+}
+function record(kind: DiagnosticKind, detail: string = 'other', line?: number, column?: number): Breadcrumb | undefined {
 	if (!read) return
 	let e: Breadcrumb = { at: Date.now(), kind, detail: diagnosticDetails.includes(detail as any) ? detail as Breadcrumb['detail'] : 'other', tab: kind === 'event' ? undefined : read().tab }
 	if (Number.isFinite(line) && line! >= 0) e.line = line
 	if (Number.isFinite(column) && column! >= 0) e.column = column
 	let prev = entries.at(-1)
 	if (kind === 'event' && prev?.kind === kind && prev.detail === e.detail) entries[entries.length - 1] = e
-	else { entries.push(e); if (entries.length > 32) entries.shift() }
+	else { entries.push(e); dropped += retain(entries) }
+	return e
 }
 
 function report(): void {
@@ -30,11 +37,11 @@ async function send(): Promise<void> {
 	busy = true; last = Date.now()
 	let batch = entries.splice(0)
 	try {
-		let body = JSON.stringify({ page, version: document.documentElement.dataset.version ?? 'unknown', at: Date.now(), context: { ...read(), lag }, entries: batch })
+		let body = JSON.stringify({ page, version: document.documentElement.dataset.version ?? 'unknown', at: Date.now(), context: { ...read(), lag, dropped }, entries: batch })
 		let res = await fetch('/web-diagnostics', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body, keepalive: true, signal: AbortSignal.timeout(10_000) })
 		// A rejected report would be rejected again: drop it.
 		if (!res.ok && res.status !== 400) throw new Error('not accepted')
-	} catch { entries = [...batch, ...entries].slice(-32) }
+	} catch { entries = [...batch, ...entries]; dropped += retain(entries) }
 	finally { busy = false }
 }
 
