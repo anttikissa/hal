@@ -1,6 +1,7 @@
 // Automatic tab closure is a session property, independent of spawn kind.
 // Changes are durable transcript output; metadata pushes update both titles.
 // Tasks: p87.
+import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
@@ -34,9 +35,11 @@ function promote(id: string): void {
 
 // Called only after a completed turn. Idle plus empty work lists prevents
 // closing a waiting parent, a question, or a session with queued follow-ups.
+// A non-blank draft means the user is writing to it.
 function finished(id: string): void {
 	if (!sessions.open(id).autoclose || status.stateOf(id).type !== 'idle') return
 	if (notify.asked(id) || status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
+	if (drafts.get(id).text.trim()) return
 	if (tabs.close(id) === undefined) tabs.publish()
 }
 
