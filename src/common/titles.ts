@@ -116,7 +116,7 @@ function author(item: Shown): string | undefined {
 		case 'prompt': {
 			let call = bashResult.background(item)
 			let delivery = [item.edited && 'edited; /edit undo to go back', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && 'next round', item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued']
-			if (call) return `Bash output ↑ ${/^\d+$/.test(call) ? `t${call}` : call}`
+			if (call) return `Output of ${/^\d+$/.test(call) ? `t${call}` : call}`
 			if (item.from === undefined) return tagged(item.origin === 'model' ? 'Hal' : 'You', delivery)
 			let [id, tab] = sender(item.label ?? item.from)
 			return tagged(`From ${item.from || id}`, [tab, item.report === 'question' ? 'question' : item.report === 'summary' ? 'done' : undefined, ...delivery])

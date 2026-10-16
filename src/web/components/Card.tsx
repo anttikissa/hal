@@ -160,9 +160,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// A question is headed by its text, its addresses links.
 		if (item.type === 'question') return <For each={hrefs.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 		let ref = source(), t = titles.who(item)
-		if (backgroundCommand() !== undefined) return backgroundCommand()
 		if (titles.letter(item) === 'm') t = unmark(t)
-		return ref && t?.endsWith(ref) ? <>{t.slice(0, -ref.length)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">{ref}</a></> : t
+		let shown = ref && (/^\d+$/.test(ref) ? `t${ref}` : ref)
+		return shown && t?.endsWith(shown) ? <>{t.slice(0, -shown.length)}<a class="call" href={transcript.href(props.session, shown)} title="Go to Bash call">{shown}</a></> : t
 	}
 	let lines = () => (shown()?.text ?? '').split('\n')
 	// A commit's first line heads its card; the body omits it.
@@ -174,7 +174,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let headsWho = () => props.row.item.type === 'prompt' && !props.row.item.summary && expanded()
 	let head = () => {
 		let item = props.row.item
-		if (background()) return backgroundCommand() ?? titles.who(item)
+		if (background()) return backgroundCommand() === undefined ? titles.who(item) : `${titles.who(item)}: $ ${backgroundCommand()}`
 		if (item.type === 'thinking') {
 			let first = expanded() ? '' : parser.inline(lines().find((line) => line.trim()) ?? '', !!props.cursor).map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
@@ -196,7 +196,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type !== 'tool') return undefined
 		return pythonBash() ? 'python' : toolIcons[item.name]
 	}
-	let shellPrompt = () => backgroundCommand() !== undefined || (props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash()) ? '$ ' : undefined
+	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
 	// A wait links what it waits for (task zd8).
 	let waitParts = () => {
 		let item = props.row.item
@@ -331,7 +331,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let oneRow = createMemo(() => ['turn-end', 'divider'].includes(props.row.item.type) || (props.row.item.type === 'command' && props.row.item.from === undefined && props.row.item.output === undefined))
 	let canToggle = () => blockToggle.toggles(props.row.item) || props.row.note !== undefined || closable()
 	let headerLabel = () => {
-		if (background()) return backgroundCommand() ?? who()
+		if (background()) return backgroundCommand() === undefined ? who() : <>{who()}: $ {backgroundCommand()}</>
 		if (isChange()) return unstamp(changes()[0]?.text ?? '')
 		if (props.row.note !== undefined) return <>{unstamp(props.row.note)}<Show when={!expanded()}> <span class="secondary">{titles.preview(text())}</span></Show></>
 		if (oneRow()) return linkedParts(hrefs.urlParts(unstamp(text())))
@@ -363,7 +363,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<Show when={shown()}>
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', tall() ? 'tall' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle} onPointerEnter={measure}>
-					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} hidden={closable() && !expanded() ? titles.hidden(props.row.item) : 0} peek={peek()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={<><Show when={background() && source()}>{(ref) => <a class="call" href={transcript.href(props.session, /^\d+$/.test(ref()) ? `t${ref()}` : ref())} title="Go to Bash call">↑ {/^\d+$/.test(ref()) ? `t${ref()}` : ref()}</a>}</Show>{reference()}</>} activity={activity()}
+					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} hidden={closable() && !expanded() ? titles.hidden(props.row.item) : 0} peek={peek()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={reference()} activity={activity()}
 						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
 						<Show when={props.cursor && !open()}>{cursor()}</Show>
 						<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>

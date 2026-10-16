@@ -130,8 +130,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'prompt':
 			if (bashResult.background(item)) {
 				let command = look.background?.input.command
-				let title = typeof command === 'string' ? `$ ${command}` : titles.who(item)!
 				let ref = bashResult.background(item)!, href = session && transcript.href(session, ref)
+				let title = typeof command === 'string' ? `${titles.who(item)}: $ ${command}` : titles.who(item)!
 				let text = titles.stamp(item.ts, ansi.clean(title))
 				let head = (fold === 'short' ? [strings.clipVisual(text, hw)] : ansi.wrap(text, hw)).map((line) => ansi.heading(href ? `\x1b]8;;${ansi.webUrl(href)}\x07${line}${ansi.LINK_OFF}` : line, itemView.itemStyle(item)))
 				return fold === 'short' ? head : [...head, ...ansi.wrap(card.text(item), width).map((row) => bashCard.paint(row, itemView.itemStyle(item)))]

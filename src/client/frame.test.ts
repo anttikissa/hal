@@ -509,7 +509,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	let detached = plain(frame.build(apart, 70).lines).find(line => line.includes('M notes.md'))!
 	expect(detached).toBe('M notes.md')
-	expect(plain(frame.build(apart, 70).lines).find(line => line.includes('Result of:'))).toMatch(/^Result of: \$ Check files +↑ t1813/)
+	expect(plain(frame.build(apart, 70).lines).find(line => line.includes('Result of:'))).toMatch(/^Result of: \$ Check files +t1813/)
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	expect(printed).not.toContain('Background command finished')
 	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {

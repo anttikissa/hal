@@ -104,9 +104,9 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let title = !tool && look.call?.title ? `Result of: ${ansi.clean(look.call.title)}` : undefined
 	let status = tool && !stamp ? '' : toolView.resultStatus(item, !!call, style)
 	let key = look.call?.key ?? call
-	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`↑ t${key}`)) {
+	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`t${key}`)) {
 		let ref = session && transcript.href(session, `t${key}`)
-		let text = `↑ t${key}`
+		let text = `t${key}`
 		let link = ansi.quiet(ref ? `\x1b]8;;${ansi.webUrl(ref)}\x07${text}${ansi.LINK_OFF}` : text, style)
 		status = status ? `${status} ${link}` : link
 	}
