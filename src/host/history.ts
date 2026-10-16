@@ -42,6 +42,15 @@ function taken(u: Usage): number {
 	return (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
 }
 
+function contextNotice(id: string, records: HistoryRecord[], usage: Usage): void {
+	let context = taken(usage)
+	if (context < 150_000) return
+	let last = replay.current(records).findLast((r) => r.type === 'compact' || r.type === 'reset' || (r.type === 'round' && taken(r.usage) > 0))
+	let previous = last?.type === 'round' ? taken(last.usage) : 0
+	let crossed = [150_000, 200_000, 250_000].filter((threshold) => previous < threshold && context >= threshold)
+	if (crossed.length) history.append(id, { type: 'notice', text: `Context usage crossed ${crossed.map((n) => `${n / 1000}k`).join(', ')} tokens. Last provider round used ${context} input tokens, including cached input. These are absolute thresholds, independent of the model registry's context window.` })
+}
+
 // What the running turn's latest round with usage took in, if any.
 function contextOf(r: Running): { context?: number } {
 	let c = taken(r.turn.usage) || r.context
@@ -275,7 +284,10 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	} finally {
 		if (signal?.aborted && turn.end?.type !== 'done' && turn.blocks.at(-1)?.type === 'text') running.interrupted = true
 		flush(turn.blocks.length)
-		if (!running.ended && Object.keys(turn.usage).length) history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(turn.account && { account: turn.account }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
+		if (!running.ended && Object.keys(turn.usage).length) {
+			history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(turn.account && { account: turn.account }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
+			contextNotice(id, inputRecords, turn.usage)
+		}
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
 	}
 	if (turn.end && !running.ended) yield turn.end

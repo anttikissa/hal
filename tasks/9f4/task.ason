@@ -1,0 +1,10 @@
+{
+	title: 'Notify models at absolute context thresholds',
+	spec: 'At upward crossings of 150000, 200000 and 250000 provider-reported input tokens, including cache reads and writes, append a durable Hal notice for the next provider request through the existing notice delivery path. Report the crossed thresholds and actual input count, independent of model registry limits or percentages. Combine thresholds crossed in one round into one notice. Do not repeat a threshold while usage stays above it; re-arm it after a reported decrease below it or a context reset/compaction. Preserve delivery across host recovery and keep tool exchanges and earlier request prefixes intact. Notices neither wake idle turns nor trigger compaction or rebase; users retain control over context-management policy. Keep the existing terminal and web presentation unchanged.',
+	status: 'done',
+	notes: [
+		'Threshold notices are appended when provider usage is recorded, not synthesized from historical rounds during replay: this avoids retroactively changing earlier request prefixes. The previous reported round and context boundaries supply the crossing state, so no mutable threshold counter or registry lookup is needed. Below 150k, notice handling does no history projection. Focused notice, stats, history, replay and compaction verification passes 75 tests; changed-file lint passes.'
+	],
+	needs: ['nvm'],
+	foldInto: ['nvm']
+}

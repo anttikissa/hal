@@ -1,3 +1,4 @@
+// Next-round host facts preserve provider input and survive context transitions.
 import { expect, test } from 'bun:test'
 import { states } from '../common/states.ts'
 import { transcript } from '../common/transcript.ts'
@@ -93,4 +94,46 @@ test('notice delivery remains once across compact, prompt edits and recovery wit
 	expect(edited).toContain('New instructions.')
 	expect(edited).toContain('Corrected.')
 	expect(edited).not.toContain('Discarded answer.')
+})
+
+test('absolute context crossings reach the next round once and re-arm after decreases and compaction', async () => {
+	let c = client(), id = created(c)
+	let notices = () => history.readSync(id).flatMap((r) => r.type === 'notice' && r.text.startsWith('Context usage crossed') ? [r] : [])
+	c.conn.send({ type: 'submit', sessionId: id, text: 'Work.' })
+	let levels = [149_999, 150_000, 180_000, 200_000, 250_000, 260_000, 149_999, 251_000]
+	let counts = [0, 1, 1, 2, 3, 3, 3, 4]
+	for (let [i, input] of levels.entries()) {
+		await until(() => calls.length === i + 1)
+		let before = calls[i]!.input.messages
+		calls[i]!.push({ type: 'tool_call', id: `t${i}`, name: 'nope', input: {} }, { type: 'usage', usage: { input: input - 100_000, cacheRead: 90_000, cacheWrite: 10_000, output: 1 } }, { type: 'done', reason: 'tool_use' })
+		await until(() => calls.length === i + 2)
+		expect(notices()).toHaveLength(counts[i]!)
+		let after = calls[i + 1]!.input.messages
+		expect(after.slice(0, before.length)).toEqual(before)
+		if (counts[i]! > (counts[i - 1] ?? 0)) {
+			let text = notices().at(-1)!.text
+			expect(text).toContain(`${input} input tokens`)
+			expect(texts(after).split(text)).toHaveLength(2)
+			let blocks = after.flatMap((m: any) => m.blocks)
+			expect(blocks.findLastIndex((b: any) => b.type === 'text' && b.text.includes(text))).toBeGreaterThan(blocks.findLastIndex((b: any) => b.type === 'tool_result'))
+		}
+	}
+	expect(notices().at(-1)!.text).toContain('150k, 200k, 250k')
+	calls.at(-1)!.push({ type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
+	let before = await history.messages(id)
+	restartHost()
+	expect(await history.messages(id)).toEqual(before)
+	expect(calls).toHaveLength(levels.length + 1)
+	c = client()
+	c.conn.send({ type: 'open', sessionId: id })
+	compact.run(id)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'Continue.' })
+	await until(() => calls.length === levels.length + 2)
+	calls.at(-1)!.push({ type: 'usage', usage: { input: 250_000 } }, { type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
+	expect(notices()).toHaveLength(5)
+	expect(notices().at(-1)!.text).toContain('150k, 200k, 250k')
+	expect(calls).toHaveLength(levels.length + 2)
+	expect(texts(await history.messages(id))).toContain(notices().at(-1)!.text)
 })
