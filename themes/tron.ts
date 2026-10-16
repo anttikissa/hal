@@ -18,7 +18,6 @@ export const look: Look = {
 	// Tools stay in the grid's blues and cyans.
 	tool: () => ({ fg: [colors.fgL, colors.fgC, 235], bg: [colors.bgL, colors.bgC, 235] }),
 	toolBash: () => ({ fg: [colors.fgL, colors.fgC, 195], bg: [colors.bgL, colors.bgC, 195] }),
-	toolEval: () => ({ fg: [colors.fgL, colors.fgC, 265], bg: [colors.bgL, colors.bgC, 265] }),
 	toolRead: () => ({ fg: [colors.fgL, colors.fgC, 175], bg: [colors.bgL, colors.bgC, 175] }),
 	status: (base) => ({ ...base(), highlight: [0.9, 0.15, 200] }),
 	help: (base) => ({ ...base(), key: [0.84, 0.1, 200] }),

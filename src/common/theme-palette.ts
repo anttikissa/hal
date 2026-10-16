@@ -20,7 +20,7 @@ export function palette(p: Palette): Look {
   error: () => card(red), warning: () => card(yellow), exit: () => ({ fg: red, neutralFg: gray }),
   diff: () => ({ addFg: green, removeFg: red }),
   log: () => text(gray), fork: () => card(p.accent), commitCard: () => card(p.edit),
-  tool: () => card(gray), toolRead: () => card(p.read), toolBash: () => card(p.bash), toolEval: () => card(p.bash),
+  tool: () => card(gray), toolRead: () => card(p.read), toolBash: () => card(p.bash),
   status: () => ({ fg: gray, highlight: p.accent }), statusCool: () => ({ fg: p.read }),
   statusWarm: () => ({ fg: yellow }), statusHot: () => ({ fg: red }),
   tab: () => ({ activeFg: p.accent, inactiveFg: gray, doneFg: green, warningFg: yellow, errorFg: red, pausedFg: gray, jobsFg: p.bash }),

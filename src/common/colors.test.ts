@@ -20,25 +20,25 @@ test('every style is a set of OKLCH colors', () => {
 test('overriding a shared value moves every style derived from it, at call time', () => {
 	let saved = colors.fgL
 	try {
-		let before = { assistant: colors.assistant().fg, bash: colors.toolBash().fg, grep: colors.toolGrep().fg }
+		let before = { assistant: colors.assistant().fg, bash: colors.toolBash().fg, edit: colors.toolEdit().fg }
 		colors.fgL = 0.9
 		expect(colors.assistant().fg![0]).toBe(0.9)
 		expect(colors.toolBash().fg![0]).toBe(0.9)
-		expect(colors.toolGrep().fg).toEqual(colors.toolRead().fg!)
+		expect(colors.toolEdit().fg).toEqual(colors.toolBash().fg!)
 		expect(colors.assistant().fg).not.toEqual(before.assistant!)
-		expect(colors.toolGrep().fg).not.toEqual(before.grep!)
+		expect(colors.toolEdit().fg).not.toEqual(before.edit!)
 	} finally {
 		colors.fgL = saved
 	}
 })
 
 test('overriding one style is seen by styles built on it', () => {
-	let saved = colors.toolRead
+	let saved = colors.toolBash
 	try {
-		colors.toolRead = () => ({ fg: [0.5, 0.1, 10] })
-		expect(colors.toolLs().fg).toEqual([0.5, 0.1, 10])
+		colors.toolBash = () => ({ fg: [0.5, 0.1, 10] })
+		expect(colors.toolEdit().fg).toEqual([0.5, 0.1, 10])
 	} finally {
-		colors.toolRead = saved
+		colors.toolBash = saved
 	}
 })
 

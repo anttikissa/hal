@@ -185,11 +185,7 @@ export const colors = {
 	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
 	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 	toolEdit: (): Style => colors.toolBash(),
-	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
 	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
-	toolGrep: (): Style => colors.toolRead(),
-	toolGlob: (): Style => colors.toolRead(),
-	toolLs: (): Style => colors.toolRead(),
 	// Inter-tab messages, both directions, in the message pink.
 	toolSend: (): Style => colors.message(),
 }
