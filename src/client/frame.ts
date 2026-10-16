@@ -115,7 +115,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
 	let scroll = frame.scrolls(item, look.now) ? look.now : ''
-	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${scroll}`
+	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.wait?.map((p) => typeof p === 'string' ? p : p.text).join('') ?? ''} ${scroll}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
@@ -267,6 +267,10 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
 			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : '') : ''
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
+			if (item.type === 'tool' && !item.presentation && !look.result?.presentation) {
+				let h = toolDetails.headline(item.name, item.input, look.result?.output)
+				if (h.mark === '…') look.wait = toolDetails.waiting(h.text, session ?? '', src, view.tabs?.list)
+			}
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)
 			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)

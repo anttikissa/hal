@@ -103,21 +103,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	createEffect(() => (all().length && !starts().has(id()) ? start() : -1), (i) => void (i >= 0 && setStart(i)))
 	createEffect(shown, () => void requestAnimationFrame(check))
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
-	// A job's call title or a session's tab name, for wait cards.
-	let describe = (ref: string) => {
-		let n = ref.match(/^#?t(\d+)$/)?.[1]
-		if (!n) return props.tabs?.find((t) => t.id === ref)?.name
-		let call = items().find((i) => i.key === n)
-		if (call?.type !== 'tool') return undefined
-		let head = toolDetails.headline(call.name, call.input)
-		return head.mark ? head.text.slice(head.mark.length + 1) : head.text
-	}
+	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} describe={describe} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} waiting={waiting} />}>
 						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
 					</Show>
 					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>

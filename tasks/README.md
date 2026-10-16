@@ -247,8 +247,10 @@ it only when building the page with Bun, not on the host startup path.
   overlay scrolls itself, never the page behind it.
 - Links are cross-cutting: anything one client can link to (a session,
   a block, an image, a paste), the other can too, at the same address
-  under the host's webUrl (task e3), and a terminal link carries a
-  one-time code only in its hidden OSC 8 target.
+  under the host's webUrl (task e3). A terminal link opens that address
+  in the web app (OSC 8; the terminal cannot jump within itself) and
+  carries a one-time code only in its hidden target. Where the web links
+  something, the terminal links it too.
 - Anything that navigates is an `<a href>` (Cmd-click, middle-click,
   copy link keep working). The browser never polls: the host pushes.
 - Phones: fields at least 16px, touch targets at least 44px, touch

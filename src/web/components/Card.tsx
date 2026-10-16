@@ -37,7 +37,6 @@ import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
 import { hrefs } from '../hrefs.ts'
-import { router } from '../router.ts'
 import { folds } from '../folds.ts'
 import { forms } from '../../common/forms.ts'
 import { toggle as blockToggle } from '../../common/toggle.ts'
@@ -73,8 +72,8 @@ const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write:
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 
-// `describe`: a short title for a job (t248) or session id a wait names.
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string }; describe?: (ref: string) => string | undefined }) {
+// `waiting`: a wait title as text and links (toolDetails.waiting).
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string }; waiting?: (title: string) => ReturnType<typeof hrefs.urlParts> | undefined }) {
 	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
@@ -187,21 +186,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return pythonBash() ? 'python' : toolIcons[item.name]
 	}
 	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
-	// A wait names what it waits for: each job or session links to its
-	// card or tab, with its title when known.
+	// A wait links what it waits for (task zd8).
 	let waitParts = () => {
-		let item = props.row.item, h = head() ?? ''
-		if (item.type !== 'tool' || presentation()?.title || toolDetails.headline(item.name, item.input).mark !== '…' || !h.startsWith('Waiting for ')) return undefined
-		let parts: ReturnType<typeof hrefs.urlParts> = ['Waiting for ']
-		h.slice('Waiting for '.length).split(', ').forEach((ref, i) => {
-			if (i) parts.push(', ')
-			let job = ref.match(/^#?t(\d+)$/)?.[1]
-			let href = job ? transcript.href(props.session, `t${job}`) : /^\d+-[a-z]+$/.test(ref) ? router.format(ref) : undefined
-			let about = href && props.describe?.(ref)
-			parts.push(href ? { href, text: ref } : ref)
-			if (about) parts.push(` (${about})`)
-		})
-		return parts
+		let item = props.row.item
+		return item.type === 'tool' && !presentation()?.title && toolDetails.headline(item.name, item.input).mark === '…' ? props.waiting?.(head() ?? '') : undefined
 	}
 	let headerParts = createMemo(() => waitParts() ?? hrefs.urlParts(head() ?? ''))
 	let linkedParts = (parts: ReturnType<typeof hrefs.urlParts>) => <For each={parts}>{(part) => typeof part === 'string' ? part : part.href.startsWith('/') ? <a href={part.href}>{part.text}</a> : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>

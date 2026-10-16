@@ -19,6 +19,7 @@
 import { callText } from './call-text.ts'
 import { home } from './home.ts'
 import { titles } from './titles.ts'
+import { transcript, type Item } from './transcript.ts'
 
 // A value in readable text rather than wire syntax: a scalar beside its
 // key, lists numbered, nested values indented once per level.
@@ -234,4 +235,26 @@ const fullCommand = (name: string, input: Record<string, unknown>): boolean => n
 
 const harmless = (name: string, input: Record<string, unknown>): boolean => readOnly.has(name) || (name === 'command' && typeof input.command === 'string' && /^\s*\/(?:rename|help)(?:\s|$)/.test(input.command))
 
-export const toolDetails = { fullCommand, value, headline, lines, unsafe, limit, readOnly, harmless }
+// What a wait title names (task zd8), as text and links: each job (t248)
+// or session id links to its card or tab, then its description when
+// known: the job call's title or the tab's name. Links are web paths; the
+// terminal links them to the web app. Undefined for other titles.
+type Part = string | { href: string; text: string }
+function waiting(title: string, session: string, items: readonly Item[], tabs: readonly { id: string; name: string }[] = []): Part[] | undefined {
+	let lead = /^(?:… )?Waiting for /.exec(title)?.[0]
+	if (!lead) return undefined
+	let parts: Part[] = [lead]
+	title.slice(lead.length).split(', ').forEach((ref, i) => {
+		if (i) parts.push(', ')
+		let job = /^#?t(\d+)$/.exec(ref)?.[1]
+		let href = job ? transcript.href(session, `t${job}`) : /^\d+-[a-z]+$/.test(ref) ? `/${ref}` : undefined
+		parts.push(href ? { href, text: ref } : ref)
+		let call = job ? items.findLast((it) => it.key === job) : undefined
+		let head = call?.type === 'tool' ? toolDetails.headline(call.name, call.input) : undefined
+		let about = !href ? undefined : head ? head.text.slice(head.mark ? head.mark.length + 1 : 0) : tabs.find((t) => t.id === ref)?.name
+		if (about) parts.push(` (${about})`)
+	})
+	return parts
+}
+
+export const toolDetails = { fullCommand, value, headline, lines, unsafe, limit, readOnly, harmless, waiting }

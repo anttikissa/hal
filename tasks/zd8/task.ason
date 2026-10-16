@@ -1,6 +1,6 @@
 {
 	title: 'Wait cards link what they wait for',
-	spec: 'In the web, a WAIT card title links each job it names (t248) to that call card and each session id to its tab, followed by a short description in parentheses: the job call title without its mark, or the session tab name, when known. Unknown targets stay plain text.',
+	spec: 'A WAIT card title, in the web and the terminal, links each job it names (t248) to that call card and each session id to its tab, followed by a short description in parentheses: the job call title without its mark, or the session tab name, when known. Unknown targets stay plain text. toolDetails.waiting builds the parts for both; terminal links open the web app.',
 	status: 'done',
 	needs: [],
 	foldInto: ['b3k']

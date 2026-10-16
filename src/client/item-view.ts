@@ -28,7 +28,7 @@ import { bashCard } from './bash-card.ts'
 // style, and rows a plugin draws itself. `head`: a short call's rows
 // before its output, for its attached result; `now`: the clock a Bash
 // command scrolls by (bash-card.ts).
-export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string; title?: string }; streamRows?: number; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
+export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string; title?: string }; wait?: (string | { href: string; text: string })[]; streamRows?: number; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 

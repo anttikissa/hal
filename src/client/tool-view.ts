@@ -29,8 +29,8 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 		if (fold === 'short') return [ansi.heading(strings.expandTabs(strings.clipVisual(prefix + ansi.clean(String(command)), hw)), itemView.itemStyle(item))]
 		return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line, i) => ansi.wrap(line, width).map((row) => i ? bashCard.paint(row, itemView.itemStyle(item)) : ansi.heading(row, itemView.itemStyle(item))))
 	}
-	let title = ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)
-	let head = ansi.heading(toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw), itemView.itemStyle(item))
+	let title = look.wait ? ansi.clean(look.wait.map((p) => typeof p === 'string' ? p : p.text).join('')) : ansi.clean(look.result?.presentation?.title ?? item.presentation?.title ?? toolDetails.headline(item.name, item.input, look.result?.output).text)
+	let head = ansi.heading(toolView.linked([toolView.unsafe(strings.clipVisual(prefix + title, hw), item, hw)], look.wait)[0]!, itemView.itemStyle(item))
 	if (item.presentation || item.presentationError || look.result?.presentation || look.result?.presentationError) {
 		let rows = presentationView.call(item, head, width, fold, look.result, itemView.itemStyle(item))
 		toolView.heads.set(item, rows.length)
@@ -38,7 +38,7 @@ function call(item: Item & { type: 'tool' }, width: number, fold: Verbosity, loo
 	}
 	let bash = item.name === 'bash'
 	if (fold === 'long') {
-		let rows = ansi.wrap(prefix + title, hw)
+		let rows = toolView.linked(ansi.wrap(prefix + title, hw), look.wait)
 		rows[0] = toolView.unsafe(rows[0]!, item, hw)
 		let partial = item.partial?.replace(/\n$/, '')
 		if (partial && look.streamRows !== undefined) partial = partial.split('\n').slice(-look.streamRows).join('\n')
@@ -132,6 +132,18 @@ function unsafe(row: string, item: Item & { type: 'tool' }, width: number): stri
 	return `${strings.clipVisual(row, width - label.length - 2)}  \x1b[3m${label}\x1b[23m`
 }
 
+// `rows` with each linked part (toolDetails.waiting) linked to the web
+// app where it first appears whole.
+function linked(rows: string[], parts?: (string | { href: string; text: string })[]): string[] {
+	for (let p of parts ?? []) {
+		if (typeof p === 'string') continue
+		let whole = new RegExp(`(?<![\\w#-])${p.text}(?![\\w-])`)
+		let i = rows.findIndex((row) => whole.test(row))
+		if (i >= 0) rows[i] = rows[i]!.replace(whole, `\x1b]8;;${ansi.webUrl(p.href)}\x07${p.text}${ansi.LINK_OFF}`)
+	}
+	return rows
+}
+
 // `text` in the exit color, then back to `style`'s.
 function exitColor(text: string, style: Style | undefined): string {
 	if (ansi.mono()) return text
@@ -181,6 +193,7 @@ export const toolView = {
 	call,
 	result,
 	unsafe,
+	linked,
 	exitColor,
 	status,
 	resultStatus,
