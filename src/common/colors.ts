@@ -77,14 +77,14 @@ export const colors = {
 		linkFg: [0.9, 0.17, 80],
 		linkBg: [0.28, 0.06, 75],
 	}),
-	// Neutral gray cards: the user's, Hal's own remarks, questions,
-	// commits and command responses, so color marks only tools and replies.
+	// Neutral gray cards: Hal's own remarks, questions, commits and
+	// command responses, so color marks only tools, replies and the user.
 	plain: (): Style => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
 	synthetic: (): Style => colors.plain(),
 	// Thinking: neutral gray, distinct from replies through italic text.
 	thinking: (): Style => ({ ...colors.log(), bold: colors.log().code! }),
-	// User messages and the prompt input: the same neutral card.
-	user: (): Style => colors.plain(),
+	// User messages and the prompt input: cyan.
+	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
 	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
