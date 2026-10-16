@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'X-height matching starts off: Source Code Pro Light uses 14px and natural spacing so the user can keep its preferred baseline alignment. Verified in headless Chrome: default x-height 6.72px/stride 8.40px; match upright Plex x-height gives 15.05px text and 7.22px x-height; stride matching at 16px uses -1.20px letter-spacing; manual 7px x-height and 8.8px stride work; thinking collapse still works. Upright Plex remains unchanged. Font size and x-height are coupled; stride is adjusted with letter-spacing rather than glyph stretching.',
-		'All six numeric controls are type=text with decimal inputmode. Explicit finite/range validation preserves the last valid preview for incomplete or invalid text. The active input is never reformatted during preview updates, preserving typed decimals and the caret.'
+		'All six numeric controls are type=text with decimal inputmode. Explicit finite/range validation preserves the last valid preview for incomplete or invalid text. The active input is never reformatted during preview updates, preserving typed decimals and the caret.',
+		'The direct comparison also includes natural Plex italic at the reference Plex size, weight and upright line height, with no custom letter-spacing. Show it in both horizontal orders, alternating vertical lines, mixed sentences and the long width rulers. Candidate tuning does not change this third reference.'
 	],
 	needs: ['bje'],
 	foldInto: ['bje']

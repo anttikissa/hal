@@ -29,6 +29,7 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 .rulers { line-height: var(--upright-leading, 21px); }
 .rulers .italic-line { line-height: var(--italic-leading, 21px); }
 .rulers .candidate { font-family: var(--italic-face); font-size: var(--italic-size); font-style: italic; font-weight: 300; letter-spacing: var(--italic-spacing); line-height: var(--italic-leading, 21px); }
+.rulers .plex-italic { font-family: 'IBM Plex Mono', monospace; font-size: var(--sample-size, 14px); font-weight: 300; font-style: italic; letter-spacing: normal; line-height: var(--upright-leading, 21px); }
 #metrics { min-height: 3lh; }
 .samples { display: grid; gap: 16px; font-size: var(--sample-size, 14px); line-height: var(--upright-leading, 21px); }
 .samples .Thinking .Markdown, .samples .Markdown .i { font-family: var(--italic-face, 'IBM Plex Mono'), monospace; font-size: var(--italic-size, 14px); font-weight: 300; font-style: italic; font-synthesis: none; letter-spacing: var(--italic-spacing, 0px); line-height: var(--italic-leading, 21px); }
@@ -50,10 +51,12 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 <p id="metrics" role="status">Loading local font files...</p>
 <output id="css"></output>
 <div class="rulers" id="rulers">
-<div class="pair"><span>Hello world, afiglrt 0123456789</span><span class="candidate">Hello world, afiglrt 0123456789</span></div>
-<div class="pair"><span class="candidate">Hello world, afiglrt 0123456789</span><span>Hello world, afiglrt 0123456789</span></div>
-<div class="vertical"><p>Hello world, afiglrt 0123456789</p><p class="candidate">Hello world, afiglrt 0123456789</p><p>Hello world, afiglrt 0123456789</p><p class="candidate">Hello world, afiglrt 0123456789</p></div>
+<p>Upright Plex / tuned italic / natural Plex italic</p>
+<div class="pair"><span>Hello world, afiglrt 0123456789</span><span class="candidate">Hello world, afiglrt 0123456789</span><span class="plex-italic">Hello world, afiglrt 0123456789</span></div>
+<div class="pair"><span class="plex-italic">Hello world, afiglrt 0123456789</span><span class="candidate">Hello world, afiglrt 0123456789</span><span>Hello world, afiglrt 0123456789</span></div>
+<div class="vertical"><p>Hello world, afiglrt 0123456789</p><p class="candidate">Hello world, afiglrt 0123456789</p><p class="plex-italic">Hello world, afiglrt 0123456789</p><p>Hello world, afiglrt 0123456789</p><p class="candidate">Hello world, afiglrt 0123456789</p><p class="plex-italic">Hello world, afiglrt 0123456789</p></div>
 <p>Normal text before <span class="candidate">italic text in the middle</span> and normal text after.</p>
+<p>Normal text before <span class="plex-italic">Plex italic in the middle</span> and normal text after.</p>
 <p class="candidate">Italic text before <span style="font: 300 var(--size)/var(--upright-leading, 21px) 'IBM Plex Mono', monospace; letter-spacing: normal">normal text in the middle</span> and italic text after.</p>
 <div class="vertical" id="longRulers"></div>
 <output id="lengths"></output>
@@ -69,10 +72,11 @@ h1 { font: 400 18px/1.5 'IBM Plex Mono', monospace; margin: 0 0 16px; }
 </main>
 <script>
 const longText = '0123456789 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ | '.repeat(8) + 'END'
-for (const italic of [false, true, false, true]) {
+for (const font of ['', 'candidate', 'plex-italic', '', 'candidate', 'plex-italic']) {
  const line = document.createElement('p'), text = document.createElement('span')
  text.textContent = longText
- if (italic) { text.className = 'candidate'; line.className = 'italic-line' }
+ text.className = font
+ if (font === 'candidate') line.className = 'italic-line'
  text.style.borderRight = '1px solid currentColor'
  line.append(text)
  document.querySelector('#longRulers').append(line)
@@ -84,7 +88,7 @@ async function update(action = '') {
  const current = ++revision, px = Number(size.value)
  if (![size, italicSize, xheight, stride, uprightLeading, italicLeading].every(input => input.value.trim() !== '' && Number.isFinite(Number(input.value)) && Number(input.value) >= Number(input.dataset.min) && Number(input.value) <= Number(input.dataset.max))) return
  try {
-  await Promise.all([document.fonts.load(`italic 300 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`)])
+  await Promise.all([document.fonts.load(`italic 300 100px "${face.value}"`), document.fonts.load(`300 ${px}px "IBM Plex Mono"`), document.fonts.load(`italic 300 ${px}px "IBM Plex Mono"`)])
   if (current !== revision) return
   const ctx = document.createElement('canvas').getContext('2d')
   const measure = (family, fontSize, italic) => {
@@ -117,8 +121,8 @@ async function update(action = '') {
   css.textContent = `font-size: ${adjusted.toFixed(4)}px; line-height: ${italicLeading.value}px; letter-spacing: ${spacing.toFixed(4)}px; font-style: italic; font-weight: 300;`
  } catch (error) { metrics.textContent = `Font load failed: ${error.message}. Fetch local candidates with: bash scripts/fonts JetBrainsMono-LightItalic SourceCodePro-LightItalic RobotoMono-Italic` }
   const lines = document.querySelectorAll('#longRulers span')
-  const uprightWidth = lines[0].getBoundingClientRect().width - 1, italicWidth = lines[1].getBoundingClientRect().width - 1
-  document.querySelector('#lengths').textContent = `${longText.length} characters: upright ${uprightWidth.toFixed(2)}px; italic ${italicWidth.toFixed(2)}px; difference ${(italicWidth - uprightWidth).toFixed(2)}px.`
+   const uprightWidth = lines[0].getBoundingClientRect().width - 1, italicWidth = lines[1].getBoundingClientRect().width - 1, plexItalicWidth = lines[2].getBoundingClientRect().width - 1
+   document.querySelector('#lengths').textContent = `${longText.length} characters: upright ${uprightWidth.toFixed(2)}px; tuned italic ${italicWidth.toFixed(2)}px (difference ${(italicWidth - uprightWidth).toFixed(2)}px); Plex italic ${plexItalicWidth.toFixed(2)}px (difference ${(plexItalicWidth - uprightWidth).toFixed(2)}px).`
 }
 face.onchange = () => update('face')
 for (const input of [size, italicSize, xheight, stride, uprightLeading, italicLeading]) input.oninput = () => update(input === xheight ? 'xheight' : '')
