@@ -186,6 +186,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
 	let headerParts = createMemo(() => hrefs.urlParts(head() ?? ''))
+	let linkedParts = (parts: ReturnType<typeof hrefs.urlParts>) => <For each={parts}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
+	// A closed reply or prompt: its sender in the title color, its text
+	// in the body color it has open, as a closed Bash card shows output.
+	let compactParts = createMemo(() => {
+		let h = head() ?? '', w = titles.who(props.row.item) ?? ''
+		return w && h.startsWith(`${w}: `) ? { who: `${w}:`, text: hrefs.urlParts(h.slice(w.length + 2)) } : undefined
+	})
 	let call = createMemo(() => { let item = props.row.item; return item.type === 'tool' ? toolDetails.lines(item.name, item.input) : [] })
 	let command = <Show when={call().length}><ToolCommand lines={call()} compact={!full()} /></Show>
 	let body = () => {
@@ -270,7 +277,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop --id ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></Show>} result={statusResult()} bash={bash()} reference={reference()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} name={closable() ? folding() ? head() : titles.who(props.row.item) : undefined} open={expanded()} label={<Show when={closable() && folding()} fallback={<>{who()}</>}><Show when={compactParts()} fallback={linkedParts(headerParts())}>{(c) => <>{c().who} <span class="secondary">{linkedParts(c().text)}</span></>}</Show></Show>} result={statusResult()} bash={bash()} reference={reference()} actions={<>{editButton()}{discardButton()}</>} activity={activity()} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
