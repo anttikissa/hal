@@ -38,7 +38,7 @@ test('each tab shows at most one indicator for what it needs', () => {
 	]
 	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5✗  6Ⅱ  7✓  8   9? 10? 11! ')
 	expect(tabBar.indicator(list[0]!)?.fg).toEqual(colors.assistant().cursor)
-	expect(tabBar.indicator(list[2]!)?.fg).toEqual(colors.question().fg)
+	expect(tabBar.indicator(list[2]!)?.fg).toEqual(colors.tab().doneFg)
 	expect(tabBar.indicator(list[3]!)?.fg).toEqual(colors.tab().warningFg)
 	expect(tabBar.indicator(list[5]!)?.fg).toEqual(colors.log().fg)
 	expect(tabBar.indicator(list[8]!)?.fg).toEqual(colors.tab().warningFg)

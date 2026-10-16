@@ -2,6 +2,9 @@
 	title: 'Use color instead of redundant UI boldface',
 	spec: 'Hal UI on terminal and web avoids redundant boldface unless the user expressly approves it. tasks/README.md states this app-wide rule; it is not a personal USER.md preference. Use hue, slightly brighter text or position for hierarchy. Tab question marks are visibly green, normal weight and the same size as tab numbers. Help keys such as ctrl-r use normal weight and slightly brighter color than surrounding hints. Preserve explicit bold formatting in user or model content; the rule concerns app-generated UI emphasis. Review existing UI boldface against this rule, retaining only expressly approved uses. Restore the invariant that status markers and help keys do not use redundant weight for emphasis.',
 	status: 'planned',
+	notes: [
+		'Question markers use tab completion green in both clients, independent of question-card foreground. Approval questions retain amber. Web question marks and help keys are no longer bold; keys retain the existing brighter color shared with terminal. Tab-bar, help-row and colors tests pass. Broader boldface audit and browser visual verification remain pending.'
+	],
 	needs: ['gn'],
 	foldInto: ['gn']
 }

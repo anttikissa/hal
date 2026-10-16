@@ -178,7 +178,7 @@ function css(): string {
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
 	let tab = colors.tab(), hal = colors.assistant()
-	for (let [kind, fg] of Object.entries({ asking: colors.question().fg!, approval: tab.warningFg!, blocked: tab.warningFg!, retrying: tab.warningFg!, working: hal.cursor!, jobs: tab.jobsFg!, failed: tab.errorFg!, paused: tab.pausedFg!, done: tab.doneFg! })) {
+	for (let [kind, fg] of Object.entries({ asking: tab.doneFg!, approval: tab.warningFg!, blocked: tab.warningFg!, retrying: tab.warningFg!, working: hal.cursor!, jobs: tab.jobsFg!, failed: tab.errorFg!, paused: tab.pausedFg!, done: tab.doneFg! })) {
 		rules.push(`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`)
 	}
 	// Percentages used, one class per whole percent (colors.heat).

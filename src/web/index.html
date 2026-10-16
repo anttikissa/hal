@@ -447,7 +447,7 @@ html.typing .App { position: absolute; }
 /* 'key: description, …' as in the terminal's help row; /keys sits right. */
 .help-hints > :not(:last-child)::after { content: ','; color: var(--description); }
 .help .keys, .help .update { flex: none; }
-.help b { color: var(--key); font-weight: 600; }
+.help b { color: var(--key); font-weight: inherit; }
 /* Reads as a hint, acts as a button: the update reload (task 7t). */
 .help .update { padding: 0; border: 0; background: none; font: inherit; color: var(--update); cursor: pointer; }
 .help .update b { color: inherit; }
@@ -549,7 +549,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker .blocks-help dt { color: var(--key); }
 .Picker .blocks-help dd { margin: 0; }
 .Picker .blocks-help p { margin: 0; }
-.Picker .blocks-help b { color: var(--key); font-weight: bold; }
+.Picker .blocks-help b { color: var(--key); font-weight: inherit; }
 .Picker .blocks-hint { flex: none; overflow-wrap: anywhere; margin-block: 0.75lh; }
 .Picker ul.blocks-ids { flex: none; display: flex; flex-wrap: wrap; gap: 0 2ch; overflow: visible; color: var(--key); }
 .Picker ul.blocks-ids li { padding: 0; min-height: 0; cursor: auto; }
@@ -600,7 +600,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   25%, 75% { color: var(--mark-dark); }
   50% { color: var(--mark-alt, var(--mark-lit)); }
 }
-.Tabs .marker.asking, .Tabs .marker.approval, .Tabs .marker.blocked, .Tabs .marker.paused { font-weight: 600; }
+.Tabs .marker.asking, .Tabs .marker.approval { font-weight: normal; }
+.Tabs .marker.blocked, .Tabs .marker.paused { font-weight: 600; }
 .Tabs button { flex: none; background: transparent; color: inherit; padding: 0.25lh 1ch; }
 @media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }
