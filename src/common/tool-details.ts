@@ -57,7 +57,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 }
 
 // Each tool's mark (task b3k); tools without one show their name.
-const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: '*', stop: 'x', help: '?', inspect: '?' }
+const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: 'Spawn', stop: 'x', help: '?', inspect: '?' }
 
 function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
@@ -135,12 +135,14 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			let text = `Inspect ${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
 			return { text: marked(text), keys: ['what', 'scope', 'fields'] }
 		}
-		// * <id> <name>, then how it ends: a subagent closes when done
-		// (autoclose ↧), one left open says nothing.
+		// Spawn <id> (tab N): <name>, then how it ends: a subagent closes
+		// when done (autoclose ↧), one left open says nothing.
 		case 'spawn': {
-			let at = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)[0]
+			let [tab, at] = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g)[0] ?? []
 			let kind = input.kind === 'interactive' ? 'interactive' : input.kind === 'subagent-leave-open' ? '' : 'autoclose ↧'
-			let text = [at, str('name') ?? (at ? '' : input.kind === 'interactive' ? 'Interactive session' : 'Subagent')].filter(Boolean).join(' ')
+			let name = str('name') ?? (at ? '' : input.kind === 'interactive' ? 'Interactive session' : 'Subagent')
+			let target = at ? `${at}${tab ? ` (tab ${tab})` : ''}` : ''
+			let text = target && name ? `${target}: ${name}` : target || name
 			return { text: marked(`${text}${kind ? ` (${kind})` : ''}`), keys: str('name') ? ['name', 'kind'] : ['kind'] }
 		}
 		case 'stop':

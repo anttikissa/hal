@@ -16,9 +16,9 @@ test('rejected tool calls recover display-only purpose and task names without hi
 	expect(toolDetails.headline('tool', malformed)).toMatchObject({ text: '$ Diagnose tool failures', mark: '$' })
 	expect(toolDetails.lines('tool', malformed).join('\n')).toContain(malformed.cmd)
 	let spawn = { cmd: 'SPAWN [{ name: "Clean oversized histories", task: "Work" }]' }
-	expect(toolDetails.headline('tool', spawn).text).toBe('* Clean oversized histories (autoclose ↧)')
+	expect(toolDetails.headline('tool', spawn).text).toBe('Spawn Clean oversized histories (autoclose ↧)')
 	expect(toolDetails.lines('tool', spawn).join('\n')).toContain(spawn.cmd)
-	expect(toolDetails.headline('tool', { cmd: 'SPAWN [{ name:' }).text).toBe('* Subagent (autoclose ↧)')
+	expect(toolDetails.headline('tool', { cmd: 'SPAWN [{ name:' }).text).toBe('Spawn Subagent (autoclose ↧)')
 	expect(toolDetails.headline('tool', { cmd: {} }).text).toBe('Tool')
 })
 
@@ -30,8 +30,8 @@ test('inspect heads with every argument once; unknown ones still show', () => {
 
 test('spawn and wait name the sessions their result reports', () => {
 	let h = (name: string, input: Record<string, unknown>, out?: string) => toolDetails.headline(name, input, out).text
-	expect(h('spawn', { name: 'v3 UI craft pass', task: 't' }, 'Started tab 3 · 31-swe · v3 UI craft pass. Its last message comes back here')).toBe('* 31-swe v3 UI craft pass (autoclose ↧)')
-	expect(h('spawn', { kind: 'interactive' }, 'Opened tab 4 · 31-sit for the user.')).toBe('* 31-sit (interactive)')
+	expect(h('spawn', { name: 'v3 UI craft pass', task: 't' }, 'Started tab 3 · 31-swe · v3 UI craft pass. Its last message comes back here')).toBe('Spawn 31-swe (tab 3): v3 UI craft pass (autoclose ↧)')
+	expect(h('spawn', { kind: 'interactive' }, 'Opened tab 4 · 31-sit for the user.')).toBe('Spawn 31-sit (tab 4) (interactive)')
 	expect(h('wait', {}, 'Waiting for tab 3 · 31-swe · Pass, one, tab 5 · 31-bux. This turn ends here')).toBe('… Waiting for 31-swe, 31-bux')
 	expect(h('bash', { command: 'serve', description: 'Start server', background: true })).toBe('$ Start server')
 })

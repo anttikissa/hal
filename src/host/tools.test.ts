@@ -262,7 +262,7 @@ test('read_blob fetches a numbered tool call and its result from history', async
 		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
 		expect((await blobRun(`t${call.n}`)).output).toBe('< example.txt')
 		let spawn = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'internal-provider-call-id', name: 'spawn', input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } } } })
-		expect((await blobRun(`s/${spawn.n}`)).output).toBe('* Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true')
+		expect((await blobRun(`s/${spawn.n}`)).output).toBe('Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true')
 		expect((await blobRun(`s/${result.n}`)).output).toContain('file contents')
 		expect((await blobRun('t999999')).isError).toBe(true)
 	} finally { paths.home = originalHome }

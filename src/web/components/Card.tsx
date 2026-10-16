@@ -68,9 +68,9 @@ function enter(el: HTMLElement): void {
 // after ; & | ( $( ), optionally behind env assignments or a wrapper.
 const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
-const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
+const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
 // A title without its leading mark ($, <, =>, …): the icon shows it.
-const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!*x?]) /, '') as T
+const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string } }) {
 	let id = () => `${props.session}#${props.row.item.key}`
