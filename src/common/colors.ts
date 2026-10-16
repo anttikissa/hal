@@ -88,7 +88,7 @@ export const colors = {
 	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215], title: [0.935, 0.06, 212] }),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
-	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
+	message: (): Style => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.06, 5] }),
 	// placeholder: the example request in an empty prompt, readable but
 	// quieter than typed text.
 	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg!, placeholder: oklch.faint(colors.user().fg!, colors.user().bg!) }),

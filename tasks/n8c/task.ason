@@ -1,0 +1,7 @@
+{
+	title: 'Pink message card background',
+	spec: 'Message cards keep the hot pink foreground (OKLCH hue 350) on a dark rose background (OKLCH [bgL, 0.06, 5]) rather than a purple one, in terminal and web. Contrast stays at least 7:1. Themes that override message keep their own shade. Replaces the message background in 9p.',
+	status: 'done',
+	needs: ['9p'],
+	foldInto: ['9p']
+}
