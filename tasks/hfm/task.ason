@@ -1,0 +1,10 @@
+{
+	title: 'Unify compact card headers and reply outcomes',
+	spec: 'Web closed cards and terminal short cards with a one-row limit share identity: preview wording, timestamps and block references. Incoming messages retain From session (tab N); outgoing SEND retains To session (tab N), using the resolved send-time destination when available. Use a supplied description or summary, otherwise the first nonempty content line; preserve full expanded contents and explicit slash commands. Hal and incoming reports use done and question inside the identity parentheses; remove the leading question mark on Hal. Done means final reply, not implemented code; commentary has no outcome. Use existing summary/question metadata, ignoring quoted tags. Keep open/closed defaults. Stable semantic colors in both clients: purple tools including SEND, pink incoming messages, existing user/assistant/thinking colors; folding does not change role color and red remains failures. Restore the invariant that a compact message identifies both direction and participant rather than showing bare content or bare destination. Share header decisions rather than duplicating web/terminal wording.',
+	status: 'done',
+	notes: [
+		'Compact prompt/reply wording lives in common/titles and SEND preview wording in common/tool-details. Done/question use the existing real summary/question tags and incoming report field; quoted tags, interrupted text and naming controls do not acquire an outcome. No history or wire-format change. The newer content-first thinking layout (6q1) is unchanged. Temporary phone/desktop browser and one-row terminal checks passed and were removed; shared format-contract regressions stay. No new timers, observers, dependencies or growing state; terminal headers use the existing layout cache.'
+	],
+	needs: ['hp', 'hyt'],
+	foldInto: ['hp', 'hyt']
+}

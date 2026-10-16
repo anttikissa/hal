@@ -18,6 +18,7 @@
 
 import { callText } from './call-text.ts'
 import { home } from './home.ts'
+import { titles } from './titles.ts'
 
 // A value in readable text rather than wire syntax: a scalar beside its
 // key, lists numbered, nested values indented once per level.
@@ -56,7 +57,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 }
 
 // Each tool's mark (task b3k); tools without one show their name.
-const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: '=>', wait: '…', notify: '!', spawn: '*', stop: 'x', help: '?', inspect: '?' }
+const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: '*', stop: 'x', help: '?', inspect: '?' }
 
 function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
@@ -88,7 +89,8 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			let [first, sid] = sent?.split(' · ') ?? []
 			let target = sent ? /^tab \d+$/.test(first!) && sid ? `${sid} (${first})` : first! : /^\d+$/.test(to) ? `tab ${to}` : to
 			let command = typeof input.text === 'string' && /^\s*\//.test(input.text) ? str('text') : undefined
-			return { text: marked(`${target}${command ? ` ${command}` : ''}${str('description') ? `: ${str('description')}` : ''}`), keys: ['to', 'description', ...(command ? ['text'] : [])] }
+			let preview = str('description') || (typeof input.text === 'string' ? titles.preview(input.text) : undefined)
+			return { text: marked(`${target}${command ? ` ${command}` : ''}${preview && preview !== command ? `: ${preview}` : ''}`), keys: ['to', 'description', ...(command ? ['text'] : [])] }
 		}
 		case 'command':
 			if (str('command')) return { text: str('command')!, key: 'command' }

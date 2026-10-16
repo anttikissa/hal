@@ -38,20 +38,26 @@ test('spawn and wait name the sessions their result reports', () => {
 
 test('send headers distinguish requested destinations from host-resolved ones', () => {
 	let input = { to: '2', description: 'Report completion', text: 'Done', queue: true }
-	expect(toolDetails.headline('send', input).text).toBe('=> tab 2: Report completion')
-	expect(toolDetails.headline('send', input, 'Sent to tab 2 · 157-cms · Review').text).toBe('=> 157-cms (tab 2): Report completion')
-	expect(toolDetails.headline('send', { ...input, to: '157-cms' }, 'no session 157-cms').text).toBe('=> 157-cms: Report completion')
-	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('=> 157-cms: Report completion')
+	expect(toolDetails.headline('send', input).text).toBe('To tab 2: Report completion')
+	expect(toolDetails.headline('send', input, 'Sent to tab 2 · 157-cms · Review').text).toBe('To 157-cms (tab 2): Report completion')
+	expect(toolDetails.headline('send', { ...input, to: '157-cms' }, 'no session 157-cms').text).toBe('To 157-cms: Report completion')
+	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('To 157-cms: Report completion')
 	expect(toolDetails.lines('send', input)).toEqual(['Done', 'queue: true'])
 	for (let outcome of ['Sent to', 'Queued in', 'Waiting in', 'Interrupted']) {
 		let output = `${outcome} tab 2 · 157-cms · Review: it reads this before its next request`
-		expect(toolDetails.headline('send', input, output).text).toBe('=> 157-cms (tab 2): Report completion')
+		expect(toolDetails.headline('send', input, output).text).toBe('To 157-cms (tab 2): Report completion')
 	}
+})
+
+test('SEND without a description previews the first nonempty line and keeps the full expanded message', () => {
+	let input = { to: '176-ict', text: '\nIndex available.\nPlease commit now.' }
+	expect(toolDetails.headline('send', input).text).toBe('To 176-ict: Index available.')
+	expect(toolDetails.lines('send', input)).toEqual(['', 'Index available.', 'Please commit now.'])
 })
 
 test('SEND exposes slash commands before destinations even with a purpose', () => {
 	let input = { to: '2', text: '/close', description: 'Finish session' }
-	expect(toolDetails.headline('send', input).text).toBe('=> tab 2 /close: Finish session')
+	expect(toolDetails.headline('send', input).text).toBe('To tab 2 /close: Finish session')
 	expect(toolDetails.lines('send', input)).toEqual([])
 	let multiline = { ...input, text: '/close\nnot discarded' }
 	expect(toolDetails.lines('send', multiline)).toEqual(['/close', 'not discarded'])

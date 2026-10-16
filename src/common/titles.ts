@@ -5,6 +5,8 @@
 
 import type { Shown } from './transcript.ts'
 import { bashResult } from './bash-result.ts'
+import { card } from './card.ts'
+import { summary } from './summary.ts'
 
 // Names sent by the host's cached models.dev catalog; fall back to the
 // complete id, never a guessed marketing name.
@@ -83,8 +85,7 @@ function address(label: string, short = false): string {
 }
 
 function messageHead(item: Shown & { type: 'prompt' }): string {
-	let who = titles.who(item.from === undefined ? item : { ...item, report: undefined, ...(item.report ? { summary: undefined } : {}) })
-	return item.report ? `${who} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}` : `${who}: ${item.summary}`
+	return titles.compact(item) ?? titles.who(item) ?? ''
 }
 
 // "tab 2 · 12-xyz · Name" → ['12-xyz', 'tab 2']: the session, then its tab.
@@ -101,7 +102,6 @@ function receipt(item: Shown): 0 | 1 | 2 {
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
-	if (item.type === 'prompt' && item.report && item.summary) label = `${label} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}`
 	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
 }
 
@@ -113,7 +113,7 @@ function author(item: Shown): string | undefined {
 			if (call) return `<= Background command finished ↑ ${call.startsWith('t') ? call : `t${call}`}`
 			if (item.from === undefined) return tagged(item.origin === 'model' ? 'Hal' : 'You', delivery)
 			let [id, tab] = sender(item.label ?? item.from)
-			return tagged(`<= ${item.from || id}`, [tab, ...delivery])
+			return tagged(`From ${item.from || id}`, [tab, item.report === 'question' ? 'question' : item.report === 'summary' ? 'done' : undefined, ...delivery])
 		}
 		// Another session's command is headed as the prompt it was sent
 		// as; the human's by itself, over what it said (none alone).
@@ -123,11 +123,22 @@ function author(item: Shown): string | undefined {
 		case 'thinking':
 			return 'Thinking'
 		case 'text':
-			return `${/<question>/.test(item.text) ? '? ' : ''}${item.model ? `Hal (${titles.modelLabel(item.model, item.effort)})` : 'Hal'}`
+			return tagged('Hal', [item.model && titles.modelLabel(item.model, item.effort), !item.interrupted && !item.naming && (summary.asks(item.text) ? 'question' : summary.extract(item.text) ? 'done' : undefined)])
 		// Hal's own words without a model, such as a greeting (task 8y).
 		case 'output':
 			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : item.synthetic ? 'Hal (synthetic)' : undefined
 	}
+}
+
+function preview(text: string): string {
+	return text.match(/\S[^\r\n]*/)?.[0]?.replace(/\s+/g, ' ').trim() ?? ''
+}
+
+function compact(item: Shown): string | undefined {
+	if (item.type !== 'prompt' && item.type !== 'text') return undefined
+	let who = titles.who(item)
+	let text = titles.preview(item.type === 'prompt' ? item.summary || card.text(item) : card.text(item))
+	return text ? `${who}: ${text}` : who
 }
 
 // '10:52 Hal (Opus 5.5)', '10:52 Run this command? …' for a question;
@@ -135,7 +146,7 @@ function author(item: Shown): string | undefined {
 function title(item: Shown): string | undefined {
 	if (item.type === 'question') return stamp(item.ts, item.form.text)
 	if (item.type === 'output' && !item.synthetic && !item.commit && !item.error) return titles.time(item.ts) || undefined
-	let w = titles.who(item)
+	let w = item.type === 'prompt' && item.report && item.summary ? titles.compact(item) : titles.who(item)
 	if (w === undefined) return undefined
 	let t = titles.time((item as { ts?: string }).ts)
 	return t ? `${t} ${w}` : w
@@ -174,4 +185,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, stamp, ended, address, receipt, messageHead, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, stamp, ended, address, receipt, messageHead, preview, compact, author, who, title, letter, blockId }

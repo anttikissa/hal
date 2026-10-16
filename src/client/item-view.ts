@@ -100,6 +100,10 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	let fold = look.fold ?? card.initial(item)
 	let key = (item as { key?: string }).key ?? ''
 	let hw = look.headerWidth ?? width
+	if (fold === 'short' && settings.shortRows() === 1 && !bashResult.background(item) && (item.type === 'prompt' || (item.type === 'text' && card.text(item).trim()))) {
+		let title = titles.compact(item)
+		if (title) return [ansi.heading(strings.expandTabs(strings.clipVisual(ansi.clean(titles.stamp(item.ts, title)), hw)), itemView.itemStyle(item))]
+	}
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':

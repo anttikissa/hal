@@ -160,8 +160,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			let first = expanded() ? '' : parser.inline(lines().find((line) => line.trim()) ?? '', !!props.cursor).map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
-		if (item.type === 'prompt' && item.summary) return unmark(titles.messageHead(item))
-		if (headsWho()) return titles.letter(item) === 'm' ? unmark(titles.who(item)) : titles.who(item)
+		if (item.type === 'prompt' || item.type === 'text') return expanded() && !(item.type === 'prompt' && item.summary) ? titles.who(item) : titles.compact(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${lines()[0]}`
 		return item.type === 'tool' ? unmark(presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text) : lines()[0]
