@@ -40,6 +40,6 @@ export default (plugin: Plugin) => {
 		let paths = info.files.map((f) => f.path.slice(info.root.length + 1)).filter(source)
 		let net = 0
 		for (let p of paths) net += await at(info.root, info.hash, p) - await at(info.root, `${info.hash}~1`, p)
-		return [...lines, `Total: ${net >= 0 ? '+' : ''}${net} source LOC (net; excludes blanks, comments and tests).`]
+		return [...lines, `Total: ${net >= 0 ? '+' : ''}${net} source LOC.`]
 	})
 }

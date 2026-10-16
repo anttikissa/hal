@@ -2,6 +2,9 @@
 	title: 'Commit source-line extra',
 	spec: "extras/commit-sloc.ts (task ybg) appends to each commit seen by commits.committed (task sg0) the net source lines it added, counted by scripts/sloc rules (non-blank, non-comment lines in non-test .ts/.tsx files), reading only the commit's own files. It also rejects any background Bash call whose command contains git commit, before it runs, so the call errors with a request to retry in the foreground: commit cards (task 179) attach only to a foreground result. The check reads the command text only; a script that commits stays allowed. extras/README.md lists it.",
 	status: 'done',
+	notes: [
+		'The appended line reads "Total: +N source LOC."; the counting rules are understood, so the line does not restate them (176-roe).'
+	],
 	needs: ['ybg', 'sg0'],
 	foldInto: ['ybg']
 }
