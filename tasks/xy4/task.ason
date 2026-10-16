@@ -1,0 +1,10 @@
+{
+	title: 'Durable cwd change notices for the model',
+	spec: 'Every effective cwd change, including idle /cd, appends a durable model notice naming the old and new working directory, combined with any model-switch text and continuation instruction in one notice. These notices are ordinary notices, not section updates, so prompt rebuilds (model switch, expiry, clear) never drop them. Replaces the dt1 rule that cwd facts are only section updates. Invariant: the model always learns who worked where before it, regardless of prompt rebuilds.',
+	status: 'done',
+	notes: [
+		'Model switches rebuild the system prompt (prompt-cache.ts rebuild branch), and project() then drops earlier sectionUpdate notices, so cwd section diffs vanished after any later rebuild. Found when a model mistook its predecessor reply for its own (176-mvp). Verification: 60 focused tests across slash, context-handoff, model-notices, tool-model, host-models, rebases and prompt-cache passed.'
+	],
+	needs: [],
+	foldInto: ['21d', 'dt1']
+}

@@ -115,9 +115,10 @@ function change(id: string, patch: { cwd?: string; model?: string }, origin?: 'm
 	if (switched) slash.output(id, switched, false, origin)
 	let running = turns.state.running.get(id)
 	let continuing = running?.controller.signal.aborted ? undefined : running
-	let notice = switched || 'The working directory changed during your work.'
+	let moved = changed.cwd === undefined ? '' : `Working directory changed from ${previous.cwd} to ${changed.cwd}.`
+	let notice = [switched, moved].filter(Boolean).join(' ')
 	if (continuing) notice += ' Continue your unfinished response using the current context, without repeating what you already wrote or completed.'
-	if (switched || continuing) history.append(id, { type: 'notice', text: notice })
+	history.append(id, { type: 'notice', text: notice })
 	if (continuing) prompts.force(continuing)
 	if (changed.model) {
 		// A turn waiting out a failure tries the new model now.
