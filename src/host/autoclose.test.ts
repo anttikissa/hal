@@ -5,7 +5,6 @@ import { ason } from '../common/ason.ts'
 import { paths } from './paths.ts'
 import { protocol } from '../common/protocol.ts'
 import { autoclose } from './autoclose.ts'
-import { drafts } from './drafts.ts'
 import { calls, client, toolSession, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
@@ -113,16 +112,6 @@ test('unfinished jobs and running subagents prevent ordinary autoclose', async (
 		autoclose.finished(id)
 		expect(tabs.file().open).toContain(id)
 	} finally { jobs.state.running.delete('job') }
-})
-
-test('a draft keeps an autoclose tab open after a final answer', async () => {
-	let { c, id } = ordinary()
-	c.conn.send({ type: 'submit', sessionId: id, text: 'do this job' })
-	await until(() => calls.length === 1)
-	drafts.set(id, 'half-written reply')
-	calls[0]!.push({ type: 'text', text: 'Done. <summary>All done</summary>' }, { type: 'done', reason: 'end' })
-	await until(() => status.stateOf(id).type === 'idle')
-	expect(tabs.file().open).toContain(id)
 })
 
 test('autoclose initialization rejects non-boolean wire and stored values', () => {

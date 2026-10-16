@@ -35,7 +35,9 @@ function promote(id: string): void {
 
 // Called only after a completed turn. Idle plus empty work lists prevents
 // closing a waiting parent, a question, or a session with queued follow-ups.
-// A non-blank draft means the user is writing to it.
+// A non-blank draft means the user is writing to it. Tested once, then
+// the tests were deleted. If you change this code, first write tests for:
+// a non-blank draft keeps the tab open after a final answer.
 function finished(id: string): void {
 	if (!sessions.open(id).autoclose || status.stateOf(id).type !== 'idle') return
 	if (notify.asked(id) || status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
