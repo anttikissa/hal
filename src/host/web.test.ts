@@ -621,6 +621,33 @@ function providerHome(): void {
 
 
 
+browserTest('Unicode drafts keep the composer and tab navigation responsive', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let other = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	tabs.insert(id, 0); tabs.insert(other, 1)
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.Chat')`)
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		for (let width of [390, 1440]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
+			for (let text of ['é', '—', '漢字', '👨‍👩‍👧', 'e\u0301']) {
+				await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.focus() })()`)
+				await b.waitFor(`!document.querySelector('.entry .hint').classList.contains('gone')`)
+				await b.call('Input.insertText', { text })
+				await b.waitFor(`document.querySelector('.entry .hint').classList.contains('gone') && !document.querySelector('.actions button[aria-label="Send"]').disabled`)
+				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
+			}
+			await b.evaluate(`document.querySelector('.Tabs [href="/${other}"]').click()`)
+			await b.waitFor(`document.querySelector('.Tabs [href="/${other}"]').hasAttribute('aria-current') && document.querySelector('textarea').value === ''`)
+			await b.evaluate(`document.querySelector('.Tabs [href="/${id}"]').click()`)
+			await b.waitFor(`document.querySelector('textarea').value === 'e\\u0301'`)
+		}
+	} finally { await b.close() }
+})
+
 browserTest('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
 	// Turns taller than the window, one per page.
 	let id = tabs.create('/tmp')

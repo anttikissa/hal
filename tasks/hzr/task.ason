@@ -1,0 +1,11 @@
+{
+	title: 'Keep Unicode drafts from breaking the web UI',
+	spec: 'Shared string width measurement is browser-safe. Typing accented text, Unicode punctuation, CJK or emoji while a prompt example is visible never throws or stops reactive updates: the example clears, draft text stays intact, action buttons update and tabs remain usable. Keep native Bun width measurement on terminal and host paths; the browser fallback handles combining marks, wide CJK and emoji without a Bun global. Verify with real browser input and subsequent tab navigation. Restore the invariant that common modules used by the browser do not require host-only globals.',
+	status: 'done',
+	notes: [
+		'Browser diagnostics at the reported freeze show ReferenceError at the bundled Bun.stringWidth expression, followed by a Solid error. Later events still arrived but renderedTab stayed 7 after controller tab switched to 8. Native non-ASCII widths introduced for terminal Unicode 16 leaked through placeholders.follow into the browser. Guard Bun and use a browser-only Unicode-property/CJK-range fallback; terminal widths stay unchanged. The regression fixture uses explicit idle example/model sessions: tabs.create defaults to hal/intro and does not show a request placeholder. Browser checks cover accented text, em dash, CJK, ZWJ emoji and decomposed accents at 390 and 1440 CSS pixels, enabled Send, example dismissal, tab navigation and retained drafts.',
+		'Verification: focused Chromium regression passed (1 test, 11 assertions); shared width/editor selection passed (190 tests); changed-file lint passed. Whole-project typecheck is blocked by unrelated untracked root test.ts (undefined ebar and zot). An accidentally unfiltered web run exposed an existing host-mode event expectation mismatch and intro/default-model fixture timeouts; it was stopped at the command deadline, not counted as passing.'
+	],
+	needs: ['1b'],
+	foldInto: ['1b', 'cc']
+}
