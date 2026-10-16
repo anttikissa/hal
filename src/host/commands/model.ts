@@ -8,6 +8,7 @@ import { effort } from '../effort.ts'
 import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
+import { history } from '../history.ts'
 
 export const command: SlashCommand & { levels(id: string): string[] } = {
 	help: () => '/model <provider/model or family>[:level]: switch this session immediately, interrupting active work and continuing safely, keeping its effort (snapped to the nearest supported level).\n/model :level changes only the effort; :default clears it.\n/model alone opens the picker (Ctrl-M too).',
@@ -56,8 +57,11 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 			liveFiles.save(meta)
 			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
 		}
-		// The command line already names the model; say only what it doesn't.
-		let said = [...(previous === next || args.trim() === next ? [] : [`model: ${next}`]), ...(choice.note ? [choice.note] : []), ...(cacheChanged ? ['changing request effort invalidates the Anthropic prompt cache for messages'] : [])]
+		let names = models.names([ctx.model, choice.id])
+		let describe = (id: string, qualified: string) => names[id] ? `${names[id]} (${qualified})` : qualified
+		let switched = previous === next ? '' : `Switched from ${describe(ctx.model, previous)} to ${describe(choice.id, next)}.`
+		if (switched) history.append(ctx.sessionId, { type: 'notice', text: switched })
+		let said = [...(switched ? [switched] : []), ...(choice.note ? [choice.note] : []), ...(cacheChanged ? ['changing request effort invalidates the Anthropic prompt cache for messages'] : [])]
 		return { ...(said.length && { say: said.join('; ') }), ...(welcome && { synthetic: welcome }) }
 	},
 }

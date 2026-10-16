@@ -1,0 +1,10 @@
+{
+	title: 'Describe model switches to users and models',
+	spec: 'Every effective /model change, including picker selections and exact IDs, reports a readable switch from the previous model to the new model, with available display names and actual provider/model IDs and effort suffixes. The same switch text is delivered durably in model context on the next request, including idle-session changes. Both web and terminal use the shared command output without duplicate notice cards. Unchanged or invalid selections create no switch notice. Preserve effort normalization, warnings and safe active-work handoff. This replaces task 71z model-output suppression; its /config requirements remain. Invariant: a successful model change is explicitly visible to both user and model.',
+	status: 'done',
+	notes: [
+		'The shared /model command formats available models.names display names with qualified IDs (including effort), falling back to IDs when no name exists. It uses the same text for its visible reply and a durable notice; notice records are absent from transcript cards, so model delivery does not duplicate UI output. The existing active-work continuation notice and hard steering remain unchanged. Each effective switch adds one small history record, with no polling, new queue or dependency. Focused verification: 23 tests across host-models, tool-model, context-handoff and effort passed; tsc --noEmit and changed-file oxlint passed.'
+	],
+	needs: ['71z', '6eq'],
+	foldInto: ['71z', '6eq']
+}

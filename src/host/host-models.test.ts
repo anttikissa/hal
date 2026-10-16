@@ -221,6 +221,16 @@ test('/model <id> switches the session model for every follower and the next tur
 	a.conn.send({ type: 'submit', sessionId: id, text: '/model hal/ok' })
 	await until(() => b.views.get(id)!.meta.model === 'hal/ok')
 	expect(sessions.open(id).model).toBe('hal/ok')
+	let switched = 'Switched from Intro (hal/intro) to hal/ok.'
+	await until(() => b.of('output').some((e) => e.text === switched))
+	expect(a.of('output').filter((e) => e.text === switched)).toHaveLength(1)
+	expect(JSON.stringify(await history.messages(id))).toContain(switched)
+	let notices = () => history.readSync(id).filter((r) => r.type === 'notice' && r.text === switched)
+	expect(notices()).toHaveLength(1)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/model hal/ok' })
+	await until(() => a.views.get(id)!.items.filter((i) => i.type === 'command').length === 2)
+	expect(notices()).toHaveLength(1)
+	expect((await opened(id)).views.get(id)).toEqual(b.views.get(id))
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => a.of('turn-end').length)
 	expect(a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'ok')).toBe(true)
@@ -235,6 +245,7 @@ test('/model refuses an id no provider serves', async () => {
 		await until(() => refused() === i + 1)
 	}
 	expect(sessions.open(id).model).toBe('hal/intro')
+	expect(history.readSync(id).some((r) => r.type === 'notice' && r.text.startsWith('Switched from'))).toBe(false)
 })
 
 test('/model alone opens the picker on every client following the session', async () => {
