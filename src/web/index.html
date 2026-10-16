@@ -26,7 +26,8 @@
 button:has(> .icon) { display: inline-flex; align-items: center; justify-content: center; gap: 0.75ch; }
 * { box-sizing: border-box; }
 /* Selection is reverse video in the text's own color (each theme class
-   sets --sel-back); a solid block (bg in its color) reverses back. */
+   sets --sel-back, as does each rule that recolors text); a solid block
+   (bg in its color) reverses back. */
 .page { --sel-text: var(--canvas); }
 ::selection { background-color: var(--sel-back); color: var(--sel-text); -webkit-text-fill-color: var(--sel-text); }
 .Question button[aria-pressed="true"], .Question mark, .Card.question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
@@ -92,7 +93,7 @@ html.typing .App { position: absolute; }
    card's top and bottom whitespace match. */
 .Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
-.Card.tool .content, .Card.background-result .content { color: var(--output); }
+.Card.tool .content, .Card.background-result .content { color: var(--output); --sel-back: var(--output); }
 /* Thinking and model text have no tint, so half the inset reads as
    the same gap (the user's choice, over the 44px header row). */
 .Card.thinking, .Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
@@ -108,12 +109,12 @@ html.typing .App { position: absolute; }
 .Thinking .stamp { padding: 0; min-height: 0; background: none; color: inherit; font: inherit; }
 .Thinking .thinking-meta { display: flex; gap: 1ch; }
 .Thinking .thinking-meta .link { position: relative; padding: 0; }
-.Thinking .more { position: absolute; bottom: var(--card-inset); right: 1ch; color: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
-.Card .result-text { color: var(--output, inherit); }
+.Thinking .more { position: absolute; bottom: var(--card-inset); right: 1ch; color: var(--quiet); --sel-back: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
+.Card .result-text { color: var(--output, inherit); --sel-back: var(--output, var(--fg)); }
 .Card .result-text.error { background: none; }
 .Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }
-.Card .sender { color: var(--quiet); margin-bottom: 0.25lh; }
-.Card .who { color: var(--title-fg); }
+.Card .sender { color: var(--quiet); --sel-back: var(--quiet); margin-bottom: 0.25lh; }
+.Card .who { color: var(--title-fg); --sel-back: var(--title-fg); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 .Card .change > :not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
@@ -125,17 +126,17 @@ html.typing .App { position: absolute; }
 .ToolPresentation code { font: inherit; }
 .ToolPresentation .diff { overflow-x: auto; }
 .ToolPresentation .diff > div { white-space: pre; width: max-content; min-width: 100%; }
-.ToolPresentation .add { color: var(--add-fg); }
-.ToolPresentation .del { color: var(--remove-fg); }
-.ToolPresentation .dim { color: var(--quiet); }
+.ToolPresentation .add { color: var(--add-fg); --sel-back: var(--add-fg); }
+.ToolPresentation .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
+.ToolPresentation .dim { color: var(--quiet); --sel-back: var(--quiet); }
 .raw-tool button { background: none; color: inherit; padding: 0.5lh 1ch; min-height: 44px; text-decoration: underline; }
 /* An opened diff keeps whole lines and scrolls sideways as one box, its
    right edge fading while more is off screen, like a wide table. */
 .Card .change .lines, .Card .edit-diff { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
 .Card .change .lines > div, .Card .edit-diff > div { white-space: pre; width: max-content; min-width: 100%; }
-.Card .change .add, .Card .edit-diff .add, .CardHeader .status .add, .Markdown pre[data-lang=diff] .add { color: var(--add-fg); }
-.Card .change .del, .Card .edit-diff .del, .CardHeader .status .del, .Markdown pre[data-lang=diff] .del { color: var(--remove-fg); }
-.Card .change .dim, .Card .edit-diff .dim, .Markdown pre[data-lang=diff] .dim { color: var(--quiet); }
+.Card .change .add, .Card .edit-diff .add, .CardHeader .status .add, .Markdown pre[data-lang=diff] .add { color: var(--add-fg); --sel-back: var(--add-fg); }
+.Card .change .del, .Card .edit-diff .del, .CardHeader .status .del, .Markdown pre[data-lang=diff] .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
+.Card .change .dim, .Card .edit-diff .dim, .Markdown pre[data-lang=diff] .dim { color: var(--quiet); --sel-back: var(--quiet); }
 /* Removed text in the rows is struck through, as in the terminal. */
 .Card .change .row.del, .Card .change span.del { text-decoration: line-through; }
 .Card .change .head:not(:first-child) { margin-top: 0.5lh; }
@@ -170,7 +171,7 @@ html.typing .App { position: absolute; }
 .CardHeader > .receipt { padding-block: var(--card-inset); }
 .Card .link:has(.receipt) { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5ch; }
 .Card .link:has(.receipt)::before { order: 1; }
-.CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
+.CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
 .CardHeader .status.diff { min-width: 0; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; }
 .Card.open .CardHeader:has(> .status.diff) { grid-template-columns: minmax(0, 1fr) auto; }
 .Card.open .CardHeader:has(> .status.diff) > .link { grid-column: 2; grid-row: 1; }
@@ -214,7 +215,7 @@ html.typing .App { position: absolute; }
 .Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 88px + var(--receipt-space, 0ch)); }
 .Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 132px + var(--receipt-space, 0ch)); }
 .Card.queued > .content.line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.Card.pending { color: var(--quiet); transition-delay: 300ms; }
+.Card.pending { color: var(--quiet); --sel-back: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }
 /* Each card links to itself (task 0z): a # in its top right corner,
@@ -249,14 +250,14 @@ html.typing .App { position: absolute; }
 .Card.thinking .cursor { background: var(--quiet); }
 .CardHeader .cursor { vertical-align: top; }
 /* Task hyt: a live block's elapsed time and spinner. */
-.CardHeader .ticker { display: flex; gap: 1ch; padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
+.CardHeader .ticker { display: flex; gap: 1ch; padding-block: var(--card-inset); color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
 .CardHeader .spinner { display: inline-block; width: 1ch; }
 .CardHeader .spinner:not(.on) { display: none; }
 .CardHeader .spinner.on::after { content: '⠁'; animation: spin 2s steps(1, end) infinite; }
 @keyframes spin { 0% { content: '⠁'; } 12.5% { content: '⠈'; } 25% { content: '⠐'; } 37.5% { content: '⠠'; } 50% { content: '⢀'; } 62.5% { content: '⡀'; } 75% { content: '⠄'; } 87.5% { content: '⠂'; } }
-.CardHeader .latest { margin-left: 1ch; color: var(--quiet); }
-.CardHeader .secondary { color: var(--fg); }
-.CardHeader, .Thinking .stamp { color: var(--title-fg); }
+.CardHeader .latest { margin-left: 1ch; color: var(--quiet); --sel-back: var(--quiet); }
+.CardHeader .secondary { color: var(--fg); --sel-back: var(--fg); }
+.CardHeader, .Thinking .stamp { color: var(--title-fg); --sel-back: var(--title-fg); }
 @media (prefers-reduced-motion: reduce) { .CardHeader .spinner.on::after { animation: none; content: '·'; } }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
@@ -277,7 +278,7 @@ html.typing .App { position: absolute; }
 .Markdown .b { font-weight: bold; }
 .Markdown .i { font-style: italic; }
 .Markdown .code, .Markdown pre { font-family: 'IBM Plex Mono', monospace; }
-.Markdown .code, .Markdown pre code { color: var(--code, inherit); }
+.Markdown .code, .Markdown pre code { color: var(--code, inherit); --sel-back: var(--code, var(--fg)); }
 .Markdown a { color: inherit; }
 .Markdown pre { margin: 0.25lh 0; white-space: pre-wrap; }
 .Markdown pre[data-lang]::before { content: attr(data-lang); display: block; color: var(--quiet); }
@@ -294,11 +295,11 @@ html.typing .App { position: absolute; }
 @media (max-width: 40rem) { .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); } }
 .Notices .stack { position: absolute; right: var(--gr); bottom: 0.5lh; width: min(24rem, calc(100% - var(--gl) - var(--gr))); display: flex; flex-direction: column; gap: 0.25lh; }
 .Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 4px color-mix(in oklab, var(--overlay-bg) 75%, transparent); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
-.Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); }
-.Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); }
-.Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); }
-.Notices .card.commit { border-color: var(--commit-fg); } .Notices .card.commit strong { color: var(--commit-fg); }
-.Notices .card.tinted { border-color: var(--bar); background-color: var(--tint); } .Notices .card.tinted strong { color: var(--bar); }
+.Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); --sel-back: var(--done-fg); }
+.Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); --sel-back: var(--failed-fg); }
+.Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); --sel-back: var(--attention-fg); }
+.Notices .card.commit { border-color: var(--commit-fg); } .Notices .card.commit strong { color: var(--commit-fg); --sel-back: var(--commit-fg); }
+.Notices .card.tinted { border-color: var(--bar); background-color: var(--tint); } .Notices .card.tinted strong { color: var(--bar); --sel-back: var(--bar); }
 .Notices .card .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Notices .more { align-self: flex-end; padding: 0 1ch; }
 @media (pointer: coarse) { .Notices .card { min-height: 44px; } }
