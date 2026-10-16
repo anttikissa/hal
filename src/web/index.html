@@ -108,6 +108,8 @@ html.typing .App { position: absolute; }
 .Thinking .more { position: absolute; bottom: 0; right: 0; color: var(--quiet); --sel-back: var(--quiet); background: var(--canvas); padding-left: 2ch; font-style: italic; }
 .Card .result-text { color: var(--output, inherit); --sel-back: var(--output, var(--fg)); }
 .Card .result-text.error { background: none; }
+.result-output .CardHeader { min-height: 0; padding: 0; color: inherit; }
+.result-output .CardHeader.inline :is(.title, .stamp, .status) { padding-block: 0; }
 .Card .sender { color: var(--quiet); --sel-back: var(--quiet); margin-bottom: 0.25lh; }
 .Card .who { color: var(--title-fg); --sel-back: var(--title-fg); }
 .Card .who .call { color: inherit; text-decoration: underline; }

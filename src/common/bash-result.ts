@@ -16,10 +16,15 @@ function trim(text: string): string {
 	return text.replace(/^(?:[ \t]*\n)+/, '').trimEnd()
 }
 
+function exit(output: string): string | undefined {
+	let code = STATUS.exec(output)?.[1]
+	return code === undefined ? undefined : `exit ${code}`
+}
+
 // 'exit 1' for a nonzero exit, else undefined.
 function status(output: string): string | undefined {
-	let code = STATUS.exec(output)?.[1]
-	return code && code !== '0' ? `exit ${code}` : undefined
+	let code = bashResult.exit(output)
+	return code === 'exit 0' ? undefined : code
 }
 
 function failure(result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash = false): string | undefined {
@@ -44,4 +49,4 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 }
 
 // Stored job labels identify literal Bash output and its original call.
-export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, failure, duration, interrupted }
+export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, exit, status, failure, duration, interrupted }

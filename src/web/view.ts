@@ -248,11 +248,12 @@ function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 // prompt or command this client sent, the command id it had while pending.
 // `pending`: sent, not yet acknowledged. `waiting`: in the inbox;
 // `note`: a queued message's compact row starts with it (task 16).
-export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true; waiting?: true; note?: string }
+export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; call?: Item & { type: 'tool' }; pending?: true; waiting?: true; note?: string }
 
 function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = []): Row[] {
 	let out: Row[] = []
 	let calls = new Map<string, Row>()
+	let keyedCalls = new Map<string, Item & { type: 'tool' }>()
 	items = promptChanges.group(items)
 	for (let [at, item] of items.entries()) {
 		if (item.type === 'turn-end' && item.status === 'completed') continue
@@ -265,14 +266,16 @@ function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = 
 			continue
 		}
 		let row: Row = { item, at, key: sent[item.key] ?? item.key }
-		if (item.type === 'tool') calls.set(item.id, row)
+		let background = bashResult.background(item)
+		if (background) row.call = keyedCalls.get(background.replace(/^t/, ''))
+		if (item.type === 'tool') { calls.set(item.id, row); keyedCalls.set(item.key, item) }
 		out.push(row)
 	}
 	if (!before.length) return out
 	let previous = new Map(before.map((row) => [row.key, row]))
 	let next = out.map((row) => {
 		let old = previous.get(row.key)
-		return old && old.item === row.item && old.result === row.result && old.at === row.at ? old : row
+		return old && old.item === row.item && old.result === row.result && old.call === row.call && old.at === row.at ? old : row
 	})
 	return next.length === before.length && next.every((row, i) => row === before[i]) ? before : next
 }
@@ -312,6 +315,7 @@ function jobs(rows: Row[]): ReadonlySet<string> {
 function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
+			if (bashResult.background(item)) return { kind: 'tool tool-bash background-result', text: card.text(item) }
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
 			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: card.text(item) }

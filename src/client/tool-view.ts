@@ -73,11 +73,14 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	// A canceled call's note to the model: the title says "(canceled)".
 	let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
 	let style = look.style ?? itemView.itemStyle(item, tool)
+	let stamp = tool ? titles.resultTime(look.call?.ts, item.ts) : ''
+	let inset = stamp ? strings.visLen(stamp) + 1 : 0
+	let outputWidth = Math.max(1, width - inset)
 	if (tool && ((fold === 'short' && look.full) || (!out && !item.isError && !item.presentation && !item.presentationError))) return []
 	if (tool && (item.presentation || item.presentationError)) {
 		let max = fold === 'long' ? Infinity : settings.shortRows() - (look.head ?? 1)
 		let raw = fold === 'long' ? toolView.fullAt('', session, look.call?.key) : undefined
-		return presentationView.result(item, out, width, max, style, itemView.itemStyle({ ...item, isError: false }, tool), raw)
+		return presentationView.result(item, out, outputWidth, max, style, itemView.itemStyle({ ...item, isError: false }, tool), raw).map((row, i) => (stamp ? i ? ' '.repeat(inset) : `${stamp} ` : '') + row)
 	}
 	// Under its short call, a result fills the rows the call leaves.
 	let max = look.full ? Infinity : fold === 'long' ? toolView.openRows : settings.shortRows() - (tool ? look.head ?? 1 : 0)
@@ -90,15 +93,15 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	let live = (item as { live?: boolean }).live
 	let rows: string[] = [], used = 0
 	while (!live && used < lines.length && rows.length <= max) {
-		let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * width * 4), width, false)
+		let line = lines[used++]!, wrapped = ansi.wrap(line.slice(0, (max + 1) * outputWidth * 4), outputWidth, false)
 		if (fold === 'short' && !line.trim()) continue
 		rows.push(...wrapped)
 		tones.push(...wrapped.map(() => diff.tone(line)))
 	}
-	let shown = live ? lines.flatMap(line => ansi.wrap(line.slice(-Math.max(1, max) * width * 4), width, false)).slice(-max) : rows.slice(0, max)
+	let shown = live ? lines.flatMap(line => ansi.wrap(line.slice(-Math.max(1, max) * outputWidth * 4), outputWidth, false)).slice(-max) : rows.slice(0, max)
 	let more = live ? 0 : rows.length - shown.length + lines.length - used
 	let title = !tool && look.call?.title ? `Result of: ${ansi.clean(look.call.title)}` : undefined
-	let status = tool ? '' : toolView.resultStatus(item, !!call, style)
+	let status = tool && !stamp ? '' : toolView.resultStatus(item, !!call, style)
 	let key = look.call?.key ?? call
 	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`↑ t${key}`)) {
 		let ref = session && transcript.href(session, `t${key}`)
@@ -108,6 +111,7 @@ function result(item: Item & { type: 'tool-result' }, width: number, fold: Verbo
 	}
 	let res = shown.map((l, i) => {
 		let prefix = !i && item.isError ? '✗ ' : ''
+		if (stamp) prefix = (i ? ' '.repeat(inset) : `${stamp} `) + prefix
 		// Apart from its call, a result is its own block: it leads with its time.
 		if (!i && !tool && !title) prefix = titles.stamp(item.ts, prefix)
 		let text = strings.clipVisual(prefix + l, width)
@@ -147,6 +151,7 @@ function linked(rows: string[], parts?: (string | { href: string; text: string }
 // `text` in the exit color, then back to `style`'s.
 function exitColor(text: string, style: Style | undefined): string {
 	if (ansi.mono()) return text
+	if (text === 'exit 0') return ansi.quiet(text, style)
 	return ansi.sgr({ fg: text === 'exit 1' ? colors.exit().neutralFg! : colors.exit().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 }
 

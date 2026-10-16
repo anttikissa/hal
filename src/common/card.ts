@@ -31,7 +31,8 @@ function kind(item: Shown, failed = false): Kind | undefined {
 		case 'output':
 			return item.commit ? 'commit' : item.change ? 'notice' : undefined
 		case 'prompt':
-			if (bashResult.background(item) || (item.from === undefined && item.origin === 'model')) return 'notice'
+			if (bashResult.background(item)) return card.failed({ output: item.text }, true) ? 'failed' : 'tool'
+			if (item.from === undefined && item.origin === 'model') return 'notice'
 			return item.from === undefined ? 'prompt' : 'message'
 	}
 	return undefined
@@ -63,6 +64,7 @@ function failed(result: { output: string; isError?: boolean; interrupted?: 'canc
 // How `item` starts. A message queued for the turn end is its queue
 // card's one row.
 function initial(item: Shown, blocks?: SessionMeta['blocks'], failed = false): Verbosity {
+	if (item.type === 'prompt' && bashResult.background(item)) return bashResult.exit(item.text) === 'exit 0' ? 'short' : 'long'
 	if (item.type === 'prompt' && item.waiting && item.delivery === 'after-turn') return 'short'
 	let k = card.kind(item, failed)
 	return k ? card.verbosity(k, blocks) : 'long'

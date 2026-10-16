@@ -12,8 +12,8 @@ import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 import { Disclosure } from './Disclosure.tsx'
 
-export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: string; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean }) {
-	let exit = () => props.result ? bashResult.failure(props.result, props.bash) : undefined
+export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: string; time?: string; label?: JSX.Element; reference?: JSX.Element; actions?: JSX.Element; activity?: JSX.Element; name?: string; open?: boolean; limit?: string; children?: JSX.Element; result?: { output: string; diff?: string; ms?: number; isError?: boolean; interrupted?: 'canceled' | 'stopped' }; bash?: boolean; allExits?: boolean }) {
+	let exit = () => props.result ? props.allExits ? bashResult.exit(props.result.output) : bashResult.failure(props.result, props.bash) : undefined
 	let label = createMemo(() => props.label)
 	let rest = () => props.result && (bashResult.interrupted(props.result) ?? (props.limit ? `${bashResult.duration(props.result.ms) ?? '0s'} / ${props.limit}` : bashResult.duration(props.result.ms)))
 	// An EDIT's counts and changed lines, as in the terminal.
@@ -30,7 +30,7 @@ export function CardHeader(props: { inline?: boolean; icon?: IconName; prefix?: 
 				<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.prefix}{label()}</span>{props.children}</span>
 			</span>
 			{props.actions}
-			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class="exit" style={s() === 'exit 1' ? { color: 'var(--neutral-fg)' } : undefined}>{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>
+			<Show when={!stats() && (exit() || rest())}><span class="status">(<Show when={exit()}>{(s) => <span class={s() === 'exit 0' ? '' : 'exit'} style={s() === 'exit 1' ? { color: 'var(--neutral-fg)' } : undefined}>{s()}</span>}</Show>{exit() && rest() ? ', ' : ''}{rest()})</span></Show>
 			<Show when={stats()}>{(s) => <span class="status diff">(<Show when={s().added}><span class="add">+{s().added}</span></Show>{s().added && s().removed ? ' ' : ''}<Show when={s().removed}><span class="del">−{s().removed}</span></Show>, {s().lines}{rest() ? `, ${rest()}` : ''})</span>}</Show>
 			{props.activity}
 			{props.reference}

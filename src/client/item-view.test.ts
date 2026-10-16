@@ -82,16 +82,17 @@ test('A short Bash card shows its command in its rows, with stable live and fini
 	expect(toolView.call(item, 20, 'long', {}).join('\n')).toContain('echo later')
 })
 
-test('background reports and thinking start short, expand fully, and SEND shows /close', () => {
+test('background successes collapse, failures stay open, and thinking and SEND keep their controls', () => {
 	for (let label of ['bash #t19', 'bash b123abc']) {
-		let item = { type: 'prompt' as const, text: '[exit 1]\nfirst\nsecond\nthird\nlast', from: 'self', label, delivery: 'next-round' as const }
-		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('last')
+		let item = { type: 'prompt' as const, text: '[exit 0]\nfirst\nsecond\nthird\nlast', from: 'self', label, delivery: 'next-round' as const }
+		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('first')
 		expect(itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
 		expect(itemView.receipt(item)).toBe('')
-		let spaced = { ...item, text: 'first\n\nsecond\n\nthird\nlast' }
-		let preview = itemView.itemLines(spaced, 100).map(Bun.stripANSI)
-		expect(preview.at(-1)).toContain('second')
-		expect(preview.at(-1)).toContain('more lines')
+		for (let output of ['[exit 1]\nfirst\n\nlast', '[timed out]\nfirst\n\nlast']) {
+			let failed = { ...item, text: output }
+			expect(itemView.itemLines(failed, 100).map(Bun.stripANSI)).toContain('last')
+		}
+		let spaced = { ...item, text: '[exit 0]\nfirst\n\nsecond\n\nthird\nlast' }
 		expect(itemView.itemLines(spaced, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).map(Bun.stripANSI)).toContain('')
 	}
 	let thinking = { type: 'thinking' as const, text: 'first\n\nsecond\n\nlast' }

@@ -31,6 +31,7 @@ import { promptChanges } from '../common/prompt-changes.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { settings } from '../common/settings.ts'
 import { toolView } from './tool-view.ts'
+import { titles } from '../common/titles.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -111,11 +112,11 @@ function promptWidth(cols: number): number {
 // (tasks ghs, hyt).
 function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
 	let style = look.style ?? itemView.itemStyle(item, tool)
-	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.resultStatus({ output: item.text }, true, style)
+	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.status(bashResult.exit(item.text), undefined, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
 	let scroll = frame.scrolls(item, look.now) ? look.now : ''
-	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.wait?.map((p) => typeof p === 'string' ? p : p.text).join('') ?? ''} ${scroll}`
+	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}${look.call?.ts ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.background?.input.command ?? ''} ${look.wait?.map((p) => typeof p === 'string' ? p : p.text).join('') ?? ''} ${scroll}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
@@ -175,7 +176,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	if (memo.at.i < memo.grouped.length) return undefined
 	let items = memo.at.out
 	let calls = new Map<string, string>()
-	let toolCalls = new Map<string, { key: string; name: string; title?: string }>()
+	let toolCalls = new Map<string, NonNullable<Look['call']>>()
+	let backgroundCalls: Map<string, Item & { type: 'tool' }> | undefined
 	let callFolds = new Map<string, Verbosity>()
 	let formCursor: Frame['cursor'] | undefined
 	let tick: Past['tick']
@@ -232,12 +234,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let look: Look = { fold }
 		if (item.type === 'tool') {
 			let title = item.presentation?.title ?? toolDetails.headline(item.name, item.input).text
-			toolCalls.set(item.id, { key: item.key, name: item.name, title })
-			tools.push({ at: i, id: item.id, key: item.key, name: item.name, title, fold })
+			toolCalls.set(item.id, { key: item.key, name: item.name, title, ts: item.ts })
+			tools.push({ at: i, id: item.id, key: item.key, name: item.name, title, ts: item.ts, fold })
 			if (item.name === 'bash') calls.set(item.id, item.key)
 		} else if (item.type === 'tool-result') {
 			look.call = toolCalls.get(item.id)
 			if (look.call) look.style = itemView.itemStyle(item, look.call.name)
+		}
+		let background = bashResult.background(item)
+		if (background) {
+			backgroundCalls ??= new Map(src.flatMap((i) => i.type === 'tool' && i.name === 'bash' ? [[i.key, i] as const] : []))
+			look.background = backgroundCalls.get(background.replace(/^t/, ''))
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let { inner, mark } = itemView.place(item, cols, session, itemView.itemStyle(item)) // its id, like every block's
@@ -273,7 +280,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			}
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)
-			else if (look.result) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)
+			else if (look.result && !(fold === 'long' && titles.resultTime(item.ts, look.result.ts) && bashResult.trim(look.result.output))) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)
 			if (item.type === 'tool' && item.name === 'bash' && view.now !== undefined) look.now = view.now
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
 			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
@@ -411,7 +418,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 }
 
 // The unchanged transcript prefix, including originating tool identities.
-type History = { look: string; items: Item[]; ends: number[]; tools: { at: number; id: string; key: string; name: string; title?: string; fold: Verbosity }[]; lines: string[] }
+type History = { look: string; items: Item[]; ends: number[]; tools: (NonNullable<Look['call']> & { at: number; id: string; fold: Verbosity })[]; lines: string[] }
 
 // A Bash call whose command still scrolls at `now`: redrawn every frame.
 const scrolls = (item: Item, now: number | undefined): boolean => now !== undefined && item.type === 'tool' && item.name === 'bash' && bashCard.scrolling(item.input.command, now - Date.parse(item.ts ?? ''))

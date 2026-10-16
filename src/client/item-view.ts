@@ -28,7 +28,7 @@ import { bashCard } from './bash-card.ts'
 // style, and rows a plugin draws itself. `head`: a short call's rows
 // before its output, for its attached result; `now`: the clock a Bash
 // command scrolls by (bash-card.ts).
-export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string; title?: string }; wait?: (string | { href: string; text: string })[]; streamRows?: number; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
+export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string; title?: string; ts?: string }; background?: Keyed & { type: 'tool' }; wait?: (string | { href: string; text: string })[]; streamRows?: number; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -49,6 +49,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	}
 	switch (item.type) {
 		case 'prompt':
+			if (bashResult.background(item)) return itemView.toolStyle('bash')
 			return titles.letter(item) === 'm' ? colors.message() : colors.user()
 		// The human's command reads like its output (joined).
 		case 'command':
@@ -118,16 +119,22 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
+			if (bashResult.background(item)) {
+				let command = look.background?.input.command
+				let title = typeof command === 'string' ? `$ ${command}` : titles.who(item)!
+				let ref = bashResult.background(item)!, href = session && transcript.href(session, ref)
+				let text = titles.stamp(item.ts, ansi.clean(title))
+				let head = (fold === 'short' ? [strings.clipVisual(text, hw)] : ansi.wrap(text, hw)).map((line) => ansi.heading(href ? `\x1b]8;;${ansi.webUrl(href)}\x07${line}${ansi.LINK_OFF}` : line, itemView.itemStyle(item)))
+				return fold === 'short' ? head : [...head, ...ansi.wrap(card.text(item), width).map((row) => bashCard.paint(row, itemView.itemStyle(item)))]
+			}
 			let source = card.text(item)
 			let body = !source.trim() ? [] : card.markdown(item) ? markdownView.lines(source, width, streaming, itemView.itemStyle(item)) : ansi.wrap(source, width).map(ansi.links)
-			if (fold === 'short' && bashResult.background(item)) body = body.filter((row) => Bun.stripANSI(row).trim())
 			// Another session's message: its summary, then its text quieter.
 			// A summary counts toward a short card's rows.
 			let summary = item.summary && !item.report ? ansi.wrap(item.summary, width) : undefined
 			if (fold === 'short') body = blockView.short(body, width, false, itemView.itemStyle(item), settings.shortRows() - 1 - (summary?.length ?? 0))
 			if (summary) body = [...summary, ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
 			if (fold === 'short') body = body.slice(0, Math.max(0, settings.shortRows() - 1))
-			if (bashResult.background(item)) body = body.map((row) => bashCard.paint(row, itemView.itemStyle(item)))
 			// Its images follow as labels packed into rows: a quick
 			// way to open those its markers name.
 			let rows: string[] = []
@@ -140,7 +147,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fits) rows[rows.length - 1] += ' ' + linked
 				else rows.push(linked)
 			}
-			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short' && !bashResult.background(item))
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, hw, session, fold !== 'short')
 		case 'image':
 			return [itemView.imageLabel(item, session)]
 		// Thinking spends its short row budget on content, not a label (6q1).

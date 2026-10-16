@@ -57,6 +57,11 @@ function time(ts: string | undefined): string {
 	return t
 }
 
+function resultTime(call: string | undefined, result: string | undefined): string {
+	let time = titles.time(result)
+	return time === titles.time(call) ? '' : time
+}
+
 // A one-row block's text behind its time: '10:52 Paused.'.
 function stamp(ts: string | undefined, text: string): string {
 	let t = titles.time(ts)
@@ -108,9 +113,9 @@ function who(item: Shown): string | undefined {
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt': {
-			let call = item.from !== undefined && /^bash #?(t?\d+)$/.exec(item.label ?? '')?.[1]
+			let call = bashResult.background(item)
 			let delivery = [item.edited && 'edited; /edit undo to go back', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && 'next round', item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued']
-			if (call) return `<= Background command finished ↑ ${call.startsWith('t') ? call : `t${call}`}`
+			if (call) return `Bash output ↑ ${/^\d+$/.test(call) ? `t${call}` : call}`
 			if (item.from === undefined) return tagged(item.origin === 'model' ? 'Hal' : 'You', delivery)
 			let [id, tab] = sender(item.label ?? item.from)
 			return tagged(`From ${item.from || id}`, [tab, item.report === 'question' ? 'question' : item.report === 'summary' ? 'done' : undefined, ...delivery])
@@ -185,4 +190,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, stamp, ended, address, receipt, messageHead, preview, compact, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, resultTime, stamp, ended, address, receipt, messageHead, preview, compact, author, who, title, letter, blockId }
