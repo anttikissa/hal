@@ -481,7 +481,7 @@ test('Ctrl-T/W/N/P stay the browser\'s off macOS', () => {
 	expect(sent).toEqual([])
 })
 
-test('draft arrows stay native; an empty box starts history browsing until Down restores it', () => {
+test('arrows inside a draft stay native; its first row starts history browsing until Down restores it', () => {
 	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
 	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('two\nlines')]))
 	let writes: [string, number][] = []
@@ -492,17 +492,19 @@ test('draft arrows stay native; an empty box starts history browsing until Down 
 		anchor,
 		write: (edit, at) => void writes.push([text.slice(0, edit.start) + edit.text + text.slice(edit.end), at]),
 	})
-	app.input('mine')
-	// Nonempty drafts keep native movement at every caret, with or
-	// without explicit newlines; a soft wrap must not trigger recall.
-	for (let text of ['mine', 'words '.repeat(40), 'mine\nx']) {
-		for (let cursor of [0, 2, text.length]) {
-			expect(press('ArrowUp', box(text, cursor))).toBe(false)
-			expect(press('ArrowDown', box(text, cursor))).toBe(false)
-		}
-	}
-	expect(press('ArrowUp', box('mine', 0, 4))).toBe(false)
+	app.input('mine\nx')
+	// Rows inside a draft move natively, explicit or soft-wrapped.
+	expect(press('ArrowUp', box('mine\nx'))).toBe(false)
+	expect(press('ArrowDown', box('mine\nx', 2))).toBe(false)
+	let wrapped = 'words '.repeat(40)
+	expect(press('ArrowUp', { ...box(wrapped, 100), top: false } as Target)).toBe(false)
+	expect(press('ArrowDown', { ...box(wrapped, 100), bottom: false } as Target)).toBe(false)
+	expect(press('ArrowUp', box('mine\nx', 0, 4))).toBe(false)
 	expect(writes).toEqual([])
+	expect(press('ArrowUp', box('mine\nx', 2))).toBe(true)
+	expect(writes.at(-1)).toEqual(['two\nlines', 9])
+	expect(press('ArrowDown', box('two\nlines'))).toBe(true)
+	expect(writes.at(-1)?.[0]).toBe('mine\nx')
 	app.input('')
 	expect(press('ArrowUp', box(''))).toBe(true)
 	expect(writes.at(-1)).toEqual(['two\nlines', 9])

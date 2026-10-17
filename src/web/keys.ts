@@ -225,14 +225,13 @@ function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 }
 
 // Input history for Up (-1) or Down (1) on the box, through the shared
-// code with logical lines for rows. True if handled; else the key stays
-// native.
+// code; the caller checks the caret is on the first/last visual row.
+// True if handled; else the key stays native.
 function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): boolean {
 	let st = app.state
 	let t = st.view.transcript
 	if (!t || st.view.editing?.queueEdit) return false
 	let id = t.meta.id
-	if (st.text && recall.shown(id) === undefined) return false
 	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
 	if (!shown) return false
 	target.write?.(editor.splice(st.text, shown.text), shown.cursor, shown.cursor)

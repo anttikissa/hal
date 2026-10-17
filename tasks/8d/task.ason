@@ -5,7 +5,8 @@
 	notes: [
 		'Task 91 deliberately treated the first web line as no newline before the caret. That approximation steals native Up on soft-wrapped drafts. The web-only recall guard uses existing browse state; shared terminal layout and recall behavior stay unchanged. Fold this correction by removing 91’s obsolete web logical-line exception.',
 		'Verified trusted Chromium Up/Down events in soft-wrapped nonempty drafts at 390px and 1280px: text stays intact and the caret moves natively. Web app tests also cover explicit lines, selections, empty-composer history, ending browsing on edit, and draft restoration on submit. Full ./test was run twice; shared-checkout failures outside this patch prevent a green full-suite result.',
-		'Web arrows recall or leave an edit only on the first/last visual row: Chat.tsx measures soft wraps with a hidden textarea copy (Target.top/bottom). Logical-line edges sent a wrapped recalled or edited prompt to history on Up.'
+		'Web arrows recall or leave an edit only on the first/last visual row: Chat.tsx measures soft wraps with a hidden textarea copy (Target.top/bottom). Logical-line edges sent a wrapped recalled or edited prompt to history on Up.',
+		'User request 2026-10-17 replaces the rule that nonempty drafts never recall: Up on a draft first visual row and Down on its last recall history (Down restores the draft); rows inside it stay native. The row measure runs through the end of the caret word, so that word wraps as in the box.'
 	],
 	needs: ['91'],
 	foldInto: ['91']

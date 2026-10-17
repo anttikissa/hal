@@ -113,7 +113,8 @@ function rows(t: HTMLTextAreaElement, cursor: number): { top?: boolean; bottom?:
 	let copy = t.parentElement?.querySelector<HTMLTextAreaElement>('textarea.measure')
 	if (!copy) return {}
 	let height = (s: string) => ((copy.value = s), copy.scrollHeight)
-	let before = height(t.value.slice(0, cursor))
+	// Through the end of the caret's word, so that word wraps as in the box.
+	let before = height(t.value.slice(0, cursor + t.value.slice(cursor).search(/\s|$/)))
 	// The last measure leaves the whole text in the copy, as fit() expects.
 	return { top: before === height(''), bottom: before === height(t.value) }
 }
