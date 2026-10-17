@@ -1,0 +1,9 @@
+{
+	title: 'READ_ENTRY reads an entry and its blobs',
+	spec: `The READ_BLOB tool is named READ_ENTRY (read_entry on the wire). It takes entry IDs (t35, 176-ray/t35, t35.1) with the same paging options, and returns the entry's metadata and the data of each blob it refers to: text paged, images as images.
+
+Omission and cut notices, HELP, prompts and benchmarks name READ_ENTRY and entry IDs only. Blob-id arguments are accepted only if some blob cannot be reached from an entry.`,
+	status: 'planned',
+	needs: ['2kh'],
+	foldInto: ['bz']
+}

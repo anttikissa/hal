@@ -1,0 +1,11 @@
+{
+	title: 'Entries and cards; # only in URL fragments',
+	spec: `Hal has two terms for history. The data model has entries: an entry is one line in a session's history.asonl together with the blobs it refers to (images, whole tool output), zero or more. The UI has cards: a card shows an entry. No user-, model- or developer-facing text, code identifier, comment or task speaks of blocks, block ids, history items or records for these; code names records "entry".
+
+An entry ID is its kind letter and number, t35, in its own session, and <session>/t35 in another (176-ray/t35); .1 names a part. The kind letter may be omitted where accepted today. The number on a card is its entry ID.
+
+# appears only as the fragment of a web URL: /176-ray#t35. Nothing else writes or accepts #: entry IDs in model text and their links, STOP/WAIT/INSPECT targets, /rebase plans and reports, /changes lists, background job labels (bash t19), /kill targets, toggle input, tool headlines and HELP. Comment lines starting with # in /rebase plans and plugin lists are unaffected.`,
+	status: 'planned',
+	needs: [],
+	foldInto: ['9p', 'd92', '0z']
+}
