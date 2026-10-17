@@ -1,0 +1,6 @@
+{
+	title: 'Shell-tool error rubric for benchmark hosts',
+	spec: 'benchmarks/shell-errors.ts scans the most recent BASH calls in Hal session histories, read-only, and prints the host tool dialects (GNU or BSD) and a table of shell-tool errors per tool: wrong options, bad expressions, missing commands, missing paths and other messages from failed calls, with optional examples. Running it on different hosts (Linux, macOS) gives comparable tables for deciding which tools and dialects the system prompt should report.',
+	status: 'done',
+	needs: []
+}
