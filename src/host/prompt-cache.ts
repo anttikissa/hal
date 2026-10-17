@@ -1,3 +1,57 @@
+// Freezes each session's system prompt so the provider's prompt cache
+// keeps hitting, and reports later prompt changes as history notes.
+//
+// HOW CHANGES REACH THE MODEL
+//
+// The system prompt sent to the provider never changes mid-session.
+// When SYSTEM.md, AGENTS.md, a skill, the tool list or a session
+// setting changes, prepare() compares the old rendering with the new
+// one, section by section, and appends one notice that starts with
+// "System prompt changed:". The model keeps its own copy of each
+// section: the frozen system prompt plus every change note since.
+//
+// Each changed section gets one of five forms (see updates()):
+//
+//   # T [section changed; new contents follow]   full body; the default
+//   # T [section changed; diff follows]          update="diff" sections
+//   # T [section changed; diff and new contents follow]
+//                                                 diff, then "New contents:"
+//                                                 and the full body; only
+//                                                 after a rebase, see below
+//   # T [new section]                            full body
+//   # T [section removed; its instructions no longer apply]
+//
+// WHY THE FIFTH FORM EXISTS
+//
+// A diff is right only if the model's copy equals Hal's "old" side.
+// Normally it does: the model saw every earlier note. A /rebase, or a
+// setting change made through one, can drop or edit earlier notes,
+// and then the two copies drift apart. Example with the "Session"
+// section, an update="diff" section:
+//
+//   1. The frozen prompt says  Autoclose: false  and  Cwd: /x.
+//   2. Autoclose turns on; Hal notes  -Autoclose: false  +Autoclose: true.
+//   3. The user rebases and drops that note. The model now believes
+//      Autoclose: false, but Hal's last rendering says true.
+//   4. The user runs /cd /y; Hal notes  -Cwd: /x  +Cwd: /y.
+//
+// The diff in step 4 is correct but never mentions the Autoclose
+// line, so without help the model would believe "false" forever. After
+// any rebase, every diff update therefore also carries the full new
+// body, which restates every line. The diff stays so the model still
+// sees what changed (for example the previous cwd).
+//
+// data.reconcile marks this state. A rebase sets it (prepare() sees a
+// newer rebase record, or rebases.ts calls rebased()); only a full
+// rebuild of the system prompt clears it, because only then do the
+// copies match again. Until then, every diff update uses the fifth
+// form, not just the first. Hal never sends a note only to repair a
+// rebase; the full body rides along with the next real change.
+//
+// Not done: diffing against the model's actual copy (frozen prompt
+// plus surviving notes). It would need replaying those notes; the
+// full body is simpler, at the cost of a longer note after a rebase.
+
 import { readFileSync } from 'fs'
 import type { HistoryRecord } from '../common/replay.ts'
 import { liveFiles } from './live-file.ts'
@@ -54,6 +108,9 @@ function outside(rendered: Rendering): string {
 	return parts.map((s) => s.replace(/^\n+|\n+$/g, '')).filter(Boolean).join('\n\n')
 }
 
+// One change note body: a block per changed, added or removed section.
+// reconcile: a rebase may have desynced the model's copy, so diff
+// updates also restate the full body (see the file header).
 function updates(before: PromptSection[], after: PromptSection[], reconcile = false): string {
 	let previous = new Map(before.filter((s) => s.body.trim()).map((s) => [s.title, s]))
 	let current = new Map(after.filter((s) => s.body.trim()).map((s) => [s.title, s]))
