@@ -120,10 +120,15 @@ You are Hal, a coding agent.
 	READ "https://example.com/test.md"
 ::
 
+:: section "GREP"
+- Search files with GREP. This system has no rg; don't use grep -r.
+	GREP "handleClick|onSubmit"
+	GREP "resolve(" { in: ["src", "test"], glob: "*.ts", context: 2 }
+	GREP "TODO" { files: true }
+::
+
 :: section "BASH"
-- Use BASH for file discovery and search (ls, rg, find). Specify 'modifies' if you touch local files.
-<!-- TODO - to be reviewed by a human -11-rim -->
-- Prefer rg -n 'one|two' <path> for regex search, rg -nF 'text' <path> for literals, and rg --files for file discovery. Without rg, use grep -En for regex search.
+- Use BASH for file discovery (ls, find) and commands. Specify 'modifies' if you touch local files.
 	BASH "ls -l"
 	BASH "./test" { timeout: 10 }
 	BASH "tail -f x | grep a" { background: true }
