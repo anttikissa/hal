@@ -282,6 +282,13 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
 Task gn holds the rest of the user's choices (selection, focus, tabs).
 Readable text (below) still applies.
 
+## Composer arrows
+
+Up and Down leave the composer text (history, leaving an edit) only
+from its first/last visual row, soft wraps included; elsewhere they
+move the caret. A newline-free text is not one row.
+<!-- TODO - to be reviewed by a human -177-len -->
+
 ## Emergency keys (invariants)
 
 - Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts — in every state,

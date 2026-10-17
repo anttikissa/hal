@@ -107,13 +107,25 @@ function away(card: Element): void {
 	watching.observe(card)
 }
 
+// Whether the caret is on the box's first and last visual rows, soft
+// wraps included, measured with the composer's hidden copy (Composer.tsx).
+function rows(t: HTMLTextAreaElement, cursor: number): { top?: boolean; bottom?: boolean } {
+	let copy = t.parentElement?.querySelector<HTMLTextAreaElement>('textarea.measure')
+	if (!copy) return {}
+	let height = (s: string) => ((copy.value = s), copy.scrollHeight)
+	let before = height(t.value.slice(0, cursor))
+	// The last measure leaves the whole text in the copy, as fit() expects.
+	return { top: before === height(''), bottom: before === height(t.value) }
+}
+
 function target(e: Event): Target {
 	let t = e.target
 	if (t instanceof HTMLTextAreaElement && !t.closest('dialog[open]')) {
 		let back = t.selectionDirection === 'backward'
 		let [cursor, anchor] = back ? [t.selectionStart, t.selectionEnd] : [t.selectionEnd, t.selectionStart]
 		let coarse = matchMedia('(pointer: coarse)').matches
-		return { kind: 'message', text: t.value, cursor, anchor, coarse, write: (edit, at, from) => editor.write(t, edit, at, from) }
+		let arrow = e instanceof KeyboardEvent && (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+		return { kind: 'message', text: t.value, cursor, anchor, coarse, ...(arrow ? rows(t, cursor) : {}), write: (edit, at, from) => editor.write(t, edit, at, from) }
 	}
 	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return { kind: 'field', cursor: t.selectionStart ?? undefined }
 	// An open sheet keeps its keys (the box behind it is inert).

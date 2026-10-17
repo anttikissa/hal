@@ -8,9 +8,9 @@
 // Escape pauses a running turn, Up on an empty box edits the last
 // prompt (src/common/amend.ts; Escape also cancels a card's Edit,
 // edit-prompt.ts), Up on an empty box begins history
-// browsing (src/common/recall.ts). While browsing, first/last logical
-// line arrows recall entries, including after edits; other drafts keep
-// native movement, including soft wraps. Tab completes a slash command; command keys run theirs,
+// browsing (src/common/recall.ts). While browsing or editing, arrows on
+// the first/last visual row recall entries, including after edits; elsewhere
+// they move natively, including across soft wraps. Tab completes a slash command; command keys run theirs,
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
@@ -44,8 +44,10 @@ import { emergency } from '../common/emergency.ts'
 // anywhere else. `coarse`: the box is typed on a touch keyboard
 // (pointer: coarse), which has no Shift: Enter is a newline there and
 // the Send button sends.
+// `top`/`bottom`: the caret is on the box's first/last visual row (soft
+// wraps included); without them, logical lines decide.
 export type Target =
-	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void; coarse?: boolean }
+	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void; coarse?: boolean; top?: boolean; bottom?: boolean }
 	| { kind: 'field'; cursor?: number }
 	| { kind: 'link' }
 	| { kind: 'button'; submits: boolean }
@@ -149,7 +151,7 @@ function key(e: KeyInput, target: Target): boolean {
 		if (waiting) return queuedPrompt.begin(waiting.id)
 	}
 	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original) return queuedPrompt.cancel()
-	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? !st.text.slice(0, target.cursor).includes('\n') : e.key === 'ArrowDown' ? !st.text.slice(target.cursor).includes('\n') : true)
+	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? (target.top ?? !st.text.slice(0, target.cursor).includes('\n')) : e.key === 'ArrowDown' ? (target.bottom ?? !st.text.slice(target.cursor).includes('\n')) : true)
 	if (plain && edge && e.key === 'ArrowDown' && st.view.editing?.aside && st.view.editing.rewind === undefined && st.text === st.view.editing.original) return editPrompt.leave()
 	let edit = plain && edge && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
@@ -171,7 +173,7 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
-	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
+	if (plain && !sel && edge && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
 	// Undo on an empty box takes back a message sent early (task csn).
 	let id = app.sessionId()
 	if (!st.text && id && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'z' && st.view.transcript && states.promoted(st.view.transcript.inbox)) {
