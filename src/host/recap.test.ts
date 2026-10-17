@@ -113,6 +113,16 @@ test('provider recap input and output are bounded and no tools are available', a
 	} finally { provider.stream = original }
 })
 
+test('a recap the provider stops early is an error with its reason and partial text, not a recap', async () => {
+	let c = client(), id = created(c), original = provider.stream
+	provider.stream = async function* () {
+		yield { type: 'text', text: 'Goal: clearer cards by drop' }
+		yield { type: 'done', reason: 'max_tokens' }
+	}
+	try {
+		await expect(recap.generate(id, [], new AbortController().signal)).rejects.toThrow(/max_tokens[\s\S]*Partial text: Goal: clearer cards by drop/)
+	} finally { provider.stream = original }
+})
 
 test('unknown visibility reports are rejected before recap history access', () => {
 	let c = client()
