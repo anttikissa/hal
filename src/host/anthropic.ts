@@ -42,7 +42,7 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
 		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
 	}
-	let images = blocks.resultImages(b)
+	let images = b.isError ? [] : blocks.resultImages(b)
 	let content = images.length ? [{ type: 'text', text: b.output }, ...images.map((image) => userBlock(image, req))] : b.output
 	return { type: 'tool_result', tool_use_id: b.id, content, ...(b.isError ? { is_error: true } : {}) }
 }
@@ -62,6 +62,7 @@ function toMessages(req: ProviderRequest): any[] {
 	let earlier: any
 	for (let m of req.messages) {
 		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
+		if (m.role === 'user') content.push(...m.blocks.flatMap((b) => b.type === 'tool_result' && b.isError ? blocks.resultImages(b).map((image) => userBlock(image, req)) : []))
 		// The API rejects empty text blocks and empty messages.
 		let keep = (b: any) => b && (b.type !== 'text' || b.text !== '')
 		// The old input ended at its last block sent: foreign thinking and

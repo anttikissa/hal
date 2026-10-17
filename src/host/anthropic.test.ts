@@ -181,6 +181,26 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 	expect(body.messages.at(-1).content.at(-1).cache_control).toEqual({ type: 'ephemeral' })
 })
 
+test('failed tool results keep text and move all images after sibling results', () => {
+	let image = (blob: string) => ({ type: 'image' as const, blob, mediaType: 'image/png' })
+	let messages: Message[] = [{ role: 'user', blocks: [
+		{ type: 'tool_result', id: 'failed', output: 'complete failure\n/path/missing', isError: true, images: [image('one'), image('two')] },
+		{ type: 'tool_result', id: 'ok', output: 'success', image: image('nested') },
+		{ type: 'tool_result', id: 'legacy', output: 'another failure', isError: true, image: image('gone') },
+	] }]
+	let content = anthropic.toMessages({ model: 'claude-test', messages, image: (blob) => blob === 'gone' ? undefined : blob })[0].content
+	expect(content.slice(0, 3)).toEqual([
+		{ type: 'tool_result', tool_use_id: 'failed', content: 'complete failure\n/path/missing', is_error: true },
+		{ type: 'tool_result', tool_use_id: 'ok', content: [{ type: 'text', text: 'success' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'nested' } }] },
+		{ type: 'tool_result', tool_use_id: 'legacy', content: 'another failure', is_error: true },
+	])
+	expect(content.slice(3)).toEqual([
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'one' } },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'two' } },
+		{ type: 'text', text: provider.imageNote('its file is gone'), cache_control: { type: 'ephemeral' } },
+	])
+})
+
 test('thinking is enabled within max_tokens, and skipped when there is no room for it', async () => {
 	reply = endTurn
 	await run(undefined, { maxTokens: 20_000 })

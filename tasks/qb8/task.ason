@@ -1,0 +1,11 @@
+{
+	title: 'Keep Anthropic error results text-only',
+	spec: 'Anthropic replay sends failed tool results with is_error true and text-only content. Images attached to failed results remain available as sibling user image blocks after all tool results in that message, preserving their order, full error text, legacy image fields and plural images. Successful tool results retain nested images. Existing histories need no migration. Regression coverage checks mixed failed/successful results, multiple images and missing blobs.',
+	status: 'done',
+	notes: [
+		'Invariant restored: Anthropic rejects non-text blocks inside is_error tool results. The provider mapper keeps the complete failed result text and error flag, then appends its images as sibling user blocks after all tool results. Successful results still embed their images. This repairs replay of saved mixed-batch READ results without mutating history or losing attachments; missing blobs retain the existing image note.',
+		'Verification: 12 Anthropic tests and 9 URL-read tests pass; changed-file lint passes. Global typecheck is blocked by unrelated src/client/item-view.ts:44 Oklch undefined errors. No real provider request was sent.'
+	],
+	needs: ['5er'],
+	foldInto: ['5er']
+}
