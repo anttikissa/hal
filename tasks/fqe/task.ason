@@ -1,0 +1,7 @@
+{
+	title: 'Web prompt links: text color and plain URLs',
+	spec: 'In web human prompt prose, links keep the card text color with an underline, like Markdown links; the browser link and visited colors never show. Plain http(s) URLs in prompt text are links, as are attachment markers. The terminal is unchanged: terminals detect URLs themselves.',
+	status: 'done',
+	needs: ['zw9'],
+	foldInto: ['zw9']
+}
