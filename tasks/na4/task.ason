@@ -1,10 +1,12 @@
 {
 	title: 'Commit line-count extra',
-	spec: "extras/commit-sloc.ts (task ybg) appends to each commit seen by commits.committed (task sg0) the net non-blank, non-comment lines it added across every text file of the commit, tests and tasks included; binary files (numstat -) are skipped. It reads only the commit's own files. It also rejects any background Bash call whose command contains git commit, before it runs, so the call errors with a request to retry in the foreground: commit cards (task 179) attach only to a foreground result. The check reads the command text only; a script that commits stays allowed. extras/README.md lists it.",
+	spec: 'extras/commit-sloc.ts (task ybg) rewrites each commit card file row (via commits.committed, task sg0) to the code lines that commit added and removed in that file: non-blank, non-comment lines, judged in place with whole-file diff context so lines inside an unchanged /* */ block are comments. Every text file gets such a row, tests and tasks included; binary files keep -1. The LOC tag is the net sum of the rows of source files only, by scripts/sloc rules (non-test .ts/.tsx, not tasks/ or docs/). It also rejects any background Bash call whose command contains git commit, before it runs, so the call errors with a request to retry in the foreground: commit cards (task 179) attach only to a foreground result. The check reads the command text only; a script that commits stays allowed. extras/README.md lists it.',
 	status: 'done',
 	notes: [
 		'The appended line reads "Total: +N source LOC."; the counting rules are understood, so the line does not restate them (176-roe).',
-		'User (176-tbd): the total must not lie next to the per-file +N -N rows; counting only non-test .ts files made +3 -0 read as +2. Invariant: the total covers every text file in the commit, excluding only blank and comment lines.'
+		'User (176-tbd): the total must not lie next to the per-file +N -N rows; counting only non-test .ts files made +3 -0 read as +2. Invariant: the total covers every text file in the commit, excluding only blank and comment lines.',
+		'User (176-tbd): rows and total must agree; a total that counts differently from the +N -M rows beside it reads as a lie. Invariant: the LOC tag equals the sum of added minus removed over the source-file rows shown.',
+		'One git show -U1000000 for the whole commit, split by file in numstat order: each Git process costs ~17 ms, and per-file calls took 1.3 s on a 79-file commit (2 s with 8 parallel workers); one call takes ~40 ms warm.'
 	],
 	needs: ['ybg', 'sg0'],
 	foldInto: ['ybg']
