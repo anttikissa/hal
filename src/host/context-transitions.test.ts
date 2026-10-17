@@ -43,7 +43,7 @@ test('self-issued clear records results for later undispatched calls, ends old t
 	let prompt = c.views.get(id)!.items.find((i) => i.type === 'prompt')!
 	expect(prompt).toMatchObject({ text: tail, origin: 'model', generatingCommand: 'clear' })
 	expect(titles.author(prompt)).toBe('Hal (/clear continuation)')
-	expect(amend.begin(c.views.get(id), '')).toBeUndefined()
+	expect(amend.begin(c.views.get(id))).toBeUndefined()
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('; Hal; /clear continuation]')
 	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('old prompt')
 	calls[1]!.push({ type: 'done', reason: 'end' })

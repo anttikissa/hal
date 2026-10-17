@@ -261,7 +261,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		if (c.amend && delivery !== 'queue' && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
 		else if (commands.parse(c.text)?.name === 'rebase') refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => { if (reply.rebase) client.deliver({ type: 'rebase-plan', sessionId: c.sessionId, snapshot: reply.rebase, todo: rebaseRows.render(c.sessionId, reply.rebase) }) })
 		else refused = prompts.submit(c.sessionId, c.text, c.id, delivery, { interactive: c.interactive ?? true })
-		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id, c.base)
+		if (refused === undefined && !c.aside) prompts.sent(c.sessionId, c.text, c.id, c.base)
 	} else if (c.type === 'draft') {
 		let changed = drafts.set(c.sessionId, c.text, c.base)
 		if (changed) prompts.draft(c.sessionId, changed, c.id)

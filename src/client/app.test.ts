@@ -215,7 +215,7 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix it', base: 0 })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix it', aside: true })
 	expect(appView.view().prompt.text).toBe('')
 	// The edit is over: the next prompt is a new one.
 	type('more')
@@ -237,7 +237,7 @@ test('an edit not yet acknowledged is sent again as an edit by the next client',
 		app.reset()
 		sent = []
 		app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: '/edit 5\nfix ti!', base: 0 }])
+		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: '/edit 5\nfix ti!', aside: true }])
 	} finally {
 		drafts.store = store
 	}
@@ -284,16 +284,22 @@ test('Up recalls an invalid slash command instead of amending the earlier runnin
 	}
 })
 
-test('Up does nothing with text typed or when nothing works', () => {
+test('Up edits with text typed; the draft comes back after leaving or sending the edit', () => {
 	working()
 	type('x')
 	up()
-	app.onKeys([key('end'), key('backspace')])
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+	expect(appView.view().prompt.text).toBe('fix ti')
 	paused()
+	down()
+	expect(appView.view().prompt.text).toBe('x')
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
 	up()
-	expect(sent).toEqual([])
-	// Not an edit: input history recalls the prompt instead.
-	expect(appView.view().editing).toBeUndefined()
+	paused()
+	type('!')
+	enter()
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix ti!', aside: true })
+	expect(appView.view().prompt.text).toBe('x')
 })
 
 test('replayed history carries no mark: it reads like one followed live', () => {

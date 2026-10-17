@@ -134,7 +134,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'find-results') return find.event(event)
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
-	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing?.queueEdit) app.setPrompt(drafts.text(mine))
+	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing) app.setPrompt(drafts.text(mine))
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
 	// Replayed as the chord bound to its delivery, so remapped keys hold (task 8kx).
@@ -214,6 +214,7 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 		return false
 	}
 	if (!st.editing && !text.trim() && delivery === 'steer') text = states.nudge(st.transcript.state) ?? text
+	let editing = st.editing
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
 		? { command: amend.enter(st.editing, st.transcript, text, delivery === 'queue'), refused: undefined }
@@ -226,7 +227,7 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 	if (command) {
 		st.notice = undefined
 		let c = command as { type: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string }
-		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c)
+		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, editing ? { ...c, aside: true } : c)
 		else app.send(command)
 	}
 	return true
@@ -294,7 +295,7 @@ function onKeys(events: KeyEvent[]): void {
 			st.notice = undefined
 			continue
 		}
-		if (promptKeys.edit(st, k, app.send)) continue
+		if (promptKeys.edit(st, k, app.send, frame.promptWidth(app.cols()))) continue
 		let shown = st.transcript?.meta.id
 		if (promptKeys.clip(st, k, (r) => app.pasted(shown, r))) continue
 		// Tab at the end of a slash command: the host completes it.
@@ -317,6 +318,7 @@ function onKeys(events: KeyEvent[]): void {
 			let start = prompt.selection(st.prompt)?.start ?? st.prompt.cursor
 			key = { ...key, text: uploads.pad(key.text, st.prompt.text.slice(0, start)) }
 		}
+		let editing = st.editing
 		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.delivery)) continue
 		// An in-process /go can focus another session during submit (qhz).
@@ -324,9 +326,9 @@ function onKeys(events: KeyEvent[]): void {
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
 		let id = st.transcript?.meta.id
-		if (edited && id && !queueEdit.input(id, state.text) && recall.typed(id, state.text)) drafts.edit(id, state.text)
-		// A recalled entry was sent: the user's own text comes back.
-		if (action?.type === 'submit' && id && recall.stop(id)) app.setPrompt(drafts.text(id))
+		if (edited && id && !queueEdit.input(id, state.text) && !st.editing && recall.typed(id, state.text)) drafts.edit(id, state.text)
+		// A recalled entry or an edit was sent: the user's own text comes back.
+		if (action?.type === 'submit' && id && (recall.stop(id) || (editing && !editing.queueEdit))) app.setPrompt(drafts.text(id))
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()

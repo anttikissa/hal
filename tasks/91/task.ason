@@ -4,10 +4,11 @@
 Precedence for Up and Down, in order: an open modal, an open question form, completion choices, editing the last prompt (Up on an empty prompt while the session works, task wb), row movement inside the text (task 8m), then history. Browsing state belongs to the session, so it survives switching tabs.
 Web: Up with the caret on the textarea's first line and no selection, and Down on its last line, do the same through the shared code; elsewhere they stay native.`,
 	status: 'done',
-	needs: ['8m'],
 	notes: [
 		"Old behavior to keep (old-prompt.ts in task 1x, browseHistory): when the just-sent prompt is still in the editor (edit mode), the first Up skips the entry equal to the current text. Old commits: 81c0440 'Unify up-arrow recall: one per-tab list, web prompts included', 8ac5f72 'Keep edited prompts on down'.",
 		'The web cannot know where the textarea wraps; "first line" there means no newline before the caret. That differs from the terminal\'s visual rows on purpose.',
-		"Sending a recalled entry keeps the draft: drafts.submit empties the local draft only when the sent text contains it, mirroring the host's drafts.sent, and both clients then put the draft back in the editor. The first-Up skip applies whenever the editor text equals the newest entry, not only in edit mode."
-	]
+		"Sending a recalled entry keeps the draft: drafts.submit empties the local draft only when the sent text contains it, mirroring the host's drafts.sent, and both clients then put the draft back in the editor. The first-Up skip applies whenever the editor text equals the newest entry, not only in edit mode.",
+		'User request 2026-10-17 replaces Up on an empty prompt: Up on the top (visual) row edits or recalls whatever the box holds, in both clients. An edit sets the draft aside like history browsing: typing an edit never writes the draft, Down/Escape out and sending the edit bring it back, and the submit carries aside so neither client nor host clears the draft. Restores the invariant that a typed draft is never lost to an edit; before, the edit text was the draft and a host draft echo could refill the box after sending, inviting a duplicate send.'
+	],
+	needs: ['8m']
 }

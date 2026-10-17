@@ -5,12 +5,11 @@
 //
 // Enter submits (steering a running turn; Alt+Enter queues after it,
 // Shift+Enter is a newline; on a touch keyboard Enter is a newline),
-// Escape pauses a running turn, Up on an empty box edits the last
-// prompt (src/common/amend.ts; Escape also cancels a card's Edit,
-// edit-prompt.ts), Up on an empty box begins history
-// browsing (src/common/recall.ts). While browsing or editing, arrows on
-// the first/last visual row recall entries, including after edits; elsewhere
-// they move natively, including across soft wraps. Tab completes a slash command; command keys run theirs,
+// Escape pauses a running turn, Up on the box's first visual row edits
+// the last prompt (src/common/amend.ts; Escape also cancels a card's
+// Edit, edit-prompt.ts) or else browses history (src/common/recall.ts),
+// whatever the box holds; the draft comes back after. Elsewhere arrows
+// move natively, including across soft wraps. Tab completes a slash command; command keys run theirs,
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
@@ -146,18 +145,18 @@ function key(e: KeyInput, target: Target): boolean {
 	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
 	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active) return queuedPrompt.cancel()
 	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()
-	if (plain && target.kind === 'message' && e.key === 'ArrowUp' && !st.text && !st.view.editing) {
+	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? (target.top ?? !st.text.slice(0, target.cursor).includes('\n')) : e.key === 'ArrowDown' ? (target.bottom ?? !st.text.slice(target.cursor).includes('\n')) : true)
+	if (plain && edge && target.kind === 'message' && e.key === 'ArrowUp' && !st.view.editing) {
 		let waiting = queueEdit.candidate(st.view.transcript)
 		if (waiting) return queuedPrompt.begin(waiting.id)
 	}
 	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original) return queuedPrompt.cancel()
-	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? (target.top ?? !st.text.slice(0, target.cursor).includes('\n')) : e.key === 'ArrowDown' ? (target.bottom ?? !st.text.slice(target.cursor).includes('\n')) : true)
 	if (plain && edge && e.key === 'ArrowDown' && st.view.editing?.aside && st.view.editing.rewind === undefined && st.text === st.view.editing.original) return editPrompt.leave()
 	let edit = plain && edge && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
 		st.view = edit.view
 		if (edit.command) connection.send(edit.command)
-		app.input(edit.text)
+		app.input(edit.view.editing ? edit.text : editPrompt.draft(app.sessionId()))
 		return true
 	}
 	if (e.key === 'Escape') {

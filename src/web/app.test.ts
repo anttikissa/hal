@@ -109,16 +109,16 @@ test('typing is the session draft, and a snapshot brings the kept draft back', (
 	expect(sent.some((c) => c.type === 'draft' && c.text === 'mine')).toBe(true)
 })
 
-test('Up on an empty box while the model works edits the last prompt; Down unchanged leaves', () => {
+test('Up on the first row while the model works edits the last prompt; Down unchanged brings the draft back', () => {
 	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }, [{ type: 'user', blocks: [{ type: 'text', text: 'fix ti' }], ts }]))
+	app.input('draft\nmore')
 	expect(press('ArrowUp', message('draft\nmore'))).toBe(false)
-	app.input('')
-	expect(press('ArrowUp', message(''))).toBe(true)
+	expect(press('ArrowUp', message('draft\nmore', 2))).toBe(true)
 	expect(app.state.text).toBe('fix ti')
 	expect(sent.at(-1)).toMatchObject({ type: 'pause', sessionId })
 	expect(app.state.view.editing).toBeDefined()
 	expect(press('ArrowDown', message('fix ti'))).toBe(true)
-	expect(app.state.text).toBe('')
+	expect(app.state.text).toBe('draft\nmore')
 	expect(app.state.view.editing).toBeUndefined()
 })
 

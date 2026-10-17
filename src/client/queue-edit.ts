@@ -6,7 +6,7 @@ import { prompt } from '../common/prompt.ts'
 import type { PromptKeysState } from './prompt-keys.ts'
 import type { KeyEvent } from './keys.ts'
 
-function key(st: PromptKeysState, k: KeyEvent): boolean {
+function key(st: PromptKeysState, k: KeyEvent, top: boolean): boolean {
 	let t = st.transcript
 	if (!t) return false
 	let id = t.meta.id
@@ -19,7 +19,7 @@ function key(st: PromptKeysState, k: KeyEvent): boolean {
 		st.prompt = { ...prompt.cleared(st.prompt), text: drafts.text(id), cursor: drafts.text(id).length }
 		return true
 	}
-	if (plain && k.key === 'up' && !st.editing && !st.prompt.text) {
+	if (plain && top && !st.editing) {
 		let waiting = queueEdit.candidate(t)
 		if (waiting) return queueEdit.begin(t, waiting.id)
 	}

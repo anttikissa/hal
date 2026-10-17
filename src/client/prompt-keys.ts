@@ -17,15 +17,16 @@ export type PromptKeysState = { transcript?: Transcript; prompt: PromptState; ed
 
 const plain = (k: KeyEvent): boolean => !k.shift && !k.ctrl && !k.alt && !k.cmd
 
-// Editing the last prompt: Up on an empty prompt while the session
-// works starts it, Down unchanged or Escape leaves it. The editor text
-// is the draft, as ever. `send` takes the pause or continue.
-function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void): boolean {
-	if (queuedPrompt.key(st, k)) return true
+// Editing the last prompt: Up on the prompt's top row while the session
+// works starts it, Down unchanged or Escape leaves it. The draft is set
+// aside meanwhile and comes back after. `send` takes the pause or continue.
+function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void, width: number): boolean {
+	let top = k.key === 'up' && promptLayout.position(st.prompt.text, promptLayout.rows(st.prompt.text, width), st.prompt.cursor).row === 0
+	if (queuedPrompt.key(st, k, top)) return true
 	if (!plain(k) || !st.transcript) return false
 	let id = st.transcript.meta.id
-	if (k.key === 'up' && !st.editing) {
-		let begun = amend.begin(st.transcript, st.prompt.text)
+	if (top && !st.editing) {
+		let begun = amend.begin(st.transcript)
 		if (!begun) return false
 		let target = begun.editing.target
 		let after = target && st.transcript.items.slice(st.transcript.items.findIndex((i) => i.key === target) + 1)
@@ -33,15 +34,14 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 		st.editing = begun.editing
 		let { anchor: _, ...rest } = st.prompt
 		st.prompt = { ...rest, text: begun.editing.original, cursor: begun.editing.original.length }
-		drafts.edit(id, st.prompt.text)
 		if (begun.command) send(begun.command)
 		return true
 	}
 	let editing = st.editing
 	if (!editing || !(k.key === 'escape' || (k.key === 'down' && editing.rewind === undefined && st.prompt.text === editing.original))) return false
 	st.editing = undefined
-	st.prompt = prompt.cleared(st.prompt)
-	drafts.edit(id, '')
+	let draft = drafts.text(id)
+	st.prompt = { ...prompt.cleared(st.prompt), text: draft, cursor: draft.length }
 	let command = amend.resume(editing, st.transcript)
 	if (command) send(command)
 	return true
@@ -60,7 +60,6 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 		if (next) {
 			st.editing = next
 			st.prompt = { ...prompt.cleared(st.prompt), text: next.original, cursor: k.key === 'up' ? recall.topEnd(next.original, width) : next.original.length }
-			drafts.edit(t.meta.id, next.original)
 		}
 		return true
 	}

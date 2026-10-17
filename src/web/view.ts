@@ -160,7 +160,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 		if (key === 'up') return { view: st, text }
 	}
 	if (key === 'up') {
-		let begun = !editing && amend.begin(st.transcript, text)
+		let begun = !editing && amend.begin(st.transcript)
 		return begun ? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original } : undefined
 	}
 	if (!editing || editing.aside || (key === 'down' && text !== editing.original)) return undefined

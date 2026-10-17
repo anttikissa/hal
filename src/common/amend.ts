@@ -1,6 +1,7 @@
 // Editing the last message the user sent (tasks/j1/states.md, task
-// dg), the part every client shares. Up on an empty prompt loads it into
-// the editor. A message still waiting in the inbox is edited in place
+// dg), the part every client shares. Up on the prompt's top row loads
+// it into the editor; the draft is set aside and comes back after, as in
+// history browsing. A message still waiting in the inbox is edited in place
 // there, with no pause: the model never saw it. Otherwise, while the
 // model works, Up pauses the turn and edits the last prompt; Enter sends
 // the edit, and the host decides from history whether it replaces that
@@ -60,11 +61,10 @@ function at(t: Transcript, key: string): { editing: Editing; command?: unknown }
 	return command ? { editing, command } : { editing }
 }
 
-// Up with `text` in the editor: the edit to start and the pause to
-// send (none for a waiting message), or undefined when Up means
-// nothing here.
-function begin(t: Transcript | undefined, text: string): { editing: Editing; command?: unknown } | undefined {
-	if (!t || text !== '') return undefined
+// Up on the editor's top row: the edit to start and the pause to send
+// (none for a waiting message), or undefined when Up means nothing here.
+function begin(t: Transcript | undefined): { editing: Editing; command?: unknown } | undefined {
+	if (!t) return undefined
 	let sessionId = t.meta.id
 	// Queued messages require queueEdit.begin and its host handshake.
 	if (t.inbox.some((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')) return undefined

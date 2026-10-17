@@ -63,7 +63,7 @@ test('an advisory message reaches a working session with its next request, frame
 	await until(() => c.views.get(a)!.state.type === 'idle')
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 	// Up never recalls it: the human's last message is 'go'.
-	expect(amend.begin({ ...c.views.get(a)!, state: { type: 'running', phase: 'streaming' } }, '')?.editing.original).toBe('go')
+	expect(amend.begin({ ...c.views.get(a)!, state: { type: 'running', phase: 'streaming' } })?.editing.original).toBe('go')
 })
 
 test('an idle session gets the message as a turn of its own, with full attention', async () => {
@@ -137,7 +137,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	let delivered = lastText(next + 1)
 	expect(delivered).toMatch(/\[[^\]\n]*message from [^\n]+\]\n<hal-note>[^\n]+<\/hal-note>\nfyi\n\n\[[^\]\n]*\]\nand hury$/)
 	// Up edits the human's text, not the later one from the other session.
-	expect(amend.begin(c.views.get(a)!, '')?.editing.original).toBe('and hury')
+	expect(amend.begin(c.views.get(a)!)?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
 	c.conn.send({ type: 'submit', sessionId: a, text: amending(a, 'and hurry') })
 	await until(() => calls.length === next + 3)

@@ -125,8 +125,8 @@ function onEvent(event: Event): void {
 		return
 	}
 	let id = app.sessionId()
-	// A recalled entry stays in the box; the draft changes underneath.
-	if (id && (changed || event.type === 'snapshot') && !st.view.editing?.aside) st.text = recall.shown(id) ?? drafts.text(id)
+	// A recalled entry or an edit stays in the box; the draft changes underneath.
+	if (id && (changed || event.type === 'snapshot') && !st.view.editing) st.text = recall.shown(id) ?? drafts.text(id)
 	queuedPrompt.sync()
 	if (queueChanged?.notice) st.view = { ...st.view, notice: queueChanged.notice }
 	app.seek()
@@ -208,7 +208,7 @@ function input(text: string): void {
 		}
 	}
 	let id = app.sessionId()
-	if (id && !queueEdit.input(id, text) && !st.view.editing?.aside && recall.typed(id, text)) drafts.edit(id, text)
+	if (id && !queueEdit.input(id, text) && !st.view.editing && recall.typed(id, text)) drafts.edit(id, text)
 	app.changed()
 }
 
@@ -302,12 +302,13 @@ function send(delivery: Delivery = 'steer'): void {
 	let { command, notice, keep } = view.submit(st.view, st.text, delivery)
 	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string } | undefined
 	// A prompt shows at once and waits, pending, for the host.
-	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
+	// An edit's text is not the draft: the draft stays.
+	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, st.view.editing ? { ...c, aside: true } : c)
 	else if (c) connection.send(c)
 	diagnostics.record('outcome', c?.type === 'submit' ? 'submitted' : c ? 'command' : keep ? 'refused' : 'empty')
 	if (!keep) {
-		// A recalled entry was sent, or an edit set the draft aside: the user's own text comes back.
-		let back = (c?.type === 'submit' && recall.stop(c.sessionId)) || st.view.editing?.aside
+		// A recalled entry or an edit was sent: the user's own text comes back.
+		let back = (c?.type === 'submit' && recall.stop(c.sessionId)) || st.view.editing
 		st.view = { ...st.view, editing: undefined }
 		app.input(back && id ? drafts.text(id) : '')
 	}

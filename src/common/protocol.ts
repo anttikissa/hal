@@ -131,11 +131,12 @@ export type Command = (
 	// `rewind`: the text replaces prompt record #n, which and everything
 	// after it a rebase drops first (task 26q). `base`: the draft rev the
 	// sent text emptied; the host clears its draft if still at that rev.
+	// `aside`: an edit was sent, not the draft, so the draft stays.
 	// Always the human's: another session's messages come from the host
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; queueEdit?: string; base?: number }
+	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; queueEdit?: string; base?: number; aside?: boolean }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
