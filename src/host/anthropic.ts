@@ -184,8 +184,9 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	let written = ''
 	let reason: StopReason | undefined
 	let explanation: string | undefined
-	// A call whose input is not JSON: cut off by max_tokens (then it is
-	// no call) or broken (then a call whose input holds the raw text).
+	// A call whose input is not JSON, cut off by max_tokens or broken: a
+	// call whose input holds the raw text, so nothing the model wrote is
+	// lost. A cut-off round runs none of its calls (turn-policy.ts).
 	let broken: { id: string; name: string; json: string }[] = []
 	for await (let m of messages) {
 		let ev = JSON.parse(m.data)
@@ -252,8 +253,10 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				break
 			}
 			case 'message_stop': {
+				// A call still open when the stream ends was cut off mid-input.
+				for (let t of tools.values()) if (!t.server) broken.push({ id: t.id, name: t.name, json: t.json })
 				// The model sees its malformed call as a tool error and may retry.
-				if (reason !== 'max_tokens') for (let b of broken) yield { type: 'tool_call', id: b.id, name: b.name, input: { invalidJson: b.json } }
+				for (let b of broken) yield { type: 'tool_call', id: b.id, name: b.name, input: { invalidJson: b.json } }
 				let sources = [...cited].filter((u) => !written.includes(u))
 				if (sources.length) yield { type: 'text', text: `\n\nSources:\n${sources.join('\n')}\n` }
 				yield { type: 'done', reason: reason ?? 'end', ...(explanation !== undefined && { explanation }) }

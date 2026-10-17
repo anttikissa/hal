@@ -265,7 +265,7 @@ test('redacted thinking survives a round trip', async () => {
 	])
 })
 
-test('stop reasons map to neutral ones; a call cut off by max_tokens is none; a refusal keeps its explanation', async () => {
+test('stop reasons map to neutral ones; a call cut off by max_tokens keeps its raw input; a refusal keeps its explanation', async () => {
 	for (let [wire, reason] of [['end_turn', 'end'], ['stop_sequence', 'end']]) {
 		reply = () => sse(start(), ...stop(wire!))
 		expect(await run()).toEqual([{ type: 'done', reason: reason as any }])
@@ -275,8 +275,9 @@ test('stop reasons map to neutral ones; a call cut off by max_tokens is none; a 
 		{ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: json } },
 		{ type: 'content_block_stop', index: 0 },
 	]
+	// A call cut off by max_tokens is kept with its raw input, never dropped.
 	reply = () => sse(start(), ...tool('{"pa'), ...stop('max_tokens'))
-	expect(await run()).toEqual([{ type: 'done', reason: 'max_tokens' }])
+	expect(await run()).toEqual([{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } }, { type: 'done', reason: 'max_tokens' }])
 	reply = () => sse(start(), { type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: { explanation: 'No.' } }, usage: {} }, { type: 'message_stop' })
 	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
 })
