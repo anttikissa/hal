@@ -57,7 +57,7 @@ Variables:
   hal_dir, hal_home, hal_source, hal_web_url
   subagent, subagent_owner, subagent_slots
   fork, fork_parent
-  user_notes, tools_summary, skills, agents
+  user_notes, other_tools, skills, agents
 
 Tools: providers see one native tool, `tool` { cmd: string }; cmd is TOOL
 plus its arguments, such as READ "a.ts" or BASH "ls". README.md explains why.
@@ -172,8 +172,21 @@ src/main.ts@4d9ej delete 9-9
 :::
 ::
 
+<!--
+=====================================================================
+$other_tools: lesser-used tools that get only a one-line mention.
+
+We want the system prompt to teach the main tools in detail: READ,
+GREP, BASH and EDIT have their own sections above, and HELP, WAIT,
+SPAWN and STOP are explained where they are used. Those tools set
+syntax.summary: false in src/host/tools/*.ts.
+
+Every other tool, including plugin tools, appears here as one line:
+its name, then syntax.summary. The model learns the rest with HELP.
+=====================================================================
+-->
 :: section "Other tools"
-$tools_summary
+$other_tools
 ::
 
 :: section "Images"

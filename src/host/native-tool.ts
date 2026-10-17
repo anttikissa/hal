@@ -153,7 +153,7 @@ function help(tool: Tool<unknown>, interactive = false): string {
 	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...align(usage(tool, interactive)).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
 }
 
-// One line per tool the system prompt does not explain, for $tools_summary.
+// One line per tool the system prompt does not explain, for $other_tools.
 function summary(): string {
 	return [...tools.all().values()].filter((t) => t.syntax?.summary !== false).map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`).join('\n')
 }

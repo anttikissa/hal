@@ -41,7 +41,7 @@ export type ToolOutput = string | { text: string; image?: { mediaType: string; d
 // instead, so clients know too (task 26q). run returns the output; throwing makes an error
 // result with the message.
 // `syntax`: how call text reaches this tool (native-tool.ts, task
-// aks). `summary` follows the name in $tools_summary (false: the system
+// aks). `summary` follows the name in $other_tools (false: the system
 // prompt explains the tool already); `usage` lists exact syntax lines
 // for HELP (default: made from the schema); `positional` names the
 // fields string arguments fill, in order (default: required fields);

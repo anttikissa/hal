@@ -119,7 +119,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		subagent: input.owner ? 'true' : 'false', subagent_owner: input.owner ?? '',
 		subagent_slots: String(input.slots ?? settings.subagentSlots()),
 		fork: input.parent ? 'true' : 'false', fork_parent: input.parent ?? '',
-		user_notes: input.noUser ? 'false' : 'true', tools_summary: nativeTool.summary(),
+		user_notes: input.noUser ? 'false' : 'true', other_tools: nativeTool.summary(),
 		skills: systemPrompt.skills(input.cwd),
 		agents: systemPrompt.agents(input.cwd, sources),
 	}

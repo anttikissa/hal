@@ -151,7 +151,7 @@ test('file tools work outside tracking scope and snapshot eligible literal filen
 	} finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('HELP comes from the tool modules; $tools_summary lists only tools the prompt does not explain', async () => {
+test('HELP comes from the tool modules; $other_tools lists only tools the prompt does not explain', async () => {
 	let id = created(client(), testHome())
 	let help = (await act(id, 'HELP bash')).output
 	expect(help).toContain('BASH /* <description> */ "<command>"')
