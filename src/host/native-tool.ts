@@ -26,7 +26,8 @@ function def(): ToolDef {
 }
 
 function find(id: string): Tool<unknown> {
-	let tool = tools.all().get(id)
+	// READ_BLOB was READ_ENTRY's name; old notices in histories still say it.
+	let tool = tools.all().get(id === 'read_blob' ? 'read_entry' : id)
 	if (!tool) throw new Error(`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`)
 	return tool
 }

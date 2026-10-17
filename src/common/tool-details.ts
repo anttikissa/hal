@@ -58,7 +58,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 }
 
 // Each tool's mark (task b3k); tools without one show their name.
-const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: 'Spawn', stop: 'x', help: '?', inspect: '?' }
+const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', read_entry: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: 'Spawn', stop: 'x', help: '?', inspect: '?' }
 
 function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
@@ -110,11 +110,13 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			break
 		case 'read':
 		case 'read_url':
-		case 'read_blob': {
+		case 'read_blob':
+		case 'read_entry': {
 			let list = (key: string, many: unknown) => Array.isArray(many) ? many.map((p) => typeof p === 'string' ? p : p && typeof p === 'object' ? (p as Record<string, unknown>)[key] : undefined).filter((p): p is string => typeof p === 'string' && p !== '') : []
 			if (name === 'read' && Array.isArray(input.paths)) return { text: marked(list('path', input.paths).map((p) => oneLine(p)).join(', ')) }
-			if (name === 'read_blob' && Array.isArray(input.ids)) return { text: marked(list('id', input.ids).join(', ')) }
-			let key = name === 'read_blob' ? 'id' : str('url') ? 'url' : 'path'
+			let entries = name === 'read_blob' || name === 'read_entry'
+			if (entries && Array.isArray(input.ids)) return { text: marked(list('id', input.ids).join(', ')) }
+			let key = entries ? 'id' : str('url') ? 'url' : 'path'
 			if (str(key)) return { text: marked(str(key)!), key }
 			break
 		}

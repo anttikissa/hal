@@ -1,9 +1,20 @@
 {
 	title: 'READ_ENTRY reads an entry and its blobs',
-	spec: `The READ_BLOB tool is named READ_ENTRY (read_entry on the wire). It takes entry IDs (t35, 176-ray/t35, t35.1) with the same paging options, and returns the entry's metadata and the data of each blob it refers to: text paged, images as images.
+	spec: `The READ_BLOB tool is named READ_ENTRY (read_entry); READ_BLOB still resolves to it because old histories name it. It takes an entry ID, t35 or 35 in this session and 176-ray/t35 in another, with any kind letter, plus paging options, and returns what the model expects for it:
 
-Omission and cut notices, HELP, prompts and benchmarks name READ_ENTRY and entry IDs only. Blob-id arguments are accepted only if some blob cannot be reached from an entry.`,
-	status: 'planned',
-	needs: ['2kh'],
+- A tool call (the t35 of a [12:34 t35] header or a card): the call, then its whole result with images; "No result recorded." without one.
+- A user entry: its one part, or with several parts the entry with every cut output read back and every image.
+- Any other entry, including one with no parts: the entry itself.
+- .N: part N alone, numbered as cards are (part 0 is the bare number): t35.1 is a call's result; in a user entry each tool result is followed by its images.
+- A range, t30-t40: every current entry in it.
+- A blob id from a cut notice.
+
+Cut notices and pruning markers name READ_ENTRY and an entry; they add .N whenever the entry has several parts, since a bare ID reads them all.`,
+	status: 'done',
+	notes: [
+		'Observed in 177-cub (2026-10-17): the part suffix is 0-based (u293.1 is the second part; HELP says first); a session-qualified id (177-cub/293) returns only part 0; t385 returned two tool results with the first still cut, its blob unread; any letter is accepted (t15 read user entry 15); an entry with no parts (177-cub/4) fails as not found; a multi-id call with errors plus an image set isError with image content, and Anthropic rejected the next request with HTTP 400 (read_blob.ts:53).',
+		"Implemented without 2kh: READ_ENTRY needs only entry IDs, not the wider terminology change. The model sees a tool result under its call's number ([12:34 t382]), while the result is stored in a later user entry (385); so t382 returns the call and its whole result. READ_BLOB used to read only part 0 of a session-qualified ID and accept any part beyond the end as not found; an entry with no parts failed. Renaming a tool file in place with git mv breaks the running host (the file name must match the tool name): create the new file and delete the old in one edit."
+	],
+	needs: [],
 	foldInto: ['bz']
 }

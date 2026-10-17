@@ -179,7 +179,7 @@ import { blobs } from './blobs.ts'
 import { history } from './history.ts'
 
 const originalHome = paths.home
-const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_blob', input: { id, ...options } }, { cwd: dir, signal, sessionId: 's' })
+const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_entry', input: { id, ...options } }, { cwd: dir, signal, sessionId: 's' })
 
 test('large bash output is bounded, keeps both ends and the whole result in a session blob', async () => {
 	paths.home = () => dir
@@ -208,7 +208,7 @@ test('bash output past 100 lines keeps both ends and says how to page the blob',
 		expect(result.output).toContain('\n1\n')
 		expect(result.output).toContain('\n300\n')
 		expect(result.output).not.toContain('\n150\n')
-		let id = result.output.match(/READ_BLOB "([0-9a-f]{12})" \{ offset: 1, limit: 100 \}/)?.[1]
+		let id = result.output.match(/READ_ENTRY "([0-9a-f]{12})" \{ offset: 1, limit: 100 \}/)?.[1]
 		expect(id).toBeDefined()
 		expect((await blobRun(id!, { offset: 151, limit: 1 })).output).toStartWith('150\n')
 	} finally { paths.home = originalHome }
@@ -260,9 +260,11 @@ test('read_blob fetches a numbered tool call and its result from history', async
 		mkdirSync(paths.sessionDir('s'), { recursive: true })
 		let call = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } } })
 		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
-		expect((await blobRun(`t${call.n}`)).output).toBe('< example.txt')
+		expect((await blobRun(`t${call.n}`)).output).toBe('< example.txt\n\nResult:\nfile contents')
+		expect((await blobRun(`t${call.n}.1`)).output).toBe('file contents')
+		expect((await blobRun(`s/${call.n}-${result.n}`)).output).toContain('file contents')
 		let spawn = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'internal-provider-call-id', name: 'spawn', input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } } } })
-		expect((await blobRun(`s/${spawn.n}`)).output).toBe('Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true')
+		expect((await blobRun(`s/${spawn.n}`)).output).toBe('Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true\n\nNo result recorded.')
 		expect((await blobRun(`s/${result.n}`)).output).toContain('file contents')
 		expect((await blobRun('t999999')).isError).toBe(true)
 	} finally { paths.home = originalHome }

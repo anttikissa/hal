@@ -80,7 +80,7 @@ const columns = (header: HTMLElement) => {
 	canvas!.font = style.font
 	return Math.max(1, Math.floor((header.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / canvas!.measureText('0').width))
 }
-const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', stop: 'stop', help: 'inspect' }
+const toolIcons: Record<string, IconName> = { read: 'read', edit: 'edit', write: 'edit', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', read_entry: 'blob', stop: 'stop', help: 'inspect' }
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 

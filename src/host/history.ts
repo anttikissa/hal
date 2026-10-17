@@ -86,11 +86,13 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	let full = { ...rest, n: n ?? history.number(id), ts: ts ?? new Date().toISOString() } as HistoryRecord
 	if (full.type === 'user') {
 		let slot = 0
+		// A bare entry ID reads every part, so name the part when there are several.
+		let many = full.blocks.length > 1 || full.blocks.some((b) => b.type === 'tool_result' && blocks.resultImages(b).length)
 		for (let b of full.blocks) {
 			if (b.type === 'tool_result') {
 				if (b.outputBlob) {
-					let ref = `${id}/${full.n}${slot ? `.${slot}` : ''}`
-					b.output = b.output.replace(`whole output in blob ${b.outputBlob}. Page it with READ_BLOB "${b.outputBlob}"`, `whole output in history item ${ref}. Page it with READ_BLOB "${ref}"`)
+					let ref = `${id}/${full.n}${many ? `.${slot}` : ''}`
+					b.output = b.output.replace(`whole output in blob ${b.outputBlob}. Page it with READ_ENTRY "${b.outputBlob}"`, `whole output in entry ${ref}. Page it with READ_ENTRY "${ref}"`)
 				}
 				slot += blocks.resultImages(b).length
 			}

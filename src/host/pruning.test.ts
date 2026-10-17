@@ -64,7 +64,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 		let calls = messages.flatMap((m) => m.blocks as unknown[]).filter((b: any) => b.type === 'tool_call') as any[]
 		expect(calls[0].input.cmd).toContain(`command: "printf '0/0'"`)
 		expect(calls[0].input.cmd).toContain("path: 'src/file.ts'")
-		if (turn >= 7) expect(calls[0].input.cmd).toContain(`${'a'.repeat(200)}\\n[pruned argument: 1800 more characters; read_blob id=`)
+		if (turn >= 7) expect(calls[0].input.cmd).toContain(`${'a'.repeat(200)}\\n[pruned argument: 1800 more characters; read_entry id=`)
 		frozen = providerBytes(messages).slice(0, -1)
 		history.state.cache.clear()
 		expect(providerBytes(await history.messages(id))).toEqual(providerBytes(messages))
@@ -91,18 +91,18 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	let marker = pruned.flatMap((m) => m.blocks as unknown[]).find((b: any) => b.type === 'tool_result') as any
 	expect(marker.output).toContain('[pruned tool output;')
 	let blob = /id=([^\]]+)/.exec(marker.output)![1]
-	let recovered = await tools.run({ type: 'tool_call', id: 'r', name: 'read_blob', input: { id: blob, limit: 2 } }, ctx)
+	let recovered = await tools.run({ type: 'tool_call', id: 'r', name: 'read_entry', input: { id: blob, limit: 2 } }, ctx)
 	expect(recovered.output).toContain('first\nretained whole output\n')
-	let original = await tools.run({ type: 'tool_call', id: 'r2', name: 'read_blob', input: { id: `${id}/${result.n}` } }, ctx)
+	let original = await tools.run({ type: 'tool_call', id: 'r2', name: 'read_entry', input: { id: `${id}/${result.n}` } }, ctx)
 	expect(original.output).toContain('first\nretained whole output\n')
-	let tail = await tools.run({ type: 'tool_call', id: 'r3', name: 'read_blob', input: { id: `${id}/${result.n}`, charOffset: 5001 } }, ctx)
+	let tail = await tools.run({ type: 'tool_call', id: 'r3', name: 'read_entry', input: { id: `${id}/${result.n}`, charOffset: 5001 } }, ctx)
 	expect(tail.output).toStartWith(whole.slice(5000, 5100))
 	let rejected = await tools.run({ type: 'tool_call', id: 'bad', name: 'bash', input: { command: `printf '%s' '${marker.output}' > should-not-exist` } }, ctx)
 	expect(rejected.isError).toBe(true)
 	expect(rejected.output).toContain('actual value')
 	expect(existsSync(`${home}/should-not-exist`)).toBe(false)
 	// Still over pressure: newly consumed results cannot slide this boundary.
-	await round(id, [{ type: 'tool_call', id: 'b', name: 'read_blob', input: { id: blob } }, { type: 'done', reason: 'tool_use' }])
+	await round(id, [{ type: 'tool_call', id: 'b', name: 'read_entry', input: { id: blob } }, { type: 'done', reason: 'tool_use' }])
 	history.results(id, [{ type: 'tool_result', id: 'b', output: 'fresh recovery '.repeat(1000) }])
 	let fresh = await history.messages(id)
 	await round(id, [{ type: 'text', text: 'consumed' }, { type: 'done', reason: 'end' }])

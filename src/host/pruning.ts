@@ -17,12 +17,12 @@ function saved(id: string): Saved {
 }
 
 function marker(kind: string, ref: string): string {
-	return `[pruned ${kind}; read_blob id=${ref}]`
+	return `[pruned ${kind}; read_entry id=${ref}]`
 }
 
-// Match our reserved generated form, recursively, before any tool executes.
+// Match our reserved generated form (read_blob before READ_ENTRY), recursively, before any tool executes.
 function copied(value: unknown): string | undefined {
-	if (typeof value === 'string') return /\[pruned [^\]\n;]+; read_blob id=[\w/#.-]+\]/.exec(value)?.[0]
+	if (typeof value === 'string') return /\[pruned [^\]\n;]+; read_(?:blob|entry) id=[\w/#.-]+\]/.exec(value)?.[0]
 	if (value && typeof value === 'object') for (let child of Object.entries(value).flat()) {
 		let found = pruning.copied(child)
 		if (found) return found
@@ -34,7 +34,7 @@ function copied(value: unknown): string | undefined {
 function argumentsOf(value: unknown, ref: string): unknown {
 	if (typeof value === 'string' && value.length > pruning.maxArgumentChars) {
 		let head = value.split('\n', 1)[0]!.slice(0, pruning.keptArgumentChars)
-		return `${head}\n[pruned argument: ${value.length - head.length} more characters; read_blob id=${ref}]`
+		return `${head}\n[pruned argument: ${value.length - head.length} more characters; read_entry id=${ref}]`
 	}
 	if (typeof value === 'string') return value
 	if (Array.isArray(value)) return value.map((v) => pruning.argumentsOf(v, ref))
@@ -47,7 +47,9 @@ function omit(id: string, r: HistoryRecord): HistoryRecord {
 	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>, ...(r.block.cmd !== undefined && { cmd: pruning.argumentsOf(r.block.cmd, ref) as string }) } }
 	if (r.type !== 'user') return r
 	let slot = 0
-	let itemRef = (at: number) => `${id}/${r.n}${at ? `.${at}` : ''}`
+	// A bare entry ID reads every part, so name the part when there are several.
+	let many = r.blocks.length > 1 || r.blocks.some((b) => b.type === 'tool_result' && conversationBlocks.resultImages(b).length)
+	let itemRef = (at: number) => `${id}/${r.n}${many ? `.${at}` : ''}`
 	let blocks: UserBlock[] = r.blocks.map((b) => {
 		let at = slot++
 		if (b.type === 'image') return { type: 'text', text: pruning.marker('image', itemRef(at)) }

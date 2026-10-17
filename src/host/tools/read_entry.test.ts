@@ -13,7 +13,7 @@ import { tools } from '../tools.ts'
 let home: string
 let originalHome = paths.home
 const signal = new AbortController().signal
-const read = (id: string, page = {}) => tools.run({ type: 'tool_call', id: 'recover', name: 'read_blob', input: { id, ...page } }, { sessionId: 'reader', cwd: home, signal })
+const read = (id: string, page = {}) => tools.run({ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id, ...page } }, { sessionId: 'reader', cwd: home, signal })
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-read-blob-`)
@@ -36,7 +36,7 @@ test('history addresses recover complete output and match each displayed image s
 	let record = history.append('source', { type: 'user', blocks: [{ type: 'tool_result', id: 'images', output: 'two images', images }, saved] })
 	let items = transcript.recordItems(history.readSync('source').find((r) => r.n === record.n)!, 0)
 	expect(items.map((i) => i.key)).toEqual([`${record.n}`, `${record.n}.1`, `${record.n}.2`, `${record.n}.3`])
-	expect(saved.output).toContain(`READ_BLOB "source/${record.n}.3"`)
+	expect(saved.output).toContain(`READ_ENTRY "source/${record.n}.3"`)
 	expect(saved.output.length).toBeLessThanOrEqual(900)
 	let omitted = pruning.omit('source', record)
 	if (omitted.type !== 'user' || omitted.blocks[0]?.type !== 'tool_result') throw new Error('missing pruned result')
@@ -51,9 +51,10 @@ test('history addresses recover complete output and match each displayed image s
 		let result = await read(`source/${record.n}.${slot}`)
 		expect(blobs.base64('reader', blocks.resultImages(result)[0]!.blob)).toBe(expected)
 	}
+	expect((await read(`source/${record.n}.0`)).output).toBe('two images')
 	expect((await read(`source/${record.n}.3`, { offset: 151, limit: 1 })).output).toStartWith('payload 150\n')
 	expect(blocks.resultImages(await read(`source/${record.n}`))).toHaveLength(2)
-	for (let ref of [`source/${record.n}.9`, `source/${record.n}.0`, 'source/0', 'source/9007199254740992', 'source/1.9007199254740992', 'source/../1']) expect((await read(ref)).isError).toBe(true)
+	for (let ref of [`source/${record.n}.9`, 'source/0', 'source/9007199254740992', 'source/1.9007199254740992', 'source/../1']) expect((await read(ref)).isError).toBe(true)
 })
 
 test('legacy capped history records recover their full blob without metadata', async () => {
@@ -87,12 +88,12 @@ test('rebased output replaces the original blob and drops its former image slot'
 	expect((await read(`source/${record.n}`)).output).toContain('was dropped by rebase')
 })
 
-test('READ_BLOB call text with several ids reads each', async () => {
+test('READ_ENTRY call text with several ids reads each', async () => {
 	let a = history.append('source', { type: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'first output' }] })
 	let b = history.append('source', { type: 'user', blocks: [{ type: 'tool_result', id: 'b', output: 'second output' }] })
-	let { name, input } = nativeTool.resolve(`READ_BLOB "source/${a.n}" "source/${b.n}"`)
+	let { name, input } = nativeTool.resolve(`READ_ENTRY "source/${a.n}" "source/${b.n}"`)
 	let result = await tools.run({ type: 'tool_call', id: 'both', name, input }, { sessionId: 'reader', cwd: home, signal })
 	expect(result.isError).toBeUndefined()
-	expect(result.output).toBe(`== READ_BLOB source/${a.n} ==\nfirst output\n\n== READ_BLOB source/${b.n} ==\nsecond output`)
-	expect(nativeTool.resolve('READ_BLOB "t1" { offset: 2 }').input).toEqual({ id: 't1', offset: 2 })
+	expect(result.output).toBe(`== READ_ENTRY source/${a.n} ==\nfirst output\n\n== READ_ENTRY source/${b.n} ==\nsecond output`)
+	expect(nativeTool.resolve('READ_ENTRY "t1" { offset: 2 }').input).toEqual({ id: 't1', offset: 2 })
 })

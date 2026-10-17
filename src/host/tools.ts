@@ -111,7 +111,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	ctx = { ...ctx, signal: AbortSignal.any([ctx.signal, controller.signal]) }
 	try {
 		let copied = pruning.copied(call.input)
-		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
+		if (copied) throw new Error(`Copied omission marker ${copied}: read the named entry with READ_ENTRY and retry with the actual value.`)
 		// A provider's call whose input was not a JSON object.
 		if (typeof call.input.invalidJson === 'string') throw new Error(`your input for '${call.name}' was not a valid JSON object (cut off or malformed); call it again with valid arguments. Long inputs with many escapes (big heredocs, nested quotes) fail often: send a smaller, simpler call, such as one edit or one short script per call. Input received: ${call.input.invalidJson}`)
 		// A native call that did not resolve as it arrived
@@ -148,7 +148,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	if (/<hal-note/i.test(result.output)) {
 		history.append(ctx.sessionId, { type: 'notice', text: tools.imitationWarning })
 	}
-	if (call.name !== 'read_blob') result.output = tools.cap(result.output, ctx.sessionId, call.name === 'bash' ? tools.bashMaxChars : tools.maxChars, call.name === 'bash' ? tools.bashMaxLines : Infinity, (blob) => { result.outputBlob = blob })
+	if (call.name !== 'read_entry') result.output = tools.cap(result.output, ctx.sessionId, call.name === 'bash' ? tools.bashMaxChars : tools.maxChars, call.name === 'bash' ? tools.bashMaxLines : Infinity, (blob) => { result.outputBlob = blob })
 	// Only a time worth showing (1 s or more, task wm0) is kept.
 	let ms = Math.round(performance.now() - start)
 	if (ms >= 1000) result.ms = ms
@@ -183,7 +183,7 @@ function cap(output: string, sessionId?: string, max = tools.maxChars, maxLines 
 	let saved = sessionId && blobs.storeOutput(sessionId, output)
 	if (saved) onStore?.(saved.blob)
 	let note = saved
-		? `\n[cut: ${lines.length} lines, ${Buffer.byteLength(output)} bytes total; whole output in blob ${saved.blob}. Page it with READ_BLOB "${saved.blob}" { offset: 1, limit: 100 }, or grep -n / sed -n '1,100p' ${saved.path}]`
+		? `\n[cut: ${lines.length} lines, ${Buffer.byteLength(output)} bytes total; whole output in blob ${saved.blob}. Page it with READ_ENTRY "${saved.blob}" { offset: 1, limit: 100 }, or grep -n / sed -n '1,100p' ${saved.path}]`
 		: `\n[output truncated: ${output.length - max} more characters]`
 	let gap = byLines ? `[… ${lines.length - maxLines} lines omitted …]\n` : ''
 	let head = byLines ? lines.slice(0, Math.ceil(maxLines / 2)).join('') : output
