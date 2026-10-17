@@ -63,7 +63,7 @@ test('section changes freeze the system and combine whole/diff updates, removals
 	expect(prepare(id).system).toBe(initial)
 	let update = notes(id).at(-1)!
 	expect(update.type === 'notice' && update.text).toContain('-three\n+two')
-	expect(update.type === 'notice' && update.text).toContain('# Full\nReplace this section in full:\nreplacement')
+	expect(update.type === 'notice' && update.text).toContain('# Full [section changed; new contents follow]\nreplacement')
 	writeFileSync(file, source('three', 'replacement'))
 	prepare(id)
 	expect(notes(id)).toHaveLength(2)
@@ -73,8 +73,8 @@ test('section changes freeze the system and combine whole/diff updates, removals
 	expect(prepare(id).system).toBe(initial)
 	let messages = JSON.stringify(await history.messages(id))
 	expect(messages).toContain('<hal-note>')
-	expect(messages).toContain('Withdraw this section')
-	expect(messages).toContain('New section:\\nadded')
+	expect(messages).toContain('[section removed; its instructions no longer apply]')
+	expect(messages).toContain('[new section]\\nadded')
 })
 
 test('forks inherit the frozen prefix and cache identity while role and effort updates follow it', async () => {
@@ -119,7 +119,7 @@ test('family activity postpones expiry; clear, compact and inactive requests reb
 	writeFileSync(file, source('compact'))
 	compact.run(parent)
 	expect(prepare(parent, 7_600_002).system).toContain('# Diff\ncompact')
-	expect(JSON.stringify(await history.messages(parent))).not.toContain('Instruction section updates')
+	expect(JSON.stringify(await history.messages(parent))).not.toContain('System prompt changed')
 })
 
 test('rebased section-note edits/removals stay authoritative until a genuine source change', async () => {
@@ -139,7 +139,7 @@ test('rebased section-note edits/removals stay authoritative until a genuine sou
 	prepare(id)
 	expect(notes(id)).toHaveLength(2)
 	let next = notes(id).at(-1)!
-	expect(next.type === 'notice' && next.text).toContain('Replace this rebased section in full:\nlater')
+	expect(next.type === 'notice' && next.text).toContain('New contents:\nlater')
 })
 
 test('every family member rebuilds after inactivity without filtering rebase targets too early', async () => {
@@ -156,7 +156,7 @@ test('every family member rebuilds after inactivity without filtering rebase tar
 	let late = 2000 + promptCache.inactivityMs + 1
 	expect(prepare(child, late).system).toContain('# Diff\nnew')
 	expect(prepare(parent, late + 1).system).toContain('# Diff\nnew')
-	expect(JSON.stringify(await history.messages(parent))).not.toContain('Instruction section updates')
+	expect(JSON.stringify(await history.messages(parent))).not.toContain('System prompt changed')
 })
 
 test('a real source edit between setting rebase and first request is delivered without restoring disk instructions', async () => {
@@ -173,7 +173,7 @@ test('a real source edit between setting rebase and first request is delivered w
 	let text = JSON.stringify(await history.messages(id))
 	expect(text).toContain('-literal old')
 	expect(text).toContain('+literal later')
-	expect(text).toContain('Replace this rebased section in full')
+	expect(text).toContain('New contents:')
 })
 
 test('malformed templates retain the last valid prompt and persistent complete errors, or expose raw recovery input', () => {

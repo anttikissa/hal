@@ -60,12 +60,14 @@ function updates(before: PromptSection[], after: PromptSection[], reconcile = fa
 	let changes: string[] = []
 	for (let [title, old] of previous) {
 		let now = current.get(title)
-		if (!now) changes.push(`# ${title}\nWithdraw this section; its earlier instructions no longer apply.`)
+		if (!now) changes.push(`# ${title} [section removed; its instructions no longer apply]`)
 		else if (old.body !== now.body) changes.push(now.update === 'diff'
-			? `# ${title}\nUpdate these lines (- old, + new):\n${textDiff.text(`${old.body}\n`, `${now.body}\n`)}${reconcile ? `\nReplace this rebased section in full:\n${now.body}` : ''}`
-			: `# ${title}\nReplace this section in full:\n${now.body}`)
+			? reconcile
+				? `# ${title} [section changed; diff and new contents follow]\n${textDiff.text(`${old.body}\n`, `${now.body}\n`)}\nNew contents:\n${now.body}`
+				: `# ${title} [section changed; diff follows]\n${textDiff.text(`${old.body}\n`, `${now.body}\n`)}`
+			: `# ${title} [section changed; new contents follow]\n${now.body}`)
 	}
-	for (let [title, now] of current) if (!previous.has(title)) changes.push(`# ${title}\nNew section:\n${now.body}`)
+	for (let [title, now] of current) if (!previous.has(title)) changes.push(`# ${title} [new section]\n${now.body}`)
 	return changes.join('\n\n')
 }
 
@@ -129,7 +131,7 @@ function prepare(id: string, selected?: PromptInput): { system: string; cacheId:
 				history.append(id, { type: 'notice', text: 'Instructions outside sections changed. The system prompt is current; earlier replies followed the old text.' })
 			} else {
 				let text = promptCache.updates(old.sections, rendered.sections, data.reconcile)
-				if (text) history.append(id, { type: 'notice', text: `Instruction section updates:\n\n${text}`, sectionUpdate: true })
+				if (text) history.append(id, { type: 'notice', text: `System prompt changed:\n\n${text}`, sectionUpdate: true })
 			}
 		}
 	}

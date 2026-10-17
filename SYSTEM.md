@@ -30,19 +30,17 @@ and appends the change to the transcript as a <hal-note>.
 
 By default, the note carries the whole new section:
 
-    Instruction section updates:
+    System prompt changed:
 
-    # Local instructions
-    Replace this section in full:
+    # Local instructions [section changed; new contents follow]
     <new section body>
 
 With update="diff", it shows the changed lines with their old values, so the
 model sees what changed (e.g. the previous cwd):
 
-    Instruction section updates:
+    System prompt changed:
 
-    # Local instructions
-    Update these lines (- old, + new):
+    # Local instructions [section changed; diff follows]
      unchanged context
     -old line
     +new line
