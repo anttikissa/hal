@@ -1,0 +1,7 @@
+{
+	title: 'Synthetic Hal messages fold like replies',
+	spec: 'Synthetic Hal output (output records with synthetic: true, such as the hal/tool greeting) is shown as a text item marked synthetic, so both clients reuse reply code for it: folding by header click, /toggle, /expand, /collapse and Ctrl-O, cardVerbosityText start state, assistant colors, and the compact closed header. Its header reads Hal (synthetic). It never joins a command card and survives a prompt edit. History records stay output.',
+	status: 'done',
+	needs: [],
+	foldInto: ['c5x']
+}

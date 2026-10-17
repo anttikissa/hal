@@ -74,7 +74,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return item.commit ? colors.commitCard() : item.synthetic && !item.error ? colors.assistant() : bare(item.error ? colors.error() : colors.plain())
+			return item.commit ? colors.commitCard() : bare(item.error ? colors.error() : colors.plain())
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}
@@ -240,7 +240,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let tone = diff.tone, run = promptChanges.run(item as Keyed)
 				return [summary[0]!, ...run.flatMap((o) => [...(run.length > 1 ? ['', ansi.quiet(promptChanges.line(o), style)] : []), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
-			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width, undefined, !!item.synthetic)
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width, undefined, false)
 		}
 		// One row: the text centered in a rule across the width.
 		case 'divider': {

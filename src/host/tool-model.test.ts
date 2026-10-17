@@ -41,7 +41,7 @@ test('clear and unchanged model selection show instructions before the next tool
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
 	await until(() => welcomes() === 2)
 	expect(history.readSync(id).filter((r) => r.type === 'reset')).toHaveLength(1)
-	expect(c.views.get(id)!.items.filter((i) => i.type === 'output' && i.synthetic)).toHaveLength(1)
+	expect(c.views.get(id)!.items.filter((i) => i.type === 'text' && i.synthetic)).toHaveLength(1)
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'BASH "echo before"' })
 	await until(() => c.of('turn-end').length === 1)

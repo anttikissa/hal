@@ -69,7 +69,7 @@ async function opened(id: string) {
 	return c
 }
 
-const texts = (t: Transcript) => t.items.flatMap((i) => (i.type === 'text' ? [i.text] : []))
+const texts = (t: Transcript) => t.items.flatMap((i) => (i.type === 'text' && !i.synthetic ? [i.text] : []))
 
 test('hal/intro asks a name, any client answers, the first answer wins and the model uses it', async () => {
 	let a = client()

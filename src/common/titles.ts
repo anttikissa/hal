@@ -129,10 +129,9 @@ function author(item: Shown): string | undefined {
 		case 'thinking':
 			return 'Thinking'
 		case 'text':
-			return tagged('Hal', [item.model && titles.modelLabel(item.model, item.effort), !item.interrupted && !item.naming && (summary.asks(item.text) ? 'question' : summary.extract(item.text) ? 'done' : undefined)])
-		// Hal's own words without a model, such as a greeting (task 8y).
+			return tagged('Hal', [item.synthetic ? 'synthetic' : item.model && titles.modelLabel(item.model, item.effort), !item.interrupted && !item.naming && (summary.asks(item.text) ? 'question' : summary.extract(item.text) ? 'done' : undefined)])
 		case 'output':
-			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : item.synthetic ? 'Hal (synthetic)' : undefined
+			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : undefined
 	}
 }
 
@@ -159,7 +158,7 @@ function hidden(item: Shown): number {
 // undefined for an item without a header.
 function title(item: Shown): string | undefined {
 	if (item.type === 'question') return stamp(item.ts, item.form.text)
-	if (item.type === 'output' && !item.synthetic && !item.commit && !item.error) return titles.time(item.ts) || undefined
+	if (item.type === 'output' && !item.commit && !item.error) return titles.time(item.ts) || undefined
 	let w = item.type === 'prompt' && item.report && item.summary ? titles.compact(item) : titles.who(item)
 	if (w === undefined) return undefined
 	let t = titles.time((item as { ts?: string }).ts)

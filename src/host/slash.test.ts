@@ -90,7 +90,7 @@ async function opened(id: string) {
 	return c
 }
 
-const outputs = (t: Transcript) => t.items.flatMap((i) => (i.type === 'output' ? [i.text] : []))
+const outputs = (t: Transcript) => t.items.flatMap((i) => (i.type === 'output' || (i.type === 'text' && i.synthetic) ? [i.text] : []))
 
 test('/cd changes the session cwd for every follower; a relative path resolves from the old cwd', async () => {
 	let a = client()
@@ -175,7 +175,7 @@ test('a command question asked while a turn streams leaves the turn streaming; a
 	expect(a.views.get(id)!.items.find((i) => i.type === 'question' && i.id === first)).toMatchObject({ canceled: true })
 	release()
 	await until(() => a.of('turn-end').length)
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'text').map((i: any) => i.text)).toEqual(['working done'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'text' && !i.synthetic).map((i: any) => i.text)).toEqual(['working done'])
 	expect(transcript.question(a.views.get(id))).toBeTruthy()
 	expect((await opened(id)).views.get(id)).toEqual(a.views.get(id))
 })

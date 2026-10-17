@@ -24,7 +24,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number; ts?: string }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
 	// (task hp). Records from before hp have none of them.
-	| { type: 'text'; text: string; naming?: true; interrupted?: true; ts?: string; model?: string; effort?: string }
+	| { type: 'text'; text: string; naming?: true; interrupted?: true; synthetic?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| (ToolDisplay & { type: 'tool'; id: string; name: string; input: Record<string, unknown>; cmd?: string; partial?: string; ts?: string })
 	| (ToolDisplay & { type: 'tool-result'; id: string; output: string; isError?: boolean; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string })
@@ -38,7 +38,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'command'; text: string; from?: string; label?: string; output?: string; error?: true; ts?: string }
 	// What a command said.
 	// `commit`: a commit a Bash call made (task 179), its own card.
-	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
+	| { type: 'output'; text: string; error?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared. `/clear undo` to go back.'.
 	| { type: 'divider'; text: string; ts?: string }
@@ -208,14 +208,14 @@ function aside(r: { type: 'command'; text: string; from?: string; label?: string
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'divider') return { type: r.clear ? 'output' : 'divider', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
-	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.commit && { commit: r.commit }), ...(r.ts !== undefined && { ts: r.ts }) }
+	return r.synthetic ? { type: 'text', text: r.text, synthetic: true, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.change && { change: r.change }), ...(r.commit && { commit: r.commit }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
 // Whether output `next` joins the human's command `prev` in one card:
-// the command, then what it said, adjacent. Synthetic text, prompt-file
-// changes and commits keep their own cards.
+// the command, then what it said, adjacent. Prompt-file changes and
+// commits keep their own cards; synthetic text is a reply.
 function joins(prev: Item, next: Item): prev is Item & { type: 'command' } {
-	return prev.type === 'command' && prev.from === undefined && next.type === 'output' && !next.synthetic && !next.change && !next.commit
+	return prev.type === 'command' && prev.from === undefined && next.type === 'output' && !next.change && !next.commit
 }
 
 // Command `cmd` with `out` said after it.
@@ -436,7 +436,7 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 // the place of the last prompt and everything after it.
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let at = event.amends === undefined ? t.prompt : items.findIndex((i) => i.key === String(event.amends))
-	let keep = event.replaces && at !== undefined && at >= 0 ? items.filter((i, index) => index < at || (i.type === 'output' && (i.change !== undefined || i.synthetic))) : items
+	let keep = event.replaces && at !== undefined && at >= 0 ? items.filter((i, index) => index < at || (i.type === 'output' && i.change !== undefined) || (i.type === 'text' && i.synthetic)) : items
 	let { live: _live, ...rest } = t
 	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.replaces || event.amends !== undefined)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }

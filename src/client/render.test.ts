@@ -218,7 +218,7 @@ describe('grow mode', () => {
 	test('an empty first paint and then a greeting leave one blank row under the shell', () => {
 		setup(30, 30, ['$ ./run'])
 		show([])
-		show([{ type: 'output', text: 'Hello', synthetic: true }])
+		show([{ type: 'text', text: 'Hello', synthetic: true }])
 		expect(term.content().slice(0, 3).map((r) => r.trim() !== '')).toEqual([true, false, true])
 	})
 
