@@ -64,7 +64,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 		let calls = messages.flatMap((m) => m.blocks as unknown[]).filter((b: any) => b.type === 'tool_call') as any[]
 		expect(calls[0].input.cmd).toContain(`command: "printf '0/0'"`)
 		expect(calls[0].input.cmd).toContain("path: 'src/file.ts'")
-		if (turn >= 7) expect(calls[0].input.cmd).toContain('read_blob')
+		if (turn >= 7) expect(calls[0].input.cmd).toContain(`${'a'.repeat(200)}\\n[pruned argument: 1800 more characters; read_blob id=`)
 		frozen = providerBytes(messages).slice(0, -1)
 		history.state.cache.clear()
 		expect(providerBytes(await history.messages(id))).toEqual(providerBytes(messages))

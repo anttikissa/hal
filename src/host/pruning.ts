@@ -29,8 +29,14 @@ function copied(value: unknown): string | undefined {
 	}
 }
 
+// A long argument keeps its first line (a call's purpose comment), so old
+// calls still show real calls to imitate rather than bare markers.
 function argumentsOf(value: unknown, ref: string): unknown {
-	if (typeof value === 'string') return value.length > pruning.maxArgumentChars ? pruning.marker('argument', ref) : value
+	if (typeof value === 'string' && value.length > pruning.maxArgumentChars) {
+		let head = value.split('\n', 1)[0]!.slice(0, pruning.keptArgumentChars)
+		return `${head}\n[pruned argument: ${value.length - head.length} more characters; read_blob id=${ref}]`
+	}
+	if (typeof value === 'string') return value
 	if (Array.isArray(value)) return value.map((v) => pruning.argumentsOf(v, ref))
 	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pruning.argumentsOf(v, ref)]))
 	return value
@@ -169,6 +175,7 @@ export const pruning = {
 	batchTurns: 8,
 	retainTurns: 4,
 	maxArgumentChars: 1000,
+	keptArgumentChars: 200,
 	pressureTokens: 180_000,
 	maxImageTokens: 4_800,
 }
