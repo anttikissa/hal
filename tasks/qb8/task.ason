@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Invariant restored: Anthropic rejects non-text blocks inside is_error tool results. The provider mapper keeps the complete failed result text and error flag, then appends its images as sibling user blocks after all tool results. Successful results still embed their images. This repairs replay of saved mixed-batch READ results without mutating history or losing attachments; missing blobs retain the existing image note.',
-		'Verification: 12 Anthropic tests and 9 URL-read tests pass; changed-file lint passes. Global typecheck is blocked by unrelated src/client/item-view.ts:44 Oklch undefined errors. No real provider request was sent.'
+		'Verification: 12 Anthropic tests and 9 URL-read tests pass; changed-file lint passes. Global typecheck is blocked by unrelated src/client/item-view.ts:44 Oklch undefined errors. No real provider request was sent.',
+		'Follow-up: the existing mixed-batch READ integration test still expected images nested inside an Anthropic error result. It now asserts complete error text in the result and all images in sibling user blocks. Both READ and Anthropic suites pass together: 21 tests; changed-test lint passes.'
 	],
 	needs: ['5er'],
 	foldInto: ['5er']

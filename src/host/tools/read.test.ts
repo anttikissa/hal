@@ -162,9 +162,10 @@ test('mixed batches retain every durable image, error and file version across hi
 	let messages = replay.toMessages(records)
 	let req = { model: 'test', messages, image: (blob: string) => blobs.base64('s', blob) }
 	let expected = [png, gif].map((bytes) => bytes.toString('base64'))
-	let sent: any = anthropic.toMessages(req).at(-1).content[0]
-	expect(sent.is_error).toBe(true)
-	expect(sent.content.filter((b: any) => b.type === 'image').map((b: any) => b.source.data)).toEqual(expected)
+	let content: any[] = anthropic.toMessages(req).at(-1).content
+	expect(content[0].is_error).toBe(true)
+	expect(content[0].content).toContain(result.output)
+	expect(content.filter((b: any) => b.type === 'image').map((b: any) => b.source.data)).toEqual(expected)
 	let responses: any = openai.input(req).at(-1)
 	expect(responses.content.map((b: any) => b.image_url)).toEqual(expected.map((data, i) => `data:${i ? 'image/gif' : 'image/png'};base64,${data}`))
 	let chat: any = openaiCompat.toMessages(req).at(-1)
