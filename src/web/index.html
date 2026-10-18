@@ -88,10 +88,8 @@ html.typing .App { position: absolute; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
-/* One geometry on every screen: the header row is a 44px touch target
-   with its line centered, and the body ends with that same inset, so a
-   card's top and bottom whitespace match. */
-.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
+/* Shared compact insets; touch targets extend without enlarging rows. */
+.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 4); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
 .Card.tool .content, .Card.background-result .content { color: var(--output); --sel-back: var(--output); }
 .Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
@@ -126,11 +124,8 @@ html.typing .App { position: absolute; }
 /* Removed text in the rows is struck through, as in the terminal. */
 .Card .change .row.del, .Card .change span.del { text-decoration: line-through; }
 .Card .change .head:not(:first-child) { margin-top: 0.5lh; }
-/* One header grid for metadata and folding cards; first-line alignment
-   stays the same when a label wraps. The 44px height belongs to this row:
-   every slot shares one top inset that centers a single line in 44px,
-   so a wrapped label grows down from the timestamp's line. */
-.CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
+/* Shared first-line alignment, including wrapped titles. */
+.CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; }
 .Transcript > :is(.Card, .Question) { view-timeline: --sticky-card block; }
 .CardHeader { position: sticky; top: 0; z-index: 1; --sticky-bg: var(--card-bg, var(--canvas)); background: color-mix(in oklab, var(--sticky-bg) 65%, transparent); }
 @supports (animation-timeline: --sticky-card) {
@@ -180,7 +175,8 @@ html.typing .App { position: absolute; }
 .CardHeader :is(.edit, .discard) { padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
 @media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
 .CardHeader:has(.receipt) .discard { padding-inline: 0; }
-.CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss) { position: static; align-self: start; min-width: 44px; min-height: 44px; margin: 0; }
+.CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss) { position: relative; align-self: start; min-width: 44px; min-height: calc(1lh + 2 * var(--card-inset)); margin: 0; }
+@media (pointer: coarse) { .CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss)::after { content: ''; position: absolute; inset: 50% 0 auto; height: 44px; transform: translateY(-50%); } }
 .EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(1ch, env(safe-area-inset-right)) 0 max(1ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
 .EditBar .text { flex: 1; min-width: 0; }
 .EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
