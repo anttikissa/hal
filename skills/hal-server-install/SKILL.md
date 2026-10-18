@@ -5,8 +5,9 @@ description: Set up Hal as a supervised server on another Linux machine over SSH
 
 # Install Hal on a server
 
-The target's own checkout holds the details: read its `SERVER.md` and
-follow it. This skill adds what a remote setup must decide.
+The target's own checkout holds the details: read its
+`skills/hal-server-install/SERVER.md` and follow it. This skill adds
+what a remote setup must decide.
 
 ## Ask first
 

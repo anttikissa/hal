@@ -77,6 +77,6 @@ else
 	printf 'Installed: %s\n' "$target"
 fi
 printf '\nNo host or config changed. No service enabled or started.\n'
-printf 'Read SERVER.md before enabling: hal serve takes over from a running interactive host.\n'
+printf 'Read skills/hal-server-install/SERVER.md before enabling: hal serve takes over from a running interactive host.\n'
 printf 'When ready:\n  systemctl --user daemon-reload\n  systemctl --user enable --now hal.service\n'
 printf 'Boot without login requires linger (authorization may be needed):\n  loginctl enable-linger "$USER"\n'
