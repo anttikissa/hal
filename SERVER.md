@@ -1,5 +1,7 @@
 # Hal on a Linux server
 
+> Written by an LLM; not reviewed by a human yet.
+
 Hal runs from a **writable Git checkout**, including its configuration,
 plugins, credentials and conversations. The service runs that checkout
 with Bun; it does not copy Hal into an immutable package or build a
