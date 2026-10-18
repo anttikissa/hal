@@ -20,8 +20,8 @@ follow it. This skill adds what a remote setup must decide.
 1. Check SSH, `systemctl --user` (or NixOS), free disk and Bun.
 2. Clone this checkout's origin (`git -C <hal home> remote get-url origin`)
    as the service account; run `./install -y`.
-3. Carry over files (table below), then set `hostMode: 'server'`, a
-   fixed `webPort`, and `webUrl` when public.
+3. Carry over files (table below), then set a fixed `webPort`, and
+   `webUrl` when public.
 4. `./scripts/install-service --print`, then install; enable with
    `systemctl --user enable --now hal.service`; `loginctl enable-linger`.
    On NixOS give the user the snippet from `SERVER.md`; never hand-edit
@@ -35,7 +35,7 @@ follow it. This skill adds what a remote setup must decide.
 | File | Do |
 |---|---|
 | `USER.md` | Copy: the user's preferences apply everywhere. |
-| `config.ason` | Copy, then adjust `hostMode`, `webPort`, `webUrl`. |
+| `config.ason` | Copy, then adjust `webPort`, `webUrl`. |
 | `plugins/`, `local.ts` | Ask per item; they may assume this machine. |
 | `secrets/` | **Never copy.** OAuth refresh on one host invalidates the other's token; each host logs in itself. |
 | `sessions/`, `state/` | Never: per-machine history, locks, sockets, web tokens. |
