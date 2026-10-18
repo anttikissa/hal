@@ -70,12 +70,14 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				<span id="status-quota" class="hidden-text">{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}</span>
 			</div>
 			<dialog ref={(e) => (details = e)} class="StatusDetails plain" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
-				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
-				<p class={tone()}>{line().text}</p>
-				<For each={status.groups(props.view)} keyed={false}>{(group) => <div class="fact">
-					{group().href ? <a href={group().href}><Parts group={group()} /></a> : <Parts group={group()} />}
-				</div>}</For>
-				<form method="post" action="/logout"><button type="submit"><Icon name="logout" />Log out this browser</button></form>
+				<div class="top"><strong class="title">Session details</strong><button type="button" class="close" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
+				<div class="body">
+					<p class={['fact', tone()]}>{line().text}</p>
+					<For each={status.groups(props.view)} keyed={false}>{(group) => <div class="fact">
+						{group().href ? <a href={group().href}><Parts group={group()} /></a> : <Parts group={group()} />}
+					</div>}</For>
+				</div>
+				<form method="post" action="/logout" class="footer"><button type="submit"><Icon name="logout" />Log out this browser</button></form>
 			</dialog>
 		</div>
 	)
