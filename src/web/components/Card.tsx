@@ -66,10 +66,10 @@ function enter(el: HTMLElement): void {
 // button in the header sends /kill #<job>.
 // `edit`: a prompt the user may edit and resend; its header offers Edit
 // (task 26q, edit-prompt.ts), which loads it into the box.
-// A bash command that starts Python in command position (line start or
-// after ; & | ( $( ), optionally behind env assignments or a wrapper.
-const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
 // Tool cards' header icons, by tool name.
+const toolIcons: Record<string, IconName> = { read: 'read', edit: 'scissors', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', read_entry: 'blob', stop: 'stop', help: 'inspect' }
+// A title without its leading mark ($, <, =>, …): the icon shows it.
+const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 // Rows `text` wraps to in `cols` monospace columns, as in a terminal.
 const rows = (text: string, cols: number) => text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / cols)), 0)
 // Body columns: the header's inner width over the font's character width.
@@ -80,9 +80,6 @@ const columns = (header: HTMLElement) => {
 	canvas!.font = style.font
 	return Math.max(1, Math.floor((header.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / canvas!.measureText('0').width))
 }
-const toolIcons: Record<string, IconName> = { read: 'read', edit: 'scissors', google: 'google', send: 'message', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob', read_entry: 'blob', stop: 'stop', help: 'inspect' }
-// A title without its leading mark ($, <, =>, …): the icon shows it.
-const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
 
 // `waiting`: a wait title as text and links (toolDetails.waiting).
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean; blocks?: SessionMeta['blocks']; running?: { call: string; since?: string }; waiting?: (title: string) => ReturnType<typeof hrefs.urlParts> | undefined }) {
@@ -187,16 +184,15 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// Folded cards name their kind with an icon: thinking, another
 	// session's message or command (the send tool's bubble, which
 	// unfolded ones show too), or the tool. Bash shows the terminal's
-	// `$ ` as copyable text instead (task ya1); Python bash, its logo.
-	let pythonBash = () => { let item = props.row.item; return item.type === 'tool' && item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command) }
+	// `$ ` as copyable text instead (task ya1).
 	let kindIcon = (): IconName | undefined => {
 		let item = props.row.item
 		if (item.type === 'thinking') return 'thinking'
 		if (titles.letter(item) === 'm') return 'message'
 		if (item.type !== 'tool') return undefined
-		return pythonBash() ? 'python' : toolIcons[item.name]
+		return toolIcons[item.name]
 	}
-	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' && !pythonBash() ? '$ ' : undefined
+	let shellPrompt = () => props.row.item.type === 'tool' && props.row.item.name === 'bash' ? '$ ' : undefined
 	// A wait links what it waits for (task zd8).
 	let waitParts = () => {
 		let item = props.row.item
@@ -271,7 +267,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// A prompt's [image/<name>] markers are links (task qy), rebuilt only
 	// when its text changes, not when a snapshot brings a new row object.
 	let text = createMemo(() => shown()?.text ?? '')
-	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
 	// Body columns, measured when the pointer enters the card; until then
 	// a 14px monospace estimate.
 	let [cols, setCols] = createSignal(Math.max(20, Math.floor(innerWidth / 8.4)))
@@ -295,6 +290,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	})
 	// Headers stick only on cards over 10 rows.
 	let tall = createMemo(() => rows(`${text()}\n${result()?.text ?? ''}`, cols()) > 10)
+	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
 	let prose = () => props.row.item.type === 'prompt' && !md() && !bashResult.background(props.row.item) && props.row.item.origin !== 'model'
 	let parts = () => {
 		let item = props.row.item

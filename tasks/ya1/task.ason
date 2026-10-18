@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'First attempt drew $ as SVG <text>: it looked right but could not be selected or copied. Header prefix text (CardHeader prefix) fixes that.',
-		'User 2026-10-17: Python bash cards dropped the Tabler Python logo and show $ like other bash; runsPython and the python icon were removed.'
+		'User 2026-10-17: Python bash cards dropped the Tabler Python logo and show $ like other bash; runsPython and the python icon were removed.',
+		'Commit 58feddd6 staged only part of Card.tsx; runsPython and pythonBash stayed in HEAD until a follow-up commit removed them.'
 	],
 	needs: ['19m'],
 	foldInto: ['19m']
