@@ -69,7 +69,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				</span>
 				<span id="status-quota" class="hidden-text">{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}</span>
 			</div>
-			<dialog ref={(e) => (details = e)} class="StatusDetails" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
+			<dialog ref={(e) => (details = e)} class="StatusDetails plain" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
 				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
 				<p class={tone()}>{line().text}</p>
 				<For each={status.groups(props.view)} keyed={false}>{(group) => <div class="fact">
