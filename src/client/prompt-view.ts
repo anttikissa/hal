@@ -35,17 +35,33 @@ function layoutPrompt(text: string, cursor: number, width: number, sel?: { start
 	return { rows, row: at.row, col: Math.min(at.col, width) }
 }
 
-// A full-width rule `cols` wide: `left` at its left end and `center`
-// in the middle (pushed right of `left` when they would meet), clipped
-// to fit. Unpainted.
-function rule(cols: number, left = '', center = ''): string {
-	let l = left ? ` ${left} ` : ''
-	let c = center ? strings.clipVisual(` ${center} `, cols) : ''
+// A full-width rule `cols` wide: `left` at its left end, `right` at its
+// right end and `center` in the middle (pushed aside when they would
+// meet), clipped to fit: center first kept, then left, then right.
+// Unpainted.
+function rule(cols: number, left = '', center = '', right = ''): string {
+	let pad = (s: string) => (s ? ` ${s} ` : '')
+	let c = strings.clipVisual(pad(center), cols)
 	let cw = strings.visLen(c)
-	l = strings.clipVisual(l, Math.max(0, cols - cw))
+	let l = strings.clipVisual(pad(left), Math.max(0, cols - cw))
 	let lw = strings.visLen(l)
-	let at = Math.max(lw, Math.floor((cols - cw) / 2))
-	return l + '─'.repeat(at - lw) + c + '─'.repeat(Math.max(0, cols - at - cw))
+	let r = strings.clipVisual(pad(right), Math.max(0, cols - cw - lw))
+	let rw = strings.visLen(r)
+	let at = Math.max(lw, Math.min(Math.floor((cols - cw) / 2), cols - cw - rw))
+	return l + '─'.repeat(at - lw) + c + '─'.repeat(Math.max(0, cols - at - cw - rw)) + r
+}
+
+// What the prompt's two rules carry besides the scroll counts, one
+// function per slot. Plugins hook them with plugin.around and call
+// render.request() when their text changes; a slot already taken is
+// left to its owner. topCenter is Hal's activity word.
+const slots = {
+	topLeft: (): string => '',
+	topCenter: (activity?: string): string => activity ?? '',
+	topRight: (): string => '',
+	bottomLeft: (): string => '',
+	bottomCenter: (): string => '',
+	bottomRight: (): string => '',
 }
 
 // An example in `fg` on `bg` from column `from` (where the text before
@@ -105,6 +121,7 @@ export const promptView = {
 	REST: '  ',
 	layoutPrompt,
 	rule,
+	slots,
 	example,
 	box,
 	mark,

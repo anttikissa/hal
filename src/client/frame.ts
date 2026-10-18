@@ -388,16 +388,18 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// prompt's rows, so nothing below the transcript jumps.
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let input = colors.input()
-	let rule = (left: string, center = '') => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center)) + ansi.UNCOLOR
+	let rule = (left: string, center: string, right: string) => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center), ansi.clean(right)) + ansi.UNCOLOR
+	let join = (...parts: string[]) => parts.filter(Boolean).join(' ')
+	let s = promptView.slots
 	let over = view.tabs?.list.length ? tabBar.overRow(view.tabs.list, view.tabs.focused, cols) : undefined
 	if (over !== undefined) lines.push(over)
 	else lines.push('')
 	let anchor = lines.length
 	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
-	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))
+	lines.push(rule(join(p.above ? `↑${p.above}` : '', s.topLeft()), s.topCenter(view.activity), s.topRight()))
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
-	lines.push(rule(p.below ? `↓${p.below}` : ''))
+	lines.push(rule(join(p.below ? `↓${p.below}` : '', s.bottomLeft()), s.bottomCenter(), s.bottomRight()))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
 	lines.push(...helpRow.rows(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))

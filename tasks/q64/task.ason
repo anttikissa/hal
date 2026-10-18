@@ -1,0 +1,7 @@
+{
+	title: 'Plugin slots on the prompt rules',
+	spec: 'The prompt box rules carry six text slots for plugins, promptView.slots: topLeft, topCenter, topRight, bottomLeft, bottomCenter, bottomRight. Each is a function a plugin hooks with plugin.around; the plugin calls render.request() when its text changes and leaves a slot it finds taken to its owner. topCenter returns the session activity word by default, so it is hookable too. Left slots follow the scroll counts (↑N, ↓N). When a rule is too narrow, the center is kept first, then the left, then the right. Terminal only: plugins run in the host process, so remote terminals and the web do not show slots (the user chose terminal only for now).',
+	status: 'done',
+	needs: ['p0'],
+	foldInto: ['p0']
+}
