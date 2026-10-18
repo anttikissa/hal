@@ -6,25 +6,25 @@ This is HAL 9001, an agent harness.
 
 The main selling points:
 
-- Respects the terminal: no hijacked mouse or scrolling; ctrl-c,
-  ctrl-z, copy and paste and links work as they should.
-- Basic editing amenities work: select with shift, tab to indent.
-- Excellent in the terminal; where the terminal falls short, the web
+- Respects the terminal: no hijacked mouse or scrolling. `ctrl-c`,
+  `ctrl-z`, copy and paste and links work as they should.
+- Basic editing amenities work: select with `shift`, `tab` to indent.
+- Excellent in the terminal. Where the terminal falls short, the web
   UI picks up the torch.
 - Works out of the box with Claude, ChatGPT and OpenCode Go
-  subscriptions, plus many API keys; new providers are easy to add.
+  subscriptions, plus many API keys. New providers are easy to add.
 - Micro-optimized where it matters: no typing lag, near-instant
   startup even with 100+ tabs.
-- No dependencies where we can avoid them; starting `hal` loads about
+- No dependencies where we can avoid them: starting `hal` loads about
   24k lines of TS and no third-party packages. Fewer supply-chain
   attacks are a happy side effect.
 - Small: about 34k lines in total.
 - Run any number of sessions as tabs in one terminal, no extra tools
-  needed. Connect as many terminal or web clients as you like;
+  needed. Connect as many terminal or web clients as you like, and
   sessions survive process exit or restart.
-- Hot-reloadable plugins that can do anything - failing that, Hal
-  modifies its own source code (that's how it's developed; "update
-  yourself; ctrl-r to restart; observe changes" is my normal workflow)
+- Hot-reloadable plugins that can do anything. Failing that, Hal
+  modifies its own source code. That's how it's developed: "update
+  yourself, `ctrl-r` to restart, observe changes" is my normal workflow.
 
 # Before you start
 
@@ -44,7 +44,7 @@ install script:
 ```
 git clone https://github.com/anttikissa/hal ~/.hal
 cd ~/.hal
-# Hal uses Bun as its runtime; this installs it if you don't have it.
+# Hal uses Bun as its runtime. This installs it if you don't have it.
 ./install
 # might have to restart shell for $PATH to update, then:
 hal
@@ -76,24 +76,24 @@ There's also `hal serve`, which only runs the server part.
 Hal keeps your tabs and their states over restarts (or over server-peer
 handovers). If you close the host process, they will show up as paused
 the next time you start Hal. Generally you only need to restart if you
-modify Hal itself; plugin, theme, and config changes are reloaded
+modify Hal itself. Plugin, theme, and config changes are reloaded
 automatically.
 
 # Tabs
 
-Open a tab with ctrl-t, close with ctrl-w, browse with ctrl-n/p. If
-you've ever used [an IRC client](https://irssi.org/) (or a web
-browser), the keybindings will feel familiar. Closed a tab you didn't
-want to? Resume it with ctrl-shift-t, or /resume <tab-id>.
+Open a tab with `ctrl-t`, close with `ctrl-w`, browse with `ctrl-n` and
+`ctrl-p`. If you've ever used [an IRC client](https://irssi.org/) (or a
+web browser), the keybindings will feel familiar. Closed a tab you
+didn't want to? Resume it with `ctrl-shift-t`, or `/resume <tab-id>`.
 
-Subagents are also tabs (of course) with the "autoclose" property on;
-if you interfere with the minion's meddlings, autoclose will be turned
-off. Use /autoclose to turn it back on.
+Subagents are also tabs (of course) with the "autoclose" property on.
+If you interfere with the minion's meddlings, autoclose will be turned
+off. Use `/autoclose` to turn it back on.
 
 `hal -p <prompt>` (run a prompt and print output) also shows as a tab
 while it's running, because why not.
 
-Hal is capable of introspection and issuing commands to itself; you can
+Hal is capable of introspection and issuing commands to itself. You can
 ask for things like "order my tabs by project", "close inactive or old
 tabs", etc.
 
@@ -104,21 +104,21 @@ Hal is designed to manage many sessions and many projects at a time.
 skills to scope. Opening a new tab inherits the current tab's
 directory.
 
-`/model` (or more usually, ctrl-m) switches the model and thinking
+`/model` (or more usually, `ctrl-m`) switches the model and thinking
 effort.
 
 # Forking
 
-Fork the current session with ctrl-b (for "branch"; ctrl-f is used for
-"find"/"filter") to ask a quick question or try another approach with
-the same context. If you fork while the parent is working, the fork
+Fork the current session with `ctrl-b` (for "branch", since `ctrl-f` is
+for "find"/"filter") to ask a quick question or try another approach
+with the same context. If you fork while the parent is working, the fork
 starts idle, so the work is not done twice.
 
 # Rebase and edit
 
 Rewrite session history, or ask the model to do it. (E.g. "rebase this
-session, delete the part after I made decision Y"; or "rebase, drop
-unnecessary stuff to get context usage under 30k tokens"). Takes
+session, delete the part after I made decision Y", or "rebase, drop
+unnecessary stuff to get context usage under 30k tokens".) Takes
 inspiration from `git rebase -i`. `/rebase undo` to go back.
 
 You can edit the previous prompt (arrow up on terminal, or edit icon on
@@ -131,34 +131,34 @@ else ever happened. Of course you can undo that too: `/edit undo`.
 Hal's compaction is rudimentary and mechanical: no model call.
 `/compact` replaces the earlier context with a summary that keeps the
 first prompt and its answer, and the last three prompts and every
-answer after them; each omitted run becomes one line saying what it
+answer after them. Each omitted run becomes one line saying what it
 held, and long answers keep only their head and tail. The transcript
-and history stay whole; only what the model sees shrinks. You can undo
+and history stay whole. Only what the model sees shrinks. You can undo
 it with `/compact undo`.
 
 If you want a fancier compact, write a plugin. Or use a handoff
 continuation: "Write me handoff.md and then clear the context with
-continuation"; the `/clear` command accepts a continuation prompt like
+continuation". The `/clear` command accepts a continuation prompt like
 "Follow instructions in handoff.md".
 
 # Server
 
 I run Hal on a Linux box and use it with the web interface. You can
 get a decent app-like experience (including notifications) if you save
-it as a home screen app. (iPhone tested; Android not.)
+it as a home screen app. (Tested on iPhone, not on Android.)
 
-There's a bundled skill, `hal-server-install`; so far it is tested on
+There's a bundled skill, `hal-server-install`. So far it is tested on
 CentOS and Caddy.
 
 # Plugins
 
-Hal has a wide and shallow plugin surface; a plugin can basically wrap
+Hal has a wide and shallow plugin surface: a plugin can basically wrap
 around any function in the codebase, or override any value. Write
 custom tools, providers, commands, themes, or pretty much anything as a
 plugin.
 
-Note: the plugin surface is subject to change as Hal is under
-development; a plugin written against 0.0.1 might not work on 0.0.2.
+Note: the plugin surface is subject to change while Hal is under
+development. A plugin written against 0.0.1 might not work on 0.0.2.
 
 Drop a plugin into ~/.hal/plugins (or wherever your $hal_home is) and
 it will be automatically loaded.
