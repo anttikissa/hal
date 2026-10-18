@@ -179,12 +179,24 @@ export const colors = {
 		// Where a press or a linked card's flash starts (web/flash.ts).
 		flash: [1, 0, 0],
 	}),
-	// Tools: each kind its own hue. Red is kept for real failures. A
-	// tool without its own entry (tool + capitalized name) uses `tool`.
-	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
+	// Tools: read-only tools share READ's green, tools with writes or side
+	// effects Bash's purple, messages pink. Red is kept for real failures.
+	// A tool without its own entry (tool + camel-case name) uses the gray
+	// `tool`.
+	tool: (): Style => ({ fg: [colors.fgL, 0, 0], bg: [colors.bgL, 0, 0] }),
+	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
+	toolReadEntry: (): Style => colors.toolRead(),
+	toolGrep: (): Style => colors.toolRead(),
+	toolInspect: (): Style => colors.toolRead(),
+	toolGoogle: (): Style => colors.toolRead(),
+	toolWait: (): Style => colors.toolRead(),
+	toolHelp: (): Style => colors.toolRead(),
 	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 	toolEdit: (): Style => colors.toolBash(),
-	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
+	toolCommand: (): Style => colors.toolBash(),
+	toolSpawn: (): Style => colors.toolBash(),
+	toolStop: (): Style => colors.toolBash(),
+	toolNotify: (): Style => colors.toolBash(),
 	// Inter-tab messages, both directions, in the message pink.
 	toolSend: (): Style => colors.message(),
 }

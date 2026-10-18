@@ -32,9 +32,10 @@ export type Look = { headerWidth?: number; head?: number; now?: number; full?: b
 
 const { INVERSE, UNINVERSE } = ansi
 
-// The style of a tool's name: toolBash for bash, tool for one without its own.
+// The style of a tool's name: tool + camel-case name (read_entry is
+// toolReadEntry), else the default tool.
 function toolStyle(name: string): Style {
-	let key = 'tool' + name.charAt(0).toUpperCase() + name.slice(1)
+	let key = 'tool' + name.split(/[^a-z0-9]+/i).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
 	let style = (colors as Record<string, unknown>)[key]
 	return typeof style === 'function' ? style() : colors.tool()
 }
