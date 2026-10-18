@@ -3,7 +3,7 @@
 // hal --home <dir> or by a test so it never touches live data.
 
 import { chmodSync, mkdirSync } from 'fs'
-import { tmpdir } from 'os'
+import { homedir, tmpdir } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../common/attachments.ts'
 
@@ -14,6 +14,12 @@ function home(): string {
 	// Belt and braces: a test that forgot state.home still gets a temp home.
 	if (process.env.NODE_ENV === 'test') return `${tmpdir()}/hal-test-home-${process.pid}`
 	return repoRoot
+}
+
+// The user's home, for user-scoped files such as ~/.agents/skills. Tests
+// get a missing directory, so they never read the user's files.
+function userHome(): string {
+	return process.env.NODE_ENV === 'test' ? `${tmpdir()}/hal-test-user-${process.pid}` : homedir()
 }
 
 // Conversations, one directory per session.
@@ -87,4 +93,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }
+export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, userHome, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }

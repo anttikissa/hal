@@ -33,12 +33,14 @@ function candidates(cwd: string): string[] {
 // folder: /a/skills/{x,y} /b/skills/z.
 // TODO: maybe an option to also list each skill's front matter
 // description, so models pick skills better; names suffice for now. Hal's own skills/
-// apply everywhere, like SYSTEM.md; a project's .agents/skills (or
-// .claude/skills) only where its AGENTS.md would. Only folders holding a
+// and the user's ~/.agents/skills (or ~/.claude/skills) apply everywhere,
+// like SYSTEM.md; a project's .agents/skills (or .claude/skills) only
+// where its AGENTS.md would. Only folders holding a
 // SKILL.md count; names are sorted so the text stays cache-stable.
 function skills(cwd: string): string {
-	let dirs = [`${paths.repoRoot()}/skills`]
-	for (let dir of candidates(cwd)) for (let sub of ['.agents/skills', '.claude/skills']) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
+	let subs = ['.agents/skills', '.claude/skills']
+	let dirs = [`${paths.repoRoot()}/skills`, ...subs.map((sub) => `${paths.userHome()}/${sub}`)]
+	for (let dir of candidates(cwd)) for (let sub of subs) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
 	let groups: string[] = []
 	for (let dir of new Set(dirs)) {
 		let names: string[] = []

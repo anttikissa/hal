@@ -241,30 +241,42 @@ test('the home USER.md appears in the real SYSTEM prompt when present, with no r
 	}
 })
 
-test('skills are listed by name: Hal skills always, project skills only along the cwd chain', () => {
+test('skills are listed by name: Hal and user skills always, project skills only along the cwd chain', () => {
 	let skill = (dir: string) => (mkdirSync(dir, { recursive: true }), writeFileSync(`${dir}/SKILL.md`, '---\nname: x\n---\nBODY TEXT'))
-	mkdirSync(`${root}/repo/.git`, { recursive: true })
-	skill(`${root}/repo/.agents/skills/zeta`)
-	skill(`${root}/repo/.agents/skills/alpha`)
-	mkdirSync(`${root}/repo/.agents/skills/no-skill-file`)
-	skill(`${root}/repo/sub/.claude/skills/inner`)
-	skill(`${root}/repo/other/.agents/skills/elsewhere`)
-	mkdirSync(`${root}/repo/sub/deep`, { recursive: true })
-	writeFileSync(`${root}/repo/AGENTS.md`, 'PROJECT RULE')
-	let rendered = systemPrompt.inspect({ cwd: `${root}/repo/sub/deep`, model: 'm/x', now: at })
-	let text = rendered.sections.find(s => s.title === 'Skills')!.body
-	let instructions = rendered.sections.find(s => s.title === 'Local instructions')!.body
-	expect(rendered.problems).toEqual([])
-	expect(instructions).toContain('PROJECT RULE')
-	expect(instructions).not.toContain('/skills/')
-	expect(text).not.toContain('PROJECT RULE')
-	expect(text).toMatch(new RegExp(`Skills - read <dir>/SKILL.md when appropriate: \\S+/skills/\\S*hal-server-install\\S* ${root}/repo/.agents/skills/\\{alpha,zeta\\} ${root}/repo/sub/.claude/skills/inner$`))
-	// Folders without SKILL.md, projects off the chain and skill bodies stay out.
-	expect(text).not.toContain('no-skill-file')
-	expect(text).not.toContain('elsewhere')
-	expect(text).not.toContain('BODY TEXT')
-	// Outside that project only the Hal skills remain.
-	let away = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
-	expect(away).toMatch(/\/skills\/\S*hal-server-install/)
-	expect(away).not.toContain('alpha')
+	let userHome = paths.userHome
+	paths.userHome = () => `${root}/user`
+	try {
+		skill(`${root}/user/.agents/skills/mine`)
+		skill(`${root}/user/.claude/skills/claude-mine`)
+		mkdirSync(`${root}/repo/.git`, { recursive: true })
+		skill(`${root}/repo/.agents/skills/zeta`)
+		skill(`${root}/repo/.agents/skills/alpha`)
+		mkdirSync(`${root}/repo/.agents/skills/no-skill-file`)
+		skill(`${root}/repo/sub/.claude/skills/inner`)
+		skill(`${root}/repo/other/.agents/skills/elsewhere`)
+		mkdirSync(`${root}/repo/sub/deep`, { recursive: true })
+		writeFileSync(`${root}/repo/AGENTS.md`, 'PROJECT RULE')
+		let rendered = systemPrompt.inspect({ cwd: `${root}/repo/sub/deep`, model: 'm/x', now: at })
+		let text = rendered.sections.find(s => s.title === 'Skills')!.body
+		let instructions = rendered.sections.find(s => s.title === 'Local instructions')!.body
+		expect(rendered.problems).toEqual([])
+		expect(instructions).toContain('PROJECT RULE')
+		expect(instructions).not.toContain('/skills/')
+		expect(text).not.toContain('PROJECT RULE')
+		expect(text).toMatch(new RegExp(`Skills - read <dir>/SKILL.md when appropriate: \\S+/skills/\\S*hal-server-install\\S* ${root}/user/.agents/skills/mine ${root}/user/.claude/skills/claude-mine ${root}/repo/.agents/skills/\\{alpha,zeta\\} ${root}/repo/sub/.claude/skills/inner$`))
+		// Folders without SKILL.md, projects off the chain and skill bodies stay out.
+		expect(text).not.toContain('no-skill-file')
+		expect(text).not.toContain('elsewhere')
+		expect(text).not.toContain('BODY TEXT')
+		// Outside that project only the Hal and user skills remain.
+		let away = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
+		expect(away).toMatch(/\/skills\/\S*hal-server-install/)
+		expect(away).toContain(`${root}/user/.agents/skills/mine`)
+		expect(away).not.toContain('alpha')
+		// With the home as cwd, its skill folders are listed once.
+		let atHome = systemPrompt.build({ cwd: `${root}/user`, model: 'm/x', now: at })
+		expect(atHome.split('/user/.agents/skills/mine').length).toBe(2)
+	} finally {
+		paths.userHome = userHome
+	}
 })

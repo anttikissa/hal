@@ -1,0 +1,7 @@
+{
+	title: 'User-scoped skills in every session',
+	spec: 'Skills in the user home, ~/.agents/skills (the shared convention of Cursor, VS Code and npx skills) and ~/.claude/skills (Claude Code), are listed in every session, like Hal skills, after Hal skills and before project skills, in the same name-only format. When the cwd chain includes the home, its folders are listed once. Tests run with a missing user home so they never read the user files. Tests: user skills listed inside and outside a project.',
+	status: 'done',
+	needs: ['074'],
+	foldInto: ['074']
+}
