@@ -173,7 +173,7 @@ function css(): string {
 		if (fg) decls.push(`--title-fg: ${oklch.toCss(style.title ?? colors.title(fg))}`)
 		// Selection is reverse video in the style's own color (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
-		if (fg) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
+		if (fg && !style.output) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
