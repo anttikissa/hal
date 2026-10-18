@@ -22,8 +22,18 @@ const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home'
 // scroll positions can be fractional.
 const atBottom = 1
 
-function leave(): void {
-	scroll.state.pinned = false
+// Sets following. Each change is a diagnostic transition: what caused
+// it and where the view was before (task 981).
+function pin(on: boolean, why: string): void {
+	let st = scroll.state
+	if (st.pinned === on) return
+	st.pinned = on
+	scroll.onPin(why, st.top)
+}
+
+// `why`: the reader's action that left the bottom.
+function leave(why: string): void {
+	pin(false, why)
 	scroll.state.intent = undefined
 	scroll.state.held = undefined
 }
@@ -51,7 +61,7 @@ function keep(): boolean {
 function intent(event?: Event): void {
 	let el = scroll.state.el
 	if (el) { scroll.state.intent = true; if (!event) scroll.state.top = el.scrollTop }
-	if (event) scroll.onTrace(event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type)
+	if (event) scroll.onTrace(event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type, undefined, (event as WheelEvent).deltaY)
 }
 
 function navigate(): void {
@@ -59,7 +69,7 @@ function navigate(): void {
 	if (!el) return
 	// Layout can clamp the old position; only movement beyond that is navigation.
 	if (st.intent && Math.abs(el.scrollTop - Math.min(st.top, scroll.target(el, 0))) > atBottom) {
-		st.pinned = scroll.gap(el) <= atBottom
+		pin(scroll.gap(el) <= atBottom, 'drag')
 		st.held = undefined
 		scroll.onTrace(st.pinned ? 'resume' : 'drag')
 	}
@@ -194,7 +204,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 function follow(change: () => void, force = false): void {
 	let st = scroll.state
 	navigate()
-	if (force) { st.pinned = true; st.held = undefined; st.intent = undefined; scroll.onTrace('force') }
+	if (force) { pin(true, 'force'); st.held = undefined; st.intent = undefined; scroll.onTrace('force') }
 	change()
 	scroll.check('content')
 }
@@ -217,7 +227,7 @@ function restore(id: string): void {
 	scroll.state.intent = undefined
 	let place = scroll.state.places.get(id) ?? { gap: 0 }
 	// A tab never shown here opens pinned at the bottom.
-	scroll.state.pinned = 'gap' in place && place.gap <= atBottom
+	pin('gap' in place && place.gap <= atBottom, 'restore')
 	scroll.put(el, 'top' in place ? place.top : scroll.target(el, place.gap))
 	scroll.onTrace('restore')
 }
@@ -229,7 +239,9 @@ export const scroll = {
 	// `reanchor`: takes reflow's reading anchor at the current view.
 	// `held`: the card hold() keeps in place, at `top` in the viewport.
 	state: { el: null as Box | null, top: 0, intent: undefined as true | undefined, reanchor: (): void => {}, quiet: false, pinned: true, held: undefined as { card: Element; top: number } | undefined, places: new Map<string, { top: number } | { gap: number }>() },
-	onTrace: (_why: string, _pull?: number): void => {},
+	onTrace: (_why: string, _pull?: number, _wheel?: number): void => {},
+	// Following changed; `from`: the last position Hal saw before.
+	onPin: (_why: string, _from: number): void => {},
 	gap,
 	leave,
 	hold,

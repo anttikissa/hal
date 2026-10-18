@@ -7,10 +7,16 @@ import { diagnosticDetails, type DiagnosticDetail, type Breadcrumb, type Diagnos
 let entries: Breadcrumb[] = [], read: (() => DiagnosticContext) | undefined
 let lag = 0, dropped = 0
 let page = '', timer: ReturnType<typeof setTimeout> | undefined, busy = false, last = 0
-const protectedEntry = (e: Breadcrumb) => e.kind === 'scroll' || e.kind === 'pulled' || e.kind === 'drift'
+// Pin changes are never evicted (but by each other): they are the
+// cause. The newest 12 other scroll entries outlast generic events.
+const pinEntry = (e: Breadcrumb) => e.kind === 'pin'
+const scrollEntry = (e: Breadcrumb) => e.kind === 'scroll' || e.kind === 'pulled' || e.kind === 'drift'
 export function retain(entries: Breadcrumb[]): number {
 	let before = entries.length
-	while (entries.length > 32) entries.splice(entries.filter(protectedEntry).length > 12 ? entries.findIndex(protectedEntry) : Math.max(0, entries.findIndex((e) => !protectedEntry(e))), 1)
+	while (entries.length > 32) {
+		let i = entries.filter(scrollEntry).length > 12 ? entries.findIndex(scrollEntry) : entries.findIndex((e) => !scrollEntry(e) && !pinEntry(e))
+		entries.splice(i >= 0 ? i : Math.max(0, entries.findIndex((e) => !pinEntry(e))), 1)
+	}
 	return before - entries.length
 }
 function record(kind: DiagnosticKind, detail: string = 'other', line?: number, column?: number): Breadcrumb | undefined {

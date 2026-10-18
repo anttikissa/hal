@@ -80,9 +80,10 @@ test('scroll diagnostics project structural snapshots without leaking arbitrary 
 test('scroll causes survive generic event floods and failed-batch merges within 32 entries', () => {
 	let entries: Breadcrumb[] = [], dropped = 0
 	for (let at = 0; at < 100; at++) {
-		entries.push({ at, kind: at < 15 ? 'scroll' : 'event', detail: 'other' })
+		entries.push({ at, kind: at === 0 ? 'pin' : at < 15 ? 'scroll' : 'event', detail: 'other' })
 		dropped += retain(entries)
 	}
+	expect(entries[0]?.kind).toBe('pin')
 	expect(entries.filter((e) => e.kind === 'scroll').map((e) => e.at)).toEqual(Array.from({ length: 12 }, (_, i) => i + 3))
 	expect(entries.length).toBe(32)
 	expect(dropped).toBe(68)
@@ -90,4 +91,7 @@ test('scroll causes survive generic event floods and failed-batch merges within 
 	expect(retain(merged)).toBe(32)
 	expect(merged.slice(0, 12)).toEqual(entries.slice(0, 12))
 	expect(merged.map((e) => e.at)).toEqual(merged.map((e) => e.at).sort((a, b) => a - b))
+	// A wheel flood never evicts the pin change that caused it.
+	for (let at = 200; at < 300; at++) { merged.push({ at, kind: 'scroll', detail: 'other' }); retain(merged) }
+	expect(merged[0]?.kind).toBe('pin')
 })

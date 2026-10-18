@@ -64,7 +64,7 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 		scroll.check('resize')
 		expect(el.scrollTop).toBe(920)
 		// Reader scrolls back to bottom and resumes following.
-		scroll.leave()
+		scroll.leave('drag')
 		scroll.intent()
 		el.scrollTop = 910
 		scroll.check('scroll')

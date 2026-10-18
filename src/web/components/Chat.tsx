@@ -79,7 +79,7 @@ function reveal(): void {
 	if (!card) return
 	t.shown = true
 	// The reader asked for this card: leaving the bottom is theirs.
-	scroll.leave()
+	scroll.leave('link')
 	card.scrollIntoView({ block: 'start' })
 	scroll.moved()
 	scroll.hold(card)
