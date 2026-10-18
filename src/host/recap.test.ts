@@ -99,6 +99,7 @@ test('recap failures retain the full provider body and stale success never lands
 
 test('provider recap input and output are bounded and no tools are available', async () => {
 	let c = client(), id = created(c), original = provider.stream
+	sessions.open(id).model = 'anthropic/claude-opus-5-5'
 	let input: any
 	provider.stream = async function* (_model, request) {
 		input = request
@@ -109,6 +110,7 @@ test('provider recap input and output are bounded and no tools are available', a
 		let text = await recap.generate(id, [{ type: 'assistant', block: { type: 'text', text: 'data '.repeat(10_000) }, ts: '' }], new AbortController().signal)
 		expect(Array.from(text)).toHaveLength(400)
 		expect(input.tools).toEqual([])
+		expect(input.effort).toBe('low')
 		expect(input.messages[0].blocks[0].text.length).toBeLessThan(recap.digestChars + 200)
 	} finally { provider.stream = original }
 })
@@ -116,11 +118,12 @@ test('provider recap input and output are bounded and no tools are available', a
 test('a recap the provider stops early is an error with its reason and partial text, not a recap', async () => {
 	let c = client(), id = created(c), original = provider.stream
 	provider.stream = async function* () {
+		yield { type: 'thinking', text: 'Weighing which records matter' }
 		yield { type: 'text', text: 'Goal: clearer cards by drop' }
 		yield { type: 'done', reason: 'max_tokens' }
 	}
 	try {
-		await expect(recap.generate(id, [], new AbortController().signal)).rejects.toThrow(/max_tokens[\s\S]*Partial text: Goal: clearer cards by drop/)
+		await expect(recap.generate(id, [], new AbortController().signal)).rejects.toThrow(/max_tokens[\s\S]*Thinking: Weighing which records matter[\s\S]*Partial text: Goal: clearer cards by drop/)
 	} finally { provider.stream = original }
 })
 
