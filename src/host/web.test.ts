@@ -1047,7 +1047,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 		expect(text).toContain(meta.cwd)
 		expect(text).toContain('medium')
 		expect(text).toContain('5h 52%')
-		expect(await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))")).toEqual([`/changes/${id}`, `/context/${id}`])
+		expect(await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))")).toEqual([`/${id}/changes`, `/context/${id}`])
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
 		await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })

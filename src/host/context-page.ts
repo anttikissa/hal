@@ -120,7 +120,7 @@ g.addEventListener('click', (e) => {
 
 function page(id: string, css: string): Response {
 	let nonce = crypto.randomUUID()
-	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} context</title><style>${css}\n${style}</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="/changes/${id}">Changes</a></nav><h1>${id} · context size per provider round</h1><div id="graph">${graph(id)}</div><p id="info" aria-live="polite">Tap a bar for its round.</p><script nonce="${nonce}">${script}</script></main></body></html>`
+	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} context</title><style>${css}\n${style}</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="/${id}/changes">Changes</a></nav><h1>${id} · context size per provider round</h1><div id="graph">${graph(id)}</div><p id="info" aria-live="polite">Tap a bar for its round.</p><script nonce="${nonce}">${script}</script></main></body></html>`
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src 'self'` } })
 }
 

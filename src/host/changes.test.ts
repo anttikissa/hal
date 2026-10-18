@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { changedFiles } from './changed-files.ts'
 import { changes } from './changes.ts'
-import { changesPage } from './changes-page.ts'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -79,23 +78,25 @@ test('changes retain first/latest and steps through commits, exact content match
 	expect(changes.list(id)[0]!.before).toBe(after)
 })
 
-test('diff routes require login, validate selection, escape content and show overlapping sessions and unavailable snapshots', async () => {
+test('diff data requires login, validates selection, shows overlapping sessions and unavailable snapshots; the old address redirects', async () => {
 	let before = blob('old\n'), after = blob('<script>alert(1)</script>\n')
 	history.append(id, { type: 'file_changes', cwd: home, toolId: 'call', files: [{ path: 'a.txt', before, after }, { path: '.env', before: null, after: { size: 8, mtime: 1 } }] })
 	let other = sessions.create({ cwd: home, name: 'Neighbor' }).id
 	history.append(other, { type: 'file_changes', cwd: home, toolId: 'other', files: [{ path: 'a.txt', before: null, after: blob('neighbor\n') }] })
 	let server = {} as any
-	let route = `http://localhost${changes.href(id)}`
+	let route = `http://localhost/${id}/changes.json`
 	expect((await web.fetch(new Request(route), server))!.status).toBe(401)
 	let token = webAuth.redeem(webAuth.issue())
 	if (!('token' in token)) throw new Error('login failed')
-	let response = await web.fetch(new Request(route, { headers: { cookie: `hal=${token.token}` } }), server)
-	let html = await response!.text()
-	expect(html).toContain('&#60;script&#62;')
-	expect(html).not.toContain('<script>alert')
-	expect(html).toContain(other)
-	expect(html).toContain('metadata only')
-	expect((await changesPage.serve(new URL(route + '?path=/etc/passwd'), web.css())).status).toBe(404)
+	let get = async (url: string) => (await web.fetch(new Request(url, { headers: { cookie: `hal=${token.token}` } }), server))!
+	let list = await (await get(route)).json()
+	expect(list.files.map((f: any) => f.counts)).toEqual(['+1 -1', 'metadata only (sensitive, large or non-regular file)'])
+	let file = await (await get(`${route}?path=${encodeURIComponent(`${home}/a.txt`)}`)).json()
+	expect(file.diff).toContain('+<script>alert(1)</script>')
+	expect(file.others.map((s: any) => s.id)).toEqual([other])
+	expect((await get(`${route}?path=/etc/passwd`)).status).toBe(404)
+	let moved = await get(`http://localhost/changes/${id}?path=x`)
+	expect([moved.status, moved.headers.get('location')]).toEqual([301, `/${id}/changes?path=x`])
 })
 
 test('/changes lists a file once with the cards of the calls that changed it, never provider ids', async () => {

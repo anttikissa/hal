@@ -238,9 +238,13 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let url = new URL(req.url)
 	let { pathname } = url
 	let get = req.method === 'GET'
-	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname) || changesPage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
-	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req, srv.requestIP(req)?.address)
-	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
+	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
+	let app = get && (pathname === '/' || session.isId(pathname.slice(1)) || changesPage.isApp(pathname))
+	if (get && url.searchParams.has('auth') && (blob || app)) return web.linkLogin(url, req, srv.requestIP(req)?.address)
+	if (app) return web.page()
+	let moved = get && changesPage.redirect(url)
+	if (moved) return moved
+	let changesData = get && changesPage.owns(pathname)
 	if (get && pathname === '/budget') return new Response('Spawn budget\n\nbN means N spawn slots left in this session. Each subagent spawn, fresh or forked, costs one slot from its owner and every owner ancestor. A zero count anywhere in that chain prevents spawning. Slots are not returned.\n\nSPAWN limit sets the child’s budget, at most its owner’s slots left minus one. Promised slots are not paid upfront: siblings compete for their ancestors’ remaining slots.\n\n/budget shows this session’s count. /budget N sets only this count; ancestors still limit spending. Only the user may change it.\n\nNew sessions and model-opened interactive tabs start with config.ason subagentSlots (default 3); interactive tabs are free. /fork copies the current count and starts an independent tree sharing its origin’s history.\n', { headers: { 'content-type': 'text/plain; charset=utf-8' } })
 	if (get && pathname === '/manifest.webmanifest') return new Response(JSON.stringify({ name: 'Hal', short_name: 'Hal', start_url: '/', scope: '/', display: 'standalone', background_color: '#141a26', theme_color: '#141a26', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
 	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } })
@@ -258,12 +262,13 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let check = pathname === '/login' && get
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
 	let composerDebug = pathname === '/composer-debug' && req.method === 'POST' && settings.composerDebug()
-	if (!check && !blob && pathname !== '/ws' && !diagnostic && !composerDebug) return new Response('not found\n', { status: 404 })
+	if (!check && !blob && !changesData && pathname !== '/ws' && !diagnostic && !composerDebug) return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
 	if (blob && demoPage.owns(pathname)) return demoPage.serve(pathname, web.css())
-	if (blob) return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : changesPage.owns(pathname) ? changesPage.serve(url, web.css()) : web.blob(pathname)
+	if (blob) return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : web.blob(pathname)
+	if (changesData) return changesPage.serve(url)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 	if (diagnostic) return webDiagnostics.receive(req)

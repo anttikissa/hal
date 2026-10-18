@@ -125,7 +125,7 @@ function calls(id: string, file: ChangedFile): { block: string; href: string }[]
 }
 
 function href(id: string, path?: string): string {
-	return `/changes/${id}${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`
+	return `/${id}/changes${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`
 }
 
 export const changes = { state: { cache: new Map<string, { size: number; files: ChangedFile[] }>() }, collect, list, run, diff, counts, committed, time, shown, calls, href }

@@ -42,7 +42,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : (info.color ?? hi) }])
 	out.push([{ text: ansi.clean(info.model.startsWith('hal/') ? info.model : titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: titles.budget(info.slots ?? settings.subagentSlots()).replace(/^(?=.)/, ' '), href: '/budget' }])
 	let s = info.stats
-	if (s?.files) out.push([{ text: `${s.files} file${s.files === 1 ? '' : 's'}`, href: `/changes/${info.id}` }])
+	if (s?.files) out.push([{ text: `${s.files} file${s.files === 1 ? '' : 's'}`, href: `/${info.id}/changes` }])
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
 		let fg = colors.heat(pct)

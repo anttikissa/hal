@@ -1,54 +1,58 @@
-// Authenticated read-only pages; request paths never name host files.
-import { changes } from './changes.ts'
+// The changes window's data (task ahr): authenticated read-only JSON;
+// ?path= selects only a recorded file, never an arbitrary host file.
+import { changes, type ChangedFile } from './changes.ts'
 import { clients } from './clients.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 
-function escape(s: string): string { return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`) }
-function owns(path: string): boolean { return /^\/changes\/\d+-[a-z]{3}$/.test(path) }
+const data = /^\/(\d+-[a-z]{3})\/changes\.json$/
+const moved = /^\/changes\/(\d+-[a-z]{3})$/
 
-async function serve(url: URL, css: string): Promise<Response> {
-	let id = url.pathname.slice('/changes/'.length)
+function owns(path: string): boolean { return data.test(path) }
+// /<id>/changes is the app's own address; /changes/<id> is the old one.
+function isApp(path: string): boolean { return /^\/\d+-[a-z]{3}\/changes$/.test(path) }
+function redirect(url: URL): Response | undefined {
+	let id = moved.exec(url.pathname)?.[1]
+	if (id) return new Response(null, { status: 301, headers: { location: `/${id}/changes${url.search}` } })
+}
+
+function json(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+}
+
+async function row(id: string, file: ChangedFile, cwd: string, timeZone?: string) {
+	let diff = await changes.diff(id, file.before, file.after)
+	return { path: file.path, shown: changes.shown(file, cwd), counts: changes.counts(diff), time: changes.time(file.ts, timeZone), calls: changes.calls(id, file), diff }
+}
+
+async function serve(url: URL): Promise<Response> {
+	let id = data.exec(url.pathname)![1]!
 	let all = sessions.list()
-	if (!all.some((s) => s.id === id)) return new Response('not found\n', { status: 404 })
+	let session = all.find((s) => s.id === id)
+	if (!session) return json({ error: 'not found' }, 404)
+	let selected = url.searchParams.get('path')
+	let cwd = sessions.open(id).cwd, timeZone = clients.timezone(id)
+	if (selected === null) {
+		await pages.slices(pages.catchUp(id))
+		let files = []
+		for (let file of changes.list(id)) {
+			let { diff: _, ...rest } = await row(id, file, cwd, timeZone)
+			files.push(rest)
+		}
+		return json({ id, name: session.meta?.name, files })
+	}
 	// Catch every session's marks up in slices first: after an upgrade that
 	// rebuilds marks, a synchronous catch-up of the whole home would stall.
 	for (let s of all) if (!s.error) await pages.slices(pages.catchUp(s.id))
-	let files = changes.list(id)
-	let selected = url.searchParams.get('path')
-	if (selected !== null && !files.some((f) => f.path === selected)) return new Response('not found\n', { status: 404 })
-	let neighbors = all.filter((s) => s.id !== id).map((s) => {
+	let file = changes.list(id).find((f) => f.path === selected)
+	if (!file) return json({ error: 'not found' }, 404)
+	let others = all.filter((s) => s.id !== id).flatMap((s) => {
 		if (s.error) throw new Error(s.error)
-		return { id: s.id, name: s.meta?.name, paths: new Set(changes.list(s.id).map((f) => f.path)) }
+		return changes.list(s.id).some((f) => f.path === file.path) ? [{ id: s.id, name: s.meta?.name }] : []
 	})
-	let sections: string[] = []
-	let cwd = sessions.open(id).cwd, timeZone = clients.timezone(id)
-	for (let file of files.filter((f) => selected === null || f.path === selected)) {
-		let diff = await changes.diff(id, file.before, file.after)
-		let commit = await changes.committed(id, file)
-		let others = neighbors.filter((s) => s.paths.has(file.path)).map((s) => `<a href="${changes.href(s.id, file.path)}">${escape(s.id + (s.name ? `: ${s.name}` : ''))}</a>`)
-		let steps: string[] = []
-		for (let step of file.steps) {
-			let c = step.change
-			let text = await changes.diff(id, c.before, c.after)
-			let block = step.call === undefined ? 'Call' : `<a href="/${id}#t${step.call}">t${step.call}</a>`
-			steps.push(`<details><summary>${block} · ${escape(changes.time(step.ts, timeZone))}</summary><pre>${escape(text)}</pre></details>`)
-		}
-		let ids = changes.calls(id, file).map((c) => `<a href="${c.href}">${c.block}</a>`).join(' ')
-		sections.push(`<section><h2><a href="${changes.href(id, file.path)}">${escape(changes.shown(file, cwd))}</a></h2><p>${escape(changes.counts(diff))}  ${escape(changes.time(file.ts, timeZone))}${ids ? `  ${ids}` : ''}${commit ? ` · committed in ${commit}` : ''}</p>${others.length ? `<p>Also observed by ${others.join(', ')}</p>` : ''}<pre>${escape(diff)}</pre><h3>Steps per call</h3>${steps.join('')}</section>`)
-	}
-	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} changes</title><style>${css}
-body { margin: 0; background: var(--canvas); color: var(--text); font: 16px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-main { padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-a { color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
-nav { display: flex; flex-wrap: wrap; gap: 16px; }
-nav a, summary { min-height: 44px; display: inline-flex; align-items: center; }
-summary { cursor: pointer; overflow-wrap: anywhere; }
-section { margin-top: 24px; border-top: 3px solid currentColor; }
-h1, h2 { font-size: 20px; overflow-wrap: anywhere; }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="${changes.href(id)}">All changes (${files.length} file${files.length === 1 ? '' : 's'})</a></nav><h1>${id} · file changes</h1><p>Files this session declared and changed. Commits do not clear this list.</p>${sections.join('') || '<p>No file changes since the last /changes clear.</p>'}</main></body></html>`
-	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" } })
+	let steps = []
+	for (let step of file.steps) steps.push({ block: step.call === undefined ? undefined : `t${step.call}`, time: changes.time(step.ts, timeZone), diff: await changes.diff(id, step.change.before, step.change.after) })
+	return json({ ...(await row(id, file, cwd, timeZone)), commit: await changes.committed(id, file), others, steps })
 }
 
-export const changesPage = { owns, serve }
+export const changesPage = { owns, isApp, redirect, serve }

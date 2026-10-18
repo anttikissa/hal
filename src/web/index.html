@@ -546,6 +546,55 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .Picker li:has(> a) { padding-block: 0; }
   .Picker .close { min-width: 44px; min-height: 44px; }
 }
+/* Changes window (task ahr): file list beside the diff; one pane at a
+   time below 50rem. Neutral like the transcript (.plain): only the
+   diff is colored. */
+.Changes { width: calc(var(--app-width, 100vw) - 2rem); max-width: 110rem; height: calc(var(--app-height, 100dvh) - 2rem); max-height: none; padding: 0; --line: color-mix(in oklab, currentColor 25%, transparent); --pick: color-mix(in oklab, currentColor 14%, transparent); border: 1px solid var(--line); overflow: hidden; }
+.Changes[open] { display: flex; flex-direction: column; }
+.Changes::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
+.Changes .quiet { color: var(--quiet); }
+.Changes .add { color: var(--add-fg); --sel-back: var(--add-fg); }
+.Changes .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
+.Changes .top { flex: none; display: flex; align-items: center; gap: 1ch; padding: 0 0 0 1ch; border-bottom: 1px solid var(--line); }
+.Changes .top .title { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Changes .top button { min-width: 44px; min-height: 44px; background: none; color: inherit; }
+.Changes .refused { flex: none; margin: 0; padding: 0.5lh 1ch; color: var(--error-fg); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.Changes .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(16rem, 22rem) 1fr; }
+.Changes .files { overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); }
+.Changes .files ul { margin: 0; padding: 0; list-style: none; }
+.Changes .files a { display: flex; flex-direction: column; justify-content: center; min-height: 44px; padding: 0.25lh 1ch; color: inherit; text-decoration: none; }
+.Changes .files .path, .Changes .file h2, .Changes .top .title { color: var(--title-fg); }
+.Changes .files .path { overflow-wrap: anywhere; }
+.Changes .files li[aria-current] a { background: var(--pick); }
+@media (hover: hover) and (pointer: fine) { .Changes .files li:not([aria-current]) a:hover { background: color-mix(in oklab, currentColor 7%, transparent); } }
+.Changes .files p, .Changes .file > p { margin: 0; padding: 0.5lh 1ch; }
+.Changes .file { min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.Changes .file header { padding: 0.5lh 1ch; border-bottom: 1px solid var(--line); }
+.Changes .file h2 { margin: 0; font-size: inherit; font-weight: 500; overflow-wrap: anywhere; }
+.Changes .file header p { margin: 0; }
+.Changes .links { display: flex; flex-wrap: wrap; align-items: center; column-gap: 1.5ch; }
+.Changes .links a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; overflow-wrap: anywhere; }
+@media (pointer: fine) { .Changes .links a { min-height: 0; } }
+.Changes .lines { display: grid; grid-template-columns: auto auto 2ch 1fr; padding-block: 0.25lh; }
+.Changes .line { display: contents; }
+.Changes .line > span { padding-inline: 0.5ch; }
+.Changes .line .no { color: var(--quiet); text-align: right; user-select: none; }
+.Changes .line .sign { user-select: none; padding: 0; text-align: center; }
+.Changes .line .text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; padding-right: 1ch; }
+.Changes .line.add > span { background: color-mix(in oklab, var(--add-fg) 10%, transparent); color: var(--add-fg); }
+.Changes .line.del > span { background: color-mix(in oklab, var(--remove-fg) 10%, transparent); color: var(--remove-fg); }
+.Changes .line.hunk > span, .Changes .line.note > span { color: var(--quiet); }
+.Changes .line.hunk > .text, .Changes .line.note > .text { grid-column: 1 / -1; padding: 0.5lh 1ch 0.25lh; }
+.Changes .line.hunk > .no, .Changes .line.hunk > .sign, .Changes .line.note > .no, .Changes .line.note > .sign { display: none; }
+.Changes .file h3 { margin: 0; padding: 0.5lh 1ch 0.25lh; font-size: inherit; font-weight: 500; border-top: 1px solid var(--line); }
+.Changes details > summary { min-height: 44px; display: flex; align-items: center; gap: 1ch; padding-inline: 1ch; cursor: pointer; }
+@media (max-width: 50rem) {
+  .Changes { width: calc(var(--app-width, 100vw) - 1rem); height: calc(var(--app-height, 100dvh) - 1rem); }
+  .Changes .body { grid-template-columns: 1fr; }
+  .Changes .files { border-right: none; }
+  .Changes.picked .files, .Changes:not(.picked) .file { display: none; }
+}
+@media (pointer: coarse) { .Changes { position: fixed; top: calc(var(--app-top, 0px) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); margin: 0; width: calc(var(--app-width, 100vw) - 1rem); height: calc(var(--app-height, 100dvh) - 1rem); } }
 /* Tabs (tasks 3k, ce): one row with native momentum scrolling between
    narrow secondary chevrons; menu and new-tab stay fixed. Equal cell
    widths are set by Tabs.tsx. The shown tab's

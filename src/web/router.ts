@@ -41,10 +41,24 @@ const store = {
 	},
 }
 
-// The session id the address names, if it names one.
+// The session id the address names, if it names one: /<id>, or
+// /<id>/changes with the changes window open over it (task ahr).
 function parse(url: string): string | undefined {
-	let id = new URL(url).pathname.slice(1)
+	let id = new URL(url).pathname.slice(1).replace(/\/changes$/, '')
 	return session.isId(id) ? id : undefined
+}
+
+// The changes window the address opens: its session and selected file.
+function changes(url: string): { id: string; path?: string } | undefined {
+	let u = new URL(url)
+	let id = /^\/([^/]+)\/changes$/.exec(u.pathname)?.[1]
+	if (!id || !session.isId(id)) return undefined
+	let path = u.searchParams.get('path')
+	return path === null ? { id } : { id, path }
+}
+
+function changesHref(id: string, path?: string): string {
+	return `/${id}/changes${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`
 }
 
 // Whether the address is the app's own (/ or /<id>), not a file such
@@ -72,11 +86,12 @@ function pick(tabs: Tab[], wanted: string | undefined, before: Tab[] = []): stri
 
 // The address now names `id` (and `block`, task 4qh): a new history
 // entry, or with `replace` the current one rewritten. Nothing if it
-// already does.
+// already does. Another tab's address leaves the changes window.
 function go(id: string, replace: boolean, block?: string): void {
 	let url = new URL(router.href())
 	if (router.parse(url.href) === id && (!block || url.hash === `#${block}`)) return
+	url.searchParams.delete('path')
 	router.write(`${router.format(id)}${url.search}${block ? `#${block}` : ''}`, replace)
 }
 
-export const router = { href, write, store, parse, isApp, format, pick, go }
+export const router = { href, write, store, parse, changes, changesHref, isApp, format, pick, go }

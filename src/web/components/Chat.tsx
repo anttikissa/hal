@@ -21,6 +21,7 @@ import { Composer } from './Composer.tsx'
 import { EditBar } from './EditBar.tsx'
 import { Notices } from './Notices.tsx'
 import { Picker } from './Picker.tsx'
+import { Changes } from './Changes.tsx'
 import { Rebase } from './Rebase.tsx'
 import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
@@ -209,6 +210,7 @@ export function Chat() {
 			<EditBar view={view()} />
 			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} dropping={dropping()} />
 			<Picker modal={view().modal} />
+			<Changes shown={shown()} />
 			<Rebase />
 		</div>
 	)
