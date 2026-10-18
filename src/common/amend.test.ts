@@ -98,7 +98,7 @@ test('unchanged edits continue without sending, and older targets respect side e
 	expect(amend.step(earlier, t, 1)?.original).toBe('two')
 	t.items.push({ type: 'tool', key: '4', id: 't1', name: 'command', input: { command: '/rename Title' } })
 	expect(amend.at(t, '1')!.editing.changed).toBe(false)
-	t.items.push({ type: 'tool', key: '5', id: 't2', name: 'write', input: { path: 'x' } })
+	t.items.push({ type: 'tool', key: '5', id: 't2', name: 'edit', input: { path: 'x' } })
 	let changed = amend.at(t, '1')!.editing
 	expect(amend.enter(changed, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: 'uno' })
 	expect(amend.hint(changed, 'uno')).toContain('enter: send as new')

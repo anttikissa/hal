@@ -58,7 +58,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 }
 
 // Each tool's mark (task b3k); tools without one show their name.
-const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', read_entry: '<', edit: '>', write: '>', send: 'To', wait: '…', notify: '!', spawn: 'Spawn', stop: 'x', help: '?', inspect: '?' }
+const marks: Record<string, string> = { bash: '$', read: '<', read_url: '<', read_blob: '<', read_entry: '<', edit: '>', send: 'To', wait: '…', notify: '!', spawn: 'Spawn', stop: 'x', help: '?', inspect: '?' }
 
 function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
@@ -122,9 +122,6 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		}
 		case 'notify':
 			if (str('text')) return { text: marked(str('text')!), key: 'text' }
-			break
-		case 'write':
-			if (str('path')) return { text: marked(str('path')!), key: 'path' }
 			break
 		// The files it changes; the purpose and diff open below (task ese).
 		case 'edit': {

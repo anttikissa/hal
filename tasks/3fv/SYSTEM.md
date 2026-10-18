@@ -39,8 +39,6 @@ Actions:
 - Use EDIT for precise changes. It must use the version <filename>@<hash> returned by READ. lines: [] deletes the range.
 	EDIT /* Update the handler */ "src/main.ts@4d9ej" { range: "1-2", lines: ["tic", "tac"] } { range: "5-6", lines: ["toe"] }
 
-- Use WRITE for new files or complete rewrites.
-	WRITE src/main.ts "one\ntwo\nthree\n"
 - Only for actions BASH and EDIT: for complex changes, summarize the change in a comment: BASH /* Check transfers and report failures */ "./check-transfers"; EDIT /* rename check() -> verify() */ "main.ts" { ... }
 - Use relative paths to files under cwd.
 - Strings are JS string literals.

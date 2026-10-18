@@ -104,7 +104,4 @@ test('multiline and invalid headline fields remain in expanded call details', ()
 		['spawn', { name: 'First\nSecond', task: 'Work' }, 'name: First\n  Second'],
 		['inspect', { scope: 'all', fields: 'name,\nmodel' }, 'fields: name,\n  model'],
 	] as const) expect(toolDetails.lines(name, input).join('\n')).toContain(detail)
-	let write = { content: 'new file', path: 'created.txt' }
-	expect(toolDetails.headline('write', write).text).toBe('> created.txt')
-	expect(toolDetails.lines('write', write)).toEqual(['content: new file'])
 })

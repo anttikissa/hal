@@ -2,7 +2,7 @@
 	title: 'Expire edit hints and reconcile informed sessions quietly',
 	spec: `Neighbor edit notices are short-lived activity hints, not file ownership. Restored invariant: a reader told that a neighbor modified files hears once when that declaration ends, however long it was idle; a reader that missed the activity hears nothing stale.
 
-A modifies declaration is active for the lifetime of its tool call (bash, EDIT, WRITE, background jobs alike) and for one minute after it ends. A server writing its declared server.log stays declared until its job exits. Turn ends (answer, question, pause, error) neither free nor extend declarations.
+A modifies declaration is active for the lifetime of its tool call (bash, EDIT, background jobs alike) and for one minute after it ends. A server writing its declared server.log stays declared until its job exits. Turn ends (answer, question, pause, error) neither free nor extend declarations.
 
 Before each model request, a reader in the same cwd hears declared files whose Unix mtime is less than one minute old, whoever changed them: [08-mom (Study cache) modified src/a.ts, src/b.ts <1min ago]. Declared files not modified within the minute are assumed unmodified and not told. Each file is told once while declared; newly modified declared files use the same wording. When told files are no longer declared, the reader hears the shorter of "is no longer editing X" and "is still editing only Y"; when nothing told remains, "is no longer editing files". Lines list at most 5 paths, then N more. Only mtime is checked: no hashes or file kinds.
 
