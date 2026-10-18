@@ -15,7 +15,19 @@ function init(): void {
 		diagnostics.report()
 	}
 	scroll.onTrace = (why, gap, wheel) => trace(why, gap === undefined ? 'scroll' : 'pulled', gap, wheel === undefined ? undefined : { delta: Math.abs(wheel), up: wheel < 0 })
-	scroll.onPin = (why, from) => trace(why, 'pin', undefined, { from: Math.max(0, from) })
+	// Debug marker (desktop): green while following the bottom, red for
+	// 8 s after following ends, so the moment is noticed.
+	let mark = document.body.appendChild(document.createElement('div')), fade: ReturnType<typeof setTimeout> | undefined
+	mark.className = 'ScrollMark'
+	let show = (why?: string) => {
+		clearTimeout(fade)
+		let on = scroll.state.pinned
+		mark.className = `ScrollMark ${on ? 'heat-0' : why ? 'heat-100' : ''}`
+		mark.textContent = on ? 'following bottom' : why ? `left bottom: ${why}` : 'not following'
+		if (!on && why) fade = setTimeout(show, 8000)
+	}
+	show()
+	scroll.onPin = (why, from) => { trace(why, 'pin', undefined, { from: Math.max(0, from) }); show(why) }
 	let stuck = 0, previous = ''
 	setInterval(() => {
 		let st = scroll.state, el = st.el

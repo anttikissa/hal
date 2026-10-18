@@ -268,6 +268,10 @@ html.typing .App { position: absolute; }
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
+/* Opt-in scroll-follow debug marker (web/drift.ts, task 981), desktop only. */
+.ScrollMark { position: fixed; top: 2lh; right: 1ch; z-index: 3; padding: 0.25lh 1ch; border-left: 3px solid; background: var(--overlay-bg); pointer-events: none; }
+.ScrollMark.heat-0, .ScrollMark.heat-100 { font-weight: bold; background: color-mix(in oklab, var(--heat) 20%, var(--overlay-bg)); }
+@media (pointer: coarse) { .ScrollMark { display: none; } }
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
 .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); }
