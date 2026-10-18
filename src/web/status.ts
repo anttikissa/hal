@@ -63,7 +63,7 @@ function groups(st: ViewState): StatusGroup[] {
 		{ parts: [{ text: meta.cwd }], path: true },
 		{ parts: [{ text: titles.modelLabel(meta.model, stats?.effort, true) }] },
 	]
-	if (stats?.files) out.push({ parts: [{ text: `${stats.files} files` }], href: `/changes/${meta.id}` })
+	if (stats?.files) out.push({ parts: [{ text: `${stats.files} file${stats.files === 1 ? '' : 's'}` }], href: `/changes/${meta.id}` })
 	let pct = status.context(st)
 	if (stats?.window) out.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, pct!, { text: ')' }], href: `/context/${meta.id}` })
 	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })

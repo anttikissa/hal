@@ -47,7 +47,7 @@ summary { cursor: pointer; overflow-wrap: anywhere; }
 section { margin-top: 24px; border-top: 3px solid currentColor; }
 h1, h2 { font-size: 20px; overflow-wrap: anywhere; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="${changes.href(id)}">All changes (${files.length} files)</a></nav><h1>${id} · file changes</h1><p>Files this session declared and changed. Commits do not clear this list.</p>${sections.join('') || '<p>No file changes since the last /changes clear.</p>'}</main></body></html>`
+</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="${changes.href(id)}">All changes (${files.length} file${files.length === 1 ? '' : 's'})</a></nav><h1>${id} · file changes</h1><p>Files this session declared and changed. Commits do not clear this list.</p>${sections.join('') || '<p>No file changes since the last /changes clear.</p>'}</main></body></html>`
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" } })
 }
 
