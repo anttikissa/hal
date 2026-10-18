@@ -1,13 +1,13 @@
 // Hookable prompt assembly from one input snapshot (tasks ar, q5g, ftg).
 
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'fs'
-import { dirname, isAbsolute, relative, resolve, sep } from 'path'
+import { existsSync, readdirSync, realpathSync } from 'fs'
+import { dirname, resolve } from 'path'
 import { settings } from '../common/settings.ts'
 import { clients } from './clients.ts'
 import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
-import { promptTemplate, type PromptRender, type PromptSource } from './prompt-template.ts'
-export type { PromptSource } from './prompt-template.ts'
+import { promptLang, type PromptRender, type PromptSource } from './prompt-lang.ts'
+export type { PromptSource } from './prompt-lang.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
 function date(now: number, timeZone: string): string {
@@ -45,43 +45,10 @@ function skills(cwd: string): string {
 		try {
 			names = readdirSync(dir).filter((name) => existsSync(`${dir}/${name}/SKILL.md`)).sort()
 		} catch {}
-		if (names.length) groups.push(names.length === 1 ? `${dir}/${names[0]}` : `${dir}/{${names.join(',')}}`)
+		let shown = paths.display(dir)
+		if (names.length) groups.push(names.length === 1 ? `${shown}/${names[0]}` : `${shown}/{${names.join(',')}}`)
 	}
 	return groups.length ? `Skills - read <dir>/SKILL.md when appropriate: ${groups.join(' ')}` : ''
-}
-
-function read(path: string): string | undefined {
-	try {
-		return readFileSync(path, 'utf8')
-	} catch {
-		return undefined
-	}
-}
-
-// Claude Code compatible imports (task d2j): a line that is only @path
-// becomes that file's text when its real path lies inside the project
-// root; anything else stays verbatim, so a repo cannot pull in ~/.ssh.
-// The project-boundary test stays (system-prompt.test.ts). The rest was
-// tested once, then the tests were deleted. If you change this code,
-// first write tests for: a nested in-project import expands; a missing
-// file, a cycle's closing line and an inline @ stay verbatim.
-function imports(file: string, text: string, root: string, sources?: PromptSource[], chain = [file]): string {
-	return text.split('\n').map((line) => {
-		let name = /^\s*@(\S+)\s*$/.exec(line)?.[1]
-		if (!name) return line
-		let target: string
-		try {
-			target = realpathSync(resolve(dirname(file), name))
-		} catch {
-			return line
-		}
-		let rel = relative(root, target)
-		if (!rel || rel.split(sep)[0] === '..' || isAbsolute(rel) || chain.includes(target)) return line
-		let body = read(target)
-		if (body === undefined) return line
-		sources?.push({ path: target, bytes: Buffer.byteLength(body) })
-		return imports(target, body.trim(), root, sources, [...chain, target])
-	}).join('\n')
 }
 
 function agents(cwd: string, sources?: PromptSource[]): string {
@@ -92,14 +59,11 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 	} catch {}
 	for (let dir of dirs) {
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
-			let path = `${dir === '/' ? '' : dir}/${name}`, text = read(path)
-			if (text === undefined) continue
-			sources?.push({ path, bytes: Buffer.byteLength(text) })
-			let real = path
-			try {
-				real = realpathSync(path)
-			} catch {}
-			parts.push(`<file path="${path}">\n${imports(real, text.trim(), root, sources)}\n</file>`)
+			let path = `${dir === '/' ? '' : dir}/${name}`
+			if (!existsSync(path)) continue
+			let missing: string[] = [], text = promptLang.render(path, {}, sources, missing, undefined, { root })
+			if (missing.length) continue
+			parts.push(`<file path="${path}">\n${text}\n</file>`)
 			break
 		}
 	}
@@ -107,17 +71,15 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 }
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
-	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
 	let timezone = (input.sessionId ? clients.timezone(input.sessionId) : undefined) ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 	let vars = {
 		date: date(input.now, timezone), timezone,
 		session_id: input.sessionId ?? '', session_cwd: paths.display(input.cwd), session_model: input.model,
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
 		session_interactive: String(input.interactive ?? true), session_autoclose: String(input.autoclose ?? false),
-		hal_dir: paths.display(paths.repoRoot()), hal_home: paths.home(), hal_web_url: settings.webUrl(),
-		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
+		hal_src: paths.display(paths.repoRoot()), hal_home: paths.display(paths.home()), hal_web_url: settings.webUrl(),
 		subagent: input.owner ? 'true' : 'false', subagent_owner: input.owner ?? '',
-		subagent_slots: String(input.slots ?? settings.subagentSlots()),
+		spawn_budget: String(input.slots ?? settings.subagentSlots()),
 		fork: input.parent ? 'true' : 'false', fork_parent: input.parent ?? '',
 		user_notes: input.noUser ? 'false' : 'true', other_tools: nativeTool.summary(),
 		skills: systemPrompt.skills(input.cwd),
@@ -130,11 +92,11 @@ export type PromptInput = { cwd: string; model: string; now: number; sessionId?:
 function build(input: PromptInput, problems?: string[]): string {
 	return systemPrompt.assemble(input, undefined, problems)
 }
-function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[]; sections: PromptRender['sections'] } {
+function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[]; sections: PromptRender['sections']; vars: PromptRender['vars'] } {
 	let sources: PromptSource[] = [], problems: string[] = [], rendered: PromptRender = { sections: [] }
 	let text = systemPrompt.assemble({ ...input, rendered }, sources, problems)
 	let shift = text.indexOf(rendered.text ?? text)
-	if (shift >= 0) return { sources, text, problems, sections: rendered.sections.map((s) => s.body.trim() ? { ...s, start: s.start + shift, end: s.end + shift } : s) }
+	if (shift >= 0) return { sources, text, problems, vars: rendered.vars, sections: rendered.sections.map((s) => s.body.trim() ? { ...s, start: s.start + shift, end: s.end + shift } : s) }
 	// A hook changed the text (task vd9). An intact section keeps its text;
 	// a changed one runs from its heading to the next later heading or
 	// unchanged text between sections. A missing heading withdraws it.
@@ -150,12 +112,12 @@ function inspect(input: PromptInput): { sources: PromptSource[]; text: string; p
 		from = at + body.length
 		return [{ ...s, body, start, end: from }]
 	})
-	return { sources, text, problems, sections }
+	return { sources, text, problems, vars: rendered.vars, sections }
 }
 
 export const systemPrompt = {
 	file: () => systemFile,
-	preprocess: (...args: Parameters<typeof promptTemplate.render>) => promptTemplate.render(...args),
+	preprocess: (...args: Parameters<typeof promptLang.render>) => promptLang.render(...args),
 	skills,
 	agents,
 	candidates,

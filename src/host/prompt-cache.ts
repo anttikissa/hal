@@ -60,7 +60,7 @@ import { models } from './models.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt, type PromptInput } from './system-prompt.ts'
-import type { PromptSection } from './prompt-template.ts'
+import type { PromptSection } from './prompt-lang.ts'
 import { textDiff } from './text-diff.ts'
 import { warnings } from './warnings.ts'
 

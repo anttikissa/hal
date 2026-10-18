@@ -1,0 +1,10 @@
+{
+	title: 'prompt-lang: $-operands, ==/!=/like, &&, plain mode, /system vars',
+	spec: 'src/host/prompt-lang.ts (renamed from prompt-template.ts; export promptLang) holds the system prompt language and its full reference in its opening comment; SYSTEM.md has only short examples and the variable list (defined in assemble(), shown by /system vars). Conditions: operands are $variables or "quoted text"; $x alone is false when empty, 0, false, no or off (any case), else true; !$x negates (only before a variable); $a == $b and $a != $b compare exactly; $a like "glob" matches * and ?; join with &&; anything else, including the old key="glob" form, is an error. No || or grouping until a prompt needs them. Comments do not nest: a stray --> or unclosed <!-- is an error. AGENTS.md/CLAUDE.md use render() plain mode (options.root): only whole-line @path inside the project root expands; everything else stays verbatim; this replaces system-prompt.ts imports(). Variables: $hal_src (source checkout, ~ form), $hal_home (~ form; differs only with --home), $spawn_budget (was subagent_slots); $hal_inside_src removed; $skills paths use ~. SYSTEM.md Session shows Hal source, and Hal home only when it differs. /system vars prints the rendered vars (multi-line values as byte counts), also when SYSTEM.md is broken, and completes "vars". SYSTEM.local.md is gitignored.',
+	status: 'done',
+	notes: [
+		'Hal re-reads SYSTEM.md on every build, so syntax changes to the parser must land (host restart) before SYSTEM.md uses them; otherwise every session reports SYSTEM.md is broken and keeps its last good prompt.'
+	],
+	needs: ['q5'],
+	foldInto: ['q5', 'ftg']
+}

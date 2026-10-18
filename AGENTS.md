@@ -1,22 +1,21 @@
 # Git
 
-Commit automatically, except while iterating on colors: commit once the
-user settles on one. Wrap commit messages at 72 columns. End with these
-trailers (Task only when applicable):
+Commit when work is settled. While iterating with the user (colors,
+layout, wording), commit only once results are satisfactory.
+
+Wrap commit messages at 72 columns. End with these trailers (Task
+only when applicable):
 
     Task: <id>
     Implemented by: <model id, e.g. anthropic/claude-opus-5-5>
     Session: <session id, e.g. 157-cms>
 
-Pull and push frequently: two hosts share work through GitHub. Set
-pull.rebase=true and rebase.autoStash=true. When multiple agents share a
-checkout, use --no-autostash and never stash others' changes. Rebase
-only when that checkout is clean and no other agent is editing it.
+Pull and push frequently. Set pull.rebase=true and rebase.autoStash=true.
+If others are working, use --no-autostash; never stash others' changes.
+Rebase only when that checkout is clean and no other agent is editing it.
 
-Use worktrees only read-only: to test your work when others' uncommitted
-edits break ./test, or to run or inspect another revision. Never commit
-in a worktree. Don't claim you have fixed something unless that commit
-sits in the directory Hal host runs from.
+Work is not done until its commit lands on main in the Hal source directory.
+Commits in a worktree do not count.
 
 # Tasks
 
@@ -62,8 +61,8 @@ will run in parallel." This is good guidance even though some commands
 will not run in parallel. It maximizes parallelism; the result is
 equivalent, but faster.
 
-When changing SYSTEM.md or this project's AGENTS.md on your own
-initiative, mark each change with an adjacent
+Guidance for all projects goes to SYSTEM.md. Mark each change to SYSTEM.md
+or Hal's AGENTS.md that the user has not approved with an adjacent
 `<!-- TODO - to be reviewed by a human -<current session id> -->` comment.
 
 # Security

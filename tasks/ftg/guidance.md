@@ -12,7 +12,7 @@ first-message prose.
   work and greeting eligibility. Existing sessions need no migration or
   compatibility code; old ownership links may be lost or interpreted as fork
   origins, which the user accepts.
-- Expose subagent role/kind, owner, fork status, parent, subagent_slots,
+- Expose subagent role/kind, owner, fork status, parent, spawn_budget,
   autoclose, cwd, date, model including effort, and agents to the template.
 - Ordinary /fork remains available to models. Keep SPAWN fork mode too; revisit
   only if experience warrants it, not as a preemptive restriction.
@@ -22,7 +22,7 @@ first-message prose.
 Top-level guidance says:
 
 > Spawn subagents according to user preferences. You have a /budget of
-> $subagent_slots - ask user for more if task demands it.
+> $spawn_budget - ask user for more if task demands it.
 
 Move the current spawn guidance and subagent first-message guidance into
 SYSTEM.md, including kinds, questions, SEND/WAIT, concise final handoff, and

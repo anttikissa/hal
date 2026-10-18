@@ -21,7 +21,7 @@ const notes = (id: string) => history.readSync(id).filter((r) => r.type === 'not
 const prepare = (id: string, now = 1000) => promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: sessions.open(id).model, now })
 
 test('delivered print prompts rebuild interactive guidance; queued prompts wait and UI prompts restore it', async () => {
-	writeFileSync(file, ':: if session_interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	writeFileSync(file, ':: if $session_interactive == "true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
 	let c = client(), id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: 'watched' })
 	await until(() => calls.length === 1)
@@ -43,7 +43,7 @@ test('delivered print prompts rebuild interactive guidance; queued prompts wait 
 })
 
 test('unattended child task and compaction preserve inherited interaction mode', async () => {
-	writeFileSync(file, ':: if session_interactive="true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
+	writeFileSync(file, ':: if $session_interactive == "true"\nBASH /* Explain */ "true"\n:: else\nBASH "true"\n::')
 	let parent = sessions.create({ cwd: testHome(), model: 'fake/m1', interactive: false }).id
 	let child = subagents.spawn(parent, { kind: 'subagent', task: 'check unattended behavior', fork: false, cwd: testHome(), limit: 0 })
 	await until(() => calls.length === 1)

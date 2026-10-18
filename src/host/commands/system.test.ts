@@ -15,7 +15,7 @@ test('/system names included source files and prints the same assembled prompt a
 	let now = clock.now
 	try {
 		systemPrompt.file = () => `${testHome()}/SYSTEM.md`
-		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if session_model="fake/*"\nSelected.\n:::\n$agents')
+		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if $session_model like "fake/*"\nSelected.\n:::\n$agents')
 		clock.now = () => Date.UTC(2026, 8, 28, 20)
 		let id = created(c, `${testHome()}/repo`)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
@@ -27,7 +27,7 @@ test('/system names included source files and prints the same assembled prompt a
 		expect(output).toContain('Included text: fake/m1')
 		expect(output).toContain('Stay in scope.')
 		expect(output).toContain('<!-- hidden -->')
-		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if session_model="fake/*"\nUnclosed')
+		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if $session_model like "fake/*"\nUnclosed')
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
 		await until(() => c.of('output').at(-1)?.error)
 		expect(c.of('output').at(-1).text).toMatch(/SYSTEM.md:1: unclosed/)
