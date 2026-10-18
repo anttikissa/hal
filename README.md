@@ -84,7 +84,7 @@ automatically.
 Open a tab with ctrl-t, close with ctrl-w, browse with ctrl-n/p. If
 you've ever used [an IRC client](https://irssi.org/) (or a web
 browser), the keybindings will feel familiar. Closed a tab you didn't
-want to? Resume it with ctrl-shift-t, or /resume <tab-id>.
+want to? Resume it with ctrl-shift-t, or `/resume <tab-id>`.
 
 Subagents are also tabs (of course) with the "autoclose" property on;
 if you interfere with the minion's meddlings, autoclose will be turned
