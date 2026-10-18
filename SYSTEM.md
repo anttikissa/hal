@@ -228,12 +228,11 @@ Hal's home (USER.md, plugins/): $hal_home
 $skills
 ::
 
-<!-- ~/.agents/AGENTS.md: global instructions (Cline's convention), first.
-$agents: one instruction file per directory from the git root down to
-cwd, outermost first (cwd alone outside git). Each directory contributes
-AGENTS.md, or CLAUDE.md when it has no AGENTS.md. Changing cwd re-reads them. -->
+<!-- $agents: the global ~/.agents/AGENTS.md (Cline's convention), then one
+instruction file per directory from the git root down to cwd, outermost
+first (cwd alone outside git). Each directory contributes AGENTS.md, or
+CLAUDE.md when it has no AGENTS.md. Changing cwd re-reads them. -->
 :: section "Local instructions" update="diff"
-@?~/.agents/AGENTS.md
 $agents
 ::
 

@@ -1,6 +1,6 @@
 {
 	title: 'Global ~/.agents/AGENTS.md instructions',
-	spec: 'SYSTEM.md includes ~/.agents/AGENTS.md, when it exists, at the start of the Local instructions section, before the project AGENTS.md files: global before project, like their outermost-first order. Cline reads the same path; no global instructions path is standard yet. The include is unlabeled, unlike project files in file tags, to keep it one line.',
+	spec: 'Local instructions start with the global ~/.agents/AGENTS.md, when it exists, before the project AGENTS.md files: global before project, like their outermost-first order. Cline reads the same path; no global instructions path is standard yet. The global file is wrapped in a file tag like project files, and its imports stay inside ~/.agents. It is read from paths.userHome(), so tests never read the user file.',
 	status: 'done',
 	needs: ['ctt'],
 	foldInto: ['ctt']

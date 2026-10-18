@@ -53,21 +53,23 @@ function skills(cwd: string): string {
 	return groups.length ? `Skills - read <dir>/SKILL.md when appropriate: ${groups.join(' ')}` : ''
 }
 
+// The global ~/.agents/AGENTS.md first, then project files outermost first.
+// Each file's imports stay inside its own root.
 function agents(cwd: string, sources?: PromptSource[]): string {
 	let parts: string[] = []
+	let include = (path: string, root: string) => {
+		let missing: string[] = [], text = promptLang.render(path, {}, sources, missing, undefined, { root })
+		if (!missing.length) parts.push(`<file path="${path}">\n${text}\n</file>`)
+	}
+	let global = `${paths.userHome()}/.agents`
+	if (existsSync(`${global}/AGENTS.md`)) include(`${global}/AGENTS.md`, global)
 	let dirs = systemPrompt.candidates(cwd), root = dirs[0]!
 	try {
 		root = realpathSync(root)
 	} catch {}
 	for (let dir of dirs) {
-		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
-			let path = `${dir === '/' ? '' : dir}/${name}`
-			if (!existsSync(path)) continue
-			let missing: string[] = [], text = promptLang.render(path, {}, sources, missing, undefined, { root })
-			if (missing.length) continue
-			parts.push(`<file path="${path}">\n${text}\n</file>`)
-			break
-		}
+		let path = ['AGENTS.md', 'CLAUDE.md'].map((name) => `${dir === '/' ? '' : dir}/${name}`).find((p) => existsSync(p))
+		if (path) include(path, root)
 	}
 	return parts.join('\n\n')
 }
