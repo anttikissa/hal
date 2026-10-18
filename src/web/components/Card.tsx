@@ -233,7 +233,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	// A mouse click toggles after 200 ms, so a double-click can select a
-	// word instead; keyboard activation (detail 0) toggles at once.
+	// word instead; keyboard activation (detail 0) toggles at once. The
+	// second press cancels it, since a double-click-drag clicks only on release.
 	let pending: ReturnType<typeof setTimeout> | undefined
 	let toggle = (e: MouseEvent) => {
 		clearTimeout(pending)
@@ -358,7 +359,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', tall() ? 'tall' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle} onPointerEnter={measure}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), bashResult.background(props.row.item) ? 'background-result' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() ? 'open' : '', tall() ? 'tall' : '', props.cursor ? 'streaming' : '', props.target ? 'target' : '']} onClick={toggle} onPointerEnter={measure} onMouseDown={(e) => e.detail > 1 && clearTimeout(pending)}>
 					<CardHeader icon={kindIcon()} prefix={shellPrompt()} time={time()} name={canToggle() ? head() ?? titles.who(props.row.item) ?? 'Card' : undefined} open={expanded()} label={headerLabel()} hidden={closable() && !expanded() ? titles.hidden(props.row.item) : 0} peek={peek()} result={statusResult()} bash={bash()} allExits={background()} limit={limit()} lines={outputLines()} reference={reference()} activity={activity()}
 						actions={<>{editButton()}{sendButton()}{discardButton()}{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job t${n()} (/kill t${n()})`} aria-label={`Kill background job t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}>
 						<Show when={props.cursor && !open()}>{cursor()}</Show>
