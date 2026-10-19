@@ -6,7 +6,8 @@
 		'At planning time frame.ts had 417 lines, built by tasks cc, b3, sj, 1r, 1w, nn, 2r, rw, w4, 6f, kv and et. Obvious seams then: modal compositing (withModal, modalBox; task kv), forms rendering (formLines; w4), per-item transcript rendering and styling (paint, toolStyle; 1w). Check they still are.',
 		'Prompt editing tasks (1x, 8m) and terminal tabs (7w, vq) will add prompt-box and tab-bar rendering next; leave room for them rather than filling one new module to 399 lines.',
 		'Cut made: ansi.ts (escape constants, sgr, paint, clean, wrap), item-view.ts (item rows and styles, quoteLines, resultRows), form-view.ts (formLines, fieldLines), prompt-view.ts (layoutPrompt, prompt markers FIRST/REST and mark), modal-view.ts (box, border, list, overlay, withModal); frame.ts keeps View, Frame and build. Only frame.build is used outside; tests go through it, with form and modal tests in form-view.test.ts and modal-view.test.ts. Prompt-box rendering belongs in prompt-view.ts, a tab bar in a new module.',
-		'Bug fix 2026-10-15: modalView.overlay ends each row with RESET. sliceVisual drops the underlying row closing UNCOLOR, so a card background stayed active and the renderer next erased rows (CSI 2K) in it: stale purple rows after closing Ctrl-O. Invariant: every frame row ends with no background active.'
+		'Bug fix 2026-10-15: modalView.overlay ends each row with RESET. sliceVisual drops the underlying row closing UNCOLOR, so a card background stayed active and the renderer next erased rows (CSI 2K) in it: stale purple rows after closing Ctrl-O. Invariant: every frame row ends with no background active.',
+		'Transcript layout (layout, Past, reused-history and ordering memos) lives in src/client/frame-layout.ts (frameLayout); frame tests split into frame-links.test.ts and frame-prompt.test.ts with frame-fixture.test.ts (task drz).'
 	],
 	needs: ['0j'],
 	foldInto: [
