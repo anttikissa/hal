@@ -46,7 +46,7 @@ export const tool: Tool = {
 				type: 'integer',
 				minimum: 0,
 				description:
-					'Child spawn budget; default 0, at most this session’s slots left minus 1. Each subagent spawn costs one slot from this session and every owner ancestor. Interactive sessions are free and use the configured budget.',
+					'Child spawn budget; default 0, at most this session’s slots left minus 1. Each subagent spawn costs one slot from this session and every ancestor. Interactive sessions are free and use the configured budget.',
 			},
 		},
 	},

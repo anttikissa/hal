@@ -99,14 +99,14 @@ test('section changes freeze the system and combine whole/diff updates, removals
 test('forks inherit the frozen prefix and cache identity while role and effort updates follow it', async () => {
 	writeFileSync(
 		file,
-		':: section "Role"\n$subagent_owner $fork_parent\n::\n:: section "Model" update="diff"\n$session_model\n::',
+		':: section "Role"\n$subagent_parent $forked_from\n::\n:: section "Model" update="diff"\n$session_model\n::',
 	)
 	let parent = created(client(), testHome())
 	history.submit(parent, 'original prompt')
 	let initial = prepare(parent)
 	let prefix = replay.toMessages(history.readSync(parent))
 	let child = sessions.create({ cwd: testHome(), model: 'fake/m1' }).id
-	sessions.open(child).owner = parent
+	sessions.open(child).parent = parent
 	subagents.fork(parent, child)
 	let next = prepare(child, 2000)
 	expect(next).toEqual(initial)

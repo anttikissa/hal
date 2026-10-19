@@ -56,7 +56,7 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	})
 	let k = await callWith('fix the bug')
 	let child = tabs.file().open[1]!
-	expect(sessions.open(child)).toMatchObject({ owner: p, spawn: 'subagent', name: 'fixer', slots: 0 })
+	expect(sessions.open(child)).toMatchObject({ parent: p, spawn: 'subagent', name: 'fixer', slots: 0 })
 	// Its first prompt comes from the parent and names it.
 	let first = calls[k]!.input.messages
 	expect(first).toHaveLength(1)
@@ -259,7 +259,7 @@ test('a blank interactive session opens next to its parent and does nothing', as
 	await until(() => calls.length === 2)
 	let child = tabs.file().open[1]!
 	expect(sessions.open(child)).toMatchObject({ spawn: 'interactive', slots: 3 })
-	expect(sessions.open(child).owner).toBeUndefined()
+	expect(sessions.open(child).parent).toBeUndefined()
 	expect(sessions.open(p).slots).toBe(3)
 	expect(status.stateOf(child).type).toBe('idle')
 	expect(history.readSync(child)).toEqual([])
@@ -327,8 +327,8 @@ test('automatic reports and unrelated senders do not answer a delegated question
 	})
 	let k = await callWith('clarify ownership')
 	let child = tabs.file().open[1]!
-	calls[k]!.push({ type: 'text', text: '<question>Which owner?</question>' }, { type: 'done', reason: 'end' })
-	let woke = await callWith('Which owner?', k + 1)
+	calls[k]!.push({ type: 'text', text: '<question>Which parent?</question>' }, { type: 'done', reason: 'end' })
+	let woke = await callWith('Which parent?', k + 1)
 	// A report can come from the parent when the sessions delegate to one another.
 	prompts.submit(child, 'automatic report', undefined, 'steer', { from: p, advisory: true })
 	prompts.submit(child, 'unrelated answer', undefined, 'soft-steer', { from: 'other', advisory: true })

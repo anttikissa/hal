@@ -1,0 +1,10 @@
+{
+	title: 'Separate delegation parent from fork origin',
+	spec: 'Session delegation uses parent and parentCall; fork provenance uses forkedFrom. Prompt variables are subagent_parent and forked_from. Prompts, tools, settings, metadata validation and existing tests use these terms without changing runtime behavior. Parent relationships govern reports, questions, waits, stopping and budgets; fork provenance grants none of these. Existing session relationships are preserved through an external one-time migration, with no compatibility or migration code retained in the codebase. No additional tests. This supersedes the owner/parent naming in ftg.',
+	status: 'done',
+	notes: [
+		'Existing affected suites: 88 tests pass; TypeScript passes. Full normal run: 1643 pass, two timeouts (plugin-sync-session and turns), a repository-wide size-limit failure, and lint warnings outside this rename. User approved bypassing the size hook for this rename rather than splitting prompts.ts. Cached prompt.ason input carries the same relationship fields as session.ason and must be included in the external data migration.'
+	],
+	needs: ['ftg'],
+	foldInto: ['ftg']
+}

@@ -33,7 +33,7 @@ const table: Setting[] = [
 		type: { kind: 'integer', min: 0, max: Number.MAX_SAFE_INTEGER },
 		default: 3,
 		description:
-			'Spawn slots for new sessions. Each subagent costs one slot from its owner and every owner ancestor; /budget changes only the current session.',
+			'Spawn slots for new sessions. Each subagent costs one slot from its parent and every ancestor; /budget changes only the current session.',
 		browser: true,
 	},
 	{

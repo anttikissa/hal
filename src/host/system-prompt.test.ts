@@ -17,7 +17,7 @@ afterEach(() => {
 const at = new Date(2026, 8, 26, 1, 52).getTime()
 
 test('execution guidance follows interaction mode, not subagent kind or autoclose', () => {
-	let input = { cwd: root, model: 'm/x', now: at, noUser: true, owner: '01-abc', kind: 'subagent', autoclose: true }
+	let input = { cwd: root, model: 'm/x', now: at, noUser: true, parent: '01-abc', kind: 'subagent', autoclose: true }
 	let interactive = systemPrompt.inspect(input)
 	expect(interactive.text).toContain('BASH /*')
 	expect(interactive.sections.find((s) => s.title === 'BASH')?.body).toContain('so user messages')

@@ -35,8 +35,8 @@ async function background(self: string, gate: string, unsafe = false) {
 	return started.ref
 }
 
-function owned(owner: string, name: string, limit = 0, callId?: string) {
-	return subagents.spawn(owner, {
+function owned(parent: string, name: string, limit = 0, callId?: string) {
+	return subagents.spawn(parent, {
 		kind: 'subagent-leave-open',
 		task: name,
 		name,
@@ -114,7 +114,7 @@ test('STOP walks owned descendants, leaves unrelated sessions and tabs intact, a
 	let before = [...tabs.file().open]
 	await invoke(unrelated, `SEND ${child} "coordinate this work" { delivery: "emergency" }`).promise
 	await until(() => calls.length === 4)
-	expect(sessions.open(child).owner).toBe(root)
+	expect(sessions.open(child).parent).toBe(root)
 	let result = await invoke(root, `STOP ${root}`).promise
 	expect(result.isError).toBeUndefined()
 	for (let id of [root, child, grandchild]) expect(status.stateOf(id).type).toBe('paused')
@@ -134,7 +134,7 @@ test('STOP a recorded SPAWN call cancels its child, not siblings, and WAIT expos
 	let root = toolSession(client())
 	let spawned = invoke(root, 'SPAWN { task: "first child", kind: "subagent-leave-open" }')
 	expect((await spawned.promise).isError).toBeUndefined()
-	let child = sessions.openIds().find((id) => sessions.open(id).ownerCall === Number(spawned.ref.slice(1)))!
+	let child = sessions.openIds().find((id) => sessions.open(id).parentCall === Number(spawned.ref.slice(1)))!
 	let sibling = owned(root, 'sibling')
 	let waiting = invoke(root, `WAIT ${child}`).promise
 	await until(() => work.listeners.size === 1)
@@ -213,7 +213,7 @@ test('Escape exposes surviving subagents without stopping them or leaving a WAIT
 		{ type: 'done', reason: 'tool_use' },
 	)
 	await until(() => work.listeners.size === 1)
-	let child = sessions.openIds().find((id) => sessions.open(id).owner === self)!
+	let child = sessions.openIds().find((id) => sessions.open(id).parent === self)!
 	c.conn.send({ type: 'pause', sessionId: self })
 	await until(() => work.listeners.size === 0)
 	let notice = c.of('output').find((e) => e.text.includes('Still running'))!.text

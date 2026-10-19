@@ -107,7 +107,7 @@ function choose(text: string, previous?: string, timezone?: string): string {
 
 function open(id: string, timezone = clients.timezone(id)): void {
 	let meta = sessions.open(id)
-	if ((meta.owner && meta.spawn !== 'interactive') || history.readSync(id).length) return
+	if ((meta.parent && meta.spawn !== 'interactive') || history.readSync(id).length) return
 	if (meta.model === 'hal/tool') {
 		let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')
 		slash.output(id, toolModel.welcome, false, undefined, true)

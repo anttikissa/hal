@@ -201,12 +201,12 @@ function create(cwd: string, after?: string, autoclose = false, interactive = tr
 	return id
 }
 
-// A child is owned only while doing its owner's work; a human's later
-// prompt in a leave-open subagent belongs to the human, not its old owner.
+// A child is owned only while doing its parent's work; a human's later
+// prompt in a leave-open subagent belongs to the human, not its parent.
 function stopOwned(id: string): void {
 	for (let child of sessions.openIds()) {
 		let meta = sessions.open(child)
-		if (meta.owner === id && meta.spawn !== 'interactive' && subagents.owed(child, history.readSync(child)))
+		if (meta.parent === id && meta.spawn !== 'interactive' && subagents.owed(child, history.readSync(child)))
 			tabs.stopOwned(child)
 	}
 	jobs.kill(id)

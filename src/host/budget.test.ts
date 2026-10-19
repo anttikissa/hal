@@ -11,8 +11,8 @@ import { client, toolSession, useHost } from './host-fixture.test.ts'
 
 useHost()
 
-const spawn = (owner: string, limit: number, fork = false) =>
-	subagents.spawn(owner, { kind: 'subagent-leave-open', task: '', fork, cwd: '/tmp', limit })
+const spawn = (parent: string, limit: number, fork = false) =>
+	subagents.spawn(parent, { kind: 'subagent-leave-open', task: '', fork, cwd: '/tmp', limit })
 
 test('siblings share ancestor slots without paying their promised budgets upfront', () => {
 	let c = client(),
@@ -57,13 +57,13 @@ test('interactive spawns are free and ordinary forks copy the count into an inde
 	let root = toolSession(client())
 	sessions.open(root).slots = 0
 	let interactive = subagents.spawn(root, { kind: 'interactive', task: '', fork: true, cwd: '/tmp', limit: 99 })
-	expect(sessions.open(interactive)).toMatchObject({ parent: root, slots: settings.subagentSlots() })
-	expect(sessions.open(interactive).owner).toBeUndefined()
+	expect(sessions.open(interactive)).toMatchObject({ forkedFrom: root, slots: settings.subagentSlots() })
+	expect(sessions.open(interactive).parent).toBeUndefined()
 	expect(sessions.open(root).slots).toBe(0)
 	command.run('2', undefined, slash.context(root))
 	let copy = forks.create(root)
-	expect(sessions.open(copy)).toMatchObject({ parent: root, slots: 2 })
-	expect(sessions.open(copy).owner).toBeUndefined()
+	expect(sessions.open(copy)).toMatchObject({ forkedFrom: root, slots: 2 })
+	expect(sessions.open(copy).parent).toBeUndefined()
 	spawn(copy, 1)
 	expect(sessions.open(copy).slots).toBe(1)
 	expect(sessions.open(root).slots).toBe(2)

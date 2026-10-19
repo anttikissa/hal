@@ -1,7 +1,7 @@
 // Sessions spawned by sessions (task t0): the spawn and wait tools
 // (src/host/tools/) and what the host does for them. A spawned session
-// sits in the tab after its owner's and gets its task as a message from
-// its owner (task rj). Reports go back to the owner (task mt);
+// sits in the tab after its parent's and gets its task as a message from
+// its parent (task rj). Reports go back to the parent (task mt);
 // autoclose owns tab closure and human promotion (task p87).
 
 import { cpSync, existsSync, writeFileSync } from 'fs'
@@ -41,10 +41,10 @@ export type Spawn = {
 }
 
 // Opens the child and starts its first turn; returns its id. Throws,
-// spending nothing, when an owner ancestor has too few slots left or the
+// spending nothing, when a parent ancestor has too few slots left or the
 // child's model is rate limited on every account (it would only wait).
-function spawn(owner: string, s: Spawn): string {
-	let meta = sessions.open(owner)
+function spawn(parent: string, s: Spawn): string {
+	let meta = sessions.open(parent)
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
 	let limited = auth.limitedUntil(selected.id)
 	if (limited)
@@ -57,8 +57,8 @@ function spawn(owner: string, s: Spawn): string {
 		let left = meta.slots ?? settings.subagentSlots()
 		if (s.limit > left - 1)
 			throw new Error(`limit ${s.limit} needs at least ${s.limit + 1} spawn slots, but this session has ${left} left`)
-		for (let at: SessionMeta | undefined = meta; at; at = at.owner ? sessions.open(at.owner) : undefined) {
-			if (charged.includes(at)) throw new Error(`owner cycle at ${at.id}`)
+		for (let at: SessionMeta | undefined = meta; at; at = at.parent ? sessions.open(at.parent) : undefined) {
+			if (charged.includes(at)) throw new Error(`parent cycle at ${at.id}`)
 			if ((at.slots ?? settings.subagentSlots()) === 0) throw new Error(`session ${at.id} has 0 spawn slots left`)
 			charged.push(at)
 		}
@@ -68,54 +68,54 @@ function spawn(owner: string, s: Spawn): string {
 		model: models.qualified(selected.id, selected.effort),
 		name: s.name,
 		autoclose: s.kind === 'subagent',
-		interactive: promptCache.interactive(owner),
+		interactive: promptCache.interactive(parent),
 	})
 	Object.assign(child, {
-		...(s.kind !== 'interactive' && { owner, slots: s.limit }),
+		...(s.kind !== 'interactive' && { parent, slots: s.limit }),
 		spawn: s.kind,
 	} satisfies Partial<SessionMeta>)
-	if (child.owner && s.callId) {
+	if (child.parent && s.callId) {
 		let call = history
-			.readSync(owner)
+			.readSync(parent)
 			.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === s.callId)
-		if (call?.n !== undefined) child.ownerCall = call.n
+		if (call?.n !== undefined) child.parentCall = call.n
 	}
-	if (s.fork) subagents.fork(owner, child.id)
+	if (s.fork) subagents.fork(parent, child.id)
 	liveFiles.save(child)
 	for (let ancestor of charged) {
 		ancestor.slots = (ancestor.slots ?? settings.subagentSlots()) - 1
 		liveFiles.save(ancestor)
 		host.broadcast(ancestor.id, { type: 'meta', sessionId: ancestor.id, meta: { ...ancestor } })
 	}
-	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id, clients.timezone(owner))
-	let at = tabs.file().open.indexOf(owner)
+	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id, clients.timezone(parent))
+	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
 	tabs.publish()
 	let text = s.task
 	if (text.trim()) {
-		let refused = prompts.submit(child.id, text, undefined, 'steer', { from: owner, label: tabs.label(owner) })
+		let refused = prompts.submit(child.id, text, undefined, 'steer', { from: parent, label: tabs.label(parent) })
 		if (refused) throw new Error(`${child.id} did not start: ${refused}`)
 	}
 	return child.id
 }
 
-// Gives the child the parent's history so far: its records as they
-// are, without the parent's waiting inbox. The parent's turn is still
+// Gives the fork the source's history so far: its records as they
+// are, without the source's waiting inbox. The source's turn is still
 // running this round's calls, so the copy answers them and ends it.
-function fork(parent: string, child: string): void {
+function fork(from: string, child: string): void {
 	let records = replay
-		.current(history.readSync(parent))
+		.current(history.readSync(from))
 		.filter((r) => r.type !== 'inbox')
-		.map((r) => ({ ...r, originSession: r.originSession ?? parent }))
+		.map((r) => ({ ...r, originSession: r.originSession ?? from }))
 	writeFileSync(history.file(child), records.map((r) => lines.encode(r)).join(''))
-	let source = sessions.open(parent),
+	let source = sessions.open(from),
 		target = sessions.open(child)
-	target.parent = parent
-	target.interactive = promptCache.interactive(parent)
+	target.forkedFrom = from
+	target.interactive = promptCache.interactive(from)
 	if (source.startingState) target.startingState = { ...source.startingState }
 	liveFiles.save(target)
-	promptCache.inherit(parent, child)
-	if (existsSync(blobs.dir(parent))) cpSync(blobs.dir(parent), blobs.dir(child), { recursive: true })
+	promptCache.inherit(from, child)
+	if (existsSync(blobs.dir(from))) cpSync(blobs.dir(from), blobs.dir(child), { recursive: true })
 	let pending: string[] = []
 	for (let r of records) {
 		if (r.type === 'turn_end' || r.type === 'user') {
@@ -124,13 +124,13 @@ function fork(parent: string, child: string): void {
 		}
 		if (r.type === 'assistant' && r.block.type === 'tool_call') pending.push(r.block.id)
 	}
-	let output = `Not run here: copied from ${parent} while it was still running there.`
+	let output = `Not run here: copied from ${from} while it was still running there.`
 	if (pending.length)
 		history.append(child, {
 			type: 'user',
 			blocks: pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output })),
 		})
-	history.append(child, { type: 'output', text: `Forked from ${parent}. Everything above happened there.` })
+	history.append(child, { type: 'output', text: `Forked from ${from}. Everything above happened there.` })
 	let last = records.findLast(
 		(r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue' || r.type === 'turn_end',
 	)
@@ -151,22 +151,22 @@ function fork(parent: string, child: string): void {
 	if (Object.keys(changed).length) history.append(child, { type: 'change', ...changed, previous })
 }
 
-// The owner's subagents still at work: what wait waits for.
-function running(owner: string): string[] {
+// The parent's subagents still at work: what wait waits for.
+function running(parent: string): string[] {
 	return sessions.openIds().filter((id) => {
 		let meta = sessions.open(id)
-		return meta.owner === owner && meta.spawn !== 'interactive' && states.busy(status.stateOf(id))
+		return meta.parent === parent && meta.spawn !== 'interactive' && states.busy(status.stateOf(id))
 	})
 }
 
-// Whether the session's last turn reports to its owner: the owner
+// Whether the session's last turn reports to its parent: the parent
 // started it (its first task or a later message), or continued work of
 // one it started (a continue, or a turn woken by the session's own
 // subagent or background command). A human's prompt or another session's starts work that
 // reports nothing.
 function owed(id: string, records: HistoryRecord[]): boolean {
-	let owner = sessions.open(id).owner
-	if (!owner) return false
+	let parent = sessions.open(id).parent
+	if (!parent) return false
 	let owned = false
 	let reports = false
 	let starts = true
@@ -185,21 +185,21 @@ function owed(id: string, records: HistoryRecord[]): boolean {
 			let first = r.blocks.find((b) => b.type === 'text')
 			if (!first) continue
 			starts = false
-			if (first.from === owner) owned = reports = true
+			if (first.from === parent) owned = reports = true
 			else if (first.origin === 'model') reports = owned
 			else if (first.from === undefined) owned = reports = false
-			else reports = owned && (first.from === id || sessions.open(first.from).owner === id)
+			else reports = owned && (first.from === id || sessions.open(first.from).parent === id)
 		}
 	}
 	return reports
 }
 
-// After a subagent's turn ended: its owner hears how, as an advisory
-// message from it, so no owner waits for a child that stopped. A turn
+// After a subagent's turn ended: its parent hears how, as an advisory
+// message from it, so no parent waits for a child that stopped. A turn
 // ended by wait is not over yet: its subagents' reports go on with it.
 function report(id: string): void {
 	let meta = sessions.open(id)
-	if (!meta.owner || !meta.spawn || meta.spawn === 'interactive') return
+	if (!meta.parent || !meta.spawn || meta.spawn === 'interactive') return
 	let records = history.readSync(id)
 	let end = records.at(-1)
 	if (end?.type !== 'turn_end' || (end.status === 'completed' && end.reason === 'tool_use')) return
@@ -216,7 +216,7 @@ function report(id: string): void {
 				? last.block.text
 				: `Session ${label} finished without a message`
 	}
-	let owner = meta.owner
+	let parent = meta.parent
 	subagents.delivering.add(id)
 	let settled = () => {
 		subagents.delivering.delete(id)
@@ -224,9 +224,9 @@ function report(id: string): void {
 	}
 	let deliver = () => {
 		try {
-			// A child stopped by tab close must not wake an idle, now unseen owner.
-			if (tabs.file().closed.some((tab) => tab.id === owner) && !tabs.file().open.includes(owner)) return
-			let refused = prompts.submit(owner, text, undefined, 'steer', {
+			// A child stopped by tab close must not wake an idle, now unseen parent.
+			if (tabs.file().closed.some((tab) => tab.id === parent) && !tabs.file().open.includes(parent)) return
+			let refused = prompts.submit(parent, text, undefined, 'steer', {
 				from: id,
 				label,
 				advisory: true,
@@ -235,15 +235,15 @@ function report(id: string): void {
 					? { report: summary.asks(text) ? ('question' as const) : ('summary' as const) }
 					: {}),
 			})
-			if (refused) diag.log(`report ${id} to ${owner}: ${refused}`)
+			if (refused) diag.log(`report ${id} to ${parent}: ${refused}`)
 		} finally {
 			settled()
 		}
 	}
-	let ready = host.ready(owner)
+	let ready = host.ready(parent)
 	if (!ready) return deliver()
 	ready.then(deliver, (e) => {
-		diag.log(`report ${id} to ${owner}: ${e?.message ?? e}`)
+		diag.log(`report ${id} to ${parent}: ${e?.message ?? e}`)
 		settled()
 	})
 }

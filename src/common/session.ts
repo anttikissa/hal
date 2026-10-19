@@ -24,9 +24,9 @@ export interface SessionMeta {
 	// Close after a successful final turn once no work remains (task p87).
 	autoclose?: boolean
 	interactive?: boolean
-	owner?: string
-	ownerCall?: number
 	parent?: string
+	parentCall?: number
+	forkedFrom?: string
 	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
 	spawn?: SpawnKind
 	// Spawn slots left; omitted uses the configured allowance.

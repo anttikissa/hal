@@ -101,11 +101,11 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		hal_src: paths.display(paths.repoRoot()),
 		hal_home: paths.display(paths.home()),
 		hal_web_url: settings.webUrl(),
-		subagent: input.owner ? 'true' : 'false',
-		subagent_owner: input.owner ?? '',
+		subagent: input.parent ? 'true' : 'false',
+		subagent_parent: input.parent ?? '',
 		spawn_budget: String(input.slots ?? settings.subagentSlots()),
-		fork: input.parent ? 'true' : 'false',
-		fork_parent: input.parent ?? '',
+		fork: input.forkedFrom ? 'true' : 'false',
+		forked_from: input.forkedFrom ?? '',
 		user_notes: input.noUser ? 'false' : 'true',
 		other_tools: nativeTool.summary(),
 		skills: systemPrompt.skills(input.cwd),
@@ -121,8 +121,8 @@ export type PromptInput = {
 	sessionId?: string
 	noUser?: boolean
 	interactive?: boolean
-	owner?: string
 	parent?: string
+	forkedFrom?: string
 	slots?: number
 	autoclose?: boolean
 	rendered?: PromptRender

@@ -68,24 +68,24 @@ function submit(
 	sender?: Sender,
 ): string | undefined {
 	let call = commands.parse(text)
-	// A command (/model, /pause) is not a prompt: the tab stays the owner's.
+	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
 	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	text = literal.strip(text)
 	let state = status.stateOf(id)
 	// Automatic reports never answer a question. A deliberate soft-steer
-	// from the owner of delegated work does (kar); emergencies bypass it (zb0).
+	// from the parent of delegated work does (kar); emergencies bypass it (zb0).
 	let agent = sender?.from !== undefined || sender?.origin === 'model'
 	let emergency = agent && delivery === 'steer' && sender?.advisory !== true
 	let asked = notify.asked(id)
-	let ownerAnswer =
+	let parentAnswer =
 		asked &&
 		delivery === 'soft-steer' &&
 		sender?.from !== undefined &&
-		sender.from === sessions.open(id).owner &&
+		sender.from === sessions.open(id).parent &&
 		sessions.open(id).spawn !== 'interactive' &&
 		subagents.owed(id, history.readSync(id))
-	let waitingAnswer = agent && !emergency && !ownerAnswer && asked
+	let waitingAnswer = agent && !emergency && !parentAnswer && asked
 	let queue = delivery === 'queue'
 	let interrupt = !queue && !waitingAnswer && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.

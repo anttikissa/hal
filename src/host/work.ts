@@ -54,7 +54,7 @@ function children(t: Target): Target[] {
 	if (t.call && t.call.name !== 'spawn') return []
 	return sessions.openIds().flatMap((id) => {
 		let meta = sessions.open(id)
-		if (meta.owner !== t.sessionId || meta.spawn === 'interactive' || (t.n !== undefined && meta.ownerCall !== t.n))
+		if (meta.parent !== t.sessionId || meta.spawn === 'interactive' || (t.n !== undefined && meta.parentCall !== t.n))
 			return []
 		return [{ sessionId: id, ref: id }]
 	})
