@@ -101,7 +101,7 @@ test('a stream that throws still ends the turn and frees the session', async () 
 	await until(() => calls.length === 1)
 })
 
-const milk = `== READ notes.txt@${fileText.hash(Buffer.from('remember the milk\n'))} ==\n1: remember the milk`
+const milk = `== notes.txt@${fileText.hash(Buffer.from('remember the milk\n'))} ==\n1: remember the milk`
 
 test('a tool call runs on the host and the turn continues with its result', async () => {
 	let a = client()
