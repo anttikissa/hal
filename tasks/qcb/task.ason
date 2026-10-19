@@ -1,0 +1,7 @@
+{
+	title: 'EDIT expands ~ and names missing files',
+	spec: 'EDIT paths expand a leading ~ to the home directory, as READ and GREP do. A version given for a file that does not exist fails as "<path>: no such file (<absolute path>)", never as a stale version. Restored invariant: a path READ accepts is the same file to EDIT, and EDIT reports the actual failure.',
+	status: 'done',
+	needs: [],
+	foldInto: ['aaj']
+}
