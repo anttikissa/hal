@@ -162,3 +162,32 @@ development. A plugin written against 0.0.1 might not work on 0.0.2.
 
 Drop a plugin into ~/.hal/plugins (or wherever your $hal_home is) and
 it will be automatically loaded.
+
+## Request a redraw
+
+After changing local rendering state, call
+`rendering.requestRedraw(reason)`. It refreshes this process's UI using
+loaded code and current state. It does nothing before UI initialization
+or in a headless process; it does not notify remote clients, sync plugins,
+or reload code. Browser wiring is not implemented yet.
+
+A plugin's hooks take effect during setup. On removal, Hal restores its
+hooks and overrides before running its returned cleanup, so both redraws
+below see the updated colors:
+
+```ts
+import { colors } from '../src/common/colors.ts'
+import { rendering } from '../src/common/rendering.ts'
+import type { Plugin } from '../src/host/plugins.ts'
+
+export default (plugin: Plugin) => {
+    plugin.set(colors, 'fgL', 0.9)
+    rendering.requestRedraw('theme applied')
+    return () => rendering.requestRedraw('theme removed')
+}
+```
+
+For a complete theme, see [themes/hal.ts](themes/hal.ts) or the shared
+[theme helper](src/common/theme-palette.ts). Unrelated plugin changes do
+not request redraw. Terminal-specific code may still call
+`terminal.redraw()` directly.

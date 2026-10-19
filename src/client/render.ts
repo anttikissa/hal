@@ -26,6 +26,7 @@
 //   a plugin observes each one, with why, by hooking it.
 
 import { titles } from '../common/titles.ts'
+import { rendering } from '../common/rendering.ts'
 import { ansi } from './ansi.ts'
 import { frame, type Frame, type Past, type View } from './frame.ts'
 import { terminal } from './terminal.ts'
@@ -346,9 +347,9 @@ function park(): void {
 function init(out: Output | null = terminal.state.io): void {
 	if (render.state.out || !out) return
 	render.state.out = out
-	// Never while suspended: the shell has the terminal (a plugin's
-	// onChange may call it any time).
+	// Never while suspended: the shell has the terminal.
 	terminal.redraw = (trigger = 'a redraw request') => void (terminal.state.suspended || render.draw(true, trigger))
+	rendering.requestRedraw = (reason) => terminal.redraw(reason)
 	terminal.onResize = () => render.draw(true, 'a terminal resize')
 	terminal.park = () => render.park()
 }

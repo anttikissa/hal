@@ -42,7 +42,7 @@ function toolStyle(name: string): Style {
 
 // A style's text and title colors, without its background.
 function bare({ fg, title }: Style): Style {
-	return { fg, title }
+	return { ...(fg === undefined ? {} : { fg }), ...(title === undefined ? {} : { title }) }
 }
 
 // A result keeps its originating tool's background and output color,

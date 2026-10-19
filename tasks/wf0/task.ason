@@ -1,0 +1,10 @@
+{
+	title: 'Omit absent colors from bare item styles',
+	spec: 'src/client/item-view.ts bare() preserves the defined foreground and title colors while omitting absent fields and the background. Restored invariant: every present field in Style contains an Oklch tuple, never undefined. Optional theme fields remain optional without type assertions or a weaker Style type.',
+	status: 'done',
+	notes: [
+		'Full tsc --noEmit exposed TS2322 in the existing bare helper. Conditional field spreads preserve optional colors without undefined-valued Style entries. Verified full typecheck, 7 item-view tests and changed-file lint.'
+	],
+	needs: ['3d3'],
+	foldInto: ['3d3']
+}

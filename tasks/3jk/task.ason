@@ -1,0 +1,10 @@
+{
+	title: 'Shared local redraw requests for rendering plugins',
+	spec: 'src/common/rendering.ts exports rendering.requestRedraw(reason: string): void, a local UI refresh request with a no-op default before UI initialization and in headless processes. Terminal renderer initialization connects it to terminal.redraw(reason), preserving suspension handling. Shared theme helpers and all shipped themes request redraw after applying colors and in returned cleanup after the loader restores hooks. Terminal-specific redraw callers remain direct. Restored invariant: shared theme code imports no terminal runtime code; unrelated plugin lifecycle changes do not cause redraw. The request uses loaded code and current state, sends no network messages, and does not reload code or synchronize plugins. Browser rendering wiring, live web themes and server-driven UI slots remain deferred. README plugin authoring guidance explains the local scope, setup/cleanup ordering, and reason argument with a working example and links to the actual theme helper; the Plugin API points authors to that guidance. Keep the implementation to one shared request function and renderer wiring, without an event bus.',
+	status: 'done',
+	notes: [
+		'Current loader contract is task 90v: hooks apply immediately and are restored before returned cleanup. Older task an mentions onChange/unload, but those APIs no longer exist. render.init connects the request after installing terminal.redraw, preserving suspension behavior. Verified 54 focused plugin/theme/render/layer tests, changed-source lint, and all 16 shipped themes through actual renderer output on setup and cleanup; headless and suspended requests emitted nothing. Full typecheck passes after wf0. No new timers, subscriptions, network traffic or growing state; each explicit request uses the existing redraw path.'
+	],
+	needs: ['90v', 'trx'],
+	foldInto: ['90v', 'trx']
+}

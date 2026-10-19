@@ -1,4 +1,4 @@
-import { terminal } from '../src/client/terminal.ts'
+import { rendering } from '../src/common/rendering.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
@@ -24,6 +24,6 @@ export default (plugin: Plugin) => {
 		else plugin.set(colors, key as never, v as never)
 	}
 	// Repaint in these colors now, and in the remaining ones once removed.
-	terminal.redraw()
-	return () => terminal.redraw()
+	rendering.requestRedraw('theme applied')
+	return () => rendering.requestRedraw('theme removed')
 }
