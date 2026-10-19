@@ -23,8 +23,31 @@ describe('inline', () => {
 	})
 
 	test('markers inside words or before a space stay text', () => {
-		for (let s of ['2**3 and 4**5', 'a*b*c', 'snake_case_name', 'a * b * c', 'x = y *', 'src/web/*; src/client/*'] as const)
+		for (let s of [
+			'2**3 and 4**5',
+			'a*b*c',
+			'snake_case_name',
+			'a * b * c',
+			'x = y *',
+			'src/web/*; src/client/*',
+		] as const)
 			expect(done(s)).toBe(s)
+	})
+
+	test('slash-prefixed emphasis opens before text, not punctuation', () => {
+		for (let streaming of [false, true]) {
+			for (let text of ['src/web/*; src/client/*', 'src/**; other/**', 'src/*_； other/*_', 'foo/*(bar)*', 'src/*'])
+				expect(markdown.inline(text, streaming)).toEqual([{ text }])
+			for (let [text, style] of [
+				['foo/*bar*', { italic: true }],
+				['foo/_bar_', { italic: true }],
+				['foo/**bar**', { bold: true }],
+				['foo/***bar***', { bold: true, italic: true }],
+			] as const)
+				expect(markdown.inline(text, streaming)).toEqual([{ text: 'foo/' }, { text: 'bar', ...style }])
+		}
+		expect(markdown.inline('foo/*äiti*')).toEqual([{ text: 'foo/' }, { text: 'äiti', italic: true }])
+		expect(markdown.inline('`src/*test*`')).toEqual([{ text: 'src/*test*', code: true }])
 	})
 
 	test('an unclosed marker opens while the text may grow, shows when done', () => {

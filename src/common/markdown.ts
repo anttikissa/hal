@@ -48,11 +48,9 @@ function closes(s: string, i: number, until: string): boolean {
 	return true
 }
 
-// The emphasis marker opening at s[i]: after the start, a space or
-// punctuation other than / (never a letter or digit: 2**3, a*b,
-// snake_case; never a glob: src/*) and before a non-space.
+// Emphasis opens after the start, a space or punctuation, before a non-space.
 function opener(s: string, i: number): string | undefined {
-	if (WORD.test(s[i - 1] ?? '') || s[i - 1] === '/') return undefined
+	if (WORD.test(s[i - 1] ?? '')) return undefined
 	let m = s.startsWith('**', i) ? '**' : s[i] === '*' || s[i] === '_' ? s[i]! : undefined
 	return m && /\S/.test(s[i + m.length] ?? ' ') ? m : undefined
 }
@@ -90,6 +88,12 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 				add(text, { ...st, code: true, ...(href && { href }) })
 			}
 			i = j < 0 ? (open ? s.length : i + n) : j + n
+			continue
+		}
+		let glob = s[i - 1] === '/' && /^[*_]+/.exec(s.slice(i))?.[0]
+		if (glob && /^[\s\p{P}\p{S}]|^$/u.test(s.slice(i + glob.length))) {
+			add(glob, st)
+			i += glob.length
 			continue
 		}
 		let m = markdown.opener(s, i)
