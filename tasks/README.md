@@ -161,7 +161,7 @@ minimize those exceptions and report the reason through render.clear.
 - `src/perf/` — the performance harness behind scripts/perf (tasks y9,
   te); never loaded by Hal. Imports perf and common.
 - `src/web/` — browser client, a SolidJS 2 app (task 1b). Imports web
-  and common only; host/web.ts bundles `main.tsx` into `index.html`
+  and common only; host/web-page.ts bundles `main.tsx` into `index.html`
   with Bun.build on first request, compiling .tsx with the JSX
   compiler it imports dynamically then. Solid and the compiler are
   browser-only: no host, client or common module imports them

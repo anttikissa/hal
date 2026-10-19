@@ -4,7 +4,7 @@
 // task 8a) and keeps a session token in an HttpOnly cookie.
 //
 //   GET  /         the browser client (src/web/, a SolidJS app bundled
-//   GET  /<id>     by web.page() with the JSX compiler, which is loaded
+//   GET  /<id>     by webPage.page() with the JSX compiler, which is loaded
 //                  only then: a host that never serves the page never
 //                  loads it), at / and at any path shaped like a session
 //                  id: the page shows that tab (src/web/router.ts).
@@ -19,7 +19,7 @@
 //                  command, each event one ASON message, like a socket
 //                  client's lines; the tabs come first. A page built
 //                  from other code than the host's (`?v=`,
-//                  web.version()) gets web-update when it opts into
+//                  webPage.version()) gets web-update when it opts into
 //                  manual updates; legacy pages close with code 4000.
 //                  /auth revoke closes every socket with code 4001.
 //   GET  /blob/<session>/<blob>  an attachment of that session
@@ -36,12 +36,8 @@
 //   page at that address), which comes back to it once logged in; with
 //   ?auth=<code> a file address redeems the code like a page (task e3).
 
-import type { BunPlugin, Server, ServerWebSocket } from 'bun'
-import { watch, type FSWatcher } from 'fs'
+import type { Server, ServerWebSocket } from 'bun'
 import { ason } from '../common/ason.ts'
-import { colors, DERIVED, type Style } from '../common/colors.ts'
-import { sendKeys } from '../common/send-keys.ts'
-import { oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
@@ -52,10 +48,10 @@ import { changesPage } from './changes-page.ts'
 import { contextPage } from './context-page.ts'
 import { demoPage } from './demo-page.ts'
 import { host } from './host.ts'
-import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { webLinks } from './web-links.ts'
+import { webPage } from './web-page.ts'
 import { serverLog } from './server-log.ts'
 
 const cookieName = 'hal'
@@ -111,153 +107,10 @@ function redeem(code: unknown, req: Request, ip?: string): { cookie?: string; re
 	return { cookie: cookie.serialize() }
 }
 
-// The JSX compiler, loaded on first use: nothing else on the host
-// path needs it. Missing or broken, it fails the page, not the host.
-const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> =>
-	import('@solidjs/compiler')
-
-// A Bun plugin compiling .tsx into Solid's DOM calls.
-async function plugin(): Promise<BunPlugin> {
-	let { transform } = await web.compiler()
-	return {
-		name: 'solid',
-		setup(build) {
-			build.onLoad({ filter: /\.tsx$/ }, async (args) => ({
-				contents: transform(await Bun.file(args.path).text(), {
-					filename: args.path,
-					moduleName: '@solidjs/web',
-					generate: 'dom',
-				}).code,
-				loader: 'ts',
-			}))
-		},
-	}
-}
-
-// The browser client (src/web/): index.html with main.tsx bundled into
-// it, built on first request and kept until its source changes. The
-// format is iife: esm output breaks an inline classic script. `version`,
-// a hash of the page, is also in it, so a page can tell whether it was
-// built from the host's code.
-async function build(): Promise<{ html: string; version: string }> {
-	let dir = `${import.meta.dir}/../web`
-	let plugins = [await web.plugin()]
-	let out = await Bun.build({
-		entrypoints: [`${dir}/main.tsx`],
-		target: 'browser',
-		format: 'iife',
-		minify: true,
-		plugins,
-	})
-	if (!out.success) throw new AggregateError(out.logs, 'web: bundling src/web/main.tsx failed')
-	let js = (await out.outputs[0]!.text()).replaceAll('</script', '<\\/script')
-	let html = (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
-	let version = Bun.hash(html).toString(36)
-	return { html: html.replace('/*VERSION*/', version), version }
-}
-
-// The version of the page this host serves; undefined if it can't build.
-async function version(): Promise<string | undefined> {
-	web.state.page ??= web.build()
-	return web.state.page.then(
-		(p) => p.version,
-		() => undefined,
-	)
-}
-
-const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
-
-// The theme as CSS, computed now so overrides show on the next load,
-// as oklch() (wide-gamut screens show the full color; the terminal
-// gets it fitted to sRGB):
-// one class per style (toolBash is .tool-bash) with fg as color, bg as
-// background and any other color as a custom property (--link-bg),
-// plus --quiet: the fg's quieter, still readable form (colors.quiet), for
-// secondary text, which never fades by opacity (tasks/README.md). The
-// page's is measured on its lightest surface, the button.
-// --fg and --sel-back repeat the fg for selection; --output is the
-// machine-output color (colors.toolOutput).
-function css(): string {
-	let rules: string[] = []
-	for (let [key, value] of Object.entries(colors)) {
-		if ((DERIVED as readonly string[]).includes(key)) continue
-		if (key === 'mix') {
-			rules.push(
-				`:root { ${Object.entries(colors.mix)
-					.map(([k, v]) => `--mix-${kebab(k)}: ${v}%`)
-					.join('; ')} }`,
-			)
-			continue
-		}
-		// Shared values (fgL, screen) are numbers or one color, not styles.
-		if (typeof value !== 'function') continue
-		let style = (value as () => Style)()
-		let decls = Object.entries(style).map(([part, c]) => {
-			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
-			return `${prop}: ${oklch.toCss(c)}`
-		})
-		if (style.bg) decls.push(`--card-bg: ${oklch.toCss(style.bg)}`)
-		let fg = style.fg ?? style.text
-		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
-		if (fg) decls.push(`--title-fg: ${oklch.toCss(style.title ?? colors.title(fg))}`)
-		// Selection is reverse video in the style's own color (task gn).
-		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
-		if (fg && !style.output) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
-		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
-		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
-	}
-	let tab = colors.tab(),
-		hal = colors.assistant()
-	for (let [kind, fg] of Object.entries({
-		asking: tab.doneFg!,
-		approval: tab.warningFg!,
-		blocked: tab.warningFg!,
-		retrying: tab.warningFg!,
-		working: hal.cursor!,
-		jobs: tab.jobsFg!,
-		failed: tab.errorFg!,
-		paused: tab.pausedFg!,
-		done: tab.doneFg!,
-	})) {
-		rules.push(
-			`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`,
-		)
-	}
-	// Percentages used, one class per whole percent (colors.heat).
-	for (let used = 0; used <= 100; used++)
-		rules.push(`.heat-${used} { --heat: ${oklch.toCss(colors.heat(used))}; color: var(--heat) }`)
-	return rules.join('\n')
-}
-
-async function page(): Promise<Response> {
-	web.state.page ??= web.build()
-	let html: string
-	try {
-		html = (await web.state.page).html
-	} catch (e: any) {
-		web.state.page = null
-		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
-		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
-	}
-	html = html
-		.replace('/*COLORS*/', () => web.css())
-		.replace('/*SETTINGS*/', () => settings.forPage())
-		.replace('/*SEND_KEYS*/', () => sendKeys.forPage())
-	// Public signing key only, encoded into JSON safely (never the private key).
-	try {
-		let key = (await push.keys()).publicKey
-		html = html.replace('/*PUSH_KEY*/', () => JSON.stringify(key))
-	} catch (e: any) {
-		diag.log(`push: ${e?.message ?? e}`)
-		html = html.replace('/*PUSH_KEY*/', 'null')
-	}
-	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
-}
-
 // The login gate at a file's address: the page, which shows the gate
 // and reloads the address once logged in. Never cached, unlike the file.
 async function gate(): Promise<Response> {
-	let res = await web.page()
+	let res = await webPage.page()
 	if (!res.ok) return res
 	return new Response(res.body, {
 		status: 401,
@@ -297,7 +150,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 		(pathname.startsWith('/blob/') || filePage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
 	let app = get && (pathname === '/' || session.isId(pathname.slice(1)) || changesPage.isApp(pathname))
 	if (get && url.searchParams.has('auth') && (blob || app)) return web.linkLogin(url, req, srv.requestIP(req)?.address)
-	if (app) return web.page()
+	if (app) return webPage.page()
 	let moved = get && changesPage.redirect(url)
 	if (moved) return moved
 	let changesData = get && changesPage.owns(pathname)
@@ -367,9 +220,11 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
-	if (blob && demoPage.owns(pathname)) return demoPage.serve(pathname, web.css())
+	if (blob && demoPage.owns(pathname)) return demoPage.serve(pathname, webPage.css())
 	if (blob)
-		return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : web.blob(pathname)
+		return contextPage.owns(pathname)
+			? contextPage.serve(req, webPage.css(), (r) => srv.timeout(r, 0))
+			: web.blob(pathname)
 	if (changesData) return changesPage.serve(url)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
@@ -384,7 +239,7 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	let params = new URL(req.url).searchParams
 	let v = params.get('v')
 	let manualUpdates = v !== null && params.get('updates') === 'manual'
-	let stale = v !== null && v !== (await web.version())
+	let stale = v !== null && v !== (await webPage.version())
 	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
 	if (!webAuth.validHash(loginHash)) return new Response('log in first\n', { status: 401 })
 	if (
@@ -405,7 +260,7 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 // One attachment, by exact session and blob id, or a pasted file's page
 // or bytes by exact name; anything else is 404.
 function blob(pathname: string): Response {
-	if (filePage.owns(pathname)) return filePage.serve(pathname, web.css())
+	if (filePage.owns(pathname)) return filePage.serve(pathname, webPage.css())
 	let m = /^\/blob\/([\w-]+)\/([0-9a-z]{6}|[0-9a-f]{12})$/.exec(pathname)
 	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })
@@ -438,35 +293,6 @@ const websocket = {
 		ws.data.conn?.close()
 	},
 }
-
-// Once a page was built, a change to src/web or src/common (task zz)
-// rebuilds it, and notifies opted-in pages without dropping their link.
-// Legacy pages reload on code 4000. Remote terminals stay connected;
-// a failed build (a half-saved edit) notifies nothing.
-async function refresh(): Promise<void> {
-	web.state.page = web.build()
-	let v = await web.version()
-	if (v)
-		for (let ws of web.state.sockets)
-			if (ws.data.page && ws.data.page !== v) {
-				if (ws.data.manualUpdates) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
-				else ws.close(4000, 'reload')
-			}
-}
-
-function watchSource(): FSWatcher | null {
-	let timer: Timer | undefined
-	try {
-		return watch(`${import.meta.dir}/..`, { recursive: true, persistent: false }, (_e, name) => {
-			if (!web.state.page || !name || !/^(web|common)\//.test(String(name)) || String(name).includes('.test.')) return
-			clearTimeout(timer)
-			timer = setTimeout(() => void web.refresh(), 300)
-		})
-	} catch {
-		return null
-	}
-}
-
 // Try the preferred port and the next free port through 9100. Other
 // failures (and an exhausted range) leave socket clients available.
 // `hal serve --port` (web.state.fixedPort) tries only that port.
@@ -477,7 +303,7 @@ function start(): void {
 	for (let port = preferred; port <= last; port++) {
 		try {
 			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
-			web.state.watcher = watchSource()
+			webPage.state.watcher = webPage.watchSource()
 			settings.state.listeningPort = web.state.server.port
 			webLinks.moved()
 			let url = settings.value('webUrl')
@@ -497,9 +323,9 @@ function start(): void {
 async function stop(): Promise<void> {
 	let srv = web.state.server
 	web.state.server = null
-	web.state.page = null
-	web.state.watcher?.close()
-	web.state.watcher = null
+	webPage.state.page = null
+	webPage.state.watcher?.close()
+	webPage.state.watcher = null
 	settings.state.listeningPort = undefined
 	web.state.sockets.clear()
 	webAuth.close()
@@ -524,9 +350,7 @@ function revoke(id = 'all'): number {
 export const web = {
 	state: {
 		server: null as Server<Data> | null,
-		page: null as Promise<{ html: string; version: string }> | null,
 		sockets: new Set<Socket>(),
-		watcher: null as FSWatcher | null,
 		fixedPort: undefined as number | undefined,
 		error: undefined as string | undefined,
 	},
@@ -537,13 +361,6 @@ export const web = {
 	redeem,
 	linkLogin,
 	revoke,
-	css,
-	compiler,
-	plugin,
-	build,
-	refresh,
-	version,
-	page,
 	gate,
 	upgrade,
 	login,

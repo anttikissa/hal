@@ -114,14 +114,14 @@ test('src has only the layer directories', () => {
 
 // Importing every module, including main.ts, must not print, register
 // signal handlers, or leave timers/watchers that keep the process alive.
-// .tsx files load through host/web.ts's Solid plugin under the browser
+// .tsx files load through host/web-page.ts's Solid plugin under the browser
 // condition, as the page bundle does (Solid's server build refuses DOM
 // templates).
 test('importing every module has no side effects', () => {
 	let imports = sourceFiles().map((f) => `await import(${JSON.stringify(f)})`)
 	let script = [
-		`let { web } = await import(${JSON.stringify(`${srcDir}/host/web.ts`)})`,
-		`Bun.plugin(await web.plugin())`,
+		`let { webPage } = await import(${JSON.stringify(`${srcDir}/host/web-page.ts`)})`,
+		`Bun.plugin(await webPage.plugin())`,
 		...imports,
 		`let signals = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGTSTP', 'SIGCONT', 'SIGWINCH']`,
 		`let n = signals.reduce((sum, s) => sum + process.listenerCount(s), 0)`,

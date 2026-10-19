@@ -8,7 +8,7 @@ import { settings } from '../common/settings.ts'
 import { uploads } from '../common/uploads.ts'
 import { config } from '../host/config.ts'
 import { paths } from '../host/paths.ts'
-import { web } from '../host/web.ts'
+import { webPage } from '../host/web-page.ts'
 import { app } from './app.ts'
 import { attach } from './attach.ts'
 
@@ -175,7 +175,7 @@ test('an image too large to send is refused before reading it', () => {
 // wrote into it. The host and page share `settings` here, so the host's
 // config is dropped first.
 async function loadPage(): Promise<void> {
-	let html = await (await web.page()).text()
+	let html = await (await webPage.page()).text()
 	config.reset()
 	settings.load(/<script type="application\/json" id="settings">(.*?)<\/script>/s.exec(html)?.[1])
 }

@@ -7,7 +7,7 @@ import { history } from '../history.ts'
 import { pages } from '../pages.ts'
 import { resources } from '../resources.ts'
 import { sessions } from '../sessions.ts'
-import { web } from '../web.ts'
+import { webPage } from '../web-page.ts'
 
 function size(bytes: number): string {
 	let units = ['B', 'KB', 'MB', 'GB']
@@ -35,7 +35,7 @@ async function report(): Promise<string> {
 		)
 	}
 	rows.push(`  page marks  ${pages.state.marks.size} files`)
-	let page = web.state.page && (await web.state.page.catch(() => undefined))
+	let page = webPage.state.page && (await webPage.state.page.catch(() => undefined))
 	rows.push(`  web bundle  ${page ? size(Buffer.byteLength(page.html)) : 'not built'}`)
 	return rows.join('\n')
 }
