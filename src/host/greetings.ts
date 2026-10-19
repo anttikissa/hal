@@ -114,8 +114,8 @@ function open(id: string, timezone = clients.timezone(id)): void {
 		return
 	}
 	if (meta.model === 'hal/intro') {
-		let { intro } = require('./intro.ts') as typeof import('./intro.ts')
-		let text = intro.accounts().names.length
+		let { introAccounts } = require('./intro-accounts.ts') as typeof import('./intro-accounts.ts')
+		let text = introAccounts.accounts().names.length
 			? 'This is Hal, running the hal/intro model. Pick a model with /model or Ctrl-M.'
 			: `This is Hal, running the hal/intro model. No provider configured - run /login to get started.
 

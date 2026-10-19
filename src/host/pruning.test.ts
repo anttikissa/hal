@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Message, StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { sessions } from './sessions.ts'
 import { pruning } from './pruning.ts'
 import { tools } from './tools.ts'
@@ -42,7 +43,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 	let boundaries = 0
 	for (let turn = 0; turn < 26; turn++) {
 		history.submit(id, `instructions ${turn}`)
-		let initial = await history.messages(id)
+		let initial = await historyInput.messages(id)
 		let bytes = providerBytes(initial)
 		if (turn > 0 && turn % 8 === 0) {
 			expect(bytes.join('')).not.toContain(`payload ${turn - 8}/0 `)
@@ -60,11 +61,11 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 				{ type: 'done', reason: 'tool_use' },
 			])
 			history.results(id, [{ type: 'tool_result', id: call, output: `payload ${call} ` + 'x'.repeat(5000) }])
-			let messages = await history.messages(id)
+			let messages = await historyInput.messages(id)
 			let fresh = messages.at(-1)!.blocks.find((b) => b.type === 'tool_result')
 			expect(fresh?.type === 'tool_result' && fresh.output).toContain(`payload ${call} `)
 			expect(providerBytes(messages).slice(0, frozen.length)).toEqual(frozen)
-			expect(await history.messages(id)).toEqual(messages) // unchanged-history retry
+			expect(await historyInput.messages(id)).toEqual(messages) // unchanged-history retry
 		}
 		await round(id, [
 			{ type: 'text', text: 'answer' },
@@ -72,7 +73,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 		])
 		history.end(id, { type: 'done', reason: 'end' })
 		// The new completed checkpoint is an allowed boundary.
-		let messages = await history.messages(id)
+		let messages = await historyInput.messages(id)
 		let calls = messages.flatMap((m) => m.blocks as unknown[]).filter((b: any) => b.type === 'tool_call') as any[]
 		expect(calls[0].input.cmd).toContain(`command: "printf '0/0'"`)
 		expect(calls[0].input.cmd).toContain("path: 'src/file.ts'")
@@ -82,7 +83,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 			)
 		frozen = providerBytes(messages).slice(0, -1)
 		history.state.cache.clear()
-		expect(providerBytes(await history.messages(id))).toEqual(providerBytes(messages))
+		expect(providerBytes(await historyInput.messages(id))).toEqual(providerBytes(messages))
 	}
 	expect(boundaries).toBe(3)
 	expect(readFileSync(history.file(id), 'utf8')).toContain('payload 0/0 ')
@@ -100,15 +101,15 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	let capped = tools.cap(whole, id)
 	let result = history.results(id, [{ type: 'tool_result', id: 'a', output: capped }])!
 	pruning.pressureTokens = 1
-	let protectedInput = await history.messages(id)
+	let protectedInput = await historyInput.messages(id)
 	expect(JSON.stringify(protectedInput)).toContain('whole output in blob')
 	await round(id, [{ type: 'error', message: 'failed request' }])
-	expect(await history.messages(id)).toEqual(protectedInput)
+	expect(await historyInput.messages(id)).toEqual(protectedInput)
 	await round(id, [
 		{ type: 'text', text: 'read it' },
 		{ type: 'done', reason: 'end' },
 	])
-	let pruned = await history.messages(id)
+	let pruned = await historyInput.messages(id)
 	let marker = pruned.flatMap((m) => m.blocks as unknown[]).find((b: any) => b.type === 'tool_result') as any
 	expect(marker.output).toContain('[pruned tool output;')
 	let blob = /id=([^\]]+)/.exec(marker.output)![1]
@@ -145,13 +146,13 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 		{ type: 'done', reason: 'tool_use' },
 	])
 	history.results(id, [{ type: 'tool_result', id: 'b', output: 'fresh recovery '.repeat(1000) }])
-	let fresh = await history.messages(id)
+	let fresh = await historyInput.messages(id)
 	await round(id, [
 		{ type: 'text', text: 'consumed' },
 		{ type: 'done', reason: 'end' },
 	])
-	expect(JSON.stringify(await history.messages(id))).toContain('fresh recovery ')
-	expect(providerBytes(await history.messages(id)).slice(0, providerBytes(fresh).length - 1)).toEqual(
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('fresh recovery ')
+	expect(providerBytes(await historyInput.messages(id)).slice(0, providerBytes(fresh).length - 1)).toEqual(
 		providerBytes(fresh).slice(0, -1),
 	)
 })

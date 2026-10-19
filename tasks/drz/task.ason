@@ -5,7 +5,8 @@
 	notes: [
 		'At introduction 23 files exceeded the limit (largest: src/host/web.test.ts, about 40k tokens). The hook blocks commits that stage any of them until they are split.',
 		'Split src/host/web.test.ts by feature into web-serve, web-login, web-files, web-tabs, web-navigation, web-scroll, web-status, web-phone, web-touch, web-composer, web-cards and web-card-text (.test.ts), with shared fixtures in web-fixture.test.ts (useWeb: fresh home and port, login, cookie, dial, until, testHome) and web-chrome-fixture.test.ts (browserTest, browser, useChrome). Page building (JSX compiler, bundle, theme CSS, rebuild watcher) moved from src/host/web.ts to src/host/web-page.ts (webPage).',
-		'Split by 179-mob (2026-10-19): prompts.ts -> queue-next.ts; prompts.test.ts -> prompts-edit.test.ts, prompts-fixture.test.ts; openai.test.ts -> openai-ws.test.ts, openai-fixture.test.ts; tools/edit.ts -> edit-blocks.ts; tools/edit.test.ts -> tools/edit-rollback.test.ts, tools/edit-fixture.test.ts.'
+		'Split by 179-mob (2026-10-19): prompts.ts -> queue-next.ts; prompts.test.ts -> prompts-edit.test.ts, prompts-fixture.test.ts; openai.test.ts -> openai-ws.test.ts, openai-fixture.test.ts; tools/edit.ts -> edit-blocks.ts; tools/edit.test.ts -> tools/edit-rollback.test.ts, tools/edit-fixture.test.ts.',
+		'Split by 179-mia (2026-10-19): history.ts -> history-input.ts (historyInput.messages, historyInput.turn: provider input rebuilt from history); history.test.ts -> history-input.test.ts, history-fixture.test.ts (useHistory, testHome, logged, events, drain, ended, strip, newSession, fakeStream, forget); host.ts -> session-commands.ts (sessionCommands.act: commands on a session open on the connection); turns.ts -> round-stream.ts (roundStream.stream: one provider round, request built and native tool calls expanded); intro.ts -> intro-accounts.ts (introAccounts.accounts, introAccounts.choices).'
 	],
 	needs: ['0j'],
 	foldInto: ['0j']

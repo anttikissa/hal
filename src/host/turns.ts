@@ -20,8 +20,6 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import type { StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
-import { blobs } from './blobs.ts'
-import { clock } from './clock.ts'
 import { contextTransitions } from './context-transitions.ts'
 import { compact } from './compact.ts'
 import { turnRecovery } from './turn-recovery.ts'
@@ -31,9 +29,9 @@ import { commits } from './commits.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
+import { roundStream } from './round-stream.ts'
 import { sessions } from './sessions.ts'
 import { synthetic, type Reply } from './synthetic.ts'
-import { promptCache } from './prompt-cache.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
@@ -44,8 +42,6 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
-import { nativeTool } from './native-tool.ts'
-import { bash } from './tools/bash.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
@@ -220,49 +216,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let replied: Reply | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
-		if (!scripted) {
-			let { system, cacheId } = promptCache.prepare(id, {
-				cwd: sessions.open(id).cwd,
-				model: models.qualified(model, running.effort),
-				now: clock.now(),
-				sessionId: id,
-			})
-			let defs = [nativeTool.def()]
-			let messages = await history.messages(id, {
-				overhead: system.length + JSON.stringify(defs).length,
-				window: models.contextWindow(model),
-				model,
-			})
-			if (signal.aborted) return
-			for await (let event of turns.stream(
-				model,
-				{
-					system,
-					effort: running.effort,
-					messages,
-					tools: defs,
-					image: (blob) => blobs.base64(id, blob),
-					sessionId: id,
-					cacheId,
-				},
-				signal,
-			)) {
-				if (signal.aborted) return
-				if (event.type !== 'tool_call') {
-					yield event
-					continue
-				}
-				for (let call of nativeTool.expand({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })) {
-					if (call.name === 'bash' && typeof call.input.command === 'string')
-						call = {
-							...call,
-							input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) },
-						}
-					yield { ...call, type: 'tool_call' }
-				}
-			}
-			return
-		}
+		if (!scripted) return yield* roundStream.stream(id, model, running, signal)
 		let reply = (replied = scripted(await history.read(id), answers, id))
 		answers = undefined
 		yield* reply.stream ?? synthetic.paced(reply.say, signal)

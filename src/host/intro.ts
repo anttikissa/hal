@@ -1,7 +1,6 @@
 // hal/intro (task vc): the first-run guide, a scripted model that asks
 // with forms. It keeps no step counter: its own durable messages mark a
 // run's start (the greeting) and the save, answer records the rest.
-import { existsSync } from 'fs'
 import { resolve } from 'path'
 import type { StreamEvent } from '../common/blocks.ts'
 import { card, type Kind } from '../common/card.ts'
@@ -12,11 +11,10 @@ import { settings } from '../common/settings.ts'
 import { apiKeys } from './api-keys.ts'
 import { auth } from './auth.ts'
 import { config } from './config.ts'
+import { introAccounts } from './intro-accounts.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { nativeTool } from './native-tool.ts'
-import { modelsDev } from './models-dev.ts'
-import { paths } from './paths.ts'
 import { profile } from './profile.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
@@ -139,8 +137,6 @@ const NAMES = [
 ]
 const names = (): string[] => [NAMES[0]!, ...ranked(NAMES.slice(1, -1)), NAMES.at(-1)!]
 
-type Entry = Record<string, any>
-
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
 const saved = 'I saved your '
 const closing = "You're all set."
@@ -219,54 +215,6 @@ function replied(records: HistoryRecord[], field: string): boolean {
 
 function said(records: HistoryRecord[], text: string): boolean {
 	return records.some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(text))
-}
-
-// Who can use a provider: a nonempty file account (accessToken or
-// apiKey) or an environment key. Identities only, never the values;
-// malformed credentials fail rather than disappear.
-function accounts(): { names: string[]; providers: string[]; stored: number } {
-	let data: Entry = existsSync(paths.authFile()) ? auth.store() : {}
-	let names: string[] = [],
-		providers: string[] = [],
-		stored = 0
-	for (let [kind, label, env] of [
-		['anthropic', 'Claude', 'ANTHROPIC_API_KEY'],
-		['openai', 'ChatGPT', 'OPENAI_API_KEY'],
-		['opencode-go', 'OpenCode Go', 'OPENCODE_API_KEY'],
-	] as const) {
-		let entries = data[kind] === undefined ? [] : Array.isArray(data[kind]) ? data[kind] : [data[kind]]
-		for (let entry of entries)
-			if (
-				(typeof entry?.accessToken === 'string' && entry.accessToken.length > 0) ||
-				(typeof entry?.apiKey === 'string' && entry.apiKey.length > 0)
-			) {
-				names.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
-				providers.push(kind)
-				stored++
-			}
-		if (process.env[env]) {
-			names.push(`${label} (${env})`)
-			providers.push(kind)
-		}
-	}
-	return { names, providers, stored }
-}
-
-// The claude and gpt aliases' current targets a credential can use,
-// by display name: label → id.
-// Then local Ollama models, if the greeting's warm-up found any.
-function choices(providers: string[]): Map<string, string> {
-	let out = new Map<string, string>()
-	for (let [alias, family] of [
-		['claude', 'Claude'],
-		['gpt', 'GPT'],
-	] as const) {
-		let id = models.resolve(alias).id
-		if (id && providers.includes(id.split('/')[0]!)) out.set(modelsDev.displayName(id) ?? family, id)
-	}
-	for (let id of models.cached('ollama')?.ids.slice(0, 4) ?? [])
-		out.set(`${id.slice('ollama/'.length)} (Ollama, local)`, id)
-	return out
 }
 
 // Every intro question is skippable: Escape moves on instead of
@@ -356,7 +304,7 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
 	}
 	if (!said(run, `${saved}name`)) store('Name', 'name')
 
-	let loggedIn = intro.accounts()
+	let loggedIn = introAccounts.accounts()
 	let login = answered(run, 'login')
 	// Environment keys alone still get the offer: a subscription may be
 	// what the user wants, and they may not know Hal found the key.
@@ -382,7 +330,7 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
 		return reply({ pause: 'waiting for /login', after: start })
 	}
 
-	let options = intro.choices(loggedIn.providers)
+	let options = introAccounts.choices(loggedIn.providers)
 	let chosen = answered(run, 'model')
 	if (options.size && chosen === undefined)
 		return reply({
@@ -523,4 +471,4 @@ ${now}`,
 	})
 }
 
-export const intro = { languages, restart, run, answered, accounts, choices }
+export const intro = { languages, restart, run, answered }

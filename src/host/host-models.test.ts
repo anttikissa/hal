@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
@@ -285,7 +286,7 @@ test('/model <id> switches the session model for every follower and the next tur
 	let switched = 'Switched from Intro (hal/intro) to hal/ok.'
 	await until(() => b.of('output').some((e) => e.text === switched))
 	expect(a.of('output').filter((e) => e.text === switched)).toHaveLength(1)
-	expect(JSON.stringify(await history.messages(id))).toContain(switched)
+	expect(JSON.stringify(await historyInput.messages(id))).toContain(switched)
 	let notices = () => history.readSync(id).filter((r) => r.type === 'notice' && r.text === switched)
 	expect(notices()).toHaveLength(1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/model hal/ok' })

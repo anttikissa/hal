@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import { states } from '../common/states.ts'
 import { transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { compact } from './compact.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
@@ -81,9 +82,9 @@ test('changes interrupt streaming, settle pending calls and preserve earlier req
 	expect(texts(messages)).toContain('Another session update.')
 	calls[1]!.push({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length)
-	let before = await history.messages(id)
+	let before = await historyInput.messages(id)
 	restartHost()
-	expect(await history.messages(id)).toEqual(before)
+	expect(await historyInput.messages(id)).toEqual(before)
 })
 
 test('notice delivery remains once across compact, prompt edits and recovery without waking an idle turn', async () => {
@@ -97,10 +98,10 @@ test('notice delivery remains once across compact, prompt edits and recovery wit
 	expect(states.fromHistory(history.readSync(id))).toEqual({ type: 'idle' })
 	await turns.recover()
 	expect(calls).toHaveLength(0)
-	let first = await history.messages(id)
+	let first = await historyInput.messages(id)
 	expect(texts(first)).not.toContain('model changed from')
 	restartHost()
-	expect(await history.messages(id)).toEqual(first)
+	expect(await historyInput.messages(id)).toEqual(first)
 	// Editing a prompt keeps instruction changes, without keeping the old answer.
 	history.submit(id, 'Typo.')
 	history.append(id, {
@@ -110,7 +111,7 @@ test('notice delivery remains once across compact, prompt edits and recovery wit
 	})
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Discarded answer.' } })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Corrected.' }], replaces: true })
-	let edited = texts(await history.messages(id))
+	let edited = texts(await historyInput.messages(id))
 	expect(edited).toContain('New instructions.')
 	expect(edited).toContain('Corrected.')
 	expect(edited).not.toContain('Discarded answer.')
@@ -149,9 +150,9 @@ test('absolute context crossings reach the next round once and re-arm after decr
 	expect(notices().at(-1)!.text).toContain('150k, 200k, 250k')
 	calls.at(-1)!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
-	let before = await history.messages(id)
+	let before = await historyInput.messages(id)
 	restartHost()
-	expect(await history.messages(id)).toEqual(before)
+	expect(await historyInput.messages(id)).toEqual(before)
 	expect(calls).toHaveLength(levels.length + 1)
 	c = client()
 	c.conn.send({ type: 'open', sessionId: id })
@@ -163,5 +164,5 @@ test('absolute context crossings reach the next round once and re-arm after decr
 	expect(notices()).toHaveLength(5)
 	expect(notices().at(-1)!.text).toContain('150k, 200k, 250k')
 	expect(calls).toHaveLength(levels.length + 2)
-	expect(texts(await history.messages(id))).toContain(notices().at(-1)!.text)
+	expect(texts(await historyInput.messages(id))).toContain(notices().at(-1)!.text)
 })

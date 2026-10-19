@@ -8,6 +8,7 @@ import { anthropic } from './anthropic.ts'
 import { blobs } from './blobs.ts'
 import { amending, calls, client, created, fresh, until, useHost, shown } from './host-fixture.test.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { openaiCompat } from './openai-compat.ts'
 import { paths } from './paths.ts'
 
@@ -207,7 +208,7 @@ test('a dropped .md keeps its extension; history and clients keep the marker, th
 	// Once /tmp is cleaned, the session's copy still gives the text.
 	rmSync(`${paths.fileDir(name)}/${name}`)
 	expect(
-		(await history.messages(id))
+		(await historyInput.messages(id))
 			.find((m) => m.role === 'user')!
 			.blocks.some((b: any) => b.type === 'text' && b.text.endsWith(`read ${text}`)),
 	).toBe(true)

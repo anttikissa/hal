@@ -10,7 +10,8 @@
 		'Patch points moved: tests stub turns.stream (was host.stream) and prompts.next / prompts.submit. `status` shadows the DOM global of the same name, so a file that forgets to import it type-checks as window.status (a string) and fails at .stateOf.',
 		'host.test.ts was split into host.test.ts, turns.test.ts and prompts.test.ts sharing host-fixture.test.ts (named *.test.ts so the size and import-side-effect rules skip it; call useHost() to register its hooks). host-commands, host-retry and host-approval tests became slash.test.ts, turns-retry.test.ts and turns-approval.test.ts.',
 		'Host protocol tests import only modules they use. Removing the unused pages import restores the warning-free lint invariant after the test split; lint warnings fail ./test.',
-		'Size split (task drz, 2026-10-19): prompts.test.ts keeps inbox delivery; edits of prompts and inbox messages moved to prompts-edit.test.ts, shared helpers to prompts-fixture.test.ts. /queue next and undo moved to queue-next.ts (task csn).'
+		'Size split (task drz, 2026-10-19): prompts.test.ts keeps inbox delivery; edits of prompts and inbox messages moved to prompts-edit.test.ts, shared helpers to prompts-fixture.test.ts. /queue next and undo moved to queue-next.ts (task csn).',
+		'host.act hands commands on an open session to src/host/session-commands.ts (sessionCommands.act); runTurn takes each provider round stream from src/host/round-stream.ts (roundStream.stream), which still calls turns.stream (179-mia).'
 	],
 	needs: ['0j'],
 	foldInto: [

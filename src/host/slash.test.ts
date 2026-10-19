@@ -9,6 +9,7 @@ import { commandList } from '../common/commands/list.ts'
 import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { turns } from './turns.ts'
@@ -112,7 +113,7 @@ test('/cd changes the session cwd for every follower; a relative path resolves f
 			.items.filter((i) => i.type === 'command')
 			.map((i: any) => i.text),
 	).toEqual(['/cd projects/a', '/cd ~/projection'])
-	expect(JSON.stringify(await history.messages(id))).toContain(
+	expect(JSON.stringify(await historyInput.messages(id))).toContain(
 		`Working directory changed from ${work}/projects/a to ${work}/projection.`,
 	)
 	expect(

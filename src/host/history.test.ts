@@ -1,88 +1,26 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
+// Durable history (history.ts): recording turns, repairing and reading
+// the file, and numbering records.
+import { expect, test } from 'bun:test'
+import { appendFileSync, readFileSync, writeFileSync } from 'fs'
 import { lines } from '../common/lines.ts'
-import type { DoneEvent, ErrorEvent, Message, StreamEvent } from '../common/blocks.ts'
-import type { HistoryRecord } from '../common/replay.ts'
-import { diag } from './diag.ts'
+import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { pages } from './pages.ts'
-import { liveFiles } from './live-file.ts'
-import { provider } from './provider.ts'
-import { anthropic } from './anthropic.ts'
 import { sessions } from './sessions.ts'
-import { naming } from './naming.ts'
-import { busy } from './busy.ts'
-import { paths } from './paths.ts'
+import {
+	drain,
+	ended,
+	events,
+	forget,
+	logged,
+	newSession,
+	strip,
+	testHome,
+	useHistory,
+} from './history-fixture.test.ts'
 
-const savedHome = paths.state.home
-const origOnError = liveFiles.onError
-const origStream = provider.stream
-const origLog = diag.log
-const origPrepare = naming.prepare
-let home = ''
-let logged: string[] = []
-
-beforeEach(() => {
-	home = mkdtempSync(`${tmpdir()}/hal-history-`)
-	paths.state.home = home
-	liveFiles.onError = () => {}
-	// History contracts are independent of title reminder scheduling.
-	naming.prepare = () => {}
-	logged = []
-	diag.log = (m) => void logged.push(m)
-})
-
-afterEach(() => {
-	sessions.closeAll()
-	history.state.running.clear()
-	history.state.cache.clear()
-	history.state.next.clear()
-	pages.reset()
-	provider.stream = origStream
-	naming.prepare = origPrepare
-	diag.log = origLog
-	liveFiles.onError = origOnError
-	if (savedHome === undefined) paths.state.home = undefined
-	else paths.state.home = savedHome
-	rmSync(home, { recursive: true, force: true })
-})
-
-async function* events(...list: StreamEvent[]): AsyncGenerator<StreamEvent> {
-	for (let e of list) yield e
-}
-
-async function drain<T>(it: AsyncIterable<T>): Promise<T[]> {
-	let out: T[] = []
-	for await (let x of it) out.push(x)
-	return out
-}
-
-// One recorded round ended as a whole turn, however the consumer stops.
-async function* ended(id: string, stream: AsyncIterable<StreamEvent>): AsyncGenerator<StreamEvent> {
-	let last: DoneEvent | ErrorEvent | undefined
-	try {
-		for await (let e of history.record(id, 'fake', stream)) {
-			if (e.type === 'done' || e.type === 'error') last = e
-			yield e
-		}
-	} finally {
-		history.end(id, last)
-	}
-}
-
-const strip = (records: HistoryRecord[]) => records.map(({ ts: _ts, n: _n, ...rest }) => rest)
-const newSession = () => sessions.create({ cwd: '/', model: 'fake/m', name: 'History fixture' }).id
-
-// Lets a test see what a turn sent and script what comes back.
-function fakeStream(script: (input: { messages: Message[] }) => StreamEvent[]) {
-	let sent: Message[][] = []
-	provider.stream = async function* (_model, input) {
-		sent.push(structuredClone(input.messages))
-		yield* script(input)
-	}
-	return sent
-}
+useHistory()
 
 test('a completed turn is stored as prompt, blocks and a turn end with usage', async () => {
 	let id = newSession()
@@ -145,62 +83,6 @@ test('a consumer that stops early still ends the turn, as paused', async () => {
 		{ type: 'turn_end', status: 'paused', usage: {} },
 	])
 	expect(history.state.running.has(id)).toBe(false)
-})
-
-test('a prompt after a failed turn is its own message, told of the failure', async () => {
-	let id = newSession()
-	let sent = fakeStream((input) =>
-		input.messages.length === 1
-			? [{ type: 'error', message: 'HTTP 400 from fake', status: 400 }]
-			: [{ type: 'done', reason: 'end' }],
-	)
-	history.submit(id, 'Say just the word pong')
-	await drain(history.turn(id))
-	history.submit(id, 'k')
-	await drain(history.turn(id))
-	expect(sent[1]).toEqual([
-		{
-			role: 'user',
-			blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nSay just the word pong$/) }],
-		},
-		{
-			role: 'user',
-			blocks: [{ type: 'text', text: expect.stringContaining('The turn failed with an error: HTTP 400 from fake') }],
-		},
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nk$/) }] },
-	])
-})
-
-test('thinking signatures live in blobs and replay exactly, rebuilt from disk alone', async () => {
-	let id = newSession()
-	let signature = `{"type":"reasoning","id":"rs_1","encrypted_content":"gAAA\\u0000'\`\${x}"}\n\t\\ ä😀 ${'z'.repeat(5000)}`
-	let sent = fakeStream((input) =>
-		input.messages.length === 1
-			? [
-					{ type: 'thinking', text: 'why' },
-					{ type: 'signature', value: signature },
-					{ type: 'text', text: 'ok' },
-					{ type: 'done', reason: 'end' },
-				]
-			: [{ type: 'done', reason: 'end' }],
-	)
-	history.submit(id, 'q1')
-	await drain(history.turn(id))
-	// Every record is one line, and the signature is not among them.
-	let lines = readFileSync(history.file(id), 'utf8').trimEnd().split('\n')
-	expect(lines).toHaveLength(4)
-	expect(lines.join('\n')).not.toContain('zzzz')
-	sessions.closeAll()
-	await history.open(id)
-	history.submit(id, 'q2')
-	await drain(history.turn(id))
-	expect(sent[1]![1]).toEqual({
-		role: 'assistant',
-		blocks: [
-			{ type: 'thinking', text: 'why', signature, provider: 'fake' },
-			{ type: 'text', text: 'ok' },
-		],
-	})
 })
 
 test('open recovers a partially written last record and appends cleanly after it', async () => {
@@ -358,7 +240,7 @@ test('readSync agrees with read, skipping a partial last record', async () => {
 	let id = newSession()
 	expect(history.readSync(id)).toEqual([])
 	expect(await history.read(id)).toEqual([])
-	expect(await history.messages(id)).toEqual([])
+	expect(await historyInput.messages(id)).toEqual([])
 	expect((await history.open(id)).id).toBe(id)
 	history.submit(id, 'a')
 	await drain(ended(id, events({ type: 'text', text: 'b' }, { type: 'done', reason: 'end' })))
@@ -439,13 +321,6 @@ test('unfinished: a turn with no end record, however long its last line', async 
 	expect(history.unfinished(id)).toBe(false)
 })
 
-// A fresh process: nothing of the session's numbers in memory.
-function forget() {
-	history.state.next.clear()
-	history.state.cache.clear()
-	pages.reset()
-}
-
 test('every record is numbered once; a streamed block keeps the number it started with', async () => {
 	let id = newSession()
 	history.submit(id, 'go')
@@ -503,31 +378,9 @@ test('a number that is not an integer is corrupt history', async () => {
 	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 })
 
-test('a failed turn stores the provider body with the message, never just a headline', async () => {
-	let id = newSession()
-	fakeStream(() => [{ type: 'error', message: 'Invalid JSON input', body: '{"command": "ls' }])
-	history.submit(id, 'go')
-	await drain(history.turn(id))
-	expect((await history.read(id)).at(-1)).toMatchObject({
-		type: 'turn_end',
-		status: 'error',
-		error: 'Invalid JSON input\n{"command": "ls',
-	})
-})
-
-test('a host notice reaches the next request once and never starts a turn', async () => {
-	let id = newSession()
-	history.append(id, { type: 'notice', text: 'Hal restarted.' })
-	expect(busy.list()).not.toContain(id)
-	let first = JSON.stringify(await history.messages(id))
-	expect(first).toContain('Hal restarted.')
-	expect(busy.list()).not.toContain(id)
-	expect(JSON.stringify(await history.messages(id))).toBe(first)
-})
-
 test('only canceled unfinished text gets display metadata, never provider prose', async () => {
 	for (let completed of [false, true]) {
-		let id = sessions.create({ cwd: home, model: 'fake/m' }).id
+		let id = sessions.create({ cwd: testHome(), model: 'fake/m' }).id
 		history.submit(id, 'go')
 		let controller = new AbortController()
 		async function* partial(): AsyncGenerator<StreamEvent> {
@@ -540,40 +393,9 @@ test('only canceled unfinished text gets display metadata, never provider prose'
 		expect(record).toMatchObject({ block: { type: 'text', text: 'partial\n' }, model: 'fake/m' })
 		expect(record.interrupted).toBe(completed ? undefined : true)
 		expect(history.interrupted(id)?.interrupted).toBe(completed ? undefined : true)
-		let messages = await history.messages(id)
+		let messages = await historyInput.messages(id)
 		expect(messages.at(-1)?.blocks).toEqual([{ type: 'text', text: 'partial\n' }])
 		await drain(history.record(id, 'fake', events({ type: 'text', text: 'next' }, { type: 'done', reason: 'end' })))
 		expect(history.interrupted(id)).toBeUndefined()
 	}
-})
-
-test('returning to a model marks its last input end beyond the lookback', async () => {
-	let id = newSession()
-	let opus = 'anthropic/claude-opus-5-5'
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'first question' }] })
-	let answer = history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
-	history.append(id, { type: 'round', usage: { input: 1 }, model: opus, block: answer.n })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'ask another model' }] })
-	for (let i = 0; i < 15; i++) {
-		history.append(id, {
-			type: 'assistant',
-			block: { type: 'tool_call', id: `c${i}`, name: 'bash', input: { command: 'ls' } },
-		})
-		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: `c${i}`, output: 'x' }] })
-		history.append(id, { type: 'round', usage: { input: 1 }, model: 'openai/gpt-6-astra' })
-	}
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'back' }] })
-	let marked = (messages: Message[]) =>
-		anthropic
-			.toMessages({ model: 'claude-opus-5-5', messages })
-			.flatMap((m) => m.content)
-			.filter((b: any) => b.cache_control)
-			.map((b: any) => b.text ?? b.type)
-	expect(marked(await history.messages(id, { model: opus }))).toEqual([
-		expect.stringContaining('first question'),
-		expect.stringContaining('back'),
-	])
-	// Once this model has the latest round, the newest marker reaches it.
-	history.append(id, { type: 'round', usage: { input: 1 }, model: opus })
-	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('back')])
 })

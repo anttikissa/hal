@@ -4,6 +4,7 @@ import { describe, expect, test } from 'bun:test'
 import { compact } from './compact.ts'
 import { calls, client, created, fresh, restartHost, shown, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 
 useHost()
 
@@ -45,10 +46,10 @@ test('/compact: the next request holds the summary and only later records; the t
 	expect(view.filter((i) => i.type === 'prompt').length).toBe(6)
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	// A new host rebuilds the very same input.
-	let before = await history.messages(id)
+	let before = await historyInput.messages(id)
 	restartHost()
 	history.open(id)
-	expect(await history.messages(id)).toEqual(before)
+	expect(await historyInput.messages(id)).toEqual(before)
 })
 
 test('/compact during streaming waits for settlement and continues with its active prompt', async () => {
@@ -124,7 +125,7 @@ describe('a prompt too long (task mq)', () => {
 		expect(messages.at(-1).blocks[1].blob).toBe(c.of('attached').at(-1).blob)
 		restartHost()
 		history.open(id)
-		expect(await history.messages(id)).toEqual(messages)
+		expect(await historyInput.messages(id)).toEqual(messages)
 	})
 
 	test('a paused turn keeps its original prompt verbatim when Enter resumes and is refused', async () => {
@@ -178,7 +179,7 @@ describe('a prompt too long (task mq)', () => {
 		let boundary = history.readSync(id).at(-1)
 		if (boundary?.type !== 'compact') throw new Error('expected compact')
 		expect(boundary.keep).toEqual(originals)
-		let messages = await history.messages(id)
+		let messages = await historyInput.messages(id)
 		expect(JSON.stringify(messages[0])).toContain('old turn')
 		for (let [i, prompt] of ['first prompt', 'steered prompt', 'after second pause'].entries())
 			expect(JSON.stringify(messages[i + 1])).toContain(prompt)

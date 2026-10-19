@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { history } from './history.ts'
+import { historyInput } from './history-input.ts'
 import { host } from './host.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
@@ -51,8 +52,8 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(applied.n).toBe(6)
 	expect(snapshots.build(id).dropped).toEqual([2])
 	expect(readFileSync(history.file(id)).subarray(0, prefix.length)).toEqual(prefix)
-	expect(JSON.stringify(await history.messages(id))).toContain('newneedle')
-	expect(JSON.stringify(await history.messages(id))).not.toContain('oldanswer')
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('newneedle')
+	expect(JSON.stringify(await historyInput.messages(id))).not.toContain('oldanswer')
 	expect(pages.page(id).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 3, 4]))
 	expect(snapshots.build(id).state.type).toBe('paused')
 	expect(pages.snapshot(id).history[0]).toMatchObject({ blocks: [{ text: 'newneedle' }] })
@@ -63,7 +64,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(JSON.stringify(texts)).not.toContain('oldneedle')
 	expect(JSON.stringify(texts)).not.toContain('oldanswer')
 	rebases.apply(id, { base: 4, drop: [], edit: [] }, history.readSync(id).at(-1)!.n)
-	expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('oldanswer')
 	expect(snapshots.build(id).dropped).toBeUndefined()
 	expect(pages.page(id).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 2, 3, 4]))
 })
@@ -113,14 +114,14 @@ test('rebase restores cwd, qualified model and autoclose without replaying comma
 	})
 	let note = history.append(id, { type: 'notice', text: 'New project instructions', sectionUpdate: true })
 	Object.assign(sessions.open(id), { cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
-	await history.messages(id)
+	await historyInput.messages(id)
 	let base = history.readSync(id).at(-1)!.n!
 	let bytes = readFileSync(history.file(id))
 	rebases.apply(id, { base, drop: [transition.n!, note.n!], edit: [] })
 	expect(sessions.open(id)).toMatchObject({ cwd: '/', model: 'fake/m', autoclose: false })
 	expect(sessions.open(id).effort).toBeUndefined()
 	expect(readFileSync(history.file(id)).subarray(0, bytes.length)).toEqual(bytes)
-	let text = JSON.stringify(await history.messages(id))
+	let text = JSON.stringify(await historyInput.messages(id))
 	expect(text).toContain('Old project instructions')
 	expect(text).not.toContain('New project instructions')
 	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(1)
@@ -149,7 +150,7 @@ test('dropping a cwd transition and its update restores historical project instr
 		expect(frozen).toContain('Original project A rules')
 		slash.change(id, { cwd: b })
 		promptCache.prepare(id, { cwd: b, model: 'fake/m', now: 2000 })
-		await history.messages(id)
+		await historyInput.messages(id)
 		let raw = history.readSync(id)
 		let transition = raw.findLast((r) => r.type === 'change')!,
 			note = raw.findLast((r) => r.type === 'notice' && r.sectionUpdate)!
@@ -158,14 +159,14 @@ test('dropping a cwd transition and its update restores historical project instr
 		rebases.apply(id, { base: raw.at(-1)!.n!, drop: [transition.n!, note.n!], edit: [] })
 		expect(sessions.open(id).cwd).toBe(a)
 		expect(promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 3000 }).system).toBe(frozen)
-		let input = frozen + JSON.stringify(await history.messages(id))
+		let input = frozen + JSON.stringify(await historyInput.messages(id))
 		expect(input).toContain('Original project A rules')
 		expect(input).not.toContain('Project B rules')
 		expect(input).not.toContain('A disk change after the transition')
 		expect(history.readSync(id).filter((r) => r.type === 'notice' && r.sectionUpdate)).toHaveLength(1)
 		writeFileSync(`${a}/AGENTS.md`, 'Genuine later source edit')
 		promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 4000 })
-		expect(JSON.stringify(await history.messages(id))).toContain('Genuine later source edit')
+		expect(JSON.stringify(await historyInput.messages(id))).toContain('Genuine later source edit')
 	} finally {
 		systemPrompt.file = original
 	}
@@ -184,7 +185,7 @@ test('invalid setting edits fail before pausing or writing; a note-only edit lea
 	expect(readFileSync(history.file(id))).toEqual(bytes)
 	rebases.apply(id, { base, drop: [], edit: [{ n: note.n!, text: 'User injected instructions' }] })
 	expect(sessions.open(id).cwd).toBe('/new')
-	expect(JSON.stringify(await history.messages(id))).toContain('User injected instructions')
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('User injected instructions')
 })
 
 test('committed settings recover after metadata synchronization fails without replaying commands', () => {
@@ -231,7 +232,7 @@ test('dropped signed blocks are never expanded', async () => {
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	rebases.apply(id, { base: 4, drop: [2], edit: [] })
-	expect(JSON.stringify(await history.messages(id))).not.toContain('reason')
+	expect(JSON.stringify(await historyInput.messages(id))).not.toContain('reason')
 })
 
 test('edited tool output survives an omission saved before the rebase', async () => {
@@ -246,10 +247,10 @@ test('edited tool output survives an omission saved before the rebase', async ()
 		`${paths.sessionDir(id)}/projection.ason`,
 		'{boundary:0, checkpoint:0, pressure:-1, omitted:[3], consumed:[2,3]}',
 	)
-	expect(JSON.stringify(await history.messages(id))).toContain('[pruned')
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('[pruned')
 	rebases.apply(id, { base: 4, drop: [], edit: [{ n: 3, text: 'retained edit' }] })
-	expect(JSON.stringify(await history.messages(id))).toContain('retained edit')
-	expect(JSON.stringify(await history.messages(id))).not.toContain('[pruned tool output')
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('retained edit')
+	expect(JSON.stringify(await historyInput.messages(id))).not.toContain('[pruned tool output')
 })
 
 test('failed rewrite commit keeps original content even when it must pause before committing', async () => {
@@ -265,7 +266,7 @@ test('failed rewrite commit keeps original content even when it must pause befor
 		)
 		expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
 		expect(snapshots.build(id).state.type).toBe('paused')
-		expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
+		expect(JSON.stringify(await historyInput.messages(id))).toContain('oldanswer')
 	} finally {
 		history.append = append
 	}
