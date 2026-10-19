@@ -21,7 +21,7 @@
 //   # T [new section]                            full body
 //   # T [section removed; its instructions no longer apply]
 //
-// WHY THE FIFTH FORM EXISTS
+// WHY "DIFF AND NEW CONTENTS" EXISTS
 //
 // A diff is right only if the model's copy equals Hal's "old" side.
 // Normally it does: the model saw every earlier note. A /rebase, or a
@@ -44,8 +44,8 @@
 // data.reconcile marks this state. A rebase sets it (prepare() sees a
 // newer rebase record, or rebases.ts calls rebased()); only a full
 // rebuild of the system prompt clears it, because only then do the
-// copies match again. Until then, every diff update uses the fifth
-// form, not just the first. Hal never sends a note only to repair a
+// copies match again. Until then, every diff update uses "diff and new
+// contents", not just the first. Hal never sends a note only to repair a
 // rebase; the full body rides along with the next real change.
 //
 // Not done: diffing against the model's actual copy (frozen prompt
