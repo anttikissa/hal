@@ -93,4 +93,9 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, userHome, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }
+// Expands a leading ~ to the user's home, for paths the model gives tools.
+function expand(path: string): string {
+	return path.replace(/^~(?=\/|$)/, paths.userHome())
+}
+
+export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, userHome, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display, expand }

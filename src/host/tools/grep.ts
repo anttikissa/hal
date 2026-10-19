@@ -4,7 +4,7 @@
 // named in the result while the rest are searched.
 
 import { existsSync, readdirSync, statSync } from 'fs'
-import { homedir } from 'os'
+import { paths } from '../paths.ts'
 import { relative, resolve } from 'path'
 import { callText } from '../../common/call-text.ts'
 import { settings } from '../../common/settings.ts'
@@ -203,7 +203,7 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 		let notes: string[] = []
 		let roots: string[] = []
 		for (let p of wanted as string[]) {
-			let abs = resolve(ctx.cwd, p.replace(/^~(?=\/|$)/, homedir()))
+			let abs = resolve(ctx.cwd, paths.expand(p))
 			if (!existsSync(abs)) notes.push(`No such path: ${p}`)
 			else roots.push(abs)
 		}

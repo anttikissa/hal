@@ -2,7 +2,7 @@
 // directory listings and URLs.
 
 import { readdirSync, realpathSync, statSync } from 'fs'
-import { homedir } from 'os'
+import { paths } from '../paths.ts'
 import { resolve } from 'path'
 import { attachments } from '../../common/attachments.ts'
 import { callText } from '../../common/call-text.ts'
@@ -84,7 +84,7 @@ export const tool: Tool<ToolOutput> = {
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)
-		let path = resolve(ctx.cwd, input.path.replace(/^~(?=\/|$)/, homedir()))
+		let path = resolve(ctx.cwd, paths.expand(input.path))
 		if (settings.security() !== 'none' && (approval.sensitive(path) || approval.sensitive(realpathSync(path)))) throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
 		let st = statSync(path)
 		if (st.isDirectory()) {

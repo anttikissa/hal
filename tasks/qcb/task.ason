@@ -2,6 +2,9 @@
 	title: 'EDIT expands ~ and names missing files',
 	spec: 'EDIT paths expand a leading ~ to the home directory, as READ and GREP do. A version given for a file that does not exist fails as "<path>: no such file (<absolute path>)", never as a stale version. Restored invariant: a path READ accepts is the same file to EDIT, and EDIT reports the actual failure.',
 	status: 'done',
+	notes: [
+		'READ, GREP and EDIT expand ~ through paths.expand (src/host/paths.ts), which uses paths.userHome, so tests get a temp home. client/paste.ts cannot import host code and keeps its own; prompt-lang.ts stays free of Hal imports and keeps its own @~/ handling.'
+	],
 	needs: [],
 	foldInto: ['aaj']
 }

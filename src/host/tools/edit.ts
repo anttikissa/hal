@@ -5,7 +5,6 @@
 import { readFile, mkdir, mkdtemp, writeFile, link, unlink, rm, lstat, rename, chmod, open } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { dirname, resolve } from 'path'
-import { homedir } from 'os'
 import { tools, type Tool, type ToolContext } from '../tools.ts'
 import { nativeTool } from '../native-tool.ts'
 import { approval } from '../approval.ts'
@@ -276,9 +275,7 @@ export const tool: Tool = {
 			fileChanges.validateFile(e.path)
 			if (Object.keys(e).some((k) => !['path', 'old', 'new', 'hash', 'range', 'lines', 'count', 'insert', 'create', 'delete'].includes(k))) throw new Error(`unknown edit field: ${JSON.stringify(e)}`)
 		}
-		// Paths expand a leading ~ like READ and GREP.
-		const home = (path: string) => path.replace(/^~(?=\/|$)/, homedir())
-		const observation = await fileChanges.begin(ctx, edits.map((e) => home(e.path as string)), true)
+		const observation = await fileChanges.begin(ctx, edits.map((e) => paths.expand(e.path as string)), true)
 		const plans = new Map<string, Plan>(), failures: string[] = [], written: Plan[] = []
 		let recovery = '', keep = false, failure: unknown, result: string | undefined
 		try {
@@ -287,7 +284,7 @@ export const tool: Tool = {
 				const rank = (e: Record<string, unknown>) => e.old === undefined && (e.range !== undefined || e.insert !== undefined) ? 0 : 1
 				for (const [i, e] of [...edits.entries()].sort((a, b) => rank(a[1]) - rank(b[1]))) try {
 					check(ctx)
-					const path = await fileChanges.canonical(resolve(ctx.cwd, home(e.path as string)))
+					const path = await fileChanges.canonical(resolve(ctx.cwd, paths.expand(e.path as string)))
 					let p = plans.get(path)
 					if (!p) {
 						const before = await load(path)
