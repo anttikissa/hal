@@ -16,9 +16,9 @@ The main selling points:
 - Micro-optimized where it matters: no typing lag, near-instant
   startup even with 100+ tabs.
 - No dependencies where we can avoid them: starting `hal` loads about
-  24k lines of TS and no third-party packages. Fewer supply-chain
+  33k lines of TS and no third-party packages. Fewer supply-chain
   attacks are a happy side effect.
-- Small: about 34k lines in total.
+- Small: about 48k lines in total.
 - Run any number of sessions as tabs in one terminal, no extra tools
   needed. Connect as many terminal or web clients as you like, and
   sessions survive process exit or restart.
