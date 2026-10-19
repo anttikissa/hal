@@ -7,7 +7,7 @@
 // the host's webUrl reaches the browser (task e3).
 
 import { transcript } from '../common/transcript.ts'
-import type { Row } from './view.ts'
+import type { Row } from './transcript-rows.ts'
 
 // The block the address points at in session `session`.
 export type Target = { session: string; key: string }

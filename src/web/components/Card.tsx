@@ -13,98 +13,43 @@
 // card shows all of its result; the transcript holds all of it (host
 // tools cap what they keep), so nothing is fetched.
 
-import { ToolPresentation } from './ToolPresentation.tsx'
 import { Prose } from './Prose.tsx'
-import { ToolCommand } from './ToolCommand.tsx'
 import { interruption } from '../../common/interruption.ts'
-import { diff } from '../../common/diff.ts'
-import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from 'solid-js'
+import { CardActivity } from './CardActivity.tsx'
+import { LinkedText } from './LinkedText.tsx'
+import { CardText } from './CardText.tsx'
+import { CardReceipt } from './CardReceipt.tsx'
+import { cardIcons } from '../card-icons.ts'
+import { cardMotion } from '../card-motion.ts'
 import { bashResult } from '../../common/bash-result.ts'
 import { card } from '../../common/card.ts'
 import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
-import { external, Markdown } from './Markdown.tsx'
+import { Markdown } from './Markdown.tsx'
+import { CardActions } from './CardActions.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { CardReference } from './CardReference.tsx'
-import { Disclosure } from './Disclosure.tsx'
-import { Icon } from './Icon.tsx'
-import type { IconName } from '../icons.ts'
+import { PromptChanges } from './PromptChanges.tsx'
+import { ToolBody } from './ToolBody.tsx'
 import { promptChanges } from '../../common/prompt-changes.ts'
-import { app } from '../app.ts'
-import { editPrompt } from '../edit-prompt.ts'
-import { scroll } from '../scroll.ts'
+import { cardRows } from '../card-rows.ts'
 import { target } from '../target.ts'
-import { view, type Row } from '../view.ts'
+import { view } from '../view.ts'
+import type { Row } from '../transcript-rows.ts'
 import { hrefs } from '../hrefs.ts'
 import { folds } from '../folds.ts'
-import { forms } from '../../common/forms.ts'
 import { toggle as blockToggle } from '../../common/toggle.ts'
 import type { Verbosity } from '../../common/card.ts'
 import type { SessionMeta } from '../../common/session.ts'
-import type { JSX } from '@solidjs/web'
-
-// A new card fades in (--fade-ms, --ease-out from the page's CSS). A
-// script animation, not a CSS one: moving the card in the list, as when
-// a pending command lands where it ran (task rk), would restart a CSS
-// animation, which reads as the card appearing again. Started once the
-// card is in the page: a node cloned from a template belongs to an inert
-// document, whose animations never run.
-let fade: KeyframeAnimationOptions | undefined
-function enter(el: HTMLElement): void {
-	if (scroll.state.quiet) return
-	if (!fade) {
-		let css = getComputedStyle(document.documentElement)
-		fade = {
-			duration: parseFloat(css.getPropertyValue('--fade-ms')) || 0,
-			easing: css.getPropertyValue('--ease-out').trim() || 'ease-out',
-		}
-	}
-	el.animate({ opacity: [0, 1] }, fade)
-}
 
 // An image row shows the image itself, from the session's blob.
 // `job`: the background job this Bash call started still runs; a Kill
 // button in the header sends /kill #<job>.
 // `edit`: a prompt the user may edit and resend; its header offers Edit
 // (task 26q, edit-prompt.ts), which loads it into the box.
-// Tool cards' header icons, by tool name.
-const toolIcons: Record<string, IconName> = {
-	read: 'read',
-	edit: 'scissors',
-	google: 'google',
-	send: 'message',
-	wait: 'wait',
-	command: 'command',
-	inspect: 'inspect',
-	notify: 'notify',
-	ask: 'ask',
-	read_blob: 'blob',
-	read_entry: 'blob',
-	stop: 'stop',
-	help: 'inspect',
-}
-// A title without its leading mark ($, <, =>, …): the icon shows it.
-const unmark = <T extends string | undefined>(title: T): T => title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
-// Rows `text` wraps to in `cols` monospace columns, as in a terminal.
-const rows = (text: string, cols: number) =>
-	text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / cols)), 0)
-// Body columns: the header's inner width over the font's character width.
-let canvas: CanvasRenderingContext2D | null | undefined
-const columns = (header: HTMLElement) => {
-	let style = getComputedStyle(header)
-	canvas ??= document.createElement('canvas').getContext('2d')
-	canvas!.font = style.font
-	return Math.max(
-		1,
-		Math.floor(
-			(header.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) /
-				canvas!.measureText('0').width,
-		),
-	)
-}
-
 // `waiting`: a wait title as text and links (toolDetails.waiting).
 export function Card(props: {
 	row: Row
@@ -120,7 +65,7 @@ export function Card(props: {
 }) {
 	let id = () => `${props.session}#${props.row.item.key}`
 	let root: HTMLElement | undefined
-	onSettled(() => root && enter(root))
+	onSettled(() => root && cardMotion.enter(root))
 	let bash = () =>
 		!!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	let background = () => !!bashResult.background(props.row.item)
@@ -129,14 +74,6 @@ export function Card(props: {
 		return typeof command === 'string' ? command : undefined
 	}
 	let resultTime = () => (props.row.result ? titles.resultTime(props.row.item.ts, props.row.result.ts) : '')
-	let resultSection = (label: JSX.Element) =>
-		resultTime() ? (
-			<div class="result-output">
-				<CardHeader inline time={resultTime()} label={label} result={props.row.result} bash={bash()} />
-			</div>
-		) : (
-			label
-		)
 	// Short or long (task hyt): as the session starts its kind, until a
 	// click, /toggle or Ctrl-O switches it; a call fails with its result.
 	let level = () => folds.level(id(), card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash())))
@@ -152,37 +89,13 @@ export function Card(props: {
 	// header shows its time, spinner and, short, its latest output line.
 	let running = () => props.row.item.type === 'tool' && props.running?.call === props.row.item.id
 	let live = () => !!props.cursor || running()
-	let [now, setNow] = createSignal(Date.now())
-	createEffect(live, (on) => {
-		if (!on) return
-		setNow(Date.now())
-		let t = setInterval(() => setNow(Date.now()), 1000)
-		return () => clearInterval(t)
-	})
-	let elapsed = () => {
-		let ts = Date.parse((running() ? props.running?.since : undefined) ?? (props.row.item as { ts?: string }).ts ?? '')
-		return live() && Number.isFinite(ts) ? bashResult.duration(now() - ts, true) : undefined
-	}
+	let since = () => (running() ? props.running?.since : undefined) ?? (props.row.item as { ts?: string }).ts
 	let spins = () => ['thinking', 'text', 'tool'].includes(props.row.item.type)
 	let limit = () => {
 		let item = props.row.item
 		return item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 	}
-	let activity = () => (
-		<Show when={spins()}>
-			<span class="ticker">
-				<Show when={elapsed()}>
-					{(e) => (
-						<span class="elapsed">
-							({e()}
-							{limit() ? ` / ${limit()}` : ''})
-						</span>
-					)}
-				</Show>
-				<span class={['spinner', live() ? 'on' : '']} aria-hidden="true" />
-			</span>
-		</Show>
-	)
+	let activity = () => <CardActivity live={live()} since={since()} spins={spins()} limit={limit()} />
 	let latest = () => {
 		let item = props.row.item
 		return item.type === 'tool' && running() && !open()
@@ -213,30 +126,11 @@ export function Card(props: {
 		props.row.pending || (props.row.waiting && props.row.note === undefined)
 			? undefined
 			: target.href(props.session, blockId())
-	let receipt = () => (props.row.pending ? 0 : titles.receipt(props.row.item))
-	let receiptLabel = () => (receipt() === 1 ? 'Delivered, not read yet' : `Read by Hal${time() ? ` at ${time()}` : ''}`)
-	let ticks = () => (
-		<Show when={receipt()}>
-			<span class="receipt" role="img" aria-label={receiptLabel()} title={receiptLabel()}>
-				<Icon name={receipt() === 1 ? 'check' : 'checks'} />
-			</span>
-		</Show>
-	)
-	let bodyLines = () => {
-		let item = props.row.item
-		let output =
-			item.type === 'tool'
-				? (result()?.text ?? item.partial ?? '')
-				: bashResult.background(item) && item.type === 'prompt'
-					? bashResult.display(item.text)
-					: undefined
-		return output === undefined ? undefined : output ? output.replace(/\n$/, '').split('\n').length : 0
-	}
-	let outputLines = createMemo(() => (expanded() ? bodyLines() : undefined))
+	let outputLines = createMemo(() => (expanded() ? cardRows.outputLines(props.row.item, result()?.text) : undefined))
 	let reference = () => link()
 	let link = () => (
 		<CardReference href={href()} id={blockId()}>
-			{ticks()}
+			<CardReceipt row={props.row} />
 		</CardReference>
 	)
 
@@ -253,22 +147,10 @@ export function Card(props: {
 		let item = props.row.item
 		// A question is headed by its text, its addresses links.
 		if (item.type === 'question')
-			return (
-				<For each={hrefs.urlParts(item.form.text)}>
-					{(part) =>
-						typeof part === 'string' ? (
-							part
-						) : (
-							<a href={external(part.href)} target="_blank" rel="noopener noreferrer">
-								{part.text}
-							</a>
-						)
-					}
-				</For>
-			)
+			if (item.type === 'question') return <LinkedText parts={hrefs.urlParts(item.form.text)} />
 		let ref = source(),
 			t = titles.who(item)
-		if (titles.letter(item) === 'm') t = unmark(t)
+		if (titles.letter(item) === 'm') t = cardIcons.unmark(t)
 		let shown = ref && (/^\d+$/.test(ref) ? `t${ref}` : ref)
 		return shown && t?.endsWith(shown) ? (
 			<>
@@ -316,19 +198,10 @@ export function Card(props: {
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${firstLine()}`
 		return item.type === 'tool'
-			? unmark(presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text)
+			? cardIcons.unmark(
+					presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text,
+				)
 			: lines()[0]
-	}
-	// Folded cards name their kind with an icon: thinking, another
-	// session's message or command (the send tool's bubble, which
-	// unfolded ones show too), or the tool. Bash shows the terminal's
-	// `$ ` as copyable text instead (task ya1).
-	let kindIcon = (): IconName | undefined => {
-		let item = props.row.item
-		if (item.type === 'thinking') return 'thinking'
-		if (titles.letter(item) === 'm') return 'message'
-		if (item.type !== 'tool') return undefined
-		return toolIcons[item.name]
 	}
 	let shellPrompt = () => (props.row.item.type === 'tool' && props.row.item.name === 'bash' ? '$ ' : undefined)
 	// A wait links what it waits for (task zd8).
@@ -339,21 +212,6 @@ export function Card(props: {
 			: undefined
 	}
 	let headerParts = createMemo(() => waitParts() ?? hrefs.urlParts(head() ?? ''))
-	let linkedParts = (parts: ReturnType<typeof hrefs.urlParts>) => (
-		<For each={parts}>
-			{(part) =>
-				typeof part === 'string' ? (
-					part
-				) : part.href.startsWith('/') ? (
-					<a href={part.href}>{part.text}</a>
-				) : (
-					<a href={external(part.href)} target="_blank" rel="noopener noreferrer">
-						{part.text}
-					</a>
-				)
-			}
-		</For>
-	)
 	// A closed reply or prompt: its sender in the title color, its text
 	// in the body color it has open, as a closed Bash card shows output.
 	let compactParts = createMemo(() => {
@@ -375,110 +233,18 @@ export function Card(props: {
 			? lines.slice(1)
 			: lines
 	})
-	let command = (
-		<Show when={call().length}>
-			<ToolCommand lines={call()} compact={!full()} />
-		</Show>
-	)
-	let body = () => {
-		let item = props.row.item
-		if (item.type !== 'tool') return prose() ? parts() : lines().join('\n')
-		if ((presentation() || presentationError()) && full())
-			return (
-				<>
-					<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
-					<Show when={!presentation()}>{command}</Show>
-					{resultSection(
-						<>
-							<Show
-								when={
-									props.row.result &&
-									(props.row.result.isError || props.row.result.interrupted || !presentation()) &&
-									props.row.result.output
-								}
-							>
-								{(output) => <div class={props.row.result?.isError ? 'error' : ''}>{output()}</div>}
-							</Show>
-							<Show when={presentation()}>
-								{(p) => <ToolPresentation presentation={p()} output={props.row.result?.output} />}
-							</Show>
-						</>,
-					)}
-					<Show when={!props.row.result && item.partial}>{(output) => <div>{output()}</div>}</Show>
-					<div class="raw-tool">
-						<Disclosure
-							name="Raw call and result"
-							open={folds.raw().has(id())}
-							onClick={() => folds.setRaw((s) => folds.toggled(s, id(), !s.has(id())))}
-						>
-							Raw call and result
-						</Disclosure>
-						<Show when={folds.raw().has(id())}>
-							<pre>
-								{item.cmd ?? toolDetails.value(item.input).join('\n')}
-								{'\n\n'}
-								{props.row.result?.output ?? item.partial ?? ''}
-							</pre>
-						</Show>
-					</div>
-				</>
-			)
-		// An EDIT's diff shows its edits, so it stands alone, in diff colors.
-		if (props.row.result?.diff)
-			return resultSection(
-				<div class="edit-diff diff">
-					<For each={result()!.text.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For>
-				</div>,
-			)
-		// The call once (task 8t), then its output: the result, or what
-		// has streamed so far.
-		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
-		return (
-			<>
-				<Show when={presentationError()}>{(error) => <div class="error">{error()}</div>}</Show>
-				{command}
-				{out ? resultSection(<span class={failed() ? 'result-text error' : 'result-text'}>{out}</span>) : ''}
-			</>
-		)
-	}
+	let body = () => (prose() ? parts() : lines().join('\n'))
 	let failed = () =>
 		!!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
-	// A mouse click toggles after 200 ms, so a double-click can select a
-	// word instead; keyboard activation (detail 0) toggles at once. The
-	// second press cancels it, since a double-click-drag clicks only on release.
-	let pending: ReturnType<typeof setTimeout> | undefined
-	let toggle = (e: MouseEvent) => {
-		clearTimeout(pending)
-		if (e.detail > 1) return
-		if (e.detail === 1 && !getSelection()?.isCollapsed) return
-		let hit = e.target as Element
-		let control = hit.closest('.mark, .CardHeader:not(.inline)')
-		if (!canToggle() || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
-		if (!control && expanded()) return
-		let flip = () =>
-			scroll.follow(() => {
-				let el = scroll.state.el as HTMLElement | undefined,
-					top = root?.getBoundingClientRect().top,
-					edge = el?.getBoundingClientRect().top
-				if (
-					expanded() &&
-					el &&
-					top !== undefined &&
-					edge !== undefined &&
-					top + (root?.querySelector('header')?.offsetHeight ?? 0) <= edge
-				) {
-					scroll.leave('toggle')
-					el.scrollTo({ top: el.scrollTop + top - edge, behavior: 'instant' })
-					scroll.moved()
-				}
-				untrack(() =>
-					folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]),
-				)
-				flush()
-			})
-		if (e.detail === 0) flip()
-		else pending = setTimeout(flip, 200)
-	}
+	let clicks = cardMotion.toggler({
+		root: () => root,
+		canToggle: () => canToggle(),
+		expanded: () => expanded(),
+		disclose: () =>
+			untrack(() =>
+				folds.disclose(id(), level(), [props.row.item.key, ...(props.row.result ? [props.row.result.key] : [])]),
+			),
+	})
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Model text and inter-tab prose are Markdown (tasks fn, sz); human
 	// prompts and background Bash output stay literal. A memo preserves DOM.
@@ -509,7 +275,7 @@ export function Card(props: {
 	let [cols, setCols] = createSignal(Math.max(20, Math.floor(innerWidth / 8.4)))
 	let measure = () => {
 		let header = root?.querySelector<HTMLElement>(':scope > .CardHeader')
-		if (header) setCols(columns(header))
+		if (header) setCols(cardRows.columns(header))
 	}
 	// The rows opening a closed card adds, shown faintly on hover: a tool's
 	// command, a blank row, then its whole output, wrapped like the
@@ -522,128 +288,24 @@ export function Card(props: {
 			if (presentation() || presentationError()) return undefined
 			let r = props.row.result
 			let output = (r ? (view.show(r, true, bash())?.text ?? '') : (item.partial ?? '')).replace(/\n$/, '')
-			let command = call().length ? rows(call().join('\n'), cols()) : 0
-			return command + (command && output ? 1 : 0) + (output ? rows(output, cols()) : 0)
+			let command = call().length ? cardRows.rows(call().join('\n'), cols()) : 0
+			return command + (command && output ? 1 : 0) + (output ? cardRows.rows(output, cols()) : 0)
 		}
 		let body =
 			bashResult.background(item) && item.type === 'prompt'
 				? bashResult.display(item.text).replace(/\n$/, '')
 				: text().trim()
-		return body ? rows(body, cols()) - (item.type === 'thinking' ? 1 : 0) : 0
+		return body ? cardRows.rows(body, cols()) - (item.type === 'thinking' ? 1 : 0) : 0
 	})
 	// Headers stick only on cards over 10 rows.
-	let tall = createMemo(() => rows(`${text()}\n${result()?.text ?? ''}`, cols()) > 10)
-	let linked = createMemo(() =>
-		props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text(),
-	)
+	let tall = createMemo(() => cardRows.rows(`${text()}\n${result()?.text ?? ''}`, cols()) > 10)
 	let prose = () =>
 		props.row.item.type === 'prompt' &&
 		!md() &&
 		!bashResult.background(props.row.item) &&
 		props.row.item.origin !== 'model'
-	let parts = () => {
-		let item = props.row.item
-		if (prose()) return <Prose text={text()} />
-		// A past question keeps its quote's marks, as the open form showed them.
-		if (item.type === 'question' && item.form.quote?.marks?.length) {
-			let q = item.form.quote
-			let indent = (t: string, marked: boolean) =>
-				t.split('\n').map((l, i) => (
-					<>
-						{i ? '\n    ' : ''}
-						{marked && l ? <mark>{l}</mark> : l}
-					</>
-				))
-			return (
-				<>
-					{'    '}
-					<For each={forms.quoteParts(q)}>{(p) => indent(p.text, p.marked)}</For>
-					{text().slice(q.text.length + 4 * q.text.split('\n').length)}
-				</>
-			)
-		}
-		let l = linked()
-		return typeof l === 'string'
-			? l
-			: l.map((p) =>
-					typeof p === 'string' ? (
-						p
-					) : (
-						<a href={external(p.href)} target="_blank" rel="noopener">
-							{p.text}
-						</a>
-					),
-				)
-	}
+	let parts = () => (prose() ? <Prose text={text()} /> : <CardText item={props.row.item} text={text()} />)
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
-	// A history rewrite's divider (task z71) offers its undo.
-	let undo = () => props.row.item.type === 'divider' && props.row.item.text.includes('`/rebase undo`')
-	let undoButton = () => (
-		<Show when={undo()}>
-			<button
-				type="button"
-				class="undo"
-				title="Go back (/rebase undo)"
-				onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}
-			>
-				<Icon name="undo" />
-				Undo
-			</button>
-		</Show>
-	)
-	let edit = () => {
-		if (!editPrompt.edit(props.row.waiting ? props.row.key : props.row.item.key)) return
-		flush()
-		let box = document.querySelector<HTMLTextAreaElement>('.Composer textarea')
-		box?.focus()
-		box?.setSelectionRange(box.value.length, box.value.length)
-	}
-	let editButton = () => (
-		<Show when={props.edit}>
-			<button
-				type="button"
-				class="edit"
-				aria-label={props.row.waiting ? 'Edit queued message' : 'Edit prompt'}
-				title={
-					props.row.waiting
-						? 'Edit in the queue without changing its position'
-						: 'Edit this prompt and send it again from here'
-				}
-				onClick={edit}
-			>
-				<Icon name="edit" />
-			</button>
-		</Show>
-	)
-	// Drops this queued message by its inbox id (task gr4); the host refuses with a visible reason.
-	let sendButton = () => (
-		<Show when={props.discard}>
-			<button
-				type="button"
-				class="send"
-				aria-label="Send queued message now"
-				title="Send now; it keeps its sender and arrival time"
-				onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue next ${props.row.key}` })}
-			>
-				<Icon name="send" />
-			</button>
-		</Show>
-	)
-	let discardButton = () => (
-		<Show when={props.discard}>
-			<button
-				type="button"
-				class="discard"
-				aria-label="Discard queued message"
-				title="Remove from the queue"
-				onClick={() =>
-					app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop --id ${props.row.key}` })
-				}
-			>
-				<Icon name="close" />
-			</button>
-		</Show>
-	)
 	let statusResult = () => {
 		let item = props.row.item
 		return item.type === 'prompt' && background()
@@ -682,14 +344,17 @@ export function Card(props: {
 					</Show>
 				</>
 			)
-		if (oneRow()) return linkedParts(hrefs.urlParts(unstamp(text())))
+		if (oneRow()) return <LinkedText parts={hrefs.urlParts(unstamp(text()))} />
 		if (closable())
 			return (
 				<Show when={!expanded()} fallback={who()}>
-					<Show when={compactParts()} fallback={linkedParts(headerParts())}>
+					<Show when={compactParts()} fallback={<LinkedText parts={headerParts()} />}>
 						{(c) => (
 							<>
-								{c().who} <span class="secondary">{linkedParts(c().text)}</span>
+								{c().who}{' '}
+								<span class="secondary">
+									<LinkedText parts={c().text} />
+								</span>
 							</>
 						)}
 					</Show>
@@ -698,46 +363,22 @@ export function Card(props: {
 		if (!folding()) return who()
 		if (headsWho()) return who()
 		return (
-			<Show when={props.row.item.type === 'output' && props.row.item.commit} fallback={linkedParts(headerParts())}>
+			<Show
+				when={props.row.item.type === 'output' && props.row.item.commit}
+				fallback={<LinkedText parts={headerParts()} />}
+			>
 				{titles.who(props.row.item)} <span class="secondary">{firstLine()}</span>
 			</Show>
 		)
 	}
-	let changeBody = () => (
-		<div class="content diff change">
-			<For each={changes().slice(1)}>
-				{(r) => (
-					<div class={`row ${r.tone}`}>
-						{r.parts ? (
-							<For each={r.parts}>
-								{(w, k) => (
-									<>
-										{k() ? ' ' : ''}
-										<span class={w.tone}>{w.text}</span>
-									</>
-								)}
-							</For>
-						) : (
-							r.text
-						)}
-					</div>
-				)}
-			</For>
-			<For each={promptChanges.run(props.row.item)}>
-				{(o) => (
-					<>
-						<div class="head">{promptChanges.line(o)}</div>
-						<div class="lines">
-							<For each={o.change!.diff.split('\n')}>{(r) => <div class={diff.tone(r)}>{r}</div>}</For>
-						</div>
-					</>
-				)}
-			</For>
-		</div>
-	)
 	let content = (s: () => { kind: string; text: string }) => {
 		if (oneRow()) return null
-		if (isChange()) return <Show when={expanded()}>{changeBody()}</Show>
+		if (isChange())
+			return (
+				<Show when={expanded()}>
+					<PromptChanges item={props.row.item} />
+				</Show>
+			)
 		if (queued())
 			return (
 				<Show when={expanded()}>
@@ -774,7 +415,23 @@ export function Card(props: {
 								when={props.row.item.type !== 'tool'}
 								fallback={
 									<>
-										{md() ? markdown() : <Show when={expanded() || !presentation()}>{body()}</Show>}
+										{md() ? (
+											markdown()
+										) : (
+											<Show when={expanded() || !presentation()}>
+												<ToolBody
+													row={props.row}
+													id={id()}
+													full={full()}
+													bash={bash()}
+													result={result()}
+													presentation={presentation()}
+													presentationError={presentationError()}
+													call={call()}
+													failed={failed()}
+												/>
+											</Show>
+										)}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
 									</>
 								}
@@ -810,12 +467,12 @@ export function Card(props: {
 						props.cursor ? 'streaming' : '',
 						props.target ? 'target' : '',
 					]}
-					onClick={toggle}
+					onClick={clicks.click}
 					onPointerEnter={measure}
-					onMouseDown={(e) => e.detail > 1 && clearTimeout(pending)}
+					onMouseDown={clicks.press}
 				>
 					<CardHeader
-						icon={kindIcon()}
+						icon={cardIcons.kind(props.row.item)}
 						prefix={shellPrompt()}
 						time={time()}
 						name={canToggle() ? (head() ?? titles.who(props.row.item) ?? 'Card') : undefined}
@@ -831,26 +488,13 @@ export function Card(props: {
 						reference={reference()}
 						activity={activity()}
 						actions={
-							<>
-								{editButton()}
-								{sendButton()}
-								{discardButton()}
-								{undoButton()}
-								<Show when={props.job}>
-									{(n) => (
-										<button
-											type="button"
-											class="kill error"
-											title={`Stop background job t${n()} (/kill t${n()})`}
-											aria-label={`Kill background job t${n()}`}
-											onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill t${n()}` })}
-										>
-											<Icon name="skull" />
-											kill
-										</button>
-									)}
-								</Show>
-							</>
+							<CardActions
+								row={props.row}
+								session={props.session}
+								edit={props.edit}
+								discard={props.discard}
+								job={props.job}
+							/>
 						}
 					>
 						<Show when={props.cursor && !open()}>{cursor()}</Show>

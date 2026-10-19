@@ -6,7 +6,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { app } from './app.ts'
 import { router } from './router.ts'
 import { target } from './target.ts'
-import { view } from './view.ts'
+import { transcriptRows } from './transcript-rows.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -59,7 +59,7 @@ afterEach(() => {
 	app.reset()
 })
 
-const rows = () => view.rows(app.state.view.transcript!.items)
+const rows = () => transcriptRows.rows(app.state.view.transcript!.items)
 
 test('an address for a block in an earlier page loads that page and finds its card', () => {
 	address = `http://h/${sessionId}#3`

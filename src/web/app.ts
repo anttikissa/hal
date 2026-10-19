@@ -21,6 +21,7 @@ import { push } from './push.ts'
 import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
+import { transcriptRows } from './transcript-rows.ts'
 import { find } from './find.ts'
 import { folds } from './folds.ts'
 import { rebaseView } from './rebase.ts'
@@ -211,7 +212,11 @@ function seek(): void {
 	let st = app.state
 	let t = st.target
 	if (!t || t.found) return
-	let rows = view.withPending(view.rows(st.view.transcript?.items ?? []), [], st.view.transcript?.inbox)
+	let rows = transcriptRows.withPending(
+		transcriptRows.rows(st.view.transcript?.items ?? []),
+		[],
+		st.view.transcript?.inbox,
+	)
 	let s = target.seek(
 		t,
 		st.view.transcript?.meta.id,

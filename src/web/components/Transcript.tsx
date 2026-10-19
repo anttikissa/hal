@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// The session's transcript: one card per row (view.rows), keyed by the
+// The session's transcript: one card per row (transcriptRows.rows), keyed by the
 // row's key (task w5), so a row keeps its DOM and whether it is open
 // when a snapshot replaces every item, a streaming item grows, earlier
 // history arrives above or a pending prompt lands; the open question as
@@ -18,7 +18,8 @@ import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
-import { view, type Row, type ViewState } from '../view.ts'
+import { view, type ViewState } from '../view.ts'
+import { transcriptRows, type Row } from '../transcript-rows.ts'
 import { Card } from './Card.tsx'
 import { Question } from './Question.tsx'
 
@@ -73,12 +74,18 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
-	let rows = createMemo<Row[]>((before) => view.rows(items(), props.view.sent, before))
+	let rows = createMemo<Row[]>((before) => transcriptRows.rows(items(), props.view.sent, before))
 	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), {
 		equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true),
 	})
 	let all = createMemo(() =>
-		view.withPending(rows(), props.pending, props.view.transcript?.inbox, tabIds(), props.view.transcript?.queueHold),
+		transcriptRows.withPending(
+			rows(),
+			props.pending,
+			props.view.transcript?.inbox,
+			tabIds(),
+			props.view.transcript?.queueHold,
+		),
 	)
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
@@ -96,7 +103,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		</div>
 	)
 	// Background jobs still running, by call key: their cards offer Kill.
-	let jobs = createMemo(() => view.jobs(all()))
+	let jobs = createMemo(() => transcriptRows.jobs(all()))
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
 	// One queued message is edited at a time, in one window.
 	let editableWaiting = (r: Row) =>

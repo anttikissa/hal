@@ -1,78 +1,16 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+// The web controller with the message box: sending, drafts, editing the
+// last prompt, questions, the model picker, settings and editing keys.
+
+import { expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
-import { drafts, type Local } from '../common/drafts.ts'
-import { placeholders } from '../common/placeholders.ts'
+import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { keys, type Target } from './keys.ts'
-import { router } from './router.ts'
-import { tabs } from './tabs.ts'
-import { view } from './view.ts'
 import { folds } from './folds.ts'
+import { useApp, fx, message, press, sessionId, snapshot, ts } from './app-fixture.test.ts'
 
-const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
-const sessionId = meta.id
-const ts = '2026-09-26T00:00:01Z'
-
-let sent: any[] = []
-let stored = new Map<string, Local>()
-let redraws = 0
-const orig = {
-	send: connection.send,
-	connected: connection.connected,
-	store: drafts.store,
-	href: router.href,
-	write: router.write,
-	tabStore: { ...router.store },
-	mac: tabs.mac,
-}
-let address = 'http://h/'
-let history: string[] = []
-let lastTab = undefined as string | undefined
-
-beforeEach(() => {
-	sent = []
-	stored = new Map()
-	redraws = 0
-	app.reset()
-	drafts.reset()
-	connection.send = (c: any) => void sent.push(c)
-	connection.connected = () => true
-	drafts.store = { load: (id) => stored.get(id), save: (id, l) => void stored.set(id, structuredClone(l)) }
-	app.changed = () => void redraws++
-	address = 'http://h/'
-	history = [address]
-	lastTab = undefined
-	router.href = () => address
-	router.write = (url, replace) => {
-		address = new URL(url, address).href
-		if (replace) history[history.length - 1] = address
-		else history.push(address)
-	}
-	router.store.load = () => lastTab
-	router.store.save = (id) => void (lastTab = id)
-	tabs.mac = () => true
-})
-
-afterEach(() => {
-	connection.send = orig.send
-	connection.connected = orig.connected
-	drafts.store = orig.store
-	Object.assign(router, { href: orig.href, write: orig.write })
-	Object.assign(router.store, orig.tabStore)
-	tabs.mac = orig.mac
-	drafts.reset()
-	app.reset()
-})
-
-const press = (
-	key: string,
-	target: Target,
-	mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {},
-) => keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
-const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
-const snapshot = (state: object, history: object[] = [], draft?: object): Event =>
-	({ type: 'snapshot', sessionId, snapshot: { meta, history, state, ...(draft ? { draft } : {}) } }) as Event
+useApp()
 
 test('Ctrl-O p expands draft pastes without sending the draft', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
@@ -87,19 +25,19 @@ test('Ctrl-O p expands draft pastes without sending the draft', () => {
 	expect(app.state.view.modal).toBeUndefined()
 	expect(app.state.text).toBe('before first\nlast after')
 	expect(drafts.text(sessionId)).toBe(app.state.text)
-	expect(sent.some((c) => c.type === 'submit')).toBe(false)
+	expect(fx.sent.some((c) => c.type === 'submit')).toBe(false)
 })
 
 test('Enter sends the message box as a prompt: it shows pending and the box empties', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	// Text put in the box without an input event is what gets sent.
 	expect(press('Enter', message('hi'))).toBe(true)
-	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'hi' })
+	expect(fx.sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'hi' })
 	expect(app.pending().map((s) => s.text)).toEqual(['hi'])
 	expect(app.state.text).toBe('')
-	expect(redraws).toBeGreaterThan(0)
+	expect(fx.redraws).toBeGreaterThan(0)
 	// Acknowledged, it is no longer pending.
-	let id = sent.find((c) => c.type === 'submit').id
+	let id = fx.sent.find((c) => c.type === 'submit').id
 	app.onEvent({ type: 'ack', id } as Event)
 	expect(app.pending()).toEqual([])
 })
@@ -109,15 +47,15 @@ test('Shift+Enter is a newline; Enter before a session exists keeps the text wit
 	expect(press('Enter', message('hi'))).toBe(true)
 	expect(app.state.text).toBe('hi')
 	expect(app.notice()).toBeTruthy()
-	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
+	expect(fx.sent.filter((c) => c.type === 'submit')).toEqual([])
 })
 
 test('typing is the session draft, and a snapshot brings the kept draft back', () => {
 	app.onEvent(snapshot({ type: 'idle' }, [], { text: 'from host', rev: 3 }))
 	expect(app.state.text).toBe('from host')
 	app.input('mine')
-	expect(stored.get(sessionId)?.text).toBe('mine')
-	expect(sent.some((c) => c.type === 'draft' && c.text === 'mine')).toBe(true)
+	expect(fx.stored.get(sessionId)?.text).toBe('mine')
+	expect(fx.sent.some((c) => c.type === 'draft' && c.text === 'mine')).toBe(true)
 })
 
 test('Up on the first row while the model works edits the last prompt; Down unchanged brings the draft back', () => {
@@ -130,87 +68,11 @@ test('Up on the first row while the model works edits the last prompt; Down unch
 	expect(press('ArrowUp', message('draft\nmore'))).toBe(false)
 	expect(press('ArrowUp', message('draft\nmore', 2))).toBe(true)
 	expect(app.state.text).toBe('fix ti')
-	expect(sent.at(-1)).toMatchObject({ type: 'pause', sessionId })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'pause', sessionId })
 	expect(app.state.view.editing).toBeDefined()
 	expect(press('ArrowDown', message('fix ti'))).toBe(true)
 	expect(app.state.text).toBe('draft\nmore')
 	expect(app.state.view.editing).toBeUndefined()
-})
-
-test('Tab at the end of a slash command asks the host, and its answer fills the box', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	expect(press('Tab', message('/cd ~/p', 0))).toBe(false)
-	expect(press('Tab', message('/cd ~/p'))).toBe(true)
-	expect(sent.at(-1)).toMatchObject({ type: 'complete', sessionId, text: '/cd ~/p' })
-	app.onEvent({ type: 'completions', sessionId, text: '/cd ~/p', items: ['/cd ~/projects/'] })
-	expect(app.state.text).toBe('/cd ~/projects/')
-})
-
-test('typing opens host completions; keyboard choice is not sent, stale answers and Escape stay hidden', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/c')
-	expect(sent).toContainEqual(expect.objectContaining({ type: 'complete', text: '/c' }))
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(app.state.menu?.choices).toHaveLength(2)
-	expect(press('ArrowDown', message('/c'))).toBe(true)
-	expect(press('Enter', message('/c'))).toBe(true)
-	expect(app.state.text).toBe('/clear ')
-	expect(app.state.menu).toBeUndefined()
-	app.input('/c')
-	app.onEvent({ type: 'completions', sessionId, text: '/clear ', items: ['/clear '] })
-	expect(app.state.menu).toBeUndefined()
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(press('Escape', message('/c'))).toBe(true)
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(app.state.menu).toBeUndefined()
-})
-
-// The answer arrives later than the input event. Repainting an unchanged
-// menu between the two is an observable layout jump, not loading feedback.
-test('a completion menu remains identical across input and an unchanged host reply', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/model gp')
-	app.onEvent({
-		type: 'completions',
-		sessionId,
-		text: '/model gp',
-		items: ['/model gpt-6.1'],
-		descriptions: ['openai/gpt-6.1-sol'],
-	})
-	let shown = app.state.menu
-	expect(shown?.choices[0]?.description).toBe('openai/gpt-6.1-sol')
-	app.input('/model gpt')
-	expect(app.state.menu).toBe(shown)
-	expect(sent.at(-1)).toMatchObject({ type: 'complete', text: '/model gpt' })
-	app.onEvent({ type: 'completions', sessionId, text: '/model gp', items: [] })
-	expect(app.state.menu).toBe(shown)
-	app.onEvent({
-		type: 'completions',
-		sessionId,
-		text: '/model gpt',
-		items: ['/model gpt-6.1'],
-		descriptions: ['openai/gpt-6.1-sol'],
-	})
-	expect(app.state.menu).toBe(shown)
-})
-
-test('a longer prefix filters known choices without waiting, while a shorter one waits for the full host list', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/c')
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	let first = app.state.menu!.choices[0]!
-	let clear = app.state.menu!.choices[1]!
-	app.input('/cl')
-	expect(app.state.menu!.choices).toEqual([clear])
-	let filtered = app.state.menu
-	app.onEvent({ type: 'completions', sessionId, text: '/cl', items: ['/clear '] })
-	expect(app.state.menu).toBe(filtered)
-	app.input('/c')
-	expect(app.state.menu!.choices).toEqual([clear]) // only the host can supply candidates the shorter prefix adds
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(app.state.menu!.choices).toEqual([first, clear])
-	app.input('/clx')
-	expect(app.state.menu).toBeUndefined()
 })
 
 test('an open question takes the keys: fields type natively, Enter answers', () => {
@@ -220,7 +82,7 @@ test('an open question takes the keys: fields type natively, Enter answers', () 
 	expect(press('a', { kind: 'field' })).toBe(false)
 	app.formInput(0, 'Ann')
 	expect(press('Enter', { kind: 'field' })).toBe(true)
-	expect(sent.at(-1)).toMatchObject({ type: 'answer', sessionId, question: 'q1', answers: { name: 'Ann' } })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'answer', sessionId, question: 'q1', answers: { name: 'Ann' } })
 })
 
 test('an open choice question leaves Cmd and Ctrl keys to the browser; a letter picks', () => {
@@ -233,9 +95,9 @@ test('an open choice question leaves Cmd and Ctrl keys to the browser; a letter 
 		['a', { ctrlKey: true }],
 	] as const)
 		expect(press(key, { kind: 'button', submits: false }, mods)).toBe(false)
-	expect(sent.filter((c) => c.type === 'answer')).toEqual([])
+	expect(fx.sent.filter((c) => c.type === 'answer')).toEqual([])
 	expect(press('r', { kind: 'button', submits: false })).toBe(true)
-	expect(sent.at(-1)).toMatchObject({ type: 'answer', answers: { m: 'Router' } })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'answer', answers: { m: 'Router' } })
 })
 
 test('a click on an option of a one-field question answers it, unless disconnected', () => {
@@ -244,26 +106,26 @@ test('a click on an option of a one-field question answers it, unless disconnect
 	app.onEvent({ type: 'question', sessionId, id: 'q1', form })
 	connection.connected = () => false
 	app.pick(0, 'yes')
-	expect(sent.filter((c) => c.type === 'answer')).toEqual([])
+	expect(fx.sent.filter((c) => c.type === 'answer')).toEqual([])
 	expect(app.notice()).toMatch(/not connected/)
 	connection.connected = () => true
 	app.pick(0, 'no')
-	expect(sent.at(-1)).toMatchObject({ type: 'answer', question: 'q1', answers: { ok: 'no' } })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'answer', question: 'q1', answers: { ok: 'no' } })
 })
 
 test('Ctrl-M asks for models; the picker takes the keys and a click picks', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	expect(press('m', message(''), { ctrlKey: true })).toBe(true)
-	expect(sent.at(-1)).toMatchObject({ type: 'models', sessionId })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'models', sessionId })
 	app.onEvent({ type: 'models', sessionId, current: 'fake/m', items: ['fake/m', 'x/y'] })
 	expect(app.state.view.modal).toBeDefined()
 	// Plain keys go to the search box.
 	expect(press('x', { kind: 'other' })).toBe(false)
 	// A tap on a category without a default opens it; then on its model.
 	app.modalPick(app.state.view.modal!.items.indexOf('▶ x'))
-	expect(sent.at(-1)).toMatchObject({ type: 'models' })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'models' })
 	app.modalPick(app.state.view.modal!.items.findIndex((item) => item.includes('x/y')))
-	expect(sent.at(-1)).toMatchObject({ type: 'submit', text: '/model x/y' })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'submit', text: '/model x/y' })
 	expect(app.state.view.modal).toBeUndefined()
 })
 
@@ -271,11 +133,11 @@ test('settings arrows adjust values but leave inline editing native', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	app.onEvent({ type: 'settings', sessionId, values: { subagentSlots: '3' }, stored: {} })
 	expect(press('ArrowRight', { kind: 'field' })).toBe(true)
-	expect(sent.at(-1)).toMatchObject({ type: 'submit', text: '/config subagentSlots 4' })
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'submit', text: '/config subagentSlots 4' })
 	press('Enter', { kind: 'field' })
-	let count = sent.length
+	let count = fx.sent.length
 	expect(press('ArrowLeft', { kind: 'field' })).toBe(false)
-	expect(sent).toHaveLength(count)
+	expect(fx.sent).toHaveLength(count)
 })
 
 test('the link state shows as a notice until connected', () => {
@@ -378,420 +240,3 @@ test('keys the browser already handles stay native in the box', () => {
 		expect(press(key, message('hello world', 5), mods)).toBe(false)
 	expect(app.state.text).toBe('hello world')
 })
-
-// ── Tabs ──
-
-const tab = (id: string, extra: object = {}) => ({
-	id,
-	name: `name ${id}`,
-	cwd: `/cwd/${id}`,
-	model: 'fake/m',
-	state: { type: 'idle' },
-	...extra,
-})
-const tabsEvent = (...tabs: object[]) => ({ type: 'tabs', tabs }) as Event
-const snapOf = (id: string, draft?: string): Event =>
-	({
-		type: 'snapshot',
-		sessionId: id,
-		snapshot: {
-			meta: { ...meta, id },
-			history: [],
-			state: { type: 'idle' },
-			...(draft ? { draft: { text: draft, rev: 1 } } : {}),
-		},
-	}) as Event
-const alt = (digit: number) =>
-	press(String(digit), message(app.state.text), { altKey: true, code: `Digit${digit}` } as any)
-
-test('the empty box shows an example request, from the Hal list in a tab the host marks hal', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { hal: true })))
-	expect(app.state.shown).toBe('1-aaa')
-	expect(app.placeholder('', 0)).toBeUndefined()
-	app.onEvent(snapOf('1-aaa'))
-	expect(app.placeholder('', 0)?.text).toBe(placeholders.general[0])
-	tabs.show('2-bbb', false)
-	app.onEvent(snapOf('2-bbb'))
-	expect(app.placeholder('', 0)?.text).toBe(placeholders.hal[0])
-})
-
-test('a block address resumes even a closed session, retaining its hash and history entry', () => {
-	address = 'http://h/2-bbb#5'
-	history = [address]
-	app.onState({ type: 'connected', role: 'client' })
-	expect(sent).toContainEqual({
-		type: 'tab-resume',
-		id: expect.any(String),
-		sessionId: '2-bbb',
-		timezone: expect.any(String),
-	})
-	app.onEvent(tabsEvent(tab('1-aaa')))
-	expect(app.state.shown).toBeUndefined()
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	expect(app.state.shown).toBe('2-bbb')
-	expect(sent).toContainEqual({ type: 'open', sessionId: '2-bbb' })
-	expect(history).toEqual(['http://h/2-bbb#5'])
-	// A snapshot of another session is not this page's transcript.
-	app.onEvent(snapOf('1-aaa'))
-	expect(app.sessionId()).toBeUndefined()
-	app.onEvent(snapOf('2-bbb'))
-	expect(app.sessionId()).toBe('2-bbb')
-})
-
-test('with no valid id the page lands on the tab shown last, else the first, replacing the entry', () => {
-	address = 'http://h/9-zzz'
-	history = [address]
-	lastTab = '2-bbb'
-	app.onState({ type: 'connected', role: 'client' })
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	app.onEvent({
-		type: 'rejected',
-		id: sent.find((c) => c.type === 'tab-resume').id,
-		command: 'tab-resume',
-		reason: 'no such session',
-	})
-	expect(history).toEqual(['http://h/2-bbb'])
-	app.reset()
-	address = 'http://h/'
-	history = [address]
-	lastTab = undefined
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	expect(history).toEqual(['http://h/1-aaa'])
-	expect(router.store.load()).toBe('1-aaa')
-})
-
-test('background neighbors fetch after paint and switching reuses their in-memory transcripts', async () => {
-	address = 'http://h/2-bbb'
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc'), tab('4-ddd')))
-	app.onEvent(snapOf('2-bbb'))
-	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['2-bbb'])
-	await Bun.sleep(10)
-	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '1-aaa' })
-	app.onEvent(snapOf('1-aaa'))
-	await Bun.sleep(10)
-	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '3-ccc' })
-	app.onEvent(snapOf('3-ccc'))
-	await Bun.sleep(10)
-	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '4-ddd' })
-	app.onEvent(snapOf('4-ddd'))
-	let opens = sent.filter((c) => c.type === 'open').length
-	tabs.show('3-ccc', false)
-	expect(app.sessionId()).toBe('3-ccc')
-	expect(sent.filter((c) => c.type === 'open').length).toBe(opens)
-})
-
-test('choosing a tab pushes an entry, moves the following, and each tab keeps its draft; Back returns', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
-	app.onEvent(snapOf('1-aaa'))
-	app.input('draft one')
-	sent = []
-	expect(alt(3)).toBe(true)
-	expect(app.state.shown).toBe('3-ccc')
-	expect(sent).not.toContainEqual({ type: 'close', sessionId: '1-aaa' })
-	expect(sent).toContainEqual({ type: 'open', sessionId: '3-ccc' })
-	expect(app.state.text).toBe('')
-	expect(history).toEqual(['http://h/1-aaa', 'http://h/3-ccc'])
-	// Ctrl-N wraps to the first, Ctrl-P back to the last.
-	press('n', message(''), { ctrlKey: true })
-	expect(app.state.shown).toBe('1-aaa')
-	expect(app.state.text).toBe('draft one')
-	press('p', message('draft one'), { ctrlKey: true })
-	expect(app.state.shown).toBe('3-ccc')
-	// Back: the address names tab 1 again; nothing is written.
-	history.pop()
-	address = history.at(-1)!
-	let entries = history.length
-	tabs.onPopState()
-	expect(app.state.shown).toBe('1-aaa')
-	expect(history.length).toBe(entries)
-	// Alt with no such tab does nothing.
-	alt(9)
-	expect(app.state.shown).toBe('1-aaa')
-})
-
-test('/go changes this page only if it currently shows the source tab', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
-	app.onEvent({ type: 'go', sessionId: '2-bbb', tab: '3-ccc' })
-	expect(app.state.shown).toBe('1-aaa')
-	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '2-bbb' })
-	expect(app.state.shown).toBe('2-bbb')
-	expect(history).toEqual(['http://h/1-aaa', 'http://h/2-bbb'])
-	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '3-ccc' })
-	expect(app.state.shown).toBe('2-bbb')
-})
-
-test('when the shown tab closes, the page lands on its neighbor, replacing the entry', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
-	alt(2)
-	sent = []
-	press('w', message(''), { ctrlKey: true })
-	expect(sent).toContainEqual({ type: 'tab-close', sessionId: '2-bbb' })
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('3-ccc')))
-	expect(app.state.shown).toBe('3-ccc')
-	expect(history).toEqual(['http://h/1-aaa', 'http://h/3-ccc'])
-})
-
-test('a new tab opens in the shown tab cwd, after it, and shows once the host names it', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	sent = []
-	press('t', message(''), { ctrlKey: true })
-	let c = sent.find((c) => c.type === 'tab-new')
-	expect(c).toMatchObject({ cwd: '/cwd/1-aaa', after: '1-aaa' })
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('4-ddd'), tab('2-bbb')))
-	expect(app.state.shown).toBe('1-aaa')
-	// Another client's new tab does not steal the page.
-	app.onEvent({ type: 'ack', id: 'someone-else', tab: '2-bbb' } as Event)
-	expect(app.state.shown).toBe('1-aaa')
-	app.onEvent({ type: 'ack', id: c.id, tab: '4-ddd' } as Event)
-	expect(app.state.shown).toBe('4-ddd')
-	expect(history.at(-1)).toBe('http://h/4-ddd')
-})
-
-test('the shown tab wanting attention is marked seen; other tabs keep theirs', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { attention: true })))
-	expect(sent.filter((c) => c.type === 'tab-seen')).toEqual([])
-	app.onEvent(tabsEvent(tab('1-aaa', { attention: true }), tab('2-bbb', { attention: true })))
-	expect(sent.filter((c) => c.type === 'tab-seen')).toEqual([{ type: 'tab-seen', sessionId: '1-aaa' }])
-	alt(2)
-	expect(sent.filter((c) => c.type === 'tab-seen').at(-1)).toEqual({ type: 'tab-seen', sessionId: '2-bbb' })
-})
-
-test("Ctrl-T/W/N/P stay the browser's off macOS", () => {
-	tabs.mac = () => false
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	sent = []
-	expect(press('t', message(''), { ctrlKey: true })).toBe(false)
-	expect(press('n', message(''), { ctrlKey: true })).toBe(false)
-	expect(sent).toEqual([])
-})
-
-test('arrows inside a draft stay native; its first row starts history browsing until Down restores it', () => {
-	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
-	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('two\nlines')]))
-	let writes: [string, number][] = []
-	let box = (text: string, cursor = text.length, anchor?: number): Target => ({
-		kind: 'message',
-		text,
-		cursor,
-		anchor,
-		write: (edit, at) => void writes.push([text.slice(0, edit.start) + edit.text + text.slice(edit.end), at]),
-	})
-	app.input('mine\nx')
-	// Rows inside a draft move natively, explicit or soft-wrapped.
-	expect(press('ArrowUp', box('mine\nx'))).toBe(false)
-	expect(press('ArrowDown', box('mine\nx', 2))).toBe(false)
-	let wrapped = 'words '.repeat(40)
-	expect(press('ArrowUp', { ...box(wrapped, 100), top: false } as Target)).toBe(false)
-	expect(press('ArrowDown', { ...box(wrapped, 100), bottom: false } as Target)).toBe(false)
-	expect(press('ArrowUp', box('mine\nx', 0, 4))).toBe(false)
-	expect(writes).toEqual([])
-	expect(press('ArrowUp', box('mine\nx', 2))).toBe(true)
-	expect(writes.at(-1)).toEqual(['two\nlines', 9])
-	expect(press('ArrowDown', box('two\nlines'))).toBe(true)
-	expect(writes.at(-1)?.[0]).toBe('mine\nx')
-	app.input('')
-	expect(press('ArrowUp', box(''))).toBe(true)
-	expect(writes.at(-1)).toEqual(['two\nlines', 9])
-	expect(app.state.text).toBe('two\nlines')
-	expect(stored.get(sessionId)?.text).toBe('')
-	expect(press('ArrowUp', box('two\nlines', 3))).toBe(true)
-	expect(writes.at(-1)).toEqual(['first', 5])
-	// The oldest: native Up goes to the start.
-	expect(press('ArrowUp', box('first'))).toBe(false)
-	expect(press('ArrowDown', box('first'))).toBe(true)
-	expect(writes.at(-1)).toEqual(['two\nlines', 3])
-	expect(press('ArrowDown', box('two\nlines', 3))).toBe(false)
-	expect(press('ArrowDown', box('two\nlines'))).toBe(true)
-	expect(writes.at(-1)).toEqual(['', 0])
-	expect(app.state.text).toBe('')
-})
-
-test('an edited entry becomes the draft; sending an entry brings the own text back', () => {
-	app.onEvent(snapshot({ type: 'idle' }, [{ type: 'user', blocks: [{ type: 'text', text: 'first' }], ts }]))
-	app.input('')
-	press('ArrowUp', message(''))
-	expect(app.state.text).toBe('first')
-	app.input('first!')
-	expect(stored.get(sessionId)?.text).toBe('first!')
-	expect(press('ArrowDown', message('first!'))).toBe(true)
-	app.input('')
-	press('ArrowUp', message(''))
-	// A draft received underneath browsing is not replaced by recall.
-	drafts.edit(sessionId, 'mine')
-	press('Enter', message('first'))
-	expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text: 'first' })
-	expect(app.state.text).toBe('mine')
-	expect(stored.get(sessionId)?.text).toBe('mine')
-})
-
-test('scrolling near the top fetches the page before; it goes in front', () => {
-	let turn = (n: number) => [
-		{ type: 'user', blocks: [{ type: 'text', text: `p${n}` }], ts },
-		{ type: 'assistant', block: { type: 'text', text: `a${n}` }, ts },
-		{ type: 'turn_end', status: 'completed', usage: {}, ts },
-	]
-	let open = { type: 'question', id: 'q', form: { text: 'Ok?', fields: [{ type: 'text', name: 'x' }] }, ts }
-	// The tail is turn 3; the open question and the last prompt are further back.
-	app.onEvent({
-		type: 'snapshot',
-		sessionId,
-		snapshot: { meta, history: [...turn(3)], state: { type: 'idle' }, older: 200, earlier: [] },
-	} as Event)
-	app.older()
-	app.older()
-	expect(sent.filter((c) => c.type === 'history')).toEqual([expect.objectContaining({ sessionId, before: 200 })])
-	// A page for a spot nobody asked for is ignored.
-	app.onEvent({ type: 'history', sessionId, before: 999, records: turn(9) } as Event)
-	expect(app.state.pages).toBe(0)
-	app.onEvent({ type: 'history', sessionId, before: 200, records: turn(2), older: 100 } as Event)
-	expect(app.state.pages).toBe(1)
-	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type)).toEqual([
-		'p2',
-		'a2',
-		'turn-end',
-		'p3',
-		'a3',
-		'turn-end',
-	])
-	app.older()
-	app.onEvent({ type: 'history', sessionId, before: 100, records: [...turn(1), open] } as Event)
-	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type).slice(0, 4)).toEqual([
-		'p1',
-		'a1',
-		'turn-end',
-		'question',
-	])
-	sent = []
-	app.older()
-	expect(sent).toEqual([])
-})
-
-test('slash commands never queue, including modified Enter; ordinary messages still queue', () => {
-	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }))
-	for (let text of ['/model other', '  /cd /tmp', '/']) {
-		app.input(text)
-		expect(press('Enter', message(text), { altKey: true })).toBe(true)
-		let submit = sent.findLast((c) => c.type === 'submit')
-		expect(submit.text).toBe(text)
-		expect(submit.queue).toBeUndefined()
-	}
-	app.input('/model o')
-	app.onEvent({ type: 'completions', sessionId, text: '/model o', items: ['/model other'] })
-	expect(view.hints(app.state.view, app.state.text, app.state.menu).some((h) => h[1] === 'queue')).toBe(false)
-	for (let text of ['later', '/tmp/file is broken']) {
-		app.input(text)
-		press('Enter', message(text), { altKey: true })
-		expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text, delivery: 'queue' })
-	}
-})
-
-test('exact registered commands submit their typed arguments, never passive candidates', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	for (let text of ['/cd', '/cd /existing', '/cd /missing', '/model other']) {
-		for (let items of [undefined, [text + '-candidate/'], []]) {
-			app.input(text)
-			if (items) app.onEvent({ type: 'completions', sessionId, text, items })
-			expect(press('Enter', message(text))).toBe(true)
-			expect(sent.filter((c) => c.type === 'submit').at(-1)).toMatchObject({ text })
-			expect(app.state.text).toBe('')
-		}
-	}
-})
-
-test('partial Enter chooses; explicit arrows override exact commands until the next edit', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/c')
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(view.hints(app.state.view, app.state.text, app.state.menu)[0]).toEqual(['enter', 'choose'])
-	expect(press('Enter', message('/c'))).toBe(true)
-	expect(app.state.text).toBe('/cd ')
-	app.input('/cd /p')
-	let answer: Event = { type: 'completions', sessionId, text: '/cd /p', items: ['/cd /projects/', '/cd /private/'] }
-	app.onEvent(answer)
-	press('ArrowDown', message('/cd /p'))
-	app.onEvent(answer) // a reply must preserve deliberate navigation
-	press('Enter', message('/cd /p'))
-	expect(app.state.text).toBe('/cd /private/')
-	expect(sent.some((c) => c.type === 'submit')).toBe(false)
-	app.input('/cd /p')
-	app.onEvent(answer)
-	press('ArrowUp', message('/cd /p'))
-	app.input('/cd /pr') // same candidate array after prediction: reset intent anyway
-	app.onEvent({ ...answer, text: '/cd /pr' })
-	expect(view.hints(app.state.view, app.state.text, app.state.menu)[0]).toEqual(['enter', 'run'])
-	press('Enter', message('/cd /pr'))
-	expect(sent.some((c) => c.type === 'submit' && c.text === '/cd /pr')).toBe(true)
-})
-
-test('dismissal suppresses pending completions; Escape outside never pauses as well', () => {
-	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }))
-	app.input('/c')
-	app.dismissMenu()
-	let answer: Event = { type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] }
-	app.onEvent(answer)
-	expect(app.state.menu).toBeUndefined()
-	expect(app.state.text).toBe('/c')
-	app.input('/cl')
-	app.input('/c')
-	app.onEvent(answer)
-	expect(app.state.menu).toBeDefined()
-	expect(press('Escape', { kind: 'other' })).toBe(true)
-	expect(sent.some((c) => c.type === 'pause')).toBe(false)
-	app.onEvent(answer)
-	expect(app.state.menu).toBeUndefined()
-})
-
-test('an open menu preserves touch and modified Enter and Tab contracts', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/c')
-	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
-	expect(press('Enter', { kind: 'message', text: '/c', cursor: 2, coarse: true })).toBe(false)
-	expect(press('Enter', message('/c'), { shiftKey: true })).toBe(false)
-	expect(app.state.text).toBe('/c')
-	expect(press('Tab', message('/c'))).toBe(true)
-	expect(app.state.text).toBe('/c') // no unambiguous extension
-	press('ArrowDown', message('/c'))
-	press('Tab', message('/c'))
-	expect(app.state.text).toBe('/clear ')
-	app.input('/cd')
-	app.onEvent({ type: 'completions', sessionId, text: '/cd', items: ['/cd /suggestion/'] })
-	press('Enter', message('/cd'), { altKey: true })
-	expect(sent.some((c) => c.type === 'submit' && c.text === '/cd')).toBe(true)
-})
-
-test('/go shows a cached destination draft updated by another client without writing it', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	app.onEvent(snapOf('1-aaa'))
-	tabs.show('2-bbb', false)
-	app.onEvent(snapOf('2-bbb'))
-	tabs.show('1-aaa', false)
-	app.onEvent({ type: 'draft', sessionId: '2-bbb', draft: { text: 'from terminal', rev: 5 } })
-	app.input('/go 2-bbb')
-	app.send()
-	sent = []
-	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '2-bbb' })
-	expect(app.state.text).toBe('from terminal')
-	expect(sent.filter((c) => c.type === 'draft')).toEqual([])
-	app.input('from terminal!')
-	expect(sent.find((c) => c.type === 'draft')).toMatchObject({ sessionId: '2-bbb', text: 'from terminal!', base: 5 })
-})
-
-for (let restore of ['delete', 'undo'])
-	test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
-		let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
-		app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('second'), user('third')]))
-		press('ArrowUp', message(''))
-		press('ArrowUp', message('third'))
-		expect(app.state.text).toBe('second')
-		app.input('second!')
-		// Native deletion and native undo both report restored text via input.
-		if (restore === 'undo') expect(press('z', message('second!'), { metaKey: true })).toBe(false)
-		app.input('second')
-		expect(press('ArrowUp', message('second'))).toBe(true)
-		expect(app.state.text).toBe('first')
-		press('ArrowDown', message('first'))
-		press('ArrowDown', message('second'))
-		press('ArrowDown', message('third'))
-		expect(app.state.text).toBe('second')
-		expect(stored.get(sessionId)?.text).toBe('second')
-	})

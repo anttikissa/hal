@@ -1,24 +1,13 @@
 import { titles } from '../common/titles.ts'
 import { settings } from '../common/settings.ts'
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { expect, test } from 'bun:test'
 import type { Event } from '../common/protocol.ts'
 import { view, type ViewState } from './view.ts'
 import { hrefs } from './hrefs.ts'
+import { fold, meta, running, sessionId, ts, useNames } from './view-fixture.test.ts'
 
-let originalNames: Record<string, string>
-beforeEach(() => {
-	originalNames = titles.names
-	titles.names = {}
-})
-afterEach(() => {
-	titles.names = originalNames
-})
+useNames()
 
-const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
-const sessionId = meta.id
-const ts = '2026-09-26T00:00:01Z'
-
-const fold = (events: Event[], st: ViewState = {}) => events.reduce(view.onEvent, st)
 const shown = (st: ViewState) => st.transcript!.items.map((i) => view.show(i)).filter(Boolean)
 
 test('events fold into what the page shows, like the terminal transcript', () => {
@@ -245,14 +234,6 @@ test('Ctrl-M opens the model picker from the host list; typing filters, Enter sw
 	expect(view.onEvent(r.state, { type: 'models', sessionId: 'x', current: 'a/b', items }).modal).toBeUndefined()
 })
 
-const running = (items: Event[], state: object) =>
-	fold([
-		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
-		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
-		...items,
-		{ type: 'state', sessionId, state } as Event,
-	] as Event[])
-
 test('the status line says what the session is doing, like the terminal', () => {
 	let line = (st: ViewState, connected = true) => view.line(st, connected)
 	let idle = running([], { type: 'idle' })
@@ -305,98 +286,6 @@ test('the status line says what the session is doing, like the terminal', () => 
 	expect(line(running([], { type: 'blocked', reason: 'log in: expired' })).text).toBe('log in: expired')
 	// Losing the host outranks whatever the session last said.
 	expect(line(writing, false)).toEqual({ text: 'reconnecting', tone: 'error' })
-})
-
-test('rows pair each tool call with its result and drop completed turn ends', () => {
-	let st = running(
-		[
-			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
-			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
-			{
-				type: 'tool-results',
-				sessionId,
-				results: [
-					{ type: 'tool_result', id: 'b', output: 'B' },
-					{ type: 'tool_result', id: 'a', output: 'A' },
-				],
-			},
-			{ type: 'stream', sessionId, event: { type: 'text', text: 'done' } },
-			{ type: 'turn-end', sessionId, status: 'completed' },
-		] as Event[],
-		{ type: 'idle' },
-	)
-	let rows = view.rows(st.transcript!.items)
-	expect(rows.map((r) => [r.item.type, r.result?.type === 'tool-result' ? r.result.output : undefined])).toEqual([
-		['prompt', undefined],
-		['tool', 'A'],
-		['tool', 'B'],
-		['text', undefined],
-	])
-})
-
-test('rows only grow at the end as items arrive', () => {
-	let items = running(
-		[
-			{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
-			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
-			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'A' }] },
-			{ type: 'stream', sessionId, event: { type: 'text', text: 'ok' } },
-			{ type: 'turn-end', sessionId, status: 'paused' },
-		] as Event[],
-		{ type: 'idle' },
-	).transcript!.items
-	let all = view.rows(items)
-	for (let k = 0; k <= items.length; k++) {
-		let some = view.rows(items.slice(0, k))
-		expect(some.map((r) => r.item)).toEqual(all.slice(0, some.length).map((r) => r.item))
-	}
-})
-
-test('streaming updates only its row; results replace their call row without mutating it', () => {
-	let st = running(
-		[
-			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
-			{ type: 'stream', sessionId, event: { type: 'text', text: 'one' } },
-		] as Event[],
-		{ type: 'idle' },
-	)
-	let before = view.rows(st.transcript!.items)
-	st = view.onEvent(st, { type: 'stream', sessionId, event: { type: 'text', text: ' two' } })
-	let streamed = view.rows(st.transcript!.items, st.sent, before)
-	expect(streamed[0]).toBe(before[0])
-	expect(streamed[1]).toBe(before[1])
-	expect(streamed.at(-1)).not.toBe(before.at(-1))
-	expect(view.rows(st.transcript!.items, st.sent, streamed)).toBe(streamed)
-	st = view.onEvent(st, {
-		type: 'tool-results',
-		sessionId,
-		results: [{ type: 'tool_result', id: 'a', output: 'done' }],
-	})
-	let completed = view.rows(st.transcript!.items, st.sent, streamed)
-	expect(completed[1]).not.toBe(streamed[1])
-	expect(completed[1]!.result?.output).toBe('done')
-	expect(streamed[1]!.result).toBeUndefined()
-	expect(completed.at(-1)).toBe(streamed.at(-1))
-})
-
-test('a sent prompt shows pending, then as the host’s item under the same key, once', () => {
-	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }] as Event[])
-	let sending = [{ id: 'c7', text: 'go' }]
-	let before = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
-	expect(before.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', true]])
-	// The durable inbox replaces the optimistic row before acknowledgement,
-	// using the same key; it lives in the transcript, not the fixed footer.
-	let waiting = [{ id: 'c7', text: 'go', delivery: 'after-turn' as const }]
-	let queued = view.withPending(view.rows(st.transcript!.items, st.sent), sending, waiting)
-	expect(queued.map((r) => [r.key, r.pending, r.waiting])).toEqual([['c7', undefined, true]])
-	expect(queued[0]!.item).toMatchObject({ delivery: 'after-turn' })
-	let steering = view.withPending([], sending, [{ id: 'c7', text: 'go' }])
-	expect(steering).toHaveLength(1)
-	expect(steering[0]!.item).toMatchObject({ type: 'prompt', text: 'go', delivery: 'now' })
-	// The host's item arrives before the ack that ends the pending one.
-	st = fold([{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 4, command: 'c7' }] as Event[], st)
-	let after = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
-	expect(after.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', undefined]])
 })
 
 test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {
