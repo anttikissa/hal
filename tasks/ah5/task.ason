@@ -1,0 +1,7 @@
+{
+	title: 'One batched redraw scheduler with navigable calls',
+	spec: 'Redraw requests go through one frame scheduler: many requests in one frame paint once, and the paint is full if any request asked for a full repaint. Theme changes request a full repaint; content updates stay incremental. Go to definition from any redraw call reaches the code that schedules or paints: no empty placeholder functions overwritten at startup and no forwarding aliases (AGENTS.md Module initialization and navigation). Cyclic imports are allowed within layer boundaries; src/common must not pull the terminal renderer into the web bundle. terminal.redraw and the resize handler request through the scheduler. Suspended or external terminals are never painted; requests before the renderer starts do nothing. Reset cancels queued paints. A request during a paint schedules another frame. The result has less code than before. Web behavior is unchanged.',
+	status: 'planned',
+	needs: ['3jk'],
+	foldInto: ['3jk']
+}
