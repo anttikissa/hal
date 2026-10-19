@@ -7,7 +7,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import { type Event } from '../common/protocol.ts'
-import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import type { Item, Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { replay } from '../common/replay.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
@@ -127,7 +128,7 @@ export function client() {
 		events.push(e)
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {
-			let t = transcript.fold(views.get(id), e)
+			let t = transcriptLive.fold(views.get(id), e)
 			if (t) views.set(id, t)
 		}
 	})

@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { commandList } from '../common/commands/list.ts'
 import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
@@ -63,7 +64,7 @@ function client() {
 		events.push(e)
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {
-			let t = transcript.fold(views.get(id), e)
+			let t = transcriptLive.fold(views.get(id), e)
 			if (t) views.set(id, t)
 		}
 	})

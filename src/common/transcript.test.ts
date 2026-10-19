@@ -3,13 +3,14 @@ import type { AssistantBlock } from './blocks.ts'
 import type { Event } from './protocol.ts'
 import type { Snapshot } from './snapshot.ts'
 import { transcript, type Transcript } from './transcript.ts'
+import { transcriptLive } from './transcript-live.ts'
 import { titles } from './titles.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
 
 function fold(events: Event[], start?: Transcript): Transcript | undefined {
-	return events.reduce<Transcript | undefined>((t, e) => transcript.fold(t, e), start)
+	return events.reduce<Transcript | undefined>((t, e) => transcriptLive.fold(t, e), start)
 }
 
 const ts = '2026-09-26T00:00:01Z'
@@ -142,7 +143,7 @@ test('events for other sessions, rejections and events before a snapshot change 
 		{ type: 'rejected', sessionId, command: 'submit', reason: 'busy' },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'stray' }, ts },
 	] as Event[])
-		expect(transcript.fold(t, e)).toBe(t)
+		expect(transcriptLive.fold(t, e)).toBe(t)
 })
 
 test('a later snapshot replaces whatever was folded before', () => {
@@ -403,8 +404,8 @@ test('attachment acknowledgements and picker replies cannot end a streaming turn
 		{ type: 'attached', sessionId, command: 'upload', blob: '123abc', marker: '[image/example.png]' },
 		{ type: 'models', sessionId, current: 'fake/m', items: ['fake/m'] },
 	] satisfies Event[])
-		expect(transcript.fold(t, event)).toBe(t)
-	let next = transcript.fold(t, { type: 'stream', sessionId, event: { type: 'text', text: 'working' }, n: 2, ts })!
+		expect(transcriptLive.fold(t, event)).toBe(t)
+	let next = transcriptLive.fold(t, { type: 'stream', sessionId, event: { type: 'text', text: 'working' }, n: 2, ts })!
 	expect(next.items.at(-1)).toMatchObject({ type: 'text', text: 'still working' })
 	expect(next.live).toBeDefined()
 })

@@ -5,6 +5,7 @@ import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { turns } from './turns.ts'
@@ -76,7 +77,7 @@ function client() {
 		events.push(e)
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {
-			let t = transcript.fold(views.get(id), e)
+			let t = transcriptLive.fold(views.get(id), e)
 			if (t) views.set(id, t)
 		}
 	})

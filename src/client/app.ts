@@ -19,6 +19,7 @@ import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
 import type { Delivery, Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { uploads } from '../common/uploads.ts'
 import { ansi } from './ansi.ts'
 import type { KeyEvent } from './keys.ts'
@@ -210,7 +211,7 @@ function onEvent(event: Event): void {
 	else if (event.type === 'models') app.pick(event)
 	else if (event.type === 'settings') app.configure(event)
 	else {
-		let t = transcript.fold(st.transcript, event)
+		let t = transcriptLive.fold(st.transcript, event)
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
 		if (event.type === 'snapshot' && t)

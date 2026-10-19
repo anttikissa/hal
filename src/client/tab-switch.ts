@@ -11,7 +11,7 @@ import { queuedPrompt } from './queue-edit.ts'
 import { drafts } from '../common/drafts.ts'
 import { prompt } from '../common/prompt.ts'
 import type { Event, Tab } from '../common/protocol.ts'
-import { transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { recall } from '../common/recall.ts'
 import { app, type AppState } from './app.ts'
 import type { KeyEvent } from './keys.ts'
@@ -29,7 +29,7 @@ function hiddenEvent(event: Event): void {
 	if (st.tabs.some((tab) => tab.id === event.sessionId)) {
 		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 		let kept = st.hidden.get(event.sessionId) ?? { prompt: prompt.empty() }
-		kept.transcript = transcript.fold(kept.transcript, event)
+		kept.transcript = transcriptLive.fold(kept.transcript, event)
 		if (event.type === 'snapshot' && kept.transcript)
 			kept.prompt = { text: drafts.text(event.sessionId), cursor: drafts.text(event.sessionId).length }
 		queuedPrompt.sync(kept, event)

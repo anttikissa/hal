@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Event } from '../common/protocol.ts'
-import { transcript, type Transcript } from '../common/transcript.ts'
+import type { Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
@@ -46,7 +47,7 @@ function client() {
 	let views = new Map<string, Transcript>()
 	let conn = host.connect((e: Event) => {
 		let id = 'sessionId' in e ? e.sessionId : undefined
-		let t = id ? transcript.fold(views.get(id), e) : undefined
+		let t = id ? transcriptLive.fold(views.get(id), e) : undefined
 		if (id && t) views.set(id, t)
 	})
 	return { conn, views }

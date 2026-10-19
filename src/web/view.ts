@@ -1,5 +1,5 @@
 // The browser client's state, without the DOM: the transcript folded
-// from host events (the same transcript.fold the terminal uses), a
+// from host events (the same transcriptLive.fold the terminal uses), a
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
 // Tasks: dz, a1k, kx0, rqq.
@@ -22,6 +22,7 @@ import type { Delivery, Event } from '../common/protocol.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
@@ -70,7 +71,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		if (event.refresh) return st.modal?.settings ? { ...st, modal: settingsModal.refresh(st.modal, event) } : st
 		return event.sessionId === st.transcript?.meta.id ? { ...st, modal: settingsModal.open(event) } : st
 	}
-	let t = transcript.fold(st.transcript, event)
+	let t = transcriptLive.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
 	if (

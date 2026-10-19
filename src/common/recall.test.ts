@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from 'bun:test'
 import { recall } from './recall.ts'
-import { transcript } from './transcript.ts'
+import { transcriptLive } from './transcript-live.ts'
 
 beforeEach(() => recall.reset())
 
@@ -10,14 +10,14 @@ const down = (text: string, cursor = text.length, width = Infinity) =>
 	recall.step('s', list, text, cursor, 1, width, 'mine')
 
 test('the entries are the prompts in the transcript, oldest first, edits as edited', () => {
-	let t = transcript.fold(undefined, {
+	let t = transcriptLive.fold(undefined, {
 		type: 'snapshot',
 		sessionId: 's',
 		snapshot: { meta: { id: 's', cwd: '/', model: 'a/b', createdAt: '' }, history: [], state: { type: 'idle' } },
 	} as any)!
-	t = transcript.fold(t, { type: 'turn-start', sessionId: 's', prompt: 'first', provider: 'p' } as any)!
-	t = transcript.fold(t, { type: 'turn-start', sessionId: 's', prompt: 'secnd', provider: 'p' } as any)!
-	t = transcript.fold(t, { type: 'prompt', sessionId: 's', texts: ['second'], replaces: true } as any)!
+	t = transcriptLive.fold(t, { type: 'turn-start', sessionId: 's', prompt: 'first', provider: 'p' } as any)!
+	t = transcriptLive.fold(t, { type: 'turn-start', sessionId: 's', prompt: 'secnd', provider: 'p' } as any)!
+	t = transcriptLive.fold(t, { type: 'prompt', sessionId: 's', texts: ['second'], replaces: true } as any)!
 	expect(recall.entries(t)).toEqual(['first', 'second'])
 })
 
@@ -89,7 +89,7 @@ test('browsing belongs to its session', () => {
 })
 
 test('recall excludes agent and model-generated prompts, not human continuations', () => {
-	let t = transcript.fold(undefined, {
+	let t = transcriptLive.fold(undefined, {
 		type: 'snapshot',
 		sessionId: 's',
 		snapshot: { meta: { id: 's', cwd: '/', model: 'a/b', createdAt: '' }, history: [], state: { type: 'idle' } },

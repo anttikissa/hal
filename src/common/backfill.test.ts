@@ -4,6 +4,7 @@ import type { Event } from './protocol.ts'
 import type { Snapshot } from './snapshot.ts'
 import type { HistoryRecord } from './replay.ts'
 import { transcript, type Transcript } from './transcript.ts'
+import { transcriptLive } from './transcript-live.ts'
 
 const ts = '2026-09-26T00:00:01Z'
 const meta = { id: 's', cwd: '/', model: 'fake/m', createdAt: ts }
@@ -82,8 +83,8 @@ test('the open question and its prompt stand in on top until the page holding th
 
 test('a stand-in answered meanwhile stays answered once the real history is in', () => {
 	let { sessions, t } = start()
-	t = transcript.fold(t, { type: 'answer', sessionId: 's', question: 'q', answers: { x: 'yes' } })!
-	t = transcript.fold(t, { type: 'state', sessionId: 's', state: { type: 'idle' } })!
+	t = transcriptLive.fold(t, { type: 'answer', sessionId: 's', question: 'q', answers: { x: 'yes' } })!
+	t = transcriptLive.fold(t, { type: 'state', sessionId: 's', state: { type: 'idle' } })!
 	for (let i = 0; i < 3; i++) t = page(sessions, t)
 	let answered = [...all, { type: 'answer', question: 'q', answers: { x: 'yes' }, ts, n: 9 } as HistoryRecord]
 	let full = transcript.fromSnapshot({ meta, history: answered, state: { type: 'idle' } })
