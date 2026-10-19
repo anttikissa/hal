@@ -45,7 +45,8 @@ function finished(id: string): void {
 	let before = tabs.list()
 	if (tabs.close(id) !== undefined) return
 	tabs.publish()
-	notify.closed(host.state.clients, id, before)
+	let result = notify.replyLine(id).slice(0, 200)
+	notify.closed(host.state.clients, id, result ? `Result: ${result}` : 'Result: none', before)
 }
 
 export const autoclose = { set, promote, finished }

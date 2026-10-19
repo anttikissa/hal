@@ -9,10 +9,11 @@ import { titles } from './titles.ts'
 export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit' | 'warning'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
 // or commits (host/commits.ts, its own key so it never replaces the others;
-// `what` overrides the kind's word, as 'amended' for an amend).
+// `what` overrides the kind's word, as 'amended' for an amend; `title`
+// replaces the whole title, as "Closed tab 5: name" (task 97r).
 // `color`: the sending tab's project color (colors.project p0..p7), set
 // when tabs have colors; the card takes it instead of the kind's.
-export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string }
+export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string; title?: string }
 // `href`: where a web card links when it names no session.
 export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; href?: string; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
@@ -37,7 +38,7 @@ function stamp(at: string): string {
 }
 
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
-	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
+	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: e.title ?? `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
 	if (e.tab !== undefined) n.tab = e.tab
 	if (e.color !== undefined) n.color = e.color
 	return n

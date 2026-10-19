@@ -111,22 +111,33 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
-// A tab closed by a model, another session or autoclose rather than the
-// user (task 97r): every present client hears it, even one showing
-// that tab, and it replaces the session's done notice; with nobody
-// present, a push. `before`: the tab list before closing, for its
-// number and color.
-function closed(clients: Iterable<Watcher>, id: string, before: { id: string; color?: number }[]): void {
+// A tab closed by autoclose or /close (task 97r): every present client
+// hears it, even one showing that tab, and it replaces the session's
+// done notice; with nobody present, a push. `line` says why;
+// `before`: the tab list before closing, for its number and color;
+// `closer`: the client that closed it, present but not told.
+function closed(clients: Iterable<Watcher>, id: string, line: string, before: { id: string; color?: number }[], closer?: Watcher): void {
 	let name = sessions.open(id).name ?? id
-	let line = notify.replyLine(id).slice(0, 200)
-	noticeHistory.record({ session: id, name, kind: 'done', line, what: 'closed' })
-	let watching = [...clients].filter(present)
-	if (!watching.length) return void push.notify(id, name, line ? `closed: ${line}` : 'closed').catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
-	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: 'done', what: 'closed', line }
 	let tab = before.findIndex((t) => t.id === id)
+	let title = tab >= 0 ? `Closed tab ${tab + 1}: ${name}` : `Closed ${name}`
+	noticeHistory.record({ session: id, name, kind: 'done', line, what: 'closed' })
+	let watching = [...clients].filter((c) => c === closer || present(c))
+	if (!watching.length) return void push.notify(id, title, line).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+	watching = watching.filter((c) => c !== closer)
+	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: 'done', what: 'closed', title, line }
 	if (tab >= 0) notice.tab = tab + 1
 	if (before[tab]?.color !== undefined) notice.color = before[tab]!.color
 	for (let c of watching) c.deliver(notice)
 }
 
-export const notify = { kind, asked, replyLine, reply, line, route, deliver, closed }
+// Why /close closed `id`: run by `caller`'s model, sent by another
+// session, or typed by the user (task 97r).
+function closedBy(id: string, caller: string, sender: { origin?: 'model'; from?: string } | undefined, before: { id: string }[]): string {
+	let by = sender?.from ?? (sender?.origin === 'model' ? caller : undefined)
+	if (by === undefined) return 'User called /close'
+	if (by === id) return 'Tab itself called /close'
+	let tab = before.findIndex((t) => t.id === by)
+	return `${tab >= 0 ? `Tab ${tab + 1} (${by})` : by} called /close`
+}
+
+export const notify = { kind, asked, replyLine, reply, line, route, deliver, closed, closedBy }

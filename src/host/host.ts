@@ -221,6 +221,13 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			return {}
 		})()
 	}
+	if (c.type === 'tab-close') {
+		// Other clients hear it; this one already sees the tab go (task 97r).
+		let before = tabs.list()
+		let outcome = tabs.act(c, client.record.timezone)
+		if (!outcome.refused) notify.closed(host.state.clients, c.sessionId, 'User closed the tab', before, client)
+		return outcome
+	}
 	if (tabs.is(c)) return tabs.act(c, client.record.timezone)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history' || c.type === 'plugin-sync') return c.type === 'plugin-sync' ? pluginSync.command(client, c) : { reply: { type: 'notice-history', entries: noticeHistory.list() } }

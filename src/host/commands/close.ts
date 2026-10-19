@@ -15,8 +15,7 @@ export const command: SlashCommand = {
 		let before = tabs.list()
 		let refused = id === undefined ? 'not a tab' : tabs.act({ type: 'tab-close', sessionId: id }).refused
 		if (refused) return { error: refused }
-		// The user knows what they closed; a model or another session tells them.
-		if (ctx.sender?.origin === 'model' || ctx.sender?.from !== undefined) notify.closed(host.state.clients, id!, before)
+		notify.closed(host.state.clients, id!, notify.closedBy(id!, ctx.sessionId, ctx.sender, before), before)
 		return { result: `closed ${id}` }
 	},
 }

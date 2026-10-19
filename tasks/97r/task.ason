@@ -1,6 +1,6 @@
 {
-	title: 'Notice when a tab closes without the user',
-	spec: 'When autoclose, a model (COMMAND /close) or another session (SEND /close) closes a tab, the user hears it: every present client gets a notice titled "<tab> <name> · closed" with the reply line, even a client showing that tab, replacing that session\'s done notice (same key); with no present client, a web push "closed: <line>". The notice history records it as done, what: closed. A close by the user (Ctrl-W, the tab close button, a typed /close) sends nothing. Requested by the user in session 179-eon on 2026-10-19.',
+	title: 'Notice when a tab closes',
+	spec: 'Closing a tab tells the user. The notice title is "Closed tab N: <name>" (tab number before closing); its line says why: autoclose gives "Result: <reply summary or last line>"; /close gives "Tab itself called /close" (the tab\'s own model), "Tab N (<id>) called /close" (another tab\'s model, or SEND from another session) or "User called /close" (typed); a client\'s close (Ctrl-W, the close button) gives "User closed the tab" and goes to every other present client, not the one that closed it. Every other close reaches every present client, even one showing that tab, replacing that session\'s done notice (same key). With no present client, a web push with the same title and line; a client\'s own close never pushes, since its user is present. The notice history records it as done, what: closed. The terminal clips a long title at its end. Requested by the user in session 179-eon on 2026-10-19.',
 	status: 'done',
 	needs: ['p87', 'qm'],
 	foldInto: ['qm']
