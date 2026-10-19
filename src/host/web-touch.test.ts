@@ -2,9 +2,7 @@
 // debug log.
 
 import { expect } from 'bun:test'
-import type { Event } from '../common/protocol.ts'
 import { history } from './history.ts'
-import { tabs } from './tabs.ts'
 import { server } from './server.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'

@@ -1,8 +1,7 @@
 // Browser tests of the tab strip: drafts while switching, tab squares,
 // tab links and paging.
 
-import { expect, test } from 'bun:test'
-import { history } from './history.ts'
+import { expect } from 'bun:test'
 import { host } from './host.ts'
 import { tabs } from './tabs.ts'
 import { server } from './server.ts'

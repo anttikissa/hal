@@ -10,7 +10,7 @@ import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { testHome, useWeb, base, login, cookie } from './web-fixture.test.ts'
+import { testHome, useWeb, base, cookie } from './web-fixture.test.ts'
 
 useWeb()
 

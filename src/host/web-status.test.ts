@@ -1,18 +1,16 @@
 // Browser tests of the status area: compact status, manual reload
 // notice and logout.
 
-import { expect, test } from 'bun:test'
+import { expect } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
-import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { server } from './server.ts'
-import { status } from './status.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 import { webPage } from './web-page.ts'
-import { useWeb, base, login, cookie, providerHome } from './web-fixture.test.ts'
+import { useWeb, base, cookie, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()

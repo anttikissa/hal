@@ -2,17 +2,15 @@
 // queued-message addresses, and Find.
 
 import { expect } from 'bun:test'
-import type { Event } from '../common/protocol.ts'
 import { blobs } from './blobs.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
 import { tabs } from './tabs.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
-import { status } from './status.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { useWeb, base, cookie, until } from './web-fixture.test.ts'
+import { useWeb, base, cookie } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()

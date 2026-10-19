@@ -3,13 +3,12 @@
 
 import { expect } from 'bun:test'
 import { writeFileSync } from 'fs'
-import type { Event } from '../common/protocol.ts'
 import { history } from './history.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { testHome, useWeb, base, login, providerHome } from './web-fixture.test.ts'
+import { testHome, useWeb, base, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
