@@ -2,5 +2,8 @@
 	title: 'Project setup',
 	spec: "Bun + TypeScript project. ./run starts the app; ./test runs tests, typecheck and lint, and fails if any of them fails. ./test <path-or-name> runs only matching tests, without typecheck or lint: an existing path runs that file or directory; any other text runs tests whose name contains it literally. It also fails if the tests left a .git/index.lock that was not there before (it only reports it, never deletes a lock that a live git may hold): hosts under test are killed at any moment, so a host's git call must never take a lock.",
 	status: 'done',
+	notes: [
+		'Lint runs with no-thenable off: EDIT stores a then list of follow-up calls in its tool input, plain data that is never awaited, and renaming it would change stored history. The unused raw parameter of presentationView.result was removed; 808bdd93 had dropped the raw-record row.'
+	],
 	needs: []
 }

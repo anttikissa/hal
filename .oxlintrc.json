@@ -1,4 +1,6 @@
 {
 	// A terminal program matches escape and control bytes on purpose.
-	"rules": { "no-control-regex": "off" }
+	// EDIT's stored input has a "then" list of follow-up calls. It is plain
+	// data that is never awaited.
+	"rules": { "no-control-regex": "off", "no-thenable": "off" }
 }

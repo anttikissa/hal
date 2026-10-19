@@ -59,7 +59,6 @@ function result(
 	max: number,
 	style: Style | undefined,
 	normal: Style | undefined,
-	raw: string | undefined,
 ): string[] {
 	let rows = item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []
 	if (item.isError || item.interrupted || !item.presentation)

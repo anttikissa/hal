@@ -141,9 +141,8 @@ function result(
 		return []
 	if (tool && (item.presentation || item.presentationError)) {
 		let max = fold === 'long' ? Infinity : settings.shortRows() - (look.head ?? 1)
-		let raw = fold === 'long' ? toolView.fullAt('', session, look.call?.key) : undefined
 		return presentationView
-			.result(item, out, outputWidth, max, style, itemView.itemStyle({ ...item, isError: false }, tool), raw)
+			.result(item, out, outputWidth, max, style, itemView.itemStyle({ ...item, isError: false }, tool))
 			.map((row, i) => (stamp ? (i ? ' '.repeat(inset) : `${stamp} `) : '') + row)
 	}
 	// Under its short call, a result fills the rows the call leaves.
