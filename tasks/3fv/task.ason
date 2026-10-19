@@ -22,7 +22,8 @@
 		'READ_BLOB history references: <session id>/<n>[.<m>] or, in the current session, a kind letter plus number (t35, u35.2). The old # form (sessionId#t35.1) is gone; pruning markers emit <session id>/<n>. Blob ids from cut outputs are current, not legacy.',
 		'Provider calls named for a Hal tool (COMMAND { cmd } instead of tool { cmd }) stay unknown-tool errors: seen once in 15,836 calls, too rare for code (user, 15 Oct).',
 		'A provider call to an unknown tool name fails with an error teaching tool { cmd: "<TOOL> <args...>" }, so the model corrects itself in the same turn (tools.ts run).',
-		'Unknown-tool errors name their level: a top-level provider call (COMMAND { cmd }) says it is not a provider tool and shows tool { cmd: "COMMAND <args...>" }; an unknown NAME inside the cmd text says so. The user then sees which side erred, not a correct-looking COMMAND failing.'
+		'Unknown-tool errors name their level: a top-level provider call (COMMAND { cmd }) says it is not a provider tool and shows tool { cmd: "COMMAND <args...>" }; an unknown NAME inside the cmd text says so. The user then sees which side erred, not a correct-looking COMMAND failing.',
+		'SYSTEM.md scopes testing to affected behavior: Test the behavior your change affects. Use broader tests for changes to shared code. User approved 19 Oct; edited files alone are not the test boundary.'
 	],
 	needs: ['gr', 'asp']
 }
