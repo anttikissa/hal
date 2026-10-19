@@ -176,7 +176,7 @@ function leave(): void {
 	if (!io || !terminal.state.entered) return
 	terminal.state.entered = false
 	try {
-		terminal.park()
+		render.park()
 	} catch {}
 	io.write((terminal.kitty() ? KITTY_OFF : '') + BRACKETED_PASTE_OFF + FOCUS_OFF + SHOW_CURSOR)
 	io.setRawMode(false)
@@ -287,9 +287,6 @@ export const terminal = {
 	onQuit: (): void => {},
 	/** Tells the host the new size; replaced by the app. */
 	onScreen: (): void => {},
-	/** Moves the cursor below the frame before the terminal is given
-	 * back; replaced by the renderer. Must not throw or clear. */
-	park: (): void => {},
 	writer,
 	realIO,
 	init,

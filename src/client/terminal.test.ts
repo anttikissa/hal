@@ -47,7 +47,7 @@ function fixture() {
 	let redraws = 0
 	terminal.onKeys = (events) => keys.push(...events)
 	render.request = (full) => void (full === 'a terminal resize' ? log.push('resize') : redraws++)
-	terminal.park = () => log.push('park')
+	render.park = () => void log.push('park')
 	terminal.init(io)
 	return {
 		log,
@@ -72,10 +72,11 @@ function fixture() {
 	}
 }
 
-const defaults = { onKeys: terminal.onKeys, park: terminal.park, request: render.request }
+const defaults = { onKeys: terminal.onKeys, park: render.park, request: render.request }
 afterEach(() => {
 	terminal.reset()
-	Object.assign(terminal, { onKeys: defaults.onKeys, park: defaults.park })
+	terminal.onKeys = defaults.onKeys
+	render.park = defaults.park
 	render.request = defaults.request
 })
 
@@ -242,7 +243,7 @@ describe('leaving', () => {
 
 	test('a failing park cannot keep the terminal raw', () => {
 		let t = fixture()
-		terminal.park = () => {
+		render.park = () => {
 			throw new Error('renderer broke')
 		}
 		t.type('\x03')

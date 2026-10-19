@@ -190,7 +190,6 @@ describe('leaving and coming back', () => {
 		expect(term.content()).toEqual(trimmed(frameRows.slice(0, -1)))
 		expect(term.row).toBe(height - 1)
 		terminal.reset()
-		terminal.park = () => {}
 	})
 })
 

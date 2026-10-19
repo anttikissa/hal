@@ -404,7 +404,6 @@ function park(): void {
 function init(out: Output | null = terminal.state.io): void {
 	if (render.state.out || !out) return
 	render.state.out = out
-	terminal.park = () => render.park()
 }
 
 /**
