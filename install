@@ -2,7 +2,7 @@
 # Hal installer (task hd). Makes sure Bun is there,
 # installs dependencies, links ~/.local/bin/hal to ./run and puts
 # ~/.local/bin on the PATH. Safe to run again: it only does what is
-# missing. -y answers yes to the one question.
+# missing. -y answers yes to the questions.
 set -euo pipefail
 
 hal_dir="$(cd "$(dirname "$0")" && pwd)"
@@ -14,6 +14,19 @@ for arg in "$@"; do
 		*) echo "unknown option: $arg (only -y)" >&2; exit 1 ;;
 	esac
 done
+
+# Tested once, then the tests were deleted. If you change this code, first
+# write tests for: Windows shell detection, WSL, yes/no/empty/EOF and -y.
+case "$(uname -s)" in
+	MINGW*|MSYS*|CYGWIN*)
+		echo "Hal has not been tested on native Windows. Be prepared to fix things that may be broken. WSL2 is recommended."
+		if [ -z "$yes" ]; then
+			printf "Continue? [Y/n] "
+			read -r answer || exit 1
+			case "$answer" in ""|[Yy]*) ;; *) exit 0 ;; esac
+		fi
+		;;
+esac
 
 pretty() { echo "${1/#$HOME/~}"; }
 

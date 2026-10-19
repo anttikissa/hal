@@ -1,0 +1,10 @@
+{
+	title: 'Warn before installing on native Windows',
+	spec: 'Before setup, ./install detects native Windows Bash environments from uname -s (MINGW*, MSYS*, CYGWIN*) and prints: Hal has not been tested on native Windows. Be prepared to fix things that may be broken. WSL2 is recommended. It asks Continue? [Y/n], accepting empty or yes and exiting without setup on refusal or EOF. The -y option skips confirmation but keeps the warning. Linux, including WSL, and macOS retain their existing behavior. This is a warning, not a Windows support implementation.',
+	status: 'done',
+	notes: [
+		'Verified with bash -n, ./test install (1 pass), and 25 one-off checks using fake uname for MINGW, MSYS, Cygwin, Linux and Darwin across refusal, EOF, yes, empty and -y. These check detection and prompts, not actual Windows or WSL runtime support. One-off checks were deleted.'
+	],
+	needs: ['hd'],
+	foldInto: ['hd']
+}
