@@ -11,8 +11,6 @@ import { formView } from './form-view.ts'
 import { findDialog } from '../common/find-dialog.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 
-const { UNCOLOR, RESET, LINK_OFF } = ansi
-
 type Cursor = { row: number; col: number }
 
 /**
@@ -60,7 +58,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	if (m.find) {
 		if (m.find.focus !== 0) fields.cursor = undefined
 		let red = m.find.failed ? ansi.sgr({ fg: colors.error().fg! }) : ''
-		content.push(...strings.wordWrap(m.find.status, inner).map((r) => (red ? red + r + UNCOLOR : r)), '')
+		content.push(...strings.wordWrap(m.find.status, inner).map((r) => (red ? red + r + ansi.UNCOLOR : r)), '')
 		// The filters: the focused one lit like a picker's selection, the
 		// cursor on its box.
 		let lit = ansi.sgr(colors.popupCurrent(colors.popup().neutralFg!)) || ansi.INVERSE
@@ -68,7 +66,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		findDialog.labels.forEach((label, i) => {
 			let cell = `[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`
 			if (i) row += '   '
-			if (m.find!.focus === i + 1) { col = strings.visLen(ansi.clean(row)) + 1; cell = lit + cell + UNCOLOR + ansi.UNINVERSE }
+			if (m.find!.focus === i + 1) { col = strings.visLen(ansi.clean(row)) + 1; cell = lit + cell + ansi.UNCOLOR + ansi.UNINVERSE }
 			row += cell
 		})
 		if (m.find.focus > 0 && m.find.focus < 5) fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
@@ -79,7 +77,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// a link to its block on the web (task ker).
 	if (m.restart) {
 		let r = modals.restartLines(m.restart.calls)
-		let link = (c: (typeof r.calls)[number]) => (c.href ? `\x1b]8;;${ansi.webUrl(c.href)}\x07${c.block}${LINK_OFF}` : c.block)
+		let link = (c: (typeof r.calls)[number]) => (c.href ? `\x1b]8;;${ansi.webUrl(c.href)}\x07${c.block}${ansi.LINK_OFF}` : c.block)
 		content.push(strings.clipVisual(r.head, inner), ...r.calls.map((c) => strings.clipVisual(link(c) + ansi.clean(c.rest), inner)), '')
 	}
 	let current = colors.popupCurrent(colors.popup().neutralFg!)
@@ -113,7 +111,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (i === m.selected) {
 			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight color.
-			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR + ansi.UNINVERSE
+			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + ansi.UNCOLOR + ansi.UNINVERSE
 		}
 		content.push(row)
 	}
@@ -121,17 +119,17 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	while (content.length < height - 2 - below.length) content.push('')
 	content.push(...below)
 	let line = ansi.sgr({ fg: colors.popup().neutralFg! })
-	let side = (s: string) => (width >= 2 ? line + s + UNCOLOR : '')
+	let side = (s: string) => (width >= 2 ? line + s + ansi.UNCOLOR : '')
 	let pad = (s: string) => {
 		if (width < 4) return ' '.repeat(Math.max(0, width - 2))
 		let fit = strings.clipVisual(s, inner)
-		return ' ' + fit + RESET + ' '.repeat(inner - strings.visLen(fit)) + ' '
+		return ' ' + fit + ansi.RESET + ' '.repeat(inner - strings.visLen(fit)) + ' '
 	}
 	let after = m.items.length - scroll - visible
 	let place = scroll > 0 || after > 0 ? `${m.selected + 1}/${m.items.length}` : ''
-	let rows = [line + modalView.border('┌', '┐', m.title, '', width) + UNCOLOR]
+	let rows = [line + modalView.border('┌', '┐', m.title, '', width) + ansi.UNCOLOR]
 	for (let r = 0; r < height - 2; r++) rows.push(side('│') + pad(content[r] ?? '') + side('│'))
-	rows.push(line + modalView.border('└', '┘', m.hint ?? '', place, width) + UNCOLOR)
+	rows.push(line + modalView.border('└', '┘', m.hint ?? '', place, width) + ansi.UNCOLOR)
 	// A box too small for its fields still keeps the cursor inside it.
 	let at = { row: Math.min(height - 1, 1 + cursor.row), col: Math.max(0, Math.min(width - 1, 2 + cursor.col)) }
 	return { rows: rows.slice(0, height), cursor: at, scroll }
@@ -170,15 +168,15 @@ function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor }
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
-	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + UNCOLOR : r)
+	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + ansi.UNCOLOR : r)
 	let col = Math.max(...m.blocks!.help.map(([k]) => k.length)) + 2
-	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - col)).map((line, i) => key + (i ? '' : k).padEnd(col) + desc + line + UNCOLOR))
-	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
+	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - col)).map((line, i) => key + (i ? '' : k).padEnd(col) + desc + line + ansi.UNCOLOR))
+	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + ansi.UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
-	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + UNCOLOR))
+	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + ansi.UNCOLOR))
 	let ids = m.blocks!.choices
-	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + UNCOLOR)
+	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + ansi.UNCOLOR)
 	return [...hint, '', ...rows.map((r) => strings.clipVisual(r, width))]
 }
 
@@ -188,7 +186,7 @@ function footer(m: ModalState, width: number): string[] {
 	let detail = m.details?.[m.selected]
 	let rows: string[] = []
 	if (detail) rows.push('', ...strings.wordWrap(ansi.clean(detail), width))
-	if (m.error) rows.push(...strings.wordWrap(strings.expandTabs(ansi.clean(m.error.replace(/\r\n?/g, '\n'))), width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + UNCOLOR))
+	if (m.error) rows.push(...strings.wordWrap(strings.expandTabs(ansi.clean(m.error.replace(/\r\n?/g, '\n'))), width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR))
 	return rows
 }
 
@@ -216,11 +214,11 @@ function modalScroll(m: ModalState, visible: number): number {
 // blank column kept on each side of the box.
 function overlay(line: string, row: string, left: number, width: number, cols: number): string {
 	let before = left > 0 ? strings.sliceVisual(line, 0, left - 1) : ''
-	if (before.includes('\x1b]8;')) before += LINK_OFF
+	if (before.includes('\x1b]8;')) before += ansi.LINK_OFF
 	let gap = left > 0 ? ' '.repeat(left - strings.visLen(before)) : ''
 	let right = left + width + 1
 	let after = right < cols ? strings.sliceVisual(line, right, cols) : ''
-	return before + RESET + gap + row + RESET + (left + width < cols ? ' ' : '') + after + RESET
+	return before + ansi.RESET + gap + row + ansi.RESET + (left + width < cols ? ' ' : '') + after + ansi.RESET
 }
 
 // Draws modal `m` over `lines`, centered on the screen (the last `rows`

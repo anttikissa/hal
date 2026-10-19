@@ -47,6 +47,7 @@ import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 import { synthetic } from './synthetic.ts'
 import { effort } from './effort.ts'
+import { effort as vocabulary } from '../common/effort.ts'
 
 // One provider's model ids ("provider/model") and when they were got.
 type Listing = { at: number; ids: string[]; key?: string }
@@ -220,7 +221,7 @@ export const models = {
 				let suffix = input.slice(colon + 1)
 				let candidate = input.slice(0, colon)
 				let alias = models.resolve(candidate)
-				if (suffix === 'default' || suffix === 'ultra' || effort.vocabulary.includes(suffix as any)) { base = candidate; level = suffix }
+				if (suffix === 'default' || suffix === 'ultra' || vocabulary.levels.includes(suffix as any)) { base = candidate; level = suffix }
 				else if (models.known().includes(candidate) || alias.id !== candidate || alias.login) throw new Error(`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`)
 			}
 		}

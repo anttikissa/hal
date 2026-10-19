@@ -3,7 +3,6 @@ import { expect, test } from 'bun:test'
 import { readFileSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { paths } from './paths.ts'
-import { protocol } from '../common/protocol.ts'
 import { autoclose } from './autoclose.ts'
 import { calls, client, toolSession, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
@@ -14,6 +13,7 @@ import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
+import { commandCheck } from '../common/command-check.ts'
 
 useHost()
 
@@ -115,7 +115,7 @@ test('unfinished jobs and running subagents prevent ordinary autoclose', async (
 })
 
 test('autoclose initialization rejects non-boolean wire and stored values', () => {
-	for (let type of ['create', 'tab-new']) expect(protocol.invalid({ type, cwd: '/tmp', autoclose: 'on' })).toContain('autoclose must be a boolean')
+	for (let type of ['create', 'tab-new']) expect(commandCheck.invalid({ type, cwd: '/tmp', autoclose: 'on' })).toContain('autoclose must be a boolean')
 	let { id } = ordinary()
 	expect(() => sessions.validate(id, { ...sessions.open(id), autoclose: 'on' })).toThrow('invalid autoclose')
 })

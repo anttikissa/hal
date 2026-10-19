@@ -175,6 +175,10 @@ Literal constants and local snapshots inside functions are fine.
 Core functions have concrete, navigable implementations. Do not use empty
 placeholder functions that another module overwrites at startup.
 
+Avoid indirection without useful meaning: call `ansi.INVERSE`, not a
+local alias of it, and import the module that implements a function
+instead of an object that only forwards it.
+
 ## Plugins
 
 Hal hot-reloads plugins/*.ts when they change; no restart is needed.

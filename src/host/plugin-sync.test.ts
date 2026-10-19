@@ -5,12 +5,13 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { protocol, type Event } from '../common/protocol.ts'
+import { type Event } from '../common/protocol.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError } from './plugin-sync-client.ts'
 import { plugins, type Loaded } from './plugins.ts'
 import { paths } from './paths.ts'
+import { commandCheck } from '../common/command-check.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
@@ -58,7 +59,7 @@ const host = { deliver: (_e: Event) => {} }
 
 // The host answers as host.ts would: checked, then a reply and an ack.
 function answer(c: any): void {
-	let problem = protocol.invalid(c)
+	let problem = commandCheck.invalid(c)
 	let events: Event[]
 	if (problem) events = [{ type: 'rejected', command: c.type, reason: problem, id: c.id }]
 	else {
@@ -213,7 +214,7 @@ test('the same home compares nothing; file names cannot leave the plugins direct
 	expect(pluginSyncClient.state.same).toBe(true)
 	expect(sent.map((c) => c.op)).toEqual(['inventory'])
 	for (let file of ['../x.ts', 'a/b.ts', 'x.d.ts', 'x.js'])
-		expect(protocol.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain('top-level plugin filename')
+		expect(commandCheck.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain('top-level plugin filename')
 })
 
 test('comparisons asked for while one runs collapse into one more', async () => {

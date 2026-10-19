@@ -25,8 +25,6 @@ import type { FlaggedCall } from './modals.ts'
 import type { RebasePlan } from './rebase.ts'
 import type { RebaseRows } from './rebase-rows.ts'
 import type { SubscriptionData } from './subscriptions.ts'
-import { commandCheck } from './command-check.ts'
-import { eventCheck } from './event-check.ts'
 import type { PromptChange } from './prompt-changes.ts'
 import type { PluginSyncCommand, PluginSyncEvent } from './plugin-sync.ts'
 
@@ -360,5 +358,3 @@ export type Event =
 	// Plugin sync answers and changes (task zh7), to that client only.
 	| PluginSyncEvent
 export type EventType = Event['type']
-
-export const protocol = { commandTypes: commandCheck.commandTypes, invalid: commandCheck.invalid, invalidEvent: eventCheck.invalidEvent }

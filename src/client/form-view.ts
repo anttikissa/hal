@@ -10,8 +10,6 @@ import { ansi } from './ansi.ts'
 import { itemView } from './item-view.ts'
 import { promptView } from './prompt-view.ts'
 
-const { INVERSE, UNINVERSE } = ansi
-
 /**
  * Rows of an open question being filled in, at `width` columns, headed
  * by its time `ts` and text like every block, and
@@ -42,7 +40,7 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		let lit = colors.popupCurrent(style.fg ?? colors.popup().neutralFg!)
 		let mark = (o: string) => {
 			let label = `${o === value ? formView.ARROW : ' '} ${ansi.clean(o)} `
-			return o === value ? (ansi.sgr(lit) || INVERSE) + label + ansi.UNCOLOR + UNINVERSE + ansi.sgr(style) : label
+			return o === value ? (ansi.sgr(lit) || ansi.INVERSE) + label + ansi.UNCOLOR + ansi.UNINVERSE + ansi.sgr(style) : label
 		}
 		// An inline choice is one row: its label, then its options, lined
 		// up with the other inline rows' options.

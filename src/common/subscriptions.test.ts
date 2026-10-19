@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { subscriptions } from './subscriptions.ts'
-import { protocol } from './protocol.ts'
+import { eventCheck } from './event-check.ts'
 
 test('master usage replaces omitted data and isolates accounts', () => {
 	let before = subscriptions.state
@@ -17,9 +17,9 @@ test('master usage replaces omitted data and isolates accounts', () => {
 
 test('quota events reject invalid nested readings before they reach the master store', () => {
 	for (let window of [{ used: NaN }, { used: 101 }, { used: -1 }, { used: '52' }, { used: 52, resets: 'bad' }]) {
-		expect(protocol.invalidEvent({ type: 'subscription-usage', accounts: { a: { '5h': window } } })).toBe('subscription-usage: invalid windows')
+		expect(eventCheck.invalidEvent({ type: 'subscription-usage', accounts: { a: { '5h': window } } })).toBe('subscription-usage: invalid windows')
 	}
-	expect(protocol.invalidEvent({ type: 'subscription-usage', accounts: JSON.parse('{"__proto__": {"5h": {"used": 0}}}') })).toBe('subscription-usage: invalid windows')
-	expect(protocol.invalidEvent({ type: 'tabs', tabs: [], accounts: {}, subscriptions: { a: { '5h': { used: 'bad' } } } })).toBe('tabs: invalid windows')
-	expect(protocol.invalidEvent({ type: 'subscription-usage', accounts: { a: { '5h': { used: 0 } } } })).toBeUndefined()
+	expect(eventCheck.invalidEvent({ type: 'subscription-usage', accounts: JSON.parse('{"__proto__": {"5h": {"used": 0}}}') })).toBe('subscription-usage: invalid windows')
+	expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [], accounts: {}, subscriptions: { a: { '5h': { used: 'bad' } } } })).toBe('tabs: invalid windows')
+	expect(eventCheck.invalidEvent({ type: 'subscription-usage', accounts: { a: { '5h': { used: 0 } } } })).toBeUndefined()
 })

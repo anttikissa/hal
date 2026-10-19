@@ -1,0 +1,7 @@
+{
+	title: 'No indirection without useful meaning',
+	spec: 'AGENTS.md says to avoid indirection without useful meaning. Code calls ansi.INVERSE rather than a module-level alias, imports the module that implements a function instead of an object that only forwards it, and computes derived values where used. protocol.ts holds only types: callers validate with commandCheck.invalid and eventCheck.invalidEvent directly. host/effort.ts does not re-export the shared effort levels: callers read them from common/effort.ts. Factory calls that build a distinct value, such as compatCatalog.create(name) or toggleCommands.folding(name), are meaningful construction, not forwarding.',
+	status: 'done',
+	needs: ['cej'],
+	foldInto: ['cej']
+}

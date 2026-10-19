@@ -1,7 +1,7 @@
 // Host protocol: durable history before live events, shared by all transports.
 // Sliced snapshots hold commands until sent, then run them in order (task 7j).
 
-import { protocol, type Command, type Event } from '../common/protocol.ts'
+import { type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { forms } from '../common/forms.ts'
@@ -47,6 +47,7 @@ import { models } from './models.ts'
 import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { usage } from './usage.ts'
+import { commandCheck } from '../common/command-check.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -138,7 +139,7 @@ function handle(client: Client, command: unknown): void {
 	clients.touch(client.record)
 	let held = client.held.get('*') ?? client.held.get((command as { sessionId?: string } | null)?.sessionId as string)
 	if (held) return void held.push(command)
-	let problem = protocol.invalid(command)
+	let problem = commandCheck.invalid(command)
 	if (problem) return host.reject(client, command, problem, (command as any)?.sessionId)
 	let c = command as Command
 	let repeat = c.id === undefined ? undefined : (host.state.done.get(c.id) ?? host.submitted(c))

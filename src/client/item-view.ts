@@ -30,8 +30,6 @@ import { bashCard } from './bash-card.ts'
 // command scrolls by (bash-card.ts).
 export type Look = { headerWidth?: number; head?: number; now?: number; full?: boolean; fold?: Verbosity; result?: Keyed & { type: 'tool-result' }; call?: { key: string; name: string; title?: string; ts?: string }; background?: Keyed & { type: 'tool' }; wait?: (string | { href: string; text: string })[]; streamRows?: number; pad?: boolean; gap?: boolean; status?: string; style?: Style; lines?: (width: number) => string[] }
 
-const { INVERSE, UNINVERSE } = ansi
-
 // The style of a tool's name: tool + camel-case name (read_entry is
 // toolReadEntry), else the default tool.
 function toolStyle(name: string): Style {
@@ -273,16 +271,16 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
 		.quoteParts(quote)
 		.map((p) => {
 			let t = ansi.clean(p.text.replace(/\r\n?/g, '\n'))
-			return p.marked ? t.split('\n').map((l) => INVERSE + l + UNINVERSE).join('\n') : t
+			return p.marked ? t.split('\n').map((l) => ansi.INVERSE + l + ansi.UNINVERSE).join('\n') : t
 		})
 		.join('')
 	let on = false
 	return strings.wordWrap(strings.expandTabs(text), Math.max(1, width - indent.length)).map((r) => {
-		let row = (on ? INVERSE : '') + r
-		let opened = r.lastIndexOf(INVERSE)
-		let closed = r.lastIndexOf(UNINVERSE)
+		let row = (on ? ansi.INVERSE : '') + r
+		let opened = r.lastIndexOf(ansi.INVERSE)
+		let closed = r.lastIndexOf(ansi.UNINVERSE)
 		if (opened !== closed) on = opened > closed
-		return indent + row + (on ? UNINVERSE : '')
+		return indent + row + (on ? ansi.UNINVERSE : '')
 	})
 }
 

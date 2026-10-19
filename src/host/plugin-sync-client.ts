@@ -39,8 +39,6 @@ export type Expected = { client?: string; server?: string }
 // The comparison was out of date; a revised one is in state now.
 export class StaleError extends Error {}
 
-const EMPTY = pluginSync.sha('')
-
 function createState() {
 	return {
 		active: false,
@@ -135,7 +133,7 @@ async function compare(): Promise<void> {
 
 function side(h: SyncHead | undefined): SideInfo {
 	if (!h?.id) return { status: 'missing' }
-	let status: SideInfo['status'] = h.deleted ? 'deleted' : h.hash === EMPTY ? 'empty' : 'present'
+	let status: SideInfo['status'] = h.deleted ? 'deleted' : h.hash === pluginSync.sha('') ? 'empty' : 'present'
 	return { id: h.id, ts: h.ts!, status, ...(h.hash ? { hash: h.hash } : {}), ...(h.offline ? { offline: true as const } : {}) }
 }
 

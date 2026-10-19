@@ -81,4 +81,4 @@ function wire(provider: string, model: string, selected?: string, maxTokens?: nu
 	effort.validate(`${provider}/${model}`, level)
 	return cap!.wire(level as EffortLevel, maxTokens)
 }
-export const effort = { capability, describe, validate, nearest, wire, vocabulary: vocabulary.levels }
+export const effort = { capability, describe, validate, nearest, wire }

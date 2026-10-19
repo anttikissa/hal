@@ -11,7 +11,7 @@ import { status } from './status.ts'
 import { history } from './history.ts'
 import { tabs } from './tabs.ts'
 import { config } from './config.ts'
-import { protocol } from '../common/protocol.ts'
+import { eventCheck } from '../common/event-check.ts'
 
 useHost()
 
@@ -227,8 +227,8 @@ test('a tab wants attention when its turn ends until a client has seen it', asyn
 
 test('tab question metadata accepts known kinds and rejects other wire values', () => {
 	let tab = { id: 'x', name: 'x', cwd: '/' }
-	for (let question of [undefined, 'ordinary', 'approval']) expect(protocol.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBeUndefined()
-	for (let question of [true, 'danger', {}]) expect(protocol.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBe('tabs: invalid question kind')
+	for (let question of [undefined, 'ordinary', 'approval']) expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBeUndefined()
+	for (let question of [true, 'danger', {}]) expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBe('tabs: invalid question kind')
 })
 
 test('final questions stay distinct from unread completions through viewing and restart, until answered', async () => {

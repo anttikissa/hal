@@ -17,7 +17,7 @@ import { versions } from './client/versions.ts'
 import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
 import { perf } from './common/perf.ts'
-import { protocol, type Event, type Tab } from './common/protocol.ts'
+import { type Event, type Tab } from './common/protocol.ts'
 import { settings } from './common/settings.ts'
 import { resources } from './host/resources.ts'
 import { config } from './host/config.ts'
@@ -50,6 +50,7 @@ import { serverLog } from './host/server-log.ts'
 import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
+import { eventCheck } from './common/event-check.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -245,7 +246,7 @@ async function auth(): Promise<number> {
 		void link
 			.dial(server.socketPath(), {
 				event: (e) => {
-					if (protocol.invalidEvent(e)) return
+					if (eventCheck.invalidEvent(e)) return
 					if (e.type === 'auth') done({ code: e.code })
 					else if (e.type === 'rejected' && e.command === 'auth') done({ error: `the host refused: ${e.reason}` })
 				},
