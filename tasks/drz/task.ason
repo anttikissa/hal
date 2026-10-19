@@ -3,7 +3,8 @@
 	spec: 'Files under src/ matching *.ts or *.tsx, tests included, stay at or under 20,000 bytes (about 5,000 tokens at bytes / 4) so an agent can read each whole. Bytes replace the 450-line limit because line counts depend on formatting: oxfmt raised them by 40% without growing the code. scripts/size-limit.ts holds the limit, exceptions with reasons (common/ason.ts: self-contained) and splitting advice: move one coherent responsibility into a module named for it, without re-exports; split tests by feature area into <module>-<area>.test.ts with shared fixtures in a helper; never shrink by squeezing formatting or deleting comments or tests. conventions.test.ts checks all of src/. scripts/hooks/pre-commit checks only staged files and prints the advice; package.json prepare sets core.hooksPath on bun install.',
 	status: 'done',
 	notes: [
-		'At introduction 23 files exceeded the limit (largest: src/host/web.test.ts, about 40k tokens). The hook blocks commits that stage any of them until they are split.'
+		'At introduction 23 files exceeded the limit (largest: src/host/web.test.ts, about 40k tokens). The hook blocks commits that stage any of them until they are split.',
+		'Split by 179-mob (2026-10-19): prompts.ts -> queue-next.ts; prompts.test.ts -> prompts-edit.test.ts, prompts-fixture.test.ts; openai.test.ts -> openai-ws.test.ts, openai-fixture.test.ts; tools/edit.ts -> edit-blocks.ts; tools/edit.test.ts -> tools/edit-rollback.test.ts, tools/edit-fixture.test.ts.'
 	],
 	needs: ['0j'],
 	foldInto: ['0j']

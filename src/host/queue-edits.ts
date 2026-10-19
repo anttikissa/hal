@@ -10,6 +10,7 @@ import type { Command, Event } from '../common/protocol.ts'
 import { literal } from '../common/literal.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
+import { queueNext } from './queue-next.ts'
 import { status } from './status.ts'
 import { turns } from './turns.ts'
 
@@ -53,7 +54,7 @@ function release(id: string): void {
 	queueEdits.state.delete(id)
 	host.broadcast(id, { type: 'queue-hold', sessionId: id })
 	if (hold.next) {
-		let done = prompts.queueNext(id)
+		let done = queueNext.send(id)
 		if (done.error) host.broadcast(id, { type: 'warning', text: `/queue next in ${id}: ${done.error}` })
 	} else if (!turns.state.running.has(id) && status.stateOf(id).type === 'idle') prompts.next(id)
 }

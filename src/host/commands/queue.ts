@@ -6,6 +6,7 @@ import { history } from '../history.ts'
 import { host } from '../host.ts'
 import { prompts } from '../prompts.ts'
 import { queueEdits } from '../queue-edits.ts'
+import { queueNext } from '../queue-next.ts'
 import { status } from '../status.ts'
 
 const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.delivery === 'after-turn')
@@ -72,9 +73,9 @@ export const command: SlashCommand = {
 			let item = early[2] === undefined ? undefined : target(id, early[2]).item
 			if (early[2] !== undefined && !item)
 				return { error: 'That message is no longer queued: it was already delivered or dropped.' }
-			return prompts.queueNext(id, early[1] === 'now', item?.id)
+			return queueNext.send(id, early[1] === 'now', item?.id)
 		}
-		if (args === 'undo') return prompts.unqueueUndo(id)
+		if (args === 'undo') return queueNext.undo(id)
 		let refused = prompts.submit(id, args, undefined, 'queue')
 		return refused ? { error: refused } : { say: 'queued' }
 	},

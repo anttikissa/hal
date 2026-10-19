@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'The flag is only sent while the session is busy, so idle submits stay unchanged. A nextRound steer after Escape still swaps the controller so the stopped turn goes on, as an interrupting steer does. While a turn runs, the help row drops shift-enter: with ctrl-enter added, it truncated esc: pause at 80 columns. Uploads waiting to finish resume as plain Enter, so a Ctrl-Enter sent during an upload becomes a between-rounds steer.',
-		'Promotion reuses /queue next, so slash-command plumbing carried it with no new protocol command. /queue undo remembers only the last early-sent id per session in host memory (prompts.promoted); a host restart forgets it, which only loses an undo. The interrupting tier keeps the stored field name steering for old history.'
+		'Promotion reuses /queue next, so slash-command plumbing carried it with no new protocol command. /queue undo remembers only the last early-sent id per session in host memory (prompts.promoted); a host restart forgets it, which only loses an undo. The interrupting tier keeps the stored field name steering for old history.',
+		'Size split (task drz, 2026-10-19): /queue next and /queue undo live in src/host/queue-next.ts (queueNext.send, queueNext.undo, queueNext.promoted), moved out of prompts.ts; commands/queue.ts and queue-edits.ts call it directly.'
 	],
 	needs: ['2r', 'ker'],
 	foldInto: ['2r']

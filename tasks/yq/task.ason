@@ -9,7 +9,8 @@
 		'The cut (by owned state and callers): host.ts keeps connections, command dispatch (act), ids, snapshots, broadcast and lifecycle (init, quitting, reset); status.ts owns the per-session state map (stateOf, transition, settle, inboxOf); prompts.ts is what the user sends (submit, amend, inbox delivery, next, drain, resume, reply, drafts sent); turns.ts owns running turns (state.running, stream, start, runTurn, ask, stop, recover, waitOut); slash.ts runs slash commands (command, context, change, runCommand, models, output). host.reset still clears turns.state.running and status.state.states, since tests reset through it.',
 		'Patch points moved: tests stub turns.stream (was host.stream) and prompts.next / prompts.submit. `status` shadows the DOM global of the same name, so a file that forgets to import it type-checks as window.status (a string) and fails at .stateOf.',
 		'host.test.ts was split into host.test.ts, turns.test.ts and prompts.test.ts sharing host-fixture.test.ts (named *.test.ts so the size and import-side-effect rules skip it; call useHost() to register its hooks). host-commands, host-retry and host-approval tests became slash.test.ts, turns-retry.test.ts and turns-approval.test.ts.',
-		'Host protocol tests import only modules they use. Removing the unused pages import restores the warning-free lint invariant after the test split; lint warnings fail ./test.'
+		'Host protocol tests import only modules they use. Removing the unused pages import restores the warning-free lint invariant after the test split; lint warnings fail ./test.',
+		'Size split (task drz, 2026-10-19): prompts.test.ts keeps inbox delivery; edits of prompts and inbox messages moved to prompts-edit.test.ts, shared helpers to prompts-fixture.test.ts. /queue next and undo moved to queue-next.ts (task csn).'
 	],
 	needs: ['0j'],
 	foldInto: [

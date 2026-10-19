@@ -2,5 +2,8 @@
 	title: 'Provider parser tests use recorded streams',
 	spec: 'src/host/anthropic.test.ts and src/host/openai.test.ts fake providers only with responses recorded from the real API (AGENTS.md Tests). Common cases (thinking with signature, text, tool calls, usage) replay recordings. Cases the API will not produce on demand (redacted thinking, refusals, errors mid-stream) need a rule decision first: allow hand-written events that cite their source, or drop the tests.',
 	status: 'planned',
+	notes: [
+		'Size split (task drz, 2026-10-19): the fake OpenAI server and helpers moved to src/host/openai-fixture.test.ts (useFakeOpenai, fake state object); WebSocket transport tests moved to openai-ws.test.ts.'
+	],
 	needs: ['b3']
 }

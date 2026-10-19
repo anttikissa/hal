@@ -1,94 +1,16 @@
 import '../host.ts'
-import { expect, test, spyOn } from 'bun:test'
-import {
-	readFileSync,
-	writeFileSync,
-	existsSync,
-	symlinkSync,
-	readdirSync,
-	unlinkSync,
-	chmodSync,
-	statSync,
-	realpathSync,
-} from 'fs'
-import { tool as multiedit, io, parseBlocks } from './edit.ts'
-import { fileChanges } from '../file-changes.ts'
+import { expect, test } from 'bun:test'
+import { readFileSync, existsSync, symlinkSync, unlinkSync } from 'fs'
+import { tool as multiedit } from './edit.ts'
+import { crlf, file, nl, run } from './edit-fixture.test.ts'
+import { editBlocks } from '../edit-blocks.ts'
 import { fileText } from '../file-text.ts'
 import { client, created, testHome, useHost } from '../host-fixture.test.ts'
-import { paths } from '../paths.ts'
 import { toolPresentations } from '../tool-presentation.ts'
 import { toolPresentation } from '../../common/tool-presentation.ts'
 import { tools } from '../tools.ts'
 
 useHost()
-
-test('symlink retargeting cannot overwrite another file with identical bytes', async () => {
-	const a = file('a', 'same'),
-		b = file('b', 'same'),
-		original = io.save
-	const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-		unlinkSync(a)
-		symlinkSync(b, a)
-		await original(...args)
-	})
-	try {
-		await expect(run([{ path: 'a', old: 'same', new: 'changed' }])).rejects.toThrow('target identity changed')
-		expect(readFileSync(b, 'utf8')).toBe('same')
-	} finally {
-		mock.mockRestore()
-	}
-})
-
-test('cancellation after a write rolls the entire change back', async () => {
-	const a = file('a', 'old'),
-		b = file('b', 'before'),
-		controller = new AbortController(),
-		original = io.save
-	let calls = 0
-	const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-		await original(...args)
-		if (++calls === 1) controller.abort()
-	})
-	try {
-		await expect(
-			run(
-				[
-					{ path: 'a', old: 'old', new: 'new' },
-					{ path: 'b', old: 'before', new: 'after' },
-				],
-				controller.signal,
-			),
-		).rejects.toThrow('Rolled back all writes')
-		expect(readFileSync(a, 'utf8')).toBe('old')
-		expect(readFileSync(b, 'utf8')).toBe('before')
-	} finally {
-		mock.mockRestore()
-	}
-})
-
-test('cleanup failure preserves the original failure', async () => {
-	file('a', 'same')
-	const original = fileChanges.finish
-	const mock = spyOn(fileChanges, 'finish').mockImplementation(async (...args) => {
-		await original(...args)
-		throw new Error('finish failure')
-	})
-	try {
-		const result = run([{ path: 'a', old: 'missing', new: 'x' }])
-		await expect(result).rejects.toThrow('old not found')
-		await expect(result).rejects.toThrow('finish failure')
-	} finally {
-		mock.mockRestore()
-	}
-})
-const nl = String.fromCharCode(10),
-	crlf = String.fromCharCode(13, 10)
-const run = (edits: unknown[], signal = new AbortController().signal) =>
-	multiedit.run({ edits }, { cwd: testHome(), sessionId: created(client(), testHome()), signal, callId: 'edit' })
-const file = (name: string, text: string) => {
-	writeFileSync(`${testHome()}/${name}`, text)
-	return `${testHome()}/${name}`
-}
 
 test('text steps, version-checked ranges and creation return contents or a single diff', async () => {
 	const a = file('a', 'old'),
@@ -119,17 +41,17 @@ test('text steps, version-checked ranges and creation return contents or a singl
 test('whole-file writes return READ output; uppercase operations return only a contextual diff', async () => {
 	const a = file('a', 'before'),
 		id = created(client(), testHome())
-	const output = await run(parseBlocks('a WRITE\n!!NEW\none\ntwo\nthree\n!!END').edits)
+	const output = await run(editBlocks.parse('a WRITE\n!!NEW\none\ntwo\nthree\n!!END').edits)
 	const read = await tools.run(
 		{ type: 'tool_call', id: 'read', name: 'read', input: { path: 'a', offset: 1 } },
 		{ cwd: testHome(), sessionId: id, signal: new AbortController().signal },
 	)
 	expect(output).toBe(read.output)
-	const changed = await run(parseBlocks('a REPLACE\n!!OLD\ntwo\n!!NEW\nkaksi\n2\n!!END').edits)
+	const changed = await run(editBlocks.parse('a REPLACE\n!!OLD\ntwo\n!!NEW\nkaksi\n2\n!!END').edits)
 	expect(changed).toBe(`== a@${fileText.hash(readFileSync(a))} ==\n 1: one\n-2: two\n+2: kaksi\n+3: 2\n 4: three`)
 	for (const operation of ['CREATE', 'DELETE', 'INSERT-BEFORE 1', 'INSERT-AFTER 1']) {
 		const block = operation === 'DELETE' ? '' : '\n!!NEW\nx\n!!END'
-		expect(parseBlocks(`b ${operation}${block}`).edits).toHaveLength(1)
+		expect(editBlocks.parse(`b ${operation}${block}`).edits).toHaveLength(1)
 	}
 })
 
@@ -157,7 +79,7 @@ test('failures validate before writes, including duplicate aliases and stale ran
 test('inserts at one point and a range starting there apply in written order', async () => {
 	const a = file('a', ['1', '2', '3'].join(nl) + nl)
 	await run(
-		parseBlocks(
+		editBlocks.parse(
 			[
 				'',
 				'a insert-before 2',
@@ -181,14 +103,15 @@ test('inserts at one point and a range starting there apply in written order', a
 test('removing whole lines by text, even with !!OLD alone, leaves no blank line; a fragment keeps its line', async () => {
 	const a = file('a', ['1', '2', '3', 'x y'].join(nl) + nl)
 	await run(
-		parseBlocks(['', 'a replace', '!!OLD', '2', '!!END', 'a replace', '!!OLD', ' y', '!!NEW', '!!END'].join(nl)).edits,
+		editBlocks.parse(['', 'a replace', '!!OLD', '2', '!!END', 'a replace', '!!OLD', ' y', '!!NEW', '!!END'].join(nl))
+			.edits,
 	)
 	expect(readFileSync(a, 'utf8')).toBe(['1', '3', 'x'].join(nl) + nl)
 })
 
 test('a call after the last block runs once the edit is written; a failed edit runs none', async () => {
 	file('a', 'old' + nl)
-	const { edits, then } = parseBlocks(
+	const { edits, then } = editBlocks.parse(
 		['', 'a replace', '!!OLD', 'old', '!!NEW', 'new', '!!END', 'BASH "cat a"'].join(nl),
 	)
 	expect(then).toEqual(['BASH "cat a"'])
@@ -214,7 +137,7 @@ test('a call after the last block runs once the edit is written; a failed edit r
 test('a file takes line operations and text replaces together; text applies after lines', async () => {
 	const a = file('a', ['1', '2', '3', 'tail'].join(nl) + nl)
 	await run(
-		parseBlocks(
+		editBlocks.parse(
 			['', 'a replace', '!!OLD', 'tail', '!!NEW', 'TAIL', '!!END', 'a replace 2-2', '!!NEW', 'two', '!!END'].join(nl),
 		).edits,
 	)
@@ -225,7 +148,7 @@ test('deletes accept one optional END before another operation or trailing call'
 	for (const ending of [nl, crlf]) {
 		const a = file('a', ['keep', 'remove'].join(ending) + ending)
 		const b = file('b', 'gone')
-		const { edits, then } = parseBlocks(
+		const { edits, then } = editBlocks.parse(
 			[
 				`a@${fileText.hash(readFileSync(a))} delete 2-2`,
 				'!!END',
@@ -249,9 +172,9 @@ test('deletes accept one optional END before another operation or trailing call'
 	}
 	for (const operation of ['delete', 'delete 147-147']) {
 		const header = `src/web/components/Card.tsx@1e49h ${operation}`
-		expect(parseBlocks(header + nl + '!!END').edits).toEqual(parseBlocks(header).edits)
-		expect(() => parseBlocks(header + nl + '!!END' + nl + '!!END')).toThrow('EDIT line 3')
-		expect(() => parseBlocks(header + nl + '!!NEW')).toThrow('EDIT line 2')
+		expect(editBlocks.parse(header + nl + '!!END').edits).toEqual(editBlocks.parse(header).edits)
+		expect(() => editBlocks.parse(header + nl + '!!END' + nl + '!!END')).toThrow('EDIT line 3')
+		expect(() => editBlocks.parse(header + nl + '!!NEW')).toThrow('EDIT line 2')
 	}
 })
 
@@ -264,45 +187,12 @@ test('the parser is strict: stray text after the last block is an error naming i
 		['!!END'],
 		['some prose here'],
 	])
-		expect(() => parseBlocks([...head, ...tail].join(nl))).toThrow('EDIT line 8')
-	expect(() => parseBlocks([...head, 'f.ts replace', '!!OLD', '!!NEW', '!!END'].join(nl))).toThrow(
+		expect(() => editBlocks.parse([...head, ...tail].join(nl))).toThrow('EDIT line 8')
+	expect(() => editBlocks.parse([...head, 'f.ts replace', '!!OLD', '!!NEW', '!!END'].join(nl))).toThrow(
 		'needs nonempty old text',
 	)
-	expect(parseBlocks([...head, 'BASH "ls"'].join(nl)).then).toEqual(['BASH "ls"'])
+	expect(editBlocks.parse([...head, 'BASH "ls"'].join(nl)).then).toEqual(['BASH "ls"'])
 })
-
-for (const external of [false, true])
-	test(`write failure rolls back; external conflict=${external}`, async () => {
-		const a = file('a', 'old'),
-			b = file('b', 'before'),
-			original = io.save
-		let calls = 0
-		const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-			if (++calls === 3) {
-				if (external) writeFileSync(a, 'external')
-				throw new Error('injected failure')
-			}
-			await original(...args)
-		})
-		try {
-			await expect(
-				run([
-					{ path: 'new', new: 'created' },
-					{ path: 'a', old: 'old', new: 'changed' },
-					{ path: 'b', old: 'before', new: 'after' },
-				]),
-			).rejects.toThrow(external ? 'Recovery copies:' : 'Rolled back all writes')
-			expect(readFileSync(a, 'utf8')).toBe(external ? 'external' : 'old')
-			expect(readFileSync(b, 'utf8')).toBe('before')
-			expect(existsSync(`${testHome()}/new`)).toBe(false)
-			if (external) {
-				const dir = readdirSync(paths.tmpDir()).find((p) => p.startsWith('multiedit-'))!
-				expect(readFileSync(`${paths.tmpDir()}/${dir}/1`, 'utf8')).toBe('old')
-			}
-		} finally {
-			mock.mockRestore()
-		}
-	})
 
 test('ambiguous text reports planned context without writing and supports a contextual retry', async () => {
 	const before = ['first', 'target', '', 'spacer', '', 'second', 'target', '', 'spacer', '', 'third', 'target'].join(nl)
@@ -415,9 +305,9 @@ test('colon ranges beside the path or operation keep versions and range validati
 		const block = op.toLowerCase() === 'delete' ? '' : '\n!!NEW\ntesting\n!!END'
 		const range = op.toLowerCase().startsWith('insert-') ? '5' : '5-6'
 		for (const path of ['foo.txt', 'foo.txt@abcde']) {
-			const expected = parseBlocks(`${path} ${op} ${range}${block}`)
-			expect(parseBlocks(`${path}:${range} ${op}${block}`)).toEqual(expected)
-			expect(parseBlocks(`${path} ${op}:${range}${block}`)).toEqual(expected)
+			const expected = editBlocks.parse(`${path} ${op} ${range}${block}`)
+			expect(editBlocks.parse(`${path}:${range} ${op}${block}`)).toEqual(expected)
+			expect(editBlocks.parse(`${path} ${op}:${range}${block}`)).toEqual(expected)
 		}
 	}
 })
@@ -444,7 +334,7 @@ test('file deletion accepts advisory versions, commits with edits and deletes em
 	const a = file('a', 'remove\n'),
 		empty = file('empty', ''),
 		b = file('b', 'old')
-	const parsed = parseBlocks(`a@${fileText.hash(readFileSync(a))} delete\nempty delete`)
+	const parsed = editBlocks.parse(`a@${fileText.hash(readFileSync(a))} delete\nempty delete`)
 	const out = await run([...parsed.edits, { path: 'b', old: 'old', new: 'new' }])
 	expect(existsSync(a)).toBe(false)
 	expect(existsSync(empty)).toBe(false)
@@ -474,79 +364,5 @@ test('invalid or mixed file deletions reject the whole batch', async () => {
 		await expect(run([{ path: 'new', new: 'created' }, ...edits])).rejects.toThrow('Nothing written')
 		expect(readFileSync(a, 'utf8')).toBe('original')
 		expect(existsSync(`${testHome()}/new`)).toBe(false)
-	}
-})
-
-for (const external of [false, true])
-	test(`failed batch restores deleted file and permissions; external replacement=${external}`, async () => {
-		const a = file('a', 'original'),
-			b = file('b', 'before'),
-			original = io.save
-		chmodSync(a, 0o751)
-		const mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-			if (args[0] === realpathSync(b)) {
-				if (external) writeFileSync(a, 'external')
-				throw new Error('injected failure')
-			}
-			await original(...args)
-		})
-		try {
-			await expect(
-				run([
-					{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true },
-					{ path: 'b', old: 'before', new: 'after' },
-				]),
-			).rejects.toThrow(external ? 'Recovery copies:' : 'Rolled back all writes')
-			expect(readFileSync(a, 'utf8')).toBe(external ? 'external' : 'original')
-			expect(readFileSync(b, 'utf8')).toBe('before')
-			if (!external) expect(statSync(a).mode & 0o7777).toBe(0o751)
-			else {
-				const dir = readdirSync(paths.tmpDir()).find((p) => p.startsWith('multiedit-'))!
-				expect(readFileSync(`${paths.tmpDir()}/${dir}/0`, 'utf8')).toBe('original')
-			}
-		} finally {
-			mock.mockRestore()
-		}
-	})
-
-test('cancellation after deletion restores the file; a changed target is never deleted', async () => {
-	const a = file('a', 'original'),
-		b = file('b', 'original'),
-		original = io.save,
-		controller = new AbortController()
-	let mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-		await original(...args)
-		controller.abort()
-	})
-	try {
-		await expect(
-			run([{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true }], controller.signal),
-		).rejects.toThrow('Rolled back all writes')
-		expect(readFileSync(a, 'utf8')).toBe('original')
-	} finally {
-		mock.mockRestore()
-	}
-	mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-		writeFileSync(a, 'external')
-		await original(...args)
-	})
-	try {
-		await expect(run([{ path: 'a', delete: true }])).rejects.toThrow('changed outside Hal')
-		expect(readFileSync(a, 'utf8')).toBe('external')
-	} finally {
-		mock.mockRestore()
-	}
-	mock = spyOn(io, 'save').mockImplementation(async (...args) => {
-		unlinkSync(a)
-		symlinkSync(b, a)
-		await original(...args)
-	})
-	try {
-		await expect(run([{ path: 'a', hash: fileText.hash(readFileSync(a)), delete: true }])).rejects.toThrow(
-			'target identity changed',
-		)
-		expect(readFileSync(b, 'utf8')).toBe('original')
-	} finally {
-		mock.mockRestore()
 	}
 })
