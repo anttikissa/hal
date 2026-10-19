@@ -111,4 +111,22 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
-export const notify = { kind, asked, replyLine, reply, line, route, deliver }
+// A tab closed by a model, another session or autoclose rather than the
+// user (task 97r): every present client hears it, even one showing
+// that tab, and it replaces the session's done notice; with nobody
+// present, a push. `before`: the tab list before closing, for its
+// number and color.
+function closed(clients: Iterable<Watcher>, id: string, before: { id: string; color?: number }[]): void {
+	let name = sessions.open(id).name ?? id
+	let line = notify.replyLine(id).slice(0, 200)
+	noticeHistory.record({ session: id, name, kind: 'done', line, what: 'closed' })
+	let watching = [...clients].filter(present)
+	if (!watching.length) return void push.notify(id, name, line ? `closed: ${line}` : 'closed').catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: 'done', what: 'closed', line }
+	let tab = before.findIndex((t) => t.id === id)
+	if (tab >= 0) notice.tab = tab + 1
+	if (before[tab]?.color !== undefined) notice.color = before[tab]!.color
+	for (let c of watching) c.deliver(notice)
+}
+
+export const notify = { kind, asked, replyLine, reply, line, route, deliver, closed }

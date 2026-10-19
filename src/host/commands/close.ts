@@ -1,6 +1,8 @@
 // /close closes this session's tab, or the one named by number or id;
 // a running turn there stops. Ctrl-W does the same unrecorded.
 import type { SlashCommand } from '../commands.ts'
+import { host } from '../host.ts'
+import { notify } from '../notify.ts'
 import { tabs } from '../tabs.ts'
 
 export const command: SlashCommand = {
@@ -10,7 +12,11 @@ export const command: SlashCommand = {
 	run(args, _answers, ctx) {
 		let open = tabs.file().open
 		let id = !args ? ctx.sessionId : /^[1-9]\d*$/.test(args) ? open[Number(args) - 1] : args
+		let before = tabs.list()
 		let refused = id === undefined ? 'not a tab' : tabs.act({ type: 'tab-close', sessionId: id }).refused
-		return refused ? { error: refused } : { result: `closed ${id}` }
+		if (refused) return { error: refused }
+		// The user knows what they closed; a model or another session tells them.
+		if (ctx.sender?.origin === 'model' || ctx.sender?.from !== undefined) notify.closed(host.state.clients, id!, before)
+		return { result: `closed ${id}` }
 	},
 }

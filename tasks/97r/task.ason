@@ -1,0 +1,7 @@
+{
+	title: 'Notice when a tab closes without the user',
+	spec: 'When autoclose, a model (COMMAND /close) or another session (SEND /close) closes a tab, the user hears it: every present client gets a notice titled "<tab> <name> · closed" with the reply line, even a client showing that tab, replacing that session\'s done notice (same key); with no present client, a web push "closed: <line>". The notice history records it as done, what: closed. A close by the user (Ctrl-W, the tab close button, a typed /close) sends nothing. Requested by the user in session 179-eon on 2026-10-19.',
+	status: 'done',
+	needs: ['p87', 'qm'],
+	foldInto: ['qm']
+}
