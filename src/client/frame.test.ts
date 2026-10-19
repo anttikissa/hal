@@ -9,6 +9,7 @@ import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
 import { uploads } from '../common/uploads.ts'
 import { frame, type Frame, type View } from './frame.ts'
+import { frameLayout } from './frame-layout.ts'
 import { promptView } from './prompt-view.ts'
 import { ansi } from './ansi.ts'
 import { target } from '../web/target.ts'
@@ -196,10 +197,10 @@ test('a frame reusing the last one equals a frame built from nothing, as items s
 	]
 	let v = view(items)
 	let fresh = (w: View) => {
-		let kept = frame.state.history
-		frame.state.history = undefined
+		let kept = frameLayout.state.history
+		frameLayout.state.history = undefined
 		let f = frame.build(w, 50, 20, true)
-		frame.state.history = kept
+		frameLayout.state.history = kept
 		return f.lines
 	}
 	let steps: View[] = [v]
@@ -230,7 +231,7 @@ test('a frame reusing the last one equals a frame built from nothing, as items s
 	for (let w of steps) expect(frame.build(w, 50, 20, true).lines).toEqual(fresh(w))
 	// Another width lays everything out again.
 	let narrow = frame.build(steps[4]!, 30, 20, true).lines
-	frame.state.history = undefined
+	frameLayout.state.history = undefined
 	expect(narrow).toEqual(frame.build(steps[4]!, 30, 20, true).lines)
 })
 

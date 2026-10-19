@@ -3,6 +3,7 @@ import { colors } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { frame, type View } from './frame.ts'
+import { frameLayout } from './frame-layout.ts'
 import { markdownView } from './markdown-view.ts'
 
 const REPLY = [
@@ -125,7 +126,7 @@ describe('tool card high-water mark', () => {
 		expect(height(done)).toBe(running)
 		// Not only through the mark: running output is laid out as the short result.
 		frame.state.peaks.clear()
-		frame.state.history = undefined
+		frameLayout.state.history = undefined
 		expect(height(done)).toBe(running)
 	})
 
@@ -137,7 +138,7 @@ describe('tool card high-water mark', () => {
 		])
 		expect(height(done)).toBe(running)
 		frame.state.peaks.clear()
-		frame.state.history = undefined
+		frameLayout.state.history = undefined
 		expect(height(done)).toBeLessThan(running)
 	})
 })

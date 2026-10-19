@@ -1,5 +1,6 @@
 // Builds terminal frames and schedules incremental paints and canonical rebuilds.
 import { frame, type View } from './frame.ts'
+import { frameLayout } from './frame-layout.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { batchOrder } from './batch-order.ts'
@@ -9,8 +10,8 @@ function rebuild(view: View): void {
 	batchOrder.state.joined = new WeakSet(view.transcript?.items.filter((item) => item.type === 'tool-result'))
 	frame.state.rows = new WeakMap()
 	frame.state.peaks.clear()
-	frame.state.history = undefined
-	frame.state.ordered = undefined
+	frameLayout.state.history = undefined
+	frameLayout.state.ordered = undefined
 }
 
 function draw(force = false, trigger?: string): void {
@@ -35,13 +36,13 @@ function draw(force = false, trigger?: string): void {
 		st.past = undefined
 	}
 	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
+	let past = frameLayout.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
 	if (!past) {
 		render.later()
 		past =
 			st.past && st.past.session === session
 				? st.past.past
-				: frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
+				: frameLayout.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
 	}
 	st.past = { session, past }
 	// Full mode never shrinks between forced paints: rows given up turn
@@ -53,7 +54,7 @@ function draw(force = false, trigger?: string): void {
 	let pending = ''
 	for (let p of render.paintParts(next, rows, force, trigger, () => {
 		rebuild(st.view)
-		past = frame.layout(st.view, cols, Infinity, true, rows)!
+		past = frameLayout.layout(st.view, cols, Infinity, true, rows)!
 		st.past = { session, past }
 		return frame.build(st.view, cols, rows, st.fullscreen, past)
 	})) {
@@ -83,7 +84,7 @@ function later(): void {
 		st.slicing = null
 		if (!st.out) return
 		let { cols, rows } = st.out.size()
-		if (frame.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)) render.request()
+		if (frameLayout.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)) render.request()
 		else render.later()
 	}, 0)
 }

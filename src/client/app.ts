@@ -31,6 +31,7 @@ import { terminal } from './terminal.ts'
 import { clientCommands } from './commands.ts'
 import { markdown } from '../common/markdown.ts'
 import { frame } from './frame.ts'
+import { frameLayout } from './frame-layout.ts'
 import { paste } from './paste.ts'
 import { pulse } from './pulse.ts'
 import { halCursor } from './hal-cursor.ts'
@@ -320,7 +321,7 @@ function onKeys(events: KeyEvent[]): void {
 		// (task fn) may shrink now without a jolt.
 		if (frame.state.padded) {
 			frame.state.peaks.clear()
-			frame.state.history = undefined
+			frameLayout.state.history = undefined
 			frame.state.padded = false
 		}
 		// Tab and command keys, whatever has the keys.

@@ -1,5 +1,5 @@
 // The order the terminal draws a transcript's tool batches in
-// (frame.layout).
+// (frameLayout.layout).
 
 import type { Item } from '../common/transcript.ts'
 
@@ -68,7 +68,7 @@ function order(items: Item[], deadline?: number, at: Ordering = { i: 0, out: [] 
 export type Ordering = { i: number; out: Item[] }
 
 // `below`: the blocks after a split batch's calls, by the batch's first
-// call; together they never shrink (frame.layout).
+// call; together they never shrink (frameLayout.layout).
 export const batchOrder = {
 	state: {
 		split: new Set<string>(),

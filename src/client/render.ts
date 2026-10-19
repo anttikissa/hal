@@ -28,7 +28,8 @@
 import { titles } from '../common/titles.ts'
 import { rendering } from '../common/rendering.ts'
 import { ansi } from './ansi.ts'
-import { frame, type Frame, type Past, type View } from './frame.ts'
+import { frame, type Frame, type View } from './frame.ts'
+import { frameLayout, type Past } from './frame-layout.ts'
 import { terminal } from './terminal.ts'
 import { renderView } from './render-view.ts'
 
@@ -414,7 +415,7 @@ function reset(): void {
 	if (render.state.slicing) clearTimeout(render.state.slicing)
 	render.state = createState()
 	frame.state.peaks.clear()
-	frame.state.history = undefined
+	frameLayout.state.history = undefined
 }
 
 export const render = {
