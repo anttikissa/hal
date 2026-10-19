@@ -49,10 +49,10 @@ function closes(s: string, i: number, until: string): boolean {
 }
 
 // The emphasis marker opening at s[i]: after the start, a space or
-// punctuation (never a letter or digit: 2**3, a*b, snake_case) and
-// before a non-space.
+// punctuation other than / (never a letter or digit: 2**3, a*b,
+// snake_case; never a glob: src/*) and before a non-space.
 function opener(s: string, i: number): string | undefined {
-	if (WORD.test(s[i - 1] ?? '')) return undefined
+	if (WORD.test(s[i - 1] ?? '') || s[i - 1] === '/') return undefined
 	let m = s.startsWith('**', i) ? '**' : s[i] === '*' || s[i] === '_' ? s[i]! : undefined
 	return m && /\S/.test(s[i + m.length] ?? ' ') ? m : undefined
 }

@@ -23,7 +23,7 @@ describe('inline', () => {
 	})
 
 	test('markers inside words or before a space stay text', () => {
-		for (let s of ['2**3 and 4**5', 'a*b*c', 'snake_case_name', 'a * b * c', 'x = y *'] as const)
+		for (let s of ['2**3 and 4**5', 'a*b*c', 'snake_case_name', 'a * b * c', 'x = y *', 'src/web/*; src/client/*'] as const)
 			expect(done(s)).toBe(s)
 	})
 
