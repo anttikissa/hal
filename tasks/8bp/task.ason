@@ -1,10 +1,11 @@
 {
 	title: 'Reload plugins after literal dependency edits',
-	spec: 'The rejected dependency reloader is absent. Plugin loading uses its original directory watcher. The requested feature remains unimplemented: edits to core colors.ts must propagate through theme dependencies and plugins without restarting Hal, preserving the shared colors object and theme overrides. Do not substitute dependency reload that excludes colors.ts. A future replacement must be smaller than the rejected 81-source-line implementation.',
+	spec: 'Plugins reload only when their own file changes; Hal has no reload for core modules (src/) or plugin dependencies. The user wants only a generic solution, and none is safe: a module reloaded in place loses its state, reruns its top-level code, and leaves old exported constants and classes in use, while a fresh module copy disagrees with the one the rest of Hal holds. A colors.ts-only reload was possible but rejected as not generic. Editing src/ files, including colors.ts, requires restarting Hal.',
 	status: 'done',
 	notes: [
 		'Bun 1.4.2 supports invalidating canonical real-path ESM cache entries through require.cache. Real paths matter on macOS symlinked temp directories. Clear changed modules and their importing ancestors across all affected graphs before loading any owner; unchanged target objects retain identity. Root and dependency watcher events share a serialized queue with a close-generation guard. Dependency graphs store hashes, not source text. Ten plugins sharing two dependency files used two fs.watch instances total (root and dependency directory); a single edit reloaded all ten in 15.83 ms in an isolated local probe. Existing cache-busted plugin entry modules still accumulate per reload as before; dependencies do not introduce per-version cache keys. Bare imports and computed dynamic imports are not tracked. Missing or invalid dependencies use the existing broken-plugin policy; fix and re-enable the plugin. Not a core-module hot reloader.',
-		'User requested redesign with fewer lines and core color propagation, or revert. Reverted 4249c52a with targeted edits because it excluded the central requirement. Earlier dependency-reload measurements describe the removed implementation, not current behavior.'
+		'User requested redesign with fewer lines and core color propagation, or revert. Reverted 4249c52a with targeted edits because it excluded the central requirement. Earlier dependency-reload measurements describe the removed implementation, not current behavior.',
+		'Decided 2026-10-19 with the user: no live reload of core modules, because only a generic solution was wanted.'
 	],
 	needs: ['an'],
 	foldInto: ['an']
