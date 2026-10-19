@@ -9,7 +9,8 @@ import { stats } from './stats.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 
-let home = '', id = ''
+let home = '',
+	id = ''
 let saved = paths.state.home
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-context-`)

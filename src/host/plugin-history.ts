@@ -21,14 +21,32 @@
 // (crash mid-append) is cut; any other bad record stops the history with
 // its path and error, and nothing more is written. No pruning, no merge.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, truncateSync, unlinkSync, writeFileSync } from 'fs'
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	truncateSync,
+	unlinkSync,
+	writeFileSync,
+} from 'fs'
 import { basename, dirname, join } from 'path'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { history } from './history.ts'
 import { plugins } from './plugins.ts'
 
-export type Version = { id: string; file: string; hash?: string; parent?: string; ts: string; deleted?: true; offline?: true; received?: true }
+export type Version = {
+	id: string
+	file: string
+	hash?: string
+	parent?: string
+	ts: string
+	deleted?: true
+	offline?: true
+	received?: true
+}
 type Checkout = { file: string; checkout: string; ts: string }
 
 const sha = (bytes: Uint8Array | string): string => new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
@@ -84,7 +102,12 @@ function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean)
 	let hash = bytes && sha(bytes)
 	if (hash ? prev?.hash === hash : !prev || prev.deleted) return
 	if (bytes) pluginHistory.store(hash!, bytes)
-	let base = { file, ...(hash ? { hash } : { deleted: true as const }), ...(prev ? { parent: prev.id } : {}), ts: new Date().toISOString() }
+	let base = {
+		file,
+		...(hash ? { hash } : { deleted: true as const }),
+		...(prev ? { parent: prev.id } : {}),
+		ts: new Date().toISOString(),
+	}
 	let v: Version = { id: idOf(base), ...base, ...(offline ? { offline: true as const } : {}) }
 	append(v)
 	return v
@@ -96,7 +119,11 @@ function seen(path: string): void {
 	if (!st.dir || dirname(path) !== st.dir) return
 	try {
 		let bytes: Buffer | undefined
-		try { bytes = readFileSync(path) } catch (e: any) { if (e?.code !== 'ENOENT') throw e }
+		try {
+			bytes = readFileSync(path)
+		} catch (e: any) {
+			if (e?.code !== 'ENOENT') throw e
+		}
 		pluginHistory.observe(basename(path), bytes)
 	} catch (e: any) {
 		plugins.report(`plugin history ${ledger()}: recording ${path} failed: ${e?.stack ?? e}`)
@@ -106,14 +133,31 @@ function seen(path: string): void {
 // Takes in versions from another home, keeping their id, ts and parent.
 // `bytes`: their contents by hash. Checks every field before storing.
 function receive(list: Version[], bytes: Map<string, Uint8Array>): void {
-	if (!pluginHistory.state.dir || pluginHistory.state.error) throw new Error(`plugin history unavailable: ${pluginHistory.state.error ?? 'not started'}`)
+	if (!pluginHistory.state.dir || pluginHistory.state.error)
+		throw new Error(`plugin history unavailable: ${pluginHistory.state.error ?? 'not started'}`)
 	for (let v of list) {
 		if (pluginHistory.state.versions.has(v.id)) continue
 		let { id, file, hash, parent, ts, deleted } = v
-		let clean: Version = { id, file, ...(hash ? { hash } : {}), ...(parent ? { parent } : {}), ts, ...(deleted ? { deleted } : {}), ...(v.offline ? { offline: true } : {}) }
+		let clean: Version = {
+			id,
+			file,
+			...(hash ? { hash } : {}),
+			...(parent ? { parent } : {}),
+			ts,
+			...(deleted ? { deleted } : {}),
+			...(v.offline ? { offline: true } : {}),
+		}
 		let data = hash ? bytes.get(hash) : undefined
-		if (!isPlugin(file) || typeof ts !== 'string' || !hash === !deleted || id !== idOf(clean) || (hash && (!data || sha(data) !== hash)))
-			throw new Error(`plugin history: received version is invalid or lacks its contents: ${ason.stringify(v, 'short')}`)
+		if (
+			!isPlugin(file) ||
+			typeof ts !== 'string' ||
+			!hash === !deleted ||
+			id !== idOf(clean) ||
+			(hash && (!data || sha(data) !== hash))
+		)
+			throw new Error(
+				`plugin history: received version is invalid or lacks its contents: ${ason.stringify(v, 'short')}`,
+			)
 		if (hash) pluginHistory.store(hash, data!)
 		append({ ...clean, received: true })
 	}
@@ -124,7 +168,8 @@ function receive(list: Version[], bytes: Map<string, Uint8Array>): void {
 function checkout(id: string): void {
 	let st = pluginHistory.state
 	let v = st.versions.get(id)
-	if (!v || !st.dir || st.error) throw new Error(`plugin history: cannot check out ${id}: ${st.error ?? 'unknown version'}`)
+	if (!v || !st.dir || st.error)
+		throw new Error(`plugin history: cannot check out ${id}: ${st.error ?? 'unknown version'}`)
 	let path = join(st.dir, v.file)
 	pluginHistory.seen(path)
 	if (v.deleted) {
@@ -146,17 +191,22 @@ function init(dir: string): void {
 		let text = existsSync(path) ? readFileSync(path, 'utf8') : ''
 		let end = text.lastIndexOf('\n') + 1
 		if (end < text.length) truncateSync(path, Buffer.byteLength(text.slice(0, end)))
-		text.slice(0, end).split('\n').forEach((line, i) => {
-			if (!line) return
-			try {
-				pluginHistory.index(ason.parse(line) as any)
-			} catch (e: any) {
-				throw new Error(`${path}:${i + 1}: ${e?.message ?? e}\n${line}`)
-			}
-		})
+		text
+			.slice(0, end)
+			.split('\n')
+			.forEach((line, i) => {
+				if (!line) return
+				try {
+					pluginHistory.index(ason.parse(line) as any)
+				} catch (e: any) {
+					throw new Error(`${path}:${i + 1}: ${e?.message ?? e}\n${line}`)
+				}
+			})
 	} catch (e: any) {
 		st.error = String(e?.message ?? e)
-		return plugins.report(`plugin history ${path} is unreadable; plugin versions are not recorded until it is fixed.\n${st.error}`)
+		return plugins.report(
+			`plugin history ${path} is unreadable; plugin versions are not recorded until it is fixed.\n${st.error}`,
+		)
 	}
 	let names = new Set(readdirSync(dir).filter(isPlugin))
 	for (let file of new Set([...names, ...st.heads.keys()])) {
@@ -175,6 +225,21 @@ function close(): void {
 export const pluginHistory = {
 	// `dir`: the plugins directory followed; `versions` by id; `heads`:
 	// each file's current version id; `error`: why the ledger is unusable.
-	state: { dir: undefined as string | undefined, error: undefined as string | undefined, versions: new Map<string, Version>(), heads: new Map<string, string>() },
-	idOf, content, store, index, head, observe, seen, receive, checkout, init, close,
+	state: {
+		dir: undefined as string | undefined,
+		error: undefined as string | undefined,
+		versions: new Map<string, Version>(),
+		heads: new Map<string, string>(),
+	},
+	idOf,
+	content,
+	store,
+	index,
+	head,
+	observe,
+	seen,
+	receive,
+	checkout,
+	init,
+	close,
 }

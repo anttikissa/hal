@@ -4,7 +4,12 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import { approval } from './approval.ts'
 
-const bash = (command: string, id = 'c1'): ToolCallBlock => ({ type: 'tool_call', id, name: 'bash', input: { command, description: 'x' } })
+const bash = (command: string, id = 'c1'): ToolCallBlock => ({
+	type: 'tool_call',
+	id,
+	name: 'bash',
+	input: { command, description: 'x' },
+})
 
 // The offending parts of a bash command, as the form marks them.
 function marked(command: string): string[] {
@@ -80,27 +85,51 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 	try {
 		settings.security = () => 'none'
 		expect(approval.form(bash('cat ~/.ssh/id_rsa'))).toBeUndefined()
-	} finally { settings.security = original }
+	} finally {
+		settings.security = original
+	}
 })
 
 test('wallet-specific paths are sensitive without banning ordinary data files or source names', () => {
 	let sensitive = [
-		'wallet.dat', 'backup/wallet.dat-journal', 'backup/wallet.dat-wal', 'backup/wallet.dat-shm',
-		'~/.electrum/wallets/default_wallet', '~/.electrum/testnet/wallets/custom', 'Electrum/wallets',
-		'~/.electron-cash/wallets/default_wallet', 'Electron Cash/wallets/custom',
+		'wallet.dat',
+		'backup/wallet.dat-journal',
+		'backup/wallet.dat-wal',
+		'backup/wallet.dat-shm',
+		'~/.electrum/wallets/default_wallet',
+		'~/.electrum/testnet/wallets/custom',
+		'Electrum/wallets',
+		'~/.electron-cash/wallets/default_wallet',
+		'Electron Cash/wallets/custom',
 		'.ethereum/keystore/UTC--2026-10-14T12-00-00--address',
-		'~/.config/solana/id.json', 'Monero/wallets/personal.keys',
-		'Library/Application Support/Exodus/exodus.wallet', 'exodus.wallet/storage.seco',
-		'~/.sparrow/wallets/personal.mv.db', '~/.sparrow/testnet/wallets/personal.mv.db',
-		'~/.local/share/sparrow/wallets/personal.mv.db', 'Sparrow/wallets',
-		'~/.walletwasabi/client/Wallets/personal.json', 'WalletWasabi/Client/Wallets',
+		'~/.config/solana/id.json',
+		'Monero/wallets/personal.keys',
+		'Library/Application Support/Exodus/exodus.wallet',
+		'exodus.wallet/storage.seco',
+		'~/.sparrow/wallets/personal.mv.db',
+		'~/.sparrow/testnet/wallets/personal.mv.db',
+		'~/.local/share/sparrow/wallets/personal.mv.db',
+		'Sparrow/wallets',
+		'~/.walletwasabi/client/Wallets/personal.json',
+		'WalletWasabi/Client/Wallets',
 		'Local Extension Settings/nkbihfbeogaeaoehlefnkodbefgpgknn/000003.ldb',
 	]
 	let ordinary = [
-		'wallet.dat.txt', 'wallet.data', 'UTC-not-a-wallet.txt', 'id.json',
-		'catalog.dat', 'config.json', 'cache.ldb', 'database.mv.db', 'wallets/config.json',
-		'.electrum/config', '.sparrow/config', '.walletwasabi/client/Config.json',
-		'src/wallet.dat.ts', 'src/key.keys.ts', 'exodus.wallet.ts',
+		'wallet.dat.txt',
+		'wallet.data',
+		'UTC-not-a-wallet.txt',
+		'id.json',
+		'catalog.dat',
+		'config.json',
+		'cache.ldb',
+		'database.mv.db',
+		'wallets/config.json',
+		'.electrum/config',
+		'.sparrow/config',
+		'.walletwasabi/client/Config.json',
+		'src/wallet.dat.ts',
+		'src/key.keys.ts',
+		'exodus.wallet.ts',
 		'Local Extension Settings/another-extension/000003.ldb',
 	]
 	for (let path of sensitive) expect([path, approval.sensitive(path)]).toEqual([path, true])
@@ -109,7 +138,8 @@ test('wallet-specific paths are sensitive without banning ordinary data files or
 
 const at = (r: object) => ({ ...r, ts: '2026-09-27T00:00:00Z' }) as HistoryRecord
 const call = (id: string, command = 'rm -rf x') => at({ type: 'assistant', block: bash(command, id) })
-const q = (id: string, callId: string) => at({ type: 'question', id, form: approval.form(bash('rm -rf x'))!, call: callId })
+const q = (id: string, callId: string) =>
+	at({ type: 'question', id, form: approval.form(bash('rm -rf x'))!, call: callId })
 const a = (question: string, run: string) => at({ type: 'answer', question, answers: { run } })
 const prompt = at({ type: 'user', blocks: [{ type: 'text', text: 'go' }] })
 
@@ -119,19 +149,33 @@ test('calls held for approval are found with the decisions so far, until they ra
 		return h && { calls: h.calls.map((c) => c.id), decided: Object.fromEntries(h.decided) }
 	}
 	// Asked, then answered: run with the decision.
-	expect(held([prompt, call('c1'), call('c2'), q('q1', 'c1'), a('q1', 'no')])).toEqual({ calls: ['c1', 'c2'], decided: { c1: false } })
+	expect(held([prompt, call('c1'), call('c2'), q('q1', 'c1'), a('q1', 'no')])).toEqual({
+		calls: ['c1', 'c2'],
+		decided: { c1: false },
+	})
 	expect(held([prompt, call('c1'), call('c2'), q('q1', 'c1'), a('q1', 'no'), q('q2', 'c2'), a('q2', 'yes')])).toEqual({
 		calls: ['c1', 'c2'],
 		decided: { c1: false, c2: true },
 	})
 	// Paused at a question and continued: nothing ran, so ask again.
 	let paused = at({ type: 'turn_end', status: 'paused', usage: {} })
-	expect(held([prompt, call('c1'), q('q1', 'c1'), paused, at({ type: 'continue' })])).toEqual({ calls: ['c1'], decided: {} })
+	expect(held([prompt, call('c1'), q('q1', 'c1'), paused, at({ type: 'continue' })])).toEqual({
+		calls: ['c1'],
+		decided: {},
+	})
 	// All answered, then a host continued it: the calls may have run.
 	expect(held([prompt, call('c1'), q('q1', 'c1'), a('q1', 'yes'), at({ type: 'continue' })])).toBeUndefined()
 	// Never asked (a crash mid-round), or results recorded.
 	expect(held([prompt, call('c1')])).toBeUndefined()
-	expect(held([prompt, call('c1'), q('q1', 'c1'), a('q1', 'yes'), at({ type: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: 'ok' }] })])).toBeUndefined()
+	expect(
+		held([
+			prompt,
+			call('c1'),
+			q('q1', 'c1'),
+			a('q1', 'yes'),
+			at({ type: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: 'ok' }] }),
+		]),
+	).toBeUndefined()
 })
 
 test('rm -rf after cd into /tmp or a mktemp dir runs without asking, as far as the cd can be followed', () => {

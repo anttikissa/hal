@@ -14,8 +14,12 @@ describe('stringify', () => {
 
 		test('values without a literal become parseable: toJSON, then strings for functions and symbols', () => {
 			const out = stringify({ d: new Date(0), f() {}, c: class K {}, s: Symbol('x'), a: [() => 1] }, 'short')
-			expect(out).toBe("{ d: '1970-01-01T00:00:00.000Z', f: '[Function: f]', c: '[class K]', s: 'Symbol(x)', a: ['[Function: (anonymous)]'] }")
-			expect(stringify([new TypeError('bad'), new Map([[1, 2]]), new Set([1, 2])], 'short')).toBe("['[TypeError: bad]', '[Map with 1 item]', '[Set with 2 items]']")
+			expect(out).toBe(
+				"{ d: '1970-01-01T00:00:00.000Z', f: '[Function: f]', c: '[class K]', s: 'Symbol(x)', a: ['[Function: (anonymous)]'] }",
+			)
+			expect(stringify([new TypeError('bad'), new Map([[1, 2]]), new Set([1, 2])], 'short')).toBe(
+				"['[TypeError: bad]', '[Map with 1 item]', '[Set with 2 items]']",
+			)
 			expect(() => parse(out)).not.toThrow()
 		})
 
@@ -94,10 +98,8 @@ describe('parse', () => {
 
 		test('string with unicode escape', () => expect(parse("'\\u0041'")).toBe('A'))
 
-		test('invalid unicode escape: too short', () =>
-			expect(() => parse("'\\u00'")).toThrow(/Invalid unicode escape/))
-		test('invalid unicode escape: bad hex', () =>
-			expect(() => parse("'\\uXXXX'")).toThrow(/Invalid unicode escape/))
+		test('invalid unicode escape: too short', () => expect(() => parse("'\\u00'")).toThrow(/Invalid unicode escape/))
+		test('invalid unicode escape: bad hex', () => expect(() => parse("'\\uXXXX'")).toThrow(/Invalid unicode escape/))
 		test('backtick string', () => expect(parse('`hello`')).toBe('hello'))
 
 		test('backtick escaped ${', () => expect(parse('`cost: \\${x}`')).toBe('cost: ${x}'))

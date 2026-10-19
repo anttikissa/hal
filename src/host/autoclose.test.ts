@@ -46,7 +46,12 @@ test('autoclose command records each change once, pushes metadata and persists i
 	c.conn.send({ type: 'submit', sessionId: id, text: '/autoclose' })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/autoclose nonsense' })
 	await until(() => c.of('output').some((e) => e.error))
-	expect(history.readSync(id).filter((r) => r.type === 'output' && r.text.includes('→')).map((r) => r.type === 'output' && r.text)).toEqual(['on → off', 'off → on'])
+	expect(
+		history
+			.readSync(id)
+			.filter((r) => r.type === 'output' && r.text.includes('→'))
+			.map((r) => r.type === 'output' && r.text),
+	).toEqual(['on → off', 'off → on'])
 	expect(c.of('meta').at(-1)?.meta.autoclose).toBe(true)
 	expect(c.views.get(id)?.items.some((r) => r.type === 'command' && r.output === 'off → on')).toBe(true)
 	let stored = sessions.load(id, false)
@@ -56,8 +61,16 @@ test('autoclose command records each change once, pushes metadata and persists i
 
 test('hidden autoclose aliases preserve canonical reports and changes', async () => {
 	let { c, id } = ordinary()
-	for (let [off, on] of [['false', 'true'], ['0', '1'], ['no', 'yes'], ['n', 'y']]) {
-		for (let [arg, value] of [[off, false], [on, true]] as const) {
+	for (let [off, on] of [
+		['false', 'true'],
+		['0', '1'],
+		['no', 'yes'],
+		['n', 'y'],
+	]) {
+		for (let [arg, value] of [
+			[off, false],
+			[on, true],
+		] as const) {
 			c.conn.send({ type: 'submit', sessionId: id, text: `/autoclose ${arg}` })
 			await until(() => sessions.open(id).autoclose === value)
 			let outputs = c.of('output').length
@@ -69,14 +82,17 @@ test('hidden autoclose aliases preserve canonical reports and changes', async ()
 	expect(history.readSync(id).filter((r) => r.type === 'change').length).toBe(8)
 })
 
-for (let delivery of ['steer', 'soft-steer'] as const) test(`human ${delivery} promotes existing work without rewriting spawn kind`, async () => {
-	let { id } = ordinary()
-	let child = subagents.spawn(id, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp', limit: 0 })
-	await until(() => calls.length === 1)
-	prompts.submit(child, 'human intervention', undefined, delivery)
-	expect(sessions.open(child)).toMatchObject({ autoclose: false, spawn: 'subagent' })
-	expect(history.readSync(child).filter((r) => r.type === 'output' && r.text === 'Autoclose: on → off')).toHaveLength(1)
-})
+for (let delivery of ['steer', 'soft-steer'] as const)
+	test(`human ${delivery} promotes existing work without rewriting spawn kind`, async () => {
+		let { id } = ordinary()
+		let child = subagents.spawn(id, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp', limit: 0 })
+		await until(() => calls.length === 1)
+		prompts.submit(child, 'human intervention', undefined, delivery)
+		expect(sessions.open(child)).toMatchObject({ autoclose: false, spawn: 'subagent' })
+		expect(history.readSync(child).filter((r) => r.type === 'output' && r.text === 'Autoclose: on → off')).toHaveLength(
+			1,
+		)
+	})
 
 test('questions and errors leave ordinary autoclose tabs open', async () => {
 	let { c, id } = ordinary()
@@ -111,11 +127,14 @@ test('unfinished jobs and running subagents prevent ordinary autoclose', async (
 	try {
 		autoclose.finished(id)
 		expect(tabs.file().open).toContain(id)
-	} finally { jobs.state.running.delete('job') }
+	} finally {
+		jobs.state.running.delete('job')
+	}
 })
 
 test('autoclose initialization rejects non-boolean wire and stored values', () => {
-	for (let type of ['create', 'tab-new']) expect(commandCheck.invalid({ type, cwd: '/tmp', autoclose: 'on' })).toContain('autoclose must be a boolean')
+	for (let type of ['create', 'tab-new'])
+		expect(commandCheck.invalid({ type, cwd: '/tmp', autoclose: 'on' })).toContain('autoclose must be a boolean')
 	let { id } = ordinary()
 	expect(() => sessions.validate(id, { ...sessions.open(id), autoclose: 'on' })).toThrow('invalid autoclose')
 })

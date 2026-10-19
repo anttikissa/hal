@@ -21,7 +21,11 @@ export type Shown = { text: string; cursor: number }
 // Human prompts sent to the session, oldest first, escaped to send as
 // prompts again.
 function entries(t: Transcript, commands = false): string[] {
-	return t.items.flatMap((i) => ((i.type === 'prompt' && i.origin !== 'model' || commands && i.type === 'command') && i.from === undefined ? [i.type === 'prompt' ? literal.escape(i.text) : i.text] : []))
+	return t.items.flatMap((i) =>
+		((i.type === 'prompt' && i.origin !== 'model') || (commands && i.type === 'command')) && i.from === undefined
+			? [i.type === 'prompt' ? literal.escape(i.text) : i.text]
+			: [],
+	)
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are
@@ -36,7 +40,15 @@ function topEnd(text: string, width: number): number {
 // cursor as usual. `list`: the session's entries; `draft`: the user's
 // own text, shown again past the newest entry. `width`: the layout's
 // width, Infinity for logical lines.
-function step(id: string, list: string[], text: string, cursor: number, dir: -1 | 1, width: number, draft: string): Shown | undefined {
+function step(
+	id: string,
+	list: string[],
+	text: string,
+	cursor: number,
+	dir: -1 | 1,
+	width: number,
+	draft: string,
+): Shown | undefined {
 	let rows = promptLayout.rows(text, width)
 	let { row } = promptLayout.position(text, rows, cursor)
 	if (dir < 0 ? row > 0 : row < rows.length - 1) return undefined

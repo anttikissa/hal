@@ -46,14 +46,31 @@ import { emergency } from '../common/emergency.ts'
 // `top`/`bottom`: the caret is on the box's first/last visual row (soft
 // wraps included); without them, logical lines decide.
 export type Target =
-	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void; coarse?: boolean; top?: boolean; bottom?: boolean }
+	| {
+			kind: 'message'
+			text: string
+			cursor: number
+			anchor?: number
+			write?: (edit: Splice, cursor: number, anchor: number) => void
+			coarse?: boolean
+			top?: boolean
+			bottom?: boolean
+	  }
 	| { kind: 'field'; cursor?: number }
 	| { kind: 'link' }
 	| { kind: 'button'; submits: boolean }
 	| { kind: 'other' }
 
 // `code`: the physical key (KeyD), for Option-letters on macOS.
-export type KeyInput = { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
+export type KeyInput = {
+	key: string
+	code?: string
+	shiftKey: boolean
+	ctrlKey: boolean
+	altKey: boolean
+	metaKey: boolean
+	isComposing?: boolean
+}
 
 // A key that types a character: one code point, no Ctrl, Alt or Cmd.
 function typing(e: KeyInput): boolean {
@@ -68,7 +85,8 @@ function key(e: KeyInput, target: Target): boolean {
 	let st = app.state
 	let action = emergency.action({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey, shift: e.shiftKey })
 	let restartAll = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'r'
-	if ((action === 'restart' || restartAll) && target.kind === 'message' && target.text !== st.text) app.input(target.text)
+	if ((action === 'restart' || restartAll) && target.kind === 'message' && target.text !== st.text)
+		app.input(target.text)
 	if (restartAll) {
 		let sessionId = st.view.transcript?.meta.id ?? st.shown
 		if (sessionId) connection.send({ type: 'submit', sessionId, text: '/restart all' })
@@ -82,29 +100,60 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
-	let named = k && commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name
-	if (named === 'find') { find.open(); return true }
+	let named =
+		k &&
+		commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name
+	if (named === 'find') {
+		find.open()
+		return true
+	}
 	// Ctrl-O asks which blocks to toggle (task r4d), never the browser's open-file.
-	if (named === 'toggle') { folds.open(); return true }
+	if (named === 'toggle') {
+		folds.open()
+		return true
+	}
 	// Find has native text editing; model arrows remain tree/effort keys.
 	if (st.view.modal) {
 		if (st.view.modal.compact) {
-			if (!k || e.ctrlKey || e.metaKey || e.altKey || (k.key === 'tab' && e.shiftKey) || !['enter', 'escape', 'tab'].includes(k.key)) return false
+			if (
+				!k ||
+				e.ctrlKey ||
+				e.metaKey ||
+				e.altKey ||
+				(k.key === 'tab' && e.shiftKey) ||
+				!['enter', 'escape', 'tab'].includes(k.key)
+			)
+				return false
 			folds.key(k, target.kind === 'field' ? target.cursor : undefined)
 			return true
 		}
 		if (st.view.modal.find) {
 			// Arrows move among field, filters and results; Space toggles a filter.
-			let f = st.view.modal.find.focus, filters = f > 0 && f < 5
+			let f = st.view.modal.find.focus,
+				filters = f > 0 && f < 5
 			let space = filters && k?.text === ' '
-			if (!k || e.ctrlKey || e.metaKey || e.altKey || (!space && !['enter', 'escape', 'up', 'down', ...(filters ? ['left', 'right'] : [])].includes(k.key))) return false
+			if (
+				!k ||
+				e.ctrlKey ||
+				e.metaKey ||
+				e.altKey ||
+				(!space && !['enter', 'escape', 'up', 'down', ...(filters ? ['left', 'right'] : [])].includes(k.key))
+			)
+				return false
 			find.key(space ? { key: ' ' } : k)
 			return true
 		}
 		if ((target.kind === 'button' || target.kind === 'link') && (e.key === 'Enter' || e.key === ' ')) return false
 		// /config: Space changes the selected setting, except in its edit field.
 		let space = !!st.view.modal.settings && !st.view.modal.edit && k?.text === ' '
-		if (!k || e.ctrlKey || e.metaKey || e.altKey || (!space && !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key))) return false
+		if (
+			!k ||
+			e.ctrlKey ||
+			e.metaKey ||
+			e.altKey ||
+			(!space && !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key))
+		)
+			return false
 		if (st.view.modal.settings && (k.key === 'left' || k.key === 'right')) {
 			let modal = st.view.modal
 			let kind = settings.table.find((s) => s.name === modal.settings!.names[modal.selected])?.type.kind
@@ -125,7 +174,8 @@ function key(e: KeyInput, target: Target): boolean {
 		// keys stay the browser's (Cmd-R, Cmd-L); the shared form keys
 		// decide the rest.
 		let native = target.kind === 'field' && !['enter', 'escape', 'tab', 'up', 'down'].includes(k?.key ?? '')
-		if (!k || native || e.metaKey || e.ctrlKey || (target.kind === 'button' && target.submits && e.key === 'Enter')) return false
+		if (!k || native || e.metaKey || e.ctrlKey || (target.kind === 'button' && target.submits && e.key === 'Enter'))
+			return false
 		let { state, command } = view.formKey(st.view, k)
 		app.setView(state)
 		if (command) app.sendNow(command)
@@ -143,16 +193,35 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
-	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active) return queuedPrompt.cancel()
+	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active)
+		return queuedPrompt.cancel()
 	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()
-	let edge = target.kind === 'message' && (e.key === 'ArrowUp' ? (target.top ?? !st.text.slice(0, target.cursor).includes('\n')) : e.key === 'ArrowDown' ? (target.bottom ?? !st.text.slice(target.cursor).includes('\n')) : true)
+	let edge =
+		target.kind === 'message' &&
+		(e.key === 'ArrowUp'
+			? (target.top ?? !st.text.slice(0, target.cursor).includes('\n'))
+			: e.key === 'ArrowDown'
+				? (target.bottom ?? !st.text.slice(target.cursor).includes('\n'))
+				: true)
 	if (plain && edge && target.kind === 'message' && e.key === 'ArrowUp' && !st.view.editing) {
 		let waiting = queueEdit.candidate(st.view.transcript)
 		if (waiting) return queuedPrompt.begin(waiting.id)
 	}
-	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original) return queuedPrompt.cancel()
-	if (plain && edge && e.key === 'ArrowDown' && st.view.editing?.aside && st.view.editing.rewind === undefined && st.text === st.view.editing.original) return editPrompt.leave()
-	let edit = plain && edge && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
+	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original)
+		return queuedPrompt.cancel()
+	if (
+		plain &&
+		edge &&
+		e.key === 'ArrowDown' &&
+		st.view.editing?.aside &&
+		st.view.editing.rewind === undefined &&
+		st.text === st.view.editing.original
+	)
+		return editPrompt.leave()
+	let edit =
+		plain && edge && target.kind === 'message' && arrows[e.key]
+			? view.editKey(st.view, arrows[e.key]!, st.text)
+			: undefined
 	if (edit) {
 		st.view = edit.view
 		if (edit.command) connection.send(edit.command)
@@ -171,21 +240,52 @@ function key(e: KeyInput, target: Target): boolean {
 		keys.insert(e.key)
 		return true
 	}
-	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
-	if (plain && !sel && edge && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
+	let sel =
+		target.anchor === undefined
+			? ''
+			: st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
+	if (
+		plain &&
+		!sel &&
+		edge &&
+		(e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+		keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)
+	)
+		return true
 	// Undo on an empty box takes back a message sent early (task csn).
 	let id = app.sessionId()
-	if (!st.text && id && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'z' && st.view.transcript && states.promoted(st.view.transcript.inbox)) {
+	if (
+		!st.text &&
+		id &&
+		(e.metaKey || e.ctrlKey) &&
+		!e.shiftKey &&
+		!e.altKey &&
+		e.key === 'z' &&
+		st.view.transcript &&
+		states.promoted(st.view.transcript.inbox)
+	) {
 		drafts.submit(id, '/queue undo')
 		return true
 	}
 	if (k && editor.routed(k)) return keys.edit(k, target)
-	if (e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && st.menu && (st.menu.explicit || st.known?.input === st.text)) {
+	if (
+		e.key === 'Tab' &&
+		!e.shiftKey &&
+		target.cursor === st.text.length &&
+		st.menu &&
+		(st.menu.explicit || st.known?.input === st.text)
+	) {
 		if (st.menu.explicit) app.choose(st.menu.selected)
 		else {
 			// Reuse the reply path so ready and pending Tab behave identically.
 			st.completedByTab = st.text
-			app.onEvent({ type: 'completions', sessionId: app.sessionId()!, text: st.text, items: st.menu.choices.map((c) => c.value), descriptions: st.menu.choices.map((c) => c.description) })
+			app.onEvent({
+				type: 'completions',
+				sessionId: app.sessionId()!,
+				text: st.text,
+				items: st.menu.choices.map((c) => c.value),
+				descriptions: st.menu.choices.map((c) => c.description),
+			})
 		}
 		return true
 	}
@@ -201,7 +301,8 @@ function key(e: KeyInput, target: Target): boolean {
 	let start = st.text.lastIndexOf('\n', target.cursor - 1) + 1
 	let lead = !sel && start > 0 && /^[ \t]*$/.test(st.text.slice(start, target.cursor))
 	let indents = lead && (!e.shiftKey || /^[ \t]/.test(st.text.slice(start)))
-	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents)) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
+	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents))
+		return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
 	// Each Enter chord sends as sendKeys binds it (tasks csn, 8kx).
 	let delivery = sendKeys.delivery({ ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
@@ -237,7 +338,6 @@ function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): b
 	app.input(shown.text)
 	return true
 }
-
 
 // A paste on the page outside any field goes into the box at its caret
 // (an image or long text as an attachment, attach.ts). True if taken

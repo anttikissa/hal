@@ -25,9 +25,11 @@ function held(id: string): string | undefined {
 
 function acquire(id: string, owner: object, edit: string, message: string): { refused?: string; reply?: Event } {
 	let hold = queueEdits.state.get(id)
-	if (hold && (hold.edit !== edit || hold.message !== message)) return { refused: 'Another window is editing a queued message of this session.' }
+	if (hold && (hold.edit !== edit || hold.message !== message))
+		return { refused: 'Another window is editing a queued message of this session.' }
 	let item = status.inboxOf(id).find((m) => m.id === message)
-	if (!(item?.delivery === 'after-turn') || item.from !== undefined || item.origin === 'model') return { refused: 'This message is no longer queued: it was already delivered.' }
+	if (!(item?.delivery === 'after-turn') || item.from !== undefined || item.origin === 'model')
+		return { refused: 'This message is no longer queued: it was already delivered.' }
 	// The same edit from a new connection is its window reconnecting.
 	if (hold) hold.owner = owner
 	else {
@@ -39,7 +41,9 @@ function acquire(id: string, owner: object, edit: string, message: string): { re
 
 function owns(id: string, owner: object, edit: string, message?: string): string | undefined {
 	let hold = queueEdits.state.get(id)
-	return !hold || hold.owner !== owner || hold.edit !== edit || (message !== undefined && hold.message !== message) ? 'This window is not editing that queued message; start the edit again.' : undefined
+	return !hold || hold.owner !== owner || hold.edit !== edit || (message !== undefined && hold.message !== message)
+		? 'This window is not editing that queued message; start the edit again.'
+		: undefined
 }
 
 // Ends the lock; the message goes now if delivery waited for it.
@@ -54,7 +58,14 @@ function release(id: string): void {
 	} else if (!turns.state.running.has(id) && status.stateOf(id).type === 'idle') prompts.next(id)
 }
 
-function save(id: string, owner: object, edit: string, message: string, text: string, command?: string): string | undefined {
+function save(
+	id: string,
+	owner: object,
+	edit: string,
+	message: string,
+	text: string,
+	command?: string,
+): string | undefined {
 	let problem = queueEdits.owns(id, owner, edit, message) ?? prompts.edit(id, message, text, command, true)
 	if (!problem) queueEdits.release(id)
 	return problem
@@ -79,7 +90,8 @@ function intercept(owner: object, c: Command): { refused?: string; reply?: Event
 	let id = c.sessionId
 	if (c.type === 'queue-edit') return queueEdits.acquire(id, owner, c.edit, c.message)
 	if (c.type === 'queue-edit-cancel') return { refused: queueEdits.cancel(id, owner, c.edit) }
-	if (c.type === 'submit' && c.queueEdit !== undefined) return { refused: queueEdits.save(id, owner, c.queueEdit, c.edits!, c.text, c.id) }
+	if (c.type === 'submit' && c.queueEdit !== undefined)
+		return { refused: queueEdits.save(id, owner, c.queueEdit, c.edits!, c.text, c.id) }
 	if (!queueEdits.state.has(id)) return
 	if (c.type === 'rebase-apply') return { refused: busy }
 	if (c.type === 'submit' && c.edits === queueEdits.held(id)) return { refused: busy }
@@ -100,10 +112,27 @@ function deferNext(id: string): boolean {
 }
 
 function disconnect(owner: object, id?: string): void {
-	for (let [key, hold] of queueEdits.state) if (hold.owner === owner && (id === undefined || key === id)) {
-		host.broadcast(key, { type: 'warning', text: `The window editing a queued message in ${key} disconnected. The message is unchanged and stays in the queue.` })
-		queueEdits.release(key)
-	}
+	for (let [key, hold] of queueEdits.state)
+		if (hold.owner === owner && (id === undefined || key === id)) {
+			host.broadcast(key, {
+				type: 'warning',
+				text: `The window editing a queued message in ${key} disconnected. The message is unchanged and stays in the queue.`,
+			})
+			queueEdits.release(key)
+		}
 }
 
-export const queueEdits = { state: new Map<string, Hold>(), held, acquire, owns, release, save, cancel, repeated, intercept, refused, deferNext, disconnect }
+export const queueEdits = {
+	state: new Map<string, Hold>(),
+	held,
+	acquire,
+	owns,
+	release,
+	save,
+	cancel,
+	repeated,
+	intercept,
+	refused,
+	deferNext,
+	disconnect,
+}

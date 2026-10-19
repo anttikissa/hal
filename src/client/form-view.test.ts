@@ -15,7 +15,12 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
+	let transcript: Transcript = {
+		meta: { id: 's', cwd: '/', model: 'm', createdAt: '' },
+		state: { type: 'idle' },
+		inbox: [],
+		items: items.map((item, i) => ({ ...item, key: `~${i}` })),
+	}
 	return { transcript, prompt: { text, cursor } }
 }
 
@@ -25,7 +30,13 @@ function plain(lines: string[]): string[] {
 }
 
 const ask = { type: 'text' as const, name: 'name', label: 'Name', placeholder: 'leave empty' }
-const secretForm = { text: 'Log in', fields: [{ type: 'secret' as const, name: 'key', label: 'Key' }, { type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
+const secretForm = {
+	text: 'Log in',
+	fields: [
+		{ type: 'secret' as const, name: 'key', label: 'Key' },
+		{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] },
+	],
+}
 
 test('an open question shows its fields and takes the cursor into the focused text', () => {
 	let item: Item = { type: 'question', id: 'q1', form: { text: 'How should I call you?', fields: [ask] } }
@@ -67,15 +78,26 @@ test('an answered question shows its answers, secrets only as given; one not ans
 test('a quote shows under the question with its marked part highlighted on every row it wraps to', () => {
 	let command = 'cd build && rm -rf everything-in-this-directory'
 	let from = command.indexOf('rm')
-	let form = { text: 'Run this?', quote: { text: command, marks: [[from, command.length]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'run', options: ['yes', 'no'], initial: 1 }] }
+	let form = {
+		text: 'Run this?',
+		quote: { text: command, marks: [[from, command.length]] as [number, number][] },
+		fields: [{ type: 'choice' as const, name: 'run', options: ['yes', 'no'], initial: 1 }],
+	}
 	let item: Item = { type: 'question', id: 'q1', form }
 	let open = frame.build({ ...view([item]), form: forms.start('q1', form) }, 30).lines
 	let answered = frame.build(view([{ ...item, answers: { run: 'no' } }]), 30).lines
 	for (let lines of [open, answered]) {
 		// Quote rows are indented past the answer rows.
-		let rows = lines.filter((l) => strip(l).startsWith(' '.repeat(5)) && strip(l).trim() !== '' && !strip(l).includes('/keys'))
+		let rows = lines.filter(
+			(l) => strip(l).startsWith(' '.repeat(5)) && strip(l).trim() !== '' && !strip(l).includes('/keys'),
+		)
 		expect(rows.length).toBe(3)
-		expect(rows.map((r) => strip(r).trim()).join(' ').replace(/\s+/g, ' ')).toContain('cd build && rm -rf')
+		expect(
+			rows
+				.map((r) => strip(r).trim())
+				.join(' ')
+				.replace(/\s+/g, ' '),
+		).toContain('cd build && rm -rf')
 		// Marked text is inverse; every row ends it, so nothing bleeds.
 		expect(rows[0]).toContain('\x1b[7mrm')
 		expect(rows[0]).not.toContain('\x1b[7mcd')

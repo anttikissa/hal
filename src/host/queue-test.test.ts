@@ -2,7 +2,9 @@ import { afterAll, expect, test } from 'bun:test'
 import { queueTest } from './queue-test.ts'
 
 queueTest.thinkMs = 0
-afterAll(() => { queueTest.thinkMs = 4000 })
+afterAll(() => {
+	queueTest.thinkMs = 4000
+})
 
 const user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts: '2026-10-06T11:34:00Z' })
 const round = (n: number) => [

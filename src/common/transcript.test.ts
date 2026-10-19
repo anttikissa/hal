@@ -13,7 +13,12 @@ function fold(events: Event[], start?: Transcript): Transcript | undefined {
 
 const ts = '2026-09-26T00:00:01Z'
 // Records numbered as the host numbers them (HistoryRecord `n`).
-const prompt = (text: string, n: number) => ({ type: 'user' as const, blocks: [{ type: 'text' as const, text }], ts, n })
+const prompt = (text: string, n: number) => ({
+	type: 'user' as const,
+	blocks: [{ type: 'text' as const, text }],
+	ts,
+	n,
+})
 const said = (block: AssistantBlock, n: number) => ({ type: 'assistant' as const, block, ts, n })
 
 function snap(snapshot: Omit<Snapshot, 'meta' | 'state'>): Event {
@@ -21,10 +26,17 @@ function snap(snapshot: Omit<Snapshot, 'meta' | 'state'>): Event {
 }
 
 test('live and restored tool images share stable items, including legacy single-image results', () => {
-	let images = [{ type: 'image' as const, blob: '0123456789ab', mediaType: 'image/png', bytes: 12 }, { type: 'image' as const, blob: '0123456789ac', mediaType: 'image/gif', bytes: 8 }]
+	let images = [
+		{ type: 'image' as const, blob: '0123456789ab', mediaType: 'image/png', bytes: 12 },
+		{ type: 'image' as const, blob: '0123456789ac', mediaType: 'image/gif', bytes: 8 },
+	]
 	for (let attached of [{ images }, { image: images[0] }]) {
 		let result = { type: 'tool_result' as const, id: 'r', output: 'images and an error', isError: true, ...attached }
-		let live = fold([snap({ history: [] }), { type: 'turn-start', sessionId, provider: 'fake' }, { type: 'tool-results', sessionId, results: [result], n: 3, ts }])!
+		let live = fold([
+			snap({ history: [] }),
+			{ type: 'turn-start', sessionId, provider: 'fake' },
+			{ type: 'tool-results', sessionId, results: [result], n: 3, ts },
+		])!
 		let restored = fold([snap({ history: [{ type: 'user', blocks: [result], n: 3, ts }] })])!
 		expect(live.items).toEqual(restored.items)
 		expect(live.items.filter((b) => b.type === 'image')).toHaveLength('images' in attached ? 2 : 1)
@@ -41,7 +53,15 @@ test('a snapshot shows history as display items without provider details', () =>
 				said({ type: 'text', text: 'hello' }, 4),
 				said({ type: 'tool_call', id: 't1', name: 'bash', input: { cmd: 'ls' } }, 5),
 				{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 3 }, ts, n: 6 },
-				{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'x' }, { type: 'tool_result', id: 't2', output: 'y' }], ts, n: 7 },
+				{
+					type: 'user',
+					blocks: [
+						{ type: 'tool_result', id: 't1', output: 'x' },
+						{ type: 'tool_result', id: 't2', output: 'y' },
+					],
+					ts,
+					n: 7,
+				},
 				{ type: 'turn_end', status: 'interrupted', usage: {}, ts },
 			],
 		}),
@@ -95,7 +115,10 @@ test('streamed deltas merge into the running turn and turn-end settles it', () =
 
 test('folding never mutates the previous transcript', () => {
 	let before = fold([
-		snap({ history: [prompt('go', 1)], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {}, ns: [2], ts: [ts] } }),
+		snap({
+			history: [prompt('go', 1)],
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {}, ns: [2], ts: [ts] },
+		}),
 	])!
 	let copy = structuredClone(before)
 	fold(
@@ -139,7 +162,13 @@ test('tool results settle the round so far; the next round streams after them', 
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' }, n: 2, ts },
 		{ type: 'stream', sessionId, event: call, n: 3, ts },
-		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], n: 4, ts },
+		{
+			type: 'tool-results',
+			sessionId,
+			results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }],
+			n: 4,
+			ts,
+		},
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' }, n: 5, ts },
 	]
 	let t = fold(events)!
@@ -170,7 +199,13 @@ test('tool results settle the round so far; the next round streams after them', 
 test('state events and a continued turn fold like the snapshot that follows them', () => {
 	let running = { type: 'running' as const, phase: 'streaming' as const }
 	let t = fold([
-		snap({ history: [prompt('go', 1), said({ type: 'text', text: 'a' }, 2), { type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 }] }),
+		snap({
+			history: [
+				prompt('go', 1),
+				said({ type: 'text', text: 'a' }, 2),
+				{ type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 },
+			],
+		}),
 		{ type: 'state', sessionId, state: running },
 		{ type: 'turn-start', sessionId, provider: 'fake' },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'b' }, n: 5, ts },
@@ -178,14 +213,18 @@ test('state events and a continued turn fold like the snapshot that follows them
 	expect(t.state).toEqual(running)
 	let later = fold([
 		snap({
-			history: [prompt('go', 1), said({ type: 'text', text: 'a' }, 2), { type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 }, { type: 'continue', ts, n: 4 }],
+			history: [
+				prompt('go', 1),
+				said({ type: 'text', text: 'a' }, 2),
+				{ type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 },
+				{ type: 'continue', ts, n: 4 },
+			],
 			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'b' }], usage: {}, ns: [5], ts: [ts] },
 		}),
 		{ type: 'state', sessionId, state: running },
 	])!
 	expect(later).toEqual(t)
 })
-
 
 test('a question and its answer fold like the snapshot that follows them, and only the waiting one is open', () => {
 	let form = { text: 'Name?', fields: [{ type: 'secret' as const, name: 'key' }] }
@@ -196,15 +235,45 @@ test('a question and its answer fold like the snapshot that follows them, and on
 		{ type: 'question', sessionId, id: 'q1', form, n: 3, ts },
 		{ type: 'state', sessionId, state: asking },
 	])!
-	let stored = fold([snap({ history: [prompt('hi', 1), said({ type: 'text', text: 'Hello.' }, 2), { type: 'question', id: 'q1', form, ts, n: 3 }] }), { type: 'state', sessionId, state: asking }])!
+	let stored = fold([
+		snap({
+			history: [
+				prompt('hi', 1),
+				said({ type: 'text', text: 'Hello.' }, 2),
+				{ type: 'question', id: 'q1', form, ts, n: 3 },
+			],
+		}),
+		{ type: 'state', sessionId, state: asking },
+	])!
 	expect(live).toEqual(stored)
 	expect(live.live).toBeUndefined()
 	expect(transcript.question(live)?.id).toBe('q1')
-	let answered = fold([{ type: 'answer', sessionId, question: 'q1', answers: {}, secrets: ['key'] }, { type: 'state', sessionId, state: { type: 'idle' } }], live)!
-	expect(answered.items.at(-1)).toEqual({ type: 'question', id: 'q1', form, answers: {}, secrets: ['key'], key: '3', ts })
+	let answered = fold(
+		[
+			{ type: 'answer', sessionId, question: 'q1', answers: {}, secrets: ['key'] },
+			{ type: 'state', sessionId, state: { type: 'idle' } },
+		],
+		live,
+	)!
+	expect(answered.items.at(-1)).toEqual({
+		type: 'question',
+		id: 'q1',
+		form,
+		answers: {},
+		secrets: ['key'],
+		key: '3',
+		ts,
+	})
 	expect(transcript.question(answered)).toBeUndefined()
 	let later = fold([
-		snap({ history: [prompt('hi', 1), said({ type: 'text', text: 'Hello.' }, 2), { type: 'question', id: 'q1', form, ts, n: 3 }, { type: 'answer', question: 'q1', answers: {}, secrets: ['key'], ts, n: 4 }] }),
+		snap({
+			history: [
+				prompt('hi', 1),
+				said({ type: 'text', text: 'Hello.' }, 2),
+				{ type: 'question', id: 'q1', form, ts, n: 3 },
+				{ type: 'answer', question: 'q1', answers: {}, secrets: ['key'], ts, n: 4 },
+			],
+		}),
 	])!
 	expect(later.items).toEqual(answered.items)
 	// A question left by a pause is not open.
@@ -213,9 +282,21 @@ test('a question and its answer fold like the snapshot that follows them, and on
 
 test('an edited prompt takes the place of the prompt it replaces and its turn, live as on reconnect', () => {
 	let paused = (n: number) => ({ type: 'turn_end' as const, status: 'paused' as const, usage: {}, ts, n })
-	let before = [prompt('hi', 1), said({ type: 'text', text: 'hello' }, 2), { type: 'turn_end' as const, status: 'completed' as const, usage: {}, ts, n: 3 }]
+	let before = [
+		prompt('hi', 1),
+		said({ type: 'text', text: 'hello' }, 2),
+		{ type: 'turn_end' as const, status: 'completed' as const, usage: {}, ts, n: 3 },
+	]
 	// A prompt that delivered a steering message ('one') with the typed one.
-	let two = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix ti' }], ts, n: 4 }
+	let two = {
+		type: 'user' as const,
+		blocks: [
+			{ type: 'text' as const, text: 'one' },
+			{ type: 'text' as const, text: 'fix ti' },
+		],
+		ts,
+		n: 4,
+	}
 	let history = [...before, two, said({ type: 'text', text: 'Looking' }, 5), paused(6)]
 	let t = fold([
 		snap({ history }),
@@ -228,15 +309,39 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 		{ type: 'prompt', text: 'fix it', edited: true, ts, key: '7.1' },
 		{ type: 'text', text: 'Fixed', ts, key: '8' },
 	])
-	let edited = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix it' }], replaces: true as const, ts, n: 7 }
-	let late = fold([snap({ history: [...history, edited], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'Fixed' }], usage: {}, ns: [8], ts: [ts] } })])!
+	let edited = {
+		type: 'user' as const,
+		blocks: [
+			{ type: 'text' as const, text: 'one' },
+			{ type: 'text' as const, text: 'fix it' },
+		],
+		replaces: true as const,
+		ts,
+		n: 7,
+	}
+	let late = fold([
+		snap({
+			history: [...history, edited],
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'Fixed' }], usage: {}, ns: [8], ts: [ts] },
+		}),
+	])!
 	expect(late).toEqual(t)
 	// Edited again: the edit is now the prompt it replaces.
 	let again: Event = { type: 'prompt', sessionId, texts: ['fix it!'], replaces: true, n: 10, ts }
 	let end: Event = { type: 'turn-end', sessionId, status: 'paused', n: 9, ts }
 	let t2 = fold([end, again], t)!
 	expect(t2.items.slice(before.length)).toEqual([{ type: 'prompt', text: 'fix it!', edited: true, ts, key: '10' }])
-	let late2 = fold([snap({ history: [...history, edited, said({ type: 'text', text: 'Fixed' }, 8), paused(9), { ...edited, blocks: [{ type: 'text', text: 'fix it!' }], n: 10 }] })])!
+	let late2 = fold([
+		snap({
+			history: [
+				...history,
+				edited,
+				said({ type: 'text', text: 'Fixed' }, 8),
+				paused(9),
+				{ ...edited, blocks: [{ type: 'text', text: 'fix it!' }], n: 10 },
+			],
+		}),
+	])!
 	expect(late2).toEqual(t2)
 })
 
@@ -288,14 +393,16 @@ test('a command during a running turn stays after the block already streaming', 
 })
 
 test('attachment acknowledgements and picker replies cannot end a streaming turn', () => {
-	let t = fold([snap({ history: [] }),
+	let t = fold([
+		snap({ history: [] }),
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'still ' }, n: 2, ts },
 	])!
 	for (let event of [
 		{ type: 'attached', sessionId, command: 'upload', blob: '123abc', marker: '[image/example.png]' },
 		{ type: 'models', sessionId, current: 'fake/m', items: ['fake/m'] },
-	] satisfies Event[]) expect(transcript.fold(t, event)).toBe(t)
+	] satisfies Event[])
+		expect(transcript.fold(t, event)).toBe(t)
 	let next = transcript.fold(t, { type: 'stream', sessionId, event: { type: 'text', text: 'working' }, n: 2, ts })!
 	expect(next.items.at(-1)).toMatchObject({ type: 'text', text: 'still working' })
 	expect(next.live).toBeDefined()
@@ -306,7 +413,10 @@ test('a model-run command shows only as its tool card, live and restored; a type
 		{ type: 'command' as const, text: '/rename New title', origin: 'model' as const, ts, n: 1 },
 		{ type: 'output' as const, text: 'Session renamed: Old title → New title', origin: 'model' as const, ts, n: 2 },
 	]
-	let typed = [{ type: 'command' as const, text: '/cd /tmp', ts, n: 3 }, { type: 'output' as const, text: 'cwd: /tmp', ts, n: 4 }]
+	let typed = [
+		{ type: 'command' as const, text: '/cd /tmp', ts, n: 3 },
+		{ type: 'output' as const, text: 'cwd: /tmp', ts, n: 4 },
+	]
 	let live = fold([snap({ history: [] }), ...[...model, ...typed].map((e) => ({ ...e, sessionId }))])!
 	let restored = fold([snap({ history: [...model, ...typed] })])!
 	expect(live.items).toEqual(restored.items)
@@ -320,10 +430,23 @@ test('waiting and delivered steering use the same header, without labeling a fol
 		snap({ history: [] }),
 		{ type: 'prompt', sessionId, texts: ['steer', 'fresh'], senders: [{ delivery: 'now' }, {}], n: 3 },
 	])!
-	let loaded = fold([snap({ history: [
-		{ type: 'inbox', id: 's1', text: 'steer', ts, n: 1 },
-		{ type: 'user', blocks: [{ type: 'text', text: 'steer', delivery: 'now' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
-	] })])!
+	let loaded = fold([
+		snap({
+			history: [
+				{ type: 'inbox', id: 's1', text: 'steer', ts, n: 1 },
+				{
+					type: 'user',
+					blocks: [
+						{ type: 'text', text: 'steer', delivery: 'now' },
+						{ type: 'text', text: 'fresh' },
+					],
+					inbox: ['s1'],
+					ts,
+					n: 3,
+				},
+			],
+		}),
+	])!
 	for (let t of [live, loaded]) {
 		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])
 	}
@@ -338,9 +461,22 @@ test('interruption reconciles an unbroadcast delta and separates same-model cont
 		{ type: 'assistant-interrupted', sessionId, record: partial },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'continued' }, model: 'fake/m', n: 3, ts },
 	])!
-	let reload = fold([snap({ history: [prompt('go', 1), partial], turn: { provider: 'fake', model: 'fake/m', blocks: [{ type: 'text', text: 'continued' }], ns: [3], ts: [ts], usage: {} } })])!
+	let reload = fold([
+		snap({
+			history: [prompt('go', 1), partial],
+			turn: {
+				provider: 'fake',
+				model: 'fake/m',
+				blocks: [{ type: 'text', text: 'continued' }],
+				ns: [3],
+				ts: [ts],
+				usage: {},
+			},
+		}),
+	])!
 	expect(live.items).toEqual(reload.items)
 	expect(live.items.filter((i) => i.type === 'text')).toMatchObject([
-		{ text: 'partial final', interrupted: true, key: '2' }, { text: 'continued', key: '3' },
+		{ text: 'partial final', interrupted: true, key: '2' },
+		{ text: 'continued', key: '3' },
 	])
 })

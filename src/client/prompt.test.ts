@@ -11,7 +11,12 @@ function run(input: string, start: PromptState = prompt.empty()): { shown: strin
 	for (let k of events) {
 		let r = prompt.step(st, k)
 		st = r.state
-		if (r.action) actions.push(r.action.type === 'submit' ? `${r.action.delivery === 'queue' ? 'queue' : 'submit'}:${r.action.text}` : r.action.type)
+		if (r.action)
+			actions.push(
+				r.action.type === 'submit'
+					? `${r.action.delivery === 'queue' ? 'queue' : 'submit'}:${r.action.text}`
+					: r.action.type,
+			)
 	}
 	return { shown: show(st), actions }
 }

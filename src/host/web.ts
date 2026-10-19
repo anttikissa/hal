@@ -60,7 +60,14 @@ import { serverLog } from './server-log.ts'
 
 const cookieName = 'hal'
 
-type Data = { loginHash?: string; conn?: ReturnType<typeof host.adapt>; stale?: boolean; manualUpdates?: boolean; page?: string; info?: ClientInfo }
+type Data = {
+	loginHash?: string
+	conn?: ReturnType<typeof host.adapt>
+	stale?: boolean
+	manualUpdates?: boolean
+	page?: string
+	info?: ClientInfo
+}
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
@@ -91,15 +98,23 @@ function redeem(code: unknown, req: Request, ip?: string): { cookie?: string; re
 	serverLog.log('web login', { ...(address && { ip: address }), agent })
 	webLinks.used(webAuth.normalize(code as string))
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
-	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
+	let local =
+		['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
 	let maxAge = Math.floor(webAuth.tokenMs / 1000)
-	let cookie = new Bun.Cookie(cookieName, out.token, { path: '/', httpOnly: true, secure: !local, sameSite: 'strict', maxAge })
+	let cookie = new Bun.Cookie(cookieName, out.token, {
+		path: '/',
+		httpOnly: true,
+		secure: !local,
+		sameSite: 'strict',
+		maxAge,
+	})
 	return { cookie: cookie.serialize() }
 }
 
 // The JSX compiler, loaded on first use: nothing else on the host
 // path needs it. Missing or broken, it fails the page, not the host.
-const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> => import('@solidjs/compiler')
+const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> =>
+	import('@solidjs/compiler')
 
 // A Bun plugin compiling .tsx into Solid's DOM calls.
 async function plugin(): Promise<BunPlugin> {
@@ -108,7 +123,11 @@ async function plugin(): Promise<BunPlugin> {
 		name: 'solid',
 		setup(build) {
 			build.onLoad({ filter: /\.tsx$/ }, async (args) => ({
-				contents: transform(await Bun.file(args.path).text(), { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
+				contents: transform(await Bun.file(args.path).text(), {
+					filename: args.path,
+					moduleName: '@solidjs/web',
+					generate: 'dom',
+				}).code,
 				loader: 'ts',
 			}))
 		},
@@ -123,7 +142,13 @@ async function plugin(): Promise<BunPlugin> {
 async function build(): Promise<{ html: string; version: string }> {
 	let dir = `${import.meta.dir}/../web`
 	let plugins = [await web.plugin()]
-	let out = await Bun.build({ entrypoints: [`${dir}/main.tsx`], target: 'browser', format: 'iife', minify: true, plugins })
+	let out = await Bun.build({
+		entrypoints: [`${dir}/main.tsx`],
+		target: 'browser',
+		format: 'iife',
+		minify: true,
+		plugins,
+	})
 	if (!out.success) throw new AggregateError(out.logs, 'web: bundling src/web/main.tsx failed')
 	let js = (await out.outputs[0]!.text()).replaceAll('</script', '<\\/script')
 	let html = (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
@@ -157,7 +182,11 @@ function css(): string {
 	for (let [key, value] of Object.entries(colors)) {
 		if ((DERIVED as readonly string[]).includes(key)) continue
 		if (key === 'mix') {
-			rules.push(`:root { ${Object.entries(colors.mix).map(([k, v]) => `--mix-${kebab(k)}: ${v}%`).join('; ')} }`)
+			rules.push(
+				`:root { ${Object.entries(colors.mix)
+					.map(([k, v]) => `--mix-${kebab(k)}: ${v}%`)
+					.join('; ')} }`,
+			)
 			continue
 		}
 		// Shared values (fgL, screen) are numbers or one color, not styles.
@@ -177,12 +206,26 @@ function css(): string {
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
-	let tab = colors.tab(), hal = colors.assistant()
-	for (let [kind, fg] of Object.entries({ asking: tab.doneFg!, approval: tab.warningFg!, blocked: tab.warningFg!, retrying: tab.warningFg!, working: hal.cursor!, jobs: tab.jobsFg!, failed: tab.errorFg!, paused: tab.pausedFg!, done: tab.doneFg! })) {
-		rules.push(`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`)
+	let tab = colors.tab(),
+		hal = colors.assistant()
+	for (let [kind, fg] of Object.entries({
+		asking: tab.doneFg!,
+		approval: tab.warningFg!,
+		blocked: tab.warningFg!,
+		retrying: tab.warningFg!,
+		working: hal.cursor!,
+		jobs: tab.jobsFg!,
+		failed: tab.errorFg!,
+		paused: tab.pausedFg!,
+		done: tab.doneFg!,
+	})) {
+		rules.push(
+			`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`,
+		)
 	}
 	// Percentages used, one class per whole percent (colors.heat).
-	for (let used = 0; used <= 100; used++) rules.push(`.heat-${used} { --heat: ${oklch.toCss(colors.heat(used))}; color: var(--heat) }`)
+	for (let used = 0; used <= 100; used++)
+		rules.push(`.heat-${used} { --heat: ${oklch.toCss(colors.heat(used))}; color: var(--heat) }`)
 	return rules.join('\n')
 }
 
@@ -196,10 +239,18 @@ async function page(): Promise<Response> {
 		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
 		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
 	}
-	html = html.replace('/*COLORS*/', () => web.css()).replace('/*SETTINGS*/', () => settings.forPage()).replace('/*SEND_KEYS*/', () => sendKeys.forPage())
+	html = html
+		.replace('/*COLORS*/', () => web.css())
+		.replace('/*SETTINGS*/', () => settings.forPage())
+		.replace('/*SEND_KEYS*/', () => sendKeys.forPage())
 	// Public signing key only, encoded into JSON safely (never the private key).
-	try { let key = (await push.keys()).publicKey; html = html.replace('/*PUSH_KEY*/', () => JSON.stringify(key)) }
-	catch (e: any) { diag.log(`push: ${e?.message ?? e}`); html = html.replace('/*PUSH_KEY*/', 'null') }
+	try {
+		let key = (await push.keys()).publicKey
+		html = html.replace('/*PUSH_KEY*/', () => JSON.stringify(key))
+	} catch (e: any) {
+		diag.log(`push: ${e?.message ?? e}`)
+		html = html.replace('/*PUSH_KEY*/', 'null')
+	}
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
@@ -208,7 +259,10 @@ async function page(): Promise<Response> {
 async function gate(): Promise<Response> {
 	let res = await web.page()
 	if (!res.ok) return res
-	return new Response(res.body, { status: 401, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+	return new Response(res.body, {
+		status: 401,
+		headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+	})
 }
 
 async function login(req: Request, ip?: string): Promise<Response> {
@@ -238,36 +292,84 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let url = new URL(req.url)
 	let { pathname } = url
 	let get = req.method === 'GET'
-	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
+	let blob =
+		get &&
+		(pathname.startsWith('/blob/') || filePage.owns(pathname) || contextPage.owns(pathname) || demoPage.owns(pathname))
 	let app = get && (pathname === '/' || session.isId(pathname.slice(1)) || changesPage.isApp(pathname))
 	if (get && url.searchParams.has('auth') && (blob || app)) return web.linkLogin(url, req, srv.requestIP(req)?.address)
 	if (app) return web.page()
 	let moved = get && changesPage.redirect(url)
 	if (moved) return moved
 	let changesData = get && changesPage.owns(pathname)
-	if (get && pathname === '/budget') return new Response('Spawn budget\n\nbN means N spawn slots left in this session. Each subagent spawn, fresh or forked, costs one slot from its owner and every owner ancestor. A zero count anywhere in that chain prevents spawning. Slots are not returned.\n\nSPAWN limit sets the child’s budget, at most its owner’s slots left minus one. Promised slots are not paid upfront: siblings compete for their ancestors’ remaining slots.\n\n/budget shows this session’s count. /budget N sets only this count; ancestors still limit spending. Only the user may change it.\n\nNew sessions and model-opened interactive tabs start with config.ason subagentSlots (default 3); interactive tabs are free. /fork copies the current count and starts an independent tree sharing its origin’s history.\n', { headers: { 'content-type': 'text/plain; charset=utf-8' } })
-	if (get && pathname === '/manifest.webmanifest') return new Response(JSON.stringify({ name: 'Hal', short_name: 'Hal', start_url: '/', scope: '/', display: 'standalone', background_color: '#141a26', theme_color: '#141a26', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
-	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } })
-	if (get && /^\/fonts\/IBMPlexMono-(Light|Medium)\.woff2$/.test(pathname)) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' } })
-	if (get && /^\/fonts\/SourceCodePro-(Light|Medium)Italic\.woff2$/.test(pathname)) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' } })
-	if (get && pathname === '/sw.js') return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'service-worker-allowed': '/' } })
+	if (get && pathname === '/budget')
+		return new Response(
+			'Spawn budget\n\nbN means N spawn slots left in this session. Each subagent spawn, fresh or forked, costs one slot from its owner and every owner ancestor. A zero count anywhere in that chain prevents spawning. Slots are not returned.\n\nSPAWN limit sets the child’s budget, at most its owner’s slots left minus one. Promised slots are not paid upfront: siblings compete for their ancestors’ remaining slots.\n\n/budget shows this session’s count. /budget N sets only this count; ancestors still limit spending. Only the user may change it.\n\nNew sessions and model-opened interactive tabs start with config.ason subagentSlots (default 3); interactive tabs are free. /fork copies the current count and starts an independent tree sharing its origin’s history.\n',
+			{ headers: { 'content-type': 'text/plain; charset=utf-8' } },
+		)
+	if (get && pathname === '/manifest.webmanifest')
+		return new Response(
+			JSON.stringify({
+				name: 'Hal',
+				short_name: 'Hal',
+				start_url: '/',
+				scope: '/',
+				display: 'standalone',
+				background_color: '#141a26',
+				theme_color: '#141a26',
+				icons: [
+					{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+					{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+				],
+			}),
+			{ headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } },
+		)
+	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png'))
+		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
+			headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' },
+		})
+	if (get && /^\/fonts\/IBMPlexMono-(Light|Medium)\.woff2$/.test(pathname))
+		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
+			headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' },
+		})
+	if (get && /^\/fonts\/SourceCodePro-(Light|Medium)Italic\.woff2$/.test(pathname))
+		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
+			headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' },
+		})
+	if (get && pathname === '/sw.js')
+		return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), {
+			headers: {
+				'content-type': 'text/javascript; charset=utf-8',
+				'cache-control': 'no-store',
+				'service-worker-allowed': '/',
+			},
+		})
 	if (pathname === '/login' && req.method === 'POST') return web.login(req, srv.requestIP(req)?.address)
 	if (pathname === '/logout' && req.method === 'POST') {
 		if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
 		if (!webAuth.validHash(h)) return new Response('log in first\n', { status: 401 })
-		webAuth.list(); web.revoke((webAuth.store()[h!] as import('./web-auth.ts').WebLogin).id)
-		return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', 'cache-control': 'no-store' } })
+		webAuth.list()
+		web.revoke((webAuth.store()[h!] as import('./web-auth.ts').WebLogin).id)
+		return new Response(null, {
+			status: 303,
+			headers: {
+				location: '/',
+				'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+				'cache-control': 'no-store',
+			},
+		})
 	}
 	let check = pathname === '/login' && get
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
 	let composerDebug = pathname === '/composer-debug' && req.method === 'POST' && settings.composerDebug()
-	if (!check && !blob && !changesData && pathname !== '/ws' && !diagnostic && !composerDebug) return new Response('not found\n', { status: 404 })
+	if (!check && !blob && !changesData && pathname !== '/ws' && !diagnostic && !composerDebug)
+		return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
 	if (blob && demoPage.owns(pathname)) return demoPage.serve(pathname, web.css())
-	if (blob) return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : web.blob(pathname)
+	if (blob)
+		return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : web.blob(pathname)
 	if (changesData) return changesPage.serve(url)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
@@ -285,7 +387,18 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	let stale = v !== null && v !== (await web.version())
 	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
 	if (!webAuth.validHash(loginHash)) return new Response('log in first\n', { status: 401 })
-	if (srv.upgrade(req, { data: { loginHash, stale, manualUpdates, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
+	if (
+		srv.upgrade(req, {
+			data: {
+				loginHash,
+				stale,
+				manualUpdates,
+				page: v ?? undefined,
+				info: clients.fromRequest(req, srv.requestIP(req)?.address),
+			},
+		})
+	)
+		return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -297,7 +410,13 @@ function blob(pathname: string): Response {
 	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })
 	let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
-	return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })
+	return new Response(new Uint8Array(found.bytes), {
+		headers: {
+			'content-type': type,
+			'x-content-type-options': 'nosniff',
+			'cache-control': 'private, max-age=31536000, immutable',
+		},
+	})
 }
 
 const websocket = {
@@ -327,10 +446,12 @@ const websocket = {
 async function refresh(): Promise<void> {
 	web.state.page = web.build()
 	let v = await web.version()
-	if (v) for (let ws of web.state.sockets) if (ws.data.page && ws.data.page !== v) {
-		if (ws.data.manualUpdates) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
-		else ws.close(4000, 'reload')
-	}
+	if (v)
+		for (let ws of web.state.sockets)
+			if (ws.data.page && ws.data.page !== v) {
+				if (ws.data.manualUpdates) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
+				else ws.close(4000, 'reload')
+			}
 }
 
 function watchSource(): FSWatcher | null {
@@ -390,17 +511,25 @@ async function stop(): Promise<void> {
 // open page is closed with code 4001, on which it reloads to the gate.
 function revoke(id = 'all'): number {
 	let hashes = webAuth.revoke(id)
-	for (let ws of web.state.sockets) if (hashes.includes(ws.data.loginHash!)) {
-		ws.data.conn?.close()
-		ws.close(4001, 'logged out')
-		web.state.sockets.delete(ws)
-	}
+	for (let ws of web.state.sockets)
+		if (hashes.includes(ws.data.loginHash!)) {
+			ws.data.conn?.close()
+			ws.close(4001, 'logged out')
+			web.state.sockets.delete(ws)
+		}
 	contextPage.closeAll()
 	return hashes.length
 }
 
 export const web = {
-	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>(), watcher: null as FSWatcher | null, fixedPort: undefined as number | undefined, error: undefined as string | undefined },
+	state: {
+		server: null as Server<Data> | null,
+		page: null as Promise<{ html: string; version: string }> | null,
+		sockets: new Set<Socket>(),
+		watcher: null as FSWatcher | null,
+		fixedPort: undefined as number | undefined,
+		error: undefined as string | undefined,
+	},
 	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),
 	authorized,

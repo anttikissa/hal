@@ -99,8 +99,6 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 	await expect(fetch(`${url}/`)).rejects.toThrow()
 })
 
-
-
 test('a missing JSX compiler fails the page with 500 and a diag line, not the host', async () => {
 	let orig = web.compiler
 	web.compiler = () => Promise.reject(new Error('Cannot find package @solidjs/compiler'))
@@ -204,7 +202,13 @@ test('GET /blob serves a session’s attachment by exact id, with the cookie onl
 	expect((await get(`/blob/${other}/${blob}`)).status).toBe(404)
 	expect((await get(`/blob/${id}/${blob.slice(0, -1)}`)).status).toBe(404)
 	expect((await get(`/blob/${id}/${blob}.png`)).status).toBe(404)
-	for (let path of [`/blob/${id}/..%2f..%2fconfig.ason`, `/blob/${id}/%2e%2e`, `/blob/${id}/blobs%2f${blob}`, `/blob/..%2f${id}/${blob}`, `/blob/${id}/${blob}/x`]) {
+	for (let path of [
+		`/blob/${id}/..%2f..%2fconfig.ason`,
+		`/blob/${id}/%2e%2e`,
+		`/blob/${id}/blobs%2f${blob}`,
+		`/blob/..%2f${id}/${blob}`,
+		`/blob/${id}/${blob}/x`,
+	]) {
 		expect((await get(path)).status).toBe(404)
 	}
 })
@@ -213,7 +217,10 @@ test('GET /image/<name> is a page naming where the image lives; /raw/<name> its 
 	await server.serve()
 	web.start()
 	let id = sessions.create({ cwd: home }).id
-	let png = Buffer.concat([Buffer.from('89504e470d0a1a0a0000000d4948445200000138000000d8', 'hex'), Buffer.from('pixels')])
+	let png = Buffer.concat([
+		Buffer.from('89504e470d0a1a0a0000000d4948445200000138000000d8', 'hex'),
+		Buffer.from('pixels'),
+	])
 	blobs.stage('abc123.png', 'image/png', png.toString('base64'))
 	let jar = await cookie()
 	let get = (path: string, auth = true) => fetch(`${base()}${path}`, { headers: auth ? { cookie: jar } : {} })
@@ -249,7 +256,14 @@ test('GET /image/<name> is a page naming where the image lives; /raw/<name> its 
 	expect(page).not.toContain(tmp)
 	expect(Buffer.from(await (await get('/raw/abc123.png')).arrayBuffer())).toEqual(png)
 	expect((await get(`/blob/${id}/abc123`)).status).toBe(200)
-	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/..%2fabc123.png', '/image/abc123.png/x', '/paste/abc123.png', '/raw/abc123']) {
+	for (let path of [
+		'/image/abc123.jpg',
+		'/image/zzz999.png',
+		'/image/..%2fabc123.png',
+		'/image/abc123.png/x',
+		'/paste/abc123.png',
+		'/raw/abc123',
+	]) {
 		expect((await get(path)).status).toBe(404)
 	}
 })
@@ -271,7 +285,10 @@ test('a pasted long text lands at the stated /tmp path; its page names that path
 	expect(await (await get('/raw/0005ab.txt')).text()).toBe(text)
 	expect((await get('/image/0005ab.txt')).status).toBe(404)
 	// The model gets the text itself; the session keeps its own copy.
-	expect(blobs.resolve(id, ['see [paste/0005ab.txt]'])).toEqual({ blocks: [{ type: 'text', text: 'see [paste/0005ab.txt]' }], unknown: [] })
+	expect(blobs.resolve(id, ['see [paste/0005ab.txt]'])).toEqual({
+		blocks: [{ type: 'text', text: 'see [paste/0005ab.txt]' }],
+		unknown: [],
+	})
 	expect(blobs.expand(id, 'see [paste/0005ab.txt]')).toBe(`see ${text}`)
 	expect(await (await get('/paste/0005ab.txt')).text()).toContain(`${paths.sessionDir(id)}/blobs/0005ab.txt`)
 })
@@ -303,7 +320,8 @@ test('a file address takes a link code; a used or expired one gets the gate, whi
 	try {
 		let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
 		blobs.stage('abc123.png', 'image/png', png.toString('base64'))
-		let open = (path: string, cookie?: string) => fetch(`${base()}${path}`, { redirect: 'manual', headers: cookie ? { cookie } : {} })
+		let open = (path: string, cookie?: string) =>
+			fetch(`${base()}${path}`, { redirect: 'manual', headers: cookie ? { cookie } : {} })
 		let gate = async (res: Response) => {
 			expect(res.status).toBe(401)
 			expect(res.headers.get('content-type')).toContain('text/html')
@@ -405,7 +423,9 @@ test('manual-update pages stay connected through rebuilds and stale reconnects; 
 	let build = web.build
 	try {
 		// Model a half-saved source edit without changing shared source files.
-		web.build = async () => { throw new Error('incomplete build') }
+		web.build = async () => {
+			throw new Error('incomplete build')
+		}
 		await web.refresh()
 		expect(await web.version()).toBeUndefined()
 		expect(manual.events.some((e) => e.type === 'web-update')).toBe(false)
@@ -470,7 +490,16 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
 	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
 	expect(seen(w.events)).toEqual(seen(local))
-	expect(seen(w.events).map((e) => e.type)).toEqual(['home', 'host-mode', 'state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
+	expect(seen(w.events).map((e) => e.type)).toEqual([
+		'home',
+		'host-mode',
+		'state',
+		'turn-start',
+		'state',
+		'stream',
+		'turn-end',
+		'state',
+	])
 
 	// A closed browser is no longer a host client.
 	w.ws.close()
@@ -478,9 +507,12 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	conn.close()
 })
 
-const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) =>
-	existsSync(p),
-)
+const chrome = [
+	'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+	'/usr/bin/chromium',
+	'/usr/bin/chromium-browser',
+	'/usr/bin/google-chrome',
+].find((p) => existsSync(p))
 
 // Test Chromes allowed at once on this machine, across all test runs:
 // one per 4 GiB of RAM. A headless Chrome takes ~0.5 GB, and parallel
@@ -500,18 +532,22 @@ async function slot(): Promise<string> {
 				return dir
 			} catch {}
 			let pid = Number(existsSync(`${dir}/watchdog.pid`) ? readFileSync(`${dir}/watchdog.pid`, 'utf8') : 0)
-			let alive = pid > 0 && (() => {
-				try {
-					return process.kill(pid, 0)
-				} catch {
-					return false
-				}
-			})()
+			let alive =
+				pid > 0 &&
+				(() => {
+					try {
+						return process.kill(pid, 0)
+					} catch {
+						return false
+					}
+				})()
 			// A slot without a pid file is being taken right now, unless old.
-			if (alive || (!pid && Date.now() - (statSync(dir, { throwIfNoEntry: false })?.mtimeMs ?? 0) < 30_000)) held.push(`${dir} (watchdog ${pid || 'starting'})`)
+			if (alive || (!pid && Date.now() - (statSync(dir, { throwIfNoEntry: false })?.mtimeMs ?? 0) < 30_000))
+				held.push(`${dir} (watchdog ${pid || 'starting'})`)
 			else rmSync(dir, { recursive: true, force: true })
 		}
-		if (held.length === chromeSlots && Date.now() > deadline) throw new Error(`every test Chrome slot stayed busy for 5 minutes: ${held.join(', ')}`)
+		if (held.length === chromeSlots && Date.now() > deadline)
+			throw new Error(`every test Chrome slot stayed busy for 5 minutes: ${held.join(', ')}`)
 		await Bun.sleep(250)
 	}
 }
@@ -533,13 +569,34 @@ stop`
 async function launch() {
 	let dir = await slot()
 	let profile = `${dir}/profile`
-	let proc = Bun.spawn(['sh', '-c', watchdog, 'sh', String(process.pid), dir, chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], {
-		stdio: ['ignore', 'ignore', 'ignore'],
-		detached: true,
-	})
+	let proc = Bun.spawn(
+		[
+			'sh',
+			'-c',
+			watchdog,
+			'sh',
+			String(process.pid),
+			dir,
+			chrome!,
+			'--headless=new',
+			'--remote-debugging-port=0',
+			`--user-data-dir=${profile}`,
+			'--no-first-run',
+			...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+			'about:blank',
+		],
+		{
+			stdio: ['ignore', 'ignore', 'ignore'],
+			detached: true,
+		},
+	)
 	writeFileSync(`${dir}/watchdog.pid`, String(proc.pid))
 	let port = ''
-	await until(() => existsSync(`${profile}/DevToolsActivePort`) && (port = readFileSync(`${profile}/DevToolsActivePort`, 'utf8').split('\n')[0]!))
+	await until(
+		() =>
+			existsSync(`${profile}/DevToolsActivePort`) &&
+			(port = readFileSync(`${profile}/DevToolsActivePort`, 'utf8').split('\n')[0]!),
+	)
 	let targets: any[] = []
 	for (let i = 0; i < 100 && !targets.some((t) => t.type === 'page'); i++) {
 		targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
@@ -554,7 +611,10 @@ async function launch() {
 	ws.onmessage = (m) => {
 		let msg = JSON.parse(String(m.data))
 		waiting.get(msg.id)?.(msg)
-		if (msg.method === 'Runtime.exceptionThrown') diagnostics.push(`[EXCEPTION] ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`)
+		if (msg.method === 'Runtime.exceptionThrown')
+			diagnostics.push(
+				`[EXCEPTION] ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`,
+			)
 		if (msg.method !== 'Runtime.consoleAPICalled') return
 		let text = msg.params.args.map((a: any) => a.value ?? a.description ?? '').join(' ')
 		if (/^\[[A-Z][A-Z_]+\]/.test(text)) diagnostics.push(text)
@@ -566,7 +626,8 @@ async function launch() {
 		})
 	let evaluate = async (expression: string) => {
 		let response = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
-		if (response.result?.exceptionDetails) throw new Error(response.result.exceptionDetails.exception?.description ?? response.result.exceptionDetails.text)
+		if (response.result?.exceptionDetails)
+			throw new Error(response.result.exceptionDetails.exception?.description ?? response.result.exceptionDetails.text)
 		return response.result?.result?.value
 	}
 	let waitFor = async (expression: string) => {
@@ -574,7 +635,9 @@ async function launch() {
 			if (await evaluate(expression)) return
 			await Bun.sleep(20)
 		}
-		throw new Error(`timed out waiting for ${expression}: ${await evaluate("location.href + document.documentElement.outerHTML.slice(-600)")}`)
+		throw new Error(
+			`timed out waiting for ${expression}: ${await evaluate('location.href + document.documentElement.outerHTML.slice(-600)')}`,
+		)
 	}
 	await call('Runtime.enable', {})
 	let close = async () => {
@@ -618,58 +681,75 @@ function providerHome(): void {
 	settings.state.raw = { model: 'anthropic/claude-opus-5-5' }
 }
 
-
-
 browserTest('Unicode drafts keep the composer and tab navigation responsive', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let other = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	tabs.insert(id, 0); tabs.insert(other, 1)
+	tabs.insert(id, 0)
+	tabs.insert(other, 1)
 	let b = await browser()
 	try {
-		await server.serve(); web.start()
+		await server.serve()
+		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`!!document.querySelector('.Chat')`)
 		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
 		for (let width of [390, 1440]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
 			for (let text of ['é', '—', '漢字', '👨‍👩‍👧', 'e\u0301']) {
-				await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.focus() })()`)
+				await b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.focus() })()`,
+				)
 				await b.waitFor(`!document.querySelector('.entry .hint').classList.contains('gone')`)
 				await b.call('Input.insertText', { text })
-				await b.waitFor(`document.querySelector('.entry .hint').classList.contains('gone') && !document.querySelector('.actions button[aria-label="Send"]').disabled`)
+				await b.waitFor(
+					`document.querySelector('.entry .hint').classList.contains('gone') && !document.querySelector('.actions button[aria-label="Send"]').disabled`,
+				)
 				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
 			}
 			await b.evaluate(`document.querySelector('.Tabs [href="/${other}"]').click()`)
-			await b.waitFor(`document.querySelector('.Tabs [href="/${other}"]').hasAttribute('aria-current') && document.querySelector('textarea').value === ''`)
+			await b.waitFor(
+				`document.querySelector('.Tabs [href="/${other}"]').hasAttribute('aria-current') && document.querySelector('textarea').value === ''`,
+			)
 			await b.evaluate(`document.querySelector('.Tabs [href="/${id}"]').click()`)
 			await b.waitFor(`document.querySelector('textarea').value === 'e\\u0301'`)
 		}
-	} finally { await b.close() }
+	} finally {
+		await b.close()
+	}
 })
 
-browserTest('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
-	// Turns taller than the window, one per page.
-	let id = tabs.create('/tmp')
-	for (let t = 0; t < 4; t++) {
-		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
-		history.append(id, { type: 'assistant', block: { type: 'thinking', text: `thought ${t}` } })
-		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
-		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	}
-	pages.budget = 1500
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`document.querySelector('main')?.innerText.includes('thought 3') && !document.querySelector('main')?.innerText.includes('prompt 0')`)
-		// Open the newest thinking card, then read up to the top until the
-		// first prompt has arrived.
-		await b.evaluate(`[...document.querySelectorAll('.Card.thinking')].at(-1).click()`)
-		await b.waitFor(`[...document.querySelectorAll('.Card.thinking')].at(-1).classList.contains('open')`)
-		let loaded = await b.evaluate(`(async () => {
+browserTest(
+	'in a browser earlier history loads above: shown cards stay, open ones stay open',
+	async () => {
+		// Turns taller than the window, one per page.
+		let id = tabs.create('/tmp')
+		for (let t = 0; t < 4; t++) {
+			history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+			history.append(id, { type: 'assistant', block: { type: 'thinking', text: `thought ${t}` } })
+			history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
+			history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		}
+		pages.budget = 1500
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 1200,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			await b.waitFor(
+				`document.querySelector('main')?.innerText.includes('thought 3') && !document.querySelector('main')?.innerText.includes('prompt 0')`,
+			)
+			// Open the newest thinking card, then read up to the top until the
+			// first prompt has arrived.
+			await b.evaluate(`[...document.querySelectorAll('.Card.thinking')].at(-1).click()`)
+			await b.waitFor(`[...document.querySelectorAll('.Card.thinking')].at(-1).classList.contains('open')`)
+			let loaded = await b.evaluate(`(async () => {
 			let main = document.querySelector('main'), cards = [...document.querySelectorAll('.Card')], added = 0
 			let open = cards.filter((c) => c.matches('.thinking.open'))
 			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
@@ -690,77 +770,122 @@ browserTest('in a browser earlier history loads above: shown cards stay, open on
 				first: main.innerText.includes('prompt 0'),
 			}
 		})()`)
-		expect(loaded).toEqual({ kept: true, stillOpen: true, opened: 1, grew: true, first: true })
-	} finally {
-		await b.close()
-	}
-}, 20000)
+			expect(loaded).toEqual({ kept: true, stillOpen: true, opened: 1, grew: true, first: true })
+		} finally {
+			await b.close()
+		}
+	},
+	20000,
+)
 
-browserTest('in a browser a block address loads its page, marks its card and opens the whole output', async () => {
-	// The linked tool result sits in the first turn, pages away from the tail.
-	let id = tabs.create('/tmp')
-	let output = Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n')
-	let { blob } = blobs.store(id, 'image/gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt 0' }, { type: 'image', blob, mediaType: 'image/gif' }] })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'c0', name: 'bash', input: { command: 'seq 40\nprintf done', modifies: ['/tmp/example.log'], timeout: 120000, background: false, unfamiliar: { explanation: 'Keep this visible' } } } })
-	let result = history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'c0', output }] })
-	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	for (let t = 1; t < 4; t++) {
-		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
-		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
+browserTest(
+	'in a browser a block address loads its page, marks its card and opens the whole output',
+	async () => {
+		// The linked tool result sits in the first turn, pages away from the tail.
+		let id = tabs.create('/tmp')
+		let output = Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n')
+		let { blob } = blobs.store(id, 'image/gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+		history.append(id, {
+			type: 'user',
+			blocks: [
+				{ type: 'text', text: 'prompt 0' },
+				{ type: 'image', blob, mediaType: 'image/gif' },
+			],
+		})
+		history.append(id, {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'c0',
+				name: 'bash',
+				input: {
+					command: 'seq 40\nprintf done',
+					modifies: ['/tmp/example.log'],
+					timeout: 120000,
+					background: false,
+					unfamiliar: { explanation: 'Keep this visible' },
+				},
+			},
+		})
+		let result = history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'c0', output }] })
 		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	}
-	pages.budget = 1500
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}#${result.n}` })
-		await b.waitFor(`!!document.querySelector('.Card.target.open')?.innerText.includes('row 40')`)
-		let seen = await b.evaluate(`(() => {
+		for (let t = 1; t < 4; t++) {
+			history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+			history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
+			history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		}
+		pages.budget = 1500
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 1200,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}#${result.n}` })
+			await b.waitFor(`!!document.querySelector('.Card.target.open')?.innerText.includes('row 40')`)
+			let seen = await b.evaluate(`(() => {
 			let card = document.querySelector('.Card.target'), box = card.getBoundingClientRect(), main = document.querySelector('main').getBoundingClientRect()
 			let link = card.querySelector('a.link')
 			return { targets: document.querySelectorAll('.Card.target').length, visible: box.top < main.bottom && box.bottom > main.top, link: link && new URL(link.href).pathname + new URL(link.href).hash }
 		})()`)
-		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#t${result.n! - 1}` })
-		let inspection = await b.evaluate(`document.querySelector('.Card.target .contents').textContent`)
-		expect(inspection).toContain('seq 40\nprintf done\nEdits /tmp/example.log')
-		expect(inspection).toContain('Keep this visible')
-		expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
-		// It flashes; scrolled out of view, the address drops its #block.
-		expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
-		await b.evaluate(`(() => { let t = document.querySelector('.Transcript'); t.dispatchEvent(new WheelEvent('wheel', { deltaY: 1000, bubbles: true })); t.scrollTop = 1e6 })()`)
-		await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
-	} finally {
-		await b.close()
-	}
-}, 20000)
+			expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#t${result.n! - 1}` })
+			let inspection = await b.evaluate(`document.querySelector('.Card.target .contents').textContent`)
+			expect(inspection).toContain('seq 40\nprintf done\nEdits /tmp/example.log')
+			expect(inspection).toContain('Keep this visible')
+			expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
+			// It flashes; scrolled out of view, the address drops its #block.
+			expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
+			await b.evaluate(
+				`(() => { let t = document.querySelector('.Transcript'); t.dispatchEvent(new WheelEvent('wheel', { deltaY: 1000, bubbles: true })); t.scrollTop = 1e6 })()`,
+			)
+			await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
+		} finally {
+			await b.close()
+		}
+	},
+	20000,
+)
 
-browserTest('in a browser a queued message address shows its card at the bottom', async () => {
-	// The reveal's scroll event may come after a resize; the view must not
-	// go back to the pre-reveal reading anchor (the top).
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	for (let t = 0; t < 12; t++) {
-		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
-		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n\nmore` } })
-	}
-	let queued = history.append(id, { type: 'inbox', id: 'q1', text: 'Queued one', delivery: 'after-turn' })
-	history.append(id, { type: 'assistant', block: { type: 'text', text: 'still working' } })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1000, height: 600, deviceScaleFactor: 1, mobile: false })
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#u${queued.n}` })
-		await b.waitFor(`document.querySelector('.Card.target.queued')`)
-		await Bun.sleep(300)
-		let box = await b.evaluate(`(() => { let c = document.querySelector('.Card.target').getBoundingClientRect(), m = document.querySelector('.Transcript').getBoundingClientRect(); return c.top >= m.top && c.bottom <= m.bottom })()`)
-		expect(box).toBe(true)
-	} finally {
-		await b.close()
-	}
-}, 20000)
+browserTest(
+	'in a browser a queued message address shows its card at the bottom',
+	async () => {
+		// The reveal's scroll event may come after a resize; the view must not
+		// go back to the pre-reveal reading anchor (the top).
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		for (let t = 0; t < 12; t++) {
+			history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+			history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n\nmore` } })
+		}
+		let queued = history.append(id, { type: 'inbox', id: 'q1', text: 'Queued one', delivery: 'after-turn' })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: 'still working' } })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 1000,
+				height: 600,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#u${queued.n}` })
+			await b.waitFor(`document.querySelector('.Card.target.queued')`)
+			await Bun.sleep(300)
+			let box = await b.evaluate(
+				`(() => { let c = document.querySelector('.Card.target').getBoundingClientRect(), m = document.querySelector('.Transcript').getBoundingClientRect(); return c.top >= m.top && c.bottom <= m.bottom })()`,
+			)
+			expect(box).toBe(true)
+		} finally {
+			await b.close()
+		}
+	},
+	20000,
+)
 
 browserTest('tab squares align with numerals and blink in terminal colors', async () => {
 	let id = tabs.create('/tmp')
@@ -772,10 +897,13 @@ browserTest('tab squares align with numerals and blink in terminal colors', asyn
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 		await b.waitFor(`!!document.querySelector('.Tabs .strip .tab .n')`)
-		let list = tabs.list().map((t) => ({ ...t, state: { type: 'running' as const, phase: 'streaming' as const }, jobs: 1 }))
+		let list = tabs
+			.list()
+			.map((t) => ({ ...t, state: { type: 'running' as const, phase: 'streaming' as const }, jobs: 1 }))
 		for (let c of host.state.clients) c.deliver({ type: 'tabs', tabs: list })
 		await b.waitFor(`!!document.querySelector('.Tabs .strip .marker.working.with-jobs')?.getAnimations().length`)
-		let result = JSON.parse(await b.evaluate(`JSON.stringify((() => {
+		let result = JSON.parse(
+			await b.evaluate(`JSON.stringify((() => {
 			let m = document.querySelector('.Tabs .strip .marker.working'), n = m.previousElementSibling;
 			let mr = m.getBoundingClientRect(), nr = n.getBoundingClientRect();
 			let a = m.getAnimations()[0]; a.pause(); a.effect.updateTiming({ delay: 0 });
@@ -784,107 +912,173 @@ browserTest('tab squares align with numerals and blink in terminal colors', asyn
 			let values = [100, 400, 600, 900, 1100, 1400, 1600, 1900].map(t => { a.currentTime = t; return [rgb(getComputedStyle(m).color), getComputedStyle(m).opacity]; });
 			let s = getComputedStyle(m);
 			return { center: Math.abs(mr.y + mr.height / 2 - nr.y - nr.height / 2), gap: mr.x - nr.right, values, lit: rgb(s.getPropertyValue('--mark-lit').trim()), dark: rgb(s.getPropertyValue('--mark-dark').trim()), alt: rgb(s.getPropertyValue('--jobs-fg').trim()) };
-		})())`))
+		})())`),
+		)
 		expect(result.center).toBeLessThan(0.5)
 		expect(result.gap).toBeGreaterThan(0)
-		expect(result.values).toEqual([result.lit, result.lit, result.dark, result.dark, result.alt, result.alt, result.dark, result.dark].map((c) => [c, '1']))
+		expect(result.values).toEqual(
+			[result.lit, result.lit, result.dark, result.dark, result.alt, result.alt, result.dark, result.dark].map((c) => [
+				c,
+				'1',
+			]),
+		)
 	} finally {
 		await b.call('Emulation.setEmulatedMedia', { features: [] })
 		await b.close()
 	}
 })
 
-browserTest('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
-	let origCwd = host.cwd
-	host.cwd = () => '/tmp'
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
-		await b.call('Page.navigate', { url: `${base()}/` })
-		// Landing on the first (new) tab rewrites the address.
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && /\\/\\d+-[a-z]{3}$/.test(location.pathname)`)
-		let first = await b.evaluate(`location.pathname`)
-		expect(await b.evaluate(`document.querySelector('.Tabs .strip a.tab').getAttribute('href')`)).toBe(first)
-		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 2 && location.pathname !== '${first}'`)
-		let second = await b.evaluate(`location.pathname`)
-		expect(await b.evaluate(`document.querySelector('.Tabs .strip [aria-current]').getAttribute('href')`)).toBe(second)
-		// The strip never scrolls sideways.
-		expect(await b.evaluate(`(() => { let s = document.querySelector('.Tabs .strip'); return s.scrollWidth <= s.clientWidth })()`)).toBe(true)
-		// Back shows the first tab again; a click on a tab link pushes.
-		await b.evaluate(`history.back()`)
-		await b.waitFor(`location.pathname === '${first}' && document.querySelector('.Tabs .strip [aria-current]')?.getAttribute('href') === '${first}'`)
-		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${second}"]').click()`)
-		await b.waitFor(`location.pathname === '${second}'`)
-		// Closing the shown tab lands on its neighbor, replacing the entry.
-		let entries = await b.evaluate(`history.length`)
-		// A real click: focus moves, running focus handlers as the sheet opens.
-		let menu = JSON.parse(await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .menu').getBoundingClientRect())`))
-		for (let type of ['mousePressed', 'mouseReleased']) await b.call('Input.dispatchMouseEvent', { type, x: menu.x + menu.width / 2, y: menu.y + menu.height / 2, button: 'left', clickCount: 1 })
-		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
-		expect(await b.evaluate(`document.activeElement === document.querySelector('.Tabs .sheet ul') && getComputedStyle(document.activeElement).outlineStyle === 'none'`)).toBe(true)
-		expect(await b.evaluate(`document.querySelector('.Tabs .sheet [aria-current]').getAttribute('href')`)).toBe(second)
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
-		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
-		expect(await b.evaluate(`document.activeElement === document.querySelector('.Tabs .sheet a') && document.activeElement.matches(':focus-visible') && getComputedStyle(document.activeElement).outlineStyle !== 'none'`)).toBe(true)
-		await b.evaluate(`document.querySelector('.Tabs .sheet li:has([aria-current]) .close').click()`)
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`)
-		expect(await b.evaluate(`history.length`)).toBe(entries)
-		// A phone: the same one row, its menu opening the sheet.
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
-		expect(await b.evaluate(`document.querySelector('.Tabs').getBoundingClientRect().height < 50`)).toBe(true)
-		await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .menu').click()`)
-		await b.waitFor(`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`)
-		await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
-		await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
-		expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
-		// The menu's Notifications sheet opens and closes.
-		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
-		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
-		await b.evaluate(`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent === 'Notifications').click()`)
-		await b.waitFor(`document.querySelector('.Notifications').open && !document.querySelector('.Tabs .sheet').open`)
-		await b.evaluate(`[...document.querySelectorAll('.Notifications button')].find(b => b.textContent === 'Close').click()`)
-		await b.waitFor(`!document.querySelector('.Notifications').open`)
-	} finally {
-		host.cwd = origCwd
-		await b.close()
-	}
-}, 20000)
+browserTest(
+	'in a browser tabs are links; new, Back and close move the address; the strip stays one short row',
+	async () => {
+		let origCwd = host.cwd
+		host.cwd = () => '/tmp'
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 1200,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Page.navigate', { url: `${base()}/` })
+			// Landing on the first (new) tab rewrites the address.
+			await b.waitFor(
+				`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && /\\/\\d+-[a-z]{3}$/.test(location.pathname)`,
+			)
+			let first = await b.evaluate(`location.pathname`)
+			expect(await b.evaluate(`document.querySelector('.Tabs .strip a.tab').getAttribute('href')`)).toBe(first)
+			await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
+			await b.waitFor(
+				`document.querySelectorAll('.Tabs .strip a.tab').length === 2 && location.pathname !== '${first}'`,
+			)
+			let second = await b.evaluate(`location.pathname`)
+			expect(await b.evaluate(`document.querySelector('.Tabs .strip [aria-current]').getAttribute('href')`)).toBe(
+				second,
+			)
+			// The strip never scrolls sideways.
+			expect(
+				await b.evaluate(
+					`(() => { let s = document.querySelector('.Tabs .strip'); return s.scrollWidth <= s.clientWidth })()`,
+				),
+			).toBe(true)
+			// Back shows the first tab again; a click on a tab link pushes.
+			await b.evaluate(`history.back()`)
+			await b.waitFor(
+				`location.pathname === '${first}' && document.querySelector('.Tabs .strip [aria-current]')?.getAttribute('href') === '${first}'`,
+			)
+			await b.evaluate(`document.querySelector('.Tabs .strip a[href="${second}"]').click()`)
+			await b.waitFor(`location.pathname === '${second}'`)
+			// Closing the shown tab lands on its neighbor, replacing the entry.
+			let entries = await b.evaluate(`history.length`)
+			// A real click: focus moves, running focus handlers as the sheet opens.
+			let menu = JSON.parse(
+				await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .menu').getBoundingClientRect())`),
+			)
+			for (let type of ['mousePressed', 'mouseReleased'])
+				await b.call('Input.dispatchMouseEvent', {
+					type,
+					x: menu.x + menu.width / 2,
+					y: menu.y + menu.height / 2,
+					button: 'left',
+					clickCount: 1,
+				})
+			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+			expect(
+				await b.evaluate(
+					`document.activeElement === document.querySelector('.Tabs .sheet ul') && getComputedStyle(document.activeElement).outlineStyle === 'none'`,
+				),
+			).toBe(true)
+			expect(await b.evaluate(`document.querySelector('.Tabs .sheet [aria-current]').getAttribute('href')`)).toBe(
+				second,
+			)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+			expect(
+				await b.evaluate(
+					`document.activeElement === document.querySelector('.Tabs .sheet a') && document.activeElement.matches(':focus-visible') && getComputedStyle(document.activeElement).outlineStyle !== 'none'`,
+				),
+			).toBe(true)
+			await b.evaluate(`document.querySelector('.Tabs .sheet li:has([aria-current]) .close').click()`)
+			await b.waitFor(
+				`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`,
+			)
+			expect(await b.evaluate(`history.length`)).toBe(entries)
+			// A phone: the same one row, its menu opening the sheet.
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			expect(await b.evaluate(`document.querySelector('.Tabs').getBoundingClientRect().height < 50`)).toBe(true)
+			await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .menu').click()`)
+			await b.waitFor(
+				`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`,
+			)
+			await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
+			await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
+			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+			// The menu's Notifications sheet opens and closes.
+			await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+			await b.evaluate(
+				`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent === 'Notifications').click()`,
+			)
+			await b.waitFor(`document.querySelector('.Notifications').open && !document.querySelector('.Tabs .sheet').open`)
+			await b.evaluate(
+				`[...document.querySelectorAll('.Notifications button')].find(b => b.textContent === 'Close').click()`,
+			)
+			await b.waitFor(`!document.querySelector('.Notifications').open`)
+		} finally {
+			host.cwd = origCwd
+			await b.close()
+		}
+	},
+	20000,
+)
 
-browserTest('in a browser a command stays below the block already streaming: same card, no fade again', async () => {
-	providerHome()
-	let id = tabs.create('/tmp')
-	let release = () => {}
-	let gate = new Promise<void>((r) => (release = r))
-	turns.stream = () =>
-		(async function* (): AsyncGenerator<StreamEvent> {
-			yield { type: 'text', text: 'streaming now' }
-			await gate
-			yield { type: 'done', reason: 'end' }
-		})()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		// Commands naming /help wait in the page until let go, so the
-		// pending card is shown (and done fading in) before it lands.
-		await b.evaluate(`(() => {
+browserTest(
+	'in a browser a command stays below the block already streaming: same card, no fade again',
+	async () => {
+		providerHome()
+		let id = tabs.create('/tmp')
+		let release = () => {}
+		let gate = new Promise<void>((r) => (release = r))
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				yield { type: 'text', text: 'streaming now' }
+				await gate
+				yield { type: 'done', reason: 'end' }
+			})()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			// Commands naming /help wait in the page until let go, so the
+			// pending card is shown (and done fading in) before it lands.
+			await b.evaluate(`(() => {
 			let send = WebSocket.prototype.send, held = []
 			window.letGo = () => held.splice(0).forEach((f) => f())
 			WebSocket.prototype.send = function (data) { String(data).includes('/help') ? held.push(() => send.call(this, data)) : send.call(this, data) }
 		})()`)
-		let enter = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		await enter('go')
-		await b.waitFor(`document.querySelector('main')?.innerText.includes('streaming now')`)
-		await enter('/help')
-		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent.endsWith('/help') && !c.getAnimations().some((a) => !(a instanceof CSSTransition)) })()`)
-		let moved = await b.evaluate(`(async () => {
+			let enter = (text: string) =>
+				b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`,
+				)
+			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await enter('go')
+			await b.waitFor(`document.querySelector('main')?.innerText.includes('streaming now')`)
+			await enter('/help')
+			await b.waitFor(
+				`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent.endsWith('/help') && !c.getAnimations().some((a) => !(a instanceof CSSTransition)) })()`,
+			)
+			let moved = await b.evaluate(`(async () => {
 			let card = document.querySelector('.Card.pending'), reply = document.querySelector('.Card.assistant')
 			let before = !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
 			window.letGo()
@@ -898,271 +1092,404 @@ browserTest('in a browser a command stays below the block already streaming: sam
 				copies: [...document.querySelectorAll('.Card')].filter((c) => c.querySelector('.CardHeader .label')?.textContent === '/help').length,
 			}
 		})()`)
-		expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, copies: 1 })
-		release()
-	} finally {
-		release()
-		await b.close()
-	}
-}, 20000)
+			expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, copies: 1 })
+			release()
+		} finally {
+			release()
+			await b.close()
+		}
+	},
+	20000,
+)
 
-
-browserTest('web tab paging scrolls with overlap without selecting, and selection recenters', async () => {
-	providerHome()
-	let ids = Array.from({ length: 21 }, () => sessions.create({ cwd: home }).id)
-	tabs.file().open = ids
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Page.navigate', { url: `${base()}/${ids[0]}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.track .tab').length === 21 && document.querySelector('.edge.left')?.disabled`)
-		let geometry = `(() => {
+browserTest(
+	'web tab paging scrolls with overlap without selecting, and selection recenters',
+	async () => {
+		providerHome()
+		let ids = Array.from({ length: 21 }, () => sessions.create({ cwd: home }).id)
+		tabs.file().open = ids
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Page.navigate', { url: `${base()}/${ids[0]}?auth=${webAuth.issue()}` })
+			await b.waitFor(
+				`document.querySelectorAll('.track .tab').length === 21 && document.querySelector('.edge.left')?.disabled`,
+			)
+			let geometry = `(() => {
 			let track = document.querySelector('.track'), r = track.getBoundingClientRect(), links = [...track.querySelectorAll('.tab')];
 			let visible = links.filter(a => { let t = a.getBoundingClientRect(); return t.left >= r.left - 1 && t.right <= r.right + 1 });
 			let left = document.querySelector('.edge.left'), right = document.querySelector('.edge.right');
 			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, leftDisabled: left.disabled, rightDisabled: right.disabled, opacity: getComputedStyle(left).opacity, target: left.getBoundingClientRect().width, height: left.getBoundingClientRect().height, offscreen: left.classList.contains('offscreen'), border: getComputedStyle(left).borderBottomWidth, weight: getComputedStyle(left).fontWeight, color: getComputedStyle(left).color, activeColor: getComputedStyle(track.querySelector('[aria-current]')).color, gap: Math.abs(visible[0].getBoundingClientRect().left - r.left), snap: getComputedStyle(track).scrollSnapType };
 		})()`
-		let scrollPage = (side: 'left' | 'right') => b.evaluate(`new Promise(resolve => { let track = document.querySelector('.track'); track.addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.edge.${side}').click() })`)
-		let first = await b.evaluate(geometry)
-		expect(first.first).toBe(0)
-		expect(first.last).toBeGreaterThan(0)
-		expect(first.opacity).toBe('0.5')
-		expect(first.target).toBe(24)
-		expect(first.height).toBeGreaterThanOrEqual(44)
-		expect(first.gap).toBeLessThanOrEqual(1)
-		expect(first.snap).toBe('x') // CSSOM omits the default proximity value.
-		expect(await b.evaluate("[...document.querySelectorAll('.edge')].every(e => !/[0-9]/.test(e.textContent))")).toBe(true)
-		// Native touch scrolling moves only the strip, not the active session.
-		let swipe = await b.evaluate("(() => { let r = document.querySelector('.track').getBoundingClientRect(); return { x: r.right - 20, y: r.y + r.height / 2 } })()")
-		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [swipe] })
-		for (let i = 1; i <= 8; i++) {
-			await b.call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: swipe.x - i * 15, y: swipe.y }] })
-			await Bun.sleep(16)
-		}
-		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-		await b.evaluate("new Promise(resolve => { let track = document.querySelector('.track'), last = track.scrollLeft, still = 0; let check = () => { let now = track.scrollLeft; still = now === last ? still + 1 : 0; last = now; if (still >= 10) resolve(); else requestAnimationFrame(check); }; requestAnimationFrame(check) })")
-		await b.waitFor(`(${geometry}).scroll > 0`)
-		expect((await b.evaluate(geometry)).path).toBe(`/${ids[0]}`)
-		// Tapping the already selected tab reveals it again smoothly.
-		await b.evaluate("new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.track [aria-current]').click() })")
-		await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
-		await scrollPage('right')
-		await b.waitFor(`(${geometry}).first === ${first.last} && (${geometry}).gap <= 1`)
-		let next = await b.evaluate(geometry)
-		expect(next.path).toBe(`/${ids[0]}`)
-		expect(next.offscreen).toBe(true)
-		expect(next.border).toBe('0px')
-		expect(next.weight).toBe('700')
-		expect(next.color).toBe(next.activeColor)
-		// Urgent hidden status redraws its edge, but never recenters.
-		status.transition(ids[0]!, { type: 'submit' })
-		status.transition(ids[0]!, { type: 'end', error: 'test failure' })
-		await b.waitFor("!!document.querySelector('.edge.left .failed')")
-		expect((await b.evaluate(geometry)).scroll).toBeCloseTo(next.scroll, 0)
-		await scrollPage('left')
-		await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
-		// Select a hidden session using its native link; selection reveals it.
-		await b.evaluate("new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelectorAll('.track .tab')[10].click() })")
-		await b.waitFor(`location.pathname === '/${ids[10]}' && (${geometry}).first > 0 && (${geometry}).last >= 10 && (${geometry}).first <= 10`)
-		let centered = await b.evaluate(geometry)
-		expect(Math.abs((centered.first + centered.last) / 2 - 10)).toBeLessThanOrEqual(.5)
-		// Page all the way to the end without changing that selection.
-		for (let i = 0; i < 21; i++) {
-			let before = await b.evaluate(geometry)
-			if (before.rightDisabled) break
+			let scrollPage = (side: 'left' | 'right') =>
+				b.evaluate(
+					`new Promise(resolve => { let track = document.querySelector('.track'); track.addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.edge.${side}').click() })`,
+				)
+			let first = await b.evaluate(geometry)
+			expect(first.first).toBe(0)
+			expect(first.last).toBeGreaterThan(0)
+			expect(first.opacity).toBe('0.5')
+			expect(first.target).toBe(24)
+			expect(first.height).toBeGreaterThanOrEqual(44)
+			expect(first.gap).toBeLessThanOrEqual(1)
+			expect(first.snap).toBe('x') // CSSOM omits the default proximity value.
+			expect(await b.evaluate("[...document.querySelectorAll('.edge')].every(e => !/[0-9]/.test(e.textContent))")).toBe(
+				true,
+			)
+			// Native touch scrolling moves only the strip, not the active session.
+			let swipe = await b.evaluate(
+				"(() => { let r = document.querySelector('.track').getBoundingClientRect(); return { x: r.right - 20, y: r.y + r.height / 2 } })()",
+			)
+			await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [swipe] })
+			for (let i = 1; i <= 8; i++) {
+				await b.call('Input.dispatchTouchEvent', {
+					type: 'touchMove',
+					touchPoints: [{ x: swipe.x - i * 15, y: swipe.y }],
+				})
+				await Bun.sleep(16)
+			}
+			await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+			await b.evaluate(
+				"new Promise(resolve => { let track = document.querySelector('.track'), last = track.scrollLeft, still = 0; let check = () => { let now = track.scrollLeft; still = now === last ? still + 1 : 0; last = now; if (still >= 10) resolve(); else requestAnimationFrame(check); }; requestAnimationFrame(check) })",
+			)
+			await b.waitFor(`(${geometry}).scroll > 0`)
+			expect((await b.evaluate(geometry)).path).toBe(`/${ids[0]}`)
+			// Tapping the already selected tab reveals it again smoothly.
+			await b.evaluate(
+				"new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.track [aria-current]').click() })",
+			)
+			await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
 			await scrollPage('right')
-			await b.waitFor(`(${geometry}).first > ${before.first} && (${geometry}).gap <= 1`)
+			await b.waitFor(`(${geometry}).first === ${first.last} && (${geometry}).gap <= 1`)
+			let next = await b.evaluate(geometry)
+			expect(next.path).toBe(`/${ids[0]}`)
+			expect(next.offscreen).toBe(true)
+			expect(next.border).toBe('0px')
+			expect(next.weight).toBe('700')
+			expect(next.color).toBe(next.activeColor)
+			// Urgent hidden status redraws its edge, but never recenters.
+			status.transition(ids[0]!, { type: 'submit' })
+			status.transition(ids[0]!, { type: 'end', error: 'test failure' })
+			await b.waitFor("!!document.querySelector('.edge.left .failed')")
+			expect((await b.evaluate(geometry)).scroll).toBeCloseTo(next.scroll, 0)
+			await scrollPage('left')
+			await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
+			// Select a hidden session using its native link; selection reveals it.
+			await b.evaluate(
+				"new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelectorAll('.track .tab')[10].click() })",
+			)
+			await b.waitFor(
+				`location.pathname === '/${ids[10]}' && (${geometry}).first > 0 && (${geometry}).last >= 10 && (${geometry}).first <= 10`,
+			)
+			let centered = await b.evaluate(geometry)
+			expect(Math.abs((centered.first + centered.last) / 2 - 10)).toBeLessThanOrEqual(0.5)
+			// Page all the way to the end without changing that selection.
+			for (let i = 0; i < 21; i++) {
+				let before = await b.evaluate(geometry)
+				if (before.rightDisabled) break
+				await scrollPage('right')
+				await b.waitFor(`(${geometry}).first > ${before.first} && (${geometry}).gap <= 1`)
+			}
+			let end = await b.evaluate(geometry)
+			expect(end.rightDisabled).toBe(true)
+			expect(end.last).toBe(20)
+			expect(end.path).toBe(`/${ids[10]}`)
+		} finally {
+			await b.close()
 		}
-		let end = await b.evaluate(geometry)
-		expect(end.rightDisabled).toBe(true)
-		expect(end.last).toBe(20)
-		expect(end.path).toBe(`/${ids[10]}`)
-	} finally {
-		await b.close()
-	}
-}, 20000)
+	},
+	20000,
+)
 
-browserTest('compact status keeps two lines and opens full live details without losing the draft', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
-		let id = await b.evaluate("location.pathname.slice(1)")
-		let meta = { id, cwd: '/tmp/very-long-parent-directory/project', model: 'fake/a-very-long-model-name', name: 'A long conversation name that must not wrap on a narrow phone', createdAt: new Date().toISOString() }
-		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 17 } } } })
-		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, key: 'test' } } })
-		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
-		await b.waitFor("document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
-		await b.evaluate("let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))")
-		for (let width of [320, 390, 1024, 1600]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 760, deviceScaleFactor: 1, mobile: true })
-			await b.evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))')
-			let geometry = await b.evaluate(`(() => {
+browserTest(
+	'compact status keeps two lines and opens full live details without losing the draft',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
+			let id = await b.evaluate('location.pathname.slice(1)')
+			let meta = {
+				id,
+				cwd: '/tmp/very-long-parent-directory/project',
+				model: 'fake/a-very-long-model-name',
+				name: 'A long conversation name that must not wrap on a narrow phone',
+				createdAt: new Date().toISOString(),
+			}
+			for (let client of host.state.clients)
+				client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 17 } } } })
+			host.broadcast(meta.id, {
+				type: 'meta',
+				sessionId: meta.id,
+				meta,
+				stats: {
+					context: 85000,
+					window: 100000,
+					files: 4,
+					effort: 'medium',
+					plan: { account: 1, accounts: 1, key: 'test' },
+				},
+			})
+			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
+			await b.waitFor(
+				"document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')",
+			)
+			await b.evaluate(
+				"let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))",
+			)
+			for (let width of [320, 390, 1024, 1600]) {
+				await b.call('Emulation.setDeviceMetricsOverride', { width, height: 760, deviceScaleFactor: 1, mobile: true })
+				await b.evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))')
+				let geometry = await b.evaluate(`(() => {
 				let q = s => document.querySelector(s), r = s => q(s).getBoundingClientRect();
 				return { height: r('.overview').height, lineHeight: parseFloat(getComputedStyle(q('.overview')).lineHeight), primary: r('.primary').height, secondary: r('.secondary').height, overflow: document.documentElement.scrollWidth > innerWidth, cwd: q('.cwd').innerText, id: q('.id').checkVisibility() ? q('.id').innerText : '', windows: q('.windows').checkVisibility() ? q('.windows').innerText.replace(/\\s+/g, ' ') : '', fill: getComputedStyle(q('.model')).getPropertyValue('--fill'), duplicated: !!q('.Composer .status') };
 			})()`)
-			expect(geometry.height).toBeGreaterThanOrEqual(44)
-			expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
-			expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
-			expect(geometry.overflow).toBe(false)
-			// Full cwd at every width; only id and windows depend on room.
-			expect(geometry.cwd).toBe(meta.cwd)
-			expect(geometry.id).toBe(width < 600 ? '' : `${id}: `)
-			expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
-			expect(geometry.fill).toBe('83%')
-			expect(geometry.duplicated).toBe(false)
-			expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('⣄')
-			expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
+				expect(geometry.height).toBeGreaterThanOrEqual(44)
+				expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
+				expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
+				expect(geometry.overflow).toBe(false)
+				// Full cwd at every width; only id and windows depend on room.
+				expect(geometry.cwd).toBe(meta.cwd)
+				expect(geometry.id).toBe(width < 600 ? '' : `${id}: `)
+				expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
+				expect(geometry.fill).toBe('83%')
+				expect(geometry.duplicated).toBe(false)
+				expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('⣄')
+				expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
+			}
+			host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
+			await b.waitFor("document.querySelector('.budget').textContent === ''")
+			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
+			await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
+			// A master update alone must repaint quota on this idle view. No
+			// replacement Stats, transcript, status nodes or draft are needed.
+			await b.evaluate(
+				"window.quotaNodes = [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')]",
+			)
+			for (let client of host.state.clients)
+				client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 52 } } } })
+			await b.waitFor(
+				"document.querySelector('.windows').textContent.includes('52% used') && getComputedStyle(document.querySelector('.model')).getPropertyValue('--fill') === '48%'",
+			)
+			expect(
+				await b.evaluate(
+					"window.quotaNodes.every((n, i) => n === [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')][i])",
+				),
+			).toBe(true)
+			expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
+			// An unrelated account must not touch this status row.
+			await b.evaluate(
+				"window.quotaMutations = 0; window.quotaObserver = new MutationObserver(ms => window.quotaMutations += ms.length); window.quotaObserver.observe(document.querySelector('.StatusRow'), { subtree: true, childList: true, characterData: true, attributes: true })",
+			)
+			for (let client of host.state.clients)
+				client.deliver({ type: 'subscription-usage', accounts: { other: { '5h': { used: 99 } } } })
+			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+			expect(await b.evaluate('window.quotaMutations')).toBe(0)
+			await b.evaluate('window.quotaObserver.disconnect()')
+			await b.evaluate("document.querySelector('.details-target').focus()")
+			await b.call('Input.dispatchKeyEvent', {
+				type: 'keyDown',
+				key: 'Enter',
+				code: 'Enter',
+				windowsVirtualKeyCode: 13,
+				text: '\r',
+			})
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+			await b.waitFor("document.querySelector('.StatusDetails').open")
+			let text = await b.evaluate("document.querySelector('.StatusDetails').textContent")
+			expect(text).toContain(meta.name)
+			expect(text).toContain(meta.cwd)
+			expect(text).toContain('medium')
+			expect(text).toContain('5h 52%')
+			expect(
+				await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))"),
+			).toEqual([`/${id}/changes`, `/context/${id}`])
+			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
+			await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
+			await b.call('Input.dispatchKeyEvent', {
+				type: 'keyDown',
+				key: 'Escape',
+				code: 'Escape',
+				windowsVirtualKeyCode: 27,
+			})
+			await b.call('Input.dispatchKeyEvent', {
+				type: 'keyUp',
+				key: 'Escape',
+				code: 'Escape',
+				windowsVirtualKeyCode: 27,
+			})
+			await b.waitFor("!document.querySelector('.StatusDetails').open")
+			expect(await b.evaluate("document.activeElement === document.querySelector('.details-target')")).toBe(true)
+			expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
-		await b.waitFor("document.querySelector('.budget').textContent === ''")
-		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
-		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
-		// A master update alone must repaint quota on this idle view. No
-		// replacement Stats, transcript, status nodes or draft are needed.
-		await b.evaluate("window.quotaNodes = [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')]")
-		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 52 } } } })
-		await b.waitFor("document.querySelector('.windows').textContent.includes('52% used') && getComputedStyle(document.querySelector('.model')).getPropertyValue('--fill') === '48%'")
-		expect(await b.evaluate("window.quotaNodes.every((n, i) => n === [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')][i])")).toBe(true)
-		expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
-		// An unrelated account must not touch this status row.
-		await b.evaluate("window.quotaMutations = 0; window.quotaObserver = new MutationObserver(ms => window.quotaMutations += ms.length); window.quotaObserver.observe(document.querySelector('.StatusRow'), { subtree: true, childList: true, characterData: true, attributes: true })")
-		for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts: { other: { '5h': { used: 99 } } } })
-		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		expect(await b.evaluate('window.quotaMutations')).toBe(0)
-		await b.evaluate('window.quotaObserver.disconnect()')
-		await b.evaluate("document.querySelector('.details-target').focus()")
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
-		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
-		await b.waitFor("document.querySelector('.StatusDetails').open")
-		let text = await b.evaluate("document.querySelector('.StatusDetails').textContent")
-		expect(text).toContain(meta.name)
-		expect(text).toContain(meta.cwd)
-		expect(text).toContain('medium')
-		expect(text).toContain('5h 52%')
-		expect(await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))")).toEqual([`/${id}/changes`, `/context/${id}`])
-		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
-		await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
-		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
-		await b.waitFor("!document.querySelector('.StatusDetails').open")
-		expect(await b.evaluate("document.activeElement === document.querySelector('.details-target')")).toBe(true)
-		expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20_000)
+	},
+	20_000,
+)
 
-browserTest('mobile disabled Nudge slides behind Send without replacing the editor', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('[aria-label=\"Nudge\"]') && !document.querySelector('[aria-label=\"Nudge\"]').disabled")
-		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(1, 1); t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
-		let geometry = () => b.evaluate(`(() => {
+browserTest(
+	'mobile disabled Nudge slides behind Send without replacing the editor',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(
+				'document.querySelector(\'[aria-label="Nudge"]\') && !document.querySelector(\'[aria-label="Nudge"]\').disabled',
+			)
+			let input = (text: string) =>
+				b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(1, 1); t.dispatchEvent(new Event('input', { bubbles: true })); })()`,
+				)
+			let geometry = () =>
+				b.evaluate(`(() => {
 			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect().toJSON();
 			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled, front: document.elementFromPoint(rect('.go').x + 22, rect('.go').y + 22)?.closest('button') === q('.go'), opaque: getComputedStyle(q('.go')).backgroundColor === getComputedStyle(q('.entry')).backgroundColor };
 		})()`)
-		for (let [width, height, touch] of [[390, 760, true], [844, 390, true], [1280, 800, false]] as const) {
-			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
-			await b.waitFor(`Math.abs(document.querySelector('.App').getBoundingClientRect().height - ${height}) < 2`)
-			await input('')
-			await b.waitFor("document.querySelector('.toggle').getBoundingClientRect().right <= document.querySelector('.go').getBoundingClientRect().left + 1")
-			await b.evaluate("window.oldEditor = document.querySelector('textarea')")
-			let before = await geometry()
-			await input('draft')
-			if (touch) await b.waitFor("document.querySelector('.actions').classList.contains('tucked') && document.querySelector('.toggle').getAnimations().length === 0")
-			let after = await geometry()
-			expect(after).toMatchObject({ same: true, focused: true, cursor: 1, disabled: true })
-			if (touch) {
-				expect(after.field.width - before.field.width).toBeCloseTo(44, 0)
-				expect(after.nudge.left).toBeCloseTo(after.send.left, 0)
-				expect(after.nudge.top).toBe(after.send.top)
-				expect(after.entry.height).toBe(before.entry.height)
-				expect(after).toMatchObject({ front: true, opaque: true })
-			} else expect(after.field.width).toBe(before.field.width)
-			await input('first line\nsecond line\nthird line')
-			let tall = await geometry()
-			expect(tall.same).toBe(true)
-			if (touch) expect([tall.send.top, tall.send.bottom]).toEqual([tall.entry.top, tall.entry.bottom])
-			if (touch) {
-				let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
-				writeFileSync(`/tmp/hal-nudge-${width}.png`, Buffer.from(screenshot.result.data, 'base64'))
+			for (let [width, height, touch] of [
+				[390, 760, true],
+				[844, 390, true],
+				[1280, 800, false],
+			] as const) {
+				await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+				await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+				await b.waitFor(`Math.abs(document.querySelector('.App').getBoundingClientRect().height - ${height}) < 2`)
+				await input('')
+				await b.waitFor(
+					"document.querySelector('.toggle').getBoundingClientRect().right <= document.querySelector('.go').getBoundingClientRect().left + 1",
+				)
+				await b.evaluate("window.oldEditor = document.querySelector('textarea')")
+				let before = await geometry()
+				await input('draft')
+				if (touch)
+					await b.waitFor(
+						"document.querySelector('.actions').classList.contains('tucked') && document.querySelector('.toggle').getAnimations().length === 0",
+					)
+				let after = await geometry()
+				expect(after).toMatchObject({ same: true, focused: true, cursor: 1, disabled: true })
+				if (touch) {
+					expect(after.field.width - before.field.width).toBeCloseTo(44, 0)
+					expect(after.nudge.left).toBeCloseTo(after.send.left, 0)
+					expect(after.nudge.top).toBe(after.send.top)
+					expect(after.entry.height).toBe(before.entry.height)
+					expect(after).toMatchObject({ front: true, opaque: true })
+				} else expect(after.field.width).toBe(before.field.width)
+				await input('first line\nsecond line\nthird line')
+				let tall = await geometry()
+				expect(tall.same).toBe(true)
+				if (touch) expect([tall.send.top, tall.send.bottom]).toEqual([tall.entry.top, tall.entry.bottom])
+				if (touch) {
+					let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
+					writeFileSync(`/tmp/hal-nudge-${width}.png`, Buffer.from(screenshot.result.data, 'base64'))
+				}
 			}
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+			expect(await b.evaluate("getComputedStyle(document.querySelector('.toggle')).transitionDuration")).toBe('0s')
+		} finally {
+			await b.call('Emulation.setEmulatedMedia', { features: [] })
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
-		expect(await b.evaluate("getComputedStyle(document.querySelector('.toggle')).transitionDuration")).toBe('0s')
-	} finally {
-		await b.call('Emulation.setEmulatedMedia', { features: [] })
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20_000)
+	},
+	20_000,
+)
 
-browserTest('phone landscape shrinks chrome and bounds long drafts as the visible viewport changes', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.includes('Session ')")
-		let draft = Array.from({ length: 30 }, (_, i) => `Draft line ${i}: preserve this text`).join('\n')
-		await b.evaluate(`let t = document.querySelector('textarea'); t.value = ${JSON.stringify(draft)}; t.dispatchEvent(new Event('input', { bubbles: true }))`)
-		let geometry = (height?: number) => b.evaluate(`(() => {
+browserTest(
+	'phone landscape shrinks chrome and bounds long drafts as the visible viewport changes',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 760,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(
+				"document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.includes('Session ')",
+			)
+			let draft = Array.from({ length: 30 }, (_, i) => `Draft line ${i}: preserve this text`).join('\n')
+			await b.evaluate(
+				`let t = document.querySelector('textarea'); t.value = ${JSON.stringify(draft)}; t.dispatchEvent(new Event('input', { bubbles: true }))`,
+			)
+			let geometry = (height?: number) =>
+				b.evaluate(`(() => {
 			${height ? `document.documentElement.style.setProperty('--app-height', '${height}px');` : ''}
 			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect(), font = s => parseFloat(getComputedStyle(q(s)).fontSize);
 			return { transcriptFont: font('.Transcript'), statusFont: font('.overview'), draftFont: font('textarea'), draftHeight: rect('textarea').height, scrollable: q('textarea').scrollHeight > q('textarea').clientHeight, transcriptHeight: rect('.Transcript').height, targets: [...document.querySelectorAll('.overview, .entry button')].every(e => e.getBoundingClientRect().height >= 44), overflow: document.documentElement.scrollWidth > innerWidth, value: q('textarea').value };
 		})()`)
-		let portrait = await geometry()
-		expect(portrait.transcriptFont).toBe(14)
-		expect(portrait.statusFont).toBeGreaterThan(11)
-		expect(portrait.draftHeight).toBeGreaterThan(80)
-		for (let [width, height] of [[844, 390], [667, 375]]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
-			let landscape = await geometry()
-			expect(landscape.transcriptFont).toBe(12)
-			expect(landscape.statusFont).toBe(11)
-			expect(landscape.draftFont).toBe(16)
-			expect(landscape.draftHeight).toBeLessThanOrEqual(80)
-			expect(landscape.scrollable).toBe(true)
-			expect(landscape.transcriptHeight).toBeGreaterThan(100)
-			expect(landscape.targets).toBe(true)
-			expect(landscape.overflow).toBe(false)
-			expect(landscape.value).toBe(draft)
+			let portrait = await geometry()
+			expect(portrait.transcriptFont).toBe(14)
+			expect(portrait.statusFont).toBeGreaterThan(11)
+			expect(portrait.draftHeight).toBeGreaterThan(80)
+			for (let [width, height] of [
+				[844, 390],
+				[667, 375],
+			]) {
+				await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+				let landscape = await geometry()
+				expect(landscape.transcriptFont).toBe(12)
+				expect(landscape.statusFont).toBe(11)
+				expect(landscape.draftFont).toBe(16)
+				expect(landscape.draftHeight).toBeLessThanOrEqual(80)
+				expect(landscape.scrollable).toBe(true)
+				expect(landscape.transcriptHeight).toBeGreaterThan(100)
+				expect(landscape.targets).toBe(true)
+				expect(landscape.overflow).toBe(false)
+				expect(landscape.value).toBe(draft)
+			}
+			// Model the visible space left by a keyboard without changing the draft.
+			let keyboard = await geometry(180)
+			expect(keyboard.draftHeight).toBeLessThanOrEqual(45)
+			expect(keyboard.transcriptHeight).toBeGreaterThan(10)
+			expect(keyboard.value).toBe(draft)
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 760,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.waitFor("document.querySelector('.App').getBoundingClientRect().height >= 750")
+			expect((await geometry()).draftHeight).toBeGreaterThan(80)
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 844,
+				height: 390,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			let desktop = await geometry()
+			expect(desktop.transcriptFont).toBe(14)
+			expect(desktop.statusFont).toBe(portrait.statusFont)
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-		// Model the visible space left by a keyboard without changing the draft.
-		let keyboard = await geometry(180)
-		expect(keyboard.draftHeight).toBeLessThanOrEqual(45)
-		expect(keyboard.transcriptHeight).toBeGreaterThan(10)
-		expect(keyboard.value).toBe(draft)
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
-		await b.waitFor("document.querySelector('.App').getBoundingClientRect().height >= 750")
-		expect((await geometry()).draftHeight).toBeGreaterThan(80)
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: false })
-		let desktop = await geometry()
-		expect(desktop.transcriptFont).toBe(14)
-		expect(desktop.statusFont).toBe(portrait.statusFont)
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20000)
+	},
+	20000,
+)
 
 browserTest('touch tab navigation does not focus the composer', async () => {
 	providerHome()
@@ -1178,12 +1505,16 @@ browserTest('touch tab navigation does not focus the composer', async () => {
 		let first = await b.evaluate('location.pathname')
 		// A question owns focus in this tab. Leaving it used to refocus the
 		// composer as soon as the next tab had no question.
-		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/cd ${home}/missing'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		await b.evaluate(
+			`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/cd ${home}/missing'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,
+		)
 		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(true)
 		await b.evaluate(`document.querySelector('.Composer .actions .go').click()`)
 		await b.waitFor(`document.querySelector('textarea').disabled`)
 		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
-		await b.waitFor(`location.pathname !== '${first}' && document.querySelector('textarea') && !document.querySelector('textarea').disabled`)
+		await b.waitFor(
+			`location.pathname !== '${first}' && document.querySelector('textarea') && !document.querySelector('textarea').disabled`,
+		)
 		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(false)
 		let second = await b.evaluate('location.pathname')
 		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${first}"]').click()`)
@@ -1203,267 +1534,433 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 	let id = sessions.create({ cwd: home, model: 'anthropic/claude-opus-5-5' }).id
 	let url = `https://example.com/oauth?state=a_b&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=${'user%3Aprofile+'.repeat(30)}#fragment`
 	let text = `Open (${url}).\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
-	history.append(id, { type: 'question', id: 'q-links', form: { text, fields: [{ type: 'text', name: 'code' }, { type: 'choice', name: 'mode', options: ['Continue', 'Cancel'] }] }, from: { command: 'login', args: '' } })
+	history.append(id, {
+		type: 'question',
+		id: 'q-links',
+		form: {
+			text,
+			fields: [
+				{ type: 'text', name: 'code' },
+				{ type: 'choice', name: 'mode', options: ['Continue', 'Cancel'] },
+			],
+		},
+		from: { command: 'login', args: '' },
+	})
 	let b = await browser()
 	try {
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`!!document.querySelector('.Question .label a')`)
-		let link = await b.evaluate(`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`)
+		let link = await b.evaluate(
+			`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`,
+		)
 		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text, links: 2, scripts: 0 })
 		for (let width of [390, 1280]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: width === 390,
+			})
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
-			expect(await b.evaluate(`(() => { let q = document.querySelector('.Question'); return q.scrollWidth <= q.clientWidth && document.documentElement.scrollWidth <= innerWidth })()`)).toBe(true)
+			expect(
+				await b.evaluate(
+					`(() => { let q = document.querySelector('.Question'); return q.scrollWidth <= q.clientWidth && document.documentElement.scrollWidth <= innerWidth })()`,
+				),
+			).toBe(true)
 			// A wrapped question continues at the left edge, under its time, as in the terminal.
-			expect(await b.evaluate(`(() => { let h = document.querySelector('.Question .CardHeader'), rects = [...h.querySelector('.title .label').getClientRects()]; return Math.abs(rects.at(-1).left - h.querySelector('.stamp').getBoundingClientRect().left) })()`)).toBeLessThanOrEqual(1)
+			expect(
+				await b.evaluate(
+					`(() => { let h = document.querySelector('.Question .CardHeader'), rects = [...h.querySelector('.title .label').getClientRects()]; return Math.abs(rects.at(-1).left - h.querySelector('.stamp').getBoundingClientRect().left) })()`,
+				),
+			).toBeLessThanOrEqual(1)
 		}
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 		await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
-		expect(await b.evaluate(`[...document.querySelectorAll('.Question button')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)`)).toBe(true)
+		expect(
+			await b.evaluate(
+				`[...document.querySelectorAll('.Question button')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)`,
+			),
+		).toBe(true)
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.evaluate(`document.querySelector('.Question input').focus()`)
 		for (let selector of ['a.link', '.dismiss', '.label a']) {
-			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
-			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
+			await b.call('Input.dispatchKeyEvent', {
+				type: 'keyDown',
+				key: 'Tab',
+				code: 'Tab',
+				windowsVirtualKeyCode: 9,
+				modifiers: 8,
+			})
+			await b.call('Input.dispatchKeyEvent', {
+				type: 'keyUp',
+				key: 'Tab',
+				code: 'Tab',
+				windowsVirtualKeyCode: 9,
+				modifiers: 8,
+			})
 			expect(await b.evaluate(`document.activeElement === document.querySelector('.Question ${selector}')`)).toBe(true)
 		}
-		expect(history.readSync(id).some(r => r.type === 'answer')).toBe(false)
+		expect(history.readSync(id).some((r) => r.type === 'answer')).toBe(false)
 	} finally {
 		await b.close()
 	}
 })
 
-browserTest('manual reload notice preserves the draft and command actions stay distinct from steering', async () => {
-	providerHome()
-	let id = tabs.create('/tmp')
-	let finish = () => {}
-	turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
-		yield { type: 'text', text: 'Still working' }
-		await new Promise<void>((resolve) => { finish = resolve })
-		yield { type: 'done', reason: 'end' }
-	})()
-	let b = await browser()
-	let build = web.build
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
-		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
-		let actions = () => b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => b.getAttribute('aria-label') ?? b.textContent)")
-		// Idle with an empty draft: Play is enabled, even before an answer (task yhn).
-		expect(await b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])")).toEqual([['Nudge', false], ['Send', true]])
-		await input('start')
-		await b.evaluate("document.querySelector('.Composer .actions .go').click()")
-		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
-		await input('later')
-		expect(await actions()).toEqual(['Pause (Esc)', 'Queue', 'Steer'])
-		// Named buttons (task 02s) keep 44px targets and fit the 390px row.
-		let fit = await b.evaluate("(() => { let rs = [...document.querySelectorAll('.Composer .actions button')].map(b => b.getBoundingClientRect()); return { small: Math.min(...rs.map(r => Math.min(r.width, r.height))), right: Math.max(...rs.map(r => r.right)), width: document.documentElement.clientWidth, names: [...document.querySelectorAll('.Composer .actions small')].map(s => s.textContent) } })()")
-		expect(fit.names).toEqual(['Pause', 'Queue', 'Steer'])
-		expect(fit.small).toBeGreaterThanOrEqual(44)
-		expect(fit.right).toBeLessThanOrEqual(fit.width)
-		await input('/model')
-		expect(await actions()).toEqual(['Pause (Esc)', 'Run'])
-		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('alt+enter')")).toBe(false)
-		await input('draft stays put')
-		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea'); window.__transcriptRect = document.querySelector('.Transcript').getBoundingClientRect().toJSON()")
-		let page = await web.state.page!
-		web.build = async () => ({ html: page.html.replace(`data-version="${page.version}"`, 'data-version="updated"'), version: 'updated' })
-		await web.refresh()
-		await b.waitFor("document.querySelector('.source-update button')?.textContent === 'reload'")
-		let geometry = await b.evaluate(`(() => {
+browserTest(
+	'manual reload notice preserves the draft and command actions stay distinct from steering',
+	async () => {
+		providerHome()
+		let id = tabs.create('/tmp')
+		let finish = () => {}
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				yield { type: 'text', text: 'Still working' }
+				await new Promise<void>((resolve) => {
+					finish = resolve
+				})
+				yield { type: 'done', reason: 'end' }
+			})()
+		let b = await browser()
+		let build = web.build
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 760,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
+			let input = (text: string) =>
+				b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`,
+				)
+			let actions = () =>
+				b.evaluate(
+					"[...document.querySelectorAll('.Composer .actions button')].map(b => b.getAttribute('aria-label') ?? b.textContent)",
+				)
+			// Idle with an empty draft: Play is enabled, even before an answer (task yhn).
+			expect(
+				await b.evaluate(
+					"[...document.querySelectorAll('.Composer .actions button')].map(b => [b.getAttribute('aria-label'), b.disabled])",
+				),
+			).toEqual([
+				['Nudge', false],
+				['Send', true],
+			])
+			await input('start')
+			await b.evaluate("document.querySelector('.Composer .actions .go').click()")
+			await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
+			await input('later')
+			expect(await actions()).toEqual(['Pause (Esc)', 'Queue', 'Steer'])
+			// Named buttons (task 02s) keep 44px targets and fit the 390px row.
+			let fit = await b.evaluate(
+				"(() => { let rs = [...document.querySelectorAll('.Composer .actions button')].map(b => b.getBoundingClientRect()); return { small: Math.min(...rs.map(r => Math.min(r.width, r.height))), right: Math.max(...rs.map(r => r.right)), width: document.documentElement.clientWidth, names: [...document.querySelectorAll('.Composer .actions small')].map(s => s.textContent) } })()",
+			)
+			expect(fit.names).toEqual(['Pause', 'Queue', 'Steer'])
+			expect(fit.small).toBeGreaterThanOrEqual(44)
+			expect(fit.right).toBeLessThanOrEqual(fit.width)
+			await input('/model')
+			expect(await actions()).toEqual(['Pause (Esc)', 'Run'])
+			expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('alt+enter')")).toBe(
+				false,
+			)
+			await input('draft stays put')
+			await b.evaluate(
+				"document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea'); window.__transcriptRect = document.querySelector('.Transcript').getBoundingClientRect().toJSON()",
+			)
+			let page = await web.state.page!
+			web.build = async () => ({
+				html: page.html.replace(`data-version="${page.version}"`, 'data-version="updated"'),
+				version: 'updated',
+			})
+			await web.refresh()
+			await b.waitFor("document.querySelector('.source-update button')?.textContent === 'reload'")
+			let geometry = await b.evaluate(`(() => {
 			let button = document.querySelector('.source-update button'), r = button.getBoundingClientRect(), tabs = document.querySelector('.Tabs').getBoundingClientRect();
 			let transcript = document.querySelector('.Transcript').getBoundingClientRect();
 			return { unchanged: transcript.top === window.__transcriptRect.top && transcript.height === window.__transcriptRect.height, overlay: r.top >= transcript.top && r.bottom <= transcript.bottom, background: getComputedStyle(button).backgroundColor, anchor: document.querySelector('.source-update').getBoundingClientRect().height, font: getComputedStyle(button).fontSize, border: getComputedStyle(button).borderTopWidth, height: r.height, width: r.width, clear: r.top >= tabs.bottom, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
 		})()`)
-		expect(geometry).toMatchObject({ unchanged: true, overlay: true, anchor: 0, font: '16px', border: '0px', clear: true, focused: true, same: true, draft: 'draft stays put' })
-		expect(geometry.background).toContain('0.75')
-		expect(geometry.height).toBeGreaterThanOrEqual(24)
-		expect(geometry.width).toBeGreaterThanOrEqual(44)
-		// A second rebuild keeps one persistent notice and the same page.
-		await web.refresh()
-		expect(await b.evaluate("document.querySelectorAll('.source-update').length")).toBe(1)
-		finish()
-		await b.waitFor("document.querySelector('.activity').textContent.includes('idle')")
-		await input('/help')
-		expect(await actions()).toEqual(['Nudge', 'Run'])
-		await input('draft stays put')
-		await b.evaluate("document.querySelector('.source-update button').click()")
-		await b.waitFor("!window.__beforeUpdate && document.querySelector('textarea')?.value === 'draft stays put'")
-		expect(await b.evaluate("document.querySelector('.source-update') === null")).toBe(true)
-	} finally {
-		finish()
-		web.build = build
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20000)
+			expect(geometry).toMatchObject({
+				unchanged: true,
+				overlay: true,
+				anchor: 0,
+				font: '16px',
+				border: '0px',
+				clear: true,
+				focused: true,
+				same: true,
+				draft: 'draft stays put',
+			})
+			expect(geometry.background).toContain('0.75')
+			expect(geometry.height).toBeGreaterThanOrEqual(24)
+			expect(geometry.width).toBeGreaterThanOrEqual(44)
+			// A second rebuild keeps one persistent notice and the same page.
+			await web.refresh()
+			expect(await b.evaluate("document.querySelectorAll('.source-update').length")).toBe(1)
+			finish()
+			await b.waitFor("document.querySelector('.activity').textContent.includes('idle')")
+			await input('/help')
+			expect(await actions()).toEqual(['Nudge', 'Run'])
+			await input('draft stays put')
+			await b.evaluate("document.querySelector('.source-update button').click()")
+			await b.waitFor("!window.__beforeUpdate && document.querySelector('textarea')?.value === 'draft stays put'")
+			expect(await b.evaluate("document.querySelector('.source-update') === null")).toBe(true)
+		} finally {
+			finish()
+			web.build = build
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
+		}
+	},
+	20000,
+)
 
-browserTest('completion dismissal follows pointer and focus without stealing choice clicks or Enter', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		let type = async (text: string) => {
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		}
-		let open = async () => {
-			await type('')
-			await type('/c')
-			await b.waitFor(`!!document.querySelector('.completions')`)
-		}
-		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
-		await open()
-		let choice = await b.evaluate(`document.querySelector('.completions button strong').textContent + ' '`)
-		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
-		await press('Enter')
-		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
-		await open()
-		// Keyboard focus within the popup must retain it until the click.
-		await b.evaluate(`document.querySelector('.completions button').focus()`)
-		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(true)
-		await b.evaluate(`document.activeElement.click()`)
-		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
-		// Model Safari's button default: blur the editor without focusing
-		// the option. Canceled gestures must retain both menu and draft.
-		for (let pointerType of ['mouse', 'touch']) {
+browserTest(
+	'completion dismissal follows pointer and focus without stealing choice clicks or Enter',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			let type = async (text: string) => {
+				await b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,
+				)
+			}
+			let open = async () => {
+				await type('')
+				await type('/c')
+				await b.waitFor(`!!document.querySelector('.completions')`)
+			}
+			let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
 			await open()
-			let retained = await b.evaluate(`(() => {
+			let choice = await b.evaluate(`document.querySelector('.completions button strong').textContent + ' '`)
+			expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
+			await press('Enter')
+			await b.waitFor(`!document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
+			await open()
+			// Keyboard focus within the popup must retain it until the click.
+			await b.evaluate(`document.querySelector('.completions button').focus()`)
+			expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(true)
+			await b.evaluate(`document.activeElement.click()`)
+			await b.waitFor(`!document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
+			// Model Safari's button default: blur the editor without focusing
+			// the option. Canceled gestures must retain both menu and draft.
+			for (let pointerType of ['mouse', 'touch']) {
+				await open()
+				let retained = await b.evaluate(`(() => {
 				let box = document.querySelector('textarea'), row = document.querySelector('.completions button');
 				if (row.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: '${pointerType}' }))) box.blur();
 				row.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: '${pointerType}' }));
 				return { focused: document.activeElement === box, menu: row.isConnected, text: box.value };
 			})()`)
-			expect(retained).toEqual({ focused: true, menu: true, text: '/c' })
-		}
-		// A real touch tap still produces click after pointerdown cancellation.
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await open()
-		let point = await b.evaluate(`(() => { let r = document.querySelector('.completions button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
-		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea') && !!document.querySelector('.completions')`)).toBe(true)
-		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-		await b.waitFor(`!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
-		expect(history.readSync(await b.evaluate(`location.pathname.slice(1)`)).some(r => r.type === 'user')).toBe(false)
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		for (let action of [
-			`document.querySelector('[aria-label="Attach file"]').focus()`,
-			`document.querySelector('textarea').blur()`,
-			`document.querySelector('.Transcript').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))`,
-		]) {
+				expect(retained).toEqual({ focused: true, menu: true, text: '/c' })
+			}
+			// A real touch tap still produces click after pointerdown cancellation.
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await open()
-			await b.evaluate(action)
+			let point = await b.evaluate(
+				`(() => { let r = document.querySelector('.completions button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`,
+			)
+			await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+			expect(
+				await b.evaluate(
+					`document.activeElement === document.querySelector('textarea') && !!document.querySelector('.completions')`,
+				),
+			).toBe(true)
+			await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
 			await b.waitFor(`!document.querySelector('.completions')`)
-			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/c')
-		}
-		// Departure before the host reply must also suppress it.
-		await type('')
-		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); document.querySelector('[aria-label="Attach file"]').focus() })()`)
-		await Bun.sleep(100)
-		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(false)
-		expect(await b.evaluate(`document.activeElement.getAttribute('aria-label')`)).toBe('Attach file')
-		// Exact restart commands offer described scopes without changing Enter.
-		for (let width of [390, 1280]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			for (let text of ['/restart', '/restart ']) {
-				await type(text)
-				await b.waitFor(`document.querySelectorAll('.completions button').length === 4`)
-				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
-				expect(await b.evaluate(`document.querySelector('.completions button').textContent`)).toContain('(default)')
-				expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
-				let bounds = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: innerWidth }; })()`)
-				expect(bounds.left).toBeGreaterThanOrEqual(0)
-				expect(bounds.right).toBeLessThanOrEqual(bounds.width)
-				expect(bounds.top).toBeGreaterThanOrEqual(0)
-				await press('Tab')
-				await b.waitFor(`document.querySelector('textarea').value === '/restart all' && !document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(choice)
+			expect(history.readSync(await b.evaluate(`location.pathname.slice(1)`)).some((r) => r.type === 'user')).toBe(
+				false,
+			)
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			for (let action of [
+				`document.querySelector('[aria-label="Attach file"]').focus()`,
+				`document.querySelector('textarea').blur()`,
+				`document.querySelector('.Transcript').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))`,
+			]) {
+				await open()
+				await b.evaluate(action)
+				await b.waitFor(`!document.querySelector('.completions')`)
+				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/c')
 			}
-		}
-		await type('/version')
-		await b.waitFor(`!!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
-		await press('Enter')
-		await b.waitFor(`document.querySelector('textarea').value === ''`)
-	} finally { await b.close() }
-}, 15000)
-
-
-browserTest('EDIT statistics preserve readable closed titles and full-width open titles', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let ts = new Date().toISOString()
-	for (let [name, path, marks] of [['short', 'a.ts', [29]], ['long', 'src/host/file-changes.ts', [6, 25, 28, 31, 37, 42, 59, 71, 100, 120]]] as const) {
-		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name, name: 'edit', input: { path } }, ts })
-		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name, output: 'Edited', diff: marks.map(n => `-${n} old\n+${n} new`).join('\n') }], ts })
-	}
-	history.append(id, { type: 'turn_end', status: 'completed', usage: {}, ts })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.Card.tool .status.diff').length === 2`)
-		for (let [width, height] of [[320, 760], [390, 800], [844, 390], [1200, 800]]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width! < 900 })
-			for (let open of [false, true]) {
-				if (open) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
-				await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
-				let rows = await b.evaluate(`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector('.status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector('.status').textContent, title: h.querySelector('.title').textContent }; })`)
-				for (let row of rows) {
-					expect(row.fits).toBe(true)
-					expect(row.stampFits).toBe(true)
-					expect(row.linkClear).toBe(true)
-					if (open) { expect(row.separated).toBe(true); expect(row.flowWidth).toBeGreaterThan(width! / 2) }
-					else { expect(row.flowWidth).toBeGreaterThan(row.statusWidth); expect(row.rowHeight).toBe(44) }
+			// Departure before the host reply must also suppress it.
+			await type('')
+			await b.evaluate(
+				`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); document.querySelector('[aria-label="Attach file"]').focus() })()`,
+			)
+			await Bun.sleep(100)
+			expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(false)
+			expect(await b.evaluate(`document.activeElement.getAttribute('aria-label')`)).toBe('Attach file')
+			// Exact restart commands offer described scopes without changing Enter.
+			for (let width of [390, 1280]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				for (let text of ['/restart', '/restart ']) {
+					await type(text)
+					await b.waitFor(`document.querySelectorAll('.completions button').length === 4`)
+					expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
+					expect(await b.evaluate(`document.querySelector('.completions button').textContent`)).toContain('(default)')
+					expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
+					let bounds = await b.evaluate(
+						`(() => { let r = document.querySelector('.completions').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: innerWidth }; })()`,
+					)
+					expect(bounds.left).toBeGreaterThanOrEqual(0)
+					expect(bounds.right).toBeLessThanOrEqual(bounds.width)
+					expect(bounds.top).toBeGreaterThanOrEqual(0)
+					await press('Tab')
+					await b.waitFor(
+						`document.querySelector('textarea').value === '/restart all' && !document.querySelector('.completions')`,
+					)
 				}
-				expect(rows[1].stats).toContain('120')
 			}
-			await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+			await type('/version')
+			await b.waitFor(`!!document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
+			await press('Enter')
+			await b.waitFor(`document.querySelector('textarea').value === ''`)
+		} finally {
+			await b.close()
 		}
-	} finally { await b.close() }
-}, 15000)
+	},
+	15000,
+)
+
+browserTest(
+	'EDIT statistics preserve readable closed titles and full-width open titles',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		let ts = new Date().toISOString()
+		for (let [name, path, marks] of [
+			['short', 'a.ts', [29]],
+			['long', 'src/host/file-changes.ts', [6, 25, 28, 31, 37, 42, 59, 71, 100, 120]],
+		] as const) {
+			history.append(id, {
+				type: 'assistant',
+				block: { type: 'tool_call', id: name, name: 'edit', input: { path } },
+				ts,
+			})
+			history.append(id, {
+				type: 'user',
+				blocks: [
+					{
+						type: 'tool_result',
+						id: name,
+						output: 'Edited',
+						diff: marks.map((n) => `-${n} old\n+${n} new`).join('\n'),
+					},
+				],
+				ts,
+			})
+		}
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {}, ts })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('.Card.tool .status.diff').length === 2`)
+			for (let [width, height] of [
+				[320, 760],
+				[390, 800],
+				[844, 390],
+				[1200, 800],
+			]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height,
+					deviceScaleFactor: 1,
+					mobile: width! < 900,
+				})
+				for (let open of [false, true]) {
+					if (open) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+					await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+					let rows = await b.evaluate(
+						`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector('.status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector('.status').textContent, title: h.querySelector('.title').textContent }; })`,
+					)
+					for (let row of rows) {
+						expect(row.fits).toBe(true)
+						expect(row.stampFits).toBe(true)
+						expect(row.linkClear).toBe(true)
+						if (open) {
+							expect(row.separated).toBe(true)
+							expect(row.flowWidth).toBeGreaterThan(width! / 2)
+						} else {
+							expect(row.flowWidth).toBeGreaterThan(row.statusWidth)
+							expect(row.rowHeight).toBe(44)
+						}
+					}
+					expect(rows[1].stats).toContain('120')
+				}
+				await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
+			}
+		} finally {
+			await b.close()
+		}
+	},
+	15000,
+)
 
 // Selection belongs to the browser: tests may inspect it; rendering must not.
-browserTest('streaming preserves native selection and Markdown text nodes without holding updates', async () => {
-	providerHome()
-	let b = await browser(), release = () => {}
-	try {
-		await server.serve()
-		web.start()
-		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-		tabs.insert(id, 0)
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
-		for (let [seed, delta, selector] of [
-			['alpha bravo', ' charlie', '.line span span'],
-			['alpha bravo\n\nLater paragraph', ' charlie', '.line span span'],
-			['**alpha bravo', ' charlie**', '.b'],
-			['```txt\nalpha bravo', ' charlie\n```', 'code'],
-			['https://example.com/alpha', '/bravo', '.Markdown a'],
-			['| Name | Value |\n|---|---|\n| alpha | bravo |\n| charlie', ' | delta |\n\nnext', 'td span'],
-		]) {
-			let advance = () => {}, gate = new Promise<void>((r) => { advance = r })
-			let finish = new Promise<void>((r) => { release = r })
-			turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
-				yield { type: 'text', text: seed! }
-				await gate
-				yield { type: 'text', text: delta! }
-				await finish
-				yield { type: 'done', reason: 'end' }
-			})()
-			await b.waitFor(`getSelection().removeAllRanges(); (() => { let t = document.querySelector('textarea'); t.value = 'selection'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
-			await b.waitFor(`!![...document.querySelectorAll('.Card.assistant')].at(-1)?.querySelector('.cursor')`)
-			await b.evaluate(`(() => {
+browserTest(
+	'streaming preserves native selection and Markdown text nodes without holding updates',
+	async () => {
+		providerHome()
+		let b = await browser(),
+			release = () => {}
+		try {
+			await server.serve()
+			web.start()
+			let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+			tabs.insert(id, 0)
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+			for (let [seed, delta, selector] of [
+				['alpha bravo', ' charlie', '.line span span'],
+				['alpha bravo\n\nLater paragraph', ' charlie', '.line span span'],
+				['**alpha bravo', ' charlie**', '.b'],
+				['```txt\nalpha bravo', ' charlie\n```', 'code'],
+				['https://example.com/alpha', '/bravo', '.Markdown a'],
+				['| Name | Value |\n|---|---|\n| alpha | bravo |\n| charlie', ' | delta |\n\nnext', 'td span'],
+			]) {
+				let advance = () => {},
+					gate = new Promise<void>((r) => {
+						advance = r
+					})
+				let finish = new Promise<void>((r) => {
+					release = r
+				})
+				turns.stream = () =>
+					(async function* (): AsyncGenerator<StreamEvent> {
+						yield { type: 'text', text: seed! }
+						await gate
+						yield { type: 'text', text: delta! }
+						await finish
+						yield { type: 'done', reason: 'end' }
+					})()
+				await b.waitFor(
+					`getSelection().removeAllRanges(); (() => { let t = document.querySelector('textarea'); t.value = 'selection'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
+				)
+				await b.waitFor(`!![...document.querySelectorAll('.Card.assistant')].at(-1)?.querySelector('.cursor')`)
+				await b.evaluate(`(() => {
 				let root = [...document.querySelectorAll('.Card.assistant')].at(-1)
 				window.selectedElement = root.querySelector(${JSON.stringify(selector)})
 				window.selectedNode = selectedElement.firstChild
@@ -1471,24 +1968,29 @@ browserTest('streaming preserves native selection and Markdown text nodes withou
 				getSelection().removeAllRanges(); getSelection().addRange(range)
 				window.selectedText = getSelection().toString()
 			})()`)
-			let check = () => b.evaluate(`(() => {
+				let check = () =>
+					b.evaluate(`(() => {
 				let s = getSelection(), r = s.getRangeAt(0)
 				return { element: selectedElement.isConnected, node: selectedElement.firstChild === selectedNode,
 					start: r.startContainer === selectedNode && r.startOffset === 1,
 					end: r.endContainer === selectedNode && r.endOffset === 4, text: s.toString() === selectedText }
 			})()`)
-			advance()
-			await b.waitFor(`[...document.querySelectorAll('.Card.assistant')].at(-1)?.innerText.includes(${JSON.stringify(selector === 'td span' ? 'delta' : delta!.includes('charlie') ? 'charlie' : '/bravo')})`)
-			expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+				advance()
+				await b.waitFor(
+					`[...document.querySelectorAll('.Card.assistant')].at(-1)?.innerText.includes(${JSON.stringify(selector === 'td span' ? 'delta' : delta!.includes('charlie') ? 'charlie' : '/bravo')})`,
+				)
+				expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+				release()
+				await b.waitFor(`!!document.querySelector('.cursor-line')`)
+				expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+			}
+		} finally {
 			release()
-			await b.waitFor(`!!document.querySelector('.cursor-line')`)
-			expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+			await b.close()
 		}
-	} finally {
-		release()
-		await b.close()
-	}
-}, 20000)
+	},
+	20000,
+)
 
 // A reader scrolled up with everything selected (Cmd+A) while Hal
 // streams 80 rows: no update may remove a shown node, move the focus,
@@ -1503,15 +2005,23 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 		web.start()
 		let id = tabs.create('/tmp')
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
+		await b.call('Emulation.setDeviceMetricsOverride', {
+			width: 1200,
+			height: 800,
+			deviceScaleFactor: 1,
+			mobile: false,
+		})
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
-		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
-			for (let i = 0; i < 40; i++) yield { type: 'text', text: `Line ${i} text.\n\n` }
-			yield { type: 'done', reason: 'end' }
-		})()
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				for (let i = 0; i < 40; i++) yield { type: 'text', text: `Line ${i} text.\n\n` }
+				yield { type: 'done', reason: 'end' }
+			})()
 		let atBottom = `(() => { let t = document.querySelector('.Transcript'); return t.scrollHeight - t.clientHeight - t.scrollTop <= 1 })()`
-		await b.waitFor(`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+		await b.waitFor(
+			`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
+		)
 		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle') && ${atBottom}`)
 		// Let the turn's last redraw land, so nothing else pulls the view.
 		await b.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`)
@@ -1523,9 +2033,13 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 			requestAnimationFrame(() => requestAnimationFrame(() => r(${atBottom})))
 		})`)
 		expect(grown).toBe(true)
-		let point = await b.evaluate(`(() => { let r = document.querySelector('.Transcript').getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 } })()`)
+		let point = await b.evaluate(
+			`(() => { let r = document.querySelector('.Transcript').getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 } })()`,
+		)
 		let grow = async () => {
-			await b.evaluate(`(() => { let c = document.querySelector('.Transcript > .Card:last-of-type'); c.style.minHeight = (c.getBoundingClientRect().height + 200) + 'px' })()`)
+			await b.evaluate(
+				`(() => { let c = document.querySelector('.Transcript > .Card:last-of-type'); c.style.minHeight = (c.getBoundingClientRect().height + 200) + 'px' })()`,
+			)
 			await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 			expect(await b.evaluate(atBottom)).toBe(true)
 		}
@@ -1572,80 +2086,105 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 
 // Task rha: items landing above a queued message must not push it down
 // and glide it back; a bottom reader sees it stay put.
-browserTest('a queued message at the bottom stays still while replies stream above it', async () => {
-	providerHome()
-	let b = await browser(), release = () => {}, finish = () => {}
-	try {
-		await server.serve()
-		web.start()
-		let id = tabs.create('/tmp')
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 1000, height: 600, deviceScaleFactor: 1, mobile: false })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
-		let go = new Promise<void>((r) => { release = r })
-		let end = new Promise<void>((r) => { finish = r })
-		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
-			// Enough to scroll: the queued card sits at the bottom.
-			for (let i = 0; i < 30; i++) yield { type: 'text', text: `Start ${i}.\n\n` }
-			yield { type: 'text', text: 'Starting.\n\n' }
-			await go
-			for (let i = 0; i < 30; i++) {
-				yield { type: i % 2 ? 'text' : 'thinking', text: `Line ${i} text.\n\n` }
-				await Bun.sleep(40)
-			}
-			await end
-			yield { type: 'done', reason: 'end' }
-		})()
-		let send = (text: string, alt: boolean) => `(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', altKey: ${alt}, bubbles: true })); return !document.querySelector('#notice').textContent })()`
-		await b.waitFor(send('go', false))
-		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Starting.')`)
-		await b.evaluate(send('later', true))
-		await b.waitFor(`!!document.querySelector('.Card.queued') && !document.querySelector('.Card.pending')`)
-		await Bun.sleep(400)
-		await b.evaluate(`(() => {
+browserTest(
+	'a queued message at the bottom stays still while replies stream above it',
+	async () => {
+		providerHome()
+		let b = await browser(),
+			release = () => {},
+			finish = () => {}
+		try {
+			await server.serve()
+			web.start()
+			let id = tabs.create('/tmp')
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 1000,
+				height: 600,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+			let go = new Promise<void>((r) => {
+				release = r
+			})
+			let end = new Promise<void>((r) => {
+				finish = r
+			})
+			turns.stream = () =>
+				(async function* (): AsyncGenerator<StreamEvent> {
+					// Enough to scroll: the queued card sits at the bottom.
+					for (let i = 0; i < 30; i++) yield { type: 'text', text: `Start ${i}.\n\n` }
+					yield { type: 'text', text: 'Starting.\n\n' }
+					await go
+					for (let i = 0; i < 30; i++) {
+						yield { type: i % 2 ? 'text' : 'thinking', text: `Line ${i} text.\n\n` }
+						await Bun.sleep(40)
+					}
+					await end
+					yield { type: 'done', reason: 'end' }
+				})()
+			let send = (text: string, alt: boolean) =>
+				`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', altKey: ${alt}, bubbles: true })); return !document.querySelector('#notice').textContent })()`
+			await b.waitFor(send('go', false))
+			await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Starting.')`)
+			await b.evaluate(send('later', true))
+			await b.waitFor(`!!document.querySelector('.Card.queued') && !document.querySelector('.Card.pending')`)
+			await Bun.sleep(400)
+			await b.evaluate(`(() => {
 			window.tops = []
 			let frame = () => { let c = document.querySelector('.Card.queued'); if (c) { tops.push(Math.round(c.getBoundingClientRect().top)); requestAnimationFrame(frame) } }
 			requestAnimationFrame(frame)
 		})()`)
-		release()
-		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 29 ')`)
-		await Bun.sleep(200)
-		// Before the turn ends: then the queued message is delivered.
-		let tops = await b.evaluate(`[...new Set(tops)]`)
-		expect(tops).toHaveLength(1)
-	} finally {
-		release()
-		finish()
-		await b.close()
-	}
-}, 20000)
+			release()
+			await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 29 ')`)
+			await Bun.sleep(200)
+			// Before the turn ends: then the queued message is delivered.
+			let tops = await b.evaluate(`[...new Set(tops)]`)
+			expect(tops).toHaveLength(1)
+		} finally {
+			release()
+			finish()
+			await b.close()
+		}
+	},
+	20000,
+)
 
-browserTest('a select-all survives seconds of streaming untouched', async () => {
-	providerHome()
-	let b = await browser(), release = () => {}
-	try {
-		await server.serve()
-		web.start()
-		let id = tabs.create('/tmp')
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
-		let finish = new Promise<void>((r) => { release = r })
-		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
-			yield { type: 'thinking', text: 'planning' }
-			// Alternating kinds make 80 rows, past the 40 a tab first shows.
-			for (let i = 0; i < 40; i++) {
-				yield { type: 'thinking', text: `step ${i}` }
-				yield { type: 'text', text: `Line ${i} **bold** and \`code\`.\n\n` }
-				await Bun.sleep(75)
-			}
-			await finish
-			yield { type: 'done', reason: 'end' }
-		})()
-		await b.waitFor(`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
-		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 8 ')`)
-		await b.evaluate(`(() => {
+browserTest(
+	'a select-all survives seconds of streaming untouched',
+	async () => {
+		providerHome()
+		let b = await browser(),
+			release = () => {}
+		try {
+			await server.serve()
+			web.start()
+			let id = tabs.create('/tmp')
+			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Page.navigate', { url: `${base()}/${id}` })
+			await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+			let finish = new Promise<void>((r) => {
+				release = r
+			})
+			turns.stream = () =>
+				(async function* (): AsyncGenerator<StreamEvent> {
+					yield { type: 'thinking', text: 'planning' }
+					// Alternating kinds make 80 rows, past the 40 a tab first shows.
+					for (let i = 0; i < 40; i++) {
+						yield { type: 'thinking', text: `step ${i}` }
+						yield { type: 'text', text: `Line ${i} **bold** and \`code\`.\n\n` }
+						await Bun.sleep(75)
+					}
+					await finish
+					yield { type: 'done', reason: 'end' }
+				})()
+			await b.waitFor(
+				`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
+			)
+			await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 8 ')`)
+			await b.evaluate(`(() => {
 			window.events = []
 			let t = document.querySelector('.Transcript')
 			let streaming = () => [...document.querySelectorAll('.Card.assistant')].at(-1)
@@ -1665,46 +2204,80 @@ browserTest('a select-all survives seconds of streaming untouched', async () => 
 			getSelection().selectAllChildren(document.body)
 			window.length0 = getSelection().toString().length
 		})()`)
-		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 39 ')`)
-		release()
-		await b.waitFor(`!!document.querySelector('.cursor-line')`)
-		await Bun.sleep(300)
-		let out = await b.evaluate(`({ events: [...new Set(events)], scrolls: [...new Set(scrolls)], collapsed: getSelection().isCollapsed, grew: getSelection().toString().length >= length0 })`)
-		expect(out).toEqual({ events: [], scrolls: [0], collapsed: false, grew: true })
-	} finally {
-		release()
-		await b.close()
-	}
-}, 20000)
+			await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 39 ')`)
+			release()
+			await b.waitFor(`!!document.querySelector('.cursor-line')`)
+			await Bun.sleep(300)
+			let out = await b.evaluate(
+				`({ events: [...new Set(events)], scrolls: [...new Set(scrolls)], collapsed: getSelection().isCollapsed, grew: getSelection().toString().length >= length0 })`,
+			)
+			expect(out).toEqual({ events: [], scrolls: [0], collapsed: false, grew: true })
+		} finally {
+			release()
+			await b.close()
+		}
+	},
+	20000,
+)
 
 test('/logout targets every socket of one login, persists refusal, and leaves other logins connected', async () => {
-	await server.serve(); web.start()
+	await server.serve()
+	web.start()
 	let first = await cookie()
 	let id = webAuth.list()[0]!.id
 	let second = await cookie()
-	let a = await dial(first), b = await dial(first), other = await dial(second)
+	let a = await dial(first),
+		b = await dial(first),
+		other = await dial(second)
 	await until(() => [a, b, other].every((w) => w.events.some((e) => e.type === 'tabs')))
 	let caller = sessions.create({ cwd: home, model: 'hal/intro' }).id
 	let { command } = await import('./commands/logout.ts')
-	expect(command.run(id, undefined, { sessionId: caller, cwd: home, model: 'hal/intro', setCwd() {}, setModel() {}, say() {} })).toMatchObject({ say: '1 web login(s) revoked; a browser needs a new code' })
-	expect(await a.closed).toBe(4001); expect(await b.closed).toBe(4001)
+	expect(
+		command.run(id, undefined, {
+			sessionId: caller,
+			cwd: home,
+			model: 'hal/intro',
+			setCwd() {},
+			setModel() {},
+			say() {},
+		}),
+	).toMatchObject({ say: '1 web login(s) revoked; a browser needs a new code' })
+	expect(await a.closed).toBe(4001)
+	expect(await b.closed).toBe(4001)
 	expect(other.ws.readyState).toBe(WebSocket.OPEN)
 	webAuth.close()
 	expect((await fetch(`${base()}/login`, { headers: { cookie: first } })).status).toBe(401)
 	expect((await dial(first)).opened).toBe(false)
 	expect((await fetch(`${base()}/login`, { headers: { cookie: second } })).status).toBe(204)
-	command.run('all', undefined, { sessionId: caller, cwd: home, model: 'hal/intro', setCwd() {}, setModel() {}, say() {} })
+	command.run('all', undefined, {
+		sessionId: caller,
+		cwd: home,
+		model: 'hal/intro',
+		setCwd() {},
+		setModel() {},
+		say() {},
+	})
 	expect(await other.closed).toBe(4001)
 })
 
 test('self logout is same-origin POST only and cannot revoke another login', async () => {
-	await server.serve(); web.start()
-	let first = await cookie(), second = await cookie()
-	let a = await dial(first), other = await dial(second)
+	await server.serve()
+	web.start()
+	let first = await cookie(),
+		second = await cookie()
+	let a = await dial(first),
+		other = await dial(second)
 	expect((await fetch(`${base()}/logout`, { headers: { cookie: first } })).status).toBe(404)
-	expect((await fetch(`${base()}/logout`, { method: 'POST', headers: { cookie: first, origin: 'https://example.com' } })).status).toBe(403)
+	expect(
+		(await fetch(`${base()}/logout`, { method: 'POST', headers: { cookie: first, origin: 'https://example.com' } }))
+			.status,
+	).toBe(403)
 	expect(webAuth.list()).toHaveLength(2)
-	let res = await fetch(`${base()}/logout`, { method: 'POST', headers: { cookie: first, origin: base() }, redirect: 'manual' })
+	let res = await fetch(`${base()}/logout`, {
+		method: 'POST',
+		headers: { cookie: first, origin: base() },
+		redirect: 'manual',
+	})
 	expect(res.status).toBe(303)
 	expect(res.headers.get('set-cookie')).toContain('Max-Age=0')
 	expect(await a.closed).toBe(4001)
@@ -1712,36 +2285,59 @@ test('self logout is same-origin POST only and cannot revoke another login', asy
 	expect((await fetch(`${base()}/login`, { headers: { cookie: first } })).status).toBe(401)
 })
 
-browserTest('browser status logout fits phone and desktop and returns to the login gate', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		for (let width of [390, 1280]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			await b.evaluate(`document.querySelector('.StatusRow .details-target').click()`)
-			await b.waitFor(`document.querySelector('.StatusDetails').open`)
-			let r = await b.evaluate(`(() => { let b = document.querySelector('.StatusDetails form button'), r = b.getBoundingClientRect(); return { text: b.textContent, height: r.height, left: r.left, right: r.right, viewport: innerWidth }; })()`)
-			expect(r.text).toBe('Log out this browser')
-			expect(r.height).toBeGreaterThanOrEqual(44)
-			expect(r.left).toBeGreaterThanOrEqual(0); expect(r.right).toBeLessThanOrEqual(r.viewport)
-			await b.evaluate(`document.querySelector('.StatusDetails').close()`)
+browserTest(
+	'browser status logout fits phone and desktop and returns to the login gate',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			for (let width of [390, 1280]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				await b.evaluate(`document.querySelector('.StatusRow .details-target').click()`)
+				await b.waitFor(`document.querySelector('.StatusDetails').open`)
+				let r = await b.evaluate(
+					`(() => { let b = document.querySelector('.StatusDetails form button'), r = b.getBoundingClientRect(); return { text: b.textContent, height: r.height, left: r.left, right: r.right, viewport: innerWidth }; })()`,
+				)
+				expect(r.text).toBe('Log out this browser')
+				expect(r.height).toBeGreaterThanOrEqual(44)
+				expect(r.left).toBeGreaterThanOrEqual(0)
+				expect(r.right).toBeLessThanOrEqual(r.viewport)
+				await b.evaluate(`document.querySelector('.StatusDetails').close()`)
+			}
+			await b.evaluate(
+				`document.querySelector('.StatusRow .details-target').click(); document.querySelector('.StatusDetails form button').click()`,
+			)
+			await b.waitFor(`!!document.querySelector('.Login')`)
+			expect(webAuth.list()).toHaveLength(0)
+		} finally {
+			await b.close()
 		}
-		await b.evaluate(`document.querySelector('.StatusRow .details-target').click(); document.querySelector('.StatusDetails form button').click()`)
-		await b.waitFor(`!!document.querySelector('.Login')`)
-		expect(webAuth.list()).toHaveLength(0)
-	} finally { await b.close() }
-}, 15000)
+	},
+	15000,
+)
 
 test('revocation while an upgrade awaits the page build refuses the socket', async () => {
-	await server.serve(); web.start()
+	await server.serve()
+	web.start()
 	let auth = await cookie()
 	let original = web.version
 	let waiting = false
 	let release!: (v: string) => void
-	web.version = () => { waiting = true; return new Promise((r) => { release = r }) }
+	web.version = () => {
+		waiting = true
+		return new Promise((r) => {
+			release = r
+		})
+	}
 	try {
 		let pending = dial(auth, '?v=building&updates=manual')
 		await until(() => waiting)
@@ -1749,64 +2345,100 @@ test('revocation while an upgrade awaits the page build refuses the socket', asy
 		release('building')
 		expect((await pending).opened).toBe(false)
 		expect(web.state.sockets.size).toBe(0)
-	} finally { web.version = original }
+	} finally {
+		web.version = original
+	}
 })
 
-browserTest('queued message edits retain the draft and require host protection through save, cancel and reload', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let ts = '2026-10-04T20:13:07.456Z'
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier prompt' }], ts })
-	history.append(id, { type: 'inbox', id: 'queued-first', text: 'First queued message with a long line that wraps on phones and remains readable beside the pencil and reference.\nSecond line\nThird line\nFourth line', delivery: 'after-turn', ts })
-	history.append(id, { type: 'inbox', id: 'queued-last', text: 'Last queued message', delivery: 'after-turn', ts })
-	history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('[aria-label="Edit queued message"]').length === 2`)
-		let input = async (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		for (let [name, width, height, touch] of [['portrait', 390, 800, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
-			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
-			await input('My separate draft')
-			let geometry = await b.evaluate(`(() => { let cards = [...document.querySelectorAll('.Card.queued')]; return { overflow: document.documentElement.scrollWidth > innerWidth + 1, edits: cards.map(c => { let e = c.querySelector('.edit').getBoundingClientRect(), r = c.querySelector('.link')?.getBoundingClientRect(); return { width: e.width, height: e.height, overlap: !!r && e.right > r.left + 1, within: e.bottom <= c.getBoundingClientRect().bottom + 1 }; }) }; })()`)
-			expect(geometry.overflow).toBe(false)
-			for (let control of geometry.edits) expect(control).toMatchObject({ width: 44, height: 44, overlap: false, within: true })
+browserTest(
+	'queued message edits retain the draft and require host protection through save, cancel and reload',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		let ts = '2026-10-04T20:13:07.456Z'
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier prompt' }], ts })
+		history.append(id, {
+			type: 'inbox',
+			id: 'queued-first',
+			text: 'First queued message with a long line that wraps on phones and remains readable beside the pencil and reference.\nSecond line\nThird line\nFourth line',
+			delivery: 'after-turn',
+			ts,
+		})
+		history.append(id, { type: 'inbox', id: 'queued-last', text: 'Last queued message', delivery: 'after-turn', ts })
+		history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('[aria-label="Edit queued message"]').length === 2`)
+			let input = async (text: string) =>
+				b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,
+				)
+			for (let [name, width, height, touch] of [
+				['portrait', 390, 800, true],
+				['landscape', 844, 390, true],
+				['desktop', 1200, 800, false],
+			] as const) {
+				await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+				await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+				await input('My separate draft')
+				let geometry = await b.evaluate(
+					`(() => { let cards = [...document.querySelectorAll('.Card.queued')]; return { overflow: document.documentElement.scrollWidth > innerWidth + 1, edits: cards.map(c => { let e = c.querySelector('.edit').getBoundingClientRect(), r = c.querySelector('.link')?.getBoundingClientRect(); return { width: e.width, height: e.height, overlap: !!r && e.right > r.left + 1, within: e.bottom <= c.getBoundingClientRect().bottom + 1 }; }) }; })()`,
+				)
+				expect(geometry.overflow).toBe(false)
+				for (let control of geometry.edits)
+					expect(control).toMatchObject({ width: 44, height: 44, overlap: false, within: true })
+				await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
+				await b.waitFor(
+					`!!document.querySelector('.EditBar') && document.querySelector('textarea').value.startsWith('First queued')`,
+				)
+				// Editing locks the message, not the session; one edit at a time.
+				expect(await b.evaluate(`document.querySelector('[aria-label="Continue"]').disabled`)).toBe(false)
+				expect(
+					await b.evaluate(
+						`[document.querySelectorAll('[aria-label="Edit queued message"]').length, document.querySelector('.Card.queued').textContent.includes('being edited')]`,
+					),
+				).toEqual([0, true])
+				expect(await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').disabled`)).toBe(false)
+				let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
+				writeFileSync(`/tmp/hal-queue-edit-${name}.png`, Buffer.from(screenshot.result.data, 'base64'))
+				await b.evaluate(`document.querySelector('.EditBar button').click()`)
+				await b.waitFor(
+					`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`,
+				)
+			}
 			await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
-			await b.waitFor(`!!document.querySelector('.EditBar') && document.querySelector('textarea').value.startsWith('First queued')`)
-			// Editing locks the message, not the session; one edit at a time.
-			expect(await b.evaluate(`document.querySelector('[aria-label="Continue"]').disabled`)).toBe(false)
-			expect(await b.evaluate(`[document.querySelectorAll('[aria-label="Edit queued message"]').length, document.querySelector('.Card.queued').textContent.includes('being edited')]`)).toEqual([0, true])
-			expect(await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').disabled`)).toBe(false)
-			let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
-			writeFileSync(`/tmp/hal-queue-edit-${name}.png`, Buffer.from(screenshot.result.data, 'base64'))
-			await b.evaluate(`document.querySelector('.EditBar button').click()`)
-			await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`)
+			await b.waitFor(`document.querySelector('[aria-label="Save queued message"]')`)
+			await input('Corrected first message')
+			await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').click()`)
+			await b.waitFor(
+				`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`,
+			)
+			expect(status.inboxOf(id).map((m) => [m.id, m.text, m.ts])).toEqual([
+				['queued-first', 'Corrected first message', ts],
+				['queued-last', 'Last queued message', ts],
+			])
+			// Empty composer Up chooses the newest, not the first visible queued row.
+			await input('')
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp' })
+			await b.waitFor(`document.querySelector('textarea').value === 'Last queued message'`)
+			await input('Unsaved newest edit')
+			await b.call('Page.reload', {})
+			await b.waitFor(
+				`document.querySelector('textarea')?.value === 'Unsaved newest edit' && document.querySelector('.EditBar') && !document.querySelector('[aria-label="Save queued message"]').disabled`,
+			)
+			expect(status.inboxOf(id).map((m) => m.text)).toEqual(['Corrected first message', 'Last queued message'])
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
+			await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === ''`)
+			expect(status.stateOf(id).type).toBe('paused')
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-		await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
-		await b.waitFor(`document.querySelector('[aria-label="Save queued message"]')`)
-		await input('Corrected first message')
-		await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').click()`)
-		await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`)
-		expect(status.inboxOf(id).map((m) => [m.id, m.text, m.ts])).toEqual([
-			['queued-first', 'Corrected first message', ts], ['queued-last', 'Last queued message', ts],
-		])
-		// Empty composer Up chooses the newest, not the first visible queued row.
-		await input('')
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp' })
-		await b.waitFor(`document.querySelector('textarea').value === 'Last queued message'`)
-		await input('Unsaved newest edit')
-		await b.call('Page.reload', {})
-		await b.waitFor(`document.querySelector('textarea')?.value === 'Unsaved newest edit' && document.querySelector('.EditBar') && !document.querySelector('[aria-label="Save queued message"]').disabled`)
-		expect(status.inboxOf(id).map((m) => m.text)).toEqual(['Corrected first message', 'Last queued message'])
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
-		await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === ''`)
-		expect(status.stateOf(id).type).toBe('paused')
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20000)
+	},
+	20000,
+)
 
 browserTest('Find keeps focus stable while results arrive and filters take focus', async () => {
 	let id = tabs.create('/tmp')
@@ -1814,10 +2446,17 @@ browserTest('Find keeps focus stable while results arrive and filters take focus
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	let b = await browser()
 	try {
-		await server.serve(); web.start()
+		await server.serve()
+		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`document.querySelector('main')?.innerText.includes('findneedle')`)
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 })
+		await b.call('Input.dispatchKeyEvent', {
+			type: 'keyDown',
+			key: 'f',
+			code: 'KeyF',
+			windowsVirtualKeyCode: 70,
+			modifiers: 2,
+		})
 		await b.waitFor(`document.querySelector('.Picker[open] .input') === document.activeElement`)
 		await b.call('Input.insertText', { text: 'findneedle' })
 		await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent.startsWith('Showing 1 result')`)
@@ -1828,7 +2467,9 @@ browserTest('Find keeps focus stable while results arrive and filters take focus
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ' })
 		await b.waitFor(`document.querySelectorAll('.Picker .filters button')[1].getAttribute('aria-pressed') === 'false'`)
 		await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent.startsWith('Showing 1 result')`)
-		expect(await b.evaluate(`document.activeElement === document.querySelectorAll('.Picker .filters button')[1]`)).toBe(true)
+		expect(await b.evaluate(`document.activeElement === document.querySelectorAll('.Picker .filters button')[1]`)).toBe(
+			true,
+		)
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown' })
 		await b.waitFor(`document.activeElement === document.querySelector('.Picker ul')`)
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp' })
@@ -1837,83 +2478,176 @@ browserTest('Find keeps focus stable while results arrive and filters take focus
 		await b.waitFor(`document.activeElement === document.querySelector('.Picker ul')`)
 		await b.evaluate(`document.querySelector('.Picker li a').click()`)
 		await b.waitFor(`!document.querySelector('.Picker[open]') && !!location.hash`)
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 })
+		await b.call('Input.dispatchKeyEvent', {
+			type: 'keyDown',
+			key: 'f',
+			code: 'KeyF',
+			windowsVirtualKeyCode: 70,
+			modifiers: 2,
+		})
 		await b.waitFor(`document.querySelector('.Picker[open]')`)
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
 		await b.waitFor(`!document.querySelector('.Picker[open]')`)
-	} finally { await b.close() }
-})
-
-browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes with Tab and expands', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt' }] })
-	let calls = [0, 1, 2].map((k) => history.append(id, { type: 'assistant', block: { type: 'tool_call', id: `c${k}`, name: 'bash', input: { command: `echo ${k}`, description: `Say ${k}` } } }).n)
-	history.append(id, { type: 'user', blocks: [0, 1, 2].map((k) => ({ type: 'tool_result' as const, id: `c${k}`, output: `out ${k}` })) })
-	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		for (let width of [390, 1280]) {
-			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-			await b.waitFor(`document.querySelectorAll('.Card.folds').length >= 3`)
-			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'o', code: 'KeyO', windowsVirtualKeyCode: 79, modifiers: 2 })
-			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Expand latest tool card t${calls[2]} (the default)'`)
-			let box = await b.evaluate(`(() => { let d = document.querySelector('.Picker.compact'), r = d.getBoundingClientRect(); return { left: r.left, right: r.right, height: r.height, fits: d.scrollHeight <= d.clientHeight && d.scrollWidth <= d.clientWidth, width: innerWidth } })()`)
-			expect(box.left).toBeGreaterThanOrEqual(0)
-			expect(box.right).toBeLessThanOrEqual(box.width)
-			expect(box.fits).toBe(true)
-			await b.call('Input.insertText', { text: 't' })
-			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
-			await b.waitFor(`document.querySelectorAll('.Picker .blocks-ids li').length === 3`)
-			expect(await b.evaluate(`[...document.querySelectorAll('.Picker .blocks-ids li')].map((l) => l.textContent)`)).toEqual([...calls].reverse().map((n) => `t${n}`))
-			await b.call('Input.insertText', { text: '*' })
-			await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent === 'Expand 3 tool cards: ${calls.map((n) => `t${n}`).join(', ')}'`)
-			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
-			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 3 && !document.querySelector('.Picker[open]')`)
-		}
 	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.close()
 	}
-}, 20000)
+})
+
+browserTest(
+	'the Ctrl-O dialog is as tall as its content, hints live, completes with Tab and expands',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt' }] })
+		let calls = [0, 1, 2].map(
+			(k) =>
+				history.append(id, {
+					type: 'assistant',
+					block: {
+						type: 'tool_call',
+						id: `c${k}`,
+						name: 'bash',
+						input: { command: `echo ${k}`, description: `Say ${k}` },
+					},
+				}).n,
+		)
+		history.append(id, {
+			type: 'user',
+			blocks: [0, 1, 2].map((k) => ({ type: 'tool_result' as const, id: `c${k}`, output: `out ${k}` })),
+		})
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			for (let width of [390, 1280]) {
+				await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+				await b.waitFor(`document.querySelectorAll('.Card.folds').length >= 3`)
+				await b.call('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					key: 'o',
+					code: 'KeyO',
+					windowsVirtualKeyCode: 79,
+					modifiers: 2,
+				})
+				await b.waitFor(
+					`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Expand latest tool card t${calls[2]} (the default)'`,
+				)
+				let box = await b.evaluate(
+					`(() => { let d = document.querySelector('.Picker.compact'), r = d.getBoundingClientRect(); return { left: r.left, right: r.right, height: r.height, fits: d.scrollHeight <= d.clientHeight && d.scrollWidth <= d.clientWidth, width: innerWidth } })()`,
+				)
+				expect(box.left).toBeGreaterThanOrEqual(0)
+				expect(box.right).toBeLessThanOrEqual(box.width)
+				expect(box.fits).toBe(true)
+				await b.call('Input.insertText', { text: 't' })
+				await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+				await b.waitFor(`document.querySelectorAll('.Picker .blocks-ids li').length === 3`)
+				expect(
+					await b.evaluate(`[...document.querySelectorAll('.Picker .blocks-ids li')].map((l) => l.textContent)`),
+				).toEqual([...calls].reverse().map((n) => `t${n}`))
+				await b.call('Input.insertText', { text: '*' })
+				await b.waitFor(
+					`document.querySelector('.Picker .blocks-hint')?.textContent === 'Expand 3 tool cards: ${calls.map((n) => `t${n}`).join(', ')}'`,
+				)
+				await b.call('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					key: 'Enter',
+					code: 'Enter',
+					windowsVirtualKeyCode: 13,
+				})
+				await b.waitFor(
+					`document.querySelectorAll('.Card.folds.open').length === 3 && !document.querySelector('.Picker[open]')`,
+				)
+			}
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
+		}
+	},
+	20000,
+)
 
 browserTest('interrupted answers keep accessible decoration outside prose at phone and desktop widths', async () => {
 	providerHome()
 	let id = tabs.create('/tmp')
-	for (let text of ['short', 'trailing ', 'line\n', '**long** '.repeat(50) + 'ending', '```ts\nconst partial =']) history.append(id, { type: 'assistant', block: { type: 'text', text }, interrupted: true })
+	for (let text of ['short', 'trailing ', 'line\n', '**long** '.repeat(50) + 'ending', '```ts\nconst partial ='])
+		history.append(id, { type: 'assistant', block: { type: 'text', text }, interrupted: true })
 	let b = await browser()
 	try {
-		await server.serve(); web.start()
+		await server.serve()
+		web.start()
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`document.querySelectorAll('.interrupted').length === 5`)
 		for (let width of [390, 1280]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			let marks = await b.evaluate(`Array.from(document.querySelectorAll('.interrupted'), el => ({ tail: el.dataset.tail, label: el.getAttribute('aria-label'), prose: el.textContent, contrasting: getComputedStyle(el).color !== getComputedStyle(el.parentElement).color, visible: el.getBoundingClientRect().width > 0, fits: el.getBoundingClientRect().right <= innerWidth }))`)
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: width === 390,
+			})
+			let marks = await b.evaluate(
+				`Array.from(document.querySelectorAll('.interrupted'), el => ({ tail: el.dataset.tail, label: el.getAttribute('aria-label'), prose: el.textContent, contrasting: getComputedStyle(el).color !== getComputedStyle(el.parentElement).color, visible: el.getBoundingClientRect().width > 0, fits: el.getBoundingClientRect().right <= innerWidth }))`,
+			)
 			expect(await b.evaluate(`!!document.querySelector('pre code .interrupted')`)).toBe(true)
-			expect(marks).toEqual([' --', ' --', '\n--', ' --', ' --'].map((tail) => ({ tail, label: 'Interrupted', prose: '', contrasting: true, visible: true, fits: true })))
+			expect(marks).toEqual(
+				[' --', ' --', '\n--', ' --', ' --'].map((tail) => ({
+					tail,
+					label: 'Interrupted',
+					prose: '',
+					contrasting: true,
+					visible: true,
+					fits: true,
+				})),
+			)
 		}
-	} finally { await b.close() }
+	} finally {
+		await b.close()
+	}
 })
 
 browserTest('rebase diffs are visible and colored after an earlier error and help opens full output', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id, b = await browser()
-	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 prompt:\n```diff\n-old\n+replacement\n```'
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id,
+		b = await browser()
+	let report =
+		'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 prompt:\n```diff\n-old\n+replacement\n```'
 	history.append(id, { type: 'output', text: 'Rebase failed: editor exited with code 1', error: true })
 	history.append(id, { type: 'output', text: report })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'A conversation message separates these cards.' }] })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'help', name: 'command', input: { command: '/help rebase' } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'help', output: Array.from({ length: 240 }, (_, n) => `help line ${n}`).join('\n') }] })
+	history.append(id, {
+		type: 'user',
+		blocks: [{ type: 'text', text: 'A conversation message separates these cards.' }],
+	})
+	history.append(id, {
+		type: 'assistant',
+		block: { type: 'tool_call', id: 'help', name: 'command', input: { command: '/help rebase' } },
+	})
+	history.append(id, {
+		type: 'user',
+		blocks: [
+			{ type: 'tool_result', id: 'help', output: Array.from({ length: 240 }, (_, n) => `help line ${n}`).join('\n') },
+		],
+	})
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	try {
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('pre[data-lang=diff] .add') && !!document.querySelector('.tool-command .mark')`)
+		await b.waitFor(
+			`!!document.querySelector('pre[data-lang=diff] .add') && !!document.querySelector('.tool-command .mark')`,
+		)
 		for (let width of [390, 1280]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: width === 390,
+			})
 			let result = await b.evaluate(`(() => {
 				let code = document.querySelector('pre[data-lang=diff]'), card = code.closest('.Card');
 				return { text: card.textContent, error: card.classList.contains('error'),
@@ -1932,444 +2666,798 @@ browserTest('rebase diffs are visible and colored after an earlier error and hel
 			expect(await b.evaluate(`document.querySelector('.tool-command .label').textContent`)).toBe('/help rebase')
 			await b.evaluate(`document.querySelector('.tool-command .mark').click()`)
 			await b.waitFor(`document.querySelector('.tool-command .mark').getAttribute('aria-expanded') === 'true'`)
-			expect(await b.evaluate(`document.querySelector('.tool-command .result-text').textContent`)).toContain('help line 239')
+			expect(await b.evaluate(`document.querySelector('.tool-command .result-text').textContent`)).toContain(
+				'help line 239',
+			)
 			expect(await b.evaluate(`document.querySelector('.tool-command .more') === null`)).toBe(true)
 			await b.evaluate(`document.querySelector('.tool-command .mark').click()`)
 			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
 		}
-	} finally { await b.close() }
+	} finally {
+		await b.close()
+	}
 })
 
 browserTest('foreground and background Bash share header status without losing output or command links', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'run', name: 'bash', input: { description: 'Check output', command: 'printf example' } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'run', output: '[exit 1]\nForeground output', ms: 2700 }] })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', from: id, label: 'bash #t1', text: '[exit 1]\nBackground output' }] })
+	history.append(id, {
+		type: 'assistant',
+		block: {
+			type: 'tool_call',
+			id: 'run',
+			name: 'bash',
+			input: { description: 'Check output', command: 'printf example' },
+		},
+	})
+	history.append(id, {
+		type: 'user',
+		blocks: [{ type: 'tool_result', id: 'run', output: '[exit 1]\nForeground output', ms: 2700 }],
+	})
+	history.append(id, {
+		type: 'user',
+		blocks: [{ type: 'text', from: id, label: 'bash #t1', text: '[exit 1]\nBackground output' }],
+	})
 	let b = await browser()
 	try {
-		await server.serve(); web.start()
+		await server.serve()
+		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`document.querySelectorAll('.CardHeader .exit').length === 2`)
 		for (let width of [320, 1200]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 320 })
-			let headers = await b.evaluate(`Array.from(document.querySelectorAll('.Card > .CardHeader'), h => ({ status: h.querySelector(':scope > .status:not(.line-count)').textContent, beforeLink: h.querySelector(':scope > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`)
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: width === 320,
+			})
+			let headers = await b.evaluate(
+				`Array.from(document.querySelectorAll('.Card > .CardHeader'), h => ({ status: h.querySelector(':scope > .status:not(.line-count)').textContent, beforeLink: h.querySelector(':scope > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`,
+			)
 			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1)'])
 			expect(headers.every((h: any) => h.beforeLink && h.fits && h.exit === 'exit 1')).toBe(true)
 		}
 		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
 		expect(await b.evaluate(`document.querySelector('main').textContent`)).not.toContain('[exit 1]')
 		expect(await b.evaluate(`document.querySelector('.result-text').textContent`)).toContain('Foreground output')
-		expect(await b.evaluate(`document.querySelector('.Card.background-result .content').textContent`)).toBe('Background output')
-		expect(await b.evaluate(`document.querySelector('.Card.background-result .call').getAttribute('href')`)).toEndWith('#t1')
-		expect(await b.evaluate(`document.querySelector('.Card.background-result .label').textContent`)).toBe('$ printf example')
-		expect(await b.evaluate(`getComputedStyle(document.querySelector('.Card.background-result')).backgroundColor === getComputedStyle(document.querySelector('.Card.tool')).backgroundColor`)).toBe(true)
-		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+		expect(await b.evaluate(`document.querySelector('.Card.background-result .content').textContent`)).toBe(
+			'Background output',
+		)
+		expect(await b.evaluate(`document.querySelector('.Card.background-result .call').getAttribute('href')`)).toEndWith(
+			'#t1',
+		)
+		expect(await b.evaluate(`document.querySelector('.Card.background-result .label').textContent`)).toBe(
+			'$ printf example',
+		)
+		expect(
+			await b.evaluate(
+				`getComputedStyle(document.querySelector('.Card.background-result')).backgroundColor === getComputedStyle(document.querySelector('.Card.tool')).backgroundColor`,
+			),
+		).toBe(true)
+		await b.evaluate(
+			`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+		)
 		let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
 		writeFileSync('/tmp/hal-shared-bash-header.png', Buffer.from(screenshot.result.data, 'base64'))
-	} finally { await b.close() }
+	} finally {
+		await b.close()
+	}
 })
 
-
-browserTest('card headers restore short or open and expanded tools show whole commands and output', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let lines = Array.from({ length: 12 }, (_, i) => `row ${i + 1}`).join('\n')
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Run the checks' }] })
-	history.append(id, { type: 'assistant', block: { type: 'thinking', text: `First thought\n${lines}` } })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'ok', name: 'bash', input: { description: 'Count rows', command: 'seq 12\necho done' } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'ok', output: `[exit 0]\n${lines}`, ms: 1200 }] })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'bad', name: 'bash', input: { description: 'Read missing', command: 'cat nope' } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'bad', output: '[exit 1]\ncat: nope: No such file', ms: 1100 }] })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'wide', name: 'bash', input: { description: 'Wide command', command: `printf '${'x'.repeat(70)}'` } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'wide', output: '[exit 0]\nok' }] })
-	history.append(id, { type: 'assistant', block: { type: 'text', text: 'All done.' } })
-	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false })
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.Card.tool').length === 3`)
-		let state = `Array.from(document.querySelectorAll('.Card.thinking, .Card.tool, .Card.assistant'), c => c.classList.contains('open') || !c.classList.contains('folds') ? 'open' : 'short')`
-		expect(await b.evaluate(state)).toEqual(['short', 'short', 'short', 'short', 'open'])
-		expect(await b.evaluate(`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`)).toBe(5)
-		let shot = async (name: string) => {
-			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
-			writeFileSync(`/tmp/hal-172-ink-disclosure-${name}.png`, Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
-		}
-		let rotate = async (selector: string) => {
-			await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
-			await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
-		}
-		await shot('start')
-		await rotate('.Card.user .mark')
-		await rotate('.Card.user .mark')
-		await rotate('.Card.assistant .mark')
-		await rotate('.Card.assistant .mark')
-		let steps: string[] = []
-		for (let i = 0; i < 2; i++) {
-			await rotate('.Card.thinking .mark')
-			steps.push((await b.evaluate(state))[0])
-			if (i === 0) await shot('thinking-long')
-		}
-		expect(steps).toEqual(['open', 'short'])
-		await rotate('.Card.tool .mark')
-		expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe('seq 12\necho done')
-		expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
-		await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
-		expect(await b.evaluate(`document.querySelector('.Card.tool .mark').getAttribute('aria-expanded')`)).toBe('true')
-		await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.mark').click()`)
-		for (let width of [390, 900]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: width === 390 })
-			expect(await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command').textContent`)).toContain('x'.repeat(70))
-			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
-		}
-		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/collapse a*'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
-		await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
-		await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
-		expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe('true')
-		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
-		await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
-		expect(await b.evaluate(`document.querySelector('.Card.thinking .mark').getAttribute('aria-expanded')`)).toBe('true')
-	} finally { await b.close() }
-}, 15000)
-
-browserTest('all card kinds share aligned triangle-free sticky chrome', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let text = Array.from({ length: 40 }, (_, i) => `Content row ${i}`).join('\n')
-	history.append(id, { type: 'compact', summary: 'Boundary', prompts: 0 })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text }] })
-	history.append(id, { type: 'assistant', block: { type: 'thinking', text } })
-	history.append(id, { type: 'assistant', block: { type: 'text', text } })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'chrome', name: 'bash', input: { command: 'echo first\necho second', description: 'Check chrome' } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'chrome', output: text }] })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', from: id, label: 'bash #t5', text: `[exit 0]\n${text}` }] })
-	history.append(id, { type: 'output', text: 'Changed', change: { name: 'AGENTS.md', what: 'changed', diff: text.split('\n').map((l) => `+${l}`).join('\n') } })
-	history.append(id, { type: 'command', text: '/example' })
-	history.append(id, { type: 'output', text })
-	history.append(id, { type: 'question', id: 'answered', form: { text: 'Answered question', fields: [{ type: 'text', name: 'answer' }] }, from: { command: 'example', args: '' } })
-	history.append(id, { type: 'answer', question: 'answered', answers: { answer: 'Yes' } })
-	history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
-	history.append(id, { type: 'question', id: 'active', form: { text: 'Active question', quote: { text }, fields: [{ type: 'text', name: 'answer' }] }, from: { command: 'example', args: '' } })
-	history.append(id, { type: 'inbox', id: 'queued', from: 'reviewer', text, delivery: 'after-turn' })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.Question') && !!document.querySelector('.Card.queued')`)
-		for (let width of [390, 1200]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			for (let open of [false, true]) {
-				await b.evaluate(`document.querySelectorAll('.Card > .CardHeader .stamp.mark[aria-expanded="${!open}"]').forEach(b => b.click())`)
-				await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-				let geometry = await b.evaluate(`Array.from(document.querySelectorAll('.Transcript > .Card, .Transcript > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position }; })`)
-				expect(geometry.length).toBeGreaterThanOrEqual(10)
-				expect(geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === 'sticky')).toBe(true)
-				expect(Math.max(...geometry.map((c: any) => c.x)) - Math.min(...geometry.map((c: any) => c.x))).toBeLessThanOrEqual(1)
+browserTest(
+	'card headers restore short or open and expanded tools show whole commands and output',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		let lines = Array.from({ length: 12 }, (_, i) => `row ${i + 1}`).join('\n')
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Run the checks' }] })
+		history.append(id, { type: 'assistant', block: { type: 'thinking', text: `First thought\n${lines}` } })
+		history.append(id, {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'ok',
+				name: 'bash',
+				input: { description: 'Count rows', command: 'seq 12\necho done' },
+			},
+		})
+		history.append(id, {
+			type: 'user',
+			blocks: [{ type: 'tool_result', id: 'ok', output: `[exit 0]\n${lines}`, ms: 1200 }],
+		})
+		history.append(id, {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'bad',
+				name: 'bash',
+				input: { description: 'Read missing', command: 'cat nope' },
+			},
+		})
+		history.append(id, {
+			type: 'user',
+			blocks: [{ type: 'tool_result', id: 'bad', output: '[exit 1]\ncat: nope: No such file', ms: 1100 }],
+		})
+		history.append(id, {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'wide',
+				name: 'bash',
+				input: { description: 'Wide command', command: `printf '${'x'.repeat(70)}'` },
+			},
+		})
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'wide', output: '[exit 0]\nok' }] })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: 'All done.' } })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 900,
+				height: 900,
+				deviceScaleFactor: 1,
+				mobile: false,
+			})
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('.Card.tool').length === 3`)
+			let state = `Array.from(document.querySelectorAll('.Card.thinking, .Card.tool, .Card.assistant'), c => c.classList.contains('open') || !c.classList.contains('folds') ? 'open' : 'short')`
+			expect(await b.evaluate(state)).toEqual(['short', 'short', 'short', 'short', 'open'])
+			expect(
+				await b.evaluate(
+					`Array.from(document.querySelectorAll('.Card.thinking .spinner, .Card.tool .spinner, .Card.assistant .spinner')).length`,
+				),
+			).toBe(5)
+			let shot = async (name: string) => {
+				await b.evaluate(
+					`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+				)
+				writeFileSync(
+					`/tmp/hal-172-ink-disclosure-${name}.png`,
+					Buffer.from((await b.call('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'),
+				)
 			}
-			await b.evaluate(`document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }))`)
-			let sticking = await b.evaluate(`(async () => { let main = document.querySelector('.Transcript'), cards = [...main.querySelectorAll(':scope > .Card, :scope > .Question')].filter(c => c.clientHeight > 200), results = []; for (let c of cards) { main.scrollTop += c.getBoundingClientRect().top - main.getBoundingClientRect().top + 60; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); let h = c.querySelector('.CardHeader'), pin = h.classList.contains('inline') ? h.querySelector('.stamp') : h; results.push(Math.abs(pin.getBoundingClientRect().top - main.getBoundingClientRect().top - parseFloat(getComputedStyle(main).paddingTop)) <= 1); } return results; })()`)
-			expect(sticking.length).toBeGreaterThanOrEqual(5)
-			expect(sticking.every(Boolean)).toBe(true)
+			let rotate = async (selector: string) => {
+				await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
+				await b.evaluate(
+					`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+				)
+			}
+			await shot('start')
+			await rotate('.Card.user .mark')
+			await rotate('.Card.user .mark')
+			await rotate('.Card.assistant .mark')
+			await rotate('.Card.assistant .mark')
+			let steps: string[] = []
+			for (let i = 0; i < 2; i++) {
+				await rotate('.Card.thinking .mark')
+				steps.push((await b.evaluate(state))[0])
+				if (i === 0) await shot('thinking-long')
+			}
+			expect(steps).toEqual(['open', 'short'])
+			await rotate('.Card.tool .mark')
+			expect(await b.evaluate(`document.querySelector('.Card.tool .ToolCommand .command').textContent`)).toBe(
+				'seq 12\necho done',
+			)
+			expect(await b.evaluate(`document.querySelector('.Card.tool .result-text').textContent`)).toContain('row 12')
+			await b.evaluate(`document.querySelector('.Card.tool .result-text').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.tool .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.mark').click()`)
+			for (let width of [390, 900]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 844,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				expect(
+					await b.evaluate(`document.querySelectorAll('.Card.tool')[2].querySelector('.command').textContent`),
+				).toContain('x'.repeat(70))
+				expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+			}
+			await b.evaluate(
+				`(() => { let t = document.querySelector('textarea'); t.value = '/collapse a*'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`,
+			)
+			await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
+			await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe(
+				'true',
+			)
+			await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+			await b.evaluate(`document.querySelector('.Card.thinking .mark').click()`)
+			expect(await b.evaluate(`document.querySelector('.Card.thinking .mark').getAttribute('aria-expanded')`)).toBe(
+				'true',
+			)
+		} finally {
+			await b.close()
 		}
-	} finally { await b.close() }
-}, 15000)
+	},
+	15000,
+)
 
-browserTest('change-card disclosure restores complete vertically unclipped diffs (task r7m)', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	for (let i = 0; i < 3; i++) history.append(id, { type: 'output', text: 'Instructions changed', change: { name: 'AGENTS.md', what: 'changed', diff: Array.from({ length: 12 }, (_, n) => `+change ${i} line ${n}`).join('\n') } })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.Card.output .mark')`)
-		for (let i = 0; i < 2; i++) {
-			await b.evaluate(`document.querySelector('.Card.output .mark').click()`)
-			await b.waitFor(`document.querySelectorAll('.change .lines').length === 3`)
-			expect(await b.evaluate(`(() => { let c = document.querySelector('.Card.output'); return { expanded: c.querySelector('.mark').getAttribute('aria-expanded'), rows: c.querySelectorAll('.lines > div').length, unclipped: c.scrollHeight <= c.clientHeight } })()`)).toEqual({ expanded: 'true', rows: 36, unclipped: true })
-			await b.evaluate(`document.querySelector('.change .lines').click()`)
-			expect(await b.evaluate(`document.querySelectorAll('.change .lines').length`)).toBe(3)
-			await b.evaluate(`document.querySelector('.Card.output .mark').click()`)
-			await b.waitFor(`document.querySelectorAll('.change .lines').length === 0`)
-			expect(await b.evaluate(`document.querySelector('.Card.output .mark').getAttribute('aria-expanded')`)).toBe('false')
+browserTest(
+	'all card kinds share aligned triangle-free sticky chrome',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		let text = Array.from({ length: 40 }, (_, i) => `Content row ${i}`).join('\n')
+		history.append(id, { type: 'compact', summary: 'Boundary', prompts: 0 })
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text }] })
+		history.append(id, { type: 'assistant', block: { type: 'thinking', text } })
+		history.append(id, { type: 'assistant', block: { type: 'text', text } })
+		history.append(id, {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'chrome',
+				name: 'bash',
+				input: { command: 'echo first\necho second', description: 'Check chrome' },
+			},
+		})
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'chrome', output: text }] })
+		history.append(id, {
+			type: 'user',
+			blocks: [{ type: 'text', from: id, label: 'bash #t5', text: `[exit 0]\n${text}` }],
+		})
+		history.append(id, {
+			type: 'output',
+			text: 'Changed',
+			change: {
+				name: 'AGENTS.md',
+				what: 'changed',
+				diff: text
+					.split('\n')
+					.map((l) => `+${l}`)
+					.join('\n'),
+			},
+		})
+		history.append(id, { type: 'command', text: '/example' })
+		history.append(id, { type: 'output', text })
+		history.append(id, {
+			type: 'question',
+			id: 'answered',
+			form: { text: 'Answered question', fields: [{ type: 'text', name: 'answer' }] },
+			from: { command: 'example', args: '' },
+		})
+		history.append(id, { type: 'answer', question: 'answered', answers: { answer: 'Yes' } })
+		history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+		history.append(id, {
+			type: 'question',
+			id: 'active',
+			form: { text: 'Active question', quote: { text }, fields: [{ type: 'text', name: 'answer' }] },
+			from: { command: 'example', args: '' },
+		})
+		history.append(id, { type: 'inbox', id: 'queued', from: 'reviewer', text, delivery: 'after-turn' })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.Question') && !!document.querySelector('.Card.queued')`)
+			for (let width of [390, 1200]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				for (let open of [false, true]) {
+					await b.evaluate(
+						`document.querySelectorAll('.Card > .CardHeader .stamp.mark[aria-expanded="${!open}"]').forEach(b => b.click())`,
+					)
+					await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+					let geometry = await b.evaluate(
+						`Array.from(document.querySelectorAll('.Transcript > .Card, .Transcript > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position }; })`,
+					)
+					expect(geometry.length).toBeGreaterThanOrEqual(10)
+					expect(
+						geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === 'sticky'),
+					).toBe(true)
+					expect(
+						Math.max(...geometry.map((c: any) => c.x)) - Math.min(...geometry.map((c: any) => c.x)),
+					).toBeLessThanOrEqual(1)
+				}
+				await b.evaluate(`document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }))`)
+				let sticking = await b.evaluate(
+					`(async () => { let main = document.querySelector('.Transcript'), cards = [...main.querySelectorAll(':scope > .Card, :scope > .Question')].filter(c => c.clientHeight > 200), results = []; for (let c of cards) { main.scrollTop += c.getBoundingClientRect().top - main.getBoundingClientRect().top + 60; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); let h = c.querySelector('.CardHeader'), pin = h.classList.contains('inline') ? h.querySelector('.stamp') : h; results.push(Math.abs(pin.getBoundingClientRect().top - main.getBoundingClientRect().top - parseFloat(getComputedStyle(main).paddingTop)) <= 1); } return results; })()`,
+				)
+				expect(sticking.length).toBeGreaterThanOrEqual(5)
+				expect(sticking.every(Boolean)).toBe(true)
+			}
+		} finally {
+			await b.close()
 		}
-	} finally { await b.close() }
-}, 15000)
+	},
+	15000,
+)
 
-browserTest('a touch on Send sends once, even when iOS withholds the click', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		let draft = (text: string) => b.evaluate(`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '${text}'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`)
-		let prompts = async () => history.readSync(await b.evaluate(`location.pathname.slice(1)`)).filter((r) => r.type === 'user').length
-		await draft('first')
-		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
-		let point = await b.evaluate(`(() => { let r = document.querySelector('.Composer .go').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
-		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-		await b.waitFor(`document.querySelector('textarea').value === ''`)
-		await Bun.sleep(300)
-		expect(await prompts()).toBe(1)
-		// iOS: pointerdown and pointerup inside Send, then no click.
-		await draft('second')
-		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
-		await b.evaluate(`(() => { let go = document.querySelector('.Composer .go'), init = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: ${point.x}, clientY: ${point.y} }; go.dispatchEvent(new PointerEvent('pointerdown', init)); go.dispatchEvent(new PointerEvent('pointerup', init)) })()`)
-		await b.waitFor(`document.querySelector('textarea').value === ''`)
-		await Bun.sleep(300)
-		expect(await prompts()).toBe(2)
-		// The compatibility click can land on a different control after
-		// sending changes the layout. It belongs to Send, not that control.
-		await draft('third')
-		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
-		await b.evaluate(`(() => {
+browserTest(
+	'change-card disclosure restores complete vertically unclipped diffs (task r7m)',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		for (let i = 0; i < 3; i++)
+			history.append(id, {
+				type: 'output',
+				text: 'Instructions changed',
+				change: {
+					name: 'AGENTS.md',
+					what: 'changed',
+					diff: Array.from({ length: 12 }, (_, n) => `+change ${i} line ${n}`).join('\n'),
+				},
+			})
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 844,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.Card.output .mark')`)
+			for (let i = 0; i < 2; i++) {
+				await b.evaluate(`document.querySelector('.Card.output .mark').click()`)
+				await b.waitFor(`document.querySelectorAll('.change .lines').length === 3`)
+				expect(
+					await b.evaluate(
+						`(() => { let c = document.querySelector('.Card.output'); return { expanded: c.querySelector('.mark').getAttribute('aria-expanded'), rows: c.querySelectorAll('.lines > div').length, unclipped: c.scrollHeight <= c.clientHeight } })()`,
+					),
+				).toEqual({ expanded: 'true', rows: 36, unclipped: true })
+				await b.evaluate(`document.querySelector('.change .lines').click()`)
+				expect(await b.evaluate(`document.querySelectorAll('.change .lines').length`)).toBe(3)
+				await b.evaluate(`document.querySelector('.Card.output .mark').click()`)
+				await b.waitFor(`document.querySelectorAll('.change .lines').length === 0`)
+				expect(await b.evaluate(`document.querySelector('.Card.output .mark').getAttribute('aria-expanded')`)).toBe(
+					'false',
+				)
+			}
+		} finally {
+			await b.close()
+		}
+	},
+	15000,
+)
+
+browserTest(
+	'a touch on Send sends once, even when iOS withholds the click',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			let draft = (text: string) =>
+				b.evaluate(
+					`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '${text}'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`,
+				)
+			let prompts = async () =>
+				history.readSync(await b.evaluate(`location.pathname.slice(1)`)).filter((r) => r.type === 'user').length
+			await draft('first')
+			await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+			let point = await b.evaluate(
+				`(() => { let r = document.querySelector('.Composer .go').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`,
+			)
+			await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+			await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+			await b.waitFor(`document.querySelector('textarea').value === ''`)
+			await Bun.sleep(300)
+			expect(await prompts()).toBe(1)
+			// iOS: pointerdown and pointerup inside Send, then no click.
+			await draft('second')
+			await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+			await b.evaluate(
+				`(() => { let go = document.querySelector('.Composer .go'), init = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: ${point.x}, clientY: ${point.y} }; go.dispatchEvent(new PointerEvent('pointerdown', init)); go.dispatchEvent(new PointerEvent('pointerup', init)) })()`,
+			)
+			await b.waitFor(`document.querySelector('textarea').value === ''`)
+			await Bun.sleep(300)
+			expect(await prompts()).toBe(2)
+			// The compatibility click can land on a different control after
+			// sending changes the layout. It belongs to Send, not that control.
+			await draft('third')
+			await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+			await b.evaluate(`(() => {
 			let go = document.querySelector('.Composer .go'), r = go.getBoundingClientRect(), init = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
 			go.dispatchEvent(new PointerEvent('pointerdown', init)); go.dispatchEvent(new PointerEvent('pointerup', init));
 			document.querySelector('.details-target').dispatchEvent(new MouseEvent('click', { ...init, detail: 1 }));
 		})()`)
-		expect(await b.evaluate(`document.querySelector('.StatusDetails').open`)).toBe(false)
-		await b.waitFor(`document.querySelector('textarea').value === ''`)
-		expect(await prompts()).toBe(3)
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 15000)
-
-browserTest('local touch debug is opt-in, observes canceled taps, and never consumes Send', async () => {
-	providerHome()
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
-		expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
-		let toggle = async () => {
-			await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
-			await b.waitFor(`document.querySelector('.Tabs dialog').open`)
-			await b.evaluate(`new Promise(resolve => { document.querySelector('.Tabs dialog').addEventListener('close', resolve, { once: true }); [...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent.includes('Touch debug')).click(); })`)
-			await b.waitFor(`!document.querySelector('.Tabs dialog').open`)
+			expect(await b.evaluate(`document.querySelector('.StatusDetails').open`)).toBe(false)
+			await b.waitFor(`document.querySelector('textarea').value === ''`)
+			expect(await prompts()).toBe(3)
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-		await toggle()
-		await b.evaluate(`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '/help'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`)
-		await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
-		let point = await b.evaluate(`(() => { let r = document.querySelector('.Composer .go').getBoundingClientRect(); return { x: r.x + r.width/2, y: r.y + r.height/2 }; })()`)
-		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('touchstart Run')`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('pointerdown Run')
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('prevented')
-		expect(await b.evaluate(`document.elementFromPoint(${point.x}, ${point.y}).closest('.Composer .go') !== null`)).toBe(true)
-		expect(await b.evaluate(`getComputedStyle(document.querySelector('.TouchCrosshair')).display`)).toBe('none')
-		expect(await b.evaluate(`getComputedStyle(document.querySelector('.TouchDebug')).display`)).toBe('none')
-		await b.call('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/help')
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('touchcancel')`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('touchcancel')
-		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-		await b.waitFor(`document.querySelector('textarea').value === ''`)
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('pointerup Run')`)
-		let output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
-		expect(output).not.toContain('/help')
-		expect(output).not.toContain('send:absent')
-		await b.evaluate(`(() => { let box = document.querySelector('textarea'); box.value = 'private caret text'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); box.setSelectionRange(3, 7); box.dispatchEvent(new Event('selectionchange', { bubbles: true })); })()`)
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('caret:3,7')`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('private caret text')
-		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
-		await b.waitFor(`document.querySelectorAll('.Tabs .track a.tab').length === 2 && document.querySelector('.Tabs .strip [aria-current] .n').textContent === '2'`)
-		await b.evaluate(`document.querySelector('.Tabs .track a.tab .n').click()`)
-		await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('click tab:1') && document.querySelector('.TouchDebug').textContent.includes('tab:1 url:1 dom:1')`)
-		output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
-		expect(output).toContain('tab:2 url:2 dom:2') // event-time state before the handler
-		expect(output).not.toContain(await b.evaluate(`location.pathname.slice(1)`))
-		await b.evaluate(`window.dispatchEvent(new ErrorEvent('error', { error: new DOMException('private error text', 'SecurityError'), lineno: 12, colno: 34 }))`)
-		output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
-		expect(output).toContain('error SecurityError line:12 col:34')
-		expect(output).not.toContain('private error text')
-		await b.evaluate(`window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', { promise: Promise.resolve(), reason: new TypeError('private rejection text') }))`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('rejection TypeError')
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('private rejection text')
-		await b.evaluate(`for (let i = 0; i < 20; i++) window.dispatchEvent(new ErrorEvent('error', { error: new RangeError('not captured'), lineno: i }))`)
-		expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('pointerup Run')
-		await toggle()
-		expect(await b.evaluate(`!!document.querySelector('.TouchDebug') || !!document.querySelector('.TouchCrosshair')`)).toBe(false)
-		let saved = await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)
-		expect(saved).toContain('pointerup Run')
-		expect(saved).toContain('touchcancel')
-		expect(saved).not.toContain('/help')
-		expect(saved).not.toContain('private error text')
-		await toggle()
-		expect(await b.evaluate(`document.querySelectorAll('.TouchDebug').length`)).toBe(1)
-		await b.evaluate(`for (let i = 0; i < 310; i++) window.dispatchEvent(new ErrorEvent('error', { error: new RangeError('not captured'), lineno: i }))`)
-		await toggle()
-		expect(await b.evaluate(`JSON.parse(localStorage.getItem('hal.touch-debug.log')).length`)).toBe(300)
-		await b.call('Page.reload', {})
-		await b.waitFor(`!!document.querySelector('.StatusRow .model')?.textContent`)
-		expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
-		let inspect = async () => {
-			await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
-			await b.waitFor(`document.querySelector('.Tabs dialog').open`)
-			await b.evaluate(`[...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent === 'Touch debug logs').click()`)
-			await b.waitFor(`document.querySelector('.TouchHistory')?.open && !document.querySelector('.Tabs dialog').open`)
-		}
-		await inspect()
-		output = await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)
-		expect(output).toContain('error RangeError line:309')
-		expect(output).toContain('after tab:')
-		expect(output).not.toContain('not captured')
-		expect(await b.evaluate(`document.querySelector('.TouchHistory').scrollWidth <= innerWidth`)).toBe(true)
-		await b.evaluate(`(() => { let box = document.querySelector('textarea'); box.value = 'existing draft'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); [...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Paste logs').click(); })()`)
-		await b.waitFor(`!document.querySelector('.TouchHistory') && document.querySelector('textarea').value.startsWith('existing draft\\n\\nTouch debug logs:')`)
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).toContain('error RangeError line:309')
-		expect(await b.evaluate(`document.querySelector('textarea').value`)).not.toContain('not captured')
-		await inspect()
-		await b.evaluate(`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Clear logs').click()`)
-		expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
-		expect(await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)).toBe('No recorded events.')
-		expect(await b.evaluate(`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Paste logs').disabled`)).toBe(true)
-		await b.evaluate(`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Close').click()`)
-		await b.waitFor(`!document.querySelector('.TouchHistory')`)
-		await inspect()
-		expect(await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)).toContain('No recorded events.')
-		await b.evaluate(`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Close').click()`)
-		await b.waitFor(`!document.querySelector('.TouchHistory')`)
-		await toggle()
-		await b.evaluate(`window.originalSetItem = Storage.prototype.setItem; window.originalAlert = window.alert; window.alert = message => { window.storageWarning = message }; Storage.prototype.setItem = () => { throw new DOMException('storage full', 'QuotaExceededError') }; window.dispatchEvent(new ErrorEvent('error', { error: new TypeError('not captured'), lineno: 777 }))`)
-		await b.waitFor(`!!window.storageWarning`)
-		expect(await b.evaluate(`window.storageWarning`)).toContain('QuotaExceededError: storage full')
-		await toggle()
-		await inspect()
-		output = await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)
-		expect(output).toContain('could not be saved')
-		expect(output).toContain('error TypeError line:777')
-		await b.evaluate(`Storage.prototype.setItem = window.originalSetItem; window.alert = window.originalAlert`)
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20000)
+	},
+	15000,
+)
 
-browserTest('composer history skips agents and remains navigable after native deletion and undo', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	for (let text of ['first', 'second', 'third']) history.append(id, { type: 'user', blocks: [{ type: 'text', text }] })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'not human', from: 'other' }] })
-	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelector('textarea') && document.querySelector('.Card')`)
-		await b.evaluate(`document.querySelector('textarea').focus()`)
-		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: key === 'Backspace' ? 8 : key === 'ArrowUp' ? 38 : 40 })
-		let value = () => b.evaluate(`document.querySelector('textarea').value`)
-		for (let restore of ['delete', 'undo']) {
-			await press('ArrowUp')
-			expect(await value()).toBe('third')
-			await press('ArrowUp')
-			expect(await value()).toBe('second')
-			await b.call('Input.insertText', { text: '!' })
-			expect(await value()).toBe('second!')
-			if (restore === 'delete') await press('Backspace')
-			else await b.evaluate(`document.execCommand('undo')`)
-			expect(await value()).toBe('second')
-			await press('ArrowUp')
-			expect(await value()).toBe('first')
-			for (let i = 0; i < 3; i++) await press('ArrowDown')
-			expect(await value()).toBe('second')
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		}
-	} finally { await b.close() }
-}, 15000)
-
-browserTest('assistant and completion bodies stay open through selection taps at phone and desktop widths', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	history.append(id, { type: 'user', blocks: [{ type: 'text', label: 'bash #t1', from: id, advisory: true, delivery: 'next-round', text: '[exit 0]\n' + Array.from({ length: 80 }, (_, i) => `output line ${i}`).join('\n') }] })
-	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Select this answer.\n\nTap outside the selection to keep reading.' } })
-	let b = await browser()
-	await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.Card.background-result .mark')`)
-		expect(await b.evaluate(`!!document.querySelector('.Card.background-result [title^="Read by Hal"], .Card.background-result [title^="Delivered, not read"]')`)).toBe(false)
-		expect(await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`)).toBe('false')
-		for (let width of [390, 1200]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390, maxTouchPoints: 1 })
-			let tap = async (selector: string) => {
-				if (width !== 390) { await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`); return }
-				let point = await b.evaluate(`(() => { let el = document.querySelector(${JSON.stringify(selector)}); (el.closest('.CardHeader') ? el.closest('.Card') : el).scrollIntoView({block:'nearest'}); let r = el.getClientRects()[0] ?? el.getBoundingClientRect(), header = el.closest('.Card').querySelector('.CardHeader').getBoundingClientRect(), inset = Math.min(40, r.height / 2); let point = {x:r.left+r.width/2,y:Math.max(inset,r.top+inset,el.closest('.CardHeader') ? 0 : header.bottom+inset)}; if (!document.elementFromPoint(point.x, point.y)?.closest(${JSON.stringify(selector)})) throw new Error('Tap misses ' + ${JSON.stringify(selector)}); return point })()`) as { x: number; y: number }
-				await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-				await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+browserTest(
+	'local touch debug is opt-in, observes canceled taps, and never consumes Send',
+	async () => {
+		providerHome()
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Emulation.setDeviceMetricsOverride', {
+				width: 390,
+				height: 800,
+				deviceScaleFactor: 1,
+				mobile: true,
+			})
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
+			expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
+			let toggle = async () => {
+				await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
+				await b.waitFor(`document.querySelector('.Tabs dialog').open`)
+				await b.evaluate(
+					`new Promise(resolve => { document.querySelector('.Tabs dialog').addEventListener('close', resolve, { once: true }); [...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent.includes('Touch debug')).click(); })`,
+				)
+				await b.waitFor(`!document.querySelector('.Tabs dialog').open`)
 			}
-			await tap('.Card.background-result .CardHeader .label')
-			await b.waitFor(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded') === 'true'`)
-			expect(await b.evaluate(`document.querySelector('.Card.background-result .body').inert`)).toBe(false)
-			await tap('.Card.background-result .content')
-			expect(await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`)).toBe('true')
-			await b.evaluate(`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.background-result .content')); getSelection().addRange(range); })()`)
-			await tap('.Card.background-result .content')
-			expect(await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`)).toBe('true')
-			await b.evaluate(`getSelection().removeAllRanges()`)
-			await tap('.Card.background-result .content')
-			expect(await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`)).toBe('true')
-			await tap('.Card.background-result .CardHeader .label')
-			await b.waitFor(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded') === 'false'`)
-			expect(await b.evaluate(`document.querySelector('.Card.background-result .body').inert`)).toBe(true)
-			await tap('.Card.assistant .CardHeader .label')
-			await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
-			await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
-			await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'true'`)
-			await b.evaluate(`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.assistant .content')); getSelection().addRange(range); })()`)
-			await tap('.Card.assistant .content')
-			expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe('true')
-			await b.evaluate(`getSelection().removeAllRanges()`)
-			await tap('.Card.assistant .content')
-			expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe('true')
+			await toggle()
+			await b.evaluate(
+				`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '/help'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`,
+			)
+			await b.waitFor(`!document.querySelector('.Composer .go').disabled`)
+			let point = await b.evaluate(
+				`(() => { let r = document.querySelector('.Composer .go').getBoundingClientRect(); return { x: r.x + r.width/2, y: r.y + r.height/2 }; })()`,
+			)
+			await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+			await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('touchstart Run')`)
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('pointerdown Run')
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('prevented')
+			expect(
+				await b.evaluate(`document.elementFromPoint(${point.x}, ${point.y}).closest('.Composer .go') !== null`),
+			).toBe(true)
+			expect(await b.evaluate(`getComputedStyle(document.querySelector('.TouchCrosshair')).display`)).toBe('none')
+			expect(await b.evaluate(`getComputedStyle(document.querySelector('.TouchDebug')).display`)).toBe('none')
+			await b.call('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/help')
+			await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('touchcancel')`)
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('touchcancel')
+			await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+			await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+			await b.waitFor(`document.querySelector('textarea').value === ''`)
+			await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('pointerup Run')`)
+			let output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
+			expect(output).not.toContain('/help')
+			expect(output).not.toContain('send:absent')
+			await b.evaluate(
+				`(() => { let box = document.querySelector('textarea'); box.value = 'private caret text'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); box.setSelectionRange(3, 7); box.dispatchEvent(new Event('selectionchange', { bubbles: true })); })()`,
+			)
+			await b.waitFor(`document.querySelector('.TouchDebug').textContent.includes('caret:3,7')`)
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('private caret text')
+			await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
+			await b.waitFor(
+				`document.querySelectorAll('.Tabs .track a.tab').length === 2 && document.querySelector('.Tabs .strip [aria-current] .n').textContent === '2'`,
+			)
+			await b.evaluate(`document.querySelector('.Tabs .track a.tab .n').click()`)
+			await b.waitFor(
+				`document.querySelector('.TouchDebug').textContent.includes('click tab:1') && document.querySelector('.TouchDebug').textContent.includes('tab:1 url:1 dom:1')`,
+			)
+			output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
+			expect(output).toContain('tab:2 url:2 dom:2') // event-time state before the handler
+			expect(output).not.toContain(await b.evaluate(`location.pathname.slice(1)`))
+			await b.evaluate(
+				`window.dispatchEvent(new ErrorEvent('error', { error: new DOMException('private error text', 'SecurityError'), lineno: 12, colno: 34 }))`,
+			)
+			output = await b.evaluate(`document.querySelector('.TouchDebug').textContent`)
+			expect(output).toContain('error SecurityError line:12 col:34')
+			expect(output).not.toContain('private error text')
+			await b.evaluate(
+				`window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', { promise: Promise.resolve(), reason: new TypeError('private rejection text') }))`,
+			)
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).toContain('rejection TypeError')
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain(
+				'private rejection text',
+			)
+			await b.evaluate(
+				`for (let i = 0; i < 20; i++) window.dispatchEvent(new ErrorEvent('error', { error: new RangeError('not captured'), lineno: i }))`,
+			)
+			expect(await b.evaluate(`document.querySelector('.TouchDebug').textContent`)).not.toContain('pointerup Run')
+			await toggle()
+			expect(
+				await b.evaluate(`!!document.querySelector('.TouchDebug') || !!document.querySelector('.TouchCrosshair')`),
+			).toBe(false)
+			let saved = await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)
+			expect(saved).toContain('pointerup Run')
+			expect(saved).toContain('touchcancel')
+			expect(saved).not.toContain('/help')
+			expect(saved).not.toContain('private error text')
+			await toggle()
+			expect(await b.evaluate(`document.querySelectorAll('.TouchDebug').length`)).toBe(1)
+			await b.evaluate(
+				`for (let i = 0; i < 310; i++) window.dispatchEvent(new ErrorEvent('error', { error: new RangeError('not captured'), lineno: i }))`,
+			)
+			await toggle()
+			expect(await b.evaluate(`JSON.parse(localStorage.getItem('hal.touch-debug.log')).length`)).toBe(300)
+			await b.call('Page.reload', {})
+			await b.waitFor(`!!document.querySelector('.StatusRow .model')?.textContent`)
+			expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
+			let inspect = async () => {
+				await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
+				await b.waitFor(`document.querySelector('.Tabs dialog').open`)
+				await b.evaluate(
+					`[...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent === 'Touch debug logs').click()`,
+				)
+				await b.waitFor(`document.querySelector('.TouchHistory')?.open && !document.querySelector('.Tabs dialog').open`)
+			}
+			await inspect()
+			output = await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)
+			expect(output).toContain('error RangeError line:309')
+			expect(output).toContain('after tab:')
+			expect(output).not.toContain('not captured')
+			expect(await b.evaluate(`document.querySelector('.TouchHistory').scrollWidth <= innerWidth`)).toBe(true)
+			await b.evaluate(
+				`(() => { let box = document.querySelector('textarea'); box.value = 'existing draft'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); [...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Paste logs').click(); })()`,
+			)
+			await b.waitFor(
+				`!document.querySelector('.TouchHistory') && document.querySelector('textarea').value.startsWith('existing draft\\n\\nTouch debug logs:')`,
+			)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toContain('error RangeError line:309')
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).not.toContain('not captured')
+			await inspect()
+			await b.evaluate(
+				`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Clear logs').click()`,
+			)
+			expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
+			expect(await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)).toBe('No recorded events.')
+			expect(
+				await b.evaluate(
+					`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Paste logs').disabled`,
+				),
+			).toBe(true)
+			await b.evaluate(
+				`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Close').click()`,
+			)
+			await b.waitFor(`!document.querySelector('.TouchHistory')`)
+			await inspect()
+			expect(await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)).toContain(
+				'No recorded events.',
+			)
+			await b.evaluate(
+				`[...document.querySelectorAll('.TouchHistory button')].find(b => b.textContent === 'Close').click()`,
+			)
+			await b.waitFor(`!document.querySelector('.TouchHistory')`)
+			await toggle()
+			await b.evaluate(
+				`window.originalSetItem = Storage.prototype.setItem; window.originalAlert = window.alert; window.alert = message => { window.storageWarning = message }; Storage.prototype.setItem = () => { throw new DOMException('storage full', 'QuotaExceededError') }; window.dispatchEvent(new ErrorEvent('error', { error: new TypeError('not captured'), lineno: 777 }))`,
+			)
+			await b.waitFor(`!!window.storageWarning`)
+			expect(await b.evaluate(`window.storageWarning`)).toContain('QuotaExceededError: storage full')
+			await toggle()
+			await inspect()
+			output = await b.evaluate(`document.querySelector('.TouchHistory pre').textContent`)
+			expect(output).toContain('could not be saved')
+			expect(output).toContain('error TypeError line:777')
+			await b.evaluate(`Storage.prototype.setItem = window.originalSetItem; window.alert = window.originalAlert`)
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
 		}
-	} finally { await b.close() }
-})
+	},
+	20000,
+)
 
-browserTest('queued cards share block controls and keep sender backgrounds when expanded', async () => {
-	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let queued = history.append(id, { type: 'inbox', id: 'agent-queue', from: 'reviewer', text: '**First line**\n\nLast line of the complete message', delivery: 'after-turn' })
-	history.append(id, { type: 'inbox', id: 'human-queue', text: 'Human queue', delivery: 'after-turn' })
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.Card.queued').length === 2`)
-		let command = async (text: string) => {
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`)
-			await b.evaluate(`document.querySelector('.Composer .go').click()`)
+browserTest(
+	'composer history skips agents and remains navigable after native deletion and undo',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		for (let text of ['first', 'second', 'third'])
+			history.append(id, { type: 'user', blocks: [{ type: 'text', text }] })
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'not human', from: 'other' }] })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelector('textarea') && document.querySelector('.Card')`)
+			await b.evaluate(`document.querySelector('textarea').focus()`)
+			let press = (key: string) =>
+				b.call('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					key,
+					windowsVirtualKeyCode: key === 'Backspace' ? 8 : key === 'ArrowUp' ? 38 : 40,
+				})
+			let value = () => b.evaluate(`document.querySelector('textarea').value`)
+			for (let restore of ['delete', 'undo']) {
+				await press('ArrowUp')
+				expect(await value()).toBe('third')
+				await press('ArrowUp')
+				expect(await value()).toBe('second')
+				await b.call('Input.insertText', { text: '!' })
+				expect(await value()).toBe('second!')
+				if (restore === 'delete') await press('Backspace')
+				else await b.evaluate(`document.execCommand('undo')`)
+				expect(await value()).toBe('second')
+				await press('ArrowUp')
+				expect(await value()).toBe('first')
+				for (let i = 0; i < 3; i++) await press('ArrowDown')
+				expect(await value()).toBe('second')
+				await b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,
+				)
+			}
+		} finally {
+			await b.close()
 		}
-		for (let width of [390, 1200]) {
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
-			expect(await b.evaluate(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)).toBe(false)
-			await command(`/expand #m${queued.n}`)
-			await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
-			let shown = await b.evaluate(`(() => { let agent = document.querySelector('.Card.queued.message'), human = document.querySelector('.Card.queued.user'), body = agent.querySelector('.content'); return { agent: getComputedStyle(agent).backgroundColor, human: getComputedStyle(human).backgroundColor, body: getComputedStyle(body).backgroundColor, margin: parseFloat(getComputedStyle(agent).marginBottom), overflow: document.documentElement.scrollWidth > innerWidth + 1, receipt: !!agent.querySelector('.receipt') }; })()`)
-			expect(shown.agent).not.toBe(shown.human)
-			expect(['rgba(0, 0, 0, 0)', shown.agent]).toContain(shown.body)
-			expect(shown.margin).toBeGreaterThan(0)
-			expect(shown.overflow).toBe(false)
-			expect(shown.receipt).toBe(true)
-			await command(`/collapse #m${queued.n}`)
-			await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
-			await b.evaluate(`document.querySelector('.Card.queued.message').click()`)
-			await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
-			await command(`/toggle #m${queued.n}`)
-			await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+	},
+	15000,
+)
+
+browserTest(
+	'assistant and completion bodies stay open through selection taps at phone and desktop widths',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		history.append(id, {
+			type: 'user',
+			blocks: [
+				{
+					type: 'text',
+					label: 'bash #t1',
+					from: id,
+					advisory: true,
+					delivery: 'next-round',
+					text: '[exit 0]\n' + Array.from({ length: 80 }, (_, i) => `output line ${i}`).join('\n'),
+				},
+			],
+		})
+		history.append(id, {
+			type: 'assistant',
+			block: { type: 'text', text: 'Select this answer.\n\nTap outside the selection to keep reading.' },
+		})
+		let b = await browser()
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`!!document.querySelector('.Card.background-result .mark')`)
+			expect(
+				await b.evaluate(
+					`!!document.querySelector('.Card.background-result [title^="Read by Hal"], .Card.background-result [title^="Delivered, not read"]')`,
+				),
+			).toBe(false)
+			expect(
+				await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`),
+			).toBe('false')
+			for (let width of [390, 1200]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390, maxTouchPoints: 1 })
+				let tap = async (selector: string) => {
+					if (width !== 390) {
+						await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
+						return
+					}
+					let point = (await b.evaluate(
+						`(() => { let el = document.querySelector(${JSON.stringify(selector)}); (el.closest('.CardHeader') ? el.closest('.Card') : el).scrollIntoView({block:'nearest'}); let r = el.getClientRects()[0] ?? el.getBoundingClientRect(), header = el.closest('.Card').querySelector('.CardHeader').getBoundingClientRect(), inset = Math.min(40, r.height / 2); let point = {x:r.left+r.width/2,y:Math.max(inset,r.top+inset,el.closest('.CardHeader') ? 0 : header.bottom+inset)}; if (!document.elementFromPoint(point.x, point.y)?.closest(${JSON.stringify(selector)})) throw new Error('Tap misses ' + ${JSON.stringify(selector)}); return point })()`,
+					)) as { x: number; y: number }
+					await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+					await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+				}
+				await tap('.Card.background-result .CardHeader .label')
+				await b.waitFor(
+					`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded') === 'true'`,
+				)
+				expect(await b.evaluate(`document.querySelector('.Card.background-result .body').inert`)).toBe(false)
+				await tap('.Card.background-result .content')
+				expect(
+					await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`),
+				).toBe('true')
+				await b.evaluate(
+					`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.background-result .content')); getSelection().addRange(range); })()`,
+				)
+				await tap('.Card.background-result .content')
+				expect(
+					await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`),
+				).toBe('true')
+				await b.evaluate(`getSelection().removeAllRanges()`)
+				await tap('.Card.background-result .content')
+				expect(
+					await b.evaluate(`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded')`),
+				).toBe('true')
+				await tap('.Card.background-result .CardHeader .label')
+				await b.waitFor(
+					`document.querySelector('.Card.background-result .mark').getAttribute('aria-expanded') === 'false'`,
+				)
+				expect(await b.evaluate(`document.querySelector('.Card.background-result .body').inert`)).toBe(true)
+				await tap('.Card.assistant .CardHeader .label')
+				await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'false'`)
+				await b.evaluate(`document.querySelector('.Card.assistant .mark').click()`)
+				await b.waitFor(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded') === 'true'`)
+				await b.evaluate(
+					`(() => { let range = document.createRange(); range.selectNodeContents(document.querySelector('.Card.assistant .content')); getSelection().addRange(range); })()`,
+				)
+				await tap('.Card.assistant .content')
+				expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe(
+					'true',
+				)
+				await b.evaluate(`getSelection().removeAllRanges()`)
+				await tap('.Card.assistant .content')
+				expect(await b.evaluate(`document.querySelector('.Card.assistant .mark').getAttribute('aria-expanded')`)).toBe(
+					'true',
+				)
+			}
+		} finally {
+			await b.close()
 		}
-	} finally { await b.close() }
-}, 10000)
+	},
+)
+
+browserTest(
+	'queued cards share block controls and keep sender backgrounds when expanded',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		let queued = history.append(id, {
+			type: 'inbox',
+			id: 'agent-queue',
+			from: 'reviewer',
+			text: '**First line**\n\nLast line of the complete message',
+			delivery: 'after-turn',
+		})
+		history.append(id, { type: 'inbox', id: 'human-queue', text: 'Human queue', delivery: 'after-turn' })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('.Card.queued').length === 2`)
+			let command = async (text: string) => {
+				await b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`,
+				)
+				await b.evaluate(`document.querySelector('.Composer .go').click()`)
+			}
+			for (let width of [390, 1200]) {
+				await b.call('Emulation.setDeviceMetricsOverride', {
+					width,
+					height: 800,
+					deviceScaleFactor: 1,
+					mobile: width === 390,
+				})
+				expect(
+					await b.evaluate(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`),
+				).toBe(false)
+				await command(`/expand #m${queued.n}`)
+				await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+				let shown = await b.evaluate(
+					`(() => { let agent = document.querySelector('.Card.queued.message'), human = document.querySelector('.Card.queued.user'), body = agent.querySelector('.content'); return { agent: getComputedStyle(agent).backgroundColor, human: getComputedStyle(human).backgroundColor, body: getComputedStyle(body).backgroundColor, margin: parseFloat(getComputedStyle(agent).marginBottom), overflow: document.documentElement.scrollWidth > innerWidth + 1, receipt: !!agent.querySelector('.receipt') }; })()`,
+				)
+				expect(shown.agent).not.toBe(shown.human)
+				expect(['rgba(0, 0, 0, 0)', shown.agent]).toContain(shown.body)
+				expect(shown.margin).toBeGreaterThan(0)
+				expect(shown.overflow).toBe(false)
+				expect(shown.receipt).toBe(true)
+				await command(`/collapse #m${queued.n}`)
+				await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+				await b.evaluate(`document.querySelector('.Card.queued.message').click()`)
+				await b.waitFor(`document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+				await command(`/toggle #m${queued.n}`)
+				await b.waitFor(`!document.querySelector('.Card.queued.message').textContent.includes('Last line')`)
+			}
+		} finally {
+			await b.close()
+		}
+	},
+	10000,
+)

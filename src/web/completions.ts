@@ -11,7 +11,12 @@ export type Known = { input: string; items: string[]; descriptions?: string[] }
 // answer is in flight. A shorter prefix might have additional matches.
 function predict(text: string, known: Known | undefined, current?: Menu): Menu | undefined {
 	if (!known || !text.startsWith(known.input)) return current
-	return completions.receive(text, known.items.filter((item) => item.startsWith(text)), current, known.descriptions?.filter((_, i) => known.items[i]!.startsWith(text)))
+	return completions.receive(
+		text,
+		known.items.filter((item) => item.startsWith(text)),
+		current,
+		known.descriptions?.filter((_, i) => known.items[i]!.startsWith(text)),
+	)
 }
 
 function receive(input: string, items: string[], previous?: Menu, descriptions?: string[]): Menu | undefined {
@@ -21,11 +26,23 @@ function receive(input: string, items: string[], previous?: Menu, descriptions?:
 		let name = value.trimEnd().split(' ')[0]!
 		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
 		// Only the host or the command list describes a candidate (task 4qh).
-		let description = descriptions?.[i] || (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) || ''
-		return previous?.choices.find((choice) => choice.value === value && choice.label === label && choice.description === description) ?? { value, label, description }
+		let description =
+			descriptions?.[i] || (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) || ''
+		return (
+			previous?.choices.find(
+				(choice) => choice.value === value && choice.label === label && choice.description === description,
+			) ?? { value, label, description }
+		)
 	})
-	if (previous && choices.length === previous.choices.length && choices.every((choice, i) => choice === previous.choices[i])) return previous
-	let selected = previous ? choices.findIndex((choice) => choice.value === previous.choices[previous.selected]?.value) : -1
+	if (
+		previous &&
+		choices.length === previous.choices.length &&
+		choices.every((choice, i) => choice === previous.choices[i])
+	)
+		return previous
+	let selected = previous
+		? choices.findIndex((choice) => choice.value === previous.choices[previous.selected]?.value)
+		: -1
 	return { input, selected: Math.max(0, selected), choices, explicit: selected >= 0 && previous?.explicit }
 }
 

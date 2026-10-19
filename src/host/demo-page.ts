@@ -16,7 +16,14 @@ async function serve(pathname: string, css: string): Promise<Response> {
 		html = html.replace('/*APP_STYLES*/', () => app.match(/<style>([\s\S]*?)<\/style>/)![1]!)
 	}
 	html = html.replace('/*COLORS*/', () => css)
-	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self'" } })
+	return new Response(html, {
+		headers: {
+			'content-type': 'text/html; charset=utf-8',
+			'cache-control': 'no-store',
+			'content-security-policy':
+				"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self'",
+		},
+	})
 }
 
 export const demoPage = { owns, serve }

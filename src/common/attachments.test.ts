@@ -13,5 +13,10 @@ test('markers made for a blob are found again, and only well-formed ones', () =>
 
 test('an image label rounds its size to a readable unit', () => {
 	let label = (bytes?: number) => attachments.label({ mediaType: 'image/jpeg', bytes })
-	expect([label(999), label(12_345), label(2_500_000), label()]).toEqual(['[image 999 B jpg]', '[image 12 kB jpg]', '[image 2.5 MB jpg]', '[image jpg]'])
+	expect([label(999), label(12_345), label(2_500_000), label()]).toEqual([
+		'[image 999 B jpg]',
+		'[image 12 kB jpg]',
+		'[image 2.5 MB jpg]',
+		'[image jpg]',
+	])
 })

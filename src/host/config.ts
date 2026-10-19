@@ -21,7 +21,11 @@ const POINTER = '// Every setting, its default and meaning: /config'
 function init(onChange?: () => void): void {
 	if (config.state.data) return
 	if (onChange) config.state.onChange = onChange
-	let data = liveFiles.liveFile<Record<string, unknown>>(paths.configFile(), {}, { keepBroken: true, onChange: () => config.state.onChange?.() })
+	let data = liveFiles.liveFile<Record<string, unknown>>(
+		paths.configFile(),
+		{},
+		{ keepBroken: true, onChange: () => config.state.onChange?.() },
+	)
 	config.state.data = data
 	settings.state.raw = data
 }
@@ -83,7 +87,13 @@ function explain(data: Record<string, unknown>, s: Setting): void {
 	let comments = ((data as any)[ason.COMMENTS] ?? {}) as Record<string, string>
 	if (comments[s.name]?.trim()) return
 	let text = `${s.description}${s.type.kind === 'choice' ? ` One of: ${s.type.options.join(', ')}.` : ''} Default: ${ason.stringify(s.default, 'short')}.`
-	;(data as any)[ason.COMMENTS] = { ...comments, [s.name]: strings.wordWrap(text, 70).map((l) => `// ${l}`).join('\n') }
+	;(data as any)[ason.COMMENTS] = {
+		...comments,
+		[s.name]: strings
+			.wordWrap(text, 70)
+			.map((l) => `// ${l}`)
+			.join('\n'),
+	}
 }
 
 // The /config modal's content (protocol `settings`): every setting's

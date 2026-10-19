@@ -66,7 +66,10 @@ test('/go completion: one described row per session, directories, blocks newest 
 	let other = make(c, '/tmp/go-rows')
 	sessions.open(other).name = 'Rows'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'first line\nsecond' }] })
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'c1', name: 'bash', input: { command: 'ls', description: 'List files' } } })
+	history.append(id, {
+		type: 'assistant',
+		block: { type: 'tool_call', id: 'c1', name: 'bash', input: { command: 'ls', description: 'List files' } },
+	})
 	let context = { sessionId: id, cwd: '/tmp', model: 'fake/m', setCwd() {}, setModel() {}, say() {} }
 	let rows = (text: string) => commands.suggestions(text, context)
 	expect(rows('/go ~/hal-go')).toEqual({ items: ['/go ~/hal-go-project'], descriptions: ['directory'] })
@@ -101,7 +104,8 @@ test('/go targets: n is a tab; #n, r12, #r12 and <session>#n, <session>/n are bl
 	let n = history.readSync(second).at(-1)!.n
 	expect(await go('2')).toMatchObject({ tab: second })
 	expect((await go('2')).block).toBeUndefined()
-	for (let value of [`2#${n}`, `2#t${n}`, `Second/${n}`, `${second}#u${n}`]) expect(await go(value)).toMatchObject({ tab: second, block: `u${n}` })
+	for (let value of [`2#${n}`, `2#t${n}`, `Second/${n}`, `${second}#u${n}`])
+		expect(await go(value)).toMatchObject({ tab: second, block: `u${n}` })
 	// The path /tmp/go-t/4 is a session directory: it wins over tab 1's block 4.
 	expect(await go('/tmp/go-t/4')).toMatchObject({ tab: second })
 	expect((await go('/tmp/go-t/4')).block).toBeUndefined()

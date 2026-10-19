@@ -16,13 +16,21 @@ test('/send resolves tab number and id, preserves provenance, runs remote comman
 	let send = (text: string) => a.conn.send({ type: 'submit', sessionId: sender, text })
 	send('/send 1 hello by tab')
 	await until(() => calls.length === 1)
-	expect(b.views.get(target)?.items.find((i) => i.type === 'prompt')).toMatchObject({ text: 'hello by tab', from: sender })
+	expect(b.views.get(target)?.items.find((i) => i.type === 'prompt')).toMatchObject({
+		text: 'hello by tab',
+		from: sender,
+	})
 	send(`/send ${target} /rename Remote name`)
 	await until(() => b.views.get(target)?.meta.name === 'Remote name')
-	expect(b.views.get(target)?.items.find((i) => i.type === 'command')).toMatchObject({ from: sender, text: '/rename Remote name' })
+	expect(b.views.get(target)?.items.find((i) => i.type === 'command')).toMatchObject({
+		from: sender,
+		text: '/rename Remote name',
+	})
 	send(`/send ${target} hello by id`)
 	await until(() => b.views.get(target)?.items.some((m) => m.type === 'prompt' && m.text === 'hello by id'))
-	expect(b.views.get(target)?.items.find((m) => m.type === 'prompt' && m.text === 'hello by id')).toMatchObject({ from: sender })
+	expect(b.views.get(target)?.items.find((m) => m.type === 'prompt' && m.text === 'hello by id')).toMatchObject({
+		from: sender,
+	})
 	send('/send 99 no such tab')
 	await until(() => a.of('output').at(-1)?.error)
 	expect(a.of('output').at(-1)?.text).toContain('no session 99')

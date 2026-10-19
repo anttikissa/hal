@@ -19,7 +19,10 @@ test('/queue lists in order, next steers a running turn, clear drops only queued
 	await until(() => a.of('output').some((e) => e.text.includes('1. first\n2. second')))
 	send('/queue next')
 	await until(() => b.views.get(id)?.inbox.some((m) => m.text === 'first' && m.delivery !== 'after-turn'))
-	expect(b.views.get(id)?.inbox.map((m) => [m.text, (m.delivery === 'after-turn')])).toEqual([['first', false], ['second', true]])
+	expect(b.views.get(id)?.inbox.map((m) => [m.text, m.delivery === 'after-turn'])).toEqual([
+		['first', false],
+		['second', true],
+	])
 	send('/queue clear')
 	await until(() => b.views.get(id)?.inbox.length === 1)
 	await until(() => a.of('output').at(-1)?.text.includes('1 queued message'))
@@ -57,7 +60,10 @@ test('/queue drop only reserves numbers; web drops target IDs and refuse stale c
 	send('/queue drop')
 	await until(() => a.views.get(id)?.inbox.length === 4)
 	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['keep it', 'numeric id', 'drop it', 'drop'])
-	expect((await records(id)).filter((r) => r.type === 'command').map((r) => r.text)).toEqual(['/queue drop it', '/queue drop'])
+	expect((await records(id)).filter((r) => r.type === 'command').map((r) => r.text)).toEqual([
+		'/queue drop it',
+		'/queue drop',
+	])
 	send('/queue drop 1')
 	await until(() => a.views.get(id)?.inbox.length === 3)
 	send('/queue drop --id 2')

@@ -13,8 +13,9 @@ function load(): string[] {
 	if (history) return history
 	let stored = localStorage.getItem(KEY)
 	let rows: unknown = stored === null ? [] : JSON.parse(stored)
-	if (!Array.isArray(rows) || rows.length > 300 || !rows.every(row => typeof row === 'string' && row.length <= 2048)) throw new Error(`${KEY}: invalid touch debug history`)
-	return history = rows
+	if (!Array.isArray(rows) || rows.length > 300 || !rows.every((row) => typeof row === 'string' && row.length <= 2048))
+		throw new Error(`${KEY}: invalid touch debug history`)
+	return (history = rows)
 }
 
 function persist(): void {
@@ -40,14 +41,24 @@ function retain(row: string): void {
 
 function inspect(): void {
 	let rows: string[]
-	try { rows = load() } catch (error) { alert(String(error)); return }
-	let dialog = document.createElement('dialog'), top = document.createElement('div'), title = document.createElement('h2'), text = document.createElement('pre')
+	try {
+		rows = load()
+	} catch (error) {
+		alert(String(error))
+		return
+	}
+	let dialog = document.createElement('dialog'),
+		top = document.createElement('div'),
+		title = document.createElement('h2'),
+		text = document.createElement('pre')
 	dialog.className = 'TouchHistory StatusDetails'
 	dialog.setAttribute('aria-label', 'Touch debug logs')
 	top.className = 'top'
 	title.textContent = 'Touch debug logs'
 	text.textContent = `${storageError ? `${storageError}\n\n` : ''}Stored only in this browser. Latest 300 events; recording is opt-in.\n\n${rows.join('\n\n') || 'No recorded events.'}`
-	let paste = document.createElement('button'), clear = document.createElement('button'), close = document.createElement('button')
+	let paste = document.createElement('button'),
+		clear = document.createElement('button'),
+		close = document.createElement('button')
 	paste.textContent = 'Paste logs'
 	paste.disabled = !rows.length
 	paste.onclick = () => {
@@ -58,9 +69,16 @@ function inspect(): void {
 	}
 	clear.textContent = 'Clear logs'
 	clear.onclick = () => {
-		try { localStorage.removeItem(KEY) } catch (error) { alert(`${KEY}: ${String(error)}`); return }
-		clearTimeout(saving); saving = undefined
-		history = []; storageError = ''
+		try {
+			localStorage.removeItem(KEY)
+		} catch (error) {
+			alert(`${KEY}: ${String(error)}`)
+			return
+		}
+		clearTimeout(saving)
+		saving = undefined
+		history = []
+		storageError = ''
 		paste.disabled = true
 		text.textContent = 'No recorded events.'
 	}
@@ -75,35 +93,76 @@ function inspect(): void {
 
 function start(): void {
 	if (stop) return
-	try { load() } catch (error) { alert(String(error)); throw error }
-	let panel = document.createElement('pre'), mark = document.createElement('span')
+	try {
+		load()
+	} catch (error) {
+		alert(String(error))
+		throw error
+	}
+	let panel = document.createElement('pre'),
+		mark = document.createElement('span')
 	panel.className = 'TouchDebug'
 	mark.className = 'TouchCrosshair'
 	panel.setAttribute('aria-hidden', 'true')
 	mark.setAttribute('aria-hidden', 'true')
 	panel.textContent = 'Touch debug ON — tap Send'
 	document.body.append(panel, mark)
-	let rows: string[] = [], serial = 0
+	let rows: string[] = [],
+		serial = 0
 	let label = (target: EventTarget | null) => {
 		let el = target instanceof Element ? target : null
 		let action = el?.closest('.Composer button')?.getAttribute('aria-label')
-		if (action && ['Send', 'Steer', 'Queue', 'Run', 'Pause (Esc)', 'Continue', 'Nudge', 'Attach file', 'Save queued message'].includes(action)) return action
+		if (
+			action &&
+			[
+				'Send',
+				'Steer',
+				'Queue',
+				'Run',
+				'Pause (Esc)',
+				'Continue',
+				'Nudge',
+				'Attach file',
+				'Save queued message',
+			].includes(action)
+		)
+			return action
 		let n = el?.closest('.Tabs a.tab')?.querySelector('.n')?.textContent
 		if (n && /^\d+$/.test(n)) return `tab:${Number(n)}`
-		return el?.closest('.Composer textarea') ? 'draft' : el?.closest('.Composer') ? 'composer' : el?.closest('.Tabs') ? 'tabs' : el?.closest('.Transcript') ? 'transcript' : 'other'
+		return el?.closest('.Composer textarea')
+			? 'draft'
+			: el?.closest('.Composer')
+				? 'composer'
+				: el?.closest('.Tabs')
+					? 'tabs'
+					: el?.closest('.Transcript')
+						? 'transcript'
+						: 'other'
 	}
 	let selection = () => {
-		let number = (id: string | undefined) => app.state.tabs.findIndex(t => t.id === id) + 1
+		let number = (id: string | undefined) => app.state.tabs.findIndex((t) => t.id === id) + 1
 		let rendered = Number(document.querySelector('.Tabs .strip [aria-current] .n')?.textContent) || 0
 		return `tab:${number(app.state.shown)} url:${number(router.parse(location.href))} dom:${rendered}`
 	}
 	let caret = () => {
 		let box = document.querySelector<HTMLTextAreaElement>('.Composer textarea')
-		return box ? `caret:${box.selectionStart},${box.selectionEnd} draftScroll:${Math.round(box.scrollTop)}` : 'caret:absent'
+		return box
+			? `caret:${box.selectionStart},${box.selectionEnd} draftScroll:${Math.round(box.scrollTop)}`
+			: 'caret:absent'
 	}
-	let record = (name: string, target: string, canceled: boolean, point?: { clientX: number; clientY: number; pageX: number; pageY: number }, state = '', geometry = '') => {
-		let vv = visualViewport, box = document.querySelector('.Composer .go')?.getBoundingClientRect()
-		let xy = point ? ` c${Math.round(point.clientX)},${Math.round(point.clientY)} p${Math.round(point.pageX)},${Math.round(point.pageY)}` : ''
+	let record = (
+		name: string,
+		target: string,
+		canceled: boolean,
+		point?: { clientX: number; clientY: number; pageX: number; pageY: number },
+		state = '',
+		geometry = '',
+	) => {
+		let vv = visualViewport,
+			box = document.querySelector('.Composer .go')?.getBoundingClientRect()
+		let xy = point
+			? ` c${Math.round(point.clientX)},${Math.round(point.clientY)} p${Math.round(point.pageX)},${Math.round(point.pageY)}`
+			: ''
 		rows.push(`${++serial} ${name} ${target}${xy}${canceled ? ' prevented' : ''}${state}`)
 		if (rows.length > 8) rows.shift()
 		let after = `${selection()} ${caret()} focus:${label(document.activeElement)} vv:${Math.round(vv?.height ?? innerHeight)} top:${Math.round(vv?.offsetTop ?? 0)} scroll:${Math.round(scrollY)} send:${box ? [box.left, box.top, box.right, box.bottom].map(Math.round).join(',') : 'absent'}`
@@ -112,15 +171,28 @@ function start(): void {
 	}
 	let pending = new Map<ReturnType<typeof setTimeout>, () => void>()
 	let drain = () => {
-		for (let [timer, observe] of pending) { clearTimeout(timer); observe() }
+		for (let [timer, observe] of pending) {
+			clearTimeout(timer)
+			observe()
+		}
 		pending.clear()
 	}
-	let flush = () => { drain(); persist() }
-	let hidden = () => { if (document.visibilityState === 'hidden') flush() }
+	let flush = () => {
+		drain()
+		persist()
+	}
+	let hidden = () => {
+		if (document.visibilityState === 'hidden') flush()
+	}
 	window.addEventListener('pagehide', flush)
 	document.addEventListener('visibilitychange', hidden)
 	let event = (e: Event) => {
-		let point = typeof TouchEvent !== 'undefined' && e instanceof TouchEvent ? e.changedTouches[0] : e instanceof MouseEvent ? e : undefined
+		let point =
+			typeof TouchEvent !== 'undefined' && e instanceof TouchEvent
+				? e.changedTouches[0]
+				: e instanceof MouseEvent
+					? e
+					: undefined
 		if (e.type === 'touchstart' && point) {
 			mark.style.left = `${point.pageX}px`
 			mark.style.top = `${point.pageY}px`
@@ -134,19 +206,45 @@ function start(): void {
 		let geometry = ` send:${rect ? [rect.left, rect.top, rect.right, rect.bottom].map(Math.round).join(',') : 'absent'} top:${Math.round(visualViewport?.offsetTop ?? 0)} scroll:${Math.round(scrollY)}`
 		let xy = point && { clientX: point.clientX, clientY: point.clientY, pageX: point.pageX, pageY: point.pageY }
 		let observe = () => record(e.type, target, e.defaultPrevented, xy, state, geometry)
-		let timer = setTimeout(() => { pending.delete(timer); observe() }, 0)
+		let timer = setTimeout(() => {
+			pending.delete(timer)
+			observe()
+		}, 0)
 		pending.set(timer, observe)
 	}
 	let failure = (kind: string, error: unknown, line = 0, column = 0) => {
 		let name = error instanceof Error || error instanceof DOMException ? error.name : 'other'
-		if (!['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError', 'SecurityError', 'InvalidStateError', 'QuotaExceededError'].includes(name)) name = 'other'
+		if (
+			![
+				'Error',
+				'TypeError',
+				'RangeError',
+				'ReferenceError',
+				'SyntaxError',
+				'SecurityError',
+				'InvalidStateError',
+				'QuotaExceededError',
+			].includes(name)
+		)
+			name = 'other'
 		record(kind, name, false, undefined, ` line:${line} col:${column}`)
 	}
 	let error = (e: ErrorEvent) => failure('error', e.error, e.lineno, e.colno)
 	let rejection = (e: PromiseRejectionEvent) => failure('rejection', e.reason)
 	window.addEventListener('error', error)
 	window.addEventListener('unhandledrejection', rejection)
-	let names = ['touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel', 'click', 'focusin', 'focusout', 'selectionchange']
+	let names = [
+		'touchstart',
+		'touchend',
+		'touchcancel',
+		'pointerdown',
+		'pointerup',
+		'pointercancel',
+		'click',
+		'focusin',
+		'focusout',
+		'selectionchange',
+	]
 	for (let name of names) window.addEventListener(name, event, { capture: true, passive: true })
 	let resized = () => record('vv-resize', 'viewport', false)
 	let scrolled = () => record('vv-scroll', 'viewport', false)
@@ -161,7 +259,8 @@ function start(): void {
 		visualViewport?.removeEventListener('scroll', scrolled)
 		window.removeEventListener('error', error)
 		window.removeEventListener('unhandledrejection', rejection)
-		panel.remove(); mark.remove()
+		panel.remove()
+		mark.remove()
 		stop = undefined
 	}
 }

@@ -5,5 +5,12 @@ import { icons, type IconName } from '../icons.ts'
 
 export function Icon(props: { name: IconName }) {
 	let svg = () => icons.svg(props.name)
-	return <svg class={['icon', `g${svg().grid}`]} viewBox={`0 0 ${svg().grid} ${svg().grid}`} aria-hidden="true" innerHTML={svg().body} />
+	return (
+		<svg
+			class={['icon', `g${svg().grid}`]}
+			viewBox={`0 0 ${svg().grid} ${svg().grid}`}
+			aria-hidden="true"
+			innerHTML={svg().body}
+		/>
+	)
 }

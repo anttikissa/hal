@@ -35,7 +35,9 @@ function plan(id: string, model: string): Plan | undefined {
 	try {
 		let { list } = auth.all(kind as Kind)
 		let subs = list.filter((a) => typeof a.entry.accessToken === 'string' && a.entry.accessToken)
-		let next = auth.pickAccount(kind as Kind, list, { session: id }).find((a) => !auth.skipped(kind as Kind, a, parsed!.model))
+		let next = auth
+			.pickAccount(kind as Kind, list, { session: id })
+			.find((a) => !auth.skipped(kind as Kind, a, parsed!.model))
 		if (!next || !subs.includes(next)) return undefined
 		return { account: subs.indexOf(next) + 1, accounts: subs.length, key: subscriptions.key(kind, next.name) }
 	} catch {

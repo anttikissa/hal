@@ -4,7 +4,30 @@ import { strings } from './strings.ts'
 let { clipVisual, expandTabs, sliceVisual, visLen, wordWrap } = strings
 
 test('plain symbol glyphs match Ghostty single-cell width', () => {
-	for (let glyph of ['▪', '▫', '▶', '◀', '✓', '×', '✗', '✔', '✔️', '✖️', '☀', '❤', '⚠', '➡', '⬅', '⬆', '⬇', '←', '→', '↑', '↓', '…']) {
+	for (let glyph of [
+		'▪',
+		'▫',
+		'▶',
+		'◀',
+		'✓',
+		'×',
+		'✗',
+		'✔',
+		'✔️',
+		'✖️',
+		'☀',
+		'❤',
+		'⚠',
+		'➡',
+		'⬅',
+		'⬆',
+		'⬇',
+		'←',
+		'→',
+		'↑',
+		'↓',
+		'…',
+	]) {
 		expect(visLen(glyph), glyph).toBe(1)
 	}
 })
@@ -45,7 +68,12 @@ test('word wrap breaks at spaces, and mid-word only when it must', () => {
 })
 
 test('word wrap can keep a too-long word whole on a row of its own', () => {
-	expect(wordWrap('go to https://a.b/cdefgh now or else', 8, true)).toEqual(['go to', 'https://a.b/cdefgh', 'now or', 'else'])
+	expect(wordWrap('go to https://a.b/cdefgh now or else', 8, true)).toEqual([
+		'go to',
+		'https://a.b/cdefgh',
+		'now or',
+		'else',
+	])
 })
 
 test('wrapped rows never exceed the width, and keep all visible text', () => {
@@ -53,7 +81,8 @@ test('wrapped rows never exceed the width, and keep all visible text', () => {
 	for (let width = 1; width < 40; width++) {
 		let rows = wordWrap(text, width)
 		// Only a single glyph wider than the whole row may exceed it.
-		for (let row of rows) if ([...new Intl.Segmenter().segment(row)].length > 1) expect(visLen(row)).toBeLessThanOrEqual(width)
+		for (let row of rows)
+			if ([...new Intl.Segmenter().segment(row)].length > 1) expect(visLen(row)).toBeLessThanOrEqual(width)
 		expect(rows.join('').replaceAll(' ', '')).toBe(text.replaceAll(' ', ''))
 	}
 })
@@ -99,7 +128,12 @@ test('a visual slice keeps the columns asked for and the styling active there', 
 	// A wide glyph cut by an edge becomes a space on the side kept.
 	expect(sliceVisual('a漢b', 0, 2)).toBe('a ')
 	expect(sliceVisual('a漢b', 2, 4)).toBe(' b')
-	for (let [from, to] of [[0, 1], [1, 3], [2, 5], [0, 9]] as const) {
+	for (let [from, to] of [
+		[0, 1],
+		[1, 3],
+		[2, 5],
+		[0, 9],
+	] as const) {
 		let cut = sliceVisual('漢字e\u0301👨‍👩‍👧x', from, to)
 		expect(visLen(cut)).toBe(Math.min(to, 8) - from)
 	}

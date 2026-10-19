@@ -57,7 +57,15 @@ export type Connection = {
 
 // `held`: commands waiting, by session, for its snapshot to be sent;
 // under '*', every command, until the tabs are sent.
-export type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; shown?: string; visibleAt?: number; held: Map<string, unknown[]>; record: ClientRecord }
+export type Client = {
+	deliver: (event: Event) => void
+	open: Set<string>
+	visible?: string
+	shown?: string
+	visibleAt?: number
+	held: Map<string, unknown[]>
+	record: ClientRecord
+}
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
@@ -65,7 +73,12 @@ type Outcome = { refused?: string; sessionId?: string; tab?: string; reply?: Eve
 
 function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection {
 	let open = new Set<string>()
-	let client: Client = { deliver: (e) => deliver(wire.event(e)), open, held: new Map(), record: clients.join(open, info) }
+	let client: Client = {
+		deliver: (e) => deliver(wire.event(e)),
+		open,
+		held: new Map(),
+		record: clients.join(open, info),
+	}
 	host.state.clients.add(client)
 	serverLog.joined(client.record)
 	warnings.send(client)
@@ -78,7 +91,9 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	let indexed = tabs.indexed()
 	let live = () => host.state.clients.has(client)
 	if (!indexed) tabs.greet(client, live)
-	else void (client.held.set('*', []), indexed.then(() => live() && (tabs.greet(client, live), setImmediate(() => live() && host.release(client, '*')))))
+	else
+		void (client.held.set('*', []),
+		indexed.then(() => live() && (tabs.greet(client, live), setImmediate(() => live() && host.release(client, '*')))))
 	return {
 		send: (command) => {
 			if (host.state.clients.has(client)) host.handle(client, wire.copy(command))
@@ -103,12 +118,10 @@ function release(client: Client, key: string): void {
 	for (let c of held) host.handle(client, c)
 }
 
-
 // This process's version is known: every client hears it (task n1).
 function announce(loaded: string): void {
 	for (let client of host.state.clients) client.deliver({ type: 'version', version: loaded })
 }
-
 
 function reject(client: Client, command: unknown, reason: string, sessionId?: unknown): void {
 	let c = command as { type?: unknown; id?: unknown } | null
@@ -122,7 +135,22 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['rebase-apply', 'rebase-error', 'create', 'submit', 'draft', 'pause', 'continue', 'answer', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
+const once = new Set([
+	'rebase-apply',
+	'rebase-error',
+	'create',
+	'submit',
+	'draft',
+	'pause',
+	'continue',
+	'answer',
+	'attach',
+	'tab-new',
+	'tab-close',
+	'tab-resume',
+	'tab-move',
+	'tab-start',
+])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered.
@@ -143,7 +171,10 @@ function handle(client: Client, command: unknown): void {
 	if (problem) return host.reject(client, command, problem, (command as any)?.sessionId)
 	let c = command as Command
 	let repeat = c.id === undefined ? undefined : (host.state.done.get(c.id) ?? host.submitted(c))
-	if (repeat) { queueEdits.repeated(client, c, repeat.refused); return host.answer(client, c, repeat) }
+	if (repeat) {
+		queueEdits.repeated(client, c, repeat.refused)
+		return host.answer(client, c, repeat)
+	}
 	let outcome: Outcome | Promise<Outcome> | undefined
 	try {
 		outcome = host.act(client, c)
@@ -169,7 +200,9 @@ function handle(client: Client, command: unknown): void {
 // A repeat of a submit the previous host recorded, found in history.
 function submitted(c: Command): Outcome | undefined {
 	if (c.type !== 'submit' || !sessions.state.open.has(c.sessionId)) return undefined
-	let seen = (r: HistoryRecord) => ((r.type === 'user' || r.type === 'command') && r.command === c.id) || (r.type === 'inbox' && (r.id === c.id || r.command === c.id))
+	let seen = (r: HistoryRecord) =>
+		((r.type === 'user' || r.type === 'command') && r.command === c.id) ||
+		(r.type === 'inbox' && (r.id === c.id || r.command === c.id))
 	return history.readSync(c.sessionId).some(seen) ? {} : undefined
 }
 
@@ -187,8 +220,14 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 // slices), or undefined if it will answer later.
 function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined {
 	clients.input(client.record, c)
-	if (c.type === 'find') { find.search(client, c.request, c.query, c.kinds, client.deliver); return {} }
-	if (c.type === 'find-cancel') { find.cancel(client); return {} }
+	if (c.type === 'find') {
+		find.search(client, c.request, c.query, c.kinds, client.deliver)
+		return {}
+	}
+	if (c.type === 'find-cancel') {
+		find.cancel(client)
+		return {}
+	}
 	if (c.type === 'create' || c.type === 'open-newest') {
 		let id = c.type === 'open-newest' ? sessions.newest() : undefined
 		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
@@ -230,58 +269,125 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (tabs.is(c)) return tabs.act(c, client.record.timezone)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
-	if (c.type === 'notice-history' || c.type === 'plugin-sync') return c.type === 'plugin-sync' ? pluginSync.command(client, c) : { reply: { type: 'notice-history', entries: noticeHistory.list() } }
-	if (c.type === 'handover') return client.record.kind !== 'peer' ? { refused: 'handover: only a process on the host socket may ask' } : serverLog.state.on ? { refused: 'hal serve already hosts this home' } : (handover.request(), {})
-	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid, c.version, c.newCode) : clients.screen(client.record, c)
+	if (c.type === 'notice-history' || c.type === 'plugin-sync')
+		return c.type === 'plugin-sync'
+			? pluginSync.command(client, c)
+			: { reply: { type: 'notice-history', entries: noticeHistory.list() } }
+	if (c.type === 'handover')
+		return client.record.kind !== 'peer'
+			? { refused: 'handover: only a process on the host socket may ask' }
+			: serverLog.state.on
+				? { refused: 'hal serve already hosts this home' }
+				: (handover.request(), {})
+	if (c.type === 'hello' || c.type === 'screen')
+		return c.type === 'hello'
+			? clients.hello(client.record, c.pid, c.version, c.newCode)
+			: clients.screen(client.record, c)
 	if (c.type === 'visibility') {
 		// A known tab may still be waiting for its open snapshot.
-		if (!client.open.has(c.sessionId) && !tabs.file().open.includes(c.sessionId)) return { refused: 'visibility: session is not an open tab or followed session' }
+		if (!client.open.has(c.sessionId) && !tabs.file().open.includes(c.sessionId))
+			return { refused: 'visibility: session is not an open tab or followed session' }
 		let previous = client.visible
 		if (client.shown !== undefined && client.shown !== c.sessionId) tabs.left(client.shown)
-		client.visible = c.visible ? c.sessionId : undefined; client.shown = c.sessionId; client.visibleAt = Date.now()
+		client.visible = c.visible ? c.sessionId : undefined
+		client.shown = c.sessionId
+		client.visibleAt = Date.now()
 		recap.visibility(previous, client.visible)
 		return {}
 	}
-	if (c.type === 'auth') { if (c.link) webLinks.follow(client, client.deliver); return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } } }
+	if (c.type === 'auth') {
+		if (c.link) webLinks.follow(client, client.deliver)
+		return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
+	}
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
-	let queueEdit = queueEdits.intercept(client, c); if (queueEdit) return queueEdit
+	let queueEdit = queueEdits.intercept(client, c)
+	if (queueEdit) return queueEdit
 	// Delivered-prompt edits wait for stopped work, then recheck dedup.
 	// /edit undo drops the running turn anyway, so it pauses it first.
 	let parsed = c.type === 'submit' ? commands.parse(c.text) : undefined
-	if (parsed?.name === 'edit' && parsed.args === 'undo' && states.busy(status.stateOf(c.sessionId)) && !forms.open(history.readSync(c.sessionId))) turns.stop(c.sessionId)
-	let stopping = c.type === 'submit' && (c.amend || parsed?.name === 'edit') && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
+	if (
+		parsed?.name === 'edit' &&
+		parsed.args === 'undo' &&
+		states.busy(status.stateOf(c.sessionId)) &&
+		!forms.open(history.readSync(c.sessionId))
+	)
+		turns.stop(c.sessionId)
+	let stopping =
+		c.type === 'submit' &&
+		(c.amend || parsed?.name === 'edit') &&
+		status.stateOf(c.sessionId).type === 'paused' &&
+		turns.state.running.get(c.sessionId)?.done
 	if (stopping) {
 		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
 		return undefined
 	}
 	let refused: string | undefined
-	if (c.type === 'close') { queueEdits.disconnect(client, c.sessionId); client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
-	else if (c.type === 'attach') {
-		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
-		serverLog.log(`${c.sessionId} upload ${c.mediaType} ${Math.round((c.data.length * 3) / 4 / 1024)} KB by ${serverLog.client(client.record)}`)
-		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
+	if (c.type === 'close') {
+		queueEdits.disconnect(client, c.sessionId)
+		client.open.delete(c.sessionId)
+		if (client.visible === c.sessionId) client.visible = undefined
+		if (client.shown === c.sessionId) client.shown = undefined
+	} else if (c.type === 'attach') {
+		let stored =
+			c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
+		serverLog.log(
+			`${c.sessionId} upload ${c.mediaType} ${Math.round((c.data.length * 3) / 4 / 1024)} KB by ${serverLog.client(client.record)}`,
+		)
+		return {
+			reply: {
+				type: 'attached',
+				sessionId: c.sessionId,
+				command: c.id ?? '',
+				blob: stored.blob,
+				marker: stored.marker,
+			},
+		}
 	} else if (c.type === 'rebase-error') slash.output(c.sessionId, c.text, true)
 	else if (c.type === 'rebase-apply') return { reply: rebasePlans.answer(c) }
 	else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
-		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
+		if (unknown.length)
+			client.deliver({
+				type: 'warning',
+				text: `${unknown.join(', ')} names no attachment of this session; sent as text`,
+			})
 		let delivery = sendKeys.parse(c.delivery) ?? (c.queue ? 'queue' : 'steer')
-		if (c.amend && delivery !== 'queue' && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
-		else if (commands.parse(c.text)?.name === 'rebase') refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => { if (reply.rebase) client.deliver({ type: 'rebase-plan', sessionId: c.sessionId, snapshot: reply.rebase, todo: rebaseRows.render(c.sessionId, reply.rebase) }) })
+		if (c.amend && delivery !== 'queue' && c.edits !== undefined)
+			refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
+		else if (commands.parse(c.text)?.name === 'rebase')
+			refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => {
+				if (reply.rebase)
+					client.deliver({
+						type: 'rebase-plan',
+						sessionId: c.sessionId,
+						snapshot: reply.rebase,
+						todo: rebaseRows.render(c.sessionId, reply.rebase),
+					})
+			})
 		else refused = prompts.submit(c.sessionId, c.text, c.id, delivery, { interactive: c.interactive ?? true })
 		if (refused === undefined && !c.aside) prompts.sent(c.sessionId, c.text, c.id, c.base)
 	} else if (c.type === 'draft') {
 		let changed = drafts.set(c.sessionId, c.text, c.base)
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
-		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
+		else
+			return {
+				reply: {
+					type: 'draft',
+					sessionId: c.sessionId,
+					draft: drafts.get(c.sessionId),
+					...(c.id !== undefined ? { command: c.id } : {}),
+				},
+			}
 	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
-	else if (c.type === 'pause') refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : work.pause(c.sessionId)
+	else if (c.type === 'pause')
+		refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : work.pause(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
-	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
+	else if (c.type === 'models')
+		void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
 	else if (c.type === 'history') {
 		let answer = (page: Page): Outcome => {
-			let ids = [...new Set(page.records.flatMap((r) => r.type === 'assistant' && r.model ? [r.model] : []))]
+			let ids = [...new Set(page.records.flatMap((r) => (r.type === 'assistant' && r.model ? [r.model] : [])))]
 			let names = models.nameEvent(ids)
 			if (names) client.deliver(names)
 			let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
@@ -290,7 +396,13 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		}
 		let page = pages.slices(pages.pageSteps(c.sessionId, c.before))
 		return page instanceof Promise ? page.then(answer) : answer(page)
-	} else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, ...commands.suggestions(c.text, slash.context(c.sessionId)) })
+	} else if (c.type === 'complete')
+		client.deliver({
+			type: 'completions',
+			sessionId: c.sessionId,
+			text: c.text,
+			...commands.suggestions(c.text, slash.context(c.sessionId)),
+		})
 	return refused === undefined ? {} : { refused }
 }
 
@@ -321,7 +433,8 @@ function follow(client: Client, id: string, tail?: Tail): void {
 }
 
 function broadcast(id: string, event: Event): void {
-	if (event.type === 'meta') event = { ...event, meta: { ...event.meta, slots: event.meta.slots ?? settings.subagentSlots() } }
+	if (event.type === 'meta')
+		event = { ...event, meta: { ...event.meta, slots: event.meta.slots ?? settings.subagentSlots() } }
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
 	if (event.type === 'turn-end') void recap.prepare(id)

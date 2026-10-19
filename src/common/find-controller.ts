@@ -5,7 +5,9 @@ import type { ModalState } from './modals.ts'
 
 type Hooks = { get(): ModalState | undefined; set(m: ModalState): void; send(c: unknown): void; id(): string }
 export type FindController = { filters: FindFilter[]; timer?: ReturnType<typeof setTimeout> }
-function create(): FindController { return { filters: [...findDialog.filters] } }
+function create(): FindController {
+	return { filters: [...findDialog.filters] }
+}
 function close(st: FindController, h: Hooks): void {
 	if (st.timer) clearTimeout(st.timer)
 	delete st.timer

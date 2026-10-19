@@ -12,7 +12,10 @@
 import { modals, type FlaggedCall, type ModalAction, type ModalState } from '../../common/modals.ts'
 import { terminal } from '../terminal.ts'
 
-type Open = (modal: ModalState, submit: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown) => void
+type Open = (
+	modal: ModalState,
+	submit: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown,
+) => void
 
 const state = { withHost: false }
 

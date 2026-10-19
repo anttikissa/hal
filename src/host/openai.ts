@@ -31,13 +31,20 @@ function input(req: ProviderRequest): unknown[] {
 					out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
 					for (let image of blocks.resultImages(b)) {
 						let data = req.image?.(image.blob)
-						parts.push(data === undefined ? { type: 'input_text', text: provider.imageNote('its file is gone') } : { type: 'input_image', detail: 'auto', image_url: `data:${image.mediaType};base64,${data}` })
+						parts.push(
+							data === undefined
+								? { type: 'input_text', text: provider.imageNote('its file is gone') }
+								: { type: 'input_image', detail: 'auto', image_url: `data:${image.mediaType};base64,${data}` },
+						)
 					}
-				}
-				else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })
+				} else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })
 				else {
 					let data = req.image?.(b.blob)
-					parts.push(data === undefined ? { type: 'input_text', text: provider.imageNote('its file is gone') } : { type: 'input_image', detail: 'auto', image_url: `data:${b.mediaType};base64,${data}` })
+					parts.push(
+						data === undefined
+							? { type: 'input_text', text: provider.imageNote('its file is gone') }
+							: { type: 'input_image', detail: 'auto', image_url: `data:${b.mediaType};base64,${data}` },
+					)
 				}
 			}
 			if (parts.length) out.push({ role: 'user', content: parts })
@@ -54,8 +61,17 @@ function input(req: ProviderRequest): unknown[] {
 // Only reasoning this provider encrypted can go back; other thinking is
 // dropped, as anthropic.ts drops foreign signatures.
 function assistantItem(b: ReplayBlock): unknown {
-	if (b.type === 'text') return b.text ? { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: b.text, annotations: [] }] } : undefined
-	if (b.type === 'tool_call') return { type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input) }
+	if (b.type === 'text')
+		return b.text
+			? {
+					type: 'message',
+					role: 'assistant',
+					status: 'completed',
+					content: [{ type: 'output_text', text: b.text, annotations: [] }],
+				}
+			: undefined
+	if (b.type === 'tool_call')
+		return { type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input) }
 	if (b.provider !== 'openai' || !b.signature) return undefined
 	let encrypted: unknown
 	try {
@@ -63,7 +79,11 @@ function assistantItem(b: ReplayBlock): unknown {
 	} catch {}
 	if (typeof encrypted !== 'string') return undefined
 	// The Codex backend rejects reasoning items without `summary`.
-	return { type: 'reasoning', summary: b.text.trim() ? [{ type: 'summary_text', text: b.text.trim() }] : [], encrypted_content: encrypted }
+	return {
+		type: 'reasoning',
+		summary: b.text.trim() ? [{ type: 'summary_text', text: b.text.trim() }] : [],
+		encrypted_content: encrypted,
+	}
 }
 
 function reasons(model: string): boolean {
@@ -74,9 +94,18 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 	let b: Record<string, unknown> = { model: req.model, store: false, stream: true, input: openai.input(req) }
 	if (req.system) b.instructions = req.system
 	if (req.tools?.length) {
-		b.tools = req.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.inputSchema }))
-		if (req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model) && (!auth.serperKey() || !tools.all().has('google'))) {
-			(b.tools as unknown[]).push({ type: 'web_search' })
+		b.tools = req.tools.map((t) => ({
+			type: 'function',
+			name: t.name,
+			description: t.description,
+			parameters: t.inputSchema,
+		}))
+		if (
+			req.tools.some((t) => t.name === 'tool') &&
+			catalog.webSearchModels.includes(req.model) &&
+			(!auth.serperKey() || !tools.all().has('google'))
+		) {
+			;(b.tools as unknown[]).push({ type: 'web_search' })
 			b.include = ['web_search_call.action.sources']
 		}
 		b.tool_choice = 'auto'
@@ -103,22 +132,42 @@ async function request(req: ProviderRequest) {
 		let c = claims(cred.value)
 		codex = !c.api
 		let accountId = c.accountId ?? cred.accountId
-		if (codex && !accountId) throw Object.assign(new Error(`the OpenAI token of ${cred.account} names no ChatGPT account; ${auth.logIn('openai')}`), { failure: 'auth' })
+		if (codex && !accountId)
+			throw Object.assign(
+				new Error(`the OpenAI token of ${cred.account} names no ChatGPT account; ${auth.logIn('openai')}`),
+				{ failure: 'auth' },
+			)
 		if (codex) Object.assign(headers, { originator: 'hal', 'chatgpt-account-id': accountId })
 		// The Codex backend routes its prompt cache by this header, as the
 		// Codex CLI sends it; prompt_cache_key alone gets no cache hits.
 		if (codex && (req.cacheId ?? req.sessionId)) headers.session_id = (req.cacheId ?? req.sessionId)!
 	}
 	// The Codex backend takes zstd bodies, as the Codex CLI sends them.
-	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account, ...(codex && { encoding: 'zstd' as const }) }
+	return {
+		url: codex ? openai.codexUrl : openai.apiUrl,
+		headers,
+		body: openai.body(req, codex),
+		account: cred.account,
+		...(codex && { encoding: 'zstd' as const }),
+	}
 }
 
 // Error codes in a stream, as HTTP statuses for retry decisions.
-const errorStatus: Record<string, number> = { rate_limit_exceeded: 429, usage_limit_reached: 429, server_error: 500, server_is_overloaded: 503 }
+const errorStatus: Record<string, number> = {
+	rate_limit_exceeded: 429,
+	usage_limit_reached: 429,
+	server_error: 500,
+	server_is_overloaded: 503,
+}
 
 function error(e: any, data: string): StreamEvent {
 	let status = errorStatus[e?.code] ?? errorStatus[e?.type]
-	return { type: 'error', message: typeof e?.message === 'string' ? e.message : 'Response failed', ...(status && { status }), body: JSON.stringify(e ?? data) }
+	return {
+		type: 'error',
+		message: typeof e?.message === 'string' ? e.message : 'Response failed',
+		...(status && { status }),
+		body: JSON.stringify(e ?? data),
+	}
 }
 
 function usage(u: any): Usage {
@@ -141,7 +190,8 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 		let index = ev.output_index ?? 0
 		switch (ev.type) {
 			case 'response.output_item.added':
-				if (ev.item?.type === 'function_call') calls.set(index, { id: ev.item.call_id ?? `call_${index}`, name: ev.item.name ?? '', args: '' })
+				if (ev.item?.type === 'function_call')
+					calls.set(index, { id: ev.item.call_id ?? `call_${index}`, name: ev.item.name ?? '', args: '' })
 				break
 			case 'response.reasoning_summary_part.added':
 				if (ev.summary_index > 0) yield { type: 'thinking', text: '\n\n' }
@@ -155,7 +205,11 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				break
 			case 'response.content_part.done': {
 				let part = ev.part
-				let urls = new Set<string>((part?.annotations ?? []).filter((a: any) => a.type === 'url_citation' && typeof a.url === 'string' && !part.text?.includes(a.url)).map((a: any) => a.url))
+				let urls = new Set<string>(
+					(part?.annotations ?? [])
+						.filter((a: any) => a.type === 'url_citation' && typeof a.url === 'string' && !part.text?.includes(a.url))
+						.map((a: any) => a.url),
+				)
 				if (urls.size) yield { type: 'text', text: `\n\nSources:\n${[...urls].join('\n')}\n` }
 				break
 			}
@@ -169,12 +223,22 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				if (item?.type === 'web_search_call') {
 					let action = item.action ?? {}
 					let queries: string[] = action.type === 'search' ? (action.queries ?? [action.query]).filter(Boolean) : []
-					let sources: string[] = (action.sources ?? []).map((s: any) => s?.url).filter((u: unknown) => typeof u === 'string')
+					let sources: string[] = (action.sources ?? [])
+						.map((s: any) => s?.url)
+						.filter((u: unknown) => typeof u === 'string')
 					let input = action.type === 'search' ? { query: queries.join('; ') } : { ...action }
-					let output = item.status === 'completed'
-						? [...(queries.length > 1 ? queries : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n')
-						: `Web search ${item.status ?? 'failed'}\n${m.data}`
-					yield { type: 'hosted_tool', id: item.id ?? `ws_${index}`, name: 'web_search', input, output, ...(item.status !== 'completed' && { isError: true }) }
+					let output =
+						item.status === 'completed'
+							? [...(queries.length > 1 ? queries : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n')
+							: `Web search ${item.status ?? 'failed'}\n${m.data}`
+					yield {
+						type: 'hosted_tool',
+						id: item.id ?? `ws_${index}`,
+						name: 'web_search',
+						input,
+						output,
+						...(item.status !== 'completed' && { isError: true }),
+					}
 				}
 				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') {
 					yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
@@ -218,7 +282,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	}
 }
 
-
 // The models a ChatGPT subscription can use are the Codex backend's own
 // visible list: models.dev's OpenAI list has API-only ones ("gpt-5.6",
 // "gpt-6-terra") that fail there with a 400. The backend hides models
@@ -228,21 +291,37 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	let { data, list } = auth.all('openai')
 	let subscriptions = list.filter((a) => typeof a.entry.accessToken === 'string' && !claims(a.entry.accessToken).api)
 	if (subscriptions.length) list = subscriptions
-	let results = await Promise.allSettled(list.map(async (account) => {
-		let cred = await auth.credential(data, account, 'openai')
-		if (cred.type === 'api-key' || claims(cred.value).api) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels])]
-		let accountId = claims(cred.value).accountId ?? cred.accountId
-		let res = await fetch(openai.codexModelsUrl, { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
-		if (!res.ok) throw new Error(`HTTP ${res.status}`)
-		let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
-		return (body.models ?? []).filter((m) => m.visibility === 'list' && typeof m.slug === 'string').map((m) => m.slug as string)
-	}))
-	for (let result of results) if (result.status === 'rejected') diag.log(`OpenAI model catalog: ${result.reason?.message ?? 'request failed'}`)
+	let results = await Promise.allSettled(
+		list.map(async (account) => {
+			let cred = await auth.credential(data, account, 'openai')
+			if (cred.type === 'api-key' || claims(cred.value).api)
+				return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels])]
+			let accountId = claims(cred.value).accountId ?? cred.accountId
+			let res = await fetch(openai.codexModelsUrl, {
+				signal,
+				headers: {
+					authorization: `Bearer ${cred.value}`,
+					originator: 'hal',
+					...(accountId && { 'chatgpt-account-id': accountId }),
+				},
+			})
+			if (!res.ok) throw new Error(`HTTP ${res.status}`)
+			let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
+			return (body.models ?? [])
+				.filter((m) => m.visibility === 'list' && typeof m.slug === 'string')
+				.map((m) => m.slug as string)
+		}),
+	)
+	for (let result of results)
+		if (result.status === 'rejected') diag.log(`OpenAI model catalog: ${result.reason?.message ?? 'request failed'}`)
 	let good = results.filter((r) => r.status === 'fulfilled')
-	if (!good.length) throw new AggregateError(results.filter((r) => r.status === 'rejected').map((r) => r.reason), 'No OpenAI model catalog available')
+	if (!good.length)
+		throw new AggregateError(
+			results.filter((r) => r.status === 'rejected').map((r) => r.reason),
+			'No OpenAI model catalog available',
+		)
 	return [...new Set(good.flatMap((r) => r.value))]
 }
-
 
 // Registers the provider. Idempotent.
 function init(): void {
@@ -265,19 +344,39 @@ export const openai = {
 	codexUrl: 'https://chatgpt.com/backend-api/codex/responses',
 	codexModelsUrl: 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
 	listModels,
-	get modelsKey() { return catalog.modelsKey },
-	set modelsKey(value: typeof catalog.modelsKey) { catalog.modelsKey = value },
-	get effort() { return catalog.effort! },
-	set effort(value: NonNullable<typeof catalog.effort>) { catalog.effort = value },
-	get knownModels() { return catalog.knownModels },
-	set knownModels(value: string[]) { catalog.knownModels = value },
+	get modelsKey() {
+		return catalog.modelsKey
+	},
+	set modelsKey(value: typeof catalog.modelsKey) {
+		catalog.modelsKey = value
+	},
+	get effort() {
+		return catalog.effort!
+	},
+	set effort(value: NonNullable<typeof catalog.effort>) {
+		catalog.effort = value
+	},
+	get knownModels() {
+		return catalog.knownModels
+	},
+	set knownModels(value: string[]) {
+		catalog.knownModels = value
+	},
 	input,
 	body,
 	request,
 	parse,
-	get subscription() { return catalog.subscription },
-	set subscription(value: typeof catalog.subscription) { catalog.subscription = value },
-	get contextWindow() { return catalog.contextWindow },
-	set contextWindow(value: typeof catalog.contextWindow) { catalog.contextWindow = value },
+	get subscription() {
+		return catalog.subscription
+	},
+	set subscription(value: typeof catalog.subscription) {
+		catalog.subscription = value
+	},
+	get contextWindow() {
+		return catalog.contextWindow
+	},
+	set contextWindow(value: typeof catalog.contextWindow) {
+		catalog.contextWindow = value
+	},
 	init,
 }

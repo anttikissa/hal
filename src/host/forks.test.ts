@@ -38,9 +38,9 @@ test('nested forks retain message origins without changing provider replay or ma
 	subagents.fork(child, grandchild)
 	let records = history.readSync(grandchild)
 	let items = records.flatMap((r) => transcript.recordItems(r, 0))
-	expect(items.filter((i) => i.type === 'prompt' || i.type === 'text' || i.type === 'command').map((i) => titles.who(i))).toEqual([
-		`You (in ${parent})`, `Hal (in ${parent})`, undefined, `You (in ${child})`, `Hal (in ${child})`,
-	])
+	expect(
+		items.filter((i) => i.type === 'prompt' || i.type === 'text' || i.type === 'command').map((i) => titles.who(i)),
+	).toEqual([`You (in ${parent})`, `Hal (in ${parent})`, undefined, `You (in ${child})`, `Hal (in ${child})`])
 	expect(items.find((i) => i.type === 'command')?.originSession).toBe(parent)
 	expect(replay.toMessages(records)).toEqual(replay.toMessages(history.readSync(child)))
 	history.submit(grandchild, 'new here')

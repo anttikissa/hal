@@ -22,8 +22,17 @@ function origin(typed: string): string {
 	let text = typed.trim()
 	let scheme = /^[a-z][\w+.-]*:\/\//i.test(text) ? '' : local.test(text) ? 'http://' : 'https://'
 	let url = URL.parse(scheme + text)
-	let plain = url && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash && !text.endsWith('?') && !text.endsWith('#')
-	if (!url || !plain || !['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error(`not a host: ${typed}; use a name like example.com or https://example.com`)
+	let plain =
+		url &&
+		!url.username &&
+		!url.password &&
+		url.pathname === '/' &&
+		!url.search &&
+		!url.hash &&
+		!text.endsWith('?') &&
+		!text.endsWith('#')
+	if (!url || !plain || !['http:', 'https:'].includes(url.protocol) || !url.hostname)
+		throw new Error(`not a host: ${typed}; use a name like example.com or https://example.com`)
 	return url.origin
 }
 
@@ -73,7 +82,12 @@ async function valid(at: string, token: string): Promise<boolean> {
 // A logged-in token for `typed` (or the saved last host), asking for
 // codes on `ask` until one is right; `saved` is updated for main.ts to
 // write. A saved token the host no longer takes is dropped.
-async function signIn(typed: string | undefined, saved: Saved, ask: (question: string) => string | null, say: (text: string) => void): Promise<{ origin: string; token: string }> {
+async function signIn(
+	typed: string | undefined,
+	saved: Saved,
+	ask: (question: string) => string | null,
+	say: (text: string) => void,
+): Promise<{ origin: string; token: string }> {
 	if (!typed && !saved.last) throw new Error('no remembered host; use ./run -r <host>')
 	let at = remote.origin(typed || saved.last)
 	let token: string | undefined = saved.tokens[at]
@@ -106,12 +120,20 @@ async function signIn(typed: string | undefined, saved: Saved, ask: (question: s
 // as a page of it would send (host/web.ts checks both).
 function dial(at: string, token: string): Socket {
 	let url = `${at.replace(/^http/, 'ws')}/ws`
-	return new WebSocket(url, { headers: { cookie: cookie(token), origin: at, 'user-agent': 'hal-terminal' } } as any) as unknown as Socket
+	return new WebSocket(url, {
+		headers: { cookie: cookie(token), origin: at, 'user-agent': 'hal-terminal' },
+	} as any) as unknown as Socket
 }
 
 // Follows the host until the process ends; `loggedOut` runs when the
 // host revokes the token (it then never reconnects by itself).
-function start(opts: { origin: string; token: string; onEvent: (event: Event) => void; onState: (state: LinkState) => void; loggedOut: () => void }): void {
+function start(opts: {
+	origin: string
+	token: string
+	onEvent: (event: Event) => void
+	onState: (state: LinkState) => void
+	loggedOut: () => void
+}): void {
 	wsLink.start({
 		dial: () => remote.dial(opts.origin, opts.token),
 		reload: opts.loggedOut,

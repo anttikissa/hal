@@ -13,7 +13,18 @@ export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
 // it followed when it left.
 // `timezone`: the IANA zone the client reported on connecting (task wq),
 // for this connection only: never persisted or logged.
-export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; version?: string; newCode?: true; goneAt?: number; followed?: string[]; timezone?: string; screen?: { cols: number; rows: number; term?: string } }
+export type ClientRecord = ClientInfo & {
+	connectedAt: number
+	lastAt: number
+	open: Set<string>
+	pid?: number
+	version?: string
+	newCode?: true
+	goneAt?: number
+	followed?: string[]
+	timezone?: string
+	screen?: { cols: number; rows: number; term?: string }
+}
 
 const goneMs = 24 * 60 * 60 * 1000
 
@@ -21,7 +32,16 @@ function join(open: Set<string>, info: ClientInfo = { kind: 'own' }): ClientReco
 	let rec: ClientRecord = { ...info, connectedAt: Date.now(), lastAt: Date.now(), open }
 	if (info.kind === 'own') rec.pid = process.pid
 	// The same browser or remote terminal coming back replaces its gone entry.
-	for (let old of clients.state.records) if (old.goneAt !== undefined && info.kind !== 'own' && info.kind !== 'peer' && old.kind === info.kind && old.address === info.address && old.userAgent === info.userAgent) clients.state.records.delete(old)
+	for (let old of clients.state.records)
+		if (
+			old.goneAt !== undefined &&
+			info.kind !== 'own' &&
+			info.kind !== 'peer' &&
+			old.kind === info.kind &&
+			old.address === info.address &&
+			old.userAgent === info.userAgent
+		)
+			clients.state.records.delete(old)
 	clients.state.records.add(rec)
 	return rec
 }
@@ -33,7 +53,8 @@ function hello(rec: ClientRecord, pid: number, version?: string, newCode?: true)
 	rec.pid = pid
 	if (version) rec.version = version
 	if (newCode) rec.newCode = newCode
-	for (let old of clients.state.records) if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
+	for (let old of clients.state.records)
+		if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
 	serverLog.hello(rec)
 	return {}
 }
@@ -48,7 +69,12 @@ function screen(rec: ClientRecord, s: { cols: number; rows: number; term?: strin
 // numeric offset, else ignored.
 function zone(value: unknown): string | undefined {
 	if (typeof value !== 'string' || !value || value.length > 64 || /^[+-]|\d:?\d\d$/.test(value)) return undefined
-	try { new Intl.DateTimeFormat('en', { timeZone: value }); return value } catch { return undefined }
+	try {
+		new Intl.DateTimeFormat('en', { timeZone: value })
+		return value
+	} catch {
+		return undefined
+	}
 }
 
 // What a command tells about its client: the zone of its handshake, or
@@ -67,7 +93,8 @@ function input(rec: ClientRecord, c: { type: string; sessionId?: string; timezon
 function timezone(id: string): string | undefined {
 	let sender = clients.state.senders.get(id)?.timezone
 	if (sender) return sender
-	for (let rec of clients.state.records) if (rec.goneAt === undefined && rec.open.has(id) && rec.timezone) return rec.timezone
+	for (let rec of clients.state.records)
+		if (rec.goneAt === undefined && rec.open.has(id) && rec.timezone) return rec.timezone
 	return undefined
 }
 
@@ -98,8 +125,21 @@ function fromRequest(req: Request, ip?: string): ClientInfo {
 // "Safari on iPhone": the browser and system in a few words.
 function shortAgent(ua: string | undefined): string {
 	if (!ua) return 'browser'
-	let browsers: [RegExp, string][] = [[/Edg\//, 'Edge'], [/OPR\//, 'Opera'], [/Firefox\/|FxiOS/, 'Firefox'], [/Chrome\/|CriOS/, 'Chrome'], [/Safari\//, 'Safari']]
-	let systems: [RegExp, string][] = [[/iPhone/, 'iPhone'], [/iPad/, 'iPad'], [/Android/, 'Android'], [/Macintosh/, 'Mac'], [/Windows/, 'Windows'], [/Linux/, 'Linux']]
+	let browsers: [RegExp, string][] = [
+		[/Edg\//, 'Edge'],
+		[/OPR\//, 'Opera'],
+		[/Firefox\/|FxiOS/, 'Firefox'],
+		[/Chrome\/|CriOS/, 'Chrome'],
+		[/Safari\//, 'Safari'],
+	]
+	let systems: [RegExp, string][] = [
+		[/iPhone/, 'iPhone'],
+		[/iPad/, 'iPad'],
+		[/Android/, 'Android'],
+		[/Macintosh/, 'Mac'],
+		[/Windows/, 'Windows'],
+		[/Linux/, 'Linux'],
+	]
 	let browser = browsers.find(([re]) => re.test(ua))?.[1]
 	let system = systems.find(([re]) => re.test(ua))?.[1]
 	return browser && system ? `${browser} on ${system}` : (browser ?? system ?? 'browser')
@@ -119,7 +159,9 @@ function ago(ms: number): string {
 
 // A process's terminal, "ttys003"; undefined without one.
 function tty(pid: number): string | undefined {
-	let out = Bun.spawnSync(['ps', '-o', 'tty=', '-p', String(pid)]).stdout.toString().trim()
+	let out = Bun.spawnSync(['ps', '-o', 'tty=', '-p', String(pid)])
+		.stdout.toString()
+		.trim()
 	return out && !out.startsWith('?') ? out : undefined
 }
 
@@ -132,20 +174,39 @@ function follows(ids: Iterable<string>): string {
 // (remote terminals, browsers, anything gone) below it.
 function draw(): string {
 	let now = Date.now()
-	for (let rec of clients.state.records) if (rec.goneAt !== undefined && now - rec.goneAt > goneMs) clients.state.records.delete(rec)
+	for (let rec of clients.state.records)
+		if (rec.goneAt !== undefined && now - rec.goneAt > goneMs) clients.state.records.delete(rec)
 	let all = [...clients.state.records].filter((r) => r.kind !== 'own')
 	let peers = all.filter((r) => r.kind === 'peer' && r.goneAt === undefined)
 	let rest = all.filter((r) => !peers.includes(r)).sort((a, b) => a.connectedAt - b.connectedAt)
-	let top = [`host ${process.pid} ${hostname()} (up ${span(process.uptime() * 1000)})`, ...peers.map((p) => ['peer', p.pid, p.pid === undefined ? undefined : clients.tty(p.pid)].filter((x) => x !== undefined).join(' '))]
+	let top = [
+		`host ${process.pid} ${hostname()} (up ${span(process.uptime() * 1000)})`,
+		...peers.map((p) =>
+			['peer', p.pid, p.pid === undefined ? undefined : clients.tty(p.pid)].filter((x) => x !== undefined).join(' '),
+		),
+	]
 	let rows = rest.map((r) => {
-		let who = r.kind === 'peer' ? ['peer', r.pid, r.pid === undefined ? undefined : clients.tty(r.pid)] : r.kind === 'remote' ? ['remote terminal', r.address] : ['web', r.address, clients.shortAgent(r.userAgent)]
+		let who =
+			r.kind === 'peer'
+				? ['peer', r.pid, r.pid === undefined ? undefined : clients.tty(r.pid)]
+				: r.kind === 'remote'
+					? ['remote terminal', r.address]
+					: ['web', r.address, clients.shortAgent(r.userAgent)]
 		let seen = ago(now - r.lastAt) + (r.goneAt === undefined ? '' : ' (gone)')
-		return [who.filter((x) => x !== undefined).join(' '), follows(r.goneAt === undefined ? r.open : (r.followed ?? [])), seen]
+		return [
+			who.filter((x) => x !== undefined).join(' '),
+			follows(r.goneAt === undefined ? r.open : (r.followed ?? [])),
+			seen,
+		]
 	})
 	let width = [0, 1].map((i) => Math.max(0, ...rows.map((row) => row[i]!.length)))
 	let lines = [top.join('  <->  ')]
 	if (rows.length) lines.push('    │')
-	rows.forEach((row, i) => lines.push(`    ${i === rows.length - 1 ? '└' : '├'}── ${row[0]!.padEnd(width[0]!)}   ${row[1]!.padEnd(width[1]!)}   ${row[2]}`))
+	rows.forEach((row, i) =>
+		lines.push(
+			`    ${i === rows.length - 1 ? '└' : '├'}── ${row[0]!.padEnd(width[0]!)}   ${row[1]!.padEnd(width[1]!)}   ${row[2]}`,
+		),
+	)
 	return lines.join('\n')
 }
 
@@ -156,4 +217,17 @@ function reset(): void {
 
 export const clients = {
 	state: { records: new Set<ClientRecord>(), senders: new Map<string, ClientRecord>() },
-	join, hello, screen, zone, input, timezone, touch, leave, fromRequest, shortAgent, tty, draw, reset }
+	join,
+	hello,
+	screen,
+	zone,
+	input,
+	timezone,
+	touch,
+	leave,
+	fromRequest,
+	shortAgent,
+	tty,
+	draw,
+	reset,
+}

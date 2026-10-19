@@ -16,7 +16,9 @@ export interface EmergencyState {
 }
 
 const CODEPOINTS: Record<string, EmergencyAction> = { '99': 'quit', '122': 'suspend', '114': 'restart' }
-const BYTES = Object.fromEntries(Object.entries(CODEPOINTS).map(([cp, action]) => [String.fromCharCode(Number(cp) - 96), action]))
+const BYTES = Object.fromEntries(
+	Object.entries(CODEPOINTS).map(([cp, action]) => [String.fromCharCode(Number(cp) - 96), action]),
+)
 
 // ESC [ code[:alternates] ; mods[:event] u
 const CSI_U = /\x1b\[(\d+)(?::[\d:]*)?;(\d+)(?::(\d+))?u/y
@@ -60,7 +62,8 @@ function scan(st: EmergencyState, chunk: string | Uint8Array): EmergencyAction[]
 		if (m) {
 			let action = CODEPOINTS[m[1]!]
 			let event = m[3] ?? '1'
-			if (action && ctrlOnly(m[2]!) && !(action === 'restart' && ((Number(m[2]) - 1) & 1)) && event !== '3') out.push(action)
+			if (action && ctrlOnly(m[2]!) && !(action === 'restart' && (Number(m[2]) - 1) & 1) && event !== '3')
+				out.push(action)
 			i = CSI_U.lastIndex - 1
 			continue
 		}
@@ -74,9 +77,17 @@ function scan(st: EmergencyState, chunk: string | Uint8Array): EmergencyAction[]
 }
 
 // Both input adapters resolve and dispatch emergencies here, before UI state.
-function action(k: { key: string; ctrl?: boolean; alt?: boolean; cmd?: boolean; shift?: boolean }): EmergencyAction | undefined {
+function action(k: {
+	key: string
+	ctrl?: boolean
+	alt?: boolean
+	cmd?: boolean
+	shift?: boolean
+}): EmergencyAction | undefined {
 	if (k.shift && k.key.toLowerCase() === 'r') return undefined
-	return k.key.length === 1 && k.ctrl && !k.alt && !k.cmd ? CODEPOINTS[String(k.key.toLowerCase().codePointAt(0))] : undefined
+	return k.key.length === 1 && k.ctrl && !k.alt && !k.cmd
+		? CODEPOINTS[String(k.key.toLowerCase().codePointAt(0))]
+		: undefined
 }
 
 function handle(action: EmergencyAction | undefined, handlers: Partial<Record<EmergencyAction, () => void>>): boolean {

@@ -12,7 +12,9 @@ const shown = (text: string, query: string) => {
 }
 
 test('marks every word of the query where a word of the text starts, in any case', () => {
-	expect(shown('5.6-sol  GPT-5.6 Sol · openai/gpt-5.6-sol', 'gpt sol')).toBe('5.6-[sol]  [GPT]-5.6 [Sol] · openai/[gpt]-5.6-[sol]')
+	expect(shown('5.6-sol  GPT-5.6 Sol · openai/gpt-5.6-sol', 'gpt sol')).toBe(
+		'5.6-[sol]  [GPT]-5.6 [Sol] · openai/[gpt]-5.6-[sol]',
+	)
 	// "5" is the start of 5.6 and 5 but not of 15.
 	expect(shown('claude-opus-4-15 claude-opus-5', '5')).toBe('claude-opus-4-15 claude-opus-[5]')
 	expect(shown('opus5 opus', 'opus5')).toBe('[opus5] [opus]')

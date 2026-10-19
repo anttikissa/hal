@@ -26,7 +26,17 @@ import { sendKeys } from './send-keys.ts'
 // sent, its time until the host's record replaces it (task ta).
 // `base`: the draft rev the sent text emptied (host drafts.sent).
 // `aside`: an edit was sent, not the draft, which stays.
-export type Sending = { id: string; text: string; ts?: string; delivery?: Delivery; amend?: boolean; edits?: string; queueEdit?: string; base?: number; aside?: boolean }
+export type Sending = {
+	id: string
+	text: string
+	ts?: string
+	delivery?: Delivery
+	amend?: boolean
+	edits?: string
+	queueEdit?: string
+	base?: number
+	aside?: boolean
+}
 
 export type Local = {
 	// What the editor holds.
@@ -42,7 +52,11 @@ export type Local = {
 }
 
 // `window`: names this window (queue-edit.ts), if the store is shared with others.
-export type Store = { load(sessionId: string): Local | undefined; save(sessionId: string, local: Local): void; window?(): string }
+export type Store = {
+	load(sessionId: string): Local | undefined
+	save(sessionId: string, local: Local): void
+	window?(): string
+}
 
 type DraftsState = {
 	sessions: Map<string, Local>
@@ -73,9 +87,34 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || !!sendKeys.parse(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.queueEdit === undefined || typeof s.queueEdit === 'string') && (s.base === undefined || Number.isSafeInteger(s.base)) && (s.aside === undefined || typeof s.aside === 'boolean')).map((s) => (s.delivery ? { ...s, delivery: sendKeys.parse(s.delivery)! } : s))
+	let sending = l.sending
+		.filter(
+			(s) =>
+				s &&
+				typeof s.id === 'string' &&
+				typeof s.text === 'string' &&
+				(s.ts === undefined || typeof s.ts === 'string') &&
+				(s.delivery === undefined || !!sendKeys.parse(s.delivery)) &&
+				(s.amend === undefined || typeof s.amend === 'boolean') &&
+				(s.edits === undefined || typeof s.edits === 'string') &&
+				(s.queueEdit === undefined || typeof s.queueEdit === 'string') &&
+				(s.base === undefined || Number.isSafeInteger(s.base)) &&
+				(s.aside === undefined || typeof s.aside === 'boolean'),
+		)
+		.map((s) => (s.delivery ? { ...s, delivery: sendKeys.parse(s.delivery)! } : s))
 	let e = l.queueEdit
-	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') && (e.window === undefined || typeof e.window === 'string') ? e : undefined
+	let queueEdit =
+		e &&
+		typeof e.edit === 'string' &&
+		typeof e.message === 'string' &&
+		typeof e.text === 'string' &&
+		typeof e.active === 'boolean' &&
+		(e.original === undefined || typeof e.original === 'string') &&
+		(e.request === undefined || typeof e.request === 'string') &&
+		(e.saving === undefined || typeof e.saving === 'string') &&
+		(e.window === undefined || typeof e.window === 'string')
+			? e
+			: undefined
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
 }
 
@@ -90,7 +129,9 @@ function text(id: string): string {
 // Prompts shown as pending (sent, not acknowledged); an /edit as the
 // edited prompt it becomes.
 function pending(id: string): Sending[] {
-	return drafts.local(id).sending.flatMap((s) => (s.queueEdit === undefined ? [{ ...s, text: s.text.replace(/^\/edit \d+\n/, '') }] : []))
+	return drafts
+		.local(id)
+		.sending.flatMap((s) => (s.queueEdit === undefined ? [{ ...s, text: s.text.replace(/^\/edit \d+\n/, '') }] : []))
 }
 
 // The user changed the editor text.
@@ -140,7 +181,18 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.delivery ? { delivery: s.delivery } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.base === undefined ? {} : { base: s.base }), ...(s.aside ? { aside: true } : {}), id: s.id }
+	return {
+		type: 'submit',
+		sessionId,
+		text: s.text,
+		...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }),
+		...(s.delivery ? { delivery: s.delivery } : {}),
+		...(s.amend ? { amend: true } : {}),
+		...(s.edits === undefined ? {} : { edits: s.edits }),
+		...(s.base === undefined ? {} : { base: s.base }),
+		...(s.aside ? { aside: true } : {}),
+		id: s.id,
+	}
 }
 
 // Folds a host event in. True if the session's editor text changed.
@@ -149,7 +201,12 @@ function onEvent(event: Event): boolean {
 	// The host's copy of a sent prompt (history or the inbox, under the
 	// id it was sent with) replaces the local one at once, not at the
 	// ack after it: a frame between them would draw the prompt twice.
-	let taken = event.type === 'inbox' ? event.inbox.map((m) => m.id) : (event.type === 'prompt' || event.type === 'turn-start' || event.type === 'command') && event.command ? [event.command] : []
+	let taken =
+		event.type === 'inbox'
+			? event.inbox.map((m) => m.id)
+			: (event.type === 'prompt' || event.type === 'turn-start' || event.type === 'command') && event.command
+				? [event.command]
+				: []
 	if (taken.length && 'sessionId' in event && event.sessionId) {
 		let id = event.sessionId
 		let l = st.sessions.get(id)

@@ -13,14 +13,27 @@ import type { Event } from './protocol.ts'
 import type { InboxItem } from './inbox.ts'
 import type { Transcript } from './transcript.ts'
 
-export type QueueEditing = { edit: string; message: string; text: string; original?: string; active: boolean; request?: string; saving?: string; window?: string }
+export type QueueEditing = {
+	edit: string
+	message: string
+	text: string
+	original?: string
+	active: boolean
+	request?: string
+	saving?: string
+	window?: string
+}
 
 function candidate(t: Transcript | undefined): InboxItem | undefined {
 	return t?.inbox.findLast((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')
 }
 
-function mine(e?: QueueEditing): QueueEditing | undefined { return e && (e.window === undefined || e.window === queueEdit.windowId()) ? e : undefined }
-function current(id: string): QueueEditing | undefined { return queueEdit.mine(drafts.local(id).queueEdit) }
+function mine(e?: QueueEditing): QueueEditing | undefined {
+	return e && (e.window === undefined || e.window === queueEdit.windowId()) ? e : undefined
+}
+function current(id: string): QueueEditing | undefined {
+	return queueEdit.mine(drafts.local(id).queueEdit)
+}
 // Another window holds the lock on one of the session's queued messages.
 function elsewhere(t: Transcript): boolean {
 	let e = queueEdit.current(t.meta.id)
@@ -28,7 +41,9 @@ function elsewhere(t: Transcript): boolean {
 }
 // Delivery waits: the next queued message is the one being edited.
 function waiting(t: Transcript): boolean {
-	return !!t.queueHold && t.state.type === 'idle' && t.inbox.find((m) => m.delivery === 'after-turn')?.id === t.queueHold
+	return (
+		!!t.queueHold && t.state.type === 'idle' && t.inbox.find((m) => m.delivery === 'after-turn')?.id === t.queueHold
+	)
 }
 function ready(id: string): boolean {
 	let e = queueEdit.current(id)
@@ -36,7 +51,9 @@ function ready(id: string): boolean {
 }
 function editing(id: string): Editing | undefined {
 	let e = queueEdit.current(id)
-	return e?.active && e.original !== undefined ? { sessionId: id, original: e.original, inbox: e.message, queueEdit: e.edit, aside: true } : undefined
+	return e?.active && e.original !== undefined
+		? { sessionId: id, original: e.original, inbox: e.message, queueEdit: e.edit, aside: true }
+		: undefined
 }
 function text(id: string): string {
 	let e = queueEdit.current(id)
@@ -48,7 +65,8 @@ function notice(t: Transcript): string | undefined {
 	if (!e?.active) return undefined
 	if (e.saving) return 'Saving queued message…'
 	if (e.original === undefined) return 'Opening queued message…'
-	if (!queueEdit.ready(t.meta.id)) return 'Reconnecting. Your edit is kept; you can save it when the connection is back.'
+	if (!queueEdit.ready(t.meta.id))
+		return 'Reconnecting. Your edit is kept; you can save it when the connection is back.'
 }
 function acquire(id: string): void {
 	let e = queueEdit.current(id)!
@@ -69,7 +87,9 @@ function recover(id: string): void {
 }
 function begin(t: Transcript, message: string): boolean {
 	let id = t.meta.id
-	let waiting = t.inbox.find((m) => m.id === message && (m.delivery === 'after-turn') && m.from === undefined && m.origin !== 'model')
+	let waiting = t.inbox.find(
+		(m) => m.id === message && m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model',
+	)
 	if (!waiting) return false
 	// Another window edits: the notice says so; nothing to begin here.
 	if (queueEdit.elsewhere(t)) return true
@@ -78,7 +98,14 @@ function begin(t: Transcript, message: string): boolean {
 	if (previous?.active) return true
 	if (previous && previous.message !== message) queueEdit.recover(id)
 	let kept = queueEdit.current(id)
-	drafts.local(id).queueEdit = { edit: connection.nextId(), message, text: kept?.text ?? '', original: kept?.original, active: true, window: queueEdit.windowId() }
+	drafts.local(id).queueEdit = {
+		edit: connection.nextId(),
+		message,
+		text: kept?.text ?? '',
+		original: kept?.original,
+		active: true,
+		window: queueEdit.windowId(),
+	}
 	queueEdit.acquire(id)
 	return true
 }
@@ -116,8 +143,14 @@ function onEvent(event: Event): { sessionId: string; notice?: string } | undefin
 			let e = local.queueEdit
 			if (!e) continue
 			if (event.id === e.saving) {
-				if (event.type === 'ack') { queueEdit.state.ready.delete(e.edit); delete local.queueEdit; drafts.save(id) }
-				else { delete e.saving; queueEdit.recover(id) }
+				if (event.type === 'ack') {
+					queueEdit.state.ready.delete(e.edit)
+					delete local.queueEdit
+					drafts.save(id)
+				} else {
+					delete e.saving
+					queueEdit.recover(id)
+				}
 				return { sessionId: id }
 			}
 			if (event.type === 'rejected' && event.id === e.request) {
@@ -134,20 +167,31 @@ function onEvent(event: Event): { sessionId: string; notice?: string } | undefin
 	if (event.type === 'queue-hold' && event.message === undefined) queueEdit.state.ready.delete(e.edit)
 	if (event.type === 'queue-edit' && e.active && e.edit === event.edit && e.message === event.message) {
 		if (e.original !== undefined && event.text !== e.original && !e.saving) {
-			queueEdit.cancel(id); queueEdit.recover(id)
-			return { sessionId: id, notice: 'The queued message changed while you were disconnected. Your edit is in the draft; the message was not overwritten.' }
+			queueEdit.cancel(id)
+			queueEdit.recover(id)
+			return {
+				sessionId: id,
+				notice:
+					'The queued message changed while you were disconnected. Your edit is in the draft; the message was not overwritten.',
+			}
 		}
-		if (e.original === undefined) { e.original = event.text; e.text = event.text }
+		if (e.original === undefined) {
+			e.original = event.text
+			e.text = event.text
+		}
 		delete e.request
 		queueEdit.state.ready.add(e.edit)
 		drafts.save(id)
 		return { sessionId: id }
 	}
 	if (event.type === 'snapshot' || event.type === 'inbox') {
-		let waiting = event.type === 'snapshot' ? event.snapshot.inbox ?? [] : event.inbox
+		let waiting = event.type === 'snapshot' ? (event.snapshot.inbox ?? []) : event.inbox
 		if (!e.active && !waiting.some((m) => m.id === e.message)) {
 			queueEdit.recover(id)
-			return { sessionId: id, notice: 'The queued message was sent before you saved. Your unsaved edit is in the draft.' }
+			return {
+				sessionId: id,
+				notice: 'The queued message was sent before you saved. Your unsaved edit is in the draft.',
+			}
 		}
 		if (event.type === 'snapshot' && e.active) {
 			queueEdit.state.ready.delete(e.edit)
@@ -168,9 +212,35 @@ function adopt(id: string, hold?: string): void {
 	if (!e || queueEdit.mine(e) || !e.active || e.message === hold) return
 	e.window = queueEdit.windowId()
 	e.active = false
-	delete e.request; delete e.saving
+	delete e.request
+	delete e.saving
 	drafts.save(id)
 }
-function windowId(): string { return drafts.store.window?.() ?? queueEdit.state.window }
-function disconnected(): void { queueEdit.state.ready.clear() }
-export const queueEdit = { state: { ready: new Set<string>(), window: crypto.randomUUID() as string }, candidate, windowId, mine, current, elsewhere, waiting, ready, editing, text, notice, acquire, recover, adopt, begin, input, cancel, save, onEvent, disconnected }
+function windowId(): string {
+	return drafts.store.window?.() ?? queueEdit.state.window
+}
+function disconnected(): void {
+	queueEdit.state.ready.clear()
+}
+export const queueEdit = {
+	state: { ready: new Set<string>(), window: crypto.randomUUID() as string },
+	candidate,
+	windowId,
+	mine,
+	current,
+	elsewhere,
+	waiting,
+	ready,
+	editing,
+	text,
+	notice,
+	acquire,
+	recover,
+	adopt,
+	begin,
+	input,
+	cancel,
+	save,
+	onEvent,
+	disconnected,
+}

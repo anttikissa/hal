@@ -8,9 +8,28 @@ import { context, type Cause, type Point } from './context.ts'
 import { existsSync } from 'fs'
 import { paths } from './paths.ts'
 
-const W = 400, H = 340, AXIS = 44, L = 6, R = 12, T = 22, B = 34, SLOT = 14
-const LETTER: Record<Cause, string> = { rebase: 'R', compaction: 'C', clear: 'X', 'pruning checkpoint': 'P', 'cache miss': 'M' }
-const TONE: Record<Cause, string> = { rebase: 'tool-edit', compaction: 'tool-edit', clear: 'tool-edit', 'pruning checkpoint': 'fork', 'cache miss': 'assistant' }
+const W = 400,
+	H = 340,
+	AXIS = 44,
+	L = 6,
+	R = 12,
+	T = 22,
+	B = 34,
+	SLOT = 14
+const LETTER: Record<Cause, string> = {
+	rebase: 'R',
+	compaction: 'C',
+	clear: 'X',
+	'pruning checkpoint': 'P',
+	'cache miss': 'M',
+}
+const TONE: Record<Cause, string> = {
+	rebase: 'tool-edit',
+	compaction: 'tool-edit',
+	clear: 'tool-edit',
+	'pruning checkpoint': 'fork',
+	'cache miss': 'assistant',
+}
 
 const escape = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const kilo = (n: number): string => (n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`)
@@ -18,29 +37,40 @@ const owns = (path: string): boolean => /^\/context\/\d+-[a-z]{3}(\/events)?$/.t
 
 function tip(p: Point): string {
 	let date = new Date(p.ts).toUTCString()
-	let split = p.approx ? 'turn end only, rounds not recorded' : `uncached ${p.input}, cache read ${p.cacheRead}, cache write ${p.cacheWrite}`
+	let split = p.approx
+		? 'turn end only, rounds not recorded'
+		: `uncached ${p.input}, cache read ${p.cacheRead}, cache write ${p.cacheWrite}`
 	return `Round ${p.round} · turn ${p.turn} · ${p.total} tokens (${split}) · ${date}${p.cause ? ` · after ${p.cause}` : ''}`
 }
 
 // A tick step of 1, 2 or 5 times a power of ten, about four to a chart.
 function step(max: number): number {
-	let raw = Math.max(1, max / 4), pow = 10 ** Math.floor(Math.log10(raw))
+	let raw = Math.max(1, max / 4),
+		pow = 10 ** Math.floor(Math.log10(raw))
 	return ([1, 2, 5, 10].find((m) => m * pow >= raw) ?? 10) * pow
 }
 
 function svg(id: string, pts: Point[]): string {
 	let width = Math.max(W, L + R + pts.length * SLOT)
-	let top = Math.max(...pts.map((p) => p.total)), win = Math.max(...pts.map((p) => p.window ?? 0))
+	let top = Math.max(...pts.map((p) => p.total)),
+		win = Math.max(...pts.map((p) => p.window ?? 0))
 	let tick = step(Math.max(top, Math.min(win || top, top * 2.5)) * 1.05)
-	let max = Math.ceil(Math.max(top, Math.min(win || top, top * 2.5)) * 1.05 / tick) * tick
+	let max = Math.ceil((Math.max(top, Math.min(win || top, top * 2.5)) * 1.05) / tick) * tick
 	let y = (v: number) => T + (H - T - B) * (1 - Math.min(v, max) / max)
-	let axis: string[] = [`<svg class="axis" xmlns="http://www.w3.org/2000/svg" width="${AXIS}" height="${H}" aria-hidden="true">`]
-	let out: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${H}" width="${width}" height="${H}" role="img" aria-label="Context size per provider round">`]
+	let axis: string[] = [
+		`<svg class="axis" xmlns="http://www.w3.org/2000/svg" width="${AXIS}" height="${H}" aria-hidden="true">`,
+	]
+	let out: string[] = [
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${H}" width="${width}" height="${H}" role="img" aria-label="Context size per provider round">`,
+	]
 	for (let v = 0; v <= max; v += tick) {
 		out.push(`<line class="grid" x1="0" x2="${width}" y1="${y(v)}" y2="${y(v)}"/>`)
 		axis.push(`<text class="lbl" x="${AXIS - 4}" y="${y(v) + 4}" text-anchor="end">${kilo(v)}</text>`)
 	}
-	let path = pts.map((p, i) => p.window ? `${L + i * SLOT},${y(p.window)} ${L + (i + 1) * SLOT},${y(p.window)}` : '').filter(Boolean).join(' ')
+	let path = pts
+		.map((p, i) => (p.window ? `${L + i * SLOT},${y(p.window)} ${L + (i + 1) * SLOT},${y(p.window)}` : ''))
+		.filter(Boolean)
+		.join(' ')
 	if (path) out.push(`<polyline class="win" points="${path}"/>`)
 	let labeled = -99
 	pts.forEach((p, i) => {
@@ -50,15 +80,21 @@ function svg(id: string, pts: Point[]): string {
 			if (x - labeled >= 36) out.push(`<text class="lbl" x="${x + 3}" y="${H - B + 14}">t${p.turn}</text>`)
 			if (x - labeled >= 36) labeled = x
 		}
-		if (p.cause) out.push(`<line class="cause ${TONE[p.cause]}" x1="${x + 7}" x2="${x + 7}" y1="${T}" y2="${H - B}"/><text class="mark ${TONE[p.cause]}" x="${x + 7}" y="${T - 6}" text-anchor="middle">${LETTER[p.cause]}</text>`)
-		let stack = 0, bar = (v: number, tone: string) => {
-			if (!v) return ''
-			let h = y(stack) - y(stack + v)
-			stack += v
-			return `<rect class="k ${tone}" x="${x + 2}" y="${y(stack)}" width="10" height="${Math.max(h, 1)}"/>`
-		}
+		if (p.cause)
+			out.push(
+				`<line class="cause ${TONE[p.cause]}" x1="${x + 7}" x2="${x + 7}" y1="${T}" y2="${H - B}"/><text class="mark ${TONE[p.cause]}" x="${x + 7}" y="${T - 6}" text-anchor="middle">${LETTER[p.cause]}</text>`,
+			)
+		let stack = 0,
+			bar = (v: number, tone: string) => {
+				if (!v) return ''
+				let h = y(stack) - y(stack + v)
+				stack += v
+				return `<rect class="k ${tone}" x="${x + 2}" y="${y(stack)}" width="10" height="${Math.max(h, 1)}"/>`
+			}
 		let href = `/${id}${p.block === undefined ? '' : `#${p.block}`}`
-		out.push(`<a class="pt" href="${href}"><title>${escape(tip(p))}</title>${bar(p.cacheRead, 'status-cool')}${bar(p.cacheWrite, 'status-warm')}${bar(p.input, 'status-hot')}<rect class="hit" x="${x}" y="${T}" width="${SLOT}" height="${H - T - B}"/></a>`)
+		out.push(
+			`<a class="pt" href="${href}"><title>${escape(tip(p))}</title>${bar(p.cacheRead, 'status-cool')}${bar(p.cacheWrite, 'status-warm')}${bar(p.input, 'status-hot')}<rect class="hit" x="${x}" y="${T}" width="${SLOT}" height="${H - T - B}"/></a>`,
+		)
 	})
 	out.push('</svg>')
 	axis.push('</svg>')
@@ -66,7 +102,16 @@ function svg(id: string, pts: Point[]): string {
 }
 
 function events(id: string, pts: Point[]): string {
-	let list = pts.flatMap((p, i) => p.cause ? [`<li><a href="/${id}${p.block === undefined ? '' : `#${p.block}`}">Round ${p.round}</a> · ${p.cause}: ${kilo(pts[i - 1]!.total)} → ${kilo(p.total)}</li>`] : []).reverse().slice(0, 50)
+	let list = pts
+		.flatMap((p, i) =>
+			p.cause
+				? [
+						`<li><a href="/${id}${p.block === undefined ? '' : `#${p.block}`}">Round ${p.round}</a> · ${p.cause}: ${kilo(pts[i - 1]!.total)} → ${kilo(p.total)}</li>`,
+					]
+				: [],
+		)
+		.reverse()
+		.slice(0, 50)
 	return list.length ? `<ul>${list.join('')}</ul>` : ''
 }
 
@@ -121,7 +166,13 @@ g.addEventListener('click', (e) => {
 function page(id: string, css: string): Response {
 	let nonce = crypto.randomUUID()
 	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} context</title><style>${css}\n${style}</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="/${id}/changes">Changes</a></nav><h1>${id} · context size per provider round</h1><div id="graph">${graph(id)}</div><p id="info" aria-live="polite">Tap a bar for its round.</p><script nonce="${nonce}">${script}</script></main></body></html>`
-	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src 'self'` } })
+	return new Response(html, {
+		headers: {
+			'content-type': 'text/html; charset=utf-8',
+			'cache-control': 'no-store',
+			'content-security-policy': `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src 'self'`,
+		},
+	})
 }
 
 // One event stream per open page; each push is the whole graph.
@@ -140,7 +191,12 @@ function stream(id: string, signal: AbortSignal): Response {
 				contextPage.state.ends.delete(close)
 			}
 			// /auth revoke ends every stream, as it closes every socket.
-			let close = () => { end(); try { controller.close() } catch {} }
+			let close = () => {
+				end()
+				try {
+					controller.close()
+				} catch {}
+			}
 			contextPage.state.ends.add(close)
 			signal.addEventListener('abort', end)
 			send()
@@ -167,4 +223,11 @@ function closeAll(): void {
 	for (let close of contextPage.state.ends) close()
 }
 
-export const contextPage = { state: { subs: new Map<string, Set<() => void>>(), ends: new Set<() => void>() }, owns, serve, notify, graph, closeAll }
+export const contextPage = {
+	state: { subs: new Map<string, Set<() => void>>(), ends: new Set<() => void>() },
+	owns,
+	serve,
+	notify,
+	graph,
+	closeAll,
+}

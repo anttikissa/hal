@@ -67,7 +67,14 @@ test('a printable key outside any field types into the box, keeping the key', ()
 })
 
 test('keys that do not type, fields, and Space on a button stay where they are', () => {
-	for (let [key, mods] of [['a', { ctrlKey: true }], ['a', { metaKey: true }], ['ArrowDown', {}], ['Enter', {}], ['F5', {}]] as const) expect(press(key, other, mods)).toBe(false)
+	for (let [key, mods] of [
+		['a', { ctrlKey: true }],
+		['a', { metaKey: true }],
+		['ArrowDown', {}],
+		['Enter', {}],
+		['F5', {}],
+	] as const)
+		expect(press(key, other, mods)).toBe(false)
 	expect(press('a', { kind: 'field' })).toBe(false)
 	expect(press(' ', { kind: 'button', submits: false })).toBe(false)
 	expect(press('a', other, { isComposing: true })).toBe(false)
@@ -90,8 +97,17 @@ test('a paste outside any field goes into the box; in a field it stays native', 
 })
 
 test('Tab and link Enter stay native in a pending question, while input Enter answers', () => {
-	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } })
-	app.onEvent({ type: 'question', sessionId, id: 'q', form: { text: 'Open https://example.com/', fields: [{ type: 'text', name: 'code' }] } })
+	app.onEvent({
+		type: 'snapshot',
+		sessionId,
+		snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } },
+	})
+	app.onEvent({
+		type: 'question',
+		sessionId,
+		id: 'q',
+		form: { text: 'Open https://example.com/', fields: [{ type: 'text', name: 'code' }] },
+	})
 	expect(app.state.view.form).toBeDefined()
 	expect(press('Enter', { kind: 'link' })).toBe(false)
 	expect(press('Tab', { kind: 'field' })).toBe(false)
@@ -105,14 +121,21 @@ test('Tab and link Enter stay native in a pending question, while input Enter an
 test('Ctrl-R reloads only this page in every view and saves the composer draft first', () => {
 	let original = restart.reload
 	let reloaded: string[] = []
-	restart.reload = () => { reloaded.push(drafts.text(sessionId)) }
+	restart.reload = () => {
+		reloaded.push(drafts.text(sessionId))
+	}
 	try {
 		let target: Target = { kind: 'message', text: 'unsaved input', cursor: 13 }
 		expect(press('r', target, { ctrlKey: true })).toBe(true)
 		app.setView({ ...app.state.view, modal: { items: ['a/b'], selected: 0, search: '' } as any })
 		expect(press('r', { kind: 'field' }, { ctrlKey: true })).toBe(true)
 		app.setView({ ...app.state.view, modal: undefined })
-		app.onEvent({ type: 'question', sessionId, id: 'q', form: { text: 'Answer?', fields: [{ type: 'text', name: 'answer' }] } })
+		app.onEvent({
+			type: 'question',
+			sessionId,
+			id: 'q',
+			form: { text: 'Answer?', fields: [{ type: 'text', name: 'answer' }] },
+		})
 		expect(press('r', { kind: 'field' }, { ctrlKey: true })).toBe(true)
 		expect(reloaded).toEqual(['unsaved input', 'unsaved input', 'unsaved input'])
 		expect(sent.filter((c) => c.type !== 'draft')).toEqual([])

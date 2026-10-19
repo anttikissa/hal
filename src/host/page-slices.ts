@@ -21,7 +21,8 @@ function slices<T>(steps: Steps<T>): T | Promise<T> {
 			decoded += r.value
 			let now = performance.now()
 			let end = pages.deadline()
-			if (decoded > pages.syncBytes && now > end - pages.sliceMs + 0.5 && now + (r.value / 1e6) * pages.msPerMB > end) return undefined
+			if (decoded > pages.syncBytes && now > end - pages.sliceMs + 0.5 && now + (r.value / 1e6) * pages.msPerMB > end)
+				return undefined
 		}
 	}
 	let r = run()

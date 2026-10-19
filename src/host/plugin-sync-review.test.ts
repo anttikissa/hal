@@ -17,14 +17,35 @@ import { paths } from './paths.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
-const saved = { hist: pluginHistory.state, files: plugins.state.files, home: paths.state.home, send: pluginSyncClient.send, report: plugins.report, deliver: pluginReports.deliver, onChange: pluginSyncClient.onChange, onReview: pluginSyncClient.onReview, show: pluginSyncReview.show }
-let root = '', client: Side, server: Side
-let sent: any[] = [], steps: any[] = [], notices: any[] = [], shown: (string | undefined)[] = []
+const saved = {
+	hist: pluginHistory.state,
+	files: plugins.state.files,
+	home: paths.state.home,
+	send: pluginSyncClient.send,
+	report: plugins.report,
+	deliver: pluginReports.deliver,
+	onChange: pluginSyncClient.onChange,
+	onReview: pluginSyncClient.onReview,
+	show: pluginSyncReview.show,
+}
+let root = '',
+	client: Side,
+	server: Side
+let sent: any[] = [],
+	steps: any[] = [],
+	notices: any[] = [],
+	shown: (string | undefined)[] = []
 
 function makeSide(name: string): Side {
-	let home = join(root, name), dir = join(home, 'plugins')
+	let home = join(root, name),
+		dir = join(home, 'plugins')
 	mkdirSync(dir, { recursive: true })
-	let s: Side = { home, dir, hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() }, files: new Map() }
+	let s: Side = {
+		home,
+		dir,
+		hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		files: new Map(),
+	}
 	use(s)
 	pluginHistory.init(dir)
 	return s
@@ -38,7 +59,11 @@ function use(s: Side): void {
 
 function on<T>(s: Side, fn: () => T): T {
 	use(s)
-	try { return fn() } finally { use(client) }
+	try {
+		return fn()
+	} finally {
+		use(client)
+	}
 }
 
 function put(s: Side, file: string, text: string): void {
@@ -50,12 +75,16 @@ function put(s: Side, file: string, text: string): void {
 	})
 }
 
-const read = (s: Side, file: string) => (existsSync(join(s.dir, file)) ? readFileSync(join(s.dir, file), 'utf8') : undefined)
+const read = (s: Side, file: string) =>
+	existsSync(join(s.dir, file)) ? readFileSync(join(s.dir, file), 'utf8') : undefined
 
 // The host answers as host.ts would; review steps are collected.
 function answer(c: any): void {
 	if (c.op === 'step') return void steps.push(c)
-	let events: Event[] = [on(server, () => pluginSync.command({ deliver: () => {} }, c)).reply, { type: 'ack', id: c.id }]
+	let events: Event[] = [
+		on(server, () => pluginSync.command({ deliver: () => {} }, c)).reply,
+		{ type: 'ack', id: c.id },
+	]
 	queueMicrotask(() => events.forEach((e) => pluginSyncClient.event(e)))
 }
 
@@ -72,7 +101,10 @@ beforeEach(() => {
 	plugins.report = () => {}
 	server = makeSide('server')
 	client = makeSide('client')
-	sent = []; steps = []; notices = []; shown = []
+	sent = []
+	steps = []
+	notices = []
+	shown = []
 	pluginReports.deliver = (e) => void notices.push(e)
 	pluginSyncReview.state = { asked: new Map(), announced: new Set() }
 	pluginSyncReview.start('example.com', (text) => void shown.push(text))
@@ -111,7 +143,11 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 	expect(notices).toHaveLength(1)
 
 	let first = await step()
-	expect(first.ask.fields[0].options).toEqual(['Use client version', 'Use server version', 'Keep separate — ignore sync for keys.ts on this client'])
+	expect(first.ask.fields[0].options).toEqual([
+		'Use client version',
+		'Use server version',
+		'Keep separate — ignore sync for keys.ts on this client',
+	])
 	expect(first.say).toContain('missing (no history of this file)')
 	let next = await step({ choice: 'Keep separate — ignore sync for keys.ts on this client' })
 	expect(next.say).toContain('Keeping keys.ts separate')

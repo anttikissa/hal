@@ -18,7 +18,15 @@ test('an empty file means every declared default, and every default passes its o
 })
 
 test('valid values are taken', () => {
-	let given = { model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 }
+	let given = {
+		model: 'openai/gpt-5',
+		security: 'none',
+		webPort: 8080,
+		webUrl: 'https://h.example',
+		promptRows: 4,
+		pasteLines: 20,
+		maxRounds: 50,
+	}
 	let { values, warnings } = settings.check(given)
 	expect(warnings).toEqual([])
 	expect(values).toEqual({ ...defaults(), ...given })
@@ -32,7 +40,14 @@ test('an unknown key is a warning and changes nothing else', () => {
 })
 
 test('a bad value warns and only that setting falls back to its default', () => {
-	for (let bad of [{ security: 'paranoid' }, { webPort: 'x' }, { webPort: 70000 }, { webPort: 80.5 }, { model: 3 }, { model: '' }]) {
+	for (let bad of [
+		{ security: 'paranoid' },
+		{ webPort: 'x' },
+		{ webPort: 70000 },
+		{ webPort: 80.5 },
+		{ model: 3 },
+		{ model: '' },
+	]) {
 		let key = Object.keys(bad)[0]!
 		let { values, warnings } = settings.check({ ...bad, promptRows: 4 })
 		expect(warnings.length).toBe(1)
@@ -53,7 +68,14 @@ test('getters read the current raw settings at call time', () => {
 })
 
 test('webUrl is an http(s) address links can carry; empty means localhost at webPort', () => {
-	for (let bad of ['h.example', 'ftp://h.example', 'https://h.example/?x=1', 'https://h.example/#a', 'https://h.example/\x07x', 'https://h .example']) {
+	for (let bad of [
+		'h.example',
+		'ftp://h.example',
+		'https://h.example/?x=1',
+		'https://h.example/#a',
+		'https://h.example/\x07x',
+		'https://h .example',
+	]) {
 		expect(settings.check({ webUrl: bad }).warnings).toHaveLength(1)
 	}
 	settings.state.raw = { webPort: 4321 }

@@ -23,8 +23,10 @@ async function turn(c: ReturnType<typeof client>, id: string, text: string): Pro
 }
 
 test('a turn end reaches the user once: nothing if watched, a notice if another tab is, else a push', async () => {
-	let a = client(), b = client()
-	let one = created(a), two = created(a)
+	let a = client(),
+		b = client()
+	let one = created(a),
+		two = created(a)
 	b.conn.send({ type: 'open', sessionId: one })
 
 	// b watches the session itself: no notice anywhere, no push.
@@ -49,6 +51,9 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 	c.conn.send({ type: 'notice-history' })
 	await until(() => c.of('notice-history').length)
 	let entries = c.of('notice-history')[0]!.entries
-	expect(entries).toMatchObject([{ session: one, kind: 'done', line: 'third' }, { session: one, kind: 'done', line: 'tests pass, pushed to main' }])
+	expect(entries).toMatchObject([
+		{ session: one, kind: 'done', line: 'third' },
+		{ session: one, kind: 'done', line: 'tests pass, pushed to main' },
+	])
 	expect(entries[0].block).toMatch(/^\d+$/)
 })

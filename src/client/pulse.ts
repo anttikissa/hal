@@ -19,13 +19,16 @@ function schedule(): void {
 	let now = pulse.now()
 	let st = pulse.state
 	let next = Math.min((Math.floor(now / pulse.ms) + 1) * pulse.ms, (Math.floor(now / st.interval) + 1) * st.interval)
-	st.timer = setTimeout(() => {
-		st.timer = null
-		let fn = st.onBeat
-		if (!fn) return
-		pulse.schedule()
-		fn(Math.floor(next / pulse.ms))
-	}, Math.max(1, next - now))
+	st.timer = setTimeout(
+		() => {
+			st.timer = null
+			let fn = st.onBeat
+			if (!fn) return
+			pulse.schedule()
+			fn(Math.floor(next / pulse.ms))
+		},
+		Math.max(1, next - now),
+	)
 	// Blinking alone never keeps a process alive.
 	;(st.timer as { unref?: () => void }).unref?.()
 }
@@ -45,7 +48,11 @@ function keep(fn: ((beat: number) => void) | null, interval = pulse.ms): void {
 const running = (): boolean => pulse.state.timer !== null
 
 export const pulse = {
-	state: { onBeat: null as ((beat: number) => void) | null, timer: null as ReturnType<typeof setTimeout> | null, interval: 250 },
+	state: {
+		onBeat: null as ((beat: number) => void) | null,
+		timer: null as ReturnType<typeof setTimeout> | null,
+		interval: 250,
+	},
 	/** One beat's length. */
 	ms: 250,
 	// Animations (rotating examples) repaint on finer wall-clock frames:

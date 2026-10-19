@@ -57,7 +57,9 @@ function charWidth(cp: number): number {
 		(cp >= 0xfe30 && cp <= 0xfe6b) ||
 		(cp >= 0xff01 && cp <= 0xff60) ||
 		(cp >= 0xffe0 && cp <= 0xffe6) ||
-		(cp >= 0x20000 && cp <= 0x3ffff) ? 2 : 1
+		(cp >= 0x20000 && cp <= 0x3ffff)
+		? 2
+		: 1
 }
 
 /**
@@ -119,7 +121,11 @@ function skipEscape(s: string, i: number): number {
 // Walks s, calling visit for each visible glyph with its start offset,
 // width, length and column. visit returns false to stop. Returns the
 // offset where the walk stopped.
-function walk(s: string, column: number, visit: (i: number, width: number, length: number, column: number) => boolean | void): number {
+function walk(
+	s: string,
+	column: number,
+	visit: (i: number, width: number, length: number, column: number) => boolean | void,
+): number {
 	let i = 0
 	while (i < s.length) {
 		let j = strings.skipEscape(s, i)
@@ -261,7 +267,7 @@ function clipVisual(s: string, max: number): string {
 	if (strings.visLen(s) <= max) return s
 	let cut = strings.walk(s, 0, (_i, w, _len, col) => col + w <= max - 1)
 	let escapes = ''
-	for (let i = cut; i < s.length; ) {
+	for (let i = cut; i < s.length;) {
 		let j = strings.skipEscape(s, i)
 		if (j > i) escapes += s.slice(i, j)
 		i = Math.max(j, i + 1)
@@ -297,4 +303,16 @@ function sliceVisual(s: string, from: number, to: number): string {
 	return out ? prefix + out : ''
 }
 
-export const strings = { clean, charWidth, glyphAt, skipEscape, walk, visLen, expandTabs, containLinks, wordWrap, clipVisual, sliceVisual }
+export const strings = {
+	clean,
+	charWidth,
+	glyphAt,
+	skipEscape,
+	walk,
+	visLen,
+	expandTabs,
+	containLinks,
+	wordWrap,
+	clipVisual,
+	sliceVisual,
+}

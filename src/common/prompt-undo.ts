@@ -6,7 +6,9 @@
 import type { PromptState, PromptSnapshot } from './prompt.ts'
 
 function snapshot(st: PromptState): PromptSnapshot {
-	return st.anchor === undefined ? { text: st.text, cursor: st.cursor } : { text: st.text, cursor: st.cursor, anchor: st.anchor }
+	return st.anchor === undefined
+		? { text: st.text, cursor: st.cursor }
+		: { text: st.text, cursor: st.cursor, anchor: st.anchor }
 }
 
 // `st`, an edit of `before`: one more step to undo, none to redo.

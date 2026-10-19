@@ -37,7 +37,11 @@ beforeEach(() => {
 		port: 0,
 		fetch(req) {
 			seen.push(req.headers)
-			let chunks = [{ choices: [{ delta: { content: 'ok' } }] }, { choices: [{ delta: {}, finish_reason: 'stop' }] }, '[DONE]']
+			let chunks = [
+				{ choices: [{ delta: { content: 'ok' } }] },
+				{ choices: [{ delta: {}, finish_reason: 'stop' }] },
+				'[DONE]',
+			]
 			return new Response(chunks.map((c) => `data: ${typeof c === 'string' ? c : JSON.stringify(c)}\n\n`).join(''))
 		},
 	})
@@ -71,7 +75,10 @@ const file = () => `${home}/secrets/auth.ason`
 async function send(sessionId?: string): Promise<{ events: string[]; message?: string }> {
 	let out: string[] = []
 	let message: string | undefined
-	for await (let e of provider.stream('opencode-go/m', { messages: [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }], sessionId })) {
+	for await (let e of provider.stream('opencode-go/m', {
+		messages: [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }],
+		sessionId,
+	})) {
 		out.push(e.type)
 		if (e.type === 'error') message = e.message
 	}

@@ -34,10 +34,41 @@ import { diagnostics } from './diagnostics.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; updateAvailable?: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
+export type AppState = {
+	view: ViewState
+	text: string
+	tabs: Tab[]
+	shown?: string
+	landing?: string
+	asked: Set<string>
+	kill?: string
+	older: Map<string, Backfill>
+	pages: number
+	target?: Target & { found?: true; shown?: true }
+	menu?: Menu
+	known?: Known
+	completedByTab?: string
+	suppressed?: string
+	cached: Map<string, ViewState>
+	background: Set<string>
+	painted: boolean
+	updateAvailable?: boolean
+	loading?: string
+	timer?: ReturnType<typeof setTimeout>
+}
 
 function createState(): AppState {
-	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
+	return {
+		view: {},
+		text: '',
+		tabs: [],
+		asked: new Set(),
+		older: new Map(),
+		pages: 0,
+		cached: new Map(),
+		background: new Set(),
+		painted: false,
+	}
 }
 
 function sessionId(): string | undefined {
@@ -58,7 +89,8 @@ function notice(): string | undefined {
 // None for the intro or while a question waits: neither takes requests.
 const example: PromptExample = {}
 function placeholder(text: string, now: number): Shown | undefined {
-	let v = app.state.view, t = v.transcript
+	let v = app.state.view,
+		t = v.transcript
 	let hal = !!app.state.tabs.find((tab) => tab.id === app.state.shown)?.hal
 	let list = t && t.meta.model !== 'hal/intro' && !v.form ? (hal ? placeholders.hal : placeholders.general) : undefined
 	return placeholders.follow(example, t?.meta.id ?? '', list, text, now)
@@ -91,17 +123,33 @@ function onEvent(event: Event): void {
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'restart-ask') delete restart.state.mark
-	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
-	if (event.type === 'subscription-usage' || event.type === 'redraw' || folds.onEvent(event) || rebaseView.onEvent(event)) return
+	if (event.type === 'web-update') {
+		st.updateAvailable = true
+		return app.changed()
+	}
+	if (
+		event.type === 'subscription-usage' ||
+		event.type === 'redraw' ||
+		folds.onEvent(event) ||
+		rebaseView.onEvent(event)
+	)
+		return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (push.onEvent(event)) return
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
 	let landed = uploads.settle(event)
 	if (landed) app.settled(landed)
-	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown) return tabs.hiddenEvent(event)
+	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown)
+		return tabs.hiddenEvent(event)
 	st.view = view.onEvent(st.view, event)
-	if (event.type === 'snapshot') { st.menu = undefined; st.known = undefined; st.completedByTab = undefined; st.suppressed = undefined; backfill.onSnapshot(st.older, event) }
+	if (event.type === 'snapshot') {
+		st.menu = undefined
+		st.known = undefined
+		st.completedByTab = undefined
+		st.suppressed = undefined
+		backfill.onSnapshot(st.older, event)
+	}
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
 		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
 		st.pages++
@@ -113,7 +161,10 @@ function onEvent(event: Event): void {
 			st.completedByTab = undefined
 			let done = view.completed(st.view, event, st.text)
 			if (done) {
-				let menu = event.items.length > 1 && done.notice ? completions.receive(event.text, event.items, st.menu, event.descriptions) : undefined
+				let menu =
+					event.items.length > 1 && done.notice
+						? completions.receive(event.text, event.items, st.menu, event.descriptions)
+						: undefined
 				st.view = { ...st.view, notice: event.items.length ? undefined : done.notice }
 				if (done.text !== st.text) app.rewrite(() => ({ text: done.text, cursor: done.text.length }))
 				st.menu = menu
@@ -135,7 +186,12 @@ function onEvent(event: Event): void {
 		if (st.loading === st.shown) delete st.loading
 		if (!st.painted) {
 			let current = st
-			let afterPaint = () => { if (app.state === current) { st.painted = true; app.backgroundStep() } }
+			let afterPaint = () => {
+				if (app.state === current) {
+					st.painted = true
+					app.backgroundStep()
+				}
+			}
 			if (typeof requestAnimationFrame === 'function') requestAnimationFrame(afterPaint)
 			else setTimeout(afterPaint, 0)
 		} else app.backgroundStep()
@@ -156,11 +212,20 @@ function seek(): void {
 	let t = st.target
 	if (!t || t.found) return
 	let rows = view.withPending(view.rows(st.view.transcript?.items ?? []), [], st.view.transcript?.inbox)
-	let s = target.seek(t, st.view.transcript?.meta.id, rows, !backfill.complete(st.older, t.session), st.view.transcript?.dropped)
+	let s = target.seek(
+		t,
+		st.view.transcript?.meta.id,
+		rows,
+		!backfill.complete(st.older, t.session),
+		st.view.transcript?.dropped,
+	)
 	if (s === 'older') app.older()
 	else if (s === 'missing' || s === 'dropped') {
 		st.target = undefined
-		st.view = { ...st.view, notice: s === 'dropped' ? `Block ${t.key} was dropped by rebase.` : `no block ${t.key} in this session` }
+		st.view = {
+			...st.view,
+			notice: s === 'dropped' ? `Block ${t.key} was dropped by rebase.` : `no block ${t.key} in this session`,
+		}
 	} else if (s !== 'wait') t.found = true
 }
 
@@ -171,7 +236,11 @@ function settled(done: Settled): void {
 	let shown = app.sessionId() === done.sessionId
 	if (shown) app.rewrite((p) => uploads.swap(p, done.placeholder, done.text))
 	let draft = drafts.text(done.sessionId)
-	if (draft.includes(done.placeholder)) drafts.edit(done.sessionId, draft.replace(done.placeholder, () => done.text))
+	if (draft.includes(done.placeholder))
+		drafts.edit(
+			done.sessionId,
+			draft.replace(done.placeholder, () => done.text),
+		)
 	if (shown && done.resume) app.send(done.resume.delivery)
 }
 
@@ -185,8 +254,13 @@ function older(): void {
 function onState(state: LinkState): void {
 	if (state.type !== 'connected') queueEdit.disconnected()
 	if (restart.linkChanged(state)) return
-	if (state.type === 'connected') { tabs.connected(); push.visibility(app.state.shown) }
-	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
+	if (state.type === 'connected') {
+		tabs.connected()
+		push.visibility(app.state.shown)
+	}
+	app.setNotice(
+		state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…',
+	)
 }
 
 // The message box now says `text`; stale replies may never reopen the menu.
@@ -201,8 +275,10 @@ function input(text: string): void {
 		if (st.menu?.explicit) st.menu = { ...st.menu, explicit: false }
 		st.completedByTab = undefined
 		let request = view.complete(st.view, text)
-		if (!request || text.includes('\n')) { st.menu = undefined; st.known = undefined }
-		else {
+		if (!request || text.includes('\n')) {
+			st.menu = undefined
+			st.known = undefined
+		} else {
 			st.menu = completions.predict(text, st.known, st.menu)
 			if (connection.connected()) connection.send(request)
 		}
@@ -290,17 +366,29 @@ function modalPick(index: number): void {
 // Sends what the box holds (Enter, or the Send button) as `delivery`
 // says (task csn); a command runs at once.
 function send(delivery: Delivery = 'steer'): void {
-	diagnostics.record('send', delivery); diagnostics.report()
-	let st = app.state, id = app.sessionId()
-	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { diagnostics.record('outcome', 'queue-edit'); queuedPrompt.save(); return }
+	diagnostics.record('send', delivery)
+	diagnostics.report()
+	let st = app.state,
+		id = app.sessionId()
+	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) {
+		diagnostics.record('outcome', 'queue-edit')
+		queuedPrompt.save()
+		return
+	}
 	if (view.commandDraft(st.text) && delivery === 'queue') delivery = 'steer'
 	if (id && uploads.pending(id)) {
-		diagnostics.record('outcome', 'upload'); uploads.wait(id, delivery)
+		diagnostics.record('outcome', 'upload')
+		uploads.wait(id, delivery)
 		return app.setNotice('sending once the upload is done')
 	}
-	if (restart.typed(st.text) || folds.typed(st.text)) { diagnostics.record('outcome', 'client-command'); return app.input('') }
+	if (restart.typed(st.text) || folds.typed(st.text)) {
+		diagnostics.record('outcome', 'client-command')
+		return app.input('')
+	}
 	let { command, notice, keep } = view.submit(st.view, st.text, delivery)
-	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string } | undefined
+	let c = command as
+		| { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string }
+		| undefined
 	// A prompt shows at once and waits, pending, for the host.
 	// An edit's text is not the draft: the draft stays.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, st.view.editing ? { ...c, aside: true } : c)
@@ -320,18 +408,40 @@ function start(): void {
 	drafts.store = app.store
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
 	link.start({
-		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}&updates=manual`),
+		dial: () =>
+			new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}&updates=manual`),
 		reload: () => location.reload(),
 		authorized: () => app.authorized(),
-		onEvent: (e) => diagnostics.apply(e, () => app.onEvent(e), e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0, e.type === 'snapshot' && app.state.shown === e.sessionId),
-		onMessage: diagnostics.enabled() ? (ms, bytes, e) => diagnostics.load('parsed', performance.now() - ms, e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0, bytes) : undefined,
-		onState: (s) => { diagnostics.record('connection', s.type); diagnostics.report(); app.onState(s) },
+		onEvent: (e) =>
+			diagnostics.apply(
+				e,
+				() => app.onEvent(e),
+				e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0,
+				e.type === 'snapshot' && app.state.shown === e.sessionId,
+			),
+		onMessage: diagnostics.enabled()
+			? (ms, bytes, e) =>
+					diagnostics.load(
+						'parsed',
+						performance.now() - ms,
+						e.type === 'snapshot' ? app.state.tabs.findIndex((t) => t.id === e.sessionId) + 1 : 0,
+						bytes,
+					)
+			: undefined,
+		onState: (s) => {
+			diagnostics.record('connection', s.type)
+			diagnostics.report()
+			app.onState(s)
+		},
 	})
 	addEventListener('popstate', () => tabs.onPopState())
 	addEventListener('hashchange', () => app.aim())
 	app.aim()
 	void push.start(() => app.changed()).catch(() => {})
-	let visible = () => { push.visibility(app.state.shown); if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen() }
+	let visible = () => {
+		push.visibility(app.state.shown)
+		if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen()
+	}
 	addEventListener('focus', visible)
 	addEventListener('blur', visible)
 	document.addEventListener('visibilitychange', visible)
@@ -372,7 +482,10 @@ export const app = {
 	setNotice,
 	sendNow,
 	// Play's nudge (task yhn): a prompt sent as if typed, pending until the host takes it.
-	nudge: (id: string, text: string): void => { drafts.submit(id, text); app.changed() },
+	nudge: (id: string, text: string): void => {
+		drafts.submit(id, text)
+		app.changed()
+	},
 	backgroundStep: () => tabs.backgroundStep(),
 	onEvent,
 	settled,
@@ -388,11 +501,17 @@ export const app = {
 	formInput,
 	formFocus,
 	pick,
-	submitForm: (): void => { let form = app.state.view.form; if (form) app.sendForm({ type: 'submit', answers: forms.answers(form) }) },
+	submitForm: (): void => {
+		let form = app.state.view.form
+		if (form) app.sendForm({ type: 'submit', answers: forms.answers(form) })
+	},
 	sendForm,
 	modalKey,
 	modalPick,
-	search: (text: string, edit = false): void => { if (app.state.view.modal?.find) find.input(text); else app.setView(view.search(app.state.view, text, edit)) },
+	search: (text: string, edit = false): void => {
+		if (app.state.view.modal?.find) find.input(text)
+		else app.setView(view.search(app.state.view, text, edit))
+	},
 	send,
 	store,
 	start,

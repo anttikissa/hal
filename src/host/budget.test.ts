@@ -11,12 +11,15 @@ import { client, toolSession, useHost } from './host-fixture.test.ts'
 
 useHost()
 
-const spawn = (owner: string, limit: number, fork = false) => subagents.spawn(owner, { kind: 'subagent-leave-open', task: '', fork, cwd: '/tmp', limit })
+const spawn = (owner: string, limit: number, fork = false) =>
+	subagents.spawn(owner, { kind: 'subagent-leave-open', task: '', fork, cwd: '/tmp', limit })
 
 test('siblings share ancestor slots without paying their promised budgets upfront', () => {
-	let c = client(), root = toolSession(c)
+	let c = client(),
+		root = toolSession(c)
 	sessions.open(root).slots = 5
-	let a = spawn(root, 3), b = spawn(root, 3)
+	let a = spawn(root, 3),
+		b = spawn(root, 3)
 	expect(sessions.open(root).slots).toBe(3)
 	expect(c.views.get(root)!.meta.slots).toBe(3)
 	spawn(a, 2)

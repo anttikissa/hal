@@ -13,7 +13,12 @@ const records: HistoryRecord[] = [
 	{ type: 'user', n: 4, ts, blocks: [{ type: 'tool_result', id: 'a', output: 'x'.repeat(40_000) }] },
 	{ type: 'assistant', n: 5, ts, block: { type: 'text', text: 'Done' } },
 ]
-const plan = (snapshot = rebaseRows.build(records)) => ({ type: 'rebase-plan' as const, sessionId: 's1', snapshot, todo: '' })
+const plan = (snapshot = rebaseRows.build(records)) => ({
+	type: 'rebase-plan' as const,
+	sessionId: 's1',
+	snapshot,
+	todo: '',
+})
 const saved = { send: connection.send, nextId: connection.nextId }
 let sent: unknown[] = []
 
@@ -32,10 +37,15 @@ function start() {
 }
 
 test('internal notes open, edit and drop independently of session setting rows', () => {
-	let snapshot = rebaseRows.build([{ type: 'change', n: 1, ts, cwd: '/new' }, { type: 'notice', n: 2, ts, text: 'New rules\nfull instructions', sectionUpdate: true }])
+	let snapshot = rebaseRows.build([
+		{ type: 'change', n: 1, ts, cwd: '/new' },
+		{ type: 'notice', n: 2, ts, text: 'New rules\nfull instructions', sectionUpdate: true },
+	])
 	rebaseView.open(plan(snapshot))
 	let st = rebaseView.state!
-	expect(rebaseView.parts(st, snapshot.rows[1]!)).toEqual([{ kind: 'text', label: 'internal note', text: 'New rules\nfull instructions' }])
+	expect(rebaseView.parts(st, snapshot.rows[1]!)).toEqual([
+		{ kind: 'text', label: 'internal note', text: 'New rules\nfull instructions' },
+	])
 	rebaseView.act(2, 'edit')
 	rebaseView.edit(2, 'Injected rules')
 	rebaseView.act(1, 'drop')
@@ -75,11 +85,22 @@ test('only changed edits outside dropped groups reach the plan, and Apply needs 
 	rebaseView.edit(5, 'Finished')
 	rebaseView.act(3, 'edit')
 	rebaseView.edit(3, 'short note')
-	expect(rebaseView.plan(rebaseView.state!).edit).toEqual([{ n: 4, text: 'short note' }, { n: 5, text: 'Finished' }])
+	expect(rebaseView.plan(rebaseView.state!).edit).toEqual([
+		{ n: 4, text: 'short note' },
+		{ n: 5, text: 'Finished' },
+	])
 	rebaseView.act(2, 'drop')
 	expect(rebaseView.plan(rebaseView.state!).edit).toEqual([{ n: 5, text: 'Finished' }])
 	rebaseView.apply()
-	expect(sent).toEqual([{ type: 'rebase-apply', id: 'c1', sessionId: 's1', base: 5, plan: { base: 5, drop: [2], edit: [{ n: 5, text: 'Finished' }] } }])
+	expect(sent).toEqual([
+		{
+			type: 'rebase-apply',
+			id: 'c1',
+			sessionId: 's1',
+			base: 5,
+			plan: { base: 5, drop: [2], edit: [{ n: 5, text: 'Finished' }] },
+		},
+	])
 })
 
 test('quick actions drop big tool output and everything before a row', () => {
@@ -96,7 +117,9 @@ test('the host answer: a refusal stays whole with the plan, success closes with 
 	rebaseView.act(1, 'drop')
 	rebaseView.apply()
 	let refusal = 'Rebase is stale: planned at 5, history now ends at 7. Rebuild the plan.'
-	expect(rebaseView.onEvent({ type: 'rebase-result', sessionId: 's1', command: 'other', ok: false, text: 'no' })).toBe(true)
+	expect(rebaseView.onEvent({ type: 'rebase-result', sessionId: 's1', command: 'other', ok: false, text: 'no' })).toBe(
+		true,
+	)
 	expect(rebaseView.state!.sending).toBe('c1')
 	rebaseView.onEvent({ type: 'rebase-result', sessionId: 's1', command: 'c1', ok: false, text: refusal })
 	expect(rebaseView.state).toMatchObject({ error: refusal, sending: undefined, actions: { 1: 'drop' } })
@@ -112,5 +135,8 @@ test('the host answer: a refusal stays whole with the plan, success closes with 
 test('an opened row shows readable parts, not JSON', () => {
 	let st = start()
 	let parts = rebaseView.parts(st, st.snapshot.rows[2]!)
-	expect(parts.map((p) => p.kind === 'text' ? [p.label, p.text.slice(0, 8)] : p.kind)).toEqual([['call', '$ ./test'], ['output', 'xxxxxxxx']])
+	expect(parts.map((p) => (p.kind === 'text' ? [p.label, p.text.slice(0, 8)] : p.kind))).toEqual([
+		['call', '$ ./test'],
+		['output', 'xxxxxxxx'],
+	])
 })

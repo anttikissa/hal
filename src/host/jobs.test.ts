@@ -11,11 +11,15 @@ import { tabs } from './tabs.ts'
 useHost()
 
 type C = ReturnType<typeof client>
-const bg = (command: string, id = 'b1') => ({ type: 'tool_call' as const, id, name: 'bash', input: { command, description: 'Run it', background: true } })
+const bg = (command: string, id = 'b1') => ({
+	type: 'tool_call' as const,
+	id,
+	name: 'bash',
+	input: { command, description: 'Run it', background: true },
+})
 const resultOf = (n: number) => calls[n]!.input.messages.at(-1).blocks.find((b: any) => b.type === 'tool_result')
 const texts = (n: number) =>
-	calls[n]!.input.messages
-		.at(-1)
+	calls[n]!.input.messages.at(-1)
 		.blocks.filter((b: any) => b.type === 'text')
 		.map((b: any) => b.text)
 		.join('\n')
@@ -53,7 +57,10 @@ test('the result reaches the running turn at its next request, as a message from
 	let c = client()
 	let { id, job } = await started(c, 'sleep 0.2; echo built; exit 4')
 	// The turn went on; the command still runs.
-	calls[1]!.push({ type: 'tool_call', id: 'b2', name: 'bash', input: { command: 'sleep 0.5', description: 'Wait' } }, { type: 'done', reason: 'tool_use' })
+	calls[1]!.push(
+		{ type: 'tool_call', id: 'b2', name: 'bash', input: { command: 'sleep 0.5', description: 'Wait' } },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await slow(() => calls.length === 3)
 	expect(texts(2)).toContain(`message from bash ${job}`)
 	expect(texts(2)).toContain('[exit 4]\nbuilt')

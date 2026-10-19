@@ -16,32 +16,72 @@ import { nativeTool } from '../native-tool.ts'
 
 useHost()
 
-const inspect = (sessionId: string, input: Record<string, unknown> = {}, model?: string) => tools.run(
-	{ type: 'tool_call', id: 'i', name: 'inspect', input },
-	{ cwd: '/tmp', signal: new AbortController().signal, sessionId, model },
-)
+const inspect = (sessionId: string, input: Record<string, unknown> = {}, model?: string) =>
+	tools.run(
+		{ type: 'tool_call', id: 'i', name: 'inspect', input },
+		{ cwd: '/tmp', signal: new AbortController().signal, sessionId, model },
+	)
 
 // Task 3r4: who changed each uncommitted file since its last commit, and whether it still holds the newest change.
 test('INSPECT files names every declared editor since the last commit, newest first', async () => {
 	let dir = realpathSync(mkdtempSync(join(tmpdir(), 'hal-3r4-')))
 	try {
-		let git = (...args: string[]) => Bun.spawnSync(['git', '-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], { env: { ...process.env, GIT_COMMITTER_DATE: '2001-01-01T00:00:00Z' } })
+		let git = (...args: string[]) =>
+			Bun.spawnSync(['git', '-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
+				env: { ...process.env, GIT_COMMITTER_DATE: '2001-01-01T00:00:00Z' },
+			})
 		git('init', '-q')
 		writeFileSync(join(dir, 'committed.txt'), 'v1')
 		git('add', 'committed.txt')
 		git('commit', '-q', '-m', 'c')
 		for (let name of ['kept.txt', 'redone.txt', 'stray.txt', 'committed.txt']) writeFileSync(join(dir, name), name)
-		let id = created(client(), dir), other = created(client(), dir)
+		let id = created(client(), dir),
+			other = created(client(), dir)
 		tabs.file().open.push(id)
 		let hash = (text: string) => new Bun.CryptoHasher('sha256').update(text).digest('hex')
-		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 3, cwd: dir, ts: '2000-01-01T00:00:00.000Z', files: [{ path: 'committed.txt', before: null, after: hash('v1') }] })
-		history.append(other, { type: 'file_changes', toolId: 'toolu_y', call: 5, cwd: dir, ts: '2002-01-01T00:00:00.000Z', files: [{ path: 'kept.txt', before: null, after: hash('older') }] })
-		history.append(id, { type: 'file_changes', toolId: 'toolu_x', call: 7, cwd: dir, ts: '2003-01-01T00:00:00.000Z', files: [{ path: 'kept.txt', before: null, after: hash('kept.txt') }, { path: 'redone.txt', before: null, after: hash('old') }] })
+		history.append(id, {
+			type: 'file_changes',
+			toolId: 'toolu_x',
+			call: 3,
+			cwd: dir,
+			ts: '2000-01-01T00:00:00.000Z',
+			files: [{ path: 'committed.txt', before: null, after: hash('v1') }],
+		})
+		history.append(other, {
+			type: 'file_changes',
+			toolId: 'toolu_y',
+			call: 5,
+			cwd: dir,
+			ts: '2002-01-01T00:00:00.000Z',
+			files: [{ path: 'kept.txt', before: null, after: hash('older') }],
+		})
+		history.append(id, {
+			type: 'file_changes',
+			toolId: 'toolu_x',
+			call: 7,
+			cwd: dir,
+			ts: '2003-01-01T00:00:00.000Z',
+			files: [
+				{ path: 'kept.txt', before: null, after: hash('kept.txt') },
+				{ path: 'redone.txt', before: null, after: hash('old') },
+			],
+		})
 		let input = nativeTool.resolve('INSPECT "files"').input
-		let lines = (await tools.run({ type: 'tool_call', id: 'i', name: 'inspect', input }, { cwd: dir, signal: new AbortController().signal, sessionId: id })).output.split('\n').sort()
+		let lines = (
+			await tools.run(
+				{ type: 'tool_call', id: 'i', name: 'inspect', input },
+				{ cwd: dir, signal: new AbortController().signal, sessionId: id },
+			)
+		).output
+			.split('\n')
+			.sort()
 		expect(lines).toHaveLength(4)
 		expect(lines[0]).toBe('committed.txt: no Hal record since its last commit')
-		expect(lines[1]).toMatch(new RegExp(`^kept\\.txt: ${id} \\(tab \\d+, ".*"\\) t7 at .* - current; earlier: ${other} \\(closed\\) t5 at .*$`))
+		expect(lines[1]).toMatch(
+			new RegExp(
+				`^kept\\.txt: ${id} \\(tab \\d+, ".*"\\) t7 at .* - current; earlier: ${other} \\(closed\\) t5 at .*$`,
+			),
+		)
 		expect(lines[2]).toMatch(/^redone\.txt: .* t7 at .* - changed since$/)
 		expect(lines[3]).toBe('stray.txt: no Hal record')
 	} finally {
@@ -93,17 +133,44 @@ test('clients report the terminal size they last sent', async () => {
 
 test('subscriptions refresh plans and windows, mark the caller and report quota and model limits without querying keys', async () => {
 	created(client(), '/tmp/x')
-	let all = auth.all, credential = auth.credential, save = liveFiles.save, fetchOld = globalThis.fetch
-	let a = { name: 'a@example.test', entry: { accessToken: 'anthropic-secret', email: 'a@example.test', plan: 'max' }, replace: () => {} }
-	let b = { name: 'b@example.test', entry: { accessToken: 'openai-secret', email: 'b@example.test', plan: 'plus' }, replace: () => {} }
+	let all = auth.all,
+		credential = auth.credential,
+		save = liveFiles.save,
+		fetchOld = globalThis.fetch
+	let a = {
+		name: 'a@example.test',
+		entry: { accessToken: 'anthropic-secret', email: 'a@example.test', plan: 'max' },
+		replace: () => {},
+	}
+	let b = {
+		name: 'b@example.test',
+		entry: { accessToken: 'openai-secret', email: 'b@example.test', plan: 'plus' },
+		replace: () => {},
+	}
 	let key = { name: 'OPENAI_API_KEY', entry: { apiKey: 'key-secret' }, replace: () => {} }
 	let requests: string[] = []
 	auth.all = ((kind: string) => ({ data: {}, list: kind === 'anthropic' ? [a] : [b, key] })) as typeof all
-	auth.credential = (async (_data, account) => ({ type: 'token', value: account.entry.accessToken, account: account.name })) as typeof credential
+	auth.credential = (async (_data, account) => ({
+		type: 'token',
+		value: account.entry.accessToken,
+		account: account.name,
+	})) as typeof credential
 	liveFiles.save = (() => {}) as typeof save
 	globalThis.fetch = (async (url: string | URL | Request) => {
 		requests.push(String(url))
-		return String(url).includes('anthropic') ? Response.json({ five_hour: { utilization: 18, resets_at: '2099-01-01T00:00:00Z' }, seven_day: { utilization: 57 }, seven_day_sonnet: { utilization: 72 } }) : Response.json({ plan_type: 'free', rate_limit: { primary_window: { used_percent: 100, limit_window_seconds: 18000 }, secondary_window: { used_percent: 30, limit_window_seconds: 604800 } } })
+		return String(url).includes('anthropic')
+			? Response.json({
+					five_hour: { utilization: 18, resets_at: '2099-01-01T00:00:00Z' },
+					seven_day: { utilization: 57 },
+					seven_day_sonnet: { utilization: 72 },
+				})
+			: Response.json({
+					plan_type: 'free',
+					rate_limit: {
+						primary_window: { used_percent: 100, limit_window_seconds: 18000 },
+						secondary_window: { used_percent: 30, limit_window_seconds: 604800 },
+					},
+				})
 	}) as typeof fetch
 	auth.state.chosen.set('openai s', b.name)
 	limits.set('openai/m b@example.test', clock.now() + 3600000)
@@ -123,19 +190,40 @@ test('subscriptions refresh plans and windows, mark the caller and report quota 
 		expect(result.output).not.toContain('-secret')
 		expect(requests).toHaveLength(2)
 		expect(usage.windows('openai', b.name)['7d']?.used).toBe(30)
-	} finally { usage.close(); limits.close(); auth.all = all; auth.credential = credential; liveFiles.save = save; globalThis.fetch = fetchOld; auth.state.chosen.delete('openai s') }
+	} finally {
+		usage.close()
+		limits.close()
+		auth.all = all
+		auth.credential = credential
+		liveFiles.save = save
+		globalThis.fetch = fetchOld
+		auth.state.chosen.delete('openai s')
+	}
 })
 
 test('subscription failures retain cached observations and full safe errors even with narrow fields', async () => {
 	created(client(), '/tmp/x')
-	let all = auth.all, refresh = statusUsage.refresh
-	let accounts = ['expired', 'timeout', 'healthy'].map((name) => ({ name: `${name}@example.test`, entry: { accessToken: `${name}-secret` }, replace: () => {} }))
+	let all = auth.all,
+		refresh = statusUsage.refresh
+	let accounts = ['expired', 'timeout', 'healthy'].map((name) => ({
+		name: `${name}@example.test`,
+		entry: { accessToken: `${name}-secret` },
+		replace: () => {},
+	}))
 	auth.all = ((kind: string) => ({ data: {}, list: kind === 'openai' ? accounts : [] })) as typeof all
-	usage.observe('openai', accounts[1]!.name, new Headers({ 'x-codex-primary-used-percent': '12', 'x-codex-primary-window-minutes': '300' }))
+	usage.observe(
+		'openai',
+		accounts[1]!.name,
+		new Headers({ 'x-codex-primary-used-percent': '12', 'x-codex-primary-window-minutes': '300' }),
+	)
 	statusUsage.refresh = async (_kind, account) => {
 		if (account.name.startsWith('expired')) throw Error('/private/auth.ason: HTTP 401 invalid_grant expired-secret')
 		if (account.name.startsWith('timeout')) throw Error('usage fetch timed out')
-		usage.observe('openai', account.name, new Headers({ 'x-codex-primary-used-percent': '20', 'x-codex-primary-window-minutes': '300' }))
+		usage.observe(
+			'openai',
+			account.name,
+			new Headers({ 'x-codex-primary-used-percent': '20', 'x-codex-primary-window-minutes': '300' }),
+		)
 	}
 	try {
 		let result = await inspect('s', { what: 'subscriptions' })
@@ -152,18 +240,28 @@ test('subscription failures retain cached observations and full safe errors even
 		expect(narrow.isError).toBe(true)
 		expect(narrow.output).toContain('error: /private/auth.ason: HTTP 401 invalid_grant <redacted>')
 		expect(narrow.output).toContain('error: usage fetch timed out')
-	} finally { usage.close(); limits.close(); auth.all = all; statusUsage.refresh = refresh }
+	} finally {
+		usage.close()
+		limits.close()
+		auth.all = all
+		statusUsage.refresh = refresh
+	}
 })
 
 test('subscription fields validate before reading accounts and absent accounts are explicit', async () => {
 	let all = auth.all
 	let reads = 0
-	auth.all = ((kind: string) => { reads++; throw Error(`no ${kind} login`) }) as typeof all
+	auth.all = ((kind: string) => {
+		reads++
+		throw Error(`no ${kind} login`)
+	}) as typeof all
 	try {
 		let bad = await inspect('s', { what: 'subscriptions', fields: 'credentials' })
 		expect(bad.isError).toBe(true)
 		expect(bad.output).toContain('provider, slot, account, plan, status, windows, limits, error')
 		expect(reads).toBe(0)
 		expect((await inspect('s', { what: 'subscriptions' })).output).toBe('No accounts configured.')
-	} finally { auth.all = all }
+	} finally {
+		auth.all = all
+	}
 })

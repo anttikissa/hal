@@ -42,7 +42,15 @@ export type { TurnStatus } from './replay.ts'
 // streaming and kept by its record.
 // `model`, `effort`: what writes the turn; `ts`: when each block
 // started (task hp).
-export type LiveTurn = { provider: string; model?: string; effort?: string; blocks: AssistantBlock[]; usage: Usage; ns?: number[]; ts?: string[] }
+export type LiveTurn = {
+	provider: string
+	model?: string
+	effort?: string
+	blocks: AssistantBlock[]
+	usage: Usage
+	ns?: number[]
+	ts?: string[]
+}
 
 // Text typed into a session but not sent yet, one per session, shared
 // by every client (tasks/j1/states.md, Drafts and sending). `rev` counts
@@ -115,7 +123,16 @@ export type Command = (
 	// client only, with `history`.
 	| { type: 'history'; sessionId: string; before: number }
 	| { type: 'rebase-error'; sessionId: string; text: string }
-	| { type: 'rebase-apply'; paused?: boolean; sessionId: string; base: number; plan?: RebasePlan; todo?: string; replacements?: Record<number, string>; recoveryPath?: string }
+	| {
+			type: 'rebase-apply'
+			paused?: boolean
+			sessionId: string
+			base: number
+			plan?: RebasePlan
+			todo?: string
+			replacements?: Record<number, string>
+			recoveryPath?: string
+	  }
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
@@ -134,7 +151,19 @@ export type Command = (
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; interactive?: boolean; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; queueEdit?: string; base?: number; aside?: boolean }
+	| {
+			type: 'submit'
+			sessionId: string
+			text: string
+			interactive?: boolean
+			delivery?: Delivery
+			queue?: boolean
+			amend?: boolean
+			edits?: string
+			queueEdit?: string
+			base?: number
+			aside?: boolean
+	  }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -190,7 +219,11 @@ export type Command = (
 	| { type: 'auth'; link?: boolean }
 	// A browser registers a push endpoint and reports its shown tab.
 	// Both push commands are answered, to this client only, with `push-devices`.
-	| { type: 'push-subscribe'; subscription: { endpoint: string; keys: { p256dh: string; auth: string } }; device?: string }
+	| {
+			type: 'push-subscribe'
+			subscription: { endpoint: string; keys: { p256dh: string; auth: string } }
+			device?: string
+	  }
 	| { type: 'push'; action: 'list' | 'remove' | 'test'; endpoint?: string }
 	// Answered, to this client only, with `notice-history` (task py).
 	| { type: 'notice-history' }
@@ -216,7 +249,18 @@ export type CommandType = Command['type']
 // `color`: the project color index (colors.project, task 22), only while
 // open tabs span two or more projects.
 // `jobs`: background commands still running.
-export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; question?: 'ordinary' | 'approval'; hal?: true; color?: number; jobs?: number }
+export type Tab = {
+	id: string
+	name: string
+	cwd: string
+	model: string
+	state: SessionState
+	attention?: true
+	question?: 'ordinary' | 'approval'
+	hal?: true
+	color?: number
+	jobs?: number
+}
 
 // ── Events (host → client) ──
 
@@ -236,7 +280,20 @@ export type Event =
 	// prompt, if not the human. `command`: the client's id for the submit
 	// that sent the prompt, so it can put the prompt in place of the one
 	// it shows pending.
-	| { type: 'turn-start'; inbox?: string[]; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string; model?: string; effort?: string; n?: number; command?: string; ts?: string }
+	| {
+			type: 'turn-start'
+			inbox?: string[]
+			sessionId: string
+			prompt?: string
+			images?: ImageBlock[]
+			sender?: Sender
+			provider: string
+			model?: string
+			effort?: string
+			n?: number
+			command?: string
+			ts?: string
+	  }
 	// A page of earlier history, answering the `history` command for
 	// `before`: whole records ending there, oldest first. `older`: where
 	// they start, when there are more before them.
@@ -252,9 +309,29 @@ export type Event =
 	// that takes the place of the last prompt and everything after it.
 	// `senders`: who sent each text ({} the human), when not all the human.
 	// `command`: as in turn-start, for the last text.
-	| { type: 'prompt'; inbox?: string[]; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; amends?: number; n?: number; command?: string; ts?: string }
+	| {
+			type: 'prompt'
+			inbox?: string[]
+			sessionId: string
+			texts: string[]
+			senders?: Sender[]
+			images?: ImageBlock[]
+			replaces?: true
+			amends?: number
+			n?: number
+			command?: string
+			ts?: string
+	  }
 	// `ts`: when the block it streams into started (task hp).
-	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string; model?: string; effort?: string }
+	| {
+			type: 'stream'
+			sessionId: string
+			event: LiveStreamEvent
+			n?: number
+			ts?: string
+			model?: string
+			effort?: string
+	  }
 	// A canceled partial text block, durable before broadcast (task 6eq).
 	| { type: 'assistant-interrupted'; sessionId: string; record: Extract<HistoryRecord, { type: 'assistant' }> }
 	// New bytes only; a late joiner gets the same partial output in its snapshot.
@@ -263,12 +340,30 @@ export type Event =
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number; ts?: string }
 	| { type: 'turn-stats'; sessionId: string; stats: Stats }
-	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; ts?: string; stats?: Stats }
+	| {
+			type: 'turn-end'
+			sessionId: string
+			status: TurnStatus
+			usage?: Usage
+			error?: string
+			n?: number
+			ts?: string
+			stats?: Stats
+	  }
 	// A question, now in history. A turn's waits for an answer with no
 	// turn running (the state says blocked). `command`: a slash command
 	// asked, beside whatever the session does, placed like `command`
 	// (`streaming`).
-	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number; ts?: string; command?: true; streaming?: true }
+	| {
+			type: 'question'
+			sessionId: string
+			id: string
+			form: Form
+			n?: number
+			ts?: string
+			command?: true
+			streaming?: true
+	  }
 	// The first answer to it, as history keeps it (secrets only named).
 	// `canceled`: Escape dismissed a command's question.
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; canceled?: true }
@@ -277,10 +372,32 @@ export type Event =
 	// `streaming`: the running round's last block was still streaming
 	// (not in history yet), so this goes before it; else after all the
 	// round's blocks (task rk).
-	| { type: 'command'; sessionId: string; text: string; origin?: 'model'; from?: string; label?: string; ts?: string; n?: number; command?: string; streaming?: true }
+	| {
+			type: 'command'
+			sessionId: string
+			text: string
+			origin?: 'model'
+			from?: string
+			label?: string
+			ts?: string
+			n?: number
+			command?: string
+			streaming?: true
+	  }
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
-	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; origin?: 'model'; change?: PromptChange; commit?: CommitBlock; n?: number; streaming?: true }
+	| {
+			type: 'output'
+			sessionId: string
+			text: string
+			ts?: string
+			error?: true
+			origin?: 'model'
+			change?: PromptChange
+			commit?: CommitBlock
+			n?: number
+			streaming?: true
+	  }
 	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
 	// `clear`: a /clear; clients drop everything shown before it.
 	| { type: 'divider'; sessionId: string; text: string; ts?: string; clear?: true; n?: number; streaming?: true }
@@ -294,13 +411,28 @@ export type Event =
 	// follower when /model runs alone. `names`: display names models.dev
 	// gives some of them, which the search matches too. `refresh`: lists
 	// arrived later; update a picker that is open, never open one.
-	| { type: 'models'; sessionId: string; current: string; effort?: string; capabilities?: Record<string, EffortCapability>; items: string[]; names?: Record<string, string>; refresh?: true }
+	| {
+			type: 'models'
+			sessionId: string
+			current: string
+			effort?: string
+			capabilities?: Record<string, EffortCapability>
+			items: string[]
+			names?: Record<string, string>
+			refresh?: true
+	  }
 	// Open the /config modal (common/settings-modal.ts) for `sessionId`,
 	// or with `refresh` (config.ason changed) update one already open.
 	// `values`: each setting's effective value as display text, a secret
 	// only 'set' or ''. `stored`: the config.ason text of each key it
 	// holds, such as `push: false`; a secret's value is never sent.
-	| { type: 'settings'; sessionId?: string; values: Record<string, string>; stored: Record<string, string>; refresh?: true }
+	| {
+			type: 'settings'
+			sessionId?: string
+			values: Record<string, string>
+			stored: Record<string, string>
+			refresh?: true
+	  }
 	// /restart <scope> found calls flagged unsafeToStop running (task
 	// ker): followers of `sessionId` open the restart dialog, nothing
 	// restarts yet.

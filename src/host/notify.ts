@@ -17,7 +17,12 @@ import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 
-type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { kind?: string; userAgent?: string; lastAt?: number } }
+type Watcher = {
+	deliver: (event: Event) => void
+	visible?: string
+	visibleAt?: number
+	record?: { kind?: string; userAgent?: string; lastAt?: number }
+}
 
 // iOS can drop a page without saying it is hidden, leaving its socket
 // "watching"; only a client heard from within a minute counts as present.
@@ -63,7 +68,12 @@ function reply(id: string): { line: string; block?: string } {
 		let block = r.n === undefined ? undefined : `${r.n}`
 		if (told) return { line: told, block }
 		let text = summary.strip(r.block.text)
-		let last = names.strip(text).split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
+		let last = names
+			.strip(text)
+			.split('\n')
+			.map((l) => l.trim())
+			.filter(Boolean)
+			.at(-1)
 		if (last) return { line: last, block }
 	}
 	return { line: '' }
@@ -71,7 +81,12 @@ function reply(id: string): { line: string; block?: string } {
 
 // One line saying what happened: the reply's last line, the error, or the question.
 function line(id: string, event: Event): string {
-	let text = event.type === 'question' ? event.form.text : event.type === 'turn-end' && event.error ? event.error : notify.replyLine(id)
+	let text =
+		event.type === 'question'
+			? event.form.text
+			: event.type === 'turn-end' && event.error
+				? event.error
+				: notify.replyLine(id)
 	return (text.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 200)
 }
 
@@ -91,13 +106,21 @@ let seq = 0
 
 // The same routing for automatic events and a model's mid-turn notice.
 // `source` names the triggering block and question for the history (task py).
-function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string, source: { block?: string; question?: string } = {}): void {
+function deliver(
+	clients: Iterable<Watcher>,
+	id: string,
+	k: NoticeKind,
+	line: string,
+	pushText: string,
+	source: { block?: string; question?: string } = {},
+): void {
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let name = sessions.open(id).name ?? id
 	noticeHistory.record({ session: id, name, kind: k, line, ...source })
 	let watching = all.filter(present)
-	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+	if (!watching.length)
+		return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line }
 	// Mid-turn lines stack, each for its full time; a turn's end or question
 	// replaces only that session's previous end or question.
@@ -107,7 +130,10 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	if (tab >= 0) notice.tab = tab + 1
 	if (list[tab]?.color !== undefined) notice.color = list[tab]!.color
 	for (let c of watching) c.deliver(notice)
-	let who = watching.map((c) => `${c.record?.kind === 'web' ? clientInfo.shortAgent(c.record.userAgent) : `${c.record?.kind} terminal`} showing ${c.visible} for ${c.visibleAt ? Math.round((Date.now() - c.visibleAt) / 1000) : '?'}s`)
+	let who = watching.map(
+		(c) =>
+			`${c.record?.kind === 'web' ? clientInfo.shortAgent(c.record.userAgent) : `${c.record?.kind} terminal`} showing ${c.visible} for ${c.visibleAt ? Math.round((Date.now() - c.visibleAt) / 1000) : '?'}s`,
+	)
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
@@ -116,7 +142,13 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 // done notice; with nobody present, a push. `line` says why;
 // `before`: the tab list before closing, for its number and color;
 // `closer`: the client that closed it, present but not told.
-function closed(clients: Iterable<Watcher>, id: string, line: string, before: { id: string; color?: number }[], closer?: Watcher): void {
+function closed(
+	clients: Iterable<Watcher>,
+	id: string,
+	line: string,
+	before: { id: string; color?: number }[],
+	closer?: Watcher,
+): void {
 	let name = sessions.open(id).name ?? id
 	let tab = before.findIndex((t) => t.id === id)
 	let title = tab >= 0 ? `Closed tab ${tab + 1}: ${name}` : `Closed ${name}`
@@ -132,7 +164,12 @@ function closed(clients: Iterable<Watcher>, id: string, line: string, before: { 
 
 // Why /close closed `id`: run by `caller`'s model, sent by another
 // session, or typed by the user (task 97r).
-function closedBy(id: string, caller: string, sender: { origin?: 'model'; from?: string } | undefined, before: { id: string }[]): string {
+function closedBy(
+	id: string,
+	caller: string,
+	sender: { origin?: 'model'; from?: string } | undefined,
+	before: { id: string }[],
+): string {
 	let by = sender?.from ?? (sender?.origin === 'model' ? caller : undefined)
 	if (by === undefined) return 'User called /close'
 	if (by === id) return 'Tab itself called /close'

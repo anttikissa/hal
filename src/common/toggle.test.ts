@@ -61,13 +61,17 @@ test('one named block switches short and long; more go long while at least half 
 
 test('blocks start as the session sets their kind, over the settings; a failed call as failed; an unknown stored level as the setting', () => {
 	let failed = [...items.slice(0, 5), { type: 'tool-result', key: '15', id: 'a', output: 'x', isError: true }] as Item[]
-	let at = toggle.starts({ items: failed, meta: { blocks: { thinking: 'long', prompt: 'medium' } } as unknown as SessionMeta })
+	let at = toggle.starts({
+		items: failed,
+		meta: { blocks: { thinking: 'long', prompt: 'medium' } } as unknown as SessionMeta,
+	})
 	expect(failed.map((i) => at(i))).toEqual(['long', 'long', 'long', 'short', 'short', 'long'])
 })
 
 test('the dialog hints what Enter does and Tab completes the block id under the cursor', () => {
 	let m = blocksDialog.open()
-	let typed = (text: string) => blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
+	let typed = (text: string) =>
+		blocksDialog.update({ ...m, form: { ...m.form!, values: [text], cursor: text.length } }, items, start)
 	expect(typed('t*').blocks?.hint).toBe('Expand 2 tool cards: t14, t16')
 	expect(typed('t').blocks?.hint).toBe(typed('t*').blocks?.hint)
 	expect(typed('').blocks?.hint).toBe('Expand latest tool card t16 (the default)')
@@ -83,7 +87,10 @@ test('the dialog hints what Enter does and Tab completes the block id under the 
 })
 
 test('queued inbox blocks share targeting, defaults and expansion with history', () => {
-	let all = toggle.items({ items, inbox: [{ id: 'queued', n: 20, text: 'First\nLast', from: 'other', delivery: 'after-turn' }] })
+	let all = toggle.items({
+		items,
+		inbox: [{ id: 'queued', n: 20, text: 'First\nLast', from: 'other', delivery: 'after-turn' }],
+	})
 	let states = new Map<string, Verbosity>()
 	let at = toggle.starts({ items: all, meta: {} as SessionMeta })
 	expect(at(all.at(-1)!)).toBe('short')
@@ -97,7 +104,11 @@ test('queued inbox blocks share targeting, defaults and expansion with history',
 })
 test('completion and opening share exact card keys, including extra items', () => {
 	let commit = transcript.commitItem({ hash: 'abc123', short: 'abc123', subject: 'Fix', files: [] })
-	let all = [...items, ...['18.1', '18.10', '18.2'].map((key) => ({ ...commit, key })), { type: 'output', key: '19.1', text: 'plain output' } as Item]
+	let all = [
+		...items,
+		...['18.1', '18.10', '18.2'].map((key) => ({ ...commit, key })),
+		{ type: 'output', key: '19.1', text: 'plain output' } as Item,
+	]
 	let at = () => 'short' as Verbosity
 	let selected = (args: string) => {
 		let p = toggle.plan('expand', all, args, at)
@@ -128,5 +139,6 @@ test('completion and opening share exact card keys, including extra items', () =
 	middle.form!.values[0] = '#s18.2, t14'
 	expect(blocksDialog.complete(middle, all, at, 6).form!.values[0]).toBe('#s18.2, t14')
 	expect(selected('19.1')).toBe('Card 19.1 does not expand or collapse')
-	for (let bad of ['18.', '18..1', '18.1.2', '18-19-20']) expect(selected(bad)).toBe(`Not a card, range or kind: ${bad}`)
+	for (let bad of ['18.', '18..1', '18.1.2', '18-19-20'])
+		expect(selected(bad)).toBe(`Not a card, range or kind: ${bad}`)
 })

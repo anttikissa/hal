@@ -126,7 +126,10 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 		}
 		// A block id (task d92), t5, #t5 or <session>#t5, or a bare session id
 		// (task b4b), where the resolver knows it: a link. Else text.
-		let id = markdown.state.links && (c === '#' || /[\dumartsq]/.test(c)) && !WORD.test(s[i - 1] ?? '') && s[i - 1] !== '#' ? ID.exec(s.slice(i)) : null
+		let id =
+			markdown.state.links && (c === '#' || /[\dumartsq]/.test(c)) && !WORD.test(s[i - 1] ?? '') && s[i - 1] !== '#'
+				? ID.exec(s.slice(i))
+				: null
 		let to = id ? markdown.state.links!(id[1], id[2] ?? id[3]) : undefined
 		if (id && to) {
 			add(id[0], { ...st, href: to })
@@ -166,14 +169,23 @@ function cells(row: string, open: boolean): Run[][] {
 		.trim()
 		.replace(/^\||\|$/g, '')
 		.split('|')
-		.map((c) => c.trim().split(/<br\s*\/?>/i).flatMap((line, i) => [...(i ? [{ text: '\n' }] : []), ...inline(line, open)]))
+		.map((c) =>
+			c
+				.trim()
+				.split(/<br\s*\/?>/i)
+				.flatMap((line, i) => [...(i ? [{ text: '\n' }] : []), ...inline(line, open)]),
+		)
 }
 
 // `links`: where a block id in the text links (task d92), given the
 // session it names (undefined: this one) and the id; undefined: text.
 function parse(text: string, streaming = false, links?: Links): Block[] {
 	markdown.state.links = links
-	try { return blocks(text, streaming) } finally { markdown.state.links = undefined }
+	try {
+		return blocks(text, streaming)
+	} finally {
+		markdown.state.links = undefined
+	}
 }
 
 function blocks(text: string, streaming: boolean): Block[] {
@@ -198,9 +210,11 @@ function blocks(text: string, streaming: boolean): Block[] {
 			// yet get its separator: until the next line tells, they are
 			// blank rows.
 			let rows = lines.slice(i, streaming && j === lines.length ? j - 1 : j)
-			let undecided = streaming && rows.length < 2 && (j === lines.length || (j === lines.length - 1 && lines[j] === ''))
+			let undecided =
+				streaming && rows.length < 2 && (j === lines.length || (j === lines.length - 1 && lines[j] === ''))
 			if (undecided) rows = []
-			if (rows.length > 1 && SEPARATOR.test(rows[1]!)) out.push({ type: 'table', rows: [rows[0]!, ...rows.slice(2)].map((r) => cells(r, false)) })
+			if (rows.length > 1 && SEPARATOR.test(rows[1]!))
+				out.push({ type: 'table', rows: [rows[0]!, ...rows.slice(2)].map((r) => cells(r, false)) })
 			else rows.forEach((r) => out.push(markdown.line(r, false)))
 			for (let k = i + rows.length; k < j; k++) out.push(markdown.line('', false))
 			i = j - 1
@@ -222,7 +236,11 @@ function blocks(text: string, streaming: boolean): Block[] {
 // blocks its writer could have seen; another session's when `known`,
 // by default when it exists (state.sessions, task b4b). A bare session
 // id links to the session.
-function blockLinks(session: string, key: string, known: (session: string) => boolean = (s) => markdown.state.sessions.has(s)) {
+function blockLinks(
+	session: string,
+	key: string,
+	known: (session: string) => boolean = (s) => markdown.state.sessions.has(s),
+) {
 	let before = parseInt(key, 10)
 	return (other: string | undefined, block?: string): string | undefined => {
 		if (block === undefined) return other === session || known(other!) ? `/${other}` : undefined
@@ -233,4 +251,12 @@ function blockLinks(session: string, key: string, known: (session: string) => bo
 
 export type Links = (session: string | undefined, block?: string) => string | undefined
 
-export const markdown = { state: { links: undefined as Links | undefined, sessions: new Set<string>() }, parse, blockLinks, line, inline, closes, opener }
+export const markdown = {
+	state: { links: undefined as Links | undefined, sessions: new Set<string>() },
+	parse,
+	blockLinks,
+	line,
+	inline,
+	closes,
+	opener,
+}

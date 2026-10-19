@@ -15,7 +15,8 @@ function install(data: SubscriptionData, update: (accounts: SubscriptionData, re
 }
 
 function plan(plan: Plan): { windows: Record<string, number>; resets: Record<string, string> } {
-	let windows: Record<string, number> = {}, resets: Record<string, string> = {}
+	let windows: Record<string, number> = {},
+		resets: Record<string, string> = {}
 	for (let [name, w] of Object.entries(subscriptions.state[plan.key] ?? {})) {
 		if (/^\d+[a-z]+[-_]/.test(name)) continue
 		windows[name] = Math.round(w.used)
@@ -30,5 +31,7 @@ export const subscriptions = {
 	update: (accounts: SubscriptionData, replace = false): void => {
 		subscriptions.state = replace ? accounts : { ...subscriptions.state, ...accounts }
 	},
-	install, key, plan,
+	install,
+	key,
+	plan,
 }

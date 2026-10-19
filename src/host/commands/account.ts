@@ -5,7 +5,8 @@ import { auth } from '../auth.ts'
 import type { SlashCommand } from '../commands.ts'
 
 export const command: SlashCommand = {
-	help: () => '/account moves this session to the next login of its model\'s provider, from the next request. /status lists them.',
+	help: () =>
+		"/account moves this session to the next login of its model's provider, from the next request. /status lists them.",
 	run(_args, _answers, ctx) {
 		let kind = ctx.model.split('/')[0]
 		if (kind !== 'anthropic' && kind !== 'openai') return { error: `${ctx.model} has no accounts to switch` }

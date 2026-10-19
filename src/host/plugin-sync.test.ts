@@ -15,8 +15,16 @@ import { commandCheck } from '../common/command-check.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
-const saved = { hist: pluginHistory.state, files: plugins.state.files, home: paths.state.home, send: pluginSyncClient.send, report: plugins.report }
-let root = '', client: Side, server: Side
+const saved = {
+	hist: pluginHistory.state,
+	files: plugins.state.files,
+	home: paths.state.home,
+	send: pluginSyncClient.send,
+	report: plugins.report,
+}
+let root = '',
+	client: Side,
+	server: Side
 let sent: any[] = []
 // Drops the host's answers while true, as a lost connection would.
 let lose = false
@@ -24,7 +32,12 @@ let lose = false
 function makeSide(name: string, home = join(root, name)): Side {
 	let dir = join(home, 'plugins')
 	mkdirSync(dir, { recursive: true })
-	let s: Side = { home, dir, hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() }, files: new Map() }
+	let s: Side = {
+		home,
+		dir,
+		hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		files: new Map(),
+	}
 	use(s)
 	pluginHistory.init(dir)
 	return s
@@ -38,23 +51,33 @@ function use(s: Side): void {
 
 function on<T>(s: Side, fn: () => T): T {
 	use(s)
-	try { return fn() } finally { use(client) }
+	try {
+		return fn()
+	} finally {
+		use(client)
+	}
 }
 
 // Writes (undefined: deletes) a portable plugin on side `s`.
 function put(s: Side, file: string, text: string | undefined, portable = true): void {
 	on(s, () => {
 		let path = join(s.dir, file)
-		if (text === undefined) { if (existsSync(path)) unlinkSync(path) } else writeFileSync(path, text)
+		if (text === undefined) {
+			if (existsSync(path)) unlinkSync(path)
+		} else writeFileSync(path, text)
 		pluginHistory.seen(path)
 		if (text !== undefined && portable) s.files.set(path, { path, hash: '', hooks: [], portable: true })
 	})
 }
 
-const read = (s: Side, file: string) => (existsSync(join(s.dir, file)) ? readFileSync(join(s.dir, file), 'utf8') : undefined)
+const read = (s: Side, file: string) =>
+	existsSync(join(s.dir, file)) ? readFileSync(join(s.dir, file), 'utf8') : undefined
 const ledger = (s: Side) => readFileSync(join(s.dir, 'history.asonl'), 'utf8')
 const one = (file: string) => pluginSyncClient.state.discrepancies.find((d) => d.file === file)
-const expected = (file: string) => ({ ...(one(file)!.client.id ? { client: one(file)!.client.id } : {}), ...(one(file)!.server.id ? { server: one(file)!.server.id } : {}) })
+const expected = (file: string) => ({
+	...(one(file)!.client.id ? { client: one(file)!.client.id } : {}),
+	...(one(file)!.server.id ? { server: one(file)!.server.id } : {}),
+})
 const host = { deliver: (_e: Event) => {} }
 
 // The host answers as host.ts would: checked, then a reply and an ack.
@@ -111,7 +134,11 @@ test('reports each relation, sends only heads for equal files, and suggests the 
 	expect(sent.map((c) => c.op)).toEqual(['inventory', 'history'])
 	expect(sent[1].files).toEqual(['base.ts', 'other.ts'])
 	expect(one('same.ts')).toBeUndefined()
-	expect(one('base.ts')).toMatchObject({ relation: 'server-ahead', client: { status: 'missing' }, server: { status: 'present' } })
+	expect(one('base.ts')).toMatchObject({
+		relation: 'server-ahead',
+		client: { status: 'missing' },
+		server: { status: 'present' },
+	})
 	expect(one('other.ts')!.relation).toBe('unrelated')
 
 	await pluginSyncClient.apply('base.ts', 'server', expected('base.ts'))
@@ -135,7 +162,11 @@ test('missing, empty and deleted stay distinct, and choosing an absent source de
 	put(server, 'gone.ts', undefined)
 	put(server, 'blank.ts', '')
 	await pluginSyncClient.compare()
-	expect(one('gone.ts')).toMatchObject({ relation: 'server-ahead', client: { status: 'present' }, server: { status: 'deleted' } })
+	expect(one('gone.ts')).toMatchObject({
+		relation: 'server-ahead',
+		client: { status: 'present' },
+		server: { status: 'deleted' },
+	})
 	expect(one('blank.ts')).toMatchObject({ client: { status: 'missing' }, server: { status: 'empty' } })
 
 	await pluginSyncClient.apply('gone.ts', 'server', expected('gone.ts'))
@@ -163,7 +194,11 @@ test('using the client version writes the host, keeps both versions, and a resen
 	await pending
 	expect(ledger(server)).toBe(before)
 	expect(read(server, 'k.ts')).toBe('client keys')
-	expect(on(server, () => pluginSync.versionsOf('k.ts')).map((v) => v.hash).filter(Boolean)).toHaveLength(2)
+	expect(
+		on(server, () => pluginSync.versionsOf('k.ts'))
+			.map((v) => v.hash)
+			.filter(Boolean),
+	).toHaveLength(2)
 	expect(pluginSyncClient.state.discrepancies).toEqual([])
 })
 
@@ -193,11 +228,15 @@ test("either side's .syncignore excludes a file; keep separate writes only the c
 	expect(pluginSyncClient.state.discrepancies.map((d) => d.file)).toEqual(['mine.ts'])
 	expect(pluginSyncClient.state.excluded).toEqual([{ file: 'theirs.ts', by: 'server' }])
 	expect(sent.find((c) => c.op === 'history').files).toEqual(['mine.ts'])
-	await expect(pluginSyncClient.apply('theirs.ts', 'client', { client: on(client, () => pluginSync.headOf('theirs.ts').id!) })).rejects.toThrow("excluded by the server's plugins/.syncignore")
+	await expect(
+		pluginSyncClient.apply('theirs.ts', 'client', { client: on(client, () => pluginSync.headOf('theirs.ts').id!) }),
+	).rejects.toThrow("excluded by the server's plugins/.syncignore")
 
 	await pluginSyncClient.ignore('mine.ts')
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('mine.ts\n')
-	expect(existsSync(join(server.dir, '.syncignore')) && readFileSync(join(server.dir, '.syncignore'), 'utf8')).not.toContain('mine.ts')
+	expect(
+		existsSync(join(server.dir, '.syncignore')) && readFileSync(join(server.dir, '.syncignore'), 'utf8'),
+	).not.toContain('mine.ts')
 	expect([read(client, 'mine.ts'), read(server, 'mine.ts')]).toEqual(['1', '2'])
 	expect(pluginSyncClient.state.discrepancies).toEqual([])
 	expect(pluginSyncClient.state.excluded).toContainEqual({ file: 'mine.ts', by: 'client' })
@@ -214,7 +253,9 @@ test('the same home compares nothing; file names cannot leave the plugins direct
 	expect(pluginSyncClient.state.same).toBe(true)
 	expect(sent.map((c) => c.op)).toEqual(['inventory'])
 	for (let file of ['../x.ts', 'a/b.ts', 'x.d.ts', 'x.js'])
-		expect(commandCheck.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain('top-level plugin filename')
+		expect(commandCheck.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain(
+			'top-level plugin filename',
+		)
 })
 
 test('comparisons asked for while one runs collapse into one more', async () => {

@@ -24,7 +24,13 @@ function start(session: string, id: string) {
 		let chunk = pending
 		pending = ''
 		last = Date.now()
-		host.broadcast(session, { type: 'tool-output', sessionId: session, id, at: current.output.length - chunk.length, chunk })
+		host.broadcast(session, {
+			type: 'tool-output',
+			sessionId: session,
+			id,
+			at: current.output.length - chunk.length,
+			chunk,
+		})
 	}
 	return {
 		onOutput(chunk: string) {

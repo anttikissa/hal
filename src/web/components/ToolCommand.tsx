@@ -9,19 +9,40 @@ export function ToolCommand(props: { lines: string[]; compact: boolean }) {
 	let [overflow, setOverflow] = createSignal(false)
 	let clipped = () => props.lines.length > 1 || overflow()
 	let whole = () => !props.compact || expanded()
-	let measure = () => untrack(() => { if (line && !whole()) setOverflow(line.scrollWidth > line.clientWidth) })
+	let measure = () =>
+		untrack(() => {
+			if (line && !whole()) setOverflow(line.scrollWidth > line.clientWidth)
+		})
 	onSettled(() => {
 		let observer = new ResizeObserver(measure)
 		observer.observe(line!)
 		measure()
 		return () => observer.disconnect()
 	})
-	createEffect(() => [props.lines, whole()] as const, () => measure())
-	let toggle = () => scroll.follow(() => { setExpanded(!expanded()); flush() })
+	createEffect(
+		() => [props.lines, whole()] as const,
+		() => measure(),
+	)
+	let toggle = () =>
+		scroll.follow(() => {
+			setExpanded(!expanded())
+			flush()
+		})
 	return (
 		<div class="ToolCommand">
-			<div ref={(el) => (line = el)} class={whole() ? 'command' : 'command clipped'}>{whole() ? props.lines.join('\n') : (props.lines[0] ?? '') + (props.lines.length > 1 ? '…' : '')}</div>
-			<Show when={props.compact && clipped()}><Disclosure class="command-toggle" name={expanded() ? 'Hide command' : 'Show command'} open={expanded()} onClick={toggle}><span class="label">{expanded() ? 'Hide command' : 'Show command'}</span></Disclosure></Show>
+			<div ref={(el) => (line = el)} class={whole() ? 'command' : 'command clipped'}>
+				{whole() ? props.lines.join('\n') : (props.lines[0] ?? '') + (props.lines.length > 1 ? '…' : '')}
+			</div>
+			<Show when={props.compact && clipped()}>
+				<Disclosure
+					class="command-toggle"
+					name={expanded() ? 'Hide command' : 'Show command'}
+					open={expanded()}
+					onClick={toggle}
+				>
+					<span class="label">{expanded() ? 'Hide command' : 'Show command'}</span>
+				</Disclosure>
+			</Show>
 		</div>
 	)
 }

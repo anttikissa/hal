@@ -3,7 +3,11 @@ import { client, records, restartHost, until, useHost } from '../host-fixture.te
 
 useHost()
 
-const order = (c: ReturnType<typeof client>) => c.of('tabs').at(-1).tabs.map((t: { id: string }) => t.id)
+const order = (c: ReturnType<typeof client>) =>
+	c
+		.of('tabs')
+		.at(-1)
+		.tabs.map((t: { id: string }) => t.id)
 const tab = (c: ReturnType<typeof client>) => {
 	c.conn.send({ type: 'tab-new', cwd: '/tmp/w', id: crypto.randomUUID() })
 	return c.of('ack').at(-1).tab as string
@@ -29,7 +33,10 @@ test('/move changes the shared tab order at first, middle, and past the end; per
 	move('/move 0')
 	await until(() => a.of('output').at(-1)?.error)
 	expect(order(b)).toEqual([first, middle, last])
-	expect((await records(last)).flatMap((r) => r.type === 'command' || r.type === 'output' ? [r.text] : [])).toEqual(['/move 0', 'position must be a positive integer (1-based)'])
+	expect((await records(last)).flatMap((r) => (r.type === 'command' || r.type === 'output' ? [r.text] : []))).toEqual([
+		'/move 0',
+		'position must be a positive integer (1-based)',
+	])
 	restartHost()
 	expect(order(client())).toEqual([first, middle, last])
 })

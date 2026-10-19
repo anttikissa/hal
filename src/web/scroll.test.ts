@@ -1,7 +1,11 @@
 import { expect, test } from 'bun:test'
 import { scroll } from './scroll.ts'
 
-const box = (scrollHeight: number, scrollTop: number, clientHeight: number) => ({ scrollHeight, scrollTop, clientHeight })
+const box = (scrollHeight: number, scrollTop: number, clientHeight: number) => ({
+	scrollHeight,
+	scrollTop,
+	clientHeight,
+})
 
 test('each tab keeps its place: a bottom reader returns to the (grown) bottom, others to their spot', () => {
 	let el = box(1000, 600, 400)
@@ -48,14 +52,20 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 	let el = box(1000, 600, 400)
 	Object.assign(scroll.state, { el, pinned: true })
 	try {
-		scroll.follow(() => { el.scrollHeight += 100 })
+		scroll.follow(() => {
+			el.scrollHeight += 100
+		})
 		expect(el.scrollTop).toBe(700)
 		scroll.intent()
 		el.scrollTop = 690
-		scroll.follow(() => { el.scrollHeight += 100 })
+		scroll.follow(() => {
+			el.scrollHeight += 100
+		})
 		expect(el.scrollTop).toBe(690)
 		scroll.check('scroll')
-		scroll.follow(() => { el.scrollHeight += 100 })
+		scroll.follow(() => {
+			el.scrollHeight += 100
+		})
 		expect(el.scrollTop).toBe(690)
 		scroll.follow(() => {}, true)
 		expect(el.scrollTop).toBe(900)
@@ -73,7 +83,9 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 		el.scrollTop = 920
 		scroll.check('scroll')
 		expect(scroll.state.pinned).toBe(true)
-		scroll.follow(() => { el.scrollHeight += 100 })
+		scroll.follow(() => {
+			el.scrollHeight += 100
+		})
 		expect(el.scrollTop).toBe(1020)
 	} finally {
 		Object.assign(scroll.state, original)
@@ -91,7 +103,9 @@ test('content shrinking to the bottom never resumes following for a reader', () 
 		scroll.check('scroll')
 		expect(scroll.state.pinned).toBe(false)
 		scroll.check('resize')
-		scroll.follow(() => { el.scrollHeight += 500 })
+		scroll.follow(() => {
+			el.scrollHeight += 500
+		})
 		expect(el.scrollTop).toBe(300)
 		expect(scroll.state.pinned).toBe(false)
 	} finally {
@@ -100,24 +114,32 @@ test('content shrinking to the bottom never resumes following for a reader', () 
 })
 
 test('input without navigation and layout clamps preserve following', () => {
-	let original = { ...scroll.state }, el = box(1000, 600, 400)
+	let original = { ...scroll.state },
+		el = box(1000, 600, 400)
 	Object.assign(scroll.state, { el, pinned: true, held: undefined, intent: undefined })
 	try {
 		scroll.intent()
-		scroll.follow(() => { el.scrollHeight += 200 })
+		scroll.follow(() => {
+			el.scrollHeight += 200
+		})
 		expect(el.scrollTop).toBe(800)
 		scroll.intent()
 		el.scrollHeight -= 100
 		el.scrollTop = 700
 		scroll.check('scroll')
-		scroll.follow(() => { el.scrollHeight += 200 })
+		scroll.follow(() => {
+			el.scrollHeight += 200
+		})
 		expect(el.scrollTop).toBe(900)
 		expect(scroll.state.pinned).toBe(true)
-	} finally { Object.assign(scroll.state, original) }
+	} finally {
+		Object.assign(scroll.state, original)
+	}
 })
 
 test('forced bottom navigation releases a linked-card anchor', () => {
-	let original = { ...scroll.state }, el = box(1000, 200, 400)
+	let original = { ...scroll.state },
+		el = box(1000, 200, 400)
 	let card = { isConnected: true, getBoundingClientRect: () => ({ top: 200 - el.scrollTop }) } as Element
 	Object.assign(scroll.state, { el, pinned: false, held: undefined, intent: undefined })
 	try {
@@ -126,17 +148,24 @@ test('forced bottom navigation releases a linked-card anchor', () => {
 		scroll.check('content')
 		expect(el.scrollTop).toBe(600)
 		expect(scroll.state.held).toBeUndefined()
-	} finally { Object.assign(scroll.state, original) }
+	} finally {
+		Object.assign(scroll.state, original)
+	}
 })
 
 test('compositor movement before input delivery still releases following', () => {
-	let original = { ...scroll.state }, el = box(1000, 600, 400)
+	let original = { ...scroll.state },
+		el = box(1000, 600, 400)
 	Object.assign(scroll.state, { el, top: 600, pinned: true, intent: undefined })
 	try {
 		el.scrollTop = 480
 		scroll.intent(new Event('wheel'))
-		scroll.follow(() => { el.scrollHeight += 200 })
+		scroll.follow(() => {
+			el.scrollHeight += 200
+		})
 		expect(el.scrollTop).toBe(480)
 		expect(scroll.state.pinned).toBe(false)
-	} finally { Object.assign(scroll.state, original) }
+	} finally {
+		Object.assign(scroll.state, original)
+	}
 })

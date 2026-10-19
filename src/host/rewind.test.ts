@@ -8,7 +8,11 @@ import { calls, client, created, shown, stamped, until, useHost } from './host-f
 useHost()
 
 const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
-const errors = (c: ReturnType<typeof client>) => c.of('output').filter((e) => e.error).map((e) => e.text)
+const errors = (c: ReturnType<typeof client>) =>
+	c
+		.of('output')
+		.filter((e) => e.error)
+		.map((e) => e.text)
 
 // Two completed turns: prompts 'one' and 'two'.
 async function twoTurns(a: ReturnType<typeof client>, id: string) {

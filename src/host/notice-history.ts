@@ -16,13 +16,25 @@ type Store = { next: number; entries: Stored[] }
 function store(): Store {
 	if (noticeHistory.state.store) return noticeHistory.state.store
 	mkdirSync(paths.stateDir(), { recursive: true, mode: 0o700 })
-	let data = liveFiles.liveFile<Store>(`${paths.stateDir()}/notices.ason`, { next: 1, entries: [] }, { watch: false, mode: 0o600 })
+	let data = liveFiles.liveFile<Store>(
+		`${paths.stateDir()}/notices.ason`,
+		{ next: 1, entries: [] },
+		{ watch: false, mode: 0o600 },
+	)
 	if (!Array.isArray(data.entries) || !Number.isInteger(data.next)) throw new Error('notices.ason: invalid history')
 	return (noticeHistory.state.store = data)
 }
 
 // Records one event; never stops its delivery.
-function record(e: { session: string; name: string; kind: NoticeKind; line: string; what?: string; block?: string; question?: string }): void {
+function record(e: {
+	session: string
+	name: string
+	kind: NoticeKind
+	line: string
+	what?: string
+	block?: string
+	question?: string
+}): void {
 	try {
 		let data = store()
 		let entry: Stored = { id: `${data.next}`, at: new Date().toISOString(), ...e }
@@ -39,11 +51,17 @@ function list(): NoticeEntry[] {
 	let open = new Map<string, string | undefined>()
 	let openId = (session: string) => {
 		if (!open.has(session)) {
-			try { open.set(session, forms.open(history.readSync(session))?.id) } catch { open.set(session, undefined) }
+			try {
+				open.set(session, forms.open(history.readSync(session))?.id)
+			} catch {
+				open.set(session, undefined)
+			}
 		}
 		return open.get(session)
 	}
-	return store().entries.toReversed().map(({ question, ...e }) => (question ? { ...e, awaiting: openId(e.session) === question } : e))
+	return store()
+		.entries.toReversed()
+		.map(({ question, ...e }) => (question ? { ...e, awaiting: openId(e.session) === question } : e))
 }
 
 function reset(): void {
@@ -54,5 +72,8 @@ function reset(): void {
 export const noticeHistory = {
 	state: { store: null as Store | null },
 	limit: 200,
-	store, record, list, reset,
+	store,
+	record,
+	list,
+	reset,
 }

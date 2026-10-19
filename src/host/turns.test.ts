@@ -5,7 +5,22 @@ import { expect, spyOn, test } from 'bun:test'
 import { nativeTool } from './native-tool.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
-import { calls, client, created, fakeStream, testHome, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
+import {
+	calls,
+	client,
+	created,
+	fakeStream,
+	testHome,
+	fresh,
+	readCall,
+	records,
+	restartHost,
+	stamped,
+	toolSession,
+	until,
+	useHost,
+	shown,
+} from './host-fixture.test.ts'
 import { fileText } from './file-text.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
@@ -13,15 +28,28 @@ import { turns } from './turns.ts'
 useHost()
 
 test('call resolution hears the session and model when a call arrives and when it runs', async () => {
-	let seen: unknown[] = [], spy = spyOn(nativeTool, 'resolve').mockImplementation(((text: unknown, ctx: unknown) => { seen.push(ctx); throw new Error('nope') }) as any)
+	let seen: unknown[] = [],
+		spy = spyOn(nativeTool, 'resolve').mockImplementation(((text: unknown, ctx: unknown) => {
+			seen.push(ctx)
+			throw new Error('nope')
+		}) as any)
 	try {
-		let c = client(), id = created(c, testHome())
+		let c = client(),
+			id = created(c, testHome())
 		c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'x', name: 'tool', input: { cmd: 'NOPE' } }, { type: 'done', reason: 'tool_use' })
+		calls[0]!.push(
+			{ type: 'tool_call', id: 'x', name: 'tool', input: { cmd: 'NOPE' } },
+			{ type: 'done', reason: 'tool_use' },
+		)
 		await until(() => calls.length === 2)
-		expect(seen).toEqual([{ cwd: testHome(), sessionId: id, model: 'fake/m1' }, expect.objectContaining({ cwd: testHome(), sessionId: id, model: 'fake/m1' })])
-	} finally { spy.mockRestore() }
+		expect(seen).toEqual([
+			{ cwd: testHome(), sessionId: id, model: 'fake/m1' },
+			expect.objectContaining({ cwd: testHome(), sessionId: id, model: 'fake/m1' }),
+		])
+	} finally {
+		spy.mockRestore()
+	}
 })
 
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
@@ -111,7 +139,12 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I note?' })
 	await until(() => calls.length === 1)
 	expect(calls[0]!.input.tools.map((t: any) => t.name)).toEqual(['tool'])
-	calls[0]!.push({ type: 'text', text: 'Let me look.' }, readCall(), { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{ type: 'text', text: 'Let me look.' },
+		readCall(),
+		{ type: 'usage', usage: { input: 10, output: 5 } },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(1)).toEqual([
 		{
@@ -127,7 +160,11 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	expect(a.of('turn-end')).toEqual([])
 	let late = client()
 	late.conn.send({ type: 'open', sessionId: id })
-	calls[1]!.push({ type: 'text', text: 'Milk.' }, { type: 'usage', usage: { input: 20, output: 1 } }, { type: 'done', reason: 'end' })
+	calls[1]!.push(
+		{ type: 'text', text: 'Milk.' },
+		{ type: 'usage', usage: { input: 20, output: 1 } },
+		{ type: 'done', reason: 'end' },
+	)
 	await until(() => b.of('turn-end').length && late.of('turn-end').length)
 
 	let view = await fresh(id)
@@ -150,12 +187,23 @@ test("a round's calls run concurrently, results in call order", async () => {
 	let id = toolSession(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	let bash = (callId: string, command: string): StreamEvent => ({ type: 'tool_call', id: callId, name: 'bash', input: { command, description: 'x', timeout: 5 } })
+	let bash = (callId: string, command: string): StreamEvent => ({
+		type: 'tool_call',
+		id: callId,
+		name: 'bash',
+		input: { command, description: 'x', timeout: 5 },
+	})
 	// The first waits for what the second does: run in order, it times out.
-	calls[0]!.push(bash('t1', 'until [ -f ready ]; do sleep 0.01; done; echo saw it'), bash('t2', 'touch ready'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(bash('t1', 'until [ -f ready ]; do sleep 0.01; done; echo saw it'), bash('t2', 'touch ready'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	await until(() => calls.length === 2)
 	let results = calls[1]!.input.messages.at(-1).blocks
-	expect(results.map((b: any) => [b.id, b.isError ?? false])).toEqual([['t1', false], ['t2', false]])
+	expect(results.map((b: any) => [b.id, b.isError ?? false])).toEqual([
+		['t1', false],
+		['t2', false],
+	])
 	expect(results[0].output).toContain('saw it')
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
@@ -226,7 +274,12 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 		let id = toolSession(a)
 		a.conn.send({ type: 'submit', sessionId: id, text: 'clean up' })
 		await until(() => calls.length === 1)
-		let rm: StreamEvent = { type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'rm notes.txt', description: 'Delete the notes' } }
+		let rm: StreamEvent = {
+			type: 'tool_call',
+			id: 'b1',
+			name: 'bash',
+			input: { command: 'rm notes.txt', description: 'Delete the notes' },
+		}
 		calls[0]!.push(rm, { type: 'done', reason: 'tool_use' })
 		await until(() => ran === 1)
 		restartHost()
@@ -242,12 +295,18 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 })
 
 test('a forced stop aborts even when history cannot be read', () => {
-	let read = history.readSync, controller = new AbortController()
+	let read = history.readSync,
+		controller = new AbortController()
 	let id = 'forced-stop'
 	turns.state.running.set(id, { provider: 'fake', controller })
 	try {
-		history.readSync = () => { throw new Error('disk failure') }
+		history.readSync = () => {
+			throw new Error('disk failure')
+		}
 		expect(() => turns.stop(id, 'critical resources')).toThrow('disk failure')
 		expect(controller.signal.aborted).toBe(true)
-	} finally { history.readSync = read; turns.state.running.delete(id) }
+	} finally {
+		history.readSync = read
+		turns.state.running.delete(id)
+	}
 })

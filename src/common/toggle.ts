@@ -18,7 +18,15 @@ export type Target = Part[]
 export type Plan = { items: Item[]; open?: boolean }
 
 // Kind letters (task 9p) and their words.
-const kinds: Record<string, string> = { t: 'tool', r: 'thinking', a: 'assistant', u: 'user', m: 'message', s: 'system', q: 'question' }
+const kinds: Record<string, string> = {
+	t: 'tool',
+	r: 'thinking',
+	a: 'assistant',
+	u: 'user',
+	m: 'message',
+	s: 'system',
+	q: 'question',
+}
 // What a range or '*' without letters matches: never user or assistant blocks.
 const unnamed = 'trmsq'
 
@@ -41,11 +49,17 @@ function compare(a: string, b: string, upper = false): number {
 
 function parse(args: string): Target | string {
 	let parts: Part[] = []
-	for (let text of args.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)) {
+	for (let text of args
+		.trim()
+		.replace(/\s*-\s*/g, '-')
+		.split(/[\s,]+/)
+		.filter(Boolean)) {
 		let ends = text.split('-').map(reference)
-		let first = ends[0]!, last = ends.at(-1)!
-		let star = ends.length === 1 && (first.key === '*' || !first.key && !!first.kinds)
-		if (ends.length > 2 || (!star && ends.some((e) => !transcript.addressable(e.key)))) return `Not a card, range or kind: ${text}`
+		let first = ends[0]!,
+			last = ends.at(-1)!
+		let star = ends.length === 1 && (first.key === '*' || (!first.key && !!first.kinds))
+		if (ends.length > 2 || (!star && ends.some((e) => !transcript.addressable(e.key))))
+			return `Not a card, range or kind: ${text}`
 		let bad = ends.flatMap((e) => [...e.kinds]).find((c) => !kinds[c])
 		if (bad) return `Unknown kind ${bad} in ${text} (kinds: ${Object.keys(kinds).join(' ')})`
 		let [from, to] = star ? ['', ''] : compare(first.key, last.key) <= 0 ? [first.key, last.key] : [last.key, first.key]
@@ -78,7 +92,7 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 		}
 		let letters = part.kinds || unnamed
 		for (let i of numbered) {
-			let within = !part.from || compare(i.key, part.from) >= 0 && compare(i.key, part.to, true) <= 0
+			let within = !part.from || (compare(i.key, part.from) >= 0 && compare(i.key, part.to, true) <= 0)
 			if (toggle.toggles(i) && within && letters.includes(titles.letter(i))) found.add(i)
 		}
 	}
@@ -120,7 +134,8 @@ function describe(p: Plan, fold: (item: Item) => Verbosity): string {
 // client's settings; a call counts as failed once its result says so
 // (card.failed). Built once per use: it scans the items.
 function starts(t: Pick<Transcript, 'items' | 'meta'>): (item: Item) => Verbosity {
-	let bash = new Set<string>(), failed = new Set<string>()
+	let bash = new Set<string>(),
+		failed = new Set<string>()
 	for (let i of t.items) {
 		if (i.type === 'tool' && i.name === 'bash') bash.add(i.id)
 		if (i.type === 'tool-result' && card.failed(i, bash.has(i.id))) failed.add(i.id)
@@ -140,7 +155,13 @@ function items(t: Pick<Transcript, 'items' | 'inbox'>): Item[] {
 
 // Applies `mode` with `args` to `states` (key → state), blocks not in
 // it at `start`. Returns the keys changed, or why none.
-function apply(mode: Mode, states: Map<string, Verbosity>, items: Item[], args: string, start: (item: Item) => Verbosity): string[] | string {
+function apply(
+	mode: Mode,
+	states: Map<string, Verbosity>,
+	items: Item[],
+	args: string,
+	start: (item: Item) => Verbosity,
+): string[] | string {
 	let state = (i: Item) => states.get(i.key) ?? start(i)
 	let p = toggle.plan(mode, items, args, state)
 	if (typeof p === 'string') return p
@@ -148,4 +169,18 @@ function apply(mode: Mode, states: Map<string, Verbosity>, items: Item[], args: 
 	return p.items.map((i) => i.key)
 }
 
-export const toggle = { kinds, reference, addressed, parse, toggles, resolve, plan, noun, describe, starts, step, items, apply }
+export const toggle = {
+	kinds,
+	reference,
+	addressed,
+	parse,
+	toggles,
+	resolve,
+	plan,
+	noun,
+	describe,
+	starts,
+	step,
+	items,
+	apply,
+}

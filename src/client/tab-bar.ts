@@ -32,9 +32,24 @@ const indicator = (tab: Tab): Part | undefined => {
 function markPart(m: Mark): Part {
 	let c = colors.tab()
 	let hal = colors.assistant()
-	let fg: Oklch = { asking: c.doneFg!, approval: c.warningFg!, blocked: c.warningFg!, retrying: c.warningFg!, working: hal.cursor!, jobs: c.jobsFg!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
+	let fg: Oklch = {
+		asking: c.doneFg!,
+		approval: c.warningFg!,
+		blocked: c.warningFg!,
+		retrying: c.warningFg!,
+		working: hal.cursor!,
+		jobs: c.jobsFg!,
+		failed: c.errorFg!,
+		paused: c.pausedFg!,
+		done: c.doneFg!,
+	}[m.kind]
 	if (!m.blinks) return { text: m.glyph, fg }
-	return { text: m.glyph, fg, dim: m.kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg), ...(m.jobs && { alt: c.jobsFg! }) }
+	return {
+		text: m.glyph,
+		fg,
+		dim: m.kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg),
+		...(m.jobs && { alt: c.jobsFg! }),
+	}
 }
 
 // Whether any tab in `list` has a blinking indicator.
@@ -60,10 +75,18 @@ function hints(count: number): Hint[] {
 
 // A mark drawn lit or dark, or a blank marker slot. `alt`: the other
 // color's turn for a mark that alternates (background jobs).
-const slot = (mark: Part | undefined, lit: boolean, alt = false): Part => (!mark ? { text: ' ' } : mark.dim && !lit ? dark(mark) : alt && mark.alt ? { ...mark, fg: mark.alt } : mark)
+const slot = (mark: Part | undefined, lit: boolean, alt = false): Part =>
+	!mark ? { text: ' ' } : mark.dim && !lit ? dark(mark) : alt && mark.alt ? { ...mark, fg: mark.alt } : mark
 
 // Tabs start..end-1 as cells of one width: number, marker slot, gap.
-function cells(list: Tab[], focused: string | undefined, start: number, end: number, lit: boolean, alt = false): Part[] {
+function cells(
+	list: Tab[],
+	focused: string | undefined,
+	start: number,
+	end: number,
+	lit: boolean,
+	alt = false,
+): Part[] {
 	let c = colors.tab()
 	let d = tabPages.digits(list.length)
 	let parts: Part[] = []
@@ -72,7 +95,10 @@ function cells(list: Tab[], focused: string | undefined, start: number, end: num
 		let on = tab.id === focused
 		let n = String(i + 1)
 		let over = tab.color === undefined ? undefined : colors.project()[`p${tab.color}`]
-		parts.push({ text: ' '.repeat(d - n.length), over }, { text: n, fg: on ? c.activeFg! : c.inactiveFg!, link: `/${tab.id}`, under: on, over })
+		parts.push(
+			{ text: ' '.repeat(d - n.length), over },
+			{ text: n, fg: on ? c.activeFg! : c.inactiveFg!, link: `/${tab.id}`, under: on, over },
+		)
 		parts.push({ ...slot(tabBar.indicator(tab), lit, alt), over }, { text: ' ' })
 	}
 	return parts
@@ -113,7 +139,13 @@ function fit(list: Tab[], focused: string | undefined, width: number, lit = true
 	let p = tabPages.page(list, at, width, sizes)
 	let mid = cells(list, focused, p.start, p.end, lit, alt)
 	let spare = Math.max(0, width - 5 - strings.visLen(plain(mid)))
-	return [...edge(p.left!, true, lit, alt), { text: ' ' }, ...mid, { text: ' '.repeat(spare) }, ...edge(p.right!, false, lit, alt)]
+	return [
+		...edge(p.left!, true, lit, alt),
+		{ text: ' ' },
+		...mid,
+		{ text: ' '.repeat(spare) },
+		...edge(p.right!, false, lit, alt),
+	]
 }
 
 const UNDER = '\x1b[4m'

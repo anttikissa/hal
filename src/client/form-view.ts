@@ -16,7 +16,11 @@ import { promptView } from './prompt-view.ts'
  * where the cursor goes in them: in the focused text, or on the
  * selected option.
  */
-function formLines(st: FormState, width: number, ts?: string): { rows: string[]; cursor: { row: number; col: number } } {
+function formLines(
+	st: FormState,
+	width: number,
+	ts?: string,
+): { rows: string[]; cursor: { row: number; col: number } } {
 	let quote = itemView.quoteLines(st.form.quote, width)
 	let rows = [...ansi.wrap(titles.stamp(ts, st.form.text), width), ...(quote.length ? ['', ...quote] : [])]
 	let f = formView.fieldLines(st, width)
@@ -29,7 +33,12 @@ function formLines(st: FormState, width: number, ts?: string): { rows: string[];
 
 // Rows of a form's fields alone, and the cursor in them, at `now`
 // (Date.now(): where rotating placeholders are).
-function fieldLines(st: FormState, width: number, style: Style = colors.question(), now = Date.now()): { rows: string[]; cursor: { row: number; col: number } } {
+function fieldLines(
+	st: FormState,
+	width: number,
+	style: Style = colors.question(),
+	now = Date.now(),
+): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
@@ -40,14 +49,22 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		let lit = colors.popupCurrent(style.fg ?? colors.popup().neutralFg!)
 		let mark = (o: string) => {
 			let label = `${o === value ? formView.ARROW : ' '} ${ansi.clean(o)} `
-			return o === value ? (ansi.sgr(lit) || ansi.INVERSE) + label + ansi.UNCOLOR + ansi.UNINVERSE + ansi.sgr(style) : label
+			return o === value
+				? (ansi.sgr(lit) || ansi.INVERSE) + label + ansi.UNCOLOR + ansi.UNINVERSE + ansi.sgr(style)
+				: label
 		}
 		// An inline choice is one row: its label, then its options, lined
 		// up with the other inline rows' options.
 		if (field.type === 'choice' && field.inline) {
-			let pad = Math.max(...st.form.fields.map((f) => (f.type === 'choice' && f.inline && f.label ? strings.visLen(ansi.clean(f.label)) + 2 : 0)))
+			let pad = Math.max(
+				...st.form.fields.map((f) =>
+					f.type === 'choice' && f.inline && f.label ? strings.visLen(ansi.clean(f.label)) + 2 : 0,
+				),
+			)
 			let lead = `  ${(field.label ? `${ansi.clean(field.label)}: ` : '').padEnd(pad)}`
-			let at = strings.visLen(lead) + field.options.slice(0, field.options.indexOf(value)).reduce((n, o) => n + strings.visLen(ansi.clean(o)) + 3, 0)
+			let at =
+				strings.visLen(lead) +
+				field.options.slice(0, field.options.indexOf(value)).reduce((n, o) => n + strings.visLen(ansi.clean(o)) + 3, 0)
 			if (focused) cursor = { row: rows.length, col: at + 2 }
 			rows.push(strings.clipVisual(lead + field.options.map(mark).join(''), width))
 			return
@@ -72,7 +89,17 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		// The example stays well below typed text, like the prompt's
 		// (oklch.faint): dimmer than the readable-text minimum on purpose.
 		let ex = value ? undefined : forms.example(st, i, now)
-		if (ex?.text) p.rows[0] = ansi.mono() || !style.fg ? strings.clipVisual(ansi.clean(ex.text), width - indent) : promptView.example(ex, oklch.faint(style.fg, style.bg ?? colors.screen), style.bg ?? colors.screen, width - indent, style.fg)
+		if (ex?.text)
+			p.rows[0] =
+				ansi.mono() || !style.fg
+					? strings.clipVisual(ansi.clean(ex.text), width - indent)
+					: promptView.example(
+							ex,
+							oklch.faint(style.fg, style.bg ?? colors.screen),
+							style.bg ?? colors.screen,
+							width - indent,
+							style.fg,
+						)
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
 	})

@@ -67,7 +67,12 @@ test('a snapshot of a 20 MB history reads at most the budget and keeps an open q
 	let id = newSession()
 	turn(id, 0)
 	history.submit(id, 'the last prompt')
-	history.append(id, { type: 'question', id: 'q1', form: { text: 'Allow?', fields: [{ type: 'choice', name: 'ok', options: ['yes', 'no'] }] }, usage: { input: 3 } })
+	history.append(id, {
+		type: 'question',
+		id: 'q1',
+		form: { text: 'Allow?', fields: [{ type: 'choice', name: 'ok', options: ['yes', 'no'] }] },
+		usage: { input: 3 },
+	})
 	history.append(id, { type: 'inbox', id: 'i1', text: 'waiting since long ago' })
 	// While it waits, slash commands say a lot.
 	for (let i = 0; i < 400; i++) history.append(id, { type: 'output', text: `out ${i} ${text(50_000)}` })
@@ -89,7 +94,10 @@ test('a snapshot tail starts at a prompt: it never cuts a turn in two', () => {
 	let id = newSession()
 	for (let i = 0; i < 100; i++) turn(id, i, 10_000)
 	let snap = pages.snapshot(id, 50_000)
-	expect(snap.history[0]).toMatchObject({ type: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^prompt /) }] })
+	expect(snap.history[0]).toMatchObject({
+		type: 'user',
+		blocks: [{ type: 'text', text: expect.stringMatching(/^prompt /) }],
+	})
 	expect(snap.history.at(-1)?.type).toBe('turn_end')
 	expect(snap.earlier.every((r) => snap.history.indexOf(r) < 0)).toBe(true)
 })
@@ -139,7 +147,12 @@ test('what the state needs from earlier stays right as history grows and without
 	history.append(id, { type: 'inbox', id: 'b', text: 'later', delivery: 'after-turn' })
 	check()
 	history.append(id, { type: 'command', text: '/model' })
-	history.append(id, { type: 'question', id: 'm', form: { text: 'Model?', fields: [{ type: 'text', name: 'm' }] }, from: { command: 'model', args: '' } })
+	history.append(id, {
+		type: 'question',
+		id: 'm',
+		form: { text: 'Model?', fields: [{ type: 'text', name: 'm' }] },
+		from: { command: 'model', args: '' },
+	})
 	check()
 	history.append(id, { type: 'answer', question: 'm', answers: { m: 'x' } })
 	check()
@@ -173,7 +186,9 @@ test('big marks from before the changed-file count convert off the thread, keepi
 	pages.reset()
 	let file = `${paths.sessionDir(id)}/marks.ason`
 	let old = ason.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-	old.changedPaths = Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`/some/long/path/to/file-${i}.ts`, true]))
+	old.changedPaths = Object.fromEntries(
+		Array.from({ length: 5000 }, (_, i) => [`/some/long/path/to/file-${i}.ts`, true]),
+	)
 	writeFileSync(file, ason.stringify(old) + '\n')
 	expect(statSync(file).size).toBeGreaterThan(marksWorker.bigMarks)
 	await marksWorker.upgrade([id])

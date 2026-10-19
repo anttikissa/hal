@@ -10,7 +10,8 @@ const recent = 20
 
 export const command: SlashCommand = {
 	quiet: true,
-	help: () => `/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume last reopens the most recently closed one (Shift-Ctrl-T).\n/resume <session id> reopens the session named.`,
+	help: () =>
+		`/resume lists the ${recent} most recently closed sessions.\n/resume all lists every closed session.\n/resume last reopens the most recently closed one (Shift-Ctrl-T).\n/resume <session id> reopens the session named.`,
 	complete: (args) => ['all', 'last', ...closedSessions().map((s) => s.id)].filter((v) => v.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (!args || args === 'all') {

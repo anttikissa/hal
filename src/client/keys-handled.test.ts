@@ -16,7 +16,14 @@ import { terminal } from './terminal.ts'
 
 let effects: unknown[] = []
 let clip: { text: string } | { notice: string } = { text: 'clip' }
-const saved = { send: app.send, show: render.show, quit: terminal.quit, redraw: terminal.redraw, draftSend: drafts.send, clipboard: { ...clipboard } }
+const saved = {
+	send: app.send,
+	show: render.show,
+	quit: terminal.quit,
+	redraw: terminal.redraw,
+	draftSend: drafts.send,
+	clipboard: { ...clipboard },
+}
 
 beforeEach(() => {
 	effects = []
@@ -57,7 +64,15 @@ function open(state: SessionState, text: string, cursor: number, anchor?: number
 	app.state.painted = false
 	if (app.state.timer) clearTimeout(app.state.timer)
 	delete app.state.timer
-	app.state.prompt = { text, cursor, kill: 'K', rows: 5, undo: [{ text: 'u', cursor: 1 }], redo: [{ text: 'r', cursor: 1 }], ...(anchor === undefined ? {} : { anchor }) }
+	app.state.prompt = {
+		text,
+		cursor,
+		kill: 'K',
+		rows: 5,
+		undo: [{ text: 'u', cursor: 1 }],
+		redo: [{ text: 'r', cursor: 1 }],
+		...(anchor === undefined ? {} : { anchor }),
+	}
 	effects = []
 }
 
@@ -84,12 +99,16 @@ const situations: (() => void)[] = [
 	},
 ]
 
-const event = (b: Binding): KeyEvent => ({ ...b, ...(b.key.length === 1 && !b.ctrl && !b.alt && !b.cmd ? { text: b.key } : {}) })
+const event = (b: Binding): KeyEvent => ({
+	...b,
+	...(b.key.length === 1 && !b.ctrl && !b.alt && !b.cmd ? { text: b.key } : {}),
+})
 
 // Whether `b` does anything the user could see in some situation.
 async function handled(b: Binding): Promise<boolean> {
 	// The emergency keys never reach the app: raw stdin has them first.
-	if (b.ctrl && !b.alt && !b.cmd && 'czr'.includes(b.key)) return emergency.scan(emergency.createState(), String.fromCharCode(b.key.charCodeAt(0) - 96)).length > 0
+	if (b.ctrl && !b.alt && !b.cmd && 'czr'.includes(b.key))
+		return emergency.scan(emergency.createState(), String.fromCharCode(b.key.charCodeAt(0) - 96)).length > 0
 	for (let setup of situations) {
 		app.reset()
 		setup()

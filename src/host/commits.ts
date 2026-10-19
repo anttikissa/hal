@@ -26,12 +26,29 @@ type Watch = { sessionId: string; callId?: string; cwd: string; log: string; siz
 // (its Session trailer names that session). Paths are absolute; a binary
 // file counts -1 lines. Hooks may rewrite files' counts for the card and
 // push short `tags` for the card title.
-export type Committed = { sessionId: string; callId?: string; cwd: string; root: string; hash: string; short: string; subject: string; amend: boolean; files: { path: string; added: number; removed: number }[]; tags: string[] }
+export type Committed = {
+	sessionId: string
+	callId?: string
+	cwd: string
+	root: string
+	hash: string
+	short: string
+	subject: string
+	amend: boolean
+	files: { path: string; added: number; removed: number }[]
+	tags: string[]
+}
 type Entry = { hash: string; time: number; amend: boolean }
 
 // A missing reflog before the call counts as empty, so an initial commit shows.
 async function begin(sessionId: string, cwd: string, log: string, callId?: string): Promise<Watch> {
-	let size = await stat(log).then((s) => s.size, (e) => { if (e.code === 'ENOENT') return 0; throw e })
+	let size = await stat(log).then(
+		(s) => s.size,
+		(e) => {
+			if (e.code === 'ENOENT') return 0
+			throw e
+		},
+	)
 	let watch = { sessionId, ...(callId && { callId }), cwd, log, size, start: Date.now() }
 	return watch
 }
@@ -47,7 +64,10 @@ function parse(text: string): Entry[] {
 
 // Bytes appended since `from`, cut after the last newline; none if the reflog shrank or went.
 async function appended(log: string, from: number): Promise<string> {
-	let file = await open(log).catch((e) => { if (e.code === 'ENOENT') return undefined; throw e })
+	let file = await open(log).catch((e) => {
+		if (e.code === 'ENOENT') return undefined
+		throw e
+	})
 	if (!file) return ''
 	try {
 		let { size } = await file.stat()
@@ -56,7 +76,9 @@ async function appended(log: string, from: number): Promise<string> {
 		let { bytesRead } = await file.read(buf, 0, buf.length, from)
 		let text = buf.subarray(0, bytesRead).toString('utf8')
 		return text.slice(0, text.lastIndexOf('\n') + 1)
-	} finally { await file.close() }
+	} finally {
+		await file.close()
+	}
 }
 
 // The last 'Session: <id>' line. Git's %(trailers) misses this repo's
@@ -76,17 +98,19 @@ function attribute(trailer: string): string | undefined {
 // running then has "commit" in its command, or a tool result from then
 // on prints the hash; 'wait' while a call running then has no result.
 function check(records: HistoryRecord[], short: string, time: number): 'yes' | 'no' | 'wait' {
-	let from = time * 1000, to = from + 1000
+	let from = time * 1000,
+		to = from + 1000
 	let calls = new Map<string, { command: string; start: number; end?: number }>()
 	let printed = false
 	for (let r of records) {
-		if (r.type === 'assistant' && r.block.type === 'tool_call' && r.block.name === 'bash') calls.set(r.block.id, { command: String((r.block.input as any)?.command ?? ''), start: Date.parse(r.ts) })
+		if (r.type === 'assistant' && r.block.type === 'tool_call' && r.block.name === 'bash')
+			calls.set(r.block.id, { command: String((r.block.input as any)?.command ?? ''), start: Date.parse(r.ts) })
 		if (r.type !== 'user') continue
 		for (let b of r.blocks) {
 			if (b.type !== 'tool_result') continue
 			let call = calls.get(b.id)
 			if (call) call.end = Date.parse(r.ts)
-			let out = typeof b.output === 'string' ? b.output : (b.output as any)?.text ?? ''
+			let out = typeof b.output === 'string' ? b.output : ((b.output as any)?.text ?? '')
 			if (Date.parse(r.ts) >= from && out.includes(short)) printed = true
 		}
 	}
@@ -101,9 +125,14 @@ function check(records: HistoryRecord[], short: string, time: number): 'yes' | '
 function verify(id: string, short: string, subject: string, time: number): void {
 	let run = () => {
 		let verdict = commits.check(history.readSync(id), short, time)
-		if (verdict !== 'wait') { stop(); if (verdict === 'no') commits.warn(id, short, subject) }
+		if (verdict !== 'wait') {
+			stop()
+			if (verdict === 'no') commits.warn(id, short, subject)
+		}
 	}
-	let stop = history.onAppend((sid, r) => { if (sid === id && r.type === 'user') run() })
+	let stop = history.onAppend((sid, r) => {
+		if (sid === id && r.type === 'user') run()
+	})
 	run()
 }
 
@@ -117,7 +146,11 @@ function warn(id: string, short: string, subject: string): void {
 
 // Takes the commits off a round's results, for commits.cards.
 function take(results: ToolResultBlock[]): CommitBlock[] {
-	return results.flatMap((r) => { let found = r.commits ?? []; delete r.commits; return found })
+	return results.flatMap((r) => {
+		let found = r.commits ?? []
+		delete r.commits
+		return found
+	})
 }
 
 // Each commit as its own output record after the results, so its card
@@ -139,15 +172,32 @@ async function committed(_info: Committed): Promise<string[]> {
 // Announces this call's new commits; returns the lines commits.committed
 // gives for those whose Session trailer names the calling session.
 async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitBlock[] }> {
-	let lines: string[] = [], found: CommitBlock[] = []
+	let lines: string[] = [],
+		found: CommitBlock[] = []
 	try {
-		let fresh = commits.parse(await commits.appended(watch.log, watch.size)).filter((e) => !commits.state.seen.includes(e.hash))
+		let fresh = commits
+			.parse(await commits.appended(watch.log, watch.size))
+			.filter((e) => !commits.state.seen.includes(e.hash))
 		if (!fresh.length) return { lines, commits: found }
 		// Claim before awaiting: concurrent calls read the same lines.
 		commits.state.seen = [...commits.state.seen, ...fresh.map((e) => e.hash)].slice(-commits.remember)
-		let out = await fileChanges.git(watch.cwd, ['log', '--no-walk=unsorted', '-z', '--format=%H%x1f%h%x1f%s%x1f%B', ...fresh.map((e) => e.hash)])
+		let out = await fileChanges.git(watch.cwd, [
+			'log',
+			'--no-walk=unsorted',
+			'-z',
+			'--format=%H%x1f%h%x1f%s%x1f%B',
+			...fresh.map((e) => e.hash),
+		])
 		if (out.code) throw new Error(out.error)
-		let info = new Map(out.text.split('\0').filter(Boolean).map((r) => { let [h, short, subject, body] = r.split('\x1f'); return [h!, { short: short!, subject: subject!, trailer: commits.trailer(body ?? '') }] }))
+		let info = new Map(
+			out.text
+				.split('\0')
+				.filter(Boolean)
+				.map((r) => {
+					let [h, short, subject, body] = r.split('\x1f')
+					return [h!, { short: short!, subject: subject!, trailer: commits.trailer(body ?? '') }]
+				}),
+		)
 		let root: string | undefined
 		for (let e of fresh) {
 			let c = info.get(e.hash)
@@ -159,12 +209,35 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 			try {
 				root ??= (await fileChanges.git(watch.cwd, ['rev-parse', '--show-toplevel'])).text.trim()
 				let numstat = await fileChanges.git(watch.cwd, ['show', '--numstat', '--format=', '--no-renames', '-z', e.hash])
-				let files = numstat.text.split('\0').filter(Boolean).map((f) => { let [a, r, path] = f.replace(/^\n/, '').split('\t'); return { path: join(root!, path!), added: a === '-' ? -1 : Number(a), removed: r === '-' ? -1 : Number(r) } })
+				let files = numstat.text
+					.split('\0')
+					.filter(Boolean)
+					.map((f) => {
+						let [a, r, path] = f.replace(/^\n/, '').split('\t')
+						return { path: join(root!, path!), added: a === '-' ? -1 : Number(a), removed: r === '-' ? -1 : Number(r) }
+					})
 				let rows = () => files.map((f) => ({ ...f, path: relative(root!, f.path) }))
-				let block: CommitBlock = { hash: e.hash, short: c.short, subject: c.subject, ...(e.amend && { amend: true as const }), files: rows() }
+				let block: CommitBlock = {
+					hash: e.hash,
+					short: c.short,
+					subject: c.subject,
+					...(e.amend && { amend: true as const }),
+					files: rows(),
+				}
 				found.push(block)
 				let tags: string[] = []
-				let added = await commits.committed({ sessionId: id, ...(watch.callId && { callId: watch.callId }), cwd: watch.cwd, root, hash: e.hash, short: c.short, subject: c.subject, amend: e.amend, files, tags })
+				let added = await commits.committed({
+					sessionId: id,
+					...(watch.callId && { callId: watch.callId }),
+					cwd: watch.cwd,
+					root,
+					hash: e.hash,
+					short: c.short,
+					subject: c.subject,
+					amend: e.amend,
+					files,
+					tags,
+				})
 				block.files = rows()
 				if (added.length) block.lines = added
 				if (tags.length) block.tags = tags
@@ -182,10 +255,30 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 // Every client except those watching the session (they see it in its
 // transcript); never a push. Without a session (`id` empty) the notice
 // names the repository directory `repo` instead.
-function announce(id: string | undefined, hash: string, short: string, subject: string, amend = false, repo = ''): void {
-	let notice: NoticeEvent = { type: 'notice', session: id ?? '', name: id ? sessions.open(id).name ?? id : repo, kind: 'commit', line: `${short} ${subject}`, key: `commit:${hash}` }
+function announce(
+	id: string | undefined,
+	hash: string,
+	short: string,
+	subject: string,
+	amend = false,
+	repo = '',
+): void {
+	let notice: NoticeEvent = {
+		type: 'notice',
+		session: id ?? '',
+		name: id ? (sessions.open(id).name ?? id) : repo,
+		kind: 'commit',
+		line: `${short} ${subject}`,
+		key: `commit:${hash}`,
+	}
 	if (amend) notice.what = 'amended'
-	noticeHistory.record({ session: id ?? '', name: notice.name, kind: 'commit', line: notice.line, ...(amend ? { what: 'amended' } : {}) })
+	noticeHistory.record({
+		session: id ?? '',
+		name: notice.name,
+		kind: 'commit',
+		line: notice.line,
+		...(amend ? { what: 'amended' } : {}),
+	})
 	let list = tabs.list()
 	let tab = id ? list.findIndex((t) => t.id === id) : -1
 	if (tab >= 0) notice.tab = tab + 1
@@ -196,5 +289,17 @@ function announce(id: string | undefined, hash: string, short: string, subject: 
 export const commits = {
 	state: { seen: [] as string[] },
 	remember: 500,
-	begin, parse, appended, trailer, attribute, check, verify, warn, committed, finish, announce, take, cards,
+	begin,
+	parse,
+	appended,
+	trailer,
+	attribute,
+	check,
+	verify,
+	warn,
+	committed,
+	finish,
+	announce,
+	take,
+	cards,
 }

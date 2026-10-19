@@ -51,7 +51,15 @@ const KITTY_OFF = '\x1b[<u'
 const SHOW_CURSOR = '\x1b[?25h'
 
 function createState(): TerminalState {
-	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false, external: false, escapeTimer: null }
+	return {
+		io: null,
+		decoder: keys.createState(),
+		emergency: emergency.createState(),
+		entered: false,
+		suspended: false,
+		external: false,
+		escapeTimer: null,
+	}
 }
 
 // Output to `fd` that never holds the event loop (task 7j): a write to
@@ -61,7 +69,10 @@ function createState(): TerminalState {
 // while a big one is still going out waits behind it. flush() writes
 // what is queued synchronously on the way out (exit, suspend, leaving
 // raw mode); a chunk already on its way then may land after it.
-function writer(fd: number, chunk = 64 * 1024): { write(s: string): void; defer(make: () => string): void; flush(): void } {
+function writer(
+	fd: number,
+	chunk = 64 * 1024,
+): { write(s: string): void; defer(make: () => string): void; flush(): void } {
 	let queue: (Buffer | (() => string))[] = []
 	let busy = false
 	let pump = (): void => {
@@ -99,7 +110,7 @@ function writer(fd: number, chunk = 64 * 1024): { write(s: string): void; defer(
 			try {
 				for (let next of rest) {
 					let b = typeof next === 'function' ? Buffer.from(next()) : next
-					for (let at = 0; at < b.length; ) at += fs.writeSync(fd, b, at)
+					for (let at = 0; at < b.length;) at += fs.writeSync(fd, b, at)
 				}
 			} catch {}
 		},

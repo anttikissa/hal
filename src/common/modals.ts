@@ -33,7 +33,16 @@ export type FlaggedCall = { block: string; href?: string; title: string; ms: num
 // `opened`. A category row's `open` says how it is shown now. `current`
 // is the session's model.
 export type TreeRow = { id?: string; path?: string; parent?: string; default?: string; open?: boolean }
-export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; opened?: string[]; current: string; capabilities?: Record<string, EffortCapability>; effort?: string; searchEffort?: string }
+export type Tree = {
+	rows: TreeRow[]
+	open: string[]
+	closed?: string[]
+	opened?: string[]
+	current: string
+	capabilities?: Record<string, EffortCapability>
+	effort?: string
+	searchEffort?: string
+}
 
 export type ModalState = {
 	title: string
@@ -73,7 +82,10 @@ export type ModalState = {
 	scroll: number
 }
 
-export type ModalAction = { type: 'submit'; answers: Answers; item?: number } | { type: 'cancel' } | { type: 'send'; command: unknown }
+export type ModalAction =
+	| { type: 'submit'; answers: Answers; item?: number }
+	| { type: 'cancel' }
+	| { type: 'send'; command: unknown }
 
 function open(spec: { title: string; hint?: string; form?: Form; items?: string[] }): ModalState {
 	let st: ModalState = { title: spec.title, items: spec.items ?? [], selected: 0, scroll: 0 }
@@ -92,7 +104,8 @@ function step(st: ModalState, key: Key): { state: ModalState; action?: ModalActi
 	if (key.key === 'escape') return { state: st, action: { type: 'cancel' } }
 	if (key.key === 'enter' && plain) return submit(st)
 	let move = key.key === 'down' ? 1 : key.key === 'up' ? -1 : 0
-	if (move && st.items.length) return { state: { ...st, selected: Math.max(0, Math.min(st.items.length - 1, st.selected + move)) } }
+	if (move && st.items.length)
+		return { state: { ...st, selected: Math.max(0, Math.min(st.items.length - 1, st.selected + move)) } }
 	if (!st.form) return { state: st }
 	let r = forms.step(st.form, key)
 	// New search text: the list starts again from its best match.
@@ -114,20 +127,32 @@ function scroll(scroll: number, selected: number, count: number, visible: number
 // The dialog a restart that ends the host opens while flagged calls run
 // (task ker): Wait (selected) or Restart anyway; Escape waits too.
 function restart(scope: string, calls: FlaggedCall[]): ModalState {
-	return { ...open({ title: 'Restart?', hint: 'enter: choose · esc: wait', items: ['Wait', 'Restart anyway'] }), restart: { scope, calls } }
+	return {
+		...open({ title: 'Restart?', hint: 'enter: choose · esc: wait', items: ['Wait', 'Restart anyway'] }),
+		restart: { scope, calls },
+	}
 }
 
 // The restart dialog's text above its list, one row per call after the
 // first.
 function restartLines(calls: FlaggedCall[]): { head: string; calls: { block: string; href?: string; rest: string }[] } {
-	let head = calls.length === 1 ? 'A call unsafe to stop is running:' : `${calls.length} calls unsafe to stop are running:`
-	return { head, calls: calls.map((c) => ({ block: c.block, href: c.href, rest: `  ${c.title}  (${bashResult.duration(c.ms, true) ?? '0s'})` })) }
+	let head =
+		calls.length === 1 ? 'A call unsafe to stop is running:' : `${calls.length} calls unsafe to stop are running:`
+	return {
+		head,
+		calls: calls.map((c) => ({
+			block: c.block,
+			href: c.href,
+			rest: `  ${c.title}  (${bashResult.duration(c.ms, true) ?? '0s'})`,
+		})),
+	}
 }
 
 // What `action` on the restart dialog sends: /restart <scope> anyway for
 // Restart anyway on a host scope, nothing for Wait.
 function restartCommand(modal: ModalState, action: ModalAction, sessionId: string): unknown {
-	if (action.type !== 'submit' || action.item !== 1 || !modal.restart || modal.restart.scope === 'local') return undefined
+	if (action.type !== 'submit' || action.item !== 1 || !modal.restart || modal.restart.scope === 'local')
+		return undefined
 	return { type: 'submit', sessionId, text: `/restart ${modal.restart.scope} anyway` }
 }
 

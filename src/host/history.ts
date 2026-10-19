@@ -10,7 +10,17 @@ import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, st
 import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
-import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ThinkingBlock, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
+import {
+	blocks,
+	type DoneEvent,
+	type ErrorEvent,
+	type StreamEvent,
+	type ThinkingBlock,
+	type ToolResultBlock,
+	type Turn,
+	type Usage,
+	type UserBlock,
+} from '../common/blocks.ts'
 import { modelNotices } from '../common/model-notices.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
@@ -35,7 +45,17 @@ type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit
 // `context`: what the latest earlier round with usage took in.
 // `by`: the model and effort writing the turn; `starts`: when each
 // block (by `ns` index) started, its record's ts (task hp).
-type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[]; starts: string[]; by: By; context?: number; interrupted?: true }
+type Running = {
+	turn: Turn
+	written: number
+	prior: Usage
+	ended?: boolean
+	ns: number[]
+	starts: string[]
+	by: By
+	context?: number
+	interrupted?: true
+}
 export type By = { model?: string; effort?: string }
 
 function taken(u: Usage): number {
@@ -45,10 +65,16 @@ function taken(u: Usage): number {
 function contextNotice(id: string, records: HistoryRecord[], usage: Usage): void {
 	let context = taken(usage)
 	if (context < 150_000) return
-	let last = replay.current(records).findLast((r) => r.type === 'compact' || r.type === 'reset' || (r.type === 'round' && taken(r.usage) > 0))
+	let last = replay
+		.current(records)
+		.findLast((r) => r.type === 'compact' || r.type === 'reset' || (r.type === 'round' && taken(r.usage) > 0))
 	let previous = last?.type === 'round' ? taken(last.usage) : 0
 	let crossed = [150_000, 200_000, 250_000].filter((threshold) => previous < threshold && context >= threshold)
-	if (crossed.length) history.append(id, { type: 'notice', text: `Context usage crossed ${crossed.map((n) => `${n / 1000}k`).join(', ')} tokens. Last provider round used ${context} input tokens, including cached input. These are absolute thresholds, independent of the model registry's context window.` })
+	if (crossed.length)
+		history.append(id, {
+			type: 'notice',
+			text: `Context usage crossed ${crossed.map((n) => `${n / 1000}k`).join(', ')} tokens. Last provider round used ${context} input tokens, including cached input. These are absolute thresholds, independent of the model registry's context window.`,
+		})
 }
 
 // What the running turn's latest round with usage took in, if any.
@@ -87,12 +113,16 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	if (full.type === 'user') {
 		let slot = 0
 		// A bare entry ID reads every part, so name the part when there are several.
-		let many = full.blocks.length > 1 || full.blocks.some((b) => b.type === 'tool_result' && blocks.resultImages(b).length)
+		let many =
+			full.blocks.length > 1 || full.blocks.some((b) => b.type === 'tool_result' && blocks.resultImages(b).length)
 		for (let b of full.blocks) {
 			if (b.type === 'tool_result') {
 				if (b.outputBlob) {
 					let ref = `${id}/${full.n}${many ? `.${slot}` : ''}`
-					b.output = b.output.replace(`whole output in blob ${b.outputBlob}. Page it with READ_ENTRY "${b.outputBlob}"`, `whole output in entry ${ref}. Page it with READ_ENTRY "${ref}"`)
+					b.output = b.output.replace(
+						`whole output in blob ${b.outputBlob}. Page it with READ_ENTRY "${b.outputBlob}"`,
+						`whole output in entry ${ref}. Page it with READ_ENTRY "${ref}"`,
+					)
 				}
 				slot += blocks.resultImages(b).length
 			}
@@ -104,7 +134,8 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	history.write(history.file(id), line)
 	pages.note(id, line, full)
 	naming.committed(id, full)
-	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length && !pages.marks(id).transitions?.length) busy.drop(id)
+	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length && !pages.marks(id).transitions?.length)
+		busy.drop(id)
 	for (let listener of history.state.listeners) listener(id, full)
 	return full
 }
@@ -114,7 +145,14 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 // joins a torn record mid-file (task ncy). Shrinking needs no space.
 function write(path: string, line: string): void {
 	let size = existsSync(path) ? statSync(path).size : 0
-	try { appendFileSync(path, line) } catch (e) { try { truncateSync(path, size) } catch {} throw e }
+	try {
+		appendFileSync(path, line)
+	} catch (e) {
+		try {
+			truncateSync(path, size)
+		} catch {}
+		throw e
+	}
 }
 
 // Calls `listener` after every durable append (find.ts indexes them);
@@ -242,12 +280,32 @@ async function open(id: string): Promise<SessionMeta> {
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
 	for (let text of neighbors.notes(id, sessions.open(id).cwd)) history.append(id, { type: 'notice', text })
 	// A thinking block as the provider sent it: its signature back from its blob.
-	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
-	let records = pruning.project(id, history.readSync(id), budget, (r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
-		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r, (current) => promptCache.project(id, current))
+	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({
+		...b,
+		signature: blobs.text(id, signatureBlob!),
+	})
+	let records = pruning.project(
+		id,
+		history.readSync(id),
+		budget,
+		(r) =>
+			r.type === 'user'
+				? {
+						...r,
+						blocks: r.blocks.map((b) =>
+							b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b,
+						),
+					}
+				: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined
+					? { ...r, block: signed(r.block) }
+					: r,
+		(current) => promptCache.project(id, current),
+	)
 	let due = modelNotices.pending(replay.current(records))
 	let byNumber = new Map(records.map((r) => [r.n, r]))
-	for (let notice of due) if (byNumber.get(notice.source)?.type !== 'notice') records.push(history.append(id, { type: 'notice', text: notice.text, rendered: true, source: notice.source }))
+	for (let notice of due)
+		if (byNumber.get(notice.source)?.type !== 'notice')
+			records.push(history.append(id, { type: 'notice', text: notice.text, rendered: true, source: notice.source }))
 	due = modelNotices.pending(replay.current(records))
 	if (due.length) records.push(history.append(id, { type: 'user', blocks: [], notices: due }))
 	return replay.markCache(records, replay.toMessages(records), budget.model)
@@ -258,15 +316,30 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 // rest when the consumer stops early). A stream that throws ends as an
 // error, yielded like any other error event. The turn stays running,
 // through tool calls and later rounds, until end().
-async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>, by: By = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
+async function* record(
+	id: string,
+	providerName: string,
+	events: AsyncIterable<StreamEvent>,
+	by: By = {},
+	signal?: AbortSignal,
+): AsyncGenerator<StreamEvent> {
 	let before = history.state.running.get(id)
 	let inputRecords = history.readSync(id)
 	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
-	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior, ns: [], starts: [], by, ...(before && contextOf(before)) }
+	let running: Running = {
+		turn: blocks.newTurn(providerName),
+		written: 0,
+		prior,
+		ns: [],
+		starts: [],
+		by,
+		...(before && contextOf(before)),
+	}
 	let { turn } = running
 	let flush = (upTo: number) => {
 		if (running.ended) return
-		for (; running.written < upTo; running.written++) history.append(id, history.blockRecord(id, running, running.written))
+		for (; running.written < upTo; running.written++)
+			history.append(id, history.blockRecord(id, running, running.written))
 	}
 	history.state.running.set(id, running)
 	try {
@@ -287,7 +360,13 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 		if (signal?.aborted && turn.end?.type !== 'done' && turn.blocks.at(-1)?.type === 'text') running.interrupted = true
 		flush(turn.blocks.length)
 		if (!running.ended && Object.keys(turn.usage).length) {
-			history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(turn.account && { account: turn.account }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
+			history.append(id, {
+				type: 'round',
+				usage: { ...turn.usage },
+				...(by.model !== undefined && { model: by.model }),
+				...(turn.account && { account: turn.account }),
+				...(running.ns[0] !== undefined && { block: running.ns[0] }),
+			})
 			contextNotice(id, inputRecords, turn.usage)
 		}
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
@@ -299,7 +378,10 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 // the turn's model and effort. A thinking signature goes to a blob.
 function blockRecord(id: string, running: Running, i: number): NewRecord & { ts?: string } {
 	let block = running.turn.blocks[i]!
-	if (block.type === 'thinking' && block.signature) { let { signature, ...rest } = block; block = { ...rest, signatureBlob: blobs.storeOutput(id, signature).blob } }
+	if (block.type === 'thinking' && block.signature) {
+		let { signature, ...rest } = block
+		block = { ...rest, signatureBlob: blobs.storeOutput(id, signature).blob }
+	}
 	let r: NewRecord & { type: 'assistant'; ts?: string } = { type: 'assistant', block, n: running.ns[i]! }
 	if (running.interrupted && i === running.turn.blocks.length - 1) r.interrupted = true
 	if (running.by.model !== undefined) r.model = running.by.model
@@ -324,7 +406,8 @@ function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined
 
 // A failed turn's error as stored and shown: the message, then the provider's
 // body (malformed input, HTTP reply) unless the message holds it. Never truncated.
-const errorText = (e: ErrorEvent): string => (e.body?.trim() && !e.message.includes(e.body.trim()) ? `${e.message}\n${e.body.trim()}` : e.message)
+const errorText = (e: ErrorEvent): string =>
+	e.body?.trim() && !e.message.includes(e.body.trim()) ? `${e.message}\n${e.body.trim()}` : e.message
 
 // Ends the running turn, with the usage of all its rounds: `last` is
 // how its last round ended (none, or canceled: the user paused it).
@@ -336,9 +419,18 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?:
 	history.state.running.delete(id)
 	let usage = addUsage(running.prior, running.turn.usage)
 	let context = contextOf(running)
-	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage, ...context })
-	else if (last?.type === 'error' && !last.canceled) history.append(id, { type: 'turn_end', status: 'error', error: errorText(last), usage, ...context })
-	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...context, ...(pauseReason !== undefined && { pauseReason }) })
+	if (last?.type === 'done')
+		history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage, ...context })
+	else if (last?.type === 'error' && !last.canceled)
+		history.append(id, { type: 'turn_end', status: 'error', error: errorText(last), usage, ...context })
+	else
+		history.append(id, {
+			type: 'turn_end',
+			status: 'paused',
+			usage,
+			...context,
+			...(pauseReason !== undefined && { pauseReason }),
+		})
 }
 
 // Stops recording the running turn without ending it: it asked a
@@ -355,7 +447,14 @@ function park(id: string): Usage {
 // it was parked), so its end counts them. A turn carried but ended
 // before any round (held tool calls, then a pause) still gets its end.
 function carry(id: string, providerName: string, usage: Usage): void {
-	history.state.running.set(id, { turn: blocks.newTurn(providerName), written: 0, prior: { ...usage }, ns: [], starts: [], by: {} })
+	history.state.running.set(id, {
+		turn: blocks.newTurn(providerName),
+		written: 0,
+		prior: { ...usage },
+		ns: [],
+		starts: [],
+		by: {},
+	})
 }
 
 // For a host about to exit: writes every running turn's output so far
@@ -370,8 +469,15 @@ function stop(pause: boolean): void {
 		running.ended = true
 		let { turn } = running
 		try {
-			for (; running.written < turn.blocks.length; running.written++) history.append(id, history.blockRecord(id, running, running.written))
-			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage), ...contextOf(running) })
+			for (; running.written < turn.blocks.length; running.written++)
+				history.append(id, history.blockRecord(id, running, running.written))
+			if (pause)
+				history.append(id, {
+					type: 'turn_end',
+					status: 'paused',
+					usage: addUsage(running.prior, turn.usage),
+					...contextOf(running),
+				})
 		} catch (e: any) {
 			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
 		}
@@ -385,7 +491,13 @@ function live(id: string): (Turn & { ns: number[]; ts: string[] }) | undefined {
 	let running = history.state.running.get(id)
 	if (!running) return undefined
 	let { turn, written } = running
-	return { provider: turn.provider, blocks: turn.blocks.slice(written), usage: { ...turn.usage }, ns: running.ns.slice(written), ts: running.starts.slice(written) }
+	return {
+		provider: turn.provider,
+		blocks: turn.blocks.slice(written),
+		usage: { ...turn.usage },
+		ns: running.ns.slice(written),
+		ts: running.starts.slice(written),
+	}
 }
 
 function streaming(id: string): number | undefined {
@@ -400,13 +512,31 @@ function started(id: string): string | undefined {
 // One single-round model turn for an open session, from its history
 // and model, ended however the consumer stops. Tool calls are left
 // unanswered; the host's turns run them (host.ts).
-async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
+async function* turn(
+	id: string,
+	opts: Omit<ProviderRequest, 'model' | 'messages'> = {},
+	signal?: AbortSignal,
+): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
-	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: models.contextWindow(modelId), model: modelId }), image: (blob: string) => blobs.base64(id, blob) }
+	let input = {
+		...opts,
+		messages: await history.messages(id, {
+			overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length,
+			window: models.contextWindow(modelId),
+			model: modelId,
+		}),
+		image: (blob: string) => blobs.base64(id, blob),
+	}
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {
-		for await (let event of history.record(id, providerName, provider.stream(modelId, input, signal), { model: modelId }, signal)) {
+		for await (let event of history.record(
+			id,
+			providerName,
+			provider.stream(modelId, input, signal),
+			{ model: modelId },
+			signal,
+		)) {
 			if (event.type === 'done' || event.type === 'error') last = event
 			yield event
 		}
@@ -420,8 +550,36 @@ export const history = {
 	// `cache`: each open session's complete records and the bytes they
 	// fill, kept while it is open. `next`: by history file, the next
 	// record number not given out yet. `listeners`: see onAppend.
-	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>(), listeners: new Set<(id: string, record: HistoryRecord) => void>() },
+	state: {
+		running: new Map<string, Running>(),
+		cache: new Map<string, { size: number; records: HistoryRecord[] }>(),
+		next: new Map<string, number>(),
+		listeners: new Set<(id: string, record: HistoryRecord) => void>(),
+	},
 	check: (value: unknown) => historyCheck.check(value),
-	blockRecord, started, number, file, append, write, onAppend, submit, load, lastByte, read, readSync,
-	unfinished, open, messages, record, interrupted, results, end, park, carry, stop, live, streaming, turn,
+	blockRecord,
+	started,
+	number,
+	file,
+	append,
+	write,
+	onAppend,
+	submit,
+	load,
+	lastByte,
+	read,
+	readSync,
+	unfinished,
+	open,
+	messages,
+	record,
+	interrupted,
+	results,
+	end,
+	park,
+	carry,
+	stop,
+	live,
+	streaming,
+	turn,
 }

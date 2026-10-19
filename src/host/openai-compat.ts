@@ -10,7 +10,6 @@ export type { Endpoint } from './compat-catalog.ts'
 import { effort as vocabulary, type EffortLevel } from '../common/effort.ts'
 import { effortCatalog } from './effort-catalog.ts'
 
-
 // `images`: whether the endpoint takes image input.
 function toMessages(req: ProviderRequest, images = true): unknown[] {
 	let out: unknown[] = []
@@ -26,13 +25,14 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 					out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
 					for (let image of blocks.resultImages(b)) {
 						let data = images ? req.image?.(image.blob) : undefined
-						if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${data}` } })
+						if (data !== undefined)
+							parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${data}` } })
 						else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
 					}
-				}
-				else {
+				} else {
 					let data = images ? req.image?.(b.blob) : undefined
-					if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${data}` } })
+					if (data !== undefined)
+						parts.push({ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${data}` } })
 					else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
 				}
 			}
@@ -46,9 +46,14 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 		let calls: unknown[] = []
 		for (let b of msg.blocks) {
 			if (b.type === 'text') text += b.text
-			else if (b.type === 'tool_call') calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } })
+			else if (b.type === 'tool_call')
+				calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } })
 		}
-		out.push(calls.length ? { role: 'assistant', content: text || null, tool_calls: calls } : { role: 'assistant', content: text })
+		out.push(
+			calls.length
+				? { role: 'assistant', content: text || null, tool_calls: calls }
+				: { role: 'assistant', content: text },
+		)
 	}
 	return out
 }
@@ -62,7 +67,10 @@ function body(req: ProviderRequest, images = true): Record<string, unknown> {
 	}
 	if (req.maxTokens) b.max_tokens = req.maxTokens
 	if (req.tools?.length) {
-		b.tools = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema } }))
+		b.tools = req.tools.map((t) => ({
+			type: 'function',
+			function: { name: t.name, description: t.description, parameters: t.inputSchema },
+		}))
 	}
 	return b
 }
@@ -124,7 +132,12 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					yield { type: 'error', message: `Invalid JSON arguments for tool call '${call.name}'`, body: call.args }
 					return
 				}
-				yield { type: 'tool_call', id: call.id || `call_${index}`, name: call.name, input: input as Record<string, unknown> }
+				yield {
+					type: 'tool_call',
+					id: call.id || `call_${index}`,
+					name: call.name,
+					input: input as Record<string, unknown>,
+				}
 			}
 		}
 		if (chunk.usage) yield { type: 'usage', usage: usage(chunk.usage) }
@@ -154,16 +167,29 @@ function create(name: string): Provider {
 		request(req) {
 			let { base, headers } = openaiCompat.endpoint(name)
 			let ep = openaiCompat.endpoints()[name]
-			return { url: `${base}/chat/completions`, headers: { ...headers, ...ep?.headers?.(req) }, body: { ...openaiCompat.body(req, ep?.images !== false), ...effort.wire(name, req.model, req.effort, req.maxTokens) } }
+			return {
+				url: `${base}/chat/completions`,
+				headers: { ...headers, ...ep?.headers?.(req) },
+				body: {
+					...openaiCompat.body(req, ep?.images !== false),
+					...effort.wire(name, req.model, req.effort, req.maxTokens),
+				},
+			}
 		},
 		parse: openaiCompat.parse,
-		capability: (model) => openaiCompat.endpoints()[name]?.capability?.(model) ?? openaiCompat.cachedCapability(name, model),
+		capability: (model) =>
+			openaiCompat.endpoints()[name]?.capability?.(model) ?? openaiCompat.cachedCapability(name, model),
 		// GET /models, which OpenRouter, Ollama and most servers offer.
 		async models(signal) {
 			let { base, headers } = openaiCompat.endpoint(name)
 			let res = await provider.fetch(`${base}/models`, { headers, signal })
 			if (!res.ok) throw new Error(`HTTP ${res.status} listing models`)
-			let body = (await res.json()) as { data?: { id?: unknown; reasoning?: { supported_efforts?: unknown; default_effort?: string; mandatory?: boolean } }[] }
+			let body = (await res.json()) as {
+				data?: {
+					id?: unknown
+					reasoning?: { supported_efforts?: unknown; default_effort?: string; mandatory?: boolean }
+				}[]
+			}
 			if (name === 'openrouter') {
 				openaiCompat.cachedCapability(name, '')
 				openaiCompat.state.capabilities.clear()
@@ -172,11 +198,30 @@ function create(name: string): Provider {
 				if (name !== 'openrouter' || typeof m.id !== 'string') continue
 				let r = m.reasoning
 				let supported = r?.supported_efforts
-				if (supported === undefined) { openaiCompat.state.capabilities.delete(`${name}/${m.id}`); continue }
-				let levels = vocabulary.levels.filter((l) => (supported === null || (Array.isArray(supported) && supported.includes(l))) && !(r?.mandatory && l === 'none'))
-				openaiCompat.state.capabilities.set(`${name}/${m.id}`, { levels, ...(levels.includes(r?.default_effort as EffortLevel) && { default: r!.default_effort as EffortLevel }), wire: (level) => ({ reasoning: { effort: level } }) })
+				if (supported === undefined) {
+					openaiCompat.state.capabilities.delete(`${name}/${m.id}`)
+					continue
+				}
+				let levels = vocabulary.levels.filter(
+					(l) =>
+						(supported === null || (Array.isArray(supported) && supported.includes(l))) &&
+						!(r?.mandatory && l === 'none'),
+				)
+				openaiCompat.state.capabilities.set(`${name}/${m.id}`, {
+					levels,
+					...(levels.includes(r?.default_effort as EffortLevel) && { default: r!.default_effort as EffortLevel }),
+					wire: (level) => ({ reasoning: { effort: level } }),
+				})
 			}
-			if (name === 'openrouter') effortCatalog.save(Object.fromEntries([...openaiCompat.state.capabilities].map(([id, cap]) => [id, { levels: cap.levels, ...(cap.default && { default: cap.default }) }])))
+			if (name === 'openrouter')
+				effortCatalog.save(
+					Object.fromEntries(
+						[...openaiCompat.state.capabilities].map(([id, cap]) => [
+							id,
+							{ levels: cap.levels, ...(cap.default && { default: cap.default }) },
+						]),
+					),
+				)
 			return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
 		},
 	}
@@ -190,12 +235,24 @@ function init(): void {
 }
 
 export const openaiCompat = {
-	get state() { return compatCatalog.state },
-	set state(value: typeof compatCatalog.state) { compatCatalog.state = value },
-	get cachedCapability() { return compatCatalog.cachedCapability },
-	set cachedCapability(value: typeof compatCatalog.cachedCapability) { compatCatalog.cachedCapability = value },
-	get endpoints() { return compatCatalog.endpoints },
-	set endpoints(value: typeof compatCatalog.endpoints) { compatCatalog.endpoints = value },
+	get state() {
+		return compatCatalog.state
+	},
+	set state(value: typeof compatCatalog.state) {
+		compatCatalog.state = value
+	},
+	get cachedCapability() {
+		return compatCatalog.cachedCapability
+	},
+	set cachedCapability(value: typeof compatCatalog.cachedCapability) {
+		compatCatalog.cachedCapability = value
+	},
+	get endpoints() {
+		return compatCatalog.endpoints
+	},
+	set endpoints(value: typeof compatCatalog.endpoints) {
+		compatCatalog.endpoints = value
+	},
 	toMessages,
 	body,
 	parse,

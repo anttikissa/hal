@@ -25,8 +25,14 @@ afterEach(() => {
 const ts = '2026-10-04T08:00:00Z'
 function session(id: string, records: HistoryRecord[]) {
 	mkdirSync(paths.sessionDir(id))
-	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/example', model: 'anthropic/claude-opus-5-5', createdAt: ts }))
-	writeFileSync(`${paths.sessionDir(id)}/history.asonl`, records.map((r) => ason.stringify(r, 'short')).join('\n') + '\n')
+	writeFileSync(
+		`${paths.sessionDir(id)}/session.ason`,
+		ason.stringify({ id, cwd: '/example', model: 'anthropic/claude-opus-5-5', createdAt: ts }),
+	)
+	writeFileSync(
+		`${paths.sessionDir(id)}/history.asonl`,
+		records.map((r) => ason.stringify(r, 'short')).join('\n') + '\n',
+	)
 }
 
 test('round usage wins over aggregate ends; resumed pauses, model switches and legacy ends are counted once', () => {
@@ -47,7 +53,7 @@ test('round usage wins over aggregate ends; resumed pauses, model switches and l
 	])
 	let totals = cost.totals(['01-abc', '01-def'])
 	expect(totals[0]!.usage).toEqual(usage)
-	expect(totals[0]!.cost).toBeCloseTo(.0079)
+	expect(totals[0]!.cost).toBeCloseTo(0.0079)
 	expect(totals[1]!.unpriced).toBe(1)
 	expect(totals[2]!.usage.input).toBe(300)
 	let filtered = cost.run(['--since', '2026-10-04T08:30:00Z'])
@@ -63,10 +69,24 @@ test('round usage wins over aggregate ends; resumed pauses, model switches and l
 })
 
 test('catalog retains prices, including cache prices; missing used-token prices are explicitly unpriced', () => {
-	let catalog = modelsDev.parse({ fake: { models: { a: { cost: { input: 2, output: 8, cache_read: .1, cache_write: 3 } }, b: { cost: { input: 1, output: 2 } } } } })
+	let catalog = modelsDev.parse({
+		fake: {
+			models: {
+				a: { cost: { input: 2, output: 8, cache_read: 0.1, cache_write: 3 } },
+				b: { cost: { input: 1, output: 2 } },
+			},
+		},
+	})
 	writeFileSync(modelsDev.file(), JSON.stringify(catalog))
-	expect(models.pricing('fake/a')).toEqual({ input: 2, output: 8, cacheRead: .1, cacheWrite: 3 })
-	session('01-abc', [{ type: 'round', model: 'fake/a', usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 }, ts }])
+	expect(models.pricing('fake/a')).toEqual({ input: 2, output: 8, cacheRead: 0.1, cacheWrite: 3 })
+	session('01-abc', [
+		{
+			type: 'round',
+			model: 'fake/a',
+			usage: { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 },
+			ts,
+		},
+	])
 	session('01-def', [{ type: 'round', model: 'fake/b', usage: { cacheRead: 1 }, ts }])
 	expect(cost.totals(['01-abc'])[0]!.cost).toBe(13.1)
 	expect(cost.run(['01-def'])).toContain('UNPRICED')
@@ -80,7 +100,9 @@ test('rounds split by account and sum into account subtotals across sessions', (
 		{ type: 'round', model: 'unknown/model', account: 'a@example.com', usage: { input: 10 }, ts },
 		{ type: 'round', model: 'unknown/model', account: 'b@example.com', usage: { input: 20 }, ts },
 	])
-	session('02-def', [{ type: 'round', model: 'unknown/model', account: 'a@example.com', usage: { input: 5, output: 1 }, ts }])
+	session('02-def', [
+		{ type: 'round', model: 'unknown/model', account: 'a@example.com', usage: { input: 5, output: 1 }, ts },
+	])
 	let report = cost.run([])
 	expect(report).toContain('ACCOUNT a@example.com  $0.0000  2  15  1  0  0')
 	expect(report).toContain('ACCOUNT b@example.com  $0.0000  1  20  0  0  0')

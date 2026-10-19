@@ -57,14 +57,18 @@ function verbosity(kind: Kind, blocks?: SessionMeta['blocks']): Verbosity {
 
 // Whether a call failed: its result is an error, or a bash call's
 // exit is not 0 (its status says so).
-function failed(result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' } | undefined, bash: boolean): boolean {
+function failed(
+	result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' } | undefined,
+	bash: boolean,
+): boolean {
 	return !!result && !!bashResult.failure(result, bash)
 }
 
 // How `item` starts. A message queued for the turn end is its queue
 // card's one row.
 function initial(item: Shown, blocks?: SessionMeta['blocks'], failed = false): Verbosity {
-	if (item.type === 'prompt' && bashResult.background(item)) return bashResult.exit(item.text) === 'exit 0' ? 'short' : 'long'
+	if (item.type === 'prompt' && bashResult.background(item))
+		return bashResult.exit(item.text) === 'exit 0' ? 'short' : 'long'
 	if (item.type === 'prompt' && item.waiting && item.delivery === 'after-turn') return 'short'
 	let k = card.kind(item, failed)
 	return k ? card.verbosity(k, blocks) : 'long'
@@ -79,11 +83,23 @@ function signature(blocks?: SessionMeta['blocks']): string {
 function text(item: Shown & { type: 'prompt' | 'text' | 'thinking' }): string {
 	if (item.type === 'text') return summary.answer(item.text)
 	if (item.type === 'thinking') return item.text
-	return bashResult.background(item) ? bashResult.display(item.text) : item.report ? summary.answer(item.text) : item.summary ? summary.strip(item.text) : item.text
+	return bashResult.background(item)
+		? bashResult.display(item.text)
+		: item.report
+			? summary.answer(item.text)
+			: item.summary
+				? summary.strip(item.text)
+				: item.text
 }
 
 function markdown(item: Shown): boolean {
-	return item.type === 'text' || item.type === 'thinking' || (item.type === 'output' && !item.commit) || (item.type === 'prompt' && !!item.from && !bashResult.background(item)) || (item.type === 'command' && item.output !== undefined)
+	return (
+		item.type === 'text' ||
+		item.type === 'thinking' ||
+		(item.type === 'output' && !item.commit) ||
+		(item.type === 'prompt' && !!item.from && !bashResult.background(item)) ||
+		(item.type === 'command' && item.output !== undefined)
+	)
 }
 
 export const card = { kinds, levels, kind, toggles, setting, verbosity, failed, initial, signature, text, markdown }

@@ -47,7 +47,9 @@ function hold(card: Element): void {
 
 // Puts the held card back in place; whether a card is held.
 function keep(): boolean {
-	let st = scroll.state, held = st.held, el = st.el
+	let st = scroll.state,
+		held = st.held,
+		el = st.el
 	if (!held || !el) return false
 	if (!held.card.isConnected) {
 		st.held = undefined
@@ -60,12 +62,21 @@ function keep(): boolean {
 
 function intent(event?: Event): void {
 	let el = scroll.state.el
-	if (el) { scroll.state.intent = true; if (!event) scroll.state.top = el.scrollTop }
-	if (event) scroll.onTrace(event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type, undefined, (event as WheelEvent).deltaY)
+	if (el) {
+		scroll.state.intent = true
+		if (!event) scroll.state.top = el.scrollTop
+	}
+	if (event)
+		scroll.onTrace(
+			event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type,
+			undefined,
+			(event as WheelEvent).deltaY,
+		)
 }
 
 function navigate(): void {
-	let st = scroll.state, el = st.el
+	let st = scroll.state,
+		el = st.el
 	if (!el) return
 	// Layout can clamp the old position; only movement beyond that is navigation.
 	if (st.intent && Math.abs(el.scrollTop - Math.min(st.top, scroll.target(el, 0))) > atBottom) {
@@ -79,7 +90,8 @@ function navigate(): void {
 function onKey(e: KeyboardEvent): void {
 	let t = e.target as Element | null
 	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
-	if (!e.defaultPrevented && (find || ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')))) intent(e)
+	if (!e.defaultPrevented && (find || ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input'))))
+		intent(e)
 }
 
 // Sets the view's position and remembers it as ours, so the scroll
@@ -104,10 +116,14 @@ function moved(): void {
 // content: a scroll event, a DOM change, the tab shown again. `why`
 // names the trigger for diagnostics.
 function check(why: string): void {
-	let st = scroll.state, el = st.el
+	let st = scroll.state,
+		el = st.el
 	if (!el) return
 	navigate()
-	if (!st.pinned) { scroll.keep(); return }
+	if (!st.pinned) {
+		scroll.keep()
+		return
+	}
 	let g = scroll.gap(el)
 	if (g <= atBottom) return
 	scroll.onTrace(why, g)
@@ -150,7 +166,10 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.top = el.scrollTop
 	let { stop: stopReflow, capture } = reflow.watch(el, () => {
 		navigate()
-		if (scroll.state.pinned) { scroll.put(el, scroll.target(el, 0)); return true }
+		if (scroll.state.pinned) {
+			scroll.put(el, scroll.target(el, 0))
+			return true
+		}
 		if (scroll.keep()) return true
 		scroll.state.intent = undefined
 		return false
@@ -163,7 +182,10 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	el.addEventListener('scroll', scrolled, { passive: true })
 	// Streamed text and new cards change the DOM; a change that no
 	// follow() covered would otherwise leave a pinned view short.
-	let content = new MutationObserver((changes) => { if (changes.some((c) => c.target === el && c.type === 'childList')) watchCards(); scroll.check('content') })
+	let content = new MutationObserver((changes) => {
+		if (changes.some((c) => c.target === el && c.type === 'childList')) watchCards()
+		scroll.check('content')
+	})
 	content.observe(el, { childList: true, characterData: true, subtree: true })
 	// A card can also grow with no DOM change and no scroll event: its
 	// open animation, an image or font arriving. Watch each card's size,
@@ -172,14 +194,26 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	let cards = new ResizeObserver(() => scroll.check('resize'))
 	let watched = new Set<Element>()
 	let watchCards = () => {
-		for (let c of watched) if (c.parentElement !== el) { cards.unobserve(c); watched.delete(c) }
-		for (let c of el.children) if (!watched.has(c)) { cards.observe(c, { box: 'border-box' }); watched.add(c) }
+		for (let c of watched)
+			if (c.parentElement !== el) {
+				cards.unobserve(c)
+				watched.delete(c)
+			}
+		for (let c of el.children)
+			if (!watched.has(c)) {
+				cards.observe(c, { box: 'border-box' })
+				watched.add(c)
+			}
 	}
 	watchCards()
 	// Catch up after the browser suspends a background tab.
-	let shown = () => { if (!document.hidden) scroll.check('shown') }
+	let shown = () => {
+		if (!document.hidden) scroll.check('shown')
+	}
 	document.addEventListener('visibilitychange', shown)
-	let wheel = (e: WheelEvent) => { if (!e.ctrlKey && e.deltaY) intent(e) }
+	let wheel = (e: WheelEvent) => {
+		if (!e.ctrlKey && e.deltaY) intent(e)
+	}
 	el.addEventListener('pointerdown', intent, { passive: true })
 	el.addEventListener('touchstart', intent, { passive: true })
 	el.addEventListener('wheel', wheel, { passive: true })
@@ -204,7 +238,12 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 function follow(change: () => void, force = false): void {
 	let st = scroll.state
 	navigate()
-	if (force) { pin(true, 'force'); st.held = undefined; st.intent = undefined; scroll.onTrace('force') }
+	if (force) {
+		pin(true, 'force')
+		st.held = undefined
+		st.intent = undefined
+		scroll.onTrace('force')
+	}
 	change()
 	scroll.check('content')
 }
@@ -238,7 +277,16 @@ export const scroll = {
 	nearTop: 800,
 	// `reanchor`: takes reflow's reading anchor at the current view.
 	// `held`: the card hold() keeps in place, at `top` in the viewport.
-	state: { el: null as Box | null, top: 0, intent: undefined as true | undefined, reanchor: (): void => {}, quiet: false, pinned: true, held: undefined as { card: Element; top: number } | undefined, places: new Map<string, { top: number } | { gap: number }>() },
+	state: {
+		el: null as Box | null,
+		top: 0,
+		intent: undefined as true | undefined,
+		reanchor: (): void => {},
+		quiet: false,
+		pinned: true,
+		held: undefined as { card: Element; top: number } | undefined,
+		places: new Map<string, { top: number } | { gap: number }>(),
+	},
 	onTrace: (_why: string, _pull?: number, _wheel?: number): void => {},
 	// Following changed; `from`: the last position Hal saw before.
 	onPin: (_why: string, _from: number): void => {},

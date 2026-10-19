@@ -11,7 +11,11 @@ import { client, created, until, useHost } from './host-fixture.test.ts'
 
 useHost(false, false, true)
 let saved = { generate: recap.generate, now: clock.now, raw: settings.state.raw }
-afterEach(() => { recap.generate = saved.generate; clock.now = saved.now; settings.state.raw = saved.raw })
+afterEach(() => {
+	recap.generate = saved.generate
+	clock.now = saved.now
+	settings.state.raw = saved.raw
+})
 // The automatic recap is opt-in (sessionRecap, default off).
 const optIn = () => void (settings.state.raw = { sessionRecap: true })
 function turns(id: string, count = 3): void {
@@ -23,7 +27,9 @@ function turns(id: string, count = 3): void {
 }
 
 test('recap resolves other tabs without input and persists only in the requester', async () => {
-	let c = client(), a = created(c), b = created(c)
+	let c = client(),
+		a = created(c),
+		b = created(c)
 	sessions.open(b).name = 'Another session'
 	tabs.file().open = [a, b]
 	turns(b)
@@ -40,10 +46,14 @@ test('recap resolves other tabs without input and persists only in the requester
 
 test('automatic recap is prepared away, ready on return, and never repeated last', async () => {
 	optIn()
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	turns(id)
 	let calls = 0
-	recap.generate = async () => { calls++; return 'Built the feature; awaiting review.' }
+	recap.generate = async () => {
+		calls++
+		return 'Built the feature; awaiting review.'
+	}
 	c.conn.send({ type: 'visibility', sessionId: id, visible: true })
 	c.conn.send({ type: 'visibility', sessionId: id, visible: false })
 	await until(() => calls === 1)
@@ -61,7 +71,8 @@ test('automatic recap is prepared away, ready on return, and never repeated last
 })
 
 test('automatic recap honors setting, minimum turns and subagent exclusion', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	turns(id, 2)
 	optIn()
 	expect(await recap.eligible(id)).toBeUndefined()
@@ -76,16 +87,22 @@ test('automatic recap honors setting, minimum turns and subagent exclusion', asy
 
 test('recap failures retain the full provider body and stale success never lands', async () => {
 	optIn()
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	turns(id)
 	clock.now = () => Date.now() + recap.awayMs
-	recap.generate = async () => { throw new Error('HTTP 400\ncomplete provider body') }
+	recap.generate = async () => {
+		throw new Error('HTTP 400\ncomplete provider body')
+	}
 	c.conn.send({ type: 'visibility', sessionId: id, visible: true })
 	await until(() => c.of('output').some((e) => e.error))
 	expect(c.of('output').at(-1).text).toContain('complete provider body')
 	recap.reset()
 	let finish!: (text: string) => void
-	recap.generate = () => new Promise((resolve) => { finish = resolve })
+	recap.generate = () =>
+		new Promise((resolve) => {
+			finish = resolve
+		})
 	c.conn.send({ type: 'visibility', sessionId: id, visible: false })
 	await until(() => finish)
 	c.conn.send({ type: 'visibility', sessionId: id, visible: true })
@@ -96,9 +113,10 @@ test('recap failures retain the full provider body and stale success never lands
 	host.reset()
 })
 
-
 test('provider recap input and output are bounded and no tools are available', async () => {
-	let c = client(), id = created(c), original = provider.stream
+	let c = client(),
+		id = created(c),
+		original = provider.stream
 	sessions.open(id).model = 'anthropic/claude-opus-5-5'
 	let input: any
 	provider.stream = async function* (_model, request) {
@@ -107,24 +125,36 @@ test('provider recap input and output are bounded and no tools are available', a
 		yield { type: 'done', reason: 'end' }
 	}
 	try {
-		let text = await recap.generate(id, [{ type: 'assistant', block: { type: 'text', text: 'data '.repeat(10_000) }, ts: '' }], new AbortController().signal)
+		let text = await recap.generate(
+			id,
+			[{ type: 'assistant', block: { type: 'text', text: 'data '.repeat(10_000) }, ts: '' }],
+			new AbortController().signal,
+		)
 		expect(Array.from(text)).toHaveLength(400)
 		expect(input.tools).toEqual([])
 		expect(input.effort).toBe('low')
 		expect(input.messages[0].blocks[0].text.length).toBeLessThan(recap.digestChars + 200)
-	} finally { provider.stream = original }
+	} finally {
+		provider.stream = original
+	}
 })
 
 test('a recap the provider stops early is an error with its reason and partial text, not a recap', async () => {
-	let c = client(), id = created(c), original = provider.stream
+	let c = client(),
+		id = created(c),
+		original = provider.stream
 	provider.stream = async function* () {
 		yield { type: 'thinking', text: 'Weighing which records matter' }
 		yield { type: 'text', text: 'Goal: clearer cards by drop' }
 		yield { type: 'done', reason: 'max_tokens' }
 	}
 	try {
-		await expect(recap.generate(id, [], new AbortController().signal)).rejects.toThrow(/max_tokens[\s\S]*Thinking: Weighing which records matter[\s\S]*Partial text: Goal: clearer cards by drop/)
-	} finally { provider.stream = original }
+		await expect(recap.generate(id, [], new AbortController().signal)).rejects.toThrow(
+			/max_tokens[\s\S]*Thinking: Weighing which records matter[\s\S]*Partial text: Goal: clearer cards by drop/,
+		)
+	} finally {
+		provider.stream = original
+	}
 })
 
 test('unknown visibility reports are rejected before recap history access', () => {

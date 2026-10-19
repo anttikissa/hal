@@ -55,7 +55,14 @@ function cycle(list: string[]) {
 	let c = cycles.get(list)
 	if (c) return c
 	let items = list.map(graphemes)
-	let total = items.reduce((sum, shown, i) => sum + (shown.length > 50 ? LONG_HOLD : HOLD) + shown.length * ERASE + items[(i + 1) % items.length]!.length * TYPE, 0)
+	let total = items.reduce(
+		(sum, shown, i) =>
+			sum +
+			(shown.length > 50 ? LONG_HOLD : HOLD) +
+			shown.length * ERASE +
+			items[(i + 1) % items.length]!.length * TYPE,
+		0,
+	)
 	cycles.set(list, (c = { items, total }))
 	return c
 }
@@ -71,9 +78,16 @@ function rotate(list: string[], ms: number): Shown {
 		let erase = shown.length * ERASE
 		if (ms < hold) return { cut: '', text: shown.join(''), next: hold - ms }
 		ms -= hold
-		if (ms < erase) return { cut: '', text: shown.slice(0, shown.length - Math.floor(ms / ERASE) - 1).join(''), fade: 'right', next: ERASE - (ms % ERASE) }
+		if (ms < erase)
+			return {
+				cut: '',
+				text: shown.slice(0, shown.length - Math.floor(ms / ERASE) - 1).join(''),
+				fade: 'right',
+				next: ERASE - (ms % ERASE),
+			}
 		ms -= erase
-		if (ms < coming.length * TYPE) return { cut: '', text: coming.slice(0, Math.floor(ms / TYPE) + 1).join(''), next: TYPE - (ms % TYPE) }
+		if (ms < coming.length * TYPE)
+			return { cut: '', text: coming.slice(0, Math.floor(ms / TYPE) + 1).join(''), next: TYPE - (ms % TYPE) }
 		ms -= coming.length * TYPE
 	}
 }
@@ -88,7 +102,13 @@ export type PromptExample = { key?: string; since?: number; typed?: boolean; gon
 // The example over prompt `key` holding `typed` at `now`, from `list`
 // (none: no example); updates `st`. The typed text covers the example's
 // first columns, so only what lies right of it shows.
-function follow(st: PromptExample, key: string, list: string[] | undefined, typed: string, now: number): Shown | undefined {
+function follow(
+	st: PromptExample,
+	key: string,
+	list: string[] | undefined,
+	typed: string,
+	now: number,
+): Shown | undefined {
 	if (st.key !== key || !list) {
 		for (let k of Object.keys(st)) delete st[k as keyof PromptExample]
 		st.key = key
@@ -114,7 +134,12 @@ function follow(st: PromptExample, key: string, list: string[] | undefined, type
 		st.gone = undefined
 		return undefined
 	}
-	return { cut: g.items.slice(0, n).join(''), text: g.items.slice(n).join(''), fade: 'left', next: GONE - ((now - g.at) % GONE) }
+	return {
+		cut: g.items.slice(0, n).join(''),
+		text: g.items.slice(n).join(''),
+		fade: 'left',
+		next: GONE - ((now - g.at) % GONE),
+	}
 }
 
 export const placeholders = { general, hal, graphemes, rotate, follow, BACK }

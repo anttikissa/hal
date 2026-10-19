@@ -29,14 +29,27 @@ function snapshot(id: string): RebaseRows {
 // Append-only activity does not invalidate shown IDs. A context boundary,
 // rebase or replacement prompt does, even if it happens to restore the text.
 function fresh(raw: HistoryRecord[], base: number): void {
-	if (base && !raw.some((r) => r.n === base)) throw new Error(`Rebase snapshot ${base} is missing; run /rebase show again.`)
-	if (raw.some((r) => r.n! > base && (r.type === 'rebase' || r.type === 'reset' || r.type === 'compact' || (r.type === 'user' && r.replaces)))) throw new Error(`Rebase snapshot ${base} is stale: context was rewritten. Run /rebase show again.`)
+	if (base && !raw.some((r) => r.n === base))
+		throw new Error(`Rebase snapshot ${base} is missing; run /rebase show again.`)
+	if (
+		raw.some(
+			(r) =>
+				r.n! > base &&
+				(r.type === 'rebase' || r.type === 'reset' || r.type === 'compact' || (r.type === 'user' && r.replaces)),
+		)
+	)
+		throw new Error(`Rebase snapshot ${base} is stale: context was rewritten. Run /rebase show again.`)
 }
 
 function show(id: string): string {
 	let snapshot = rebaseAgent.snapshot(id)
 	rebaseAgent.state.shown.set(sessions.open(id), snapshot)
-	return rebaseRows.render(id, snapshot).replace(/# keep\/drop\/edit\/queue[^\n]*\n# edit[^\n]*/, '# Sparse plan: unmentioned entries stay. drop targets; edit u12 "full replacement".\n# Open tails (12-, t12-, *) resolve through application, including this rebase call/result.')
+	return rebaseRows
+		.render(id, snapshot)
+		.replace(
+			/# keep\/drop\/edit\/queue[^\n]*\n# edit[^\n]*/,
+			'# Sparse plan: unmentioned entries stay. drop targets; edit u12 "full replacement".\n# Open tails (12-, t12-, *) resolve through application, including this rebase call/result.',
+		)
 }
 
 function shown(id: string): RebaseRows {
@@ -49,23 +62,41 @@ function shown(id: string): RebaseRows {
 function prepare(id: string, intent: RebaseIntent, raw = history.readSync(id)) {
 	rebaseAgent.fresh(raw, intent.sparse.plan.base)
 	if (forms.open(raw)) throw new Error('Answer or dismiss the open question before rebasing.')
-	let snapshot = rebaseRows.build(raw), plan = rebaseSparse.resolve(intent.sparse, snapshot)
+	let snapshot = rebaseRows.build(raw),
+		plan = rebaseSparse.resolve(intent.sparse, snapshot)
 	plan.edit = plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text)
 	// Each application has its own base; repeated sparse plans compose, rather
 	// than replacing an earlier rebase against the same shown snapshot.
 	plan.base = snapshot.base
 	let sums = rebaseRows.totals(snapshot, plan)
 	let continuation = rebaseAgent.continuation(raw, plan, intent.paused, intent.resume)
-	return { plan, continuation, from: sums.cacheFrom ?? snapshot.base, report: rebaseReport.text(snapshot, plan, intent.paused, continuation) }
+	return {
+		plan,
+		continuation,
+		from: sums.cacheFrom ?? snapshot.base,
+		report: rebaseReport.text(snapshot, plan, intent.paused, continuation),
+	}
 }
 
 function request(id: string, text: string, preview: boolean, paused: boolean, sender: Sender = {}): string {
 	let sparse = rebaseSparse.parse(text, rebaseAgent.shown(id))
 	// Calls run concurrently: the command tool names its own call.
-	let state = status.stateOf(id), call = sender.call ?? (state.type === 'running' && state.phase === 'tools' ? state.call : undefined)
-	let intent: RebaseIntent = { sparse, ...(turns.state.running.has(id) && { resume: true }), ...(paused && { paused: true }), ...(sender.origin === 'model' && call && { call }) }
+	let state = status.stateOf(id),
+		call = sender.call ?? (state.type === 'running' && state.phase === 'tools' ? state.call : undefined)
+	let intent: RebaseIntent = {
+		sparse,
+		...(turns.state.running.has(id) && { resume: true }),
+		...(paused && { paused: true }),
+		...(sender.origin === 'model' && call && { call }),
+	}
 	let prepared = rebaseAgent.prepare(id, intent)
-	if (preview) return prepared.report.replace(/^Rebase applied(?:\.)?/, 'Rebase preview; no changes.') + (sparse.tails.length ? '\nOpen tails resolve again through application time, including the executing rebase call/result and intervening entries.' : '')
+	if (preview)
+		return (
+			prepared.report.replace(/^Rebase applied(?:\.)?/, 'Rebase preview; no changes.') +
+			(sparse.tails.length
+				? '\nOpen tails resolve again through application time, including the executing rebase call/result and intervening entries.'
+				: '')
+		)
 	if (contextTransitions.pending(id)) throw new Error('A context transition is already pending; wait or press Escape.')
 	let transition: ContextTransition = { id: crypto.randomUUID(), kind: 'rebase', sender, rebase: intent }
 	contextTransitions.output(id, '/rebase accepted; applying after active work settles.', { transition })
@@ -76,28 +107,44 @@ function request(id: string, text: string, preview: boolean, paused: boolean, se
 // Completion belongs to the original final assistant entry of that turn.
 // A retained turn_end cannot finish commentary exposed by dropping its reply,
 // and a running turn that drops itself back to a completed reply stays done.
-function continuation(raw: HistoryRecord[], plan?: RebasePlan, paused = false, resume = false): 'prompt' | 'unfinished' | undefined {
+function continuation(
+	raw: HistoryRecord[],
+	plan?: RebasePlan,
+	paused = false,
+	resume = false,
+): 'prompt' | 'unfinished' | undefined {
 	if (paused) return
-	let before = replay.current(raw), after = plan ? rebase.apply(before, plan) : before
-	let conversational = (r: HistoryRecord) => r.type === 'assistant' || (r.type === 'user' && r.blocks.some((b) => b.type === 'text' || b.type === 'image'))
+	let before = replay.current(raw),
+		after = plan ? rebase.apply(before, plan) : before
+	let conversational = (r: HistoryRecord) =>
+		r.type === 'assistant' || (r.type === 'user' && r.blocks.some((b) => b.type === 'text' || b.type === 'image'))
 	let last = after.findLast(conversational)
 	if (last?.type === 'user') return 'prompt'
 	if (!last) return resume ? 'unfinished' : undefined
 	let at = before.findIndex((r) => r.n === last.n)
-	let tail = before.slice(at + 1), end = tail.findIndex((r) => r.type === 'turn_end')
+	let tail = before.slice(at + 1),
+		end = tail.findIndex((r) => r.type === 'turn_end')
 	let completed = end >= 0 && tail[end]!.type === 'turn_end' && tail[end]!.status === 'completed'
 	if (completed && after.some((r) => r.n === tail[end]!.n) && !tail.slice(0, end).some(conversational)) return
 	return 'unfinished'
 }
 
-function continuePrompt(id: string, paused = false, reason = rebaseAgent.continuation(history.readSync(id), undefined, paused)): void {
+function continuePrompt(
+	id: string,
+	paused = false,
+	reason = rebaseAgent.continuation(history.readSync(id), undefined, paused),
+): void {
 	if (paused || turns.state.running.has(id) || !reason) return
 	let refused = prompts.resume(id)
 	if (refused) throw new Error(refused)
 }
 
 // 'done': the running turn rewound itself to a completed reply and ends.
-function apply(id: string, transition: ContextTransition, prepared?: ReturnType<typeof prepare>): 'paused' | 'done' | undefined {
+function apply(
+	id: string,
+	transition: ContextTransition,
+	prepared?: ReturnType<typeof prepare>,
+): 'paused' | 'done' | undefined {
 	let intent = transition.rebase!
 	if (transition.canceled) {
 		contextTransitions.output(id, '/rebase canceled; history unchanged.', { transitionDone: transition.id })
@@ -118,7 +165,10 @@ function apply(id: string, transition: ContextTransition, prepared?: ReturnType<
 		let start = intent.resume && !turns.state.running.has(id)
 		if (start) history.append(id, { type: 'continue' })
 		contextTransitions.output(id, text, { transitionDone: transition.id })
-		if (start) { status.transition(id, { type: 'submit' }); turns.start(id) }
+		if (start) {
+			status.transition(id, { type: 'submit' })
+			turns.start(id)
+		}
 		return
 	}
 	// The commit is durable. Later presentation/storage failures must not
@@ -134,7 +184,10 @@ function apply(id: string, transition: ContextTransition, prepared?: ReturnType<
 	if (start) history.append(id, { type: 'continue' })
 	else if (!running && history.unfinished(id)) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
 	contextTransitions.output(id, '/rebase applied.', { transitionDone: transition.id })
-	if (start) { status.transition(id, { type: 'submit' }); turns.start(id) }
+	if (start) {
+		status.transition(id, { type: 'submit' })
+		turns.start(id)
+	}
 	return intent.paused ? 'paused' : running && !reason ? 'done' : undefined
 }
 
@@ -156,7 +209,10 @@ function results(id: string, results: ToolResultBlock[]): { record?: HistoryReco
 		if (result) result.output = prepared.report
 	} catch (error) {
 		let text = `Rebase failed: ${error instanceof Error ? error.message : String(error)}`
-		if (result) { result.output = text; result.isError = true }
+		if (result) {
+			result.output = text
+			result.isError = true
+		}
 		failure = text
 	}
 	if (result) delete result.outputBlob
@@ -170,4 +226,16 @@ function results(id: string, results: ToolResultBlock[]): { record?: HistoryReco
 	return { record: written, ...(prepared && { stop: rebaseAgent.apply(id, transition, prepared) }) }
 }
 
-export const rebaseAgent = { state: { shown: new WeakMap<object, RebaseRows>() }, snapshot, fresh, show, shown, prepare, request, continuation, continuePrompt, apply, results }
+export const rebaseAgent = {
+	state: { shown: new WeakMap<object, RebaseRows>() },
+	snapshot,
+	fresh,
+	show,
+	shown,
+	prepare,
+	request,
+	continuation,
+	continuePrompt,
+	apply,
+	results,
+}

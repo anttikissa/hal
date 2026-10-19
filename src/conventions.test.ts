@@ -53,7 +53,9 @@ function webOnlyImports(file: string): string[] {
 	let transpiler = new Bun.Transpiler({ loader: file.endsWith('.tsx') ? 'tsx' : 'ts' })
 	return transpiler
 		.scanImports(readFileSync(file, 'utf8'))
-		.filter((imp) => imp.kind !== 'dynamic-import' && webOnly.some((p) => imp.path === p || imp.path.startsWith(`${p}/`)))
+		.filter(
+			(imp) => imp.kind !== 'dynamic-import' && webOnly.some((p) => imp.path === p || imp.path.startsWith(`${p}/`)),
+		)
 		.map((imp) => `${file.slice(srcDir.length + 1)} imports ${imp.path}`)
 }
 

@@ -14,11 +14,24 @@ export type TextBlock = { type: 'text'; text: string; naming?: true }
 // `signature` is opaque and only meaningful to `provider`, the provider
 // that produced it; others must not send it back. History keeps it in
 // the session blob `signatureBlob` instead (task s1).
-export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string; signatureBlob?: string; provider?: string }
+export type ThinkingBlock = {
+	type: 'thinking'
+	text: string
+	signature?: string
+	signatureBlob?: string
+	provider?: string
+}
 
 // `cmd`: the native tool's call text this internal call came from (task
 // aks); replay sends that back instead of name and input.
-export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name: string; input: Record<string, unknown>; cmd?: string; sequence?: string }
+export type ToolCallBlock = ToolDisplay & {
+	type: 'tool_call'
+	id: string
+	name: string
+	input: Record<string, unknown>
+	cmd?: string
+	sequence?: string
+}
 
 // `ms`: the call's wall time (task wm0); records before it have none.
 // `interrupted`: a new user message canceled the call before it started
@@ -27,11 +40,31 @@ export type ToolCallBlock = ToolDisplay & { type: 'tool_call'; id: string; name:
 // providers never see it.
 // `commits`: commits the call made for its own session (task 179), each
 // shown as its own card after the result; providers never see them.
-export type ToolResultBlock = ToolDisplay & { type: 'tool_result'; id: string; output: string; outputBlob?: string; isError?: boolean; image?: ImageBlock; images?: ImageBlock[]; diff?: string; ms?: number; interrupted?: 'canceled' | 'stopped'; commits?: CommitBlock[] }
+export type ToolResultBlock = ToolDisplay & {
+	type: 'tool_result'
+	id: string
+	output: string
+	outputBlob?: string
+	isError?: boolean
+	image?: ImageBlock
+	images?: ImageBlock[]
+	diff?: string
+	ms?: number
+	interrupted?: 'canceled' | 'stopped'
+	commits?: CommitBlock[]
+}
 
 // A commit (task 179): paths relative to the repository root; a binary
 // file counts -1 lines; `lines` are those commits.committed gave.
-export type CommitBlock = { hash: string; short: string; subject: string; amend?: true; files: { path: string; added: number; removed: number }[]; lines?: string[]; tags?: string[] }
+export type CommitBlock = {
+	hash: string
+	short: string
+	subject: string
+	amend?: true
+	files: { path: string; added: number; removed: number }[]
+	lines?: string[]
+	tags?: string[]
+}
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:
@@ -46,7 +79,19 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // `summary`: one line for the user, heading the message folded.
 // queuedAt: original inbox receipt time, retained after queue delivery.
 // call: the model's tool call that ran a command (rebase keeps it open).
-export type Sender = { interactive?: boolean; queuedAt?: string; from?: string; label?: string; advisory?: true; delivery?: 'now' | 'next-round' | 'after-turn'; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; call?: string; generatingCommand?: 'clear' }
+export type Sender = {
+	interactive?: boolean
+	queuedAt?: string
+	from?: string
+	label?: string
+	advisory?: true
+	delivery?: 'now' | 'next-round' | 'after-turn'
+	summary?: string
+	report?: 'question' | 'summary'
+	origin?: 'model'
+	call?: string
+	generatingCommand?: 'clear'
+}
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender
@@ -54,14 +99,23 @@ export type UserText = TextBlock & Sender
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
 // A tool the provider ran itself (OpenAI web_search, task a0z): shown as a
 // finished tool card; never executed by Hal or replayed to providers.
-export type HostedToolBlock = { type: 'hosted_tool'; id: string; name: string; input: Record<string, unknown>; output: string; isError?: boolean }
+export type HostedToolBlock = {
+	type: 'hosted_tool'
+	id: string
+	name: string
+	input: Record<string, unknown>
+	output: string
+	isError?: boolean
+}
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | HostedToolBlock
 // What providers receive: replay drops hosted tools.
 export type ReplayBlock = Exclude<AssistantBlock, HostedToolBlock>
 
 // `cache`: an earlier request's input ended after this many of the
 // message's blocks; a provider may mark it for prompt caching (task g5j).
-export type Message = ({ role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: ReplayBlock[] }) & { cache?: number }
+export type Message = ({ role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: ReplayBlock[] }) & {
+	cache?: number
+}
 
 // Token counts. Cumulative: each usage event overwrites what it carries.
 export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
@@ -125,11 +179,21 @@ function apply(turn: Turn, event: StreamEvent): void {
 			else turn.blocks.push({ type: 'thinking', text: event.text })
 			break
 		case 'signature':
-			if (last?.type === 'thinking' && last.signature === undefined) Object.assign(last, { signature: event.value, provider: turn.provider })
+			if (last?.type === 'thinking' && last.signature === undefined)
+				Object.assign(last, { signature: event.value, provider: turn.provider })
 			else turn.blocks.push({ type: 'thinking', text: '', signature: event.value, provider: turn.provider })
 			break
 		case 'tool_call':
-			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input, ...(event.cmd !== undefined && { cmd: event.cmd }), ...(event.sequence !== undefined && { sequence: event.sequence }), ...(event.presentation !== undefined && { presentation: event.presentation }), ...(event.presentationError !== undefined && { presentationError: event.presentationError }) })
+			turn.blocks.push({
+				type: 'tool_call',
+				id: event.id,
+				name: event.name,
+				input: event.input,
+				...(event.cmd !== undefined && { cmd: event.cmd }),
+				...(event.sequence !== undefined && { sequence: event.sequence }),
+				...(event.presentation !== undefined && { presentation: event.presentation }),
+				...(event.presentationError !== undefined && { presentationError: event.presentationError }),
+			})
 			break
 		case 'hosted_tool':
 			turn.blocks.push({ ...event })

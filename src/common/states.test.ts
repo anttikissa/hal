@@ -70,8 +70,16 @@ const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
 	[retrying, { type: 'end', error: 'boom' }, { type: 'error', message: 'boom' }],
 	[paused, { type: 'end' }, paused],
 	// Failures the host fixes itself: retrying at a time, or blocked on a human.
-	[streaming, { type: 'retry', at: ts12, reason: 'connection lost' }, { type: 'retrying', at: ts12, reason: 'connection lost' }],
-	[blocked, { type: 'retry', at: ts12, reason: 'rate limited' }, { type: 'retrying', at: ts12, reason: 'rate limited' }],
+	[
+		streaming,
+		{ type: 'retry', at: ts12, reason: 'connection lost' },
+		{ type: 'retrying', at: ts12, reason: 'connection lost' },
+	],
+	[
+		blocked,
+		{ type: 'retry', at: ts12, reason: 'rate limited' },
+		{ type: 'retrying', at: ts12, reason: 'rate limited' },
+	],
 	[requesting, { type: 'block', reason: 'log in' }, { type: 'blocked', reason: 'log in' }],
 	[retrying, { type: 'block', reason: 'log in' }, { type: 'blocked', reason: 'log in' }],
 	[blocked, { type: 'request' }, requesting],
@@ -95,10 +103,11 @@ test.each(table)('%o on %o', (state, event, next) => {
 
 test('every state but idle, paused and error names what ends it', () => {
 	let seen: SessionState[] = [...all]
-	for (let s of all) for (let e of events) {
-		let next = states.step(s, e)
-		if (typeof next !== 'string') seen.push(next)
-	}
+	for (let s of all)
+		for (let e of events) {
+			let next = states.step(s, e)
+			if (typeof next !== 'string') seen.push(next)
+		}
 	for (let s of seen) {
 		if (s.type === 'running') expect(['requesting', 'streaming', 'tools']).toContain(s.phase)
 		else if (s.type === 'retrying') expect(!isNaN(Date.parse(s.at)) && s.reason.length > 0).toBe(true)
@@ -121,7 +130,12 @@ const out = (text: string): HistoryRecord => ({ type: 'assistant', block: { type
 const end = (status: TurnStatus, extra = {}): HistoryRecord => ({ type: 'turn_end', status, usage: {}, ts, ...extra })
 const cont: HistoryRecord = { type: 'continue', ts }
 const waiting = (id: string): HistoryRecord => ({ type: 'inbox', id, text: id, ts })
-const ask = (id: string): HistoryRecord => ({ type: 'question', id, form: { text: 'Name?', fields: [{ type: 'text', name: 'name' }] }, ts })
+const ask = (id: string): HistoryRecord => ({
+	type: 'question',
+	id,
+	form: { text: 'Name?', fields: [{ type: 'text', name: 'name' }] },
+	ts,
+})
 const reply = (id: string): HistoryRecord => ({ type: 'answer', question: id, answers: { name: 'Dave' }, ts })
 
 test('history alone: an unfinished turn is running, ends say the rest', () => {
@@ -130,9 +144,15 @@ test('history alone: an unfinished turn is running, ends say the rest', () => {
 	expect(states.fromHistory([say('a'), out('b')])).toEqual(requesting)
 	expect(states.fromHistory([say('a'), end('paused'), cont])).toEqual(requesting)
 	expect(states.fromHistory([say('a'), end('completed')])).toEqual(idle)
-	expect(states.fromHistory([say('a'), end('error', { error: '400 nope' })])).toEqual({ type: 'error', message: '400 nope' })
+	expect(states.fromHistory([say('a'), end('error', { error: '400 nope' })])).toEqual({
+		type: 'error',
+		message: '400 nope',
+	})
 	expect(states.fromHistory([say('a'), end('paused')])).toEqual(paused)
-	expect(states.fromHistory([say('a'), end('paused', { pauseReason: 'loop' })])).toEqual({ type: 'paused', reason: 'loop' })
+	expect(states.fromHistory([say('a'), end('paused', { pauseReason: 'loop' })])).toEqual({
+		type: 'paused',
+		reason: 'loop',
+	})
 	// The old Escape and the old restart could both continue.
 	expect(states.fromHistory([say('a'), end('canceled')])).toEqual(paused)
 	expect(states.fromHistory([say('a'), end('interrupted')])).toEqual(paused)
@@ -149,11 +169,23 @@ test('history alone: an open question blocks the turn until answered or paused',
 
 const typed = (text: string): HistoryRecord => ({ type: 'command', text, ts })
 const said = (text: string): HistoryRecord => ({ type: 'output', text, ts })
-const cmdAsk = (id: string): HistoryRecord => ({ type: 'question', id, form: { text: 'Create?', fields: [{ type: 'choice', name: 'create', options: ['yes', 'no'] }] }, from: { command: 'cd', args: 'x' }, ts })
+const cmdAsk = (id: string): HistoryRecord => ({
+	type: 'question',
+	id,
+	form: { text: 'Create?', fields: [{ type: 'choice', name: 'create', options: ['yes', 'no'] }] },
+	from: { command: 'cd', args: 'x' },
+	ts,
+})
 const cmdReply = (id: string): HistoryRecord => ({ type: 'answer', question: id, answers: { create: 'no' }, ts })
 
 test('history alone: commands leave the turn state as it was, even while one asks', () => {
-	for (let before of [[], [say('a'), end('completed')], [say('a'), end('paused')], [say('a'), end('error', { error: 'x' })], [say('a'), out('b')]] as HistoryRecord[][]) {
+	for (let before of [
+		[],
+		[say('a'), end('completed')],
+		[say('a'), end('paused')],
+		[say('a'), end('error', { error: 'x' })],
+		[say('a'), out('b')],
+	] as HistoryRecord[][]) {
 		let state = states.fromHistory(before)
 		expect(states.fromHistory([...before, typed('/help'), said('help')])).toEqual(state)
 		expect(states.fromHistory([...before, typed('/cd x'), cmdAsk('c1'), cmdReply('c1'), said('ok')])).toEqual(state)
@@ -161,7 +193,9 @@ test('history alone: commands leave the turn state as it was, even while one ask
 	}
 	expect(states.recoveries([say('a'), cont, out('x'), typed('/help'), said('h'), cont])).toBe(2)
 	// A message waiting while a command asked starts nothing by itself.
-	expect(states.fromHistory([say('a'), end('completed'), typed('/cd x'), cmdAsk('c1'), waiting('m'), cmdReply('c1')])).toEqual(idle)
+	expect(
+		states.fromHistory([say('a'), end('completed'), typed('/cd x'), cmdAsk('c1'), waiting('m'), cmdReply('c1')]),
+	).toEqual(idle)
 })
 
 test('recoveries counts continues since the last finished round, partial output aside', () => {
@@ -185,12 +219,18 @@ test('describe says when a retry happens and why', () => {
 })
 
 test('a turn says processing until the first streamed byte, then thinking or writing', () => {
-	let say = (phase: 'requesting' | 'streaming' | 'tools', items: Shown[] = []) => states.describe({ type: 'running', phase }, undefined, items)
+	let say = (phase: 'requesting' | 'streaming' | 'tools', items: Shown[] = []) =>
+		states.describe({ type: 'running', phase }, undefined, items)
 	// Waiting for the provider: the model is not thinking yet.
 	expect(say('requesting')).toBe('processing')
 	expect(say('requesting', [{ type: 'thinking', text: 'earlier round' }])).toBe('processing')
 	expect(say('streaming', [{ type: 'thinking', text: 'hm' }])).toBe('thinking')
-	expect(say('streaming', [{ type: 'thinking', text: 'hm' }, { type: 'text', text: 'hi' }])).toBe('writing')
+	expect(
+		say('streaming', [
+			{ type: 'thinking', text: 'hm' },
+			{ type: 'text', text: 'hi' },
+		]),
+	).toBe('writing')
 	expect(say('tools', [{ type: 'tool', id: 'a', name: 'bash', input: {} }])).toBe('running bash')
 })
 
@@ -212,13 +252,20 @@ test('describe speaks plain words, never internal state or phase names', () => {
 })
 
 test('Enter with text always sends: a prompt, or while busy a steer; Alt-Enter queues', () => {
-	for (let s of all) expect(states.enter('s', s, 'hi')).toEqual({ command: { type: 'submit', sessionId: 's', text: 'hi' } })
-	expect(states.enter('s', streaming, 'later', 'queue')).toEqual({ command: { type: 'submit', sessionId: 's', text: 'later', delivery: 'queue' } })
+	for (let s of all)
+		expect(states.enter('s', s, 'hi')).toEqual({ command: { type: 'submit', sessionId: 's', text: 'hi' } })
+	expect(states.enter('s', streaming, 'later', 'queue')).toEqual({
+		command: { type: 'submit', sessionId: 's', text: 'later', delivery: 'queue' },
+	})
 	// Bare Enter still only continues.
 	expect(states.enter('s', streaming, '  ')).toEqual({})
 	// An empty Enter or Ctrl-Enter sends the next queued message early (task csn).
-	expect(states.enter('s', streaming, '', 'soft-steer', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue next' } })
-	expect(states.enter('s', streaming, '', 'steer', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue now' } })
+	expect(states.enter('s', streaming, '', 'soft-steer', true)).toEqual({
+		command: { type: 'submit', sessionId: 's', text: '/queue next' },
+	})
+	expect(states.enter('s', streaming, '', 'steer', true)).toEqual({
+		command: { type: 'submit', sessionId: 's', text: '/queue now' },
+	})
 	expect(states.enter('s', streaming, '', 'soft-steer')).toEqual({})
 	expect(states.enter('s', paused, '', 'queue')).toEqual({ command: { type: 'continue', sessionId: 's' } })
 })

@@ -14,7 +14,7 @@ function collect(maxLine?: number) {
 
 const messages = [
 	{ type: 'submit', sessionId: '1-abc', text: 'two\nlines and a ✓ and 🙂' },
-	{ type: 'stream', event: { type: 'text', text: "it's \"quoted\"\r\n" } },
+	{ type: 'stream', event: { type: 'text', text: 'it\'s "quoted"\r\n' } },
 	{ n: [1, 2.5, -3], nested: { empty: [], none: null } },
 ]
 

@@ -4,7 +4,10 @@ import { colors, DERIVED, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
 // Shared values (fgL, screen) are a number or one color; the rest are styles.
-const styles = () => Object.entries(colors).filter(([key, value]) => typeof value === 'function' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => Style)()] as const)
+const styles = () =>
+	Object.entries(colors)
+		.filter(([key, value]) => typeof value === 'function' && !(DERIVED as readonly string[]).includes(key))
+		.map(([key, value]) => [key, (value as () => Style)()] as const)
 
 test('every style is a set of OKLCH colors', () => {
 	for (let [key, style] of styles()) {

@@ -22,14 +22,22 @@ function done(records: HistoryRecord[]): number {
 }
 
 async function* round(n: number): AsyncGenerator<StreamEvent> {
-	for (let line of [`Round ${n} of ${rounds}. Checking the layout of the next card`, ', then the one after it,', ' and printing some output so the transcript grows.\n\nScroll up a little and watch whether the view moves.'])
-	{
+	for (let line of [
+		`Round ${n} of ${rounds}. Checking the layout of the next card`,
+		', then the one after it,',
+		' and printing some output so the transcript grows.\n\nScroll up a little and watch whether the view moves.',
+	]) {
 		yield { type: 'thinking', text: line }
 		await sleep(1000)
 	}
 	yield { type: 'signature', value: '' }
 	let command = `for i in $(seq 1 30); do echo "round ${n} line $i"; sleep 0.1; done`
-	yield { type: 'tool_call', id: `scroll-test-${Date.now()}`, name: 'bash', input: { command, description: `Print 30 lines (round ${n})` } }
+	yield {
+		type: 'tool_call',
+		id: `scroll-test-${Date.now()}`,
+		name: 'bash',
+		input: { command, description: `Print 30 lines (round ${n})` },
+	}
 	yield { type: 'done', reason: 'tool_use' }
 }
 

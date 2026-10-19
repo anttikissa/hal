@@ -28,4 +28,3 @@ test('diagnostics land redacted in owner-only state/, not in sessions/', () => {
 	expect(statSync(diag.file()).mode & 0o077).toBe(0)
 	expect(readdirSync(paths.sessionsDir())).toEqual([])
 })
-

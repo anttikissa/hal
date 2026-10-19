@@ -16,7 +16,10 @@ function create(parent: string): string {
 	// Automatic, so the fork can name itself; fits the 60-character limit.
 	child.slots = meta.slots ?? settings.subagentSlots()
 	if (meta.blocks) child.blocks = { ...meta.blocks }
-	child.name = `${Array.from(meta.name ?? parent).slice(0, 53).join('').trimEnd()} (fork)`
+	child.name = `${Array.from(meta.name ?? parent)
+		.slice(0, 53)
+		.join('')
+		.trimEnd()} (fork)`
 	liveFiles.save(child)
 	subagents.fork(parent, child.id)
 	// The unsent draft is part of the session; a slash command in it is

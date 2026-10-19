@@ -11,8 +11,13 @@ function at(name: string) {
 }
 
 test('Space and Enter change a setting at once and keep the modal open', () => {
-	expect(settingsModal.step(at('push'), key(' '), 's').action).toEqual({ type: 'send', command: { type: 'submit', sessionId: 's', text: '/config push false' } })
-	expect(settingsModal.step(at('security'), key('enter'), 's').action).toMatchObject({ command: { text: '/config security none' } })
+	expect(settingsModal.step(at('push'), key(' '), 's').action).toEqual({
+		type: 'send',
+		command: { type: 'submit', sessionId: 's', text: '/config push false' },
+	})
+	expect(settingsModal.step(at('security'), key('enter'), 's').action).toMatchObject({
+		command: { text: '/config security none' },
+	})
 })
 
 test('an edit sends only a valid value; Escape restores without sending', () => {
@@ -40,7 +45,10 @@ test('Left and Right adjust integers and booleans without crossing bounds', () =
 	] as const) {
 		let st = at(name)
 		st.settings!.values = { ...data.values, [name]: now }
-		for (let [arrow, value] of [['left', left], ['right', right]] as const) {
+		for (let [arrow, value] of [
+			['left', left],
+			['right', right],
+		] as const) {
 			let result = settingsModal.step(st, key(arrow), 's')
 			expect(result.state).toBe(st)
 			if (value === undefined) expect(result.action).toBeUndefined()

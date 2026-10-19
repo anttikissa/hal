@@ -49,8 +49,23 @@ function store(): Store {
 	let date = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
 	let ids = new Set<string>()
 	for (let [h, e] of Object.entries(st.store)) {
-		let good = /^[0-9a-f]{64}$/.test(h) && (typeof e === 'string' ? date(e) : e && typeof e === 'object' && !Array.isArray(e) && /^[0-9a-hjkmnp-tv-z]{10}$/.test(e.id) && !ids.has(e.id) && date(e.expires) && typeof e.device === 'string' && (e.firstSeen === undefined || date(e.firstSeen)) && (e.lastSeen === undefined || date(e.lastSeen)))
-		if (!good) { webAuth.close(); throw new Error(`${path}: invalid web login ${h}: ${JSON.stringify(e)}`) }
+		let good =
+			/^[0-9a-f]{64}$/.test(h) &&
+			(typeof e === 'string'
+				? date(e)
+				: e &&
+					typeof e === 'object' &&
+					!Array.isArray(e) &&
+					/^[0-9a-hjkmnp-tv-z]{10}$/.test(e.id) &&
+					!ids.has(e.id) &&
+					date(e.expires) &&
+					typeof e.device === 'string' &&
+					(e.firstSeen === undefined || date(e.firstSeen)) &&
+					(e.lastSeen === undefined || date(e.lastSeen)))
+		if (!good) {
+			webAuth.close()
+			throw new Error(`${path}: invalid web login ${h}: ${JSON.stringify(e)}`)
+		}
 		if (typeof e !== 'string') ids.add(e.id)
 	}
 	return st.store
@@ -84,9 +99,16 @@ function redeem(typed: unknown, device = 'browser'): { token: string } | { refus
 	st.codes.delete(code)
 	let token = random(20)
 	let data = webAuth.store()
-	for (let [h, at] of Object.entries(data)) if (!(Date.parse(typeof at === 'string' ? at : at.expires) > now)) delete data[h]
+	for (let [h, at] of Object.entries(data))
+		if (!(Date.parse(typeof at === 'string' ? at : at.expires) > now)) delete data[h]
 	let stamp = new Date(now).toISOString()
-	data[hash(token)] = { id: random(10), expires: new Date(now + webAuth.tokenMs).toISOString(), firstSeen: stamp, lastSeen: stamp, device }
+	data[hash(token)] = {
+		id: random(10),
+		expires: new Date(now + webAuth.tokenMs).toISOString(),
+		firstSeen: stamp,
+		lastSeen: stamp,
+		device,
+	}
 	liveFiles.save(data)
 	return { token }
 }
@@ -109,7 +131,8 @@ function valid(token: unknown): boolean {
 // device and first-seen dates remain explicitly unknown, never invented.
 function list(): WebLogin[] {
 	let data = webAuth.store()
-	for (let [h, entry] of Object.entries(data)) if (typeof entry === 'string') data[h] = { id: random(10), expires: entry, device: 'browser (device not recorded)' }
+	for (let [h, entry] of Object.entries(data))
+		if (typeof entry === 'string') data[h] = { id: random(10), expires: entry, device: 'browser (device not recorded)' }
 	return Object.values(data).filter((e): e is WebLogin => typeof e !== 'string' && Date.parse(e.expires) > clock.now())
 }
 
@@ -124,7 +147,9 @@ function touch(h: string | undefined): void {
 function revoke(id = 'all'): string[] {
 	webAuth.list()
 	let data = webAuth.store()
-	let hashes = Object.entries(data).filter(([, e]) => id === 'all' || (typeof e !== 'string' && e.id === id)).map(([h]) => h)
+	let hashes = Object.entries(data)
+		.filter(([, e]) => id === 'all' || (typeof e !== 'string' && e.id === id))
+		.map(([h]) => h)
 	for (let h of hashes) delete data[h]
 	liveFiles.save(data)
 	if (id === 'all') webAuth.state.codes.clear()

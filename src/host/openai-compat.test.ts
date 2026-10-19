@@ -33,7 +33,9 @@ beforeEach(() => {
 			let path = new URL(req.url).pathname
 			if (req.method === 'GET') {
 				seen.push({ path, auth: req.headers.get('authorization'), body: undefined })
-				return path === '/v1/models' ? Response.json({ data: [{ id: 'vendor/a-1' }, { id: 'b-2' }] }) : new Response('', { status: 404 })
+				return path === '/v1/models'
+					? Response.json({ data: [{ id: 'vendor/a-1' }, { id: 'b-2' }] })
+					: new Response('', { status: 404 })
 			}
 			seen.push({ path, auth: req.headers.get('authorization'), body: await req.json() })
 			return reply()
@@ -58,7 +60,11 @@ afterEach(() => {
 	else process.env.FAKE_COMPAT_KEY = originalKey
 })
 
-async function run(model: string, messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }], extra = {}): Promise<StreamEvent[]> {
+async function run(
+	model: string,
+	messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }],
+	extra = {},
+): Promise<StreamEvent[]> {
 	let out: StreamEvent[] = []
 	for await (let e of provider.stream(model, { messages, ...extra })) out.push(e)
 	return out
@@ -90,14 +96,24 @@ test('conversation maps to Chat Completions messages; key and base URL come from
 	]
 	let tools = [{ name: 'ls', description: 'List', inputSchema: { type: 'object' } }]
 	let events = await run('fake/vendor/model-1', messages, { system: 'Be brief.', tools, maxTokens: 100 })
-	expect(events).toEqual([{ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' }])
+	expect(events).toEqual([
+		{ type: 'text', text: 'ok' },
+		{ type: 'done', reason: 'end' },
+	])
 
 	expect(seen).toHaveLength(1)
 	expect(seen[0]!.path).toBe('/v1/chat/completions')
 	expect(seen[0]!.auth).toBe('Bearer sk-test')
 	let body = seen[0]!.body
-	expect(body).toMatchObject({ model: 'vendor/model-1', stream: true, stream_options: { include_usage: true }, max_tokens: 100 })
-	expect(body.tools).toEqual([{ type: 'function', function: { name: 'ls', description: 'List', parameters: { type: 'object' } } }])
+	expect(body).toMatchObject({
+		model: 'vendor/model-1',
+		stream: true,
+		stream_options: { include_usage: true },
+		max_tokens: 100,
+	})
+	expect(body.tools).toEqual([
+		{ type: 'function', function: { name: 'ls', description: 'List', parameters: { type: 'object' } } },
+	])
 	expect(body.messages[0]).toEqual({ role: 'system', content: 'Be brief.' })
 	expect(body.messages[1]).toEqual({ role: 'user', content: 'list files' })
 	// Foreign thinking is not sent; tool call arguments go as JSON text.
@@ -105,7 +121,9 @@ test('conversation maps to Chat Completions messages; key and base URL come from
 	expect(assistant.role).toBe('assistant')
 	expect(assistant.content).toBe('Sure.')
 	expect(JSON.stringify(assistant)).not.toContain('secret')
-	expect(assistant.tool_calls.map((c: any) => [c.id, c.type, c.function.name, JSON.parse(c.function.arguments)])).toEqual([
+	expect(
+		assistant.tool_calls.map((c: any) => [c.id, c.type, c.function.name, JSON.parse(c.function.arguments)]),
+	).toEqual([
 		['c1', 'function', 'ls', { path: '.' }],
 		['c2', 'function', 'cat', { path: 'x' }],
 	])
@@ -122,7 +140,9 @@ test('conversation maps to Chat Completions messages; key and base URL come from
 test('the key is read at call time; a missing key is an error naming the variable, with no request; a local endpoint needs none', async () => {
 	delete process.env.FAKE_COMPAT_KEY
 	let events = await run('fake/m')
-	expect(events).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('FAKE_COMPAT_KEY') })])
+	expect(events).toEqual([
+		expect.objectContaining({ type: 'error', message: expect.stringContaining('FAKE_COMPAT_KEY') }),
+	])
 	expect(seen).toHaveLength(0)
 
 	process.env.FAKE_COMPAT_KEY = 'sk-later'
@@ -140,12 +160,29 @@ test('stream: text, reasoning, fragmented parallel tool calls and usage', async 
 			{ choices: [{ delta: { reasoning: 'hmm' } }] },
 			{ choices: [{ delta: { reasoning_content: ' ok' } }] },
 			{ choices: [{ delta: { content: 'Look' } }] },
-			{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', type: 'function', function: { name: 'ls', arguments: '{"pa' } }] } }] },
-			{ choices: [{ delta: { tool_calls: [{ index: 1, id: 'b', type: 'function', function: { name: 'cat', arguments: '' } }] } }] },
+			{
+				choices: [
+					{
+						delta: {
+							tool_calls: [{ index: 0, id: 'a', type: 'function', function: { name: 'ls', arguments: '{"pa' } }],
+						},
+					},
+				],
+			},
+			{
+				choices: [
+					{
+						delta: { tool_calls: [{ index: 1, id: 'b', type: 'function', function: { name: 'cat', arguments: '' } }] },
+					},
+				],
+			},
 			{ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'th":"."}' } }] } }] },
 			{ choices: [{ delta: { tool_calls: [{ index: 1, function: { arguments: '{}' } }] } }] },
 			finish('tool_calls'),
-			{ choices: [], usage: { prompt_tokens: 100, completion_tokens: 7, prompt_tokens_details: { cached_tokens: 60 } } },
+			{
+				choices: [],
+				usage: { prompt_tokens: 100, completion_tokens: 7, prompt_tokens_details: { cached_tokens: 60 } },
+			},
 			'[DONE]',
 		)
 	expect(await run('fake/m')).toEqual([
@@ -169,19 +206,37 @@ test('finish reasons map to neutral stop reasons; a server that omits [DONE] sti
 		expect(await run('fake/m')).toEqual([{ type: 'done', reason: reason as any }])
 	}
 	// A tool call cut off by the length limit is no call.
-	reply = () => sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] }, finish('length'), '[DONE]')
+	reply = () =>
+		sse(
+			{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] },
+			finish('length'),
+			'[DONE]',
+		)
 	expect(await run('fake/m')).toEqual([{ type: 'done', reason: 'max_tokens' }])
 })
 
 test('errors: HTTP status, error chunk, bad tool JSON, stream cut before finish', async () => {
 	reply = () => new Response('{"error":{"message":"bad key"}}', { status: 401 })
-	expect(await run('fake/m')).toEqual([expect.objectContaining({ type: 'error', status: 401, body: expect.stringContaining('bad key') })])
+	expect(await run('fake/m')).toEqual([
+		expect.objectContaining({ type: 'error', status: 401, body: expect.stringContaining('bad key') }),
+	])
 
-	reply = () => sse({ choices: [{ delta: { content: 'x' } }] }, { error: { message: 'upstream overloaded', code: 502 } })
-	expect(await run('fake/m')).toEqual([{ type: 'text', text: 'x' }, expect.objectContaining({ type: 'error', message: expect.stringContaining('upstream overloaded') })])
+	reply = () =>
+		sse({ choices: [{ delta: { content: 'x' } }] }, { error: { message: 'upstream overloaded', code: 502 } })
+	expect(await run('fake/m')).toEqual([
+		{ type: 'text', text: 'x' },
+		expect.objectContaining({ type: 'error', message: expect.stringContaining('upstream overloaded') }),
+	])
 
-	reply = () => sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] }, finish('tool_calls'), '[DONE]')
-	expect(await run('fake/m')).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('ls') })])
+	reply = () =>
+		sse(
+			{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] },
+			finish('tool_calls'),
+			'[DONE]',
+		)
+	expect(await run('fake/m')).toEqual([
+		expect.objectContaining({ type: 'error', message: expect.stringContaining('ls') }),
+	])
 
 	reply = () => sse({ choices: [{ delta: { content: 'partial' } }] })
 	let events = await run('fake/m')

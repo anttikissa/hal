@@ -11,7 +11,9 @@ import { tools } from './tools.ts'
 import type { ToolContext } from './tools.ts'
 import { paths } from './paths.ts'
 
-let home = '', cwd = '', id = ''
+let home = '',
+	cwd = '',
+	id = ''
 const savedHome = paths.state.home
 beforeEach(async () => {
 	home = mkdtempSync(`${process.cwd()}/.hal-file-changes-`)
@@ -28,8 +30,22 @@ afterEach(() => {
 	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
-const context = (sessionId = id): ToolContext => ({ sessionId, cwd, signal: new AbortController().signal, callId: 'c1' })
-const bash = (command: string, modifies?: unknown, ctx = context()) => tools.run({ type: 'tool_call', id: ctx.callId!, name: 'bash', input: { command, description: 'Change test files', ...(modifies === undefined ? {} : { modifies }) } }, ctx)
+const context = (sessionId = id): ToolContext => ({
+	sessionId,
+	cwd,
+	signal: new AbortController().signal,
+	callId: 'c1',
+})
+const bash = (command: string, modifies?: unknown, ctx = context()) =>
+	tools.run(
+		{
+			type: 'tool_call',
+			id: ctx.callId!,
+			name: 'bash',
+			input: { command, description: 'Change test files', ...(modifies === undefined ? {} : { modifies }) },
+		},
+		ctx,
+	)
 const changes = () => history.readSync(id).filter((r) => r.type === 'file_changes')
 const bytes = (hash: unknown) => readFileSync(fileChanges.blobPath(id, hash as string))
 
@@ -39,7 +55,12 @@ test('snapshots creations, edits, deletes and new glob matches; records declared
 	writeFileSync(`${cwd}/gone`, 'delete me')
 	writeFileSync(`${cwd}/same`, 'untouched')
 	await fileChanges.git(cwd, ['add', '.'])
-	let result = await bash('printf new > edit; rm gone; touch same; printf created > new.txt; printf other > other', ['edit', 'gone', 'same', '*.txt'])
+	let result = await bash('printf new > edit; rm gone; touch same; printf created > new.txt; printf other > other', [
+		'edit',
+		'gone',
+		'same',
+		'*.txt',
+	])
 	expect(result.isError).toBeUndefined()
 	let r = changes()[0]!
 	expect(r).toMatchObject({ toolId: 'c1', cwd })
@@ -65,16 +86,40 @@ test('another session changing and committing an undeclared file during a call i
 	let other = sessions.create({ cwd, model: 'fake/m' }).id
 	writeFileSync(`${cwd}/scroll.ts`, 'old')
 	await fileChanges.git(cwd, ['add', '.'])
-	await fileChanges.git(cwd, ['-c', 'user.name=Example', '-c', 'user.email=example@example.org', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Initial'])
+	await fileChanges.git(cwd, [
+		'-c',
+		'user.name=Example',
+		'-c',
+		'user.email=example@example.org',
+		'-c',
+		'commit.gpgsign=false',
+		'commit',
+		'-qm',
+		'Initial',
+	])
 	// Dirty before the call, clean after: what Git status saw in the bug.
 	writeFileSync(`${cwd}/scroll.ts`, 'dirty')
 	let running = bash('sleep 0.3; printf mine > mine', ['mine'])
 	await Bun.sleep(100)
-	let theirs = await bash('printf new > scroll.ts && git add scroll.ts && git -c user.name=Example -c user.email=example@example.org -c commit.gpgsign=false commit -qm Scroll', undefined, { ...context(other), callId: 'c2' })
+	let theirs = await bash(
+		'printf new > scroll.ts && git add scroll.ts && git -c user.name=Example -c user.email=example@example.org -c commit.gpgsign=false commit -qm Scroll',
+		undefined,
+		{ ...context(other), callId: 'c2' },
+	)
 	let mine = await running
-	let all = [id, other].flatMap((s) => history.readSync(s).filter((r) => r.type === 'file_changes').flatMap((r) => r.files.map((f) => f.path)))
+	let all = [id, other].flatMap((s) =>
+		history
+			.readSync(s)
+			.filter((r) => r.type === 'file_changes')
+			.flatMap((r) => r.files.map((f) => f.path)),
+	)
 	expect(all).toEqual(['mine'])
-	for (let output of [theirs.output, mine.output, (await bash('true', undefined, { ...context(other), callId: 'c3' })).output]) expect(output).not.toContain('scroll.ts')
+	for (let output of [
+		theirs.output,
+		mine.output,
+		(await bash('true', undefined, { ...context(other), callId: 'c3' })).output,
+	])
+		expect(output).not.toContain('scroll.ts')
 })
 
 test('sensitive paths and symlink aliases, and large files retain metadata not bytes', async () => {
@@ -84,7 +129,10 @@ test('sensitive paths and symlink aliases, and large files retain metadata not b
 	mkdirSync(`${cwd}/secrets`)
 	writeFileSync(`${cwd}/secrets/token.txt`, 'private')
 	writeFileSync(`${cwd}/wallet.dat`, 'private')
-	await bash('printf changed-secret > .env; printf changed-secret > secrets/token.txt; printf changed-secret > wallet.dat; printf x >> large', ['.env', 'alias', 'large', 'secrets/token.txt', 'wallet.dat'])
+	await bash(
+		'printf changed-secret > .env; printf changed-secret > secrets/token.txt; printf changed-secret > wallet.dat; printf x >> large',
+		['.env', 'alias', 'large', 'secrets/token.txt', 'wallet.dat'],
+	)
 	let files = changes()[0]!.files
 	expect(files).toHaveLength(5)
 	for (let f of files) {
@@ -98,11 +146,29 @@ test('sensitive paths and symlink aliases, and large files retain metadata not b
 
 test('background calls hold overlapping locks until exit and record final bytes', async () => {
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', name: 'bash', id: 'bg', input: {} } })
-	let result = await tools.run({ type: 'tool_call', id: 'bg', name: 'bash', input: { command: 'sleep 0.3; printf background > file', description: 'Create later', background: true, modifies: ['file'] } }, context())
+	let result = await tools.run(
+		{
+			type: 'tool_call',
+			id: 'bg',
+			name: 'bash',
+			input: {
+				command: 'sleep 0.3; printf background > file',
+				description: 'Create later',
+				background: true,
+				modifies: ['file'],
+			},
+		},
+		context(),
+	)
 	expect(result.output).toContain('started in background')
 	// Its own session waits too, and the wait names the job, not the session.
 	let seen = ''
-	await bash('printf foreground >> file', [`${cwd}/file`], { ...context(), onOutput: (c) => { seen += c } })
+	await bash('printf foreground >> file', [`${cwd}/file`], {
+		...context(),
+		onOutput: (c) => {
+			seen += c
+		},
+	})
 	expect(seen).toMatch(/^Waiting for background job t\d+ \(this session\) to exit; it declared file\n/)
 	expect(readFileSync(`${cwd}/file`, 'utf8')).toBe('backgroundforeground')
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('background')
@@ -121,7 +187,8 @@ test('invalid declarations never execute; failed commands still retain changes',
 test('absolute scratch declarations are tracked; outside and Git paths are accepted but ignored', async () => {
 	let scratch = mkdtempSync('/tmp/hal-tracked-')
 	try {
-		let literal = `${scratch}/scratch.log`, pattern = `${scratch}/*.txt`
+		let literal = `${scratch}/scratch.log`,
+			pattern = `${scratch}/*.txt`
 		let result = await bash(`printf log > '${literal}'; printf glob > '${scratch}/new.txt'`, [literal, pattern])
 		expect(result.isError).toBeUndefined()
 		let files = changes()[0]!.files
@@ -132,20 +199,36 @@ test('absolute scratch declarations are tracked; outside and Git paths are accep
 		}
 		let release = await fileChanges.acquire(context(), ['.git/private', '../outside.txt'])
 		try {
-			let ignored = await bash('printf git > .git/private; printf outside > ../outside.txt', ['.git/private', '../outside.txt', `${home}/outside.txt`], { ...context(), onOutput: () => { throw new Error('excluded declarations waited for a lock') } })
+			let ignored = await bash(
+				'printf git > .git/private; printf outside > ../outside.txt',
+				['.git/private', '../outside.txt', `${home}/outside.txt`],
+				{
+					...context(),
+					onOutput: () => {
+						throw new Error('excluded declarations waited for a lock')
+					},
+				},
+			)
 			expect(ignored.isError).toBeUndefined()
 			expect(changes()).toHaveLength(1)
-		} finally { release() }
+		} finally {
+			release()
+		}
 		symlinkSync('../outside.txt', `${cwd}/alias`)
 		symlinkSync('.git/private', `${cwd}/git-alias`)
 		writeFileSync(`${cwd}/keep.txt`, 'old')
 		symlinkSync('keep.txt', `${cwd}/moved-alias`)
-		let broad = await bash('printf tracked > keep.txt; printf outside-new > alias; printf git-new > git-alias; ln -sf ../outside.txt moved-alias', ['**/*'])
+		let broad = await bash(
+			'printf tracked > keep.txt; printf outside-new > alias; printf git-new > git-alias; ln -sf ../outside.txt moved-alias',
+			['**/*'],
+		)
 		expect(broad.isError).toBeUndefined()
 		expect(changes()[1]!.files.map((f) => f.path)).toEqual(['keep.txt'])
 		expect(readFileSync(`${home}/outside.txt`, 'utf8')).toBe('outside-new')
 		expect(readFileSync(`${cwd}/.git/private`, 'utf8')).toBe('git-new')
-	} finally { rmSync(scratch, { recursive: true, force: true }) }
+	} finally {
+		rmSync(scratch, { recursive: true, force: true })
+	}
 })
 
 test('generated trees and ignored files are not captured; tracked ignored files and new source files are', async () => {
@@ -159,14 +242,32 @@ test('generated trees and ignored files are not captured; tracked ignored files 
 	writeFileSync(`${cwd}/ignored.txt`, 'ignored')
 	symlinkSync('runs/output.txt', `${cwd}/alias`)
 	symlinkSync('node_modules/pkg/index.js', `${cwd}/dependency-alias`)
-	let result = await bash('printf new > node_modules/pkg/index.js; printf new > runs/output.txt; printf new > ignored.txt; printf new > runs/tracked.txt; printf source > new.ts', ['**/*'])
+	let result = await bash(
+		'printf new > node_modules/pkg/index.js; printf new > runs/output.txt; printf new > ignored.txt; printf new > runs/tracked.txt; printf source > new.ts',
+		['**/*'],
+	)
 	expect(result.isError).toBeUndefined()
-	expect(changes()[0]!.files.map((f) => f.path).sort()).toEqual(['new.ts', 'runs/tracked.txt'])
+	expect(
+		changes()[0]!
+			.files.map((f) => f.path)
+			.sort(),
+	).toEqual(['new.ts', 'runs/tracked.txt'])
 	expect(bytes(changes()[0]!.files.find((f) => f.path === 'runs/tracked.txt')!.before).toString()).toBe('source')
 	let previous = changes().length
-	await bash('printf again > ignored.txt; printf again > node_modules/pkg/index.js', ['ignored.txt', 'node_modules/pkg/index.js'])
+	await bash('printf again > ignored.txt; printf again > node_modules/pkg/index.js', [
+		'ignored.txt',
+		'node_modules/pkg/index.js',
+	])
 	expect(changes()).toHaveLength(previous)
-	let write = await tools.run({ type: 'tool_call', id: 'write-ignored', name: 'edit', input: { edits: [{ path: 'ignored.txt', new: 'written' }] } }, context())
+	let write = await tools.run(
+		{
+			type: 'tool_call',
+			id: 'write-ignored',
+			name: 'edit',
+			input: { edits: [{ path: 'ignored.txt', new: 'written' }] },
+		},
+		context(),
+	)
 	expect(write.isError).toBeUndefined()
 	expect(readFileSync(`${cwd}/ignored.txt`, 'utf8')).toBe('written')
 	expect(changes()).toHaveLength(previous)
@@ -180,7 +281,9 @@ test('non-Git glob expansion prunes dependency trees and still tracks ordinary s
 		writeFileSync(`${scratch}/node_modules/pkg/x.ts`, 'dependency')
 		writeFileSync(`${scratch}/src/x.ts`, 'source')
 		expect(await fileChanges.expand(scratch, ['**/*.ts'])).toEqual(['src/x.ts'])
-	} finally { rmSync(scratch, { recursive: true, force: true }) }
+	} finally {
+		rmSync(scratch, { recursive: true, force: true })
+	}
 })
 
 // Task hy: a commit a bash call makes is announced once, except to
@@ -189,18 +292,28 @@ test('non-Git glob expansion prunes dependency trees and still tracks ordinary s
 // says 'amended'.
 test('a commit in a bash call notifies other tabs once; a reset does not; an amend says amended', async () => {
 	let other = sessions.create({ cwd, model: 'fake/m' }).id
-	let elsewhere: any[] = [], watching: any[] = []
-	let fakes = [{ visible: other, deliver: (e: any) => elsewhere.push(e) }, { visible: id, deliver: (e: any) => watching.push(e) }] as any[]
+	let elsewhere: any[] = [],
+		watching: any[] = []
+	let fakes = [
+		{ visible: other, deliver: (e: any) => elsewhere.push(e) },
+		{ visible: id, deliver: (e: any) => watching.push(e) },
+	] as any[]
 	for (let c of fakes) host.state.clients.add(c)
 	try {
 		let git = 'git -c user.name=t -c user.email=t@example.com'
 		await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
-		expect(elsewhere.splice(0)).toMatchObject([{ session: '', name: 'repo', line: expect.stringMatching(/ untrailed$/) }])
+		expect(elsewhere.splice(0)).toMatchObject([
+			{ session: '', name: 'repo', line: expect.stringMatching(/ untrailed$/) },
+		])
 		expect(watching.splice(0)).toHaveLength(1)
 		await bash(`printf a > a && ${git} add a && ${git} commit -qm 'first line' -m 'body' -m 'Session: ${id}'`)
 		let hash = (await fileChanges.git(cwd, ['rev-parse', 'HEAD'])).text.trim()
-		expect(elsewhere).toMatchObject([{ type: 'notice', session: id, kind: 'commit', key: `commit:${hash}`, line: `${hash.slice(0, 7)} first line` }])
-		await bash(`printf b > b && ${git} add b && ${git} commit -qm second -m 'Session: ${id}' && ${git} reset -q --hard HEAD~1`)
+		expect(elsewhere).toMatchObject([
+			{ type: 'notice', session: id, kind: 'commit', key: `commit:${hash}`, line: `${hash.slice(0, 7)} first line` },
+		])
+		await bash(
+			`printf b > b && ${git} add b && ${git} commit -qm second -m 'Session: ${id}' && ${git} reset -q --hard HEAD~1`,
+		)
 		expect(elsewhere.map((e) => e.line.split(' ')[1])).toEqual(['first', 'second'])
 		await bash(`${git} reset -q --hard HEAD`)
 		expect(elsewhere).toHaveLength(2)
@@ -208,7 +321,9 @@ test('a commit in a bash call notifies other tabs once; a reset does not; an ame
 		expect(elsewhere[2]).toMatchObject({ what: 'amended', line: expect.stringMatching(/ reworded$/) })
 		expect(elsewhere[0].what).toBeUndefined()
 		expect(watching).toEqual([])
-	} finally { for (let c of fakes) host.state.clients.delete(c) }
+	} finally {
+		for (let c of fakes) host.state.clients.delete(c)
+	}
 })
 
 // Task sg0: plugins hook commits.committed; its lines follow the output
@@ -217,7 +332,10 @@ test('a commit in a bash call notifies other tabs once; a reset does not; an ame
 test('commit hook lines follow the result of the call that made the commit', async () => {
 	let seen: any[] = []
 	let original = commits.committed
-	commits.committed = async (info) => { seen.push(info); return [`hooked ${info.short}`] }
+	commits.committed = async (info) => {
+		seen.push(info)
+		return [`hooked ${info.short}`]
+	}
 	try {
 		let git = 'git -c user.name=t -c user.email=t@example.com'
 		let plain = await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
@@ -226,10 +344,25 @@ test('commit hook lines follow the result of the call that made the commit', asy
 		let made = await bash(`printf 'a\\nb\\n' > a && ${git} add a && ${git} commit -qm first -m 'Session: ${id}'`)
 		let short = (await fileChanges.git(cwd, ['rev-parse', '--short', 'HEAD'])).text.trim()
 		expect(made.output).toEndWith(`\n\nhooked ${short}`)
-		expect(seen).toMatchObject([{ sessionId: id, subject: 'first', files: [{ path: expect.stringMatching(/\/repo\/a$/), added: 2, removed: 0 }] }])
-		expect(made.commits).toEqual([{ hash: expect.any(String), short, subject: 'first', files: [{ path: 'a', added: 2, removed: 0 }], lines: [`hooked ${short}`] }])
+		expect(seen).toMatchObject([
+			{ sessionId: id, subject: 'first', files: [{ path: expect.stringMatching(/\/repo\/a$/), added: 2, removed: 0 }] },
+		])
+		expect(made.commits).toEqual([
+			{
+				hash: expect.any(String),
+				short,
+				subject: 'first',
+				files: [{ path: 'a', added: 2, removed: 0 }],
+				lines: [`hooked ${short}`],
+			},
+		])
 		let items = transcript.recordItems({ type: 'user', n: 7, ts: '', blocks: [made] }, 0)
-		expect(items.map((i) => [i.type, i.key])).toEqual([['tool-result', '7'], ['output', '7.1']])
+		expect(items.map((i) => [i.type, i.key])).toEqual([
+			['tool-result', '7'],
+			['output', '7.1'],
+		])
 		expect(items[1]).toMatchObject({ text: `${short} first\n+2 -0 a\nhooked ${short}` })
-	} finally { commits.committed = original }
+	} finally {
+		commits.committed = original
+	}
 })

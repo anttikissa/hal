@@ -12,9 +12,11 @@ import { host } from '../host.ts'
 import { sessionBlocks } from '../session-blocks.ts'
 import { status } from '../status.ts'
 
-const syntax = 'Targets:\nt24 or 24: one card\n10-24: a range\nt14,r2-9: a list\nt: every tool card (t* also works)\n*: all cards except user and assistant cards\nau: every user and assistant card\nau10-40: user and assistant cards in 10-40\nempty: the latest tool card\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant cards alone unless named.'
+const syntax =
+	'Targets:\nt24 or 24: one card\n10-24: a range\nt14,r2-9: a list\nt: every tool card (t* also works)\n*: all cards except user and assistant cards\nau: every user and assistant card\nau10-40: user and assistant cards in 10-40\nempty: the latest tool card\n\nKinds: t tool, r thinking, a assistant, u user, m message, s system, q question. Ranges and * leave user and assistant cards alone unless named.'
 const help: Record<Mode, string> = {
-	toggle: '/toggle [target] expands or collapses cards: one named card flips; more expand when more than half are collapsed, else collapse.',
+	toggle:
+		'/toggle [target] expands or collapses cards: one named card flips; more expand when more than half are collapsed, else collapse.',
 	expand: '/expand [target] expands cards.',
 	collapse: '/collapse [target] collapses cards.',
 }
@@ -24,7 +26,13 @@ const done: Record<Mode, string> = { toggle: 'Toggled', expand: 'Expanded', coll
 // history records them.
 function label(i: Item): string {
 	let by = i as { model?: string; effort?: string }
-	let tags = [by.model?.split('/').pop()!.replace(/^claude-/, ''), by.effort].filter(Boolean)
+	let tags = [
+		by.model
+			?.split('/')
+			.pop()!
+			.replace(/^claude-/, ''),
+		by.effort,
+	].filter(Boolean)
 	return titles.blockId(i) + (tags.length ? ` (${tags.join(', ')})` : '')
 }
 
@@ -34,10 +42,21 @@ function folding(mode: Mode): SlashCommand {
 		run(args, _answers, ctx) {
 			let target = toggle.parse(args)
 			if (typeof target === 'string') return { error: target }
-			let found = toggle.resolve(toggle.items({ items: sessionBlocks.of(ctx.sessionId), inbox: status.inboxOf(ctx.sessionId) }), target, mode)
+			let found = toggle.resolve(
+				toggle.items({ items: sessionBlocks.of(ctx.sessionId), inbox: status.inboxOf(ctx.sessionId) }),
+				target,
+				mode,
+			)
 			if (typeof found === 'string') return { error: found }
-			host.broadcast(ctx.sessionId, { type: 'toggle', sessionId: ctx.sessionId, target: args.trim(), ...(mode !== 'toggle' && { mode }) })
-			return { result: `${done[mode]} ${toggle.noun(found)}${found.length > 1 ? ':' : ''} ${found.map(label).join(', ')}` }
+			host.broadcast(ctx.sessionId, {
+				type: 'toggle',
+				sessionId: ctx.sessionId,
+				target: args.trim(),
+				...(mode !== 'toggle' && { mode }),
+			})
+			return {
+				result: `${done[mode]} ${toggle.noun(found)}${found.length > 1 ? ':' : ''} ${found.map(label).join(', ')}`,
+			}
 		},
 	}
 }

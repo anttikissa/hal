@@ -117,7 +117,10 @@ test('empty Enter on a busy terminal and modified Enter on idle do not nudge', (
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
 	enter()
 	app.onEvent(snapshot())
-	app.onKeys([{ ...key('enter'), ctrl: true }, { ...key('enter'), alt: true }])
+	app.onKeys([
+		{ ...key('enter'), ctrl: true },
+		{ ...key('enter'), alt: true },
+	])
 	expect(sent).toEqual([])
 })
 
@@ -151,8 +154,16 @@ test('while a turn runs, Enter steers, Ctrl-Enter soft-steers, Alt-Enter queues,
 
 test('waiting messages stay on screen, each once, until delivered', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
-	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', delivery: 'after-turn' }] })
-	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
+	app.onEvent({
+		type: 'inbox',
+		sessionId: 's1',
+		inbox: [
+			{ id: 'a', text: 'steer me' },
+			{ id: 'b', text: 'run me later', delivery: 'after-turn' },
+		],
+	})
+	let rows = () =>
+		frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	expect(rows().filter((r) => r.includes('steer me'))).toHaveLength(1)
 	expect(rows().filter((r) => r.includes('run me later'))).toHaveLength(1)
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })
@@ -226,7 +237,10 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 test('an edit not yet acknowledged is sent again as an edit by the next client', () => {
 	let stored = new Map<string, any>()
 	let store = drafts.store
-	drafts.store = { load: (id) => stored.get(id) && structuredClone(stored.get(id)), save: (id, l) => void stored.set(id, structuredClone(l)) }
+	drafts.store = {
+		load: (id) => stored.get(id) && structuredClone(stored.get(id)),
+		save: (id, l) => void stored.set(id, structuredClone(l)),
+	}
 	try {
 		working()
 		up()
@@ -307,16 +321,31 @@ test('replayed history carries no mark: it reads like one followed live', () => 
 		{ type: 'user', blocks: [{ type: 'text', text: 'old question' }], ts: '2026-09-26T00:50:00Z' },
 		{ type: 'turn_end', status: 'error', error: 'overloaded', usage: {}, ts: '2026-09-26T00:51:00Z' },
 	]
-	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history, state: { type: 'idle' } } })
+	app.onEvent({
+		type: 'snapshot',
+		sessionId: 's1',
+		snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history, state: { type: 'idle' } },
+	})
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' })
-	let rows = frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim()).filter(Boolean)
+	let rows = frame
+		.build(appView.view(), 80)
+		.lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
+		.filter(Boolean)
 	let at = (s: string) => rows.findIndex((r) => r.includes(s))
 	expect(at('error: overloaded')).toBeLessThan(at('new question'))
 	expect(rows.join('\n')).not.toMatch(/resumed|last turn/)
 	// A client that followed the same session live draws the same lines.
 	let live = frame.build(appView.view(), 80).lines
 	app.reset()
-	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state: { type: 'idle' } } })
+	app.onEvent({
+		type: 'snapshot',
+		sessionId: 's1',
+		snapshot: {
+			meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' },
+			history: [],
+			state: { type: 'idle' },
+		},
+	})
 	for (let e of [
 		{ type: 'turn-start', sessionId: 's1', prompt: 'old question', provider: 'anthropic', ts: '2026-09-26T00:50:00Z' },
 		{ type: 'turn-end', sessionId: 's1', status: 'error', error: 'overloaded', ts: '2026-09-26T00:51:00Z' },
@@ -392,7 +421,12 @@ test('an open question takes the keys until it is answered; the prompt keeps its
 
 test('Escape on an open question pauses the session', () => {
 	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'question' }))
-	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form: { text: 'Go?', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] } })
+	app.onEvent({
+		type: 'question',
+		sessionId: 's1',
+		id: 'q1',
+		form: { text: 'Go?', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] },
+	})
 	escape()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 })
@@ -401,7 +435,12 @@ test('a modal takes the keys over everything and ends in an ordinary command', (
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
 	type('draft')
 	let search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
-	app.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({ type: 'model', sessionId: 's1', item: action.item, q: action.answers.q }))
+	app.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({
+		type: 'model',
+		sessionId: 's1',
+		item: action.item,
+		q: action.answers.q,
+	}))
 	expect(appView.view().modal?.title).toBe('Models')
 	type('op')
 	app.onKeys([key('down')])
@@ -435,7 +474,12 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	type('/cd ~/pro')
 	app.onKeys([key('tab')])
 	expect(sent).toEqual([{ type: 'complete', sessionId: 's1', text: '/cd ~/pro' }])
-	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/projects/', '/cd ~/projection/'] })
+	app.onEvent({
+		type: 'completions',
+		sessionId: 's1',
+		text: '/cd ~/pro',
+		items: ['/cd ~/projects/', '/cd ~/projection/'],
+	})
 	expect(app.state.prompt).toMatchObject({ text: '/cd ~/project', cursor: 13 })
 	expect(drafts.text('s1')).toBe('/cd ~/project')
 	// Typed on meanwhile: a late answer is dropped.
@@ -447,7 +491,12 @@ test('model Tab fills the alias while retaining qualified alternatives and rejec
 	app.onEvent(snapshot())
 	type('/model astr')
 	app.onKeys([key('tab')])
-	let event = { type: 'completions' as const, sessionId: 's1', text: '/model astr', items: ['/model astra', '/model openrouter/openai/gpt-6-astra'] }
+	let event = {
+		type: 'completions' as const,
+		sessionId: 's1',
+		text: '/model astr',
+		items: ['/model astra', '/model openrouter/openai/gpt-6-astra'],
+	}
 	app.onEvent(event)
 	expect(app.state.prompt).toMatchObject({ text: '/model astra', cursor: 12 })
 	expect(drafts.text('s1')).toBe('/model astra')
@@ -542,7 +591,8 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 })
 
 test('typing erases the example from its left, right of the typed text, then it is gone', () => {
-	let now = 1_000_000, saved = pulse.now
+	let now = 1_000_000,
+		saved = pulse.now
 	pulse.now = () => now
 	try {
 		app.onEvent(snapshot())
@@ -562,8 +612,18 @@ test('typing erases the example from its left, right of the typed text, then it 
 
 // ── Tabs ──
 
-const tabOf = (id: string, extra: Partial<Tab> = {}): Tab => ({ id, name: id, cwd: `/${id}`, model: 'm', state: { type: 'idle' }, ...extra })
-const tabsEvent = (...list: (string | Tab)[]): Event => ({ type: 'tabs', tabs: list.map((t) => (typeof t === 'string' ? tabOf(t) : t)) })
+const tabOf = (id: string, extra: Partial<Tab> = {}): Tab => ({
+	id,
+	name: id,
+	cwd: `/${id}`,
+	model: 'm',
+	state: { type: 'idle' },
+	...extra,
+})
+const tabsEvent = (...list: (string | Tab)[]): Event => ({
+	type: 'tabs',
+	tabs: list.map((t) => (typeof t === 'string' ? tabOf(t) : t)),
+})
 const ctrl = (k: string, shift = false): KeyEvent => ({ key: k, shift, alt: false, ctrl: true, cmd: false })
 const alt = (k: string): KeyEvent => ({ key: k, shift: false, alt: true, ctrl: false, cmd: false })
 const acked = (tab: string) => app.onEvent({ type: 'ack', id: 'x', tab })
@@ -605,7 +665,10 @@ test('the example on an empty prompt comes from the Hal list when the host marks
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {
 	let store = drafts.store
 	let stored = new Map<string, Local>([['a', { text: 'saved', base: 0, dirty: true, sending: [] }]])
-	drafts.store = { load: (id) => stored.get(id) && structuredClone(stored.get(id)), save: (id, l) => void stored.set(id, structuredClone(l)) }
+	drafts.store = {
+		load: (id) => stored.get(id) && structuredClone(stored.get(id)),
+		save: (id, l) => void stored.set(id, structuredClone(l)),
+	}
 	try {
 		app.onEvent(tabsEvent('a', 'b'))
 		acked('a')
@@ -628,7 +691,10 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	app.state.start = { cwd: '/w', last: 'b' }
 	app.onState({ type: 'connected', role: 'host' })
 	// It also asks for a code for its web links.
-	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b', timezone: expect.any(String) }, { type: 'auth', link: true }])
+	expect(sent).toEqual([
+		{ type: 'tab-start', cwd: '/w', last: 'b', timezone: expect.any(String) },
+		{ type: 'auth', link: true },
+	])
 	app.onEvent(tabsEvent('a', 'b'))
 	expect(shown()).toBeUndefined()
 	acked('b')
@@ -764,7 +830,13 @@ test('web links carry the latest link code only in their hidden target', () => {
 		type('see [image/frdbn1.png]')
 		let lines = frame.build(appView.view(), 60).lines
 		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
-		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
+		expect(targets).toEqual(
+			expect.arrayContaining([
+				'https://h.example/a?auth=k3x9qa',
+				'https://h.example/b?auth=k3x9qa',
+				'https://h.example/image/frdbn1.png?auth=k3x9qa',
+			]),
+		)
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
 		// A history item laid out before the server bound (on another port
 		// than the preferred one) links to where it really listens.
@@ -818,7 +890,14 @@ test('an edited entry becomes the draft; sending an entry brings the own text ba
 	// Past the newest entry, Down restores the edited draft.
 	down()
 	expect(appView.view().prompt.text).toBe('first!')
-	app.onKeys([key('backspace'), key('backspace'), key('backspace'), key('backspace'), key('backspace'), key('backspace')])
+	app.onKeys([
+		key('backspace'),
+		key('backspace'),
+		key('backspace'),
+		key('backspace'),
+		key('backspace'),
+		key('backspace'),
+	])
 	type('mine')
 	up()
 	enter()
@@ -837,10 +916,18 @@ test('a draft from elsewhere does not replace a recalled entry but is what Down 
 })
 
 test('the last prompt being edited is skipped by the first Up', () => {
-	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, state: { type: 'running', phase: 'streaming' }, history: [
-		{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts: '' },
-		{ type: 'user', blocks: [{ type: 'text', text: 'two' }], n: 2, ts: '' },
-	] } })
+	app.onEvent({
+		type: 'snapshot',
+		sessionId: 's1',
+		snapshot: {
+			meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' },
+			state: { type: 'running', phase: 'streaming' },
+			history: [
+				{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts: '' },
+				{ type: 'user', blocks: [{ type: 'text', text: 'two' }], n: 2, ts: '' },
+			],
+		},
+	})
 	up()
 	expect(appView.view().prompt.text).toBe('two')
 	up()
@@ -903,8 +990,18 @@ test('output in a tab not shown paints nothing', () => {
 })
 
 test('the status row sits below the prompt box and its numbers follow each turn end', () => {
-	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it', slots: 3 }, history: [], state: { type: 'idle' }, stats: { window: 200_000 } } })
-	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
+	app.onEvent({
+		type: 'snapshot',
+		sessionId: 's1',
+		snapshot: {
+			meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it', slots: 3 },
+			history: [],
+			state: { type: 'idle' },
+			stats: { window: 200_000 },
+		},
+	})
+	let rows = () =>
+		frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
 	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 ⣄ · 0/200k (0%)')
@@ -935,7 +1032,6 @@ test('the terminal watches the tab it shows until its window reports losing focu
 	expect(watched).toHaveLength(5)
 })
 
-
 test('Up opens a queued editor only after host protection, Alt-Enter saves in place and restores the draft', () => {
 	let send = connection.send
 	connection.send = record
@@ -961,7 +1057,9 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 		app.onEvent({ type: 'ack', id: drafts.local('s1').queueEdit!.saving! })
 		expect(app.state.editing).toBeUndefined()
 		expect(app.state.prompt.text).toBe('a separate draft')
-	} finally { connection.send = send }
+	} finally {
+		connection.send = send
+	}
 })
 
 test('navigating to a cached tab uses the draft updated while it was hidden', () => {
@@ -993,19 +1091,20 @@ test('a synchronous navigation submit does not clear the destination editor', ()
 	expect(app.state.prompt.text).toBe('')
 })
 
-for (let restore of ['delete', 'undo']) test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
-	sentBefore('first', 'second', 'third')
-	up()
-	up()
-	expect(appView.view().prompt.text).toBe('second')
-	type('!')
-	app.onKeys([restore === 'undo' ? { ...key('z'), cmd: true } : key('backspace')])
-	expect(appView.view().prompt.text).toBe('second')
-	up()
-	expect(appView.view().prompt.text).toBe('first')
-	down()
-	down()
-	down()
-	expect(appView.view().prompt.text).toBe('second')
-	expect(drafts.text('s1')).toBe('second')
-})
+for (let restore of ['delete', 'undo'])
+	test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
+		sentBefore('first', 'second', 'third')
+		up()
+		up()
+		expect(appView.view().prompt.text).toBe('second')
+		type('!')
+		app.onKeys([restore === 'undo' ? { ...key('z'), cmd: true } : key('backspace')])
+		expect(appView.view().prompt.text).toBe('second')
+		up()
+		expect(appView.view().prompt.text).toBe('first')
+		down()
+		down()
+		down()
+		expect(appView.view().prompt.text).toBe('second')
+		expect(drafts.text('s1')).toBe('second')
+	})

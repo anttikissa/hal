@@ -43,7 +43,12 @@ function hiddenEvent(event: Event): void {
 function backgroundStep(): void {
 	let st = app.state
 	if (!st.painted || st.loading || st.timer || !connection.connected()) return
-	let id = backfill.nearby(st.tabs.map((tab) => tab.id), st.shown ?? '').find((id) => !st.background.has(id))
+	let id = backfill
+		.nearby(
+			st.tabs.map((tab) => tab.id),
+			st.shown ?? '',
+		)
+		.find((id) => !st.background.has(id))
 	if (!id) return
 	st.timer = setTimeout(() => {
 		delete st.timer
@@ -61,17 +66,20 @@ function onEvent(event: Event): boolean {
 	if (event.type === 'tabs') {
 		if (event.sessions) markdown.state.sessions = new Set(event.sessions)
 		tabs.onTabs(event.tabs)
-	}
-	else if (event.type === 'rejected' && event.id && st.asked.delete(event.id)) { delete st.landing; tabs.onTabs(st.tabs); return false }
-	else if (event.type === 'go') {
+	} else if (event.type === 'rejected' && event.id && st.asked.delete(event.id)) {
+		delete st.landing
+		tabs.onTabs(st.tabs)
+		return false
+	} else if (event.type === 'go') {
 		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) {
 			tabs.show(event.tab, false, event.block)
 			if (event.block) app.aim()
 		}
-	}
-	else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
-	else if (event.type === 'notice') { notices.add(notices.fromEvent(event)); push.noticed() }
-	else if (event.type === 'snapshot' && st.shown && event.sessionId !== st.shown) return false
+	} else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
+	else if (event.type === 'notice') {
+		notices.add(notices.fromEvent(event))
+		push.noticed()
+	} else if (event.type === 'snapshot' && st.shown && event.sessionId !== st.shown) return false
 	else return false
 	return true
 }
@@ -103,15 +111,23 @@ function key(e: KeyInput): boolean {
 	let label = `${b.shift ? 'shift-' : ''}${b.alt ? 'alt-' : ''}${b.ctrl ? 'ctrl-' : ''}${b.cmd ? 'cmd-' : ''}${b.key}`
 	if (!commandList.onWeb(label, tabs.mac())) return false
 	let { tabs: list, shown } = app.state
-	let r = shown === undefined ? undefined : tabKeys.key(b, shown, list.map((t) => t.id))
+	let r =
+		shown === undefined
+			? undefined
+			: tabKeys.key(
+					b,
+					shown,
+					list.map((t) => t.id),
+				)
 	if (r) {
 		if (r.focus !== undefined && r.focus !== shown) tabs.show(r.focus, false)
 		return true
 	}
 	let name = commandList.byKey(b)?.name
 	if (name === 'new') tabs.newTab()
-	else if (name === 'close') { if (shown) tabs.closeTab(shown) }
-	else if (name === 'resume') tabs.resume()
+	else if (name === 'close') {
+		if (shown) tabs.closeTab(shown)
+	} else if (name === 'resume') tabs.resume()
 	else return false
 	return true
 }
@@ -125,11 +141,12 @@ function onTabs(list: Tab[]): void {
 	for (let t of list) markdown.state.sessions.add(t.id)
 	if (st.landing && !list.some((t) => t.id === st.landing)) return
 	delete st.landing
-	for (let id of st.cached.keys()) if (!list.some((tab) => tab.id === id)) {
-		st.cached.delete(id)
-		st.background.delete(id)
-		connection.send({ type: 'close', sessionId: id })
-	}
+	for (let id of st.cached.keys())
+		if (!list.some((tab) => tab.id === id)) {
+			st.cached.delete(id)
+			st.background.delete(id)
+			connection.send({ type: 'close', sessionId: id })
+		}
 	let target = router.pick(list, st.shown ?? router.parse(router.href()), before)
 	if (target && target !== st.shown) return tabs.show(target, true)
 	tabs.seen()
@@ -155,7 +172,7 @@ function show(id: string, replace: boolean, block?: string): void {
 	diagnostics.load('selected', performance.now(), st.tabs.findIndex((t) => t.id === id) + 1)
 	st.view = st.cached.get(id) ?? {}
 	st.cached.delete(id)
-	st.text = queueEdit.editing(id) ? queueEdit.text(id) : recall.shown(id) ?? drafts.text(id)
+	st.text = queueEdit.editing(id) ? queueEdit.text(id) : (recall.shown(id) ?? drafts.text(id))
 	queuedPrompt.sync()
 	router.store.save(id)
 	if (!st.background.has(id)) {

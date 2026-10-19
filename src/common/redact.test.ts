@@ -25,7 +25,9 @@ test('provider keys and tokens never survive, in any common format', () => {
 })
 
 test('surrounding text is kept so diagnostics stay useful', () => {
-	expect(redaction.redact(`{"refresh_token":"${opaque}","expires":1}`)).toBe('{"refresh_token":"[redacted]","expires":1}')
+	expect(redaction.redact(`{"refresh_token":"${opaque}","expires":1}`)).toBe(
+		'{"refresh_token":"[redacted]","expires":1}',
+	)
 	expect(redaction.redact(`GET /v1?api_key=${opaque}&beta=1`)).toBe('GET /v1?api_key=[redacted]&beta=1')
 	expect(redaction.redact(`status 401 for ${secret} at 12:00`)).toBe('status 401 for [redacted] at 12:00')
 })

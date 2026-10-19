@@ -16,11 +16,20 @@ useHost()
 
 type C = ReturnType<typeof client>
 const text = (n: number) => JSON.stringify(calls[n]!.input.messages)
-const conversation = (n: number) => calls[n]!.input.messages.filter((m: any) => m.blocks.some((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>')))
+const conversation = (n: number) =>
+	calls[n]!.input.messages.filter((m: any) =>
+		m.blocks.some((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>')),
+	)
 const lastMessage = (n: number) => conversation(n).at(-1)
 const lastText = (n: number) => JSON.stringify(lastMessage(n))
-const resultOf = (n: number, id: string) => lastMessage(n).blocks.find((b: any) => b.type === 'tool_result' && b.id === id)
-const call = (id: string, name: string, input: Record<string, unknown> = {}): StreamEvent => ({ type: 'tool_call', id, name, input })
+const resultOf = (n: number, id: string) =>
+	lastMessage(n).blocks.find((b: any) => b.type === 'tool_result' && b.id === id)
+const call = (id: string, name: string, input: Record<string, unknown> = {}): StreamEvent => ({
+	type: 'tool_call',
+	id,
+	name,
+	input,
+})
 // The index of the first call whose last message mentions `s`, once
 // it exists.
 async function callWith(s: string, from = 0): Promise<number> {
@@ -41,7 +50,10 @@ async function parent(c: C, prompt = 'plan the work'): Promise<string> {
 test('spawn then wait in one round: the child is working, the parent sleeps until the handoff, and the child closes', async () => {
 	let c = client()
 	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'fix the bug', mode: 'fresh', name: 'fixer' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(call('s1', 'spawn', { task: 'fix the bug', mode: 'fresh', name: 'fixer' }), call('w1', 'wait'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	let k = await callWith('fix the bug')
 	let child = tabs.file().open[1]!
 	expect(sessions.open(child)).toMatchObject({ owner: p, spawn: 'subagent', name: 'fixer', slots: 0 })
@@ -51,11 +63,17 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	expect(first[0].blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
 	expect(first[0].blocks[0].text).toContain(p)
 	// WAIT holds without another provider request until the child reports.
-	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
+	await until(() => {
+		let s = status.stateOf(p)
+		return s.type === 'running' && s.phase === 'tools'
+	})
 	expect(history.readSync(p).some((r) => r.type === 'turn_end')).toBe(false)
 	expect(calls).toHaveLength(2)
 	// Its last text, without SEND, wakes the waiting parent and closes its tab.
-	calls[k]!.push({ type: 'text', text: 'looking' }, call('r1', 'read', { path: 'x' }), { type: 'done', reason: 'tool_use' })
+	calls[k]!.push({ type: 'text', text: 'looking' }, call('r1', 'read', { path: 'x' }), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	let after = await callWith('"r1"', k + 1)
 	calls[after]!.push({ type: 'text', text: 'fixed it' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('fixed it')
@@ -80,7 +98,10 @@ test('ordinary steering prevents pending spawn and wait calls from running', asy
 	let p = await parent(c)
 	c.conn.send({ type: 'submit', sessionId: p, text: 'also check docs' })
 	await until(() => status.inboxOf(p).length === 1)
-	calls[0]!.push(call('s1', 'spawn', { task: 'look around', mode: 'fresh' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(call('s1', 'spawn', { task: 'look around', mode: 'fresh' }), call('w1', 'wait'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	let next = await callWith('also check docs')
 	expect(text(next)).not.toContain('Waiting for')
 	expect(tabs.file().open).toEqual([p])
@@ -90,7 +111,11 @@ test('ordinary steering prevents pending spawn and wait calls from running', asy
 test('slots: a spawn spends one slot, not its child limit; oversized limits refuse without spending', async () => {
 	let c = client()
 	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'big job', mode: 'fresh', limit: 2 }), call('s2', 'spawn', { task: 'another', mode: 'fresh', limit: 2 }), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		call('s1', 'spawn', { task: 'big job', mode: 'fresh', limit: 2 }),
+		call('s2', 'spawn', { task: 'another', mode: 'fresh', limit: 2 }),
+		{ type: 'done', reason: 'tool_use' },
+	)
 	let next = await callWith('"s2"', 1)
 	await until(() => resultOf(next, 's2'))
 	expect(resultOf(next, 's2').isError).toBe(true)
@@ -105,7 +130,11 @@ test('slots: a spawn spends one slot, not its child limit; oversized limits refu
 test('fork gives the child the history so far; fresh does not', async () => {
 	let c = client()
 	await parent(c, 'the secret word is plum')
-	calls[0]!.push(call('s1', 'spawn', { task: 'forked task', mode: 'fork' }), call('s2', 'spawn', { task: 'fresh task' }), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		call('s1', 'spawn', { task: 'forked task', mode: 'fork' }),
+		call('s2', 'spawn', { task: 'fresh task' }),
+		{ type: 'done', reason: 'tool_use' },
+	)
 	let forked = await callWith('forked task')
 	let fresh = await callWith('fresh task')
 	expect(text(forked)).toContain('plum')
@@ -116,24 +145,33 @@ test('fork gives the child the history so far; fresh does not', async () => {
 	expect(messages[2].blocks.map((b: any) => b.id)).toEqual(['s1', 's2'])
 })
 
-for (let delivery of ['steer', 'soft-steer'] as const) test(`human ${delivery} takes over an active delegated turn without reporting its answer`, async () => {
-	let c = client()
-	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'delegated work', kind: 'subagent-leave-open' }), { type: 'done', reason: 'tool_use' })
-	let k = await callWith('delegated work')
-	let child = tabs.file().open[1]!
-	c.conn.send({ type: 'open', sessionId: child })
-	prompts.submit(child, 'Work for me instead', undefined, delivery)
-	expect(subagents.owed(child, history.readSync(child))).toBe(false)
-	if (delivery === 'soft-steer') calls[k]!.push(call('r1', 'read', { path: 'x' }), { type: 'done', reason: 'tool_use' })
-	let human = await callWith('Work for me instead', k + 1)
-	calls[human]!.push({ type: 'text', text: 'Human answer' }, { type: 'done', reason: 'end' })
-	await until(() => status.stateOf(child).type === 'idle')
-	expect(tabs.file().open).toContain(child)
-	expect(history.readSync(child).some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text === 'Human answer')).toBe(true)
-	expect(JSON.stringify(history.readSync(p))).not.toContain('Human answer')
-	expect(subagents.owed(child, history.readSync(child))).toBe(false)
-})
+for (let delivery of ['steer', 'soft-steer'] as const)
+	test(`human ${delivery} takes over an active delegated turn without reporting its answer`, async () => {
+		let c = client()
+		let p = await parent(c)
+		calls[0]!.push(call('s1', 'spawn', { task: 'delegated work', kind: 'subagent-leave-open' }), {
+			type: 'done',
+			reason: 'tool_use',
+		})
+		let k = await callWith('delegated work')
+		let child = tabs.file().open[1]!
+		c.conn.send({ type: 'open', sessionId: child })
+		prompts.submit(child, 'Work for me instead', undefined, delivery)
+		expect(subagents.owed(child, history.readSync(child))).toBe(false)
+		if (delivery === 'soft-steer')
+			calls[k]!.push(call('r1', 'read', { path: 'x' }), { type: 'done', reason: 'tool_use' })
+		let human = await callWith('Work for me instead', k + 1)
+		calls[human]!.push({ type: 'text', text: 'Human answer' }, { type: 'done', reason: 'end' })
+		await until(() => status.stateOf(child).type === 'idle')
+		expect(tabs.file().open).toContain(child)
+		expect(
+			history
+				.readSync(child)
+				.some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text === 'Human answer'),
+		).toBe(true)
+		expect(JSON.stringify(history.readSync(p))).not.toContain('Human answer')
+		expect(subagents.owed(child, history.readSync(child))).toBe(false)
+	})
 
 test('a human queued follow-up keeps autoclose, and its turn reports nothing to the parent', async () => {
 	let c = client()
@@ -150,7 +188,11 @@ test('a human queued follow-up keeps autoclose, and its turn reports nothing to 
 	await until(() => status.stateOf(child).type === 'idle')
 	expect(sessions.open(child)).toMatchObject({ spawn: 'subagent', autoclose: true })
 	await until(() => !tabs.file().open.includes(child))
-	let reports = () => history.readSync(p).filter((r) => r.type === 'inbox' || r.type === 'user').map((r) => JSON.stringify(r))
+	let reports = () =>
+		history
+			.readSync(p)
+			.filter((r) => r.type === 'inbox' || r.type === 'user')
+			.map((r) => JSON.stringify(r))
 	await until(() => reports().some((r) => r.includes('job done')))
 	await Bun.sleep(20)
 	expect(reports().some((r) => r.includes('tidied'))).toBe(false)
@@ -177,7 +219,10 @@ test('spawning a model rate limited on every account is refused and spawns nothi
 	calls[0]!.push(call('s1', 'spawn', { task: 'x' }), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	limits.set(limits.key('fake/m1'), 0)
-	expect(resultOf(1, 's1')).toMatchObject({ isError: true, output: expect.stringContaining('fake/m1 is rate limited until') })
+	expect(resultOf(1, 's1')).toMatchObject({
+		isError: true,
+		output: expect.stringContaining('fake/m1 is rate limited until'),
+	})
 	expect(tabs.file().open).toHaveLength(1)
 })
 
@@ -194,11 +239,17 @@ async function reportOf(end: (c: C, child: string, k: number) => void): Promise<
 }
 
 test('a failed subagent reports why, so its parent never waits for nothing', async () => {
-	expect(await reportOf((_c, _child, k) => calls[k]!.push({ type: 'error', message: '400 bad request', status: 400 }))).toMatch(/stopped: 400 bad request/)
+	expect(
+		await reportOf((_c, _child, k) => calls[k]!.push({ type: 'error', message: '400 bad request', status: 400 })),
+	).toMatch(/stopped: 400 bad request/)
 })
 
 test('a paused subagent reports it', async () => {
-	expect(await reportOf((c, child) => (c.conn.send({ type: 'open', sessionId: child }), c.conn.send({ type: 'pause', sessionId: child })))).toMatch(/stopped: .*paused/)
+	expect(
+		await reportOf(
+			(c, child) => (c.conn.send({ type: 'open', sessionId: child }), c.conn.send({ type: 'pause', sessionId: child })),
+		),
+	).toMatch(/stopped: .*paused/)
 })
 
 test('a blank interactive session opens next to its parent and does nothing', async () => {
@@ -217,7 +268,13 @@ test('a blank interactive session opens next to its parent and does nothing', as
 test('bad input is an error result and spawns nothing', async () => {
 	let c = client()
 	await parent(c)
-	let bad = [{ kind: 'subagent' }, { task: 'x', kind: 'robot' }, { task: 'x', limit: -1 }, { task: 'x', cwd: 'no/such/dir' }, { task: 'x', model: 'nope' }]
+	let bad = [
+		{ kind: 'subagent' },
+		{ task: 'x', kind: 'robot' },
+		{ task: 'x', limit: -1 },
+		{ task: 'x', cwd: 'no/such/dir' },
+		{ task: 'x', model: 'nope' },
+	]
 	calls[0]!.push(...bad.map((input, i) => call(`b${i}`, 'spawn', input)), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	for (let i = 0; i < bad.length; i++) expect(resultOf(1, `b${i}`).isError).toBe(true)
@@ -227,21 +284,34 @@ test('bad input is an error result and spawns nothing', async () => {
 test('a child question wakes its waiting parent, stays open, and ordinary send resumes it through final report', async () => {
 	let c = client()
 	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'choose a format' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(call('s1', 'spawn', { task: 'choose a format' }), call('w1', 'wait'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	let k = await callWith('choose a format')
 	let child = tabs.file().open[1]!
-	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
+	await until(() => {
+		let s = status.stateOf(p)
+		return s.type === 'running' && s.phase === 'tools'
+	})
 	calls[k]!.push({ type: 'text', text: '<question>JSON or text?</question>' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('JSON or text?', k + 1)
 	expect(tabs.file().open).toContain(child)
 	expect(status.stateOf(child).type).toBe('idle')
 	expect(JSON.stringify(lastMessage(woke))).toContain(`message from ${heard(tabs.label(child))}`)
-	calls[woke]!.push(call('answer', 'send', { to: child, text: 'Use JSON', description: 'Answer the format question' }), call('w2', 'wait'), { type: 'done', reason: 'tool_use' })
+	calls[woke]!.push(
+		call('answer', 'send', { to: child, text: 'Use JSON', description: 'Answer the format question' }),
+		call('w2', 'wait'),
+		{ type: 'done', reason: 'tool_use' },
+	)
 	let resumed = await callWith('Use JSON', woke + 1)
 	expect(calls[resumed]!.input.sessionId).toBe(child)
 	expect(lastMessage(resumed).blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
 	expect(sessions.open(p).slots).toBe(2)
-	await until(() => { let s = status.stateOf(p); return s.type === 'running' && s.phase === 'tools' })
+	await until(() => {
+		let s = status.stateOf(p)
+		return s.type === 'running' && s.phase === 'tools'
+	})
 	calls[resumed]!.push({ type: 'text', text: 'JSON ready' }, { type: 'done', reason: 'end' })
 	let done = await callWith('JSON ready', resumed + 1)
 	expect(calls[done]!.input.sessionId).toBe(p)
@@ -251,7 +321,10 @@ test('a child question wakes its waiting parent, stays open, and ordinary send r
 test('automatic reports and unrelated senders do not answer a delegated question; parent metadata alone is not ownership', async () => {
 	let c = client()
 	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'clarify ownership' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(call('s1', 'spawn', { task: 'clarify ownership' }), call('w1', 'wait'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	let k = await callWith('clarify ownership')
 	let child = tabs.file().open[1]!
 	calls[k]!.push({ type: 'text', text: '<question>Which owner?</question>' }, { type: 'done', reason: 'end' })
@@ -259,7 +332,10 @@ test('automatic reports and unrelated senders do not answer a delegated question
 	// A report can come from the parent when the sessions delegate to one another.
 	prompts.submit(child, 'automatic report', undefined, 'steer', { from: p, advisory: true })
 	prompts.submit(child, 'unrelated answer', undefined, 'soft-steer', { from: 'other', advisory: true })
-	expect(status.inboxOf(child).map((m) => [m.text, m.delivery])).toEqual([['automatic report', 'next-round'], ['unrelated answer', 'next-round']])
+	expect(status.inboxOf(child).map((m) => [m.text, m.delivery])).toEqual([
+		['automatic report', 'next-round'],
+		['unrelated answer', 'next-round'],
+	])
 	expect(status.stateOf(child).type).toBe('idle')
 	// A human takes over this child; later questions belong to that human.
 	c.conn.send({ type: 'open', sessionId: child })

@@ -20,9 +20,21 @@ function anything(records: HistoryRecord[]): boolean {
 	return records.slice(at + 1).some((r) => r.type === 'user' || r.type === 'assistant')
 }
 
-function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string } | { type: 'reset'; transition?: string }): HistoryRecord {
+function boundary(
+	id: string,
+	record:
+		| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string }
+		| { type: 'reset'; transition?: string },
+): HistoryRecord {
 	let r = history.append(id, record)
-	host.broadcast(id, { type: 'divider', sessionId: id, text: transcript.boundary(record), ts: r.ts, ...(record.type === 'reset' && { clear: true as const }), ...(r.n !== undefined && { n: r.n }) })
+	host.broadcast(id, {
+		type: 'divider',
+		sessionId: id,
+		text: transcript.boundary(record),
+		ts: r.ts,
+		...(record.type === 'reset' && { clear: true as const }),
+		...(r.n !== undefined && { n: r.n }),
+	})
 	// The status row's context figure measured the dropped context.
 	stats.state.context.delete(id)
 	host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id, [r]) })
@@ -34,16 +46,28 @@ function boundary(id: string, record: { type: 'compact'; summary: string; prompt
 function run(id: string, protect = false, transition?: string): number | undefined {
 	let records = replay.current(history.readSync(id))
 	if (!compact.anything(records)) return undefined
-	let start = 0, edge = records.length
+	let start = 0,
+		edge = records.length
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
 		if (r.type !== 'turn_end') continue
-		if (r.status === 'completed' || !records.slice(i + 1, edge).some((next) => next.type === 'continue')) { start = i + 1; break }
+		if (r.status === 'completed' || !records.slice(i + 1, edge).some((next) => next.type === 'continue')) {
+			start = i + 1
+			break
+		}
 		edge = i
 	}
 	let due = modelNotices.pending(records).filter((n) => !n.sectionUpdate)
-	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && (r.notices?.length || r.blocks.some((b) => b.type === 'text'))).map((r) => r.n!) : []
-	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!) && !(r.type === 'notice' && r.sectionUpdate)), history.file(id))
+	let keep = protect
+		? records
+				.slice(start)
+				.filter((r) => r.type === 'user' && (r.notices?.length || r.blocks.some((b) => b.type === 'text')))
+				.map((r) => r.n!)
+		: []
+	let made = compaction.summary(
+		records.filter((r) => !keep.includes(r.n!) && !(r.type === 'notice' && r.sectionUpdate)),
+		history.file(id),
+	)
 	if (!made) return undefined
 	compact.boundary(id, { type: 'compact', ...made, ...(transition && { transition }), ...(keep.length && { keep }) })
 	if (due.length) history.append(id, { type: 'user', blocks: [], notices: due })
@@ -66,7 +90,10 @@ function reset(id: string): boolean {
 function tooLong(e: ErrorEvent): boolean {
 	let text = `${e.message}\n${e.body ?? ''}`
 	if (/prompt is too long|context_length_exceeded/i.test(text)) return true
-	return (e.status === 400 || e.status === 413) && /too long|too large|context (length|window)|maximum context|too many tokens/i.test(text)
+	return (
+		(e.status === 400 || e.status === 413) &&
+		/too long|too large|context (length|window)|maximum context|too many tokens/i.test(text)
+	)
 }
 
 // A round refused as too long (tooLong) is no temporary failure: the

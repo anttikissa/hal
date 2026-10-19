@@ -20,15 +20,16 @@ function target(id: string, key: string, byId = false): { n: number; item?: { id
 }
 
 export const command: SlashCommand = {
-	help: () => [
-		'/queue lists queued messages.',
-		`/queue <message> queues a message, like ${sendKeys.name('queue')}.`,
-		`/queue next [n] soft-steers a running turn with the oldest or nth message, or runs it when idle (${sendKeys.name('soft-steer')} on an empty prompt).`,
-		`/queue now [n] steers with the oldest or nth message (${sendKeys.name('steer')}).`,
-		'/queue undo queues the message /queue next moved again, if the turn has not read it (Cmd-Z on an empty prompt).',
-		'/queue drop <n> drops the nth message in the list.',
-		'/queue clear drops all queued messages.',
-	].join('\n'),
+	help: () =>
+		[
+			'/queue lists queued messages.',
+			`/queue <message> queues a message, like ${sendKeys.name('queue')}.`,
+			`/queue next [n] soft-steers a running turn with the oldest or nth message, or runs it when idle (${sendKeys.name('soft-steer')} on an empty prompt).`,
+			`/queue now [n] steers with the oldest or nth message (${sendKeys.name('steer')}).`,
+			'/queue undo queues the message /queue next moved again, if the turn has not read it (Cmd-Z on an empty prompt).',
+			'/queue drop <n> drops the nth message in the list.',
+			'/queue clear drops all queued messages.',
+		].join('\n'),
 	record(args, id) {
 		let drop = args.match(dropPattern)
 		if (drop) {
@@ -52,8 +53,15 @@ export const command: SlashCommand = {
 		if (drop) {
 			let key = (drop[1] ?? drop[2])!
 			let { n, item } = target(id, key, drop[2] !== undefined)
-			if (!item) return { error: drop[1] !== undefined ? `There is no queued message ${key}. The queue has ${queued.length}.` : 'That message is no longer queued: it was already delivered or dropped.' }
-			if (item.id === queueEdits.held(id)) return { error: 'That message is being edited; save or cancel the edit first.' }
+			if (!item)
+				return {
+					error:
+						drop[1] !== undefined
+							? `There is no queued message ${key}. The queue has ${queued.length}.`
+							: 'That message is no longer queued: it was already delivered or dropped.',
+				}
+			if (item.id === queueEdits.held(id))
+				return { error: 'That message is being edited; save or cancel the edit first.' }
 			// The durable withdrawal /queue clear uses; the others keep their order.
 			history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
 			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
@@ -62,7 +70,8 @@ export const command: SlashCommand = {
 		let early = args.match(/^(next|now)(?:\s+(\S+))?$/)
 		if (early) {
 			let item = early[2] === undefined ? undefined : target(id, early[2]).item
-			if (early[2] !== undefined && !item) return { error: 'That message is no longer queued: it was already delivered or dropped.' }
+			if (early[2] !== undefined && !item)
+				return { error: 'That message is no longer queued: it was already delivered or dropped.' }
 			return prompts.queueNext(id, early[1] === 'now', item?.id)
 		}
 		if (args === 'undo') return prompts.unqueueUndo(id)

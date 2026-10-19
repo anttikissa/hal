@@ -11,9 +11,16 @@ import { testHome, useHost } from '../src/host/host-fixture.test.ts'
 useHost()
 let entries: Loaded[] = []
 beforeEach(() => {
-	entries = [quirks].map((load, i) => { const entry: Loaded = { path: `p${i}.ts`, hash: '', hooks: [], open: true }; load(plugins.api(entry)); delete entry.open; return entry })
+	entries = [quirks].map((load, i) => {
+		const entry: Loaded = { path: `p${i}.ts`, hash: '', hooks: [], open: true }
+		load(plugins.api(entry))
+		delete entry.open
+		return entry
+	})
 })
-afterEach(() => { for (const e of entries.reverse()) plugins.deactivate(e) })
+afterEach(() => {
+	for (const e of entries.reverse()) plugins.deactivate(e)
+})
 
 const head = ['EDIT', 'a replace', '!!OLD', 'x', '!!NEW', 'y', '!!END']
 const at = (model?: string) => (model ? { cwd: testHome(), sessionId: 's1', model } : undefined)
@@ -24,8 +31,14 @@ const edits = [{ path: 'a', old: 'x', new: 'y' }]
 test('each quirk rescues Sonnet; other models and unknown sessions get the strict error', () => {
 	mkdirSync(dirname(diag.file()), { recursive: true })
 	const cases: [string[], unknown][] = [
-		[['$ npm test 2>&1 | tail -15', '$ echo "ok"'], { edits, then: ['BASH "npm test 2>&1 | tail -15"', 'BASH "echo \\"ok\\""'] }],
-		[['<invoke name="tool">', '<parameter name="cmd">BASH "npm test"</parameter>', '</invoke>'], { edits, then: ['BASH "npm test"'] }],
+		[
+			['$ npm test 2>&1 | tail -15', '$ echo "ok"'],
+			{ edits, then: ['BASH "npm test 2>&1 | tail -15"', 'BASH "echo \\"ok\\""'] },
+		],
+		[
+			['<invoke name="tool">', '<parameter name="cmd">BASH "npm test"</parameter>', '</invoke>'],
+			{ edits, then: ['BASH "npm test"'] },
+		],
 		[['approve', 'BASH "npm test"'], { edits, then: ['BASH "npm test"'] }],
 		[['That', '!!END'], { edits }],
 		[['EDIT', '<br>', '!!END'], { edits }],
@@ -36,7 +49,13 @@ test('each quirk rescues Sonnet; other models and unknown sessions get the stric
 	for (const [tail, want] of cases) {
 		expect(resolve([...head, ...tail], sonnet)).toEqual(want as any)
 		for (const model of ['openai/gpt-6.1-sol', undefined]) {
-			const strict = (() => { try { return resolve([...head, ...tail], model) } catch (e: any) { return e.message } })()
+			const strict = (() => {
+				try {
+					return resolve([...head, ...tail], model)
+				} catch (e: any) {
+					return e.message
+				}
+			})()
 			expect(strict).not.toEqual(want)
 		}
 	}
@@ -45,6 +64,11 @@ test('each quirk rescues Sonnet; other models and unknown sessions get the stric
 })
 
 test('call markup is a quirk for Opus too; other quirks are not', () => {
-	expect(resolve([...head, '<invoke name="tool">', '<parameter name="cmd">BASH "ls"</parameter>'], 'anthropic/claude-opus-5-5')).toEqual({ edits, then: ['BASH "ls"'] })
+	expect(
+		resolve(
+			[...head, '<invoke name="tool">', '<parameter name="cmd">BASH "ls"</parameter>'],
+			'anthropic/claude-opus-5-5',
+		),
+	).toEqual({ edits, then: ['BASH "ls"'] })
 	expect(() => resolve([...head, '$ ls'], 'anthropic/claude-opus-5-5')).toThrow('EDIT line 8')
 })

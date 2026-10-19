@@ -26,4 +26,10 @@ function linkChanged(link: LinkState): boolean {
 	return true
 }
 
-export const restart = { state, typed, linkChanged, reload: (): void => location.reload(), mark: (): void => void (state.mark = 'marked') }
+export const restart = {
+	state,
+	typed,
+	linkChanged,
+	reload: (): void => location.reload(),
+	mark: (): void => void (state.mark = 'marked'),
+}

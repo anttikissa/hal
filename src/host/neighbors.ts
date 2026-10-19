@@ -18,9 +18,11 @@ type Declaration = { sessionId: string; cwd: string; paths: string[]; ended?: nu
 const maxPaths = 5
 
 // A path worth telling a neighbor: relative, in the project, not Git's own.
-const local = (p: string) => !p.startsWith('/') && !p.startsWith('~') && !p.split('/').includes('..') && !/^(\.\/)?\.git(\/|$)/.test(p)
+const local = (p: string) =>
+	!p.startsWith('/') && !p.startsWith('~') && !p.split('/').includes('..') && !/^(\.\/)?\.git(\/|$)/.test(p)
 
-const list = (paths: string[]) => [...paths.slice(0, maxPaths), ...paths.length > maxPaths ? [`${paths.length - maxPaths} more`] : []].join(', ')
+const list = (paths: string[]) =>
+	[...paths.slice(0, maxPaths), ...(paths.length > maxPaths ? [`${paths.length - maxPaths} more`] : [])].join(', ')
 
 function label(id: string): string {
 	let name = sessions.state.open.get(id)?.name
@@ -43,10 +45,11 @@ const glob = (p: string) => /[*?[\]{}]/.test(p)
 // Declared files in `cwd` whose mtime is within recentMs of now.
 function recent(cwd: string, patterns: string[], now: number): string[] {
 	let found = new Set<string>()
-	for (let p of patterns) for (let name of glob(p) ? [...new Bun.Glob(p).scanSync({ cwd, dot: true, onlyFiles: true })].sort() : [p]) {
-		let mtime = statSync(resolve(cwd, name), { throwIfNoEntry: false })?.mtimeMs
-		if (mtime !== undefined && now - mtime < neighbors.recentMs) found.add(name)
-	}
+	for (let p of patterns)
+		for (let name of glob(p) ? [...new Bun.Glob(p).scanSync({ cwd, dot: true, onlyFiles: true })].sort() : [p]) {
+			let mtime = statSync(resolve(cwd, name), { throwIfNoEntry: false })?.mtimeMs
+			if (mtime !== undefined && now - mtime < neighbors.recentMs) found.add(name)
+		}
 	return [...found]
 }
 
@@ -54,11 +57,14 @@ function recent(cwd: string, patterns: string[], now: number): string[] {
 // `patterns`, of which `changed` were modified recently.
 function change(was: string[], patterns: string[], changed: string[]): { lines: string[]; told: string[] } {
 	let declared = (p: string) => patterns.some((q) => q === p || (glob(q) && new Bun.Glob(q).match(p)))
-	let kept = was.filter(declared), removed = was.filter((p) => !declared(p)), added = changed.filter((p) => !was.includes(p))
+	let kept = was.filter(declared),
+		removed = was.filter((p) => !declared(p)),
+		added = changed.filter((p) => !was.includes(p))
 	let lines: string[] = []
 	if (removed.length && !kept.length && !added.length) lines.push('is no longer editing files')
 	else if (removed.length) {
-		let stopped = `is no longer editing ${list(removed)}`, only = `is still editing only ${list(kept)}`
+		let stopped = `is no longer editing ${list(removed)}`,
+			only = `is still editing only ${list(kept)}`
 		lines.push(kept.length && only.length < stopped.length ? only : stopped)
 	}
 	if (added.length) lines.push(`modified ${list(added)} <1min ago`)
@@ -68,22 +74,31 @@ function change(was: string[], patterns: string[], changed: string[]): { lines: 
 // Lines for `reader` about other sessions in `cwd`: declared files changed
 // recently that it was not told, and told files no longer declared.
 function notes(reader: string, cwd: string): string[] {
-	let now = clock.now(), { active, told } = neighbors.state, open = sessions.state.open
+	let now = clock.now(),
+		{ active, told } = neighbors.state,
+		open = sessions.state.open
 	let current = new Map<string, string[]>()
 	for (let d of active) {
-		if ((d.ended !== undefined && now - d.ended > neighbors.lingerMs) || !open.has(d.sessionId)) { active.delete(d); continue }
+		if ((d.ended !== undefined && now - d.ended > neighbors.lingerMs) || !open.has(d.sessionId)) {
+			active.delete(d)
+			continue
+		}
 		if (d.sessionId === reader || d.cwd !== cwd) continue
 		let paths = current.get(d.sessionId) ?? []
 		current.set(d.sessionId, [...paths, ...d.paths.filter((p) => !paths.includes(p))])
 	}
 	for (let id of told.keys()) if (!open.has(id)) told.delete(id)
-	let mine = told.get(reader) ?? new Map<string, string[]>(), lines: string[] = []
+	let mine = told.get(reader) ?? new Map<string, string[]>(),
+		lines: string[] = []
 	for (let id of new Set([...mine.keys(), ...current.keys()])) {
-		let patterns = current.get(id) ?? [], result = change(mine.get(id) ?? [], patterns, recent(cwd, patterns, now))
+		let patterns = current.get(id) ?? [],
+			result = change(mine.get(id) ?? [], patterns, recent(cwd, patterns, now))
 		for (let text of result.lines) lines.push(`[${label(id)} ${text}]`)
-		if (result.told.length) mine.set(id, result.told); else mine.delete(id)
+		if (result.told.length) mine.set(id, result.told)
+		else mine.delete(id)
 	}
-	if (mine.size) told.set(reader, mine); else told.delete(reader)
+	if (mine.size) told.set(reader, mine)
+	else told.delete(reader)
 	return lines
 }
 
@@ -95,5 +110,7 @@ export const neighbors = {
 	},
 	lingerMs: 60_000,
 	recentMs: 60_000,
-	start, end, notes,
+	start,
+	end,
+	notes,
 }

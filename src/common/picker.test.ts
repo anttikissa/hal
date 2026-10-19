@@ -17,7 +17,9 @@ const ids = [
 
 test('every word of the query must match, in any case and with any separator', () => {
 	expect(picker.rank(ids, 'SONNET')).toEqual(['anthropic/claude-sonnet-4-5'])
-	expect(picker.rank(ids, 'opus 4 5')).toEqual(expect.arrayContaining(['anthropic/claude-opus-4-5', 'openrouter/anthropic/claude-opus-4.5']))
+	expect(picker.rank(ids, 'opus 4 5')).toEqual(
+		expect.arrayContaining(['anthropic/claude-opus-4-5', 'openrouter/anthropic/claude-opus-4.5']),
+	)
 	expect(picker.rank(ids, 'opus 4 5')).not.toContain('anthropic/claude-opus-5-5')
 	expect(picker.rank(ids, 'gemini')).toEqual([])
 })
@@ -39,16 +41,25 @@ const enter = (st: ReturnType<typeof picker.open>) => {
 	return action?.type === 'submit' ? picker.command('s1', st, action)?.text : undefined
 }
 // A row as shown: its label, then any effort, name and ID cells.
-const row = (st: ReturnType<typeof picker.open>, i: number) => `${st.items[i]}${st.values?.[i] ?? ''}`.replace(/\t+$/, '')
+const row = (st: ReturnType<typeof picker.open>, i: number) =>
+	`${st.items[i]}${st.values?.[i] ?? ''}`.replace(/\t+$/, '')
 const rows = (st: ReturnType<typeof picker.open>) => st.items.map((_, i) => row(st, i))
 const selected = (st: ReturnType<typeof picker.open>) => row(st, st.selected).trim()
 // Rows whose effort cell is filled; only the highlighted row may have one.
-const withEffort = (st: ReturnType<typeof picker.open>) => rows(st).filter((_, i) => !!st.values?.[i]?.split('\t')[0]?.trim())
+const withEffort = (st: ReturnType<typeof picker.open>) =>
+	rows(st).filter((_, i) => !!st.values?.[i]?.split('\t')[0]?.trim())
 
 test('the picker opens as a tree on the current model, its categories open', () => {
 	let st = picker.open('anthropic/claude-sonnet-4-5', tree, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
 	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai (default: gpt-6-sol)', '▼ anthropic (default: claude-opus-5-5)', '▶ opus (default: claude-opus-5-5)', '✓ anthropic/claude-sonnet-4-5', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual([
+		'▶ hal',
+		'▶ openai (default: gpt-6-sol)',
+		'▼ anthropic (default: claude-opus-5-5)',
+		'▶ opus (default: claude-opus-5-5)',
+		'✓ anthropic/claude-sonnet-4-5',
+		'▶ openrouter',
+	])
 	expect(selected(st)).toContain('anthropic/claude-sonnet-4-5')
 	expect(enter(st)).toBe('/model anthropic/claude-sonnet-4-5')
 })
@@ -89,7 +100,13 @@ test('right opens a category, left closes it or moves from a closed category to 
 	st = press(st, key('left'))
 	expect(selected(st)).toMatch(/^▶ anthropic/)
 	st = press(press(st, key('up')), key('right'))
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▼ openai (default: gpt-6-sol)', '▶ gpt (default: gpt-6-sol)', '▶ anthropic (default: claude-opus-5-5)', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual([
+		'▶ hal',
+		'▼ openai (default: gpt-6-sol)',
+		'▶ gpt (default: gpt-6-sol)',
+		'▶ anthropic (default: claude-opus-5-5)',
+		'▶ openrouter',
+	])
 	// Enter on a category without a default opens it instead.
 	st = press(press(st, key('up')), key('enter'))
 	expect(st.items.some((r) => r.includes('hal/intro'))).toBe(true)
@@ -102,19 +119,37 @@ test('Enter with nothing matching switches to nothing', () => {
 })
 
 test('families go most capable first, and equal matches select an alias model, else the higher row', () => {
-	let all = [...tree, 'anthropic/claude-haiku-4-5', 'anthropic/claude-sonnet-5', 'anthropic/claude-fable-5', 'anthropic/claude-fable-5-1', 'openai/gpt-6-luna']
+	let all = [
+		...tree,
+		'anthropic/claude-haiku-4-5',
+		'anthropic/claude-sonnet-5',
+		'anthropic/claude-fable-5',
+		'anthropic/claude-fable-5-1',
+		'openai/gpt-6-luna',
+	]
 	let st = picker.open('hal/intro', all)
 	st = picker.refilter({ ...st, tree: { ...st.tree!, open: ['anthropic', 'openai', 'openai/gpt'] } }, all)
-	expect(st.items.map((r) => r.trim().replace(/ \(default: .*\)$/, '')).filter((r) => /^▶ (fable|opus|sonnet)$/.test(r))).toEqual(['▶ fable', '▶ opus', '▶ sonnet'])
-	let gpt = rows(st).filter((r) => r.includes('openai/gpt-')).map((r) => r.split('openai/')[1])
+	expect(
+		st.items.map((r) => r.trim().replace(/ \(default: .*\)$/, '')).filter((r) => /^▶ (fable|opus|sonnet)$/.test(r)),
+	).toEqual(['▶ fable', '▶ opus', '▶ sonnet'])
+	let gpt = rows(st)
+		.filter((r) => r.includes('openai/gpt-'))
+		.map((r) => r.split('openai/')[1])
 	expect(gpt).toEqual(['gpt-6-sol', 'gpt-6-terra', 'gpt-6-luna', 'gpt-5.5'])
 	expect(enter(picker.step(st, key('c', 'clau'), all).state)).toBe('/model anthropic/claude-opus-5-5')
 	expect(enter(picker.step(st, key('s', 'sonnet 5'), all).state)).toBe('/model anthropic/claude-sonnet-5')
 })
 
 test('dated snapshots hide; versions past a family two newest wait under older', () => {
-	let all = ['anthropic/claude-opus-5-5', 'anthropic/claude-opus-4-5', 'anthropic/claude-opus-4-5-20251101', 'anthropic/claude-opus-4-1', 'anthropic/claude-haiku-3-20240307']
-	let shown = (current: string, open: string[]) => rows(picker.refilter({ ...picker.open(current, all), tree: { rows: [], open, current } }, all)).join('\n')
+	let all = [
+		'anthropic/claude-opus-5-5',
+		'anthropic/claude-opus-4-5',
+		'anthropic/claude-opus-4-5-20251101',
+		'anthropic/claude-opus-4-1',
+		'anthropic/claude-haiku-3-20240307',
+	]
+	let shown = (current: string, open: string[]) =>
+		rows(picker.refilter({ ...picker.open(current, all), tree: { rows: [], open, current } }, all)).join('\n')
 	let closed = shown('hal/intro', ['anthropic', 'anthropic/opus'])
 	expect(closed).toMatch(/claude-opus-4-5$/m)
 	expect(closed).not.toMatch(/20251101|opus-4-1/)
@@ -122,17 +157,32 @@ test('dated snapshots hide; versions past a family two newest wait under older',
 	expect(shown('hal/intro', ['anthropic', 'anthropic/opus', 'anthropic/opus/older'])).toMatch(/claude-opus-4-1$/m)
 	// A snapshot alone stays; the current model's categories open.
 	expect(closed).toContain('claude-haiku-3-20240307')
-	expect(rows(picker.open('anthropic/claude-opus-4-1', all)).join('\n')).toMatch(/✓ 4\.1\t.*anthropic\/claude-opus-4-1$/m)
+	expect(rows(picker.open('anthropic/claude-opus-4-1', all)).join('\n')).toMatch(
+		/✓ 4\.1\t.*anthropic\/claude-opus-4-1$/m,
+	)
 })
 
 test('a family lists its flagships; variants and non-chat models wait in closed buckets, last', () => {
-	let all = ['openai/gpt-6-sol', 'openai/gpt-6-luna', 'openai/gpt-5.6-sol', 'openai/gpt-5.5', 'openai/gpt-6-mini', 'openai/gpt-daybreak-blue-latest', 'openai/gpt-image-2', 'openai/gpt-realtime-2.1', 'openai/o3', 'openai/text-embedding-3-large']
+	let all = [
+		'openai/gpt-6-sol',
+		'openai/gpt-6-luna',
+		'openai/gpt-5.6-sol',
+		'openai/gpt-5.5',
+		'openai/gpt-6-mini',
+		'openai/gpt-daybreak-blue-latest',
+		'openai/gpt-image-2',
+		'openai/gpt-realtime-2.1',
+		'openai/o3',
+		'openai/text-embedding-3-large',
+	]
 	let st = picker.open('openai/gpt-6-sol', all)
 	let text = rows(st).join('\n')
 	expect(text).toMatch(/gpt-6-luna$/m)
 	expect(text).toMatch(/gpt-5\.6-sol$/m)
 	expect(text).not.toMatch(/gpt-5\.5$|mini|daybreak|image|realtime|o3|embedding/m)
-	expect(st.items.findIndex((r) => r.trim() === '▶ older')).toBeGreaterThan(st.items.findIndex((r) => r.endsWith('gpt-5.6-sol')))
+	expect(st.items.findIndex((r) => r.trim() === '▶ older')).toBeGreaterThan(
+		st.items.findIndex((r) => r.endsWith('gpt-5.6-sol')),
+	)
 	expect(st.items.at(-1)!.trim()).toBe('▶ other')
 	// A bucket has no default: Enter opens it.
 	let other = picker.refilter({ ...st, selected: st.items.length - 1 }, all)
@@ -153,7 +203,14 @@ test('left and right open and close categories while searching too', () => {
 })
 
 test('searching opens a family but keeps its older closed, unless only older matches', () => {
-	let all = ['openai/gpt-6-sol', 'openai/gpt-6-luna', 'openai/gpt-5.6-sol', 'openai/gpt-5.5', 'openai/gpt-image-2', 'anthropic/claude-opus-5-5']
+	let all = [
+		'openai/gpt-6-sol',
+		'openai/gpt-6-luna',
+		'openai/gpt-5.6-sol',
+		'openai/gpt-5.5',
+		'openai/gpt-image-2',
+		'anthropic/claude-opus-5-5',
+	]
 	let search = (q: string) => picker.step(picker.open('anthropic/claude-opus-5-5', all), key('x', q), all).state
 	let gpt = rows(search('gpt')).join('\n')
 	expect(gpt).toMatch(/▼ gpt/)
@@ -171,7 +228,6 @@ test('searching opens a family but keeps its older closed, unless only older mat
 	expect(rows(opened).join('\n')).toMatch(/gpt-5\.5$/m)
 	expect(rows(picker.step(opened, key('left'), all).state).join('\n')).not.toMatch(/gpt-5\.5$/m)
 })
-
 
 test('effort drafts clamp on leaves, preserve tags and filtering, keep row identity, and commit only on Enter', () => {
 	let ids = ['ollama/gpt-oss:20b', 'openai/gpt-6-sol', 'hal/intro']
@@ -217,12 +273,20 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 // Exercise navigation, not just refilter: Up/Down used to move the
 // cursor without updating the help, title or effort marker (task r7r).
 test('moving rows keeps hints, effort, names and category defaults tied to the highlighted choice', () => {
-	let gpt = 'openai/gpt-6.1-sol', opus = 'anthropic/claude-opus-5-5', haiku = 'anthropic/claude-haiku-4-5-20251001'
+	let gpt = 'openai/gpt-6.1-sol',
+		opus = 'anthropic/claude-opus-5-5',
+		haiku = 'anthropic/claude-haiku-4-5-20251001'
 	let all = [gpt, 'openai/gpt-6-astra', opus, 'anthropic/claude-opus-5', haiku]
 	let names = { [gpt]: 'GPT-6.1 Sol', [opus]: 'Claude Opus 5.5', [haiku]: 'Claude Haiku 4.5' }
-	let capabilities: Record<string, EffortCapability> = { [gpt]: { levels: ['low', 'medium', 'high'], default: 'medium' }, [opus]: { levels: ['low', 'medium', 'high'], default: 'medium' }, 'anthropic/claude-opus-5': { levels: ['low', 'medium', 'high'], default: 'medium' } }
+	let capabilities: Record<string, EffortCapability> = {
+		[gpt]: { levels: ['low', 'medium', 'high'], default: 'medium' },
+		[opus]: { levels: ['low', 'medium', 'high'], default: 'medium' },
+		'anthropic/claude-opus-5': { levels: ['low', 'medium', 'high'], default: 'medium' },
+	}
 	let st = picker.open(opus, all, names, capabilities, 'high')
-	let move = (direction: string) => { st = picker.step(st, key(direction), all, names).state }
+	let move = (direction: string) => {
+		st = picker.step(st, key(direction), all, names).state
+	}
 	let chosen = () => st.tree!.rows[st.selected]!
 	let marked = () => withEffort(st)
 	expect(marked()).toEqual([row(st, st.selected)])

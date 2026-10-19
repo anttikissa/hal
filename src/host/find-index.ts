@@ -21,7 +21,9 @@ function init(): void {
 	findIndex.state.db = db
 	// The projection is disposable; version changes reindex immutable history.
 	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 1) {
-		db.exec('DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=1;')
+		db.exec(
+			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=1;',
+		)
 	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
@@ -64,9 +66,16 @@ async function text(sessionId: string, value: string): Promise<string> {
 }
 
 async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
-	let out: FindRow[] = [], ts = Date.parse(r.ts)
+	let out: FindRow[] = [],
+		ts = Date.parse(r.ts)
 	let add = async (kind: FindKind, value: string, i = 0) => {
-		out.push({ sessionId, blockId: i ? `${r.n}.${i}` : `${r.n}`, kind, ts, text: await findIndex.text(sessionId, value) })
+		out.push({
+			sessionId,
+			blockId: i ? `${r.n}.${i}` : `${r.n}`,
+			kind,
+			ts,
+			text: await findIndex.text(sessionId, value),
+		})
 	}
 	if (r.type === 'user' || r.type === 'assistant') {
 		let blocks = r.type === 'user' ? r.blocks : [r.block]
@@ -88,10 +97,13 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 async function* records(sessionId: string, offset: number): AsyncGenerator<{ record: HistoryRecord; end: number }> {
 	let path = history.file(sessionId)
 	if (!existsSync(path)) return
-	let pending = Buffer.alloc(0), at = offset, started = performance.now()
+	let pending = Buffer.alloc(0),
+		at = offset,
+		started = performance.now()
 	for await (let chunk of createReadStream(path, { start: offset, highWaterMark: 16384 })) {
 		pending = Buffer.concat([pending, chunk as Buffer])
-		let from = 0, end: number
+		let from = 0,
+			end: number
 		while ((end = pending.indexOf(10, from)) >= 0) {
 			let line = pending.subarray(from, end).toString('utf8')
 			if (line.trim()) {
@@ -99,10 +111,15 @@ async function* records(sessionId: string, offset: number): AsyncGenerator<{ rec
 					let record = history.check(ason.parse(line))
 					record.n ??= at + from + 1
 					yield { record, end: at + end + 1 }
-				} catch (e: any) { throw new Error(`${path}:${at + from}: ${e?.message ?? e}`) }
+				} catch (e: any) {
+					throw new Error(`${path}:${at + from}: ${e?.message ?? e}`)
+				}
 			}
 			from = end + 1
-			if (performance.now() - started > 4) { await Bun.sleep(0); started = performance.now() }
+			if (performance.now() - started > 4) {
+				await Bun.sleep(0)
+				started = performance.now()
+			}
 		}
 		at += from
 		pending = pending.subarray(from)
@@ -111,28 +128,43 @@ async function* records(sessionId: string, offset: number): AsyncGenerator<{ rec
 }
 
 function mark(sessionId: string): Mark | undefined {
-	return findIndex.state.db!.query('SELECT offset,size,mtime FROM marks WHERE sessionId=?').get(sessionId) as Mark | undefined
+	return findIndex.state.db!.query('SELECT offset,size,mtime FROM marks WHERE sessionId=?').get(sessionId) as
+		| Mark
+		| undefined
 }
 
 function start(sessionId: string): number {
-	let m = findIndex.mark(sessionId), stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
+	let m = findIndex.mark(sessionId),
+		stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
 	if (!m || !stat) return 0
 	return stat.size < m.offset || (stat.size === m.size && stat.mtimeMs !== m.mtime) ? 0 : m.offset
 }
 
 async function catchup(sessionId: string): Promise<void> {
-	let db = findIndex.state.db!, offset = findIndex.start(sessionId)
+	let db = findIndex.state.db!,
+		offset = findIndex.start(sessionId)
 	if (!offset) db.query('DELETE FROM docs WHERE sessionId=?').run(sessionId)
-	let batch: FindRow[] = [], end = offset
-	let flush = () => db.transaction(() => {
-		for (let row of batch) db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,kind,ts,text) VALUES(?,?,?,?,?)').run(row.sessionId, row.blockId, row.kind, row.ts, row.text)
-		let stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
-		db.query('INSERT OR REPLACE INTO marks VALUES(?,?,?,?)').run(sessionId, end, stat?.size ?? 0, stat?.mtimeMs ?? 0)
-		batch = []
-	})()
-	let items = [], stale = false
-	try { for await (let item of findIndex.records(sessionId, offset)) items.push(item) }
-	catch (e) {
+	let batch: FindRow[] = [],
+		end = offset
+	let flush = () =>
+		db.transaction(() => {
+			for (let row of batch)
+				db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,kind,ts,text) VALUES(?,?,?,?,?)').run(
+					row.sessionId,
+					row.blockId,
+					row.kind,
+					row.ts,
+					row.text,
+				)
+			let stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
+			db.query('INSERT OR REPLACE INTO marks VALUES(?,?,?,?)').run(sessionId, end, stat?.size ?? 0, stat?.mtimeMs ?? 0)
+			batch = []
+		})()
+	let items = [],
+		stale = false
+	try {
+		for await (let item of findIndex.records(sessionId, offset)) items.push(item)
+	} catch (e) {
 		// A history rewritten in place (cleanup, hand edit) can leave the
 		// mark mid-line: reindex from the start instead of failing find.
 		if (!offset) throw e
@@ -146,10 +178,24 @@ async function catchup(sessionId: string): Promise<void> {
 		items = replay.current(items.map((i) => i.record)).map((record) => ({ record, end }))
 	}
 	for (let item of items) {
-		batch.push(...await findIndex.rows(sessionId, item.record)); end = item.end
-		if (batch.length >= 16) { flush(); await Bun.sleep(0) }
+		batch.push(...(await findIndex.rows(sessionId, item.record)))
+		end = item.end
+		if (batch.length >= 16) {
+			flush()
+			await Bun.sleep(0)
+		}
 	}
 	flush()
 }
 
-export const findIndex = { state: { db: undefined as Database | undefined, meta: new Map<string, SessionMeta>() }, init, catalog, text, rows, records, mark, start, catchup }
+export const findIndex = {
+	state: { db: undefined as Database | undefined, meta: new Map<string, SessionMeta>() },
+	init,
+	catalog,
+	text,
+	rows,
+	records,
+	mark,
+	start,
+	catchup,
+}

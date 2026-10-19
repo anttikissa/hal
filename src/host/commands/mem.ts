@@ -30,7 +30,9 @@ async function report(): Promise<string> {
 	]
 	for (let id of sessions.state.open.keys()) {
 		let cached = history.state.cache.get(id)
-		rows.push(`  session ${id}  ${cached ? `${cached.records.length} history records, ${size(cached.size)}` : 'history not loaded'}`)
+		rows.push(
+			`  session ${id}  ${cached ? `${cached.records.length} history records, ${size(cached.size)}` : 'history not loaded'}`,
+		)
 	}
 	rows.push(`  page marks  ${pages.state.marks.size} files`)
 	let page = web.state.page && (await web.state.page.catch(() => undefined))
@@ -39,7 +41,8 @@ async function report(): Promise<string> {
 }
 
 export const command: SlashCommand = {
-	help: () => "/mem shows the host process's memory: resident size, JS heap, the sessions whose history is loaded and other holders, and the machine's free memory.\n/mem gc runs a full garbage collection and shows the before and after. Nothing else changes.",
+	help: () =>
+		"/mem shows the host process's memory: resident size, JS heap, the sessions whose history is loaded and other holders, and the machine's free memory.\n/mem gc runs a full garbage collection and shows the before and after. Nothing else changes.",
 	async run(args) {
 		if (args && args !== 'gc') return { error: 'usage: /mem [gc]' }
 		let before = await report()

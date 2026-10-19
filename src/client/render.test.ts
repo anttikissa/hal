@@ -219,7 +219,12 @@ describe('grow mode', () => {
 		setup(30, 30, ['$ ./run'])
 		show([])
 		show([{ type: 'text', text: 'Hello', synthetic: true }])
-		expect(term.content().slice(0, 3).map((r) => r.trim() !== '')).toEqual([true, false, true])
+		expect(
+			term
+				.content()
+				.slice(0, 3)
+				.map((r) => r.trim() !== ''),
+		).toEqual([true, false, true])
 	})
 
 	test('updates in place while the frame fits: streaming, a longer and a shorter prompt', () => {
@@ -308,7 +313,6 @@ describe('full mode', () => {
 		expect(term.written).not.toContain('\x1b[3J')
 		expect(term.content()).toEqual(['$ hal', ...frameText()])
 	})
-
 })
 
 describe('resize', () => {
@@ -423,7 +427,11 @@ describe('tabs', () => {
 	const tab = (id: string) => ({ id, name: id, cwd: '/', model: 'm', state: { type: 'idle' as const } })
 	const list = [tab('a'), tab('b'), tab('c')]
 	function showTab(focused: string, history: Item[], text = '') {
-		render.state.view = { transcript: transcript(history), prompt: { text, cursor: text.length }, tabs: { list, focused } }
+		render.state.view = {
+			transcript: transcript(history),
+			prompt: { text, cursor: text.length },
+			tabs: { list, focused },
+		}
 		render.draw()
 	}
 	const promptRow = () => term.screen().findIndex((r) => r.includes('typed'))
@@ -436,7 +444,12 @@ describe('tabs', () => {
 		let row = promptRow()
 		expect(row).toBeGreaterThan(10)
 		expect(bottom()).toBe(19)
-		for (let [id, n] of [['a', 3], ['b', 0], ['c', 30], ['a', 3]] as const) {
+		for (let [id, n] of [
+			['a', 3],
+			['b', 0],
+			['c', 30],
+			['a', 3],
+		] as const) {
 			showTab(id, items(n), 'typed')
 			expect(promptRow()).toBe(row)
 			expect(bottom()).toBe(19)
@@ -450,7 +463,11 @@ describe('tabs', () => {
 		setup(20, 30, ['$ hal'])
 		let one = [tab('a')]
 		let showOne = (history: Item[], text = '') => {
-			render.state.view = { transcript: transcript(history), prompt: { text, cursor: text.length }, tabs: { list: one, focused: 'a' } }
+			render.state.view = {
+				transcript: transcript(history),
+				prompt: { text, cursor: text.length },
+				tabs: { list: one, focused: 'a' },
+			}
 			render.draw()
 		}
 		for (let n = 0; n <= 3; n++) showOne(items(n), 'typed')
@@ -475,7 +492,11 @@ describe('tabs', () => {
 		setup(10, 30, ['$ hal', 'old prompt'])
 		render.startTabs = 2
 		render.state.view = { prompt: { text: 'Ω', cursor: 1 } } as typeof render.state.view
-		try { render.draw() } finally { render.startTabs = 0 }
+		try {
+			render.draw()
+		} finally {
+			render.startTabs = 0
+		}
 		expect(term.written).toContain('\x1b[3J')
 		showTab('b', items(1))
 		term.written = ''
@@ -508,7 +529,10 @@ describe('long words', () => {
 
 	test('rows after it and changes inside it keep it whole and in place', () => {
 		setup(20, 30)
-		let list: Item[] = [{ type: 'output', text: 'before' }, { type: 'output', text: url }]
+		let list: Item[] = [
+			{ type: 'output', text: 'before' },
+			{ type: 'output', text: url },
+		]
 		show(list)
 		show([...list, { type: 'output', text: 'after' }], 'typed')
 		expect(term.logical()).toContain(` ${url}`)
@@ -533,7 +557,8 @@ describe('terminal.redraw', () => {
 	})
 
 	test('repaints every row in the current colors, cached rows too', () => {
-		let exit = colors.exit, mono = ansi.mono
+		let exit = colors.exit,
+			mono = ansi.mono
 		// Color escapes exist only outside GNU screen (ansi.mono): a run
 		// inside screen without ./test must still paint in color.
 		ansi.mono = () => false
@@ -607,7 +632,12 @@ describe('clear reasons (task e4c)', () => {
 		show(list.slice(0, -2), '', 0, true)
 		let erases = term.written.match(/\x1b\[\d*J/g)?.length ?? 0
 		expect(erases).toBe(reasons.reduce((n, r) => n + (r.kind === 'all' ? 2 : 1), 0))
-		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all scrollback edit', 'all forced'])
+		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual([
+			'down first paint',
+			'below shrink',
+			'all scrollback edit',
+			'all forced',
+		])
 		expect(reasons.every((r) => r.text.length > 0)).toBe(true)
 	})
 

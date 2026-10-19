@@ -17,12 +17,16 @@ async function queued() {
 	return { a, id }
 }
 
-const acquire = (a: ReturnType<typeof client>, id: string, message = 'queued') => a.conn.send({ type: 'queue-edit', sessionId: id, message, edit: 'token', id: `acquire-${message}` })
-const save = (a: ReturnType<typeof client>, id: string, text: string) => a.conn.send({ type: 'submit', sessionId: id, queueEdit: 'token', amend: true, edits: 'queued', text, id: 'save' })
-const cancel = (a: ReturnType<typeof client>, id: string) => a.conn.send({ type: 'queue-edit-cancel', sessionId: id, edit: 'token' })
+const acquire = (a: ReturnType<typeof client>, id: string, message = 'queued') =>
+	a.conn.send({ type: 'queue-edit', sessionId: id, message, edit: 'token', id: `acquire-${message}` })
+const save = (a: ReturnType<typeof client>, id: string, text: string) =>
+	a.conn.send({ type: 'submit', sessionId: id, queueEdit: 'token', amend: true, edits: 'queued', text, id: 'save' })
+const cancel = (a: ReturnType<typeof client>, id: string) =>
+	a.conn.send({ type: 'queue-edit-cancel', sessionId: id, edit: 'token' })
 const end = (i: number) => calls[i]!.push({ type: 'done', reason: 'end' })
 const lastPrompt = (i: number) => JSON.stringify(calls[i]!.input.messages.at(-1))
-const waiting = (id: string) => status.inboxOf(id).map((m) => `${m.id}${(m.delivery === 'after-turn') ? '' : ' (steering)'}`)
+const waiting = (id: string) =>
+	status.inboxOf(id).map((m) => `${m.id}${m.delivery === 'after-turn' ? '' : ' (steering)'}`)
 
 test('turn end: a locked first message waits with the ones behind it; save sends it as saved', async () => {
 	let { a, id } = await queued()
@@ -139,8 +143,14 @@ test('/queue drop: refused for the locked message; a dropped one never runs, eve
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop --id later' })
 	expect(waiting(id)).toEqual(['queued'])
 	await until(() => a.of('output').length === 2)
-	expect(a.of('output').map((e) => e.text)).toEqual(['That message is being edited; save or cancel the edit first.', 'dropped queued message 2: later'])
-	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual(['/queue drop 1', '/queue drop 2'])
+	expect(a.of('output').map((e) => e.text)).toEqual([
+		'That message is being edited; save or cancel the edit first.',
+		'dropped queued message 2: later',
+	])
+	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual([
+		'/queue drop 1',
+		'/queue drop 2',
+	])
 	cancel(a, id)
 	end(0)
 	await until(() => calls.length === 2)

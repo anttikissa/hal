@@ -79,7 +79,8 @@ async function serve(): Promise<boolean> {
 // holds 104 bytes on macOS (108 on Linux), NUL included.
 function pathProblem(path = server.socketPath()): string | undefined {
 	let bytes = Buffer.byteLength(path)
-	if (bytes > 103) return `the socket path ${path} is ${bytes} bytes, over the 103-byte limit for Unix sockets; use a shorter --home`
+	if (bytes > 103)
+		return `the socket path ${path} is ${bytes} bytes, over the 103-byte limit for Unix sockets; use a shorter --home`
 	return undefined
 }
 
@@ -100,9 +101,12 @@ async function listen(path: string): Promise<Server> {
 
 function accept(socket: Socket): void {
 	server.state.sockets.add(socket)
-	let conn = host.adapt((message) => {
-		if (!socket.destroyed) socket.write(`${message}\n`)
-	}, { kind: 'peer' })
+	let conn = host.adapt(
+		(message) => {
+			if (!socket.destroyed) socket.write(`${message}\n`)
+		},
+		{ kind: 'peer' },
+	)
 	socket.on(
 		'data',
 		lines.decoder(

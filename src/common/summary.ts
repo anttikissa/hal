@@ -18,7 +18,10 @@ function last(text: string): { kind: TagKind; line: string } | undefined {
 	let match = [...markdownCode.mask(text).matchAll(TAGS)].at(-1)
 	if (!match) return undefined
 	let kind = match[1] as TagKind
-	let line = text.slice(match.index + kind.length + 2, match.index + match[0].length - kind.length - 3).replace(/\s+/g, ' ').trim()
+	let line = text
+		.slice(match.index + kind.length + 2, match.index + match[0].length - kind.length - 3)
+		.replace(/\s+/g, ' ')
+		.trim()
 	return line ? { kind, line } : undefined
 }
 
@@ -35,10 +38,13 @@ function asks(text: string): boolean {
 // Remove notification metadata; answers retain question content.
 function strip(text: string, questions = false): string {
 	let masked = markdownCode.mask(text)
-	let out = '', at = 0
+	let out = '',
+		at = 0
 	for (let match of masked.matchAll(TAGS)) {
 		if (questions && match[1] === 'question') {
-			out += text.slice(at, match.index) + text.slice(match.index + '<question>'.length, match.index + match[0].length - '</question>'.length)
+			out +=
+				text.slice(at, match.index) +
+				text.slice(match.index + '<question>'.length, match.index + match[0].length - '</question>'.length)
 		} else out += text.slice(at, match.index).trimEnd()
 		at = match.index + match[0].length
 	}
@@ -58,7 +64,7 @@ function strip(text: string, questions = false): string {
 // Hide redundant notification text, never an answer's only visible content.
 function answer(text: string): string {
 	let body = names.strip(summary.strip(text, true))
-	return body.trim() ? body : summary.extract(text) ?? body
+	return body.trim() ? body : (summary.extract(text) ?? body)
 }
 
 export const summary = { extract, asks, strip, answer }

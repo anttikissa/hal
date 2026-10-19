@@ -25,9 +25,21 @@ import type { Item, Transcript } from './transcript.ts'
 // it only then); and for an earlier prompt, `rewind`, its record
 // number, `later`, how many messages follow it, and `changed`, whether
 // tools with side effects ran since.
-export type Editing = { sessionId: string; original: string; target?: string; inbox?: string; aside?: true; paused?: boolean; rewind?: number; later?: number; changed?: boolean; queueEdit?: string }
+export type Editing = {
+	sessionId: string
+	original: string
+	target?: string
+	inbox?: string
+	aside?: true
+	paused?: boolean
+	rewind?: number
+	later?: number
+	changed?: boolean
+	queueEdit?: string
+}
 
-const mine = (i: Item): i is Item & { type: 'prompt' } => i.type === 'prompt' && i.from === undefined && i.origin !== 'model'
+const mine = (i: Item): i is Item & { type: 'prompt' } =>
+	i.type === 'prompt' && i.from === undefined && i.origin !== 'model'
 
 // Keys of the prompts the human sent since the latest compaction (a
 // clear leaves no items before it): each has an Edit button. A record
@@ -76,15 +88,22 @@ function begin(t: Transcript | undefined): { editing: Editing; command?: unknown
 	if (sent?.delivery === 'queue') return undefined
 	if (sent && !/^\/[a-z]/i.test(sent.text.trimStart())) {
 		let editing: Editing = { sessionId, original: sent.text, inbox: sent.id }
-		return states.busy(t.state) ? { editing } : { editing: { ...editing, paused: true }, command: { type: 'pause', sessionId } }
+		return states.busy(t.state)
+			? { editing }
+			: { editing: { ...editing, paused: true }, command: { type: 'pause', sessionId } }
 	}
 	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
 	if (waiting) return { editing: { sessionId, original: literal.escape(waiting.text), inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined
 	let last = t.items.findLast(mine)
 	if (!last) return undefined
-	let changed = t.items.slice(t.items.indexOf(last) + 1).some((i) => i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
-	return { editing: { sessionId, original: literal.escape(last.text), target: last.key, changed, paused: true }, command: { type: 'pause', sessionId } }
+	let changed = t.items
+		.slice(t.items.indexOf(last) + 1)
+		.some((i) => i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
+	return {
+		editing: { sessionId, original: literal.escape(last.text), target: last.key, changed, paused: true },
+		command: { type: 'pause', sessionId },
+	}
 }
 
 // Enter while editing. Alt-Enter (`queue`) and an emptied editor act as
@@ -92,9 +111,11 @@ function begin(t: Transcript | undefined): { editing: Editing; command?: unknown
 function enter(editing: Editing, t: Transcript | undefined, text: string, queue = false): unknown {
 	if (editing.queueEdit) return undefined
 	if (!queue && text === editing.original) return resume(editing, t)
-	if (queue || !text.trim()) return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
+	if (queue || !text.trim())
+		return states.enter(editing.sessionId, t?.state ?? { type: 'idle' }, text, queue ? 'queue' : 'steer').command
 	if (editing.changed) return { type: 'submit', sessionId: editing.sessionId, text }
-	if (editing.inbox !== undefined) return { type: 'submit', sessionId: editing.sessionId, text, amend: true, edits: editing.inbox }
+	if (editing.inbox !== undefined)
+		return { type: 'submit', sessionId: editing.sessionId, text, amend: true, edits: editing.inbox }
 	return { type: 'submit', sessionId: editing.sessionId, text: `/edit ${parseInt(editing.target!)}\n${text}` }
 }
 
@@ -102,8 +123,17 @@ function enter(editing: Editing, t: Transcript | undefined, text: string, queue 
 // or the one whose pause is still on its way; nothing if it ended or
 // was never paused (a waiting message was edited).
 function resume(editing: Editing, t: Transcript | undefined): unknown {
-	if (editing.queueEdit || !t || t.meta.id !== editing.sessionId || (editing.inbox !== undefined && !editing.paused) || editing.paused === false) return undefined
-	return t.state.type === 'paused' || states.busy(t.state) ? { type: 'continue', sessionId: editing.sessionId } : undefined
+	if (
+		editing.queueEdit ||
+		!t ||
+		t.meta.id !== editing.sessionId ||
+		(editing.inbox !== undefined && !editing.paused) ||
+		editing.paused === false
+	)
+		return undefined
+	return t.state.type === 'paused' || states.busy(t.state)
+		? { type: 'continue', sessionId: editing.sessionId }
+		: undefined
 }
 
 // The bar over the box during an edit from an Edit button (task 26q),

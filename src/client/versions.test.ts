@@ -13,7 +13,11 @@ afterEach(() => {
 	app.reset()
 })
 
-const snapshot: Event = { type: 'snapshot', sessionId: 's', snapshot: { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' } } }
+const snapshot: Event = {
+	type: 'snapshot',
+	sessionId: 's',
+	snapshot: { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' } },
+}
 
 test('a peer running other code than its host says both versions; equal ones say nothing', () => {
 	render.show = () => {}

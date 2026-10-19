@@ -21,7 +21,8 @@ const originalHome = paths.home
 const originalMax = attachments.maxBytes
 const originalSecurity = settings.security
 const ctx = () => ({ cwd: home, sessionId: 's', signal: new AbortController().signal })
-const read = (path: string, extra = {}) => tools.run({ type: 'tool_call', id: 'r', name: 'read', input: { path, ...extra } }, ctx())
+const read = (path: string, extra = {}) =>
+	tools.run({ type: 'tool_call', id: 'r', name: 'read', input: { path, ...extra } }, ctx())
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-read-image-`)
@@ -85,21 +86,48 @@ test('a READ without a range shows the first 200 lines and how to get more; offs
 test('READ refuses sensitive paths and symlink targets without exposing contents or dropping safe batch siblings', async () => {
 	let secret = 'FAKE-SECRET-CONTENT'
 	for (let dir of ['.ssh', '.aws', '.gnupg', 'secrets']) mkdirSync(`${home}/${dir}`)
-	let sensitive = ['.ssh/id_rsa', '.aws/credentials', '.gnupg/private', 'secrets/token.txt', '.env', '.env.production', 'credentials.json', 'auth.ason', 'id_ed25519', 'private.pem', 'wallet.dat', 'wallet.dat-journal', 'personal.keys']
+	let sensitive = [
+		'.ssh/id_rsa',
+		'.aws/credentials',
+		'.gnupg/private',
+		'secrets/token.txt',
+		'.env',
+		'.env.production',
+		'credentials.json',
+		'auth.ason',
+		'id_ed25519',
+		'private.pem',
+		'wallet.dat',
+		'wallet.dat-journal',
+		'personal.keys',
+	]
 	for (let path of sensitive) writeFileSync(`${home}/${path}`, secret)
 	writeFileSync(`${home}/public.txt`, 'ordinary public content\n')
 	writeFileSync(`${home}/image.key`, Buffer.from('89504e470d0a1a0a00000000', 'hex'))
 	symlinkSync(`${home}/.ssh/id_rsa`, `${home}/alias.txt`)
 	symlinkSync(`${home}/.ssh`, `${home}/alias-dir`)
 	symlinkSync(`${home}/public.txt`, `${home}/.env.link`)
-	for (let path of [...sensitive, '.ssh', '.ssh/*', 'secrets', 'alias.txt', 'alias-dir', '.env.link', 'image.key', `${home}/.ssh/id_rsa`]) {
+	for (let path of [
+		...sensitive,
+		'.ssh',
+		'.ssh/*',
+		'secrets',
+		'alias.txt',
+		'alias-dir',
+		'.env.link',
+		'image.key',
+		`${home}/.ssh/id_rsa`,
+	]) {
 		let result = await read(path, { offset: 1, limit: 1 })
 		expect(result.isError).toBe(true)
 		expect(result.output).toContain(`${path} is a sensitive path`)
 		expect(result.output).not.toContain(secret)
 		expect(result.image).toBeUndefined()
 	}
-	let batch = await tools.run({ type: 'tool_call', id: 'batch', ...nativeTool.resolve('READ "public.txt:1-1" "alias.txt" ".ssh/*"') }, ctx())
+	let batch = await tools.run(
+		{ type: 'tool_call', id: 'batch', ...nativeTool.resolve('READ "public.txt:1-1" "alias.txt" ".ssh/*"') },
+		ctx(),
+	)
 	expect(batch.isError).toBe(true)
 	expect(batch.output).toContain('1: ordinary public content')
 	expect(batch.output).toContain('alias.txt is a sensitive path')
@@ -167,25 +195,43 @@ test('mixed batches retain every durable image, error and file version across hi
 	expect(content[0].content).toContain(result.output)
 	expect(content.filter((b: any) => b.type === 'image').map((b: any) => b.source.data)).toEqual(expected)
 	let responses: any = openai.input(req).at(-1)
-	expect(responses.content.map((b: any) => b.image_url)).toEqual(expected.map((data, i) => `data:${i ? 'image/gif' : 'image/png'};base64,${data}`))
+	expect(responses.content.map((b: any) => b.image_url)).toEqual(
+		expected.map((data, i) => `data:${i ? 'image/gif' : 'image/png'};base64,${data}`),
+	)
 	let chat: any = openaiCompat.toMessages(req).at(-1)
-	expect(chat.content.filter((b: any) => b.type === 'image_url').map((b: any) => b.image_url.url)).toEqual(responses.content.map((b: any) => b.image_url))
-	let recovered = await tools.run({ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id: `t${record.n}` } }, ctx())
+	expect(chat.content.filter((b: any) => b.type === 'image_url').map((b: any) => b.image_url.url)).toEqual(
+		responses.content.map((b: any) => b.image_url),
+	)
+	let recovered = await tools.run(
+		{ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id: `t${record.n}` } },
+		ctx(),
+	)
 	expect(blocks.resultImages(recovered).map((b) => blobs.base64('s', b.blob))).toEqual(expected)
 	let shown = transcript.recordItems(record, 0)
-	expect(shown.filter((b) => b.type === 'image').map((b) => b.blob)).toEqual(blocks.resultImages(result).map((b) => b.blob))
+	expect(shown.filter((b) => b.type === 'image').map((b) => b.blob)).toEqual(
+		blocks.resultImages(result).map((b) => b.blob),
+	)
 	expect(new Set(shown.map((b) => b.key)).size).toBe(3)
 	let omitted = pruning.omit('s', record)
 	expect(omitted.type).toBe('user')
 	if (omitted.type === 'user' && omitted.blocks[0]?.type === 'tool_result') {
 		expect(blocks.resultImages(omitted.blocks[0])).toEqual([])
-		for (let [i] of blocks.resultImages(result).entries()) expect(omitted.blocks[0].output).toContain(`s/${record.n}.${i + 1}`)
+		for (let [i] of blocks.resultImages(result).entries())
+			expect(omitted.blocks[0].output).toContain(`s/${record.n}.${i + 1}`)
 	}
-	let withoutImages = messages.map((m) => ({ ...m, blocks: m.blocks.map((b) => b.type === 'tool_result' ? { ...b, images: undefined } : b) })) as typeof messages
-	expect(pruning.estimate('s', messages) - pruning.estimate('s', withoutImages)).toBeGreaterThanOrEqual(2 * pruning.maxImageTokens)
+	let withoutImages = messages.map((m) => ({
+		...m,
+		blocks: m.blocks.map((b) => (b.type === 'tool_result' ? { ...b, images: undefined } : b)),
+	})) as typeof messages
+	expect(pruning.estimate('s', messages) - pruning.estimate('s', withoutImages)).toBeGreaterThanOrEqual(
+		2 * pruning.maxImageTokens,
+	)
 	let missing = blocks.resultImages(result)[0]!
 	rmSync(blobs.find('s', missing.blob)!.path)
-	let partial = await tools.run({ type: 'tool_call', id: 'partial', name: 'read_entry', input: { id: `t${record.n}` } }, ctx())
+	let partial = await tools.run(
+		{ type: 'tool_call', id: 'partial', name: 'read_entry', input: { id: `t${record.n}` } },
+		ctx(),
+	)
 	expect(partial.isError).toBe(true)
 	expect(partial.output).toContain(`image blob s/${missing.blob} not found`)
 	expect(blocks.resultImages(partial).map((b) => blobs.base64('s', b.blob))).toEqual([expected[1]])
@@ -203,7 +249,10 @@ test('successful image batches and legacy single-image records share replay and 
 	let record = { type: 'user' as const, n: 3, ts: '', blocks: [single] }
 	expect(transcript.recordItems(record, 0).filter((b) => b.type === 'image')).toHaveLength(1)
 	let recoveredRecord = history.append('s', record)
-	let recovered = await tools.run({ type: 'tool_call', id: 'old', name: 'read_entry', input: { id: `t${recoveredRecord.n}` } }, ctx())
+	let recovered = await tools.run(
+		{ type: 'tool_call', id: 'old', name: 'read_entry', input: { id: `t${recoveredRecord.n}` } },
+		ctx(),
+	)
 	expect(blocks.resultImages(recovered)).toHaveLength(1)
 })
 
@@ -211,12 +260,16 @@ test('READ_ENTRY recovers images from every sibling result and direct image in a
 	let png = Buffer.from('89504e470d0a1a0a00000000', 'hex')
 	let saved = Array.from({ length: 4 }, () => blobs.store('s', 'image/png', png.toString('base64')))
 	let images = saved.map((b) => ({ type: 'image' as const, blob: b.blob, mediaType: b.mediaType, bytes: b.bytes }))
-	let record = history.append('s', { type: 'user', blocks: [
-		{ type: 'tool_result', id: 'legacy', output: 'legacy output', image: images[0] },
-		{ type: 'tool_result', id: 'multi', output: 'multi output', images: images.slice(1, 3) },
-		images[3]!,
-	] })
-	let recover = () => tools.run({ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id: `t${record.n}` } }, ctx())
+	let record = history.append('s', {
+		type: 'user',
+		blocks: [
+			{ type: 'tool_result', id: 'legacy', output: 'legacy output', image: images[0] },
+			{ type: 'tool_result', id: 'multi', output: 'multi output', images: images.slice(1, 3) },
+			images[3]!,
+		],
+	})
+	let recover = () =>
+		tools.run({ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id: `t${record.n}` } }, ctx())
 	let whole = await recover()
 	expect(whole.isError).toBeUndefined()
 	expect(blocks.resultImages(whole)).toHaveLength(4)

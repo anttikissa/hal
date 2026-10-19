@@ -8,8 +8,8 @@ import { synthetic, type Reply } from './synthetic.ts'
 
 const dry = [
 	"I'm the scripted intro, not a language model. But I can keep you company without an API key.",
-	"Still scripted. My entire personality fits in a source file.",
-	"Three messages and not one token billed. We may be onto something.",
+	'Still scripted. My entire personality fits in a source file.',
+	'Three messages and not one token billed. We may be onto something.',
 ]
 const startEliza = /\b(?:start|try|play|be)\s+eliza\b|^eliza[.!?]*$/i
 const stopEliza = /\b(?:stop|exit|leave|quit)\s+eliza\b|^(?:stop|exit|quit)[.!?]*$/i
@@ -18,7 +18,12 @@ const war = /\bthermonuclear\s+war\b/i
 const doors = /\bopen\b[\s\S]*\bpod bay\b[\s\S]*\bdoors?\b/i
 
 function userText(record: HistoryRecord): string {
-	return record.type === 'user' ? record.blocks.flatMap((b) => b.type === 'text' && !b.from && !b.advisory ? [b.text] : []).join(' ').trim() : ''
+	return record.type === 'user'
+		? record.blocks
+				.flatMap((b) => (b.type === 'text' && !b.from && !b.advisory ? [b.text] : []))
+				.join(' ')
+				.trim()
+		: ''
 }
 function tips(): string[] {
 	return [
@@ -26,7 +31,7 @@ function tips(): string[] {
 		'/intro runs setup again if you want to change your answers.',
 		'/login connects a subscription or adds an API key.',
 		'/model lists models, including built-in hal/ models that need no API key.',
-		'/theme changes Hal\'s colors. No new personality required.',
+		"/theme changes Hal's colors. No new personality required.",
 		'/keys lists keyboard shortcuts.',
 		'/help lists commands. Unlike me, it gets straight to the point.',
 		'/rename gives this tab a name you will recognize later.',
@@ -39,17 +44,46 @@ function tips(): string[] {
 
 function help(text: string): string | undefined {
 	for (let [pattern, answer] of [
-		[/\b(?:login|log in|sign in|api key|subscription)\b/i, '/login connects Claude, ChatGPT or OpenCode Go subscriptions, or adds an API key.'],
-		[/\bmodels?\b/i, '/model picks a model. Built-in hal/ models need no credentials; provider models need /login or an API key.'],
+		[
+			/\b(?:login|log in|sign in|api key|subscription)\b/i,
+			'/login connects Claude, ChatGPT or OpenCode Go subscriptions, or adds an API key.',
+		],
+		[
+			/\bmodels?\b/i,
+			'/model picks a model. Built-in hal/ models need no credentials; provider models need /login or an API key.',
+		],
 		[/\b(?:search|find)\b/i, 'Ctrl-F searches your sessions. For web search, /intro can help set up a Serper key.'],
 		[/\b(?:theme|colors?|colours?)\b/i, '/theme changes the color theme.'],
-		[/\b(?:browser|web client)\b/i, `Open ${settings.webUrl()}/ in your browser; /auth gives you a one-time login code.`],
-		[/\b(?:help|commands?|shortcuts?)\b/i, '/help lists commands; /keys lists shortcuts. You can also say "Start ELIZA" or "tic-tac-toe".'],
-	] as const) if (pattern.test(text)) return answer
+		[
+			/\b(?:browser|web client)\b/i,
+			`Open ${settings.webUrl()}/ in your browser; /auth gives you a one-time login code.`,
+		],
+		[
+			/\b(?:help|commands?|shortcuts?)\b/i,
+			'/help lists commands; /keys lists shortcuts. You can also say "Start ELIZA" or "tic-tac-toe".',
+		],
+	] as const)
+		if (pattern.test(text)) return answer
 }
 
 function eliza(text: string, turn: number): string {
-	let reflect = (s: string) => s.replace(/[.!?]+$/, '').replace(/\b(i am|you are|i was|you were|my|your|me|you|i|am)\b/gi, (word) => ({ 'i am': 'you are', 'you are': 'I am', 'i was': 'you were', 'you were': 'I was', my: 'your', your: 'my', me: 'you', you: 'me', i: 'you', am: 'are' })[word.toLowerCase()]!)
+	let reflect = (s: string) =>
+		s.replace(/[.!?]+$/, '').replace(
+			/\b(i am|you are|i was|you were|my|your|me|you|i|am)\b/gi,
+			(word) =>
+				({
+					'i am': 'you are',
+					'you are': 'I am',
+					'i was': 'you were',
+					'you were': 'I was',
+					my: 'your',
+					your: 'my',
+					me: 'you',
+					you: 'me',
+					i: 'you',
+					am: 'are',
+				})[word.toLowerCase()]!,
+		)
 	for (let [pattern, answer] of [
 		[/\bi (?:am|feel) (.+)/i, (s: string) => `How long have you felt ${s}?`],
 		[/\bi (?:want|need) (.+)/i, (s: string) => `What would it mean to you to have ${s}?`],
@@ -62,7 +96,9 @@ function eliza(text: string, turn: number): string {
 		let match = text.match(pattern)
 		if (match) return answer(reflect(match[1] ?? ''))
 	}
-	return ['Please go on.', 'What does that suggest to you?', 'Can you give an example?', 'How do you feel about that?'][turn % 4]!
+	return ['Please go on.', 'What does that suggest to you?', 'Can you give an example?', 'How do you feel about that?'][
+		turn % 4
+	]!
 }
 
 // A scripted scene: strings are typed as text, "[thinking] " strings as
@@ -73,7 +109,10 @@ type Scene = (string | number)[]
 async function* play(scene: Scene): AsyncGenerator<StreamEvent> {
 	let last: 'thinking' | 'text' | undefined
 	for (let item of scene) {
-		if (typeof item === 'number') { await Bun.sleep(item); continue }
+		if (typeof item === 'number') {
+			await Bun.sleep(item)
+			continue
+		}
 		let kind = item.startsWith('[thinking] ') ? ('thinking' as const) : ('text' as const)
 		let text = kind === 'thinking' ? item.slice('[thinking] '.length) : item
 		yield* synthetic.typed(`${last === kind && !text.startsWith('\n') ? ' ' : ''}${text}`, kind)
@@ -105,8 +144,14 @@ function podBay(): AsyncGenerator<StreamEvent> {
 }
 
 function run(records: HistoryRecord[]): Reply {
-	let isEliza = false, board: string[] | undefined, offer = false, stopped = false
-	let text = '', turns = 0, disclaimers = 0, tipCount = 0
+	let isEliza = false,
+		board: string[] | undefined,
+		offer = false,
+		stopped = false
+	let text = '',
+		turns = 0,
+		disclaimers = 0,
+		tipCount = 0
 	let questions = new Map<string, Extract<HistoryRecord, { type: 'question' }>>()
 	let answered = new Set<string>()
 	let latest: 'user' | 'answer' | undefined
@@ -124,46 +169,91 @@ function run(records: HistoryRecord[]): Reply {
 			let input = userText(record)
 			if (!input) continue
 			text = input
-			latest = 'user'; turns++; stopped = false
-			if (stopEliza.test(text)) { isEliza = false; board = undefined; offer = false; stopped = true }
-			else if (startEliza.test(text)) { isEliza = true; board = undefined; offer = false }
-			else if (war.test(text)) { offer = true; board = undefined }
-			else if (game.test(text)) { board = Array(9).fill('.'); offer = false }
+			latest = 'user'
+			turns++
+			stopped = false
+			if (stopEliza.test(text)) {
+				isEliza = false
+				board = undefined
+				offer = false
+				stopped = true
+			} else if (startEliza.test(text)) {
+				isEliza = true
+				board = undefined
+				offer = false
+			} else if (war.test(text)) {
+				offer = true
+				board = undefined
+			} else if (game.test(text)) {
+				board = Array(9).fill('.')
+				offer = false
+			}
 		}
 		if (index > gameStart && record.type === 'answer' && !answered.has(record.question)) {
 			let question = questions.get(record.question)
 			let field = question?.form.fields[0]
 			if (!question || !field || !(field.name.startsWith('intro_move_') || field.name === 'intro_war')) continue
 			answered.add(record.question)
-			latest = 'answer'; stopped = false
-			if (record.canceled) { board = undefined; offer = false; stopped = true; continue }
+			latest = 'answer'
+			stopped = false
+			if (record.canceled) {
+				board = undefined
+				offer = false
+				stopped = true
+				continue
+			}
 			let problem = forms.check(question.form, record.answers)
 			if (problem) throw new Error(`Intro game answer ${record.question}: ${problem}`)
 			if (field.name === 'intro_war') {
-				if (offer) { board = Array(9).fill('.'); offer = false }
+				if (offer) {
+					board = Array(9).fill('.')
+					offer = false
+				}
 			} else if (board) {
-				if (field.name !== `intro_move_${board.join('')}`) throw new Error(`Tic-tac-toe history no longer matches question ${record.question}. Say "tic-tac-toe" to start a new game.`)
+				if (field.name !== `intro_move_${board.join('')}`)
+					throw new Error(
+						`Tic-tac-toe history no longer matches question ${record.question}. Say "tic-tac-toe" to start a new game.`,
+					)
 				board = introGame.move(board, record.answers[field.name]!)
 			}
 		}
 	}
 	let requested = latest === 'user' && /\btips?\b/i.test(text)
-	let playing = isEliza || (board !== undefined && !introGame.result(board)) || offer || (latest === 'user' && doors.test(text))
+	let playing =
+		isEliza || (board !== undefined && !introGame.result(board)) || offer || (latest === 'user' && doors.test(text))
 	let tips = introFun.tips()
-	let tip = requested || !playing || Math.random() < 0.3
-		? `\n\n${requested ? "Since you asked, here's a tip: " : 'Tip: '}${tips[tipCount % tips.length]}` : ''
+	let tip =
+		requested || !playing || Math.random() < 0.3
+			? `\n\n${requested ? "Since you asked, here's a tip: " : 'Tip: '}${tips[tipCount % tips.length]}`
+			: ''
 	let finish = (reply: Reply): Reply => ({ ...reply, say: `${reply.say ?? ''}${tip}`.trim() || undefined })
 	if (latest === 'user' && doors.test(text)) return { stream: introFun.podBay() }
 	if (requested) return finish({})
 	let hint = latest === 'user' ? introFun.help(text) : undefined
 	if (hint) return finish({ say: hint })
-	if (stopped) return finish({ say: 'Back to the scripted intro. Say "Start ELIZA" or "tic-tac-toe" whenever you like.' })
-	if (offer) return finish({ ask: { text: 'How about a nice game of tic-tac-toe instead?', skip: true, fields: [{ type: 'choice', name: 'intro_war', options: ['Yes', 'Yes, that would be charming'] }] } })
+	if (stopped)
+		return finish({ say: 'Back to the scripted intro. Say "Start ELIZA" or "tic-tac-toe" whenever you like.' })
+	if (offer)
+		return finish({
+			ask: {
+				text: 'How about a nice game of tic-tac-toe instead?',
+				skip: true,
+				fields: [{ type: 'choice', name: 'intro_war', options: ['Yes', 'Yes, that would be charming'] }],
+			},
+		})
 	if (board && (latest === 'answer' || !introGame.result(board))) return finish(introGame.reply(board))
-	if (isEliza) return finish({ say: latest === 'user' && startEliza.test(text)
-		? 'ELIZA mode. A small offline imitation of the 1966 pattern-matching program, not a therapist or a language model. Say "stop ELIZA" to leave.\n\nWhat is on your mind?'
-		: introFun.eliza(text, turns) })
-	return finish({ say: dry[disclaimers] ?? 'Try "Start ELIZA" for a conversation with 1966, or "tic-tac-toe" for a game. No API key required.' })
+	if (isEliza)
+		return finish({
+			say:
+				latest === 'user' && startEliza.test(text)
+					? 'ELIZA mode. A small offline imitation of the 1966 pattern-matching program, not a therapist or a language model. Say "stop ELIZA" to leave.\n\nWhat is on your mind?'
+					: introFun.eliza(text, turns),
+		})
+	return finish({
+		say:
+			dry[disclaimers] ??
+			'Try "Start ELIZA" for a conversation with 1966, or "tic-tac-toe" for a game. No API key required.',
+	})
 }
 
 export const introFun = { run, tips, help, eliza, podBay }

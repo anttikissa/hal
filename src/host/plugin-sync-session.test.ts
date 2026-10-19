@@ -13,7 +13,17 @@ import { tabs } from './tabs.ts'
 useHost()
 
 const home = 'f'.repeat(16)
-const ask = { text: 'theme.ts: which version should both homes keep?', fields: [{ type: 'choice' as const, name: 'choice', options: ['Use client version', 'Use server version', 'Keep separate — ignore sync for theme.ts on this client'], initial: 0 }] }
+const ask = {
+	text: 'theme.ts: which version should both homes keep?',
+	fields: [
+		{
+			type: 'choice' as const,
+			name: 'choice',
+			options: ['Use client version', 'Use server version', 'Keep separate — ignore sync for theme.ts on this client'],
+			initial: 0,
+		},
+	],
+}
 
 test('/plugin-sync focuses one review tab, relays answers, and Escape asks nothing', async () => {
 	mkdirSync(join(testHome(), 'plugins'))
@@ -57,10 +67,21 @@ test('/plugin-sync focuses one review tab, relays answers, and Escape asks nothi
 	expect(a.of('plugin-sync').at(-1).answers).toBeUndefined()
 	a.conn.send({ type: 'plugin-sync', op: 'step', session: review, say: 'theme.ts differs.', ask, id: 's2' })
 	await until(() => a.of('question').length === 2)
-	a.conn.send({ type: 'answer', sessionId: review, question: a.of('question')[1].id, answers: { choice: 'Use client version' } })
+	a.conn.send({
+		type: 'answer',
+		sessionId: review,
+		question: a.of('question')[1].id,
+		answers: { choice: 'Use client version' },
+	})
 	await until(() => a.of('plugin-sync').filter((e: any) => e.review).length === 3)
 	expect(a.of('plugin-sync').at(-1).answers).toEqual({ choice: 'Use client version' })
-	a.conn.send({ type: 'plugin-sync', op: 'step', session: review, say: 'Used the client version of theme.ts.', id: 's3' })
+	a.conn.send({
+		type: 'plugin-sync',
+		op: 'step',
+		session: review,
+		say: 'Used the client version of theme.ts.',
+		id: 's3',
+	})
 	await until(() => status.stateOf(review).type === 'idle')
 	expect(tabs.file().open.filter((id) => sessions.open(id).model === 'hal/plugin-sync')).toEqual([review])
 	pluginHistory.state = { dir: undefined, error: undefined, versions: new Map(), heads: new Map() }

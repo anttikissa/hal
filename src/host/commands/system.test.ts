@@ -15,13 +15,17 @@ test('/system names included source files and prints the same assembled prompt a
 	let now = clock.now
 	try {
 		systemPrompt.file = () => `${testHome()}/SYSTEM.md`
-		writeFileSync(`${testHome()}/SYSTEM.md`, 'You are Hal.\n@extra.md\n::: if $session_model like "fake/*"\nSelected.\n:::\n$agents')
+		writeFileSync(
+			`${testHome()}/SYSTEM.md`,
+			'You are Hal.\n@extra.md\n::: if $session_model like "fake/*"\nSelected.\n:::\n$agents',
+		)
 		clock.now = () => Date.UTC(2026, 8, 28, 20)
 		let id = created(c, `${testHome()}/repo`)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
 		await until(() => c.of('output').at(-1)?.text?.includes('bytes total'))
 		let output: string = c.of('output').at(-1).text
-		for (let file of ['SYSTEM.md', 'extra.md', 'AGENTS.md']) expect(output).toMatch(new RegExp(`\\d+ bytes +[^\\n]*${file}`))
+		for (let file of ['SYSTEM.md', 'extra.md', 'AGENTS.md'])
+			expect(output).toMatch(new RegExp(`\\d+ bytes +[^\\n]*${file}`))
 		let expected = systemPrompt.build({ cwd: `${testHome()}/repo`, model: 'fake/m1', now: clock.now(), sessionId: id })
 		expect(output.slice(output.indexOf('\n\n') + 2)).toBe(expected)
 		expect(output).toContain('Included text: fake/m1')
@@ -31,5 +35,8 @@ test('/system names included source files and prints the same assembled prompt a
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
 		await until(() => c.of('output').at(-1)?.error)
 		expect(c.of('output').at(-1).text).toMatch(/SYSTEM.md:1: unclosed/)
-	} finally { systemPrompt.file = orig; clock.now = now }
+	} finally {
+		systemPrompt.file = orig
+		clock.now = now
+	}
 })

@@ -1,7 +1,14 @@
 // Worker entry. Importing this module in the host does no work.
 import { isMainThread } from 'worker_threads'
 import { statSync } from 'fs'
-import { findQuery, type FindBatch, type FindFilter, type FindKind, type FindQuery, type FindResult } from '../common/find.ts'
+import {
+	findQuery,
+	type FindBatch,
+	type FindFilter,
+	type FindKind,
+	type FindQuery,
+	type FindResult,
+} from '../common/find.ts'
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { findIndex, type FindRow } from './find-index.ts'
@@ -12,7 +19,10 @@ type Search = { channel: string; request: string; query: string; kinds?: FindFil
 type Reply = { channel: string; batch: FindBatch }
 
 function eligible(meta: SessionMeta, q: FindQuery): boolean {
-	return (!q.model || meta.model.toLocaleLowerCase().includes(q.model)) && (!q.cwd || meta.cwd.toLocaleLowerCase().includes(q.cwd))
+	return (
+		(!q.model || meta.model.toLocaleLowerCase().includes(q.model)) &&
+		(!q.cwd || meta.cwd.toLocaleLowerCase().includes(q.cwd))
+	)
 }
 
 function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
@@ -22,7 +32,15 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 	if (q.since !== undefined && age > q.since) return
 	let match = findQuery.match(row.text, q.words, age)
 	if (!match) return
-	return { sessionId: row.sessionId, name: meta.name ?? '', blockId: row.blockId, kind: row.kind, age, ...match, href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}` }
+	return {
+		sessionId: row.sessionId,
+		name: meta.name ?? '',
+		blockId: row.blockId,
+		kind: row.kind,
+		age,
+		...match,
+		href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}`,
+	}
 }
 
 // Each call prepares its own statement. db.query() caches one statement per
@@ -30,15 +48,24 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 // statement then failed with SQLITE_MISUSE ("bad parameter or other API
 // misuse") while the older cursor was still open.
 function* candidates(kind: FindKind, q: FindQuery): Generator<FindRow> {
-	let db = findIndex.state.db!, words = q.words.filter((w) => [...w].length >= 3)
+	let db = findIndex.state.db!,
+		words = q.words.filter((w) => [...w].length >= 3)
 	let quote = (w: string) => '"' + w.replaceAll('"', '""') + '"'
 	let grams = words.map(quote).join(' AND ')
-	let tokens = q.words.filter((w) => /^[\p{L}\p{N}_]+$/u.test(w)).map((w) => quote(w) + '*').join(' AND ')
-	let stmt = !words.length ? db.prepare('SELECT * FROM docs WHERE kind=?') : db.prepare(`SELECT * FROM docs WHERE kind=? AND id IN
+	let tokens = q.words
+		.filter((w) => /^[\p{L}\p{N}_]+$/u.test(w))
+		.map((w) => quote(w) + '*')
+		.join(' AND ')
+	let stmt = !words.length
+		? db.prepare('SELECT * FROM docs WHERE kind=?')
+		: db.prepare(`SELECT * FROM docs WHERE kind=? AND id IN
 		(SELECT rowid FROM grams WHERE grams MATCH ? ${tokens ? 'UNION SELECT rowid FROM words WHERE words MATCH ?' : ''})`)
 	let args = !words.length ? [kind] : tokens ? [kind, grams, tokens] : [kind, grams]
-	try { yield* stmt.iterate(...args) as Iterable<FindRow> }
-	finally { stmt.finalize() }
+	try {
+		yield* stmt.iterate(...args) as Iterable<FindRow>
+	} finally {
+		stmt.finalize()
+	}
 }
 
 async function search(c: Search): Promise<void> {
@@ -46,18 +73,37 @@ async function search(c: Search): Promise<void> {
 	let current = () => findWorker.state.active.get(c.channel) === c.request
 	let tier: FindKind = 'metadata'
 	let send = (results: FindResult[], done = false, scanning = 0, error?: string) => {
-		if (current()) postMessage({ channel: c.channel, batch: { type: 'find-results', request: c.request, tier, results, done, scanning, ...(error ? { error } : {}) } } satisfies Reply)
+		if (current())
+			postMessage({
+				channel: c.channel,
+				batch: { type: 'find-results', request: c.request, tier, results, done, scanning, ...(error ? { error } : {}) },
+			} satisfies Reply)
 	}
 	try {
 		await findWorker.state.ready
 		if (!current()) return
 		for (let m of c.meta ?? []) findIndex.state.meta.set(m.id, m)
-		let q = findQuery.parse(c.query, c.kinds), now = Date.now()
+		let q = findQuery.parse(c.query, c.kinds),
+			now = Date.now()
 		// No query: the sessions whose histories changed last (task 6m).
 		if (!c.query.trim()) {
-			let recent = [...findIndex.state.meta.values()].map((m) => ({ m, at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt) }))
+			let recent = [...findIndex.state.meta.values()].map((m) => ({
+				m,
+				at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt),
+			}))
 			recent.sort((a, b) => b.at - a.at)
-			send(recent.slice(0, 50).map(({ m, at }) => ({ sessionId: m.id, name: m.name ?? '', blockId: '', kind: 'metadata', age: Math.max(0, now - at), snippet: m.cwd, score: at, href: `/${m.id}` })))
+			send(
+				recent.slice(0, 50).map(({ m, at }) => ({
+					sessionId: m.id,
+					name: m.name ?? '',
+					blockId: '',
+					kind: 'metadata',
+					age: Math.max(0, now - at),
+					snippet: m.cwd,
+					score: at,
+					href: `/${m.id}`,
+				})),
+			)
 			send([], true)
 			return
 		}
@@ -70,10 +116,22 @@ async function search(c: Search): Promise<void> {
 				if (h) hits.set(`${h.sessionId}#${h.blockId}`, h)
 				if (hits.size > 100) hits = new Map(top().map((h) => [`${h.sessionId}#${h.blockId}`, h]))
 			}
-			let top = () => [...hits.values()].sort((a, b) => b.score - a.score || a.age - b.age || a.href.localeCompare(b.href)).slice(0, 50)
+			let top = () =>
+				[...hits.values()]
+					.sort((a, b) => b.score - a.score || a.age - b.age || a.href.localeCompare(b.href))
+					.slice(0, 50)
 			if (tier === 'metadata') {
-				for (let m of findIndex.state.meta.values()) take({ sessionId: m.id, blockId: '', kind: tier, ts: Date.parse(m.createdAt), text: `${m.id} ${m.name ?? ''} ${m.model} ${m.cwd}` })
-				send(top()); await Bun.sleep(0); if (!current()) return
+				for (let m of findIndex.state.meta.values())
+					take({
+						sessionId: m.id,
+						blockId: '',
+						kind: tier,
+						ts: Date.parse(m.createdAt),
+						text: `${m.id} ${m.name ?? ''} ${m.model} ${m.cwd}`,
+					})
+				send(top())
+				await Bun.sleep(0)
+				if (!current()) return
 				continue
 			}
 			let started = performance.now()
@@ -82,18 +140,31 @@ async function search(c: Search): Promise<void> {
 				pending = []
 				for (let m of findIndex.state.meta.values()) {
 					if (!findWorker.eligible(m, q)) continue
-					let stat = statSync(history.file(m.id), { throwIfNoEntry: false }), mark = findIndex.mark(m.id)
+					let stat = statSync(history.file(m.id), { throwIfNoEntry: false }),
+						mark = findIndex.mark(m.id)
 					let offset = mark?.offset ?? 0
-					if (mark && stat && (stat.size < offset || (stat.size === mark.size && stat.mtimeMs !== mark.mtime))) { offset = 0; rebuilding.add(m.id) }
-					if ((stat?.size ?? 0) > offset) { pending.push({ meta: m, offset }); rebuilding.add(m.id) }
-					if (performance.now() - started > 4) { await Bun.sleep(0); started = performance.now(); if (!current()) return }
+					if (mark && stat && (stat.size < offset || (stat.size === mark.size && stat.mtimeMs !== mark.mtime))) {
+						offset = 0
+						rebuilding.add(m.id)
+					}
+					if ((stat?.size ?? 0) > offset) {
+						pending.push({ meta: m, offset })
+						rebuilding.add(m.id)
+					}
+					if (performance.now() - started > 4) {
+						await Bun.sleep(0)
+						started = performance.now()
+						if (!current()) return
+					}
 				}
 				pending.sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
 			}
 			for (let row of findWorker.candidates(tier, q)) {
 				if (!rebuilding.has(row.sessionId)) take(row)
 				if (performance.now() - started > 4) {
-					await Bun.sleep(0); started = performance.now(); if (!current()) return
+					await Bun.sleep(0)
+					started = performance.now()
+					if (!current()) return
 				}
 			}
 			send(top(), false, pending.length)
@@ -105,11 +176,14 @@ async function search(c: Search): Promise<void> {
 					for (let row of await findIndex.rows(p.meta.id, record)) if (row.kind === tier) take(row)
 				}
 				send(top(), false, pending.length - i - 1)
-				await Bun.sleep(0); if (!current()) return
+				await Bun.sleep(0)
+				if (!current()) return
 			}
 		}
 		send([], true)
-	} catch (e: any) { send([], true, 0, String(e?.message ?? e)) }
+	} catch (e: any) {
+		send([], true, 0, String(e?.message ?? e))
+	}
 }
 
 async function drain(): Promise<void> {
@@ -122,8 +196,11 @@ async function drain(): Promise<void> {
 			await Bun.sleep(0)
 		}
 		postMessage({ indexed: true })
-	} catch (e: any) { postMessage({ error: String(e?.message ?? e) }) }
-	finally { findWorker.state.indexing = false }
+	} catch (e: any) {
+		postMessage({ error: String(e?.message ?? e) })
+	} finally {
+		findWorker.state.indexing = false
+	}
 }
 
 async function init(home: string): Promise<void> {
@@ -135,7 +212,15 @@ async function init(home: string): Promise<void> {
 	void findWorker.drain()
 }
 
-export const findWorker = { state: { ready: Promise.resolve(), active: new Map<string, string>(), dirty: new Set<string>(), indexing: false }, eligible, hit, candidates, search, drain, init }
+export const findWorker = {
+	state: { ready: Promise.resolve(), active: new Map<string, string>(), dirty: new Set<string>(), indexing: false },
+	eligible,
+	hit,
+	candidates,
+	search,
+	drain,
+	init,
+}
 
 if (!isMainThread) {
 	globalThis.onmessage = (event: MessageEvent) => {
@@ -143,8 +228,7 @@ if (!isMainThread) {
 		if (c.type === 'init') {
 			findWorker.state.ready = findWorker.init(c.home)
 			void findWorker.state.ready.catch((e) => postMessage({ error: String(e?.message ?? e) }))
-		}
-		else if (c.type === 'search') void findWorker.search(c)
+		} else if (c.type === 'search') void findWorker.search(c)
 		else if (c.type === 'cancel') findWorker.state.active.delete(c.channel)
 		else if (c.type === 'dirty') {
 			if (c.meta) findIndex.state.meta.set(c.meta.id, c.meta)

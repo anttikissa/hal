@@ -23,7 +23,14 @@ function deliver(event: NoticeEvent | { type: 'warning'; text: string }): void {
 }
 
 function everyone(text: string): void {
-	let notice: NoticeEvent = { type: 'notice', session: '', name: 'Plugins', kind: 'failed', line: text, key: 'plugin:failure' }
+	let notice: NoticeEvent = {
+		type: 'notice',
+		session: '',
+		name: 'Plugins',
+		kind: 'failed',
+		line: text,
+		key: 'plugin:failure',
+	}
 	noticeHistory.record({ session: '', name: notice.name, kind: notice.kind, line: text })
 	pluginReports.deliver(notice)
 }
@@ -37,11 +44,17 @@ async function report(text: string, path?: string): Promise<void> {
 	let message = `${by} declared and changed ${path} at ${editor.ts}, before this failure; it was the last declared edit.\n${text}`
 	let deliver = () => {
 		let refused = prompts.submit(editor.id, message, undefined, 'steer', { from: editor.id, label: 'plugin loader' })
-		if (refused) { diag.log(`plugin report to ${editor.id}: ${refused}`); everyone(text) }
+		if (refused) {
+			diag.log(`plugin report to ${editor.id}: ${refused}`)
+			everyone(text)
+		}
 	}
 	let ready = host.ready(editor.id)
 	if (!ready) return deliver()
-	ready.then(deliver, (e) => { diag.log(`plugin report to ${editor.id}: ${e?.message ?? e}`); everyone(text) })
+	ready.then(deliver, (e) => {
+		diag.log(`plugin report to ${editor.id}: ${e?.message ?? e}`)
+		everyone(text)
+	})
 }
 
 // Names where the next change to plugin `path` came from, such as a
@@ -60,10 +73,19 @@ function changed(path: string, what: string): void {
 	let from = pluginReports.state.sources.get(path)
 	pluginReports.state.sources.delete(path)
 	if (from && what === 'reloaded') what = 'replaced'
-	let name = basename(path), line = `${paths.display(path)}${from?.side ? ` on ${from.side}` : ''}${from ? ` from ${from.source}` : ''}`
+	let name = basename(path),
+		line = `${paths.display(path)}${from?.side ? ` on ${from.side}` : ''}${from ? ` from ${from.source}` : ''}`
 	noticeHistory.record({ session: '', name, kind: 'update', line, what })
 	let notice: NoticeEvent = { type: 'notice', session: '', name, kind: 'update', what, line, key: `plugin:${path}` }
 	pluginReports.deliver(notice)
 }
 
-export const pluginReports = { state: { sources: new Map<string, { source: string; side?: 'client' | 'server' }>() }, lastEditor, deliver, everyone, report, via, changed }
+export const pluginReports = {
+	state: { sources: new Map<string, { source: string; side?: 'client' | 'server' }>() },
+	lastEditor,
+	deliver,
+	everyone,
+	report,
+	via,
+	changed,
+}

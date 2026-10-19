@@ -9,7 +9,8 @@ import { toolModel } from './tool-model.ts'
 useHost(false, true)
 
 test('direct tool mode welcomes, executes each command once and preserves parser errors', async () => {
-	let c = client(), id = created(c, testHome())
+	let c = client(),
+		id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
 	await until(() => history.readSync(id).some((r) => r.type === 'output' && r.text.includes(toolModel.welcome)))
 	expect(sessions.open(id).blocks).toEqual(sessions.toolBlocks)
@@ -22,7 +23,7 @@ test('direct tool mode welcomes, executes each command once and preserves parser
 	let tools = records.filter((r) => r.type === 'assistant' && r.block.type === 'tool_call')
 	expect(tools).toHaveLength(3)
 	expect(tools[0]).toMatchObject({ block: { name: 'bash', input: { command: 'ls' }, cmd: 'BASH ls' } })
-	let results = records.flatMap((r) => r.type === 'user' ? r.blocks.filter((b) => b.type === 'tool_result') : [])
+	let results = records.flatMap((r) => (r.type === 'user' ? r.blocks.filter((b) => b.type === 'tool_result') : []))
 	expect(results).toHaveLength(3)
 	expect(results[0]?.output).toContain('example.txt')
 	expect(results[1]).toMatchObject({ isError: true })
@@ -34,9 +35,11 @@ test('direct tool mode welcomes, executes each command once and preserves parser
 })
 
 test('clear and unchanged model selection show instructions before the next tool command', async () => {
-	let c = client(), id = created(c, testHome())
+	let c = client(),
+		id = created(c, testHome())
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
-	let welcomes = () => history.readSync(id).filter((r) => r.type === 'output' && r.text.includes(toolModel.welcome)).length
+	let welcomes = () =>
+		history.readSync(id).filter((r) => r.type === 'output' && r.text.includes(toolModel.welcome)).length
 	await until(() => welcomes() === 1)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
 	await until(() => welcomes() === 2)
@@ -48,7 +51,9 @@ test('clear and unchanged model selection show instructions before the next tool
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
 	await until(() => welcomes() === 3)
 	let records = history.readSync(id)
-	expect(records.findLastIndex((r) => r.type === 'output' && r.text.includes(toolModel.welcome))).toBeGreaterThan(records.findLastIndex((r) => r.type === 'reset'))
+	expect(records.findLastIndex((r) => r.type === 'output' && r.text.includes(toolModel.welcome))).toBeGreaterThan(
+		records.findLastIndex((r) => r.type === 'reset'),
+	)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
 	await until(() => welcomes() === 4)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'BASH "echo ready"' })
@@ -58,10 +63,13 @@ test('clear and unchanged model selection show instructions before the next tool
 	let outputs = history.readSync(id).filter((r) => r.type === 'output')
 	let welcomeOutputs = outputs.filter((r) => r.text.includes(toolModel.welcome))
 	for (let r of welcomeOutputs) expect(r).toMatchObject({ text: toolModel.welcome, synthetic: true })
-	let confirmations = outputs.filter((r) => /^(Model changed:|model:|the context is already empty|[/]clear )/.test(r.text))
+	let confirmations = outputs.filter((r) =>
+		/^(Model changed:|model:|the context is already empty|[/]clear )/.test(r.text),
+	)
 	expect(confirmations.length).toBeGreaterThan(0)
 	for (let r of confirmations) expect(r.synthetic).toBeUndefined()
-	for (let event of c.of('output').filter((e) => e.text.includes(toolModel.welcome))) expect(event).toMatchObject({ text: toolModel.welcome, synthetic: true })
+	for (let event of c.of('output').filter((e) => e.text.includes(toolModel.welcome)))
+		expect(event).toMatchObject({ text: toolModel.welcome, synthetic: true })
 	expect(calls).toHaveLength(0)
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 })

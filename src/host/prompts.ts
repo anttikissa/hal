@@ -60,7 +60,13 @@ import { turns } from './turns.ts'
 // `delivery` (task csn): 'soft-steer' leaves the stream and
 // running tools alone, the turn delivering it before its next request;
 // 'steer' stops them; 'queue' runs after the turn.
-function submit(id: string, text: string, command?: string, delivery: Delivery = 'steer', sender?: Sender): string | undefined {
+function submit(
+	id: string,
+	text: string,
+	command?: string,
+	delivery: Delivery = 'steer',
+	sender?: Sender,
+): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the owner's.
 	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
@@ -72,16 +78,32 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	let agent = sender?.from !== undefined || sender?.origin === 'model'
 	let emergency = agent && delivery === 'steer' && sender?.advisory !== true
 	let asked = notify.asked(id)
-	let ownerAnswer = asked && delivery === 'soft-steer' && sender?.from !== undefined && sender.from === sessions.open(id).owner
-		&& sessions.open(id).spawn !== 'interactive' && subagents.owed(id, history.readSync(id))
+	let ownerAnswer =
+		asked &&
+		delivery === 'soft-steer' &&
+		sender?.from !== undefined &&
+		sender.from === sessions.open(id).owner &&
+		sessions.open(id).spawn !== 'interactive' &&
+		subagents.owed(id, history.readSync(id))
 	let waitingAnswer = agent && !emergency && !ownerAnswer && asked
 	let queue = delivery === 'queue'
 	let interrupt = !queue && !waitingAnswer && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.delivery === 'after-turn')
 	// After an asking turn (task nd6), a queued message waits for the reply's turn.
-	if (behind || waitingAnswer || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || (agent && !emergency)) && state.type !== 'idle')) {
-		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
+	if (
+		behind ||
+		waitingAnswer ||
+		(queue && notify.asked(id)) ||
+		turns.state.running.has(id) ||
+		states.busy(state) ||
+		((queue || (agent && !emergency)) && state.type !== 'idle')
+	) {
+		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = {
+			type: 'inbox',
+			id: command ?? crypto.randomUUID(),
+			text,
+		}
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		record.delivery = queue ? 'after-turn' : delivery === 'soft-steer' || sender?.advisory ? 'next-round' : 'now'
 		history.append(id, record)
@@ -106,7 +128,10 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	if (!steering.length) {
 		let list = prompts.blocks(id, [{ text, ...own }])
 		let record = history.submit(id, list, command) as HistoryRecord & { type: 'user' }
-		return void turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), { ...record, sender: prompts.senders(list)[0] })
+		return void turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), {
+			...record,
+			sender: prompts.senders(list)[0],
+		})
 	}
 	prompts.deliver(id, steering, { text, ...own }, command)
 	turns.start(id)
@@ -123,7 +148,10 @@ function interrupt(running: { controller: AbortController }): void {
 // A prompt's blocks from its texts, each keeping who sent it, attachment
 // markers resolved (blobs.resolve).
 function blocksOf(id: string, parts: (Sender & { text: string })[]): UserBlock[] {
-	let { blocks } = blobs.resolve(id, parts.map((p) => p.text))
+	let { blocks } = blobs.resolve(
+		id,
+		parts.map((p) => p.text),
+	)
 	return blocks.map((b, i) => (b.type === 'text' && parts[i] ? { ...b, ...inbox.sender(parts[i]) } : b))
 }
 
@@ -146,8 +174,13 @@ function amend(id: string, text: string, command?: string, target?: number): str
 	let old = records[at]
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
 	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
-	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
-	rebasePlans.drop(id, records.slice(at).flatMap((r) => r.n === undefined || rebasePlans.survives(r) ? [] : [r.n]), { continuing: true })
+	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1)))
+		return prompts.submit(id, text, command)
+	rebasePlans.drop(
+		id,
+		records.slice(at).flatMap((r) => (r.n === undefined || rebasePlans.survives(r) ? [] : [r.n])),
+		{ continuing: true },
+	)
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
 	parts[mine] = { type: 'text', text: literal.strip(text) }
@@ -173,7 +206,11 @@ function edit(id: string, message: string, text: string, command?: string, held 
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined
 	if (refused) return refused
-	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: message, text: call ? text : literal.strip(text) }
+	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = {
+		type: 'inbox',
+		id: message,
+		text: call ? text : literal.strip(text),
+	}
 	if (call) record.withdrawn = true
 	else Object.assign(record, inbox.sender(waiting))
 	if (command !== undefined) record.command = command
@@ -184,17 +221,26 @@ function edit(id: string, message: string, text: string, command?: string, held 
 // Whether the records after a prompt leave the world as it was: no
 // tool call except read-only ones (tools.readOnly).
 function harmless(records: HistoryRecord[]): boolean {
-	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name, r.block.input))
+	return records.every(
+		(r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name, r.block.input),
+	)
 }
 
 // Records inbox messages (and a new prompt `extra`) as one prompt, its
 // attachment markers resolved (blobs.resolve), and tells followers: a
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
 // carries it. Returns the prompt's record.
-function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): HistoryRecord & { type: 'user' } {
+function deliver(
+	id: string,
+	items: InboxItem[],
+	extra?: Sender & { text: string },
+	command?: string,
+	quiet = false,
+): HistoryRecord & { type: 'user' } {
 	// The invariant behind every dequeue: a locked message never leaves.
 	let hold = queueEdits.held(id)
-	if (hold !== undefined && items.some((m) => m.id === hold)) throw new Error(`queued message ${hold} is being edited; it cannot be delivered`)
+	if (hold !== undefined && items.some((m) => m.id === hold))
+		throw new Error(`queued message ${hold} is being edited; it cannot be delivered`)
 	let parts = items.map((m) => ({ ...m, ...inbox.provenance(m) }))
 	let blocks = prompts.blocks(id, extra ? [...parts, extra] : parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
@@ -245,9 +291,13 @@ function steer(id: string): void {
 // (task nd6); queued messages run after a final answer.
 function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.delivery === 'after-turn')
-	if (!queued || queued.id === queueEdits.held(id) || notify.asked(id) || status.transition(id, { type: 'submit' })) return
+	if (!queued || queued.id === queueEdits.held(id) || notify.asked(id) || status.transition(id, { type: 'submit' }))
+		return
 	let record = prompts.deliver(id, [queued], undefined, undefined, true)
-	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
+	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), {
+		...record,
+		sender: prompts.senders(record.blocks)[0],
+	})
 }
 
 // Steers turn `running` at once. A running call flagged unsafeToStop
@@ -264,11 +314,19 @@ function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>)
 function queueNext(id: string, now = false, pick?: string): { say?: string; error?: string } {
 	let item = status.inboxOf(id).find((m) => m.delivery === 'after-turn' && (pick === undefined || m.id === pick))
 	if (!item) return { say: 'queue is empty' }
-	if (pick !== undefined && pick === queueEdits.held(id)) return { error: 'That message is being edited; save or cancel the edit first.' }
-	if (pick === undefined && queueEdits.deferNext(id)) return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
+	if (pick !== undefined && pick === queueEdits.held(id))
+		return { error: 'That message is being edited; save or cancel the edit first.' }
+	if (pick === undefined && queueEdits.deferNext(id))
+		return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
 	if (states.busy(status.stateOf(id))) {
 		// Editing this inbox id preserves its place, sender and provenance.
-		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...inbox.provenance(item), delivery: now ? 'now' : 'next-round' })
+		history.append(id, {
+			type: 'inbox',
+			id: item.id,
+			text: item.text,
+			...inbox.provenance(item),
+			delivery: now ? 'now' : 'next-round',
+		})
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		let running = turns.state.running.get(id)
 		if (!now) prompts.promoted.set(id, item.id)
@@ -277,12 +335,17 @@ function queueNext(id: string, now = false, pick?: string): { say?: string; erro
 			status.transition(id, { type: 'submit' })
 			prompts.force(running)
 		}
-		return { say: now ? 'interrupting with the next queued message' : 'sending the next queued message at the next round' }
+		return {
+			say: now ? 'interrupting with the next queued message' : 'sending the next queued message at the next round',
+		}
 	}
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return { error: refused }
 	let record = prompts.deliver(id, [item], undefined, undefined, true)
-	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
+	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), {
+		...record,
+		sender: prompts.senders(record.blocks)[0],
+	})
 	return { say: 'running the next queued message' }
 }
 
@@ -338,7 +401,8 @@ function resume(id: string): string | undefined {
 function reply(id: string, question: string, answers: Answers): string | undefined {
 	let open = forms.open(history.readSync(id))
 	// A command's question may be open beside a turn blocked on login.
-	if (!open || open.id !== question || (!open.from && turns.state.running.has(id))) return 'that question is not open (answered already?)'
+	if (!open || open.id !== question || (!open.from && turns.state.running.has(id)))
+		return 'that question is not open (answered already?)'
 	let problem = forms.check(open.form, answers)
 	if (problem) return problem
 	if (open.from) {

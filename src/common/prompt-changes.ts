@@ -22,7 +22,8 @@ const runs = new WeakMap<Item, Output[]>()
 // The card's head line.
 function summary(list: Output[]): string {
 	let names = [...new Set(list.map((o) => o.change!.name))].join(', ')
-	if (list.length === 1) return `${names} ${list[0]!.change!.what === 'changed' ? 'changed' : list[0]!.change!.what === 'added' ? 'added to the system prompt' : 'removed from the system prompt'}`
+	if (list.length === 1)
+		return `${names} ${list[0]!.change!.what === 'changed' ? 'changed' : list[0]!.change!.what === 'added' ? 'added to the system prompt' : 'removed from the system prompt'}`
 	return `${list.length} changes to ${names} since ${titles.time(list[0]!.ts)}`
 }
 
@@ -30,16 +31,26 @@ function summary(list: Output[]): string {
 // its key, the summary as text's first line, then each diff.
 function group(items: Item[], now = Date.now()): Item[] {
 	let out: Item[] = []
-	for (let i = 0; i < items.length; ) {
+	for (let i = 0; i < items.length;) {
 		let item = items[i]!
-		if (item.type !== 'output' || !item.change) { out.push(item); i++; continue }
+		if (item.type !== 'output' || !item.change) {
+			out.push(item)
+			i++
+			continue
+		}
 		let run: Output[] = []
-		while (i < items.length && items[i]!.type === 'output' && (items[i] as Output).change) run.push(items[i++] as Output)
+		while (i < items.length && items[i]!.type === 'output' && (items[i] as Output).change)
+			run.push(items[i++] as Output)
 		let last = run.at(-1)!
 		let hit = cache.get(run[0]!)
 		if (hit?.last !== last || hit.count !== run.length || hit.day !== new Date(now).toDateString()) {
 			let body = run.map((o) => `${promptChanges.line(o)}\n\`\`\`diff\n${o.change!.diff}\n\`\`\``)
-			hit = { last, count: run.length, day: new Date(now).toDateString(), merged: { ...item, text: [summary(run), ...body].join('\n\n') } }
+			hit = {
+				last,
+				count: run.length,
+				day: new Date(now).toDateString(),
+				merged: { ...item, text: [summary(run), ...body].join('\n\n') },
+			}
 			cache.set(run[0]!, hit)
 			runs.set(hit.merged, run)
 		}
@@ -58,7 +69,11 @@ function line(o: Output): string {
 // Added and removed lines of a change; `text` skips blank ones.
 function counts(o: Output): { add: number; del: number; text: string[] } {
 	let rows = o.change!.diff.split('\n').filter((r) => r[0] === '+' || r[0] === '-')
-	return { add: rows.filter((r) => r[0] === '+').length, del: rows.filter((r) => r[0] === '-').length, text: rows.filter((r) => r.slice(1).trim()) }
+	return {
+		add: rows.filter((r) => r[0] === '+').length,
+		del: rows.filter((r) => r[0] === '-').length,
+		text: rows.filter((r) => r.slice(1).trim()),
+	}
 }
 
 // A one-line edit as words: each changed span with a word of context,
@@ -71,18 +86,29 @@ type Part = { text: string; tone: 'dim' | 'add' | 'del' }
 function edit(o: Output): Part[] | undefined {
 	let c = counts(o)
 	let words = (sign: string) => c.text.filter((r) => r[0] === sign).flatMap((r) => r.slice(1).trim().split(/\s+/))
-	let a = words('-'), b = words('+')
+	let a = words('-'),
+		b = words('+')
 	if (!a.length || !b.length) return undefined
 	// Word LCS table, then a walk emitting kept words and changed spans.
 	let L = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0))
-	for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
+	for (let i = a.length - 1; i >= 0; i--)
+		for (let j = b.length - 1; j >= 0; j--)
+			L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
 	if (c.text.length > 2 && L[0]![0]! * 2 < a.length) return undefined
 	let parts: ({ keep: string } | { del: string[]; add: string[] })[] = []
-	let i = 0, j = 0
+	let i = 0,
+		j = 0
 	while (i < a.length || j < b.length) {
-		if (i < a.length && j < b.length && a[i] === b[j]) { parts.push({ keep: a[i++]! }); j++; continue }
+		if (i < a.length && j < b.length && a[i] === b[j]) {
+			parts.push({ keep: a[i++]! })
+			j++
+			continue
+		}
 		let last = parts.at(-1)
-		let span = last && 'del' in last ? last : (parts.push({ del: [], add: [] }), parts.at(-1) as { del: string[]; add: string[] })
+		let span =
+			last && 'del' in last
+				? last
+				: (parts.push({ del: [], add: [] }), parts.at(-1) as { del: string[]; add: string[] })
 		if (j >= b.length || (i < a.length && L[i + 1]![j]! >= L[i]![j + 1]!)) span.del.push(a[i++]!)
 		else span.add.push(b[j++]!)
 	}
@@ -113,7 +139,8 @@ function rows(item: object): Row[] {
 	if (!run.length) return []
 	let tally = (c: ReturnType<typeof counts>) => `+${c.add} −${c.del}`
 	let tone = (r: string): 'add' | 'del' => (r[0] === '+' ? 'add' : 'del')
-	let span = (a: Output, b: Output) => (titles.time(a.ts) === titles.time(b.ts) ? titles.time(a.ts) : `${titles.time(a.ts)}–${titles.time(b.ts)}`)
+	let span = (a: Output, b: Output) =>
+		titles.time(a.ts) === titles.time(b.ts) ? titles.time(a.ts) : `${titles.time(a.ts)}–${titles.time(b.ts)}`
 	let clean = (r: string) => `${r[0]} ${r.slice(1).trim()}`
 	if (run.length === 1) {
 		let c = counts(run[0]!)
@@ -127,15 +154,29 @@ function rows(item: object): Row[] {
 	}
 	let names = [...new Set(run.map((o) => o.change!.name))]
 	let pad = Math.max(...run.map((o) => o.change!.name.length))
-	let out: Row[] = [{ text: `${span(run[0]!, run.at(-1)!)} ${run.length} changes to ${names.join(', ')}`, tone: 'head' }]
+	let out: Row[] = [
+		{ text: `${span(run[0]!, run.at(-1)!)} ${run.length} changes to ${names.join(', ')}`, tone: 'head' },
+	]
 	for (let o of run) {
 		let c = counts(o)
 		let first = c.text[0]
 		let e = edit(o)
-		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
+		let note = [
+			o.change!.what === 'changed' ? '' : o.change!.what,
+			e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : '',
+		]
+			.filter(Boolean)
+			.join(' · ')
 		let lead = `  ${titles.time(o.ts)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
 		// Only the changed text takes the diff color; the lead stays dim.
-		let parts: Part[] = e ? [{ text: lead, tone: 'dim' }, ...e] : first ? [{ text: lead, tone: 'dim' }, { text: note, tone: tone(first) }] : []
+		let parts: Part[] = e
+			? [{ text: lead, tone: 'dim' }, ...e]
+			: first
+				? [
+						{ text: lead, tone: 'dim' },
+						{ text: note, tone: tone(first) },
+					]
+				: []
 		out.push({ text: `${lead} ${note}`.trimEnd(), tone: 'dim', parts: parts.length ? parts : undefined })
 	}
 	return out

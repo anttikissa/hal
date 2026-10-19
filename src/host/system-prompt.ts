@@ -11,7 +11,14 @@ export type { PromptSource } from './prompt-lang.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
 function date(now: number, timeZone: string): string {
-	let parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long', timeZoneName: 'longOffset' }).formatToParts(now)
+	let parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		weekday: 'long',
+		timeZoneName: 'longOffset',
+	}).formatToParts(now)
 	let part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value
 	return `${part('year')}-${part('month')}-${part('day')}, ${part('weekday')}, ${part('timeZoneName').replace('GMT', 'UTC')}`
 }
@@ -45,7 +52,9 @@ function skills(cwd: string): string {
 	for (let dir of new Set(dirs)) {
 		let names: string[] = []
 		try {
-			names = readdirSync(dir).filter((name) => existsSync(`${dir}/${name}/SKILL.md`)).sort()
+			names = readdirSync(dir)
+				.filter((name) => existsSync(`${dir}/${name}/SKILL.md`))
+				.sort()
 		} catch {}
 		let shown = paths.display(dir)
 		if (names.length) groups.push(names.length === 1 ? `${shown}/${names[0]}` : `${shown}/{${names.join(',')}}`)
@@ -58,12 +67,14 @@ function skills(cwd: string): string {
 function agents(cwd: string, sources?: PromptSource[]): string {
 	let parts: string[] = []
 	let include = (path: string, root: string) => {
-		let missing: string[] = [], text = promptLang.render(path, {}, sources, missing, undefined, { root })
+		let missing: string[] = [],
+			text = promptLang.render(path, {}, sources, missing, undefined, { root })
 		if (!missing.length) parts.push(`<file path="${path}">\n${text}\n</file>`)
 	}
 	let global = `${paths.userHome()}/.agents`
 	if (existsSync(`${global}/AGENTS.md`)) include(`${global}/AGENTS.md`, global)
-	let dirs = systemPrompt.candidates(cwd), root = dirs[0]!
+	let dirs = systemPrompt.candidates(cwd),
+		root = dirs[0]!
 	try {
 		root = realpathSync(root)
 	} catch {}
@@ -75,43 +86,100 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 }
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
-	let timezone = (input.sessionId ? clients.timezone(input.sessionId) : undefined) ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+	let timezone =
+		(input.sessionId ? clients.timezone(input.sessionId) : undefined) ??
+		Intl.DateTimeFormat().resolvedOptions().timeZone
 	let vars = {
-		date: date(input.now, timezone), timezone,
-		session_id: input.sessionId ?? '', session_cwd: paths.display(input.cwd), session_model: input.model,
+		date: date(input.now, timezone),
+		timezone,
+		session_id: input.sessionId ?? '',
+		session_cwd: paths.display(input.cwd),
+		session_model: input.model,
 		session_dir: input.sessionId ? paths.display(paths.sessionDir(input.sessionId)) : '',
-		session_interactive: String(input.interactive ?? true), session_autoclose: String(input.autoclose ?? false),
-		hal_src: paths.display(paths.repoRoot()), hal_home: paths.display(paths.home()), hal_web_url: settings.webUrl(),
-		subagent: input.owner ? 'true' : 'false', subagent_owner: input.owner ?? '',
+		session_interactive: String(input.interactive ?? true),
+		session_autoclose: String(input.autoclose ?? false),
+		hal_src: paths.display(paths.repoRoot()),
+		hal_home: paths.display(paths.home()),
+		hal_web_url: settings.webUrl(),
+		subagent: input.owner ? 'true' : 'false',
+		subagent_owner: input.owner ?? '',
 		spawn_budget: String(input.slots ?? settings.subagentSlots()),
-		fork: input.parent ? 'true' : 'false', fork_parent: input.parent ?? '',
-		user_notes: input.noUser ? 'false' : 'true', other_tools: nativeTool.summary(),
+		fork: input.parent ? 'true' : 'false',
+		fork_parent: input.parent ?? '',
+		user_notes: input.noUser ? 'false' : 'true',
+		other_tools: nativeTool.summary(),
 		skills: systemPrompt.skills(input.cwd),
 		agents: systemPrompt.agents(input.cwd, sources),
 	}
 	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
 }
 
-export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string; noUser?: boolean; interactive?: boolean; owner?: string; parent?: string; slots?: number; autoclose?: boolean; rendered?: PromptRender }
+export type PromptInput = {
+	cwd: string
+	model: string
+	now: number
+	sessionId?: string
+	noUser?: boolean
+	interactive?: boolean
+	owner?: string
+	parent?: string
+	slots?: number
+	autoclose?: boolean
+	rendered?: PromptRender
+}
 function build(input: PromptInput, problems?: string[]): string {
 	return systemPrompt.assemble(input, undefined, problems)
 }
-function inspect(input: PromptInput): { sources: PromptSource[]; text: string; problems: string[]; sections: PromptRender['sections']; vars: PromptRender['vars'] } {
-	let sources: PromptSource[] = [], problems: string[] = [], rendered: PromptRender = { sections: [] }
+function inspect(input: PromptInput): {
+	sources: PromptSource[]
+	text: string
+	problems: string[]
+	sections: PromptRender['sections']
+	vars: PromptRender['vars']
+} {
+	let sources: PromptSource[] = [],
+		problems: string[] = [],
+		rendered: PromptRender = { sections: [] }
 	let text = systemPrompt.assemble({ ...input, rendered }, sources, problems)
 	let shift = text.indexOf(rendered.text ?? text)
-	if (shift >= 0) return { sources, text, problems, vars: rendered.vars, sections: rendered.sections.map((s) => s.body.trim() ? { ...s, start: s.start + shift, end: s.end + shift } : s) }
+	if (shift >= 0)
+		return {
+			sources,
+			text,
+			problems,
+			vars: rendered.vars,
+			sections: rendered.sections.map((s) =>
+				s.body.trim() ? { ...s, start: s.start + shift, end: s.end + shift } : s,
+			),
+		}
 	// A hook changed the text (task vd9). An intact section keeps its text;
 	// a changed one runs from its heading to the next later heading or
 	// unchanged text between sections. A missing heading withdraws it.
-	let full = rendered.text ?? '', shown = rendered.sections.filter((s) => s.body.trim()), from = 0
+	let full = rendered.text ?? '',
+		shown = rendered.sections.filter((s) => s.body.trim()),
+		from = 0
 	let gaps = shown.map((s, i) => full.slice(s.end, shown[i + 1]?.start ?? full.length).trim())
 	let sections = rendered.sections.flatMap((s) => {
 		if (!s.body.trim()) return [s]
-		let i = shown.indexOf(s), head = `# ${s.title}\n`, intact = text.indexOf(head + s.body, from)
+		let i = shown.indexOf(s),
+			head = `# ${s.title}\n`,
+			intact = text.indexOf(head + s.body, from)
 		let start = intact >= 0 ? intact : text.indexOf(head, from)
 		if (start < 0) return []
-		let at = start + head.length, end = intact >= 0 ? at + s.body.length : Math.min(text.length, ...[...shown.slice(i + 1).map((n) => text.indexOf(`\n# ${n.title}\n`, at)), ...gaps.slice(i).filter(Boolean).map((g) => text.indexOf(g, at))].filter((n) => n >= 0))
+		let at = start + head.length,
+			end =
+				intact >= 0
+					? at + s.body.length
+					: Math.min(
+							text.length,
+							...[
+								...shown.slice(i + 1).map((n) => text.indexOf(`\n# ${n.title}\n`, at)),
+								...gaps
+									.slice(i)
+									.filter(Boolean)
+									.map((g) => text.indexOf(g, at)),
+							].filter((n) => n >= 0),
+						)
 		let body = text.slice(at, end).replace(/\s+$/, '')
 		from = at + body.length
 		return [{ ...s, body, start, end: from }]

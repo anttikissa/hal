@@ -61,18 +61,50 @@ import { homedir } from 'os'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 
 export type PromptSource = { path: string; bytes: number }
-export type PromptSection = { title: string; body: string; update: 'full' | 'diff'; variables: string[]; start: number; end: number }
+export type PromptSection = {
+	title: string
+	body: string
+	update: 'full' | 'diff'
+	variables: string[]
+	start: number
+	end: number
+}
 export type PromptRender = { sections: PromptSection[]; text?: string; vars?: Record<string, string> }
-type Frame = { kind: 'if' | 'section'; colons: number; line: number; active: boolean; parent: boolean; alternate?: boolean; keys: string[]; section?: PromptSection; lines?: string[] }
+type Frame = {
+	kind: 'if' | 'section'
+	colons: number
+	line: number
+	active: boolean
+	parent: boolean
+	alternate?: boolean
+	keys: string[]
+	section?: PromptSection
+	lines?: string[]
+}
 const trimLines = (text: string) => text.replace(/^(?:[\t ]*\n)+|(?:\n[\t ]*)+$/g, '')
 // A bare `if $x` is false for "", 0, false, no and off (any case); true for anything else.
 const truthy = (value: string) => !/^(|0|false|no|off)$/i.test(value.trim())
 
-function render(file: string, vars: Record<string, string>, sources: PromptSource[] = [], problems: string[] = [], rendered?: PromptRender, options: { root?: string } = {}): string {
-	let stack: Frame[] = [], titles = new Set<string>(), parts: (string | PromptSection)[] = [], text: string[] = []
+function render(
+	file: string,
+	vars: Record<string, string>,
+	sources: PromptSource[] = [],
+	problems: string[] = [],
+	rendered?: PromptRender,
+	options: { root?: string } = {},
+): string {
+	let stack: Frame[] = [],
+		titles = new Set<string>(),
+		parts: (string | PromptSection)[] = [],
+		text: string[] = []
 	let active = () => stack.every((f) => f.active)
-	let substitute = (s: string) => s.replace(/\$\{(\w+)\}|\$(\w+)/g, (whole, braced?: string, bare?: string) => vars[(braced ?? bare)!] ?? whole)
-	let flush = () => { let s = trimLines(text.join('\n')); if (s.trim()) parts.push(s); text = [] }
+	let substitute = (s: string) =>
+		s.replace(/\$\{(\w+)\}|\$(\w+)/g, (whole, braced?: string, bare?: string) => vars[(braced ?? bare)!] ?? whole)
+	let flush = () => {
+		let s = trimLines(text.join('\n'))
+		if (s.trim()) parts.push(s)
+		text = []
+	}
 	let add = (s: string) => {
 		let section = stack.find((f) => f.kind === 'section')
 		if (section) section.lines!.push(s)
@@ -80,7 +112,8 @@ function render(file: string, vars: Record<string, string>, sources: PromptSourc
 	}
 	let insideRoot = (from: string, name: string, chain: string[]) => {
 		try {
-			let target = realpathSync(resolve(dirname(from), name)), rel = relative(options.root!, target)
+			let target = realpathSync(resolve(dirname(from), name)),
+				rel = relative(options.root!, target)
 			if (!rel || rel.split(sep)[0] === '..' || isAbsolute(rel) || chain.includes(target)) return
 			return { target, body: readFileSync(target, 'utf8') }
 		} catch {}
@@ -89,7 +122,8 @@ function render(file: string, vars: Record<string, string>, sources: PromptSourc
 		sources.push({ path, bytes: Buffer.byteLength(raw) })
 		if (options.root !== undefined) {
 			for (let line of raw.trim().split('\n')) {
-				let name = /^\s*@(\S+)\s*$/.exec(line)?.[1], found = name ? insideRoot(chain.at(-1)!, name, chain) : undefined
+				let name = /^\s*@(\S+)\s*$/.exec(line)?.[1],
+					found = name ? insideRoot(chain.at(-1)!, name, chain) : undefined
 				if (found) run(found.target, found.body, [...chain, found.target])
 				else add(line)
 			}
@@ -97,24 +131,32 @@ function render(file: string, vars: Record<string, string>, sources: PromptSourc
 		}
 		let depth = stack.length
 		let fault = (line: number, what: string) => problems.push(`${path}:${line}: ${what}`)
-		let commentLines = new Set<number>(), cursor = 0, lineNumber = 0
+		let commentLines = new Set<number>(),
+			cursor = 0,
+			lineNumber = 0
 		let template = raw.replace(/<!--[^]*?-->/g, (comment: string, offset: number) => {
 			lineNumber += raw.slice(cursor, offset).split('\n').length - 1
 			let count = comment.split('\n').length - 1
 			for (let i = 0; i <= count; i++) commentLines.add(lineNumber + i)
-			lineNumber += count; cursor = offset + comment.length
+			lineNumber += count
+			cursor = offset + comment.length
 			return '\n'.repeat(count)
 		})
 		for (let [index, line] of template.split('\n').entries()) {
 			if (!line.trim() && commentLines.has(index)) continue
-			let n = index + 1, directive = /^(:{2,})(?:\s+(.*?))?\s*$/.exec(line)
+			let n = index + 1,
+				directive = /^(:{2,})(?:\s+(.*?))?\s*$/.exec(line)
 			if (line.includes('-->')) fault(n, 'stray --> (comments do not nest)')
 			if (line.includes('<!--')) fault(n, 'unclosed <!--')
 			if (directive) {
-				let colons = directive[1]!.length, command = directive[2] ?? ''
+				let colons = directive[1]!.length,
+					command = directive[2] ?? ''
 				if (!command) {
 					let frame = stack.length > depth ? stack.pop() : undefined
-					if (!frame) { fault(n, 'unexpected closing directive'); continue }
+					if (!frame) {
+						fault(n, 'unexpected closing directive')
+						continue
+					}
 					if (frame.colons !== colons) fault(n, `closing fence has ${colons} colons; expected ${frame.colons}`)
 					if (frame.kind === 'section' && frame.section) {
 						frame.section.body = trimLines(frame.lines!.join('\n'))
@@ -128,33 +170,54 @@ function render(file: string, vars: Record<string, string>, sources: PromptSourc
 					if (frame?.kind !== 'if') fault(n, 'else without if')
 					else if (frame.colons !== colons) fault(n, `else fence has ${colons} colons; expected ${frame.colons}`)
 					else if (frame.alternate) fault(n, 'duplicate else')
-					else { frame.alternate = true; frame.active = !frame.active }
+					else {
+						frame.alternate = true
+						frame.active = !frame.active
+					}
 					continue
 				}
 				if (command.startsWith('if ')) {
-					let keys: string[] = [], operand = (token: string) => {
-						let name = /^\$\{?(\w+)\}?$/.exec(token)?.[1]
-						if (name === undefined) return token.slice(1, -1)
-						keys.push(name)
-						if (Object.hasOwn(vars, name)) return vars[name]!
-						fault(n, `unknown key ${name}`)
-					}
-					let value = String.raw`(\$\{?\w+\}?|"[^"]*")`
-					let test = new RegExp(String.raw`^\s*(!?)\s*(\$\{?\w+\}?)\s*$`), compare = new RegExp(String.raw`^\s*${value}\s*(==|!=|\slike\s)\s*${value}\s*$`)
-					let matches = command.slice(3).split(/&&(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((text) => {
-						let bare = test.exec(text)
-						if (bare) {
-							let v = operand(bare[2]!)
-							return v !== undefined && truthy(v) !== (bare[1] === '!')
+					let keys: string[] = [],
+						operand = (token: string) => {
+							let name = /^\$\{?(\w+)\}?$/.exec(token)?.[1]
+							if (name === undefined) return token.slice(1, -1)
+							keys.push(name)
+							if (Object.hasOwn(vars, name)) return vars[name]!
+							fault(n, `unknown key ${name}`)
 						}
-						let parts = compare.exec(text)
-						if (!parts) { fault(n, 'invalid if directive; use $key, !$key, $key == "text", $key != $other or $key like "glob*", joined by &&'); return false }
-						let left = operand(parts[1]!), right = operand(parts[3]!)
-						if (left === undefined || right === undefined) return false
-						if (parts[2] === '==') return left === right
-						if (parts[2] === '!=') return left !== right
-						return new RegExp(`^${right.replace(/[\\^$+.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`).test(left)
-					}).every(Boolean)
+					let value = String.raw`(\$\{?\w+\}?|"[^"]*")`
+					let test = new RegExp(String.raw`^\s*(!?)\s*(\$\{?\w+\}?)\s*$`),
+						compare = new RegExp(String.raw`^\s*${value}\s*(==|!=|\slike\s)\s*${value}\s*$`)
+					let matches = command
+						.slice(3)
+						.split(/&&(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+						.map((text) => {
+							let bare = test.exec(text)
+							if (bare) {
+								let v = operand(bare[2]!)
+								return v !== undefined && truthy(v) !== (bare[1] === '!')
+							}
+							let parts = compare.exec(text)
+							if (!parts) {
+								fault(
+									n,
+									'invalid if directive; use $key, !$key, $key == "text", $key != $other or $key like "glob*", joined by &&',
+								)
+								return false
+							}
+							let left = operand(parts[1]!),
+								right = operand(parts[3]!)
+							if (left === undefined || right === undefined) return false
+							if (parts[2] === '==') return left === right
+							if (parts[2] === '!=') return left !== right
+							return new RegExp(
+								`^${right
+									.replace(/[\\^$+.()|[\]{}]/g, '\\$&')
+									.replace(/\*/g, '.*')
+									.replace(/\?/g, '.')}$`,
+							).test(left)
+						})
+						.every(Boolean)
 					let section = stack.find((f) => f.kind === 'section')?.section
 					section?.variables.push(...keys)
 					stack.push({ kind: 'if', colons, line: n, active: matches, parent: active(), keys })
@@ -162,45 +225,87 @@ function render(file: string, vars: Record<string, string>, sources: PromptSourc
 				}
 				let section = /^section\s+"([^"]*)"(?:\s+update="(diff)")?$/.exec(command)
 				if (section) {
-					if (stack.some((f) => f.kind === 'section')) { fault(n, 'sections cannot nest'); continue }
+					if (stack.some((f) => f.kind === 'section')) {
+						fault(n, 'sections cannot nest')
+						continue
+					}
 					let title = section[1]!
 					if (!title.trim()) fault(n, 'section title is empty')
 					if (titles.has(title)) fault(n, `duplicate section title ${JSON.stringify(title)}`)
 					titles.add(title)
 					flush()
-					stack.push({ kind: 'section', colons, line: n, active: true, parent: active(), keys: [], lines: [], section: { title, body: '', update: section[2] ? 'diff' : 'full', variables: stack.flatMap((f) => f.keys), start: 0, end: 0 } })
+					stack.push({
+						kind: 'section',
+						colons,
+						line: n,
+						active: true,
+						parent: active(),
+						keys: [],
+						lines: [],
+						section: {
+							title,
+							body: '',
+							update: section[2] ? 'diff' : 'full',
+							variables: stack.flatMap((f) => f.keys),
+							start: 0,
+							end: 0,
+						},
+					})
 					continue
 				}
 				fault(n, `invalid directive ${command}`)
 				continue
 			}
 			let section = stack.find((f) => f.kind === 'section')?.section
-			if (section) for (let match of line.matchAll(/\$\{(\w+)\}|\$(\w+)/g)) section.variables.push((match[1] ?? match[2])!)
+			if (section)
+				for (let match of line.matchAll(/\$\{(\w+)\}|\$(\w+)/g)) section.variables.push((match[1] ?? match[2])!)
 			if (!active()) continue
 			let include = /^@(\??)(\S+)\s*$/.exec(line)
-			if (!include) { add(substitute(line)); continue }
+			if (!include) {
+				add(substitute(line))
+				continue
+			}
 			let name = substitute(include[2]!)
 			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
 			let target = resolve(dirname(path), name)
 			if (include[1] && !existsSync(target)) continue
-			if (chain.includes(target)) { fault(n, `include cycle: ${target}`); continue }
+			if (chain.includes(target)) {
+				fault(n, `include cycle: ${target}`)
+				continue
+			}
 			let body: string
-			try { body = readFileSync(target, 'utf8') }
-			catch (e: any) { fault(n, `include: ${e?.message ?? e}`); continue }
+			try {
+				body = readFileSync(target, 'utf8')
+			} catch (e: any) {
+				fault(n, `include: ${e?.message ?? e}`)
+				continue
+			}
 			run(target, body, [...chain, target])
 		}
 		for (let f of stack.splice(depth)) fault(f.line, `unclosed ${f.kind} block`)
 	}
-	let path = resolve(file), raw: string
-	try { raw = readFileSync(path, 'utf8') }
-	catch (e: any) { problems.push(`${path}: ${e?.message ?? e}`); return '' }
+	let path = resolve(file),
+		raw: string
+	try {
+		raw = readFileSync(path, 'utf8')
+	} catch (e: any) {
+		problems.push(`${path}: ${e?.message ?? e}`)
+		return ''
+	}
 	let real = path
-	if (options.root !== undefined) try { real = realpathSync(path) } catch {}
+	if (options.root !== undefined)
+		try {
+			real = realpathSync(path)
+		} catch {}
 	run(path, raw, [real])
 	flush()
 	let output = ''
 	for (let part of parts) {
-		if (typeof part === 'string') { if (output) output += '\n\n'; output += part; continue }
+		if (typeof part === 'string') {
+			if (output) output += '\n\n'
+			output += part
+			continue
+		}
 		part.variables = [...new Set(part.variables)]
 		if (part.body.trim()) {
 			if (output) output += '\n\n'

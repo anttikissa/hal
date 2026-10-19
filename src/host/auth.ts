@@ -34,7 +34,13 @@ import { usage } from './usage.ts'
 import { authRefresh } from './auth-refresh.ts'
 
 // `accountId`: the ChatGPT account an OpenAI entry was saved with.
-export type Credential = { type: 'token' | 'api-key'; value: string; email?: string; account: string; accountId?: string }
+export type Credential = {
+	type: 'token' | 'api-key'
+	value: string
+	email?: string
+	account: string
+	accountId?: string
+}
 type Failure = 'auth' | 'temporary' | 'limited'
 // The providers whose logins live in the credentials file.
 export type Kind = 'anthropic' | 'openai'
@@ -175,7 +181,9 @@ function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 // Whether pick() passes `account` over: its login is broken, or it is
 // rate limited for `model`.
 function skipped(kind: Kind, account: Account, model?: string): boolean {
-	return auth.state.broken.has(fingerprint(account.entry)) || (!!model && limits.on(`${kind}/${model}`, account.name) > 0)
+	return (
+		auth.state.broken.has(fingerprint(account.entry)) || (!!model && limits.on(`${kind}/${model}`, account.name) > 0)
+	)
 }
 
 // A valid credential of `kind`, refreshing an expired token first, from
@@ -199,7 +207,8 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 		let until = model ? limits.on(`${kind}/${model}`, account.name) : 0
 		if (until) {
 			limitedUntil = Math.min(limitedUntil, until)
-			if (subscription(account)) skipped.push(`${account.name}: rate limited until ${new Date(until).toTimeString().slice(0, 5)}`)
+			if (subscription(account))
+				skipped.push(`${account.name}: rate limited until ${new Date(until).toTimeString().slice(0, 5)}`)
 			continue
 		}
 		try {
@@ -211,7 +220,12 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 				if (auth.state.picked.get(key) !== account.name) auth.state.picked.delete(key)
 				if (cred.type === 'api-key' && before !== account.name && skipped.length) {
 					// A notice that cannot be written must not cost the request.
-					try { auth.fallback(who.session, `using ${account.name}, a paid API key: no ${kind} subscription is usable (${skipped.join('; ')})`) } catch {}
+					try {
+						auth.fallback(
+							who.session,
+							`using ${account.name}, a paid API key: no ${kind} subscription is usable (${skipped.join('; ')})`,
+						)
+					} catch {}
 				}
 			}
 			return cred
@@ -223,7 +237,9 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 		}
 	}
 	if (limitedUntil < Infinity) {
-		throw Object.assign(fail(`every usable ${kind} account is rate limited for ${model}`, 'limited'), { retryAt: limitedUntil })
+		throw Object.assign(fail(`every usable ${kind} account is rate limited for ${model}`, 'limited'), {
+			retryAt: limitedUntil,
+		})
 	}
 	throw Object.assign(new Error(problems.join('; ')), { failure: 'auth' })
 }
@@ -236,7 +252,9 @@ function tellBroken(kind: Kind, account: Account, why: string, who: For): void {
 	if (auth.state.told.has(key)) return
 	auth.state.told.add(key)
 	// A notice that cannot be written must not cost the request.
-	try { auth.broke(who.session, `${kind} login ${account.name} is not working, so requests skip it: ${why}`) } catch {}
+	try {
+		auth.broke(who.session, `${kind} login ${account.name} is not working, so requests skip it: ${why}`)
+	} catch {}
 }
 
 // Until when (epoch ms) every account that could run `modelId` is rate
@@ -246,7 +264,9 @@ function limitedUntil(modelId: string): number {
 	let kind = modelId.split('/')[0]!
 	let names: string[] = []
 	if (kind === 'anthropic' || kind === 'openai') {
-		try { names = auth.all(kind).list.map((a) => a.name) } catch {} // no login: the turn reports that
+		try {
+			names = auth.all(kind).list.map((a) => a.name)
+		} catch {} // no login: the turn reports that
 	}
 	// An account is out until its recorded 429 ends or, when a usage
 	// window it shares across models is spent, until that window resets.
@@ -260,7 +280,11 @@ function limitedUntil(modelId: string): number {
 	return until.includes(0) ? 0 : Math.min(...until)
 }
 
-async function credential(data: Entry, { entry, name, replace }: Account, kind: Kind = 'anthropic'): Promise<Credential> {
+async function credential(
+	data: Entry,
+	{ entry, name, replace }: Account,
+	kind: Kind = 'anthropic',
+): Promise<Credential> {
 	let email = typeof entry.email === 'string' ? entry.email : undefined
 	let base = { email, account: name, ...(usable(entry.accountId) && { accountId: entry.accountId }) }
 	if (!usable(entry.accessToken)) return { type: 'api-key', value: entry.apiKey, ...base }
@@ -269,7 +293,8 @@ async function credential(data: Entry, { entry, name, replace }: Account, kind: 
 	if (!stale && (entry.expires === undefined || clock.now() < entry.expires - auth.refreshMarginMs())) {
 		return { type: 'token', value: entry.accessToken, ...base }
 	}
-	if (!usable(entry.refreshToken)) throw fail(`${kind} token ${stale ? 'rejected' : 'expired'} and there is no refreshToken; ${LOG_INS[kind]}`)
+	if (!usable(entry.refreshToken))
+		throw fail(`${kind} token ${stale ? 'rejected' : 'expired'} and there is no refreshToken; ${LOG_INS[kind]}`)
 	let key = `${kind}:${name}`
 	let pending = auth.state.refreshing.get(key)
 	if (!pending) {
@@ -290,7 +315,8 @@ function rejected(name: string, kind: Kind = 'anthropic'): void {
 	if (usable(account.entry.refreshToken) && (last === undefined || clock.now() - last > auth.retryRejectedMs)) {
 		auth.state.retried.set(key, clock.now())
 		auth.state.stale.add(fp)
-	} else auth.state.broken.set(fp, fail(`${kind} credentials for ${name} were rejected (401); ${LOG_INS[kind]}`).message)
+	} else
+		auth.state.broken.set(fp, fail(`${kind} credentials for ${name} were rejected (401); ${LOG_INS[kind]}`).message)
 }
 
 // The provider says the account has no credits left (a paid key, out of
@@ -323,7 +349,6 @@ async function changed(signal?: AbortSignal): Promise<void> {
 		}
 	}
 }
-
 
 // Write pending changes and stop watching. The next call reopens.
 function close(): void {

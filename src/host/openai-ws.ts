@@ -69,7 +69,9 @@ function rateHeaders(ev: any): Headers {
 }
 
 function connect(url: string, headers: Record<string, string>): Pick<Socket, 'ws' | 'opened'> {
-	let ws = new WebSocket(url.replace(/^http/, 'ws'), { headers: { ...headers, 'OpenAI-Beta': BETA } } as unknown as string[])
+	let ws = new WebSocket(url.replace(/^http/, 'ws'), {
+		headers: { ...headers, 'OpenAI-Beta': BETA },
+	} as unknown as string[])
 	let opened = new Promise<boolean>((resolve) => {
 		let timer = setTimeout(() => resolve(false), state.connectMs)
 		let end = (ok: boolean) => () => (clearTimeout(timer), resolve(ok))
@@ -82,7 +84,13 @@ function connect(url: string, headers: Record<string, string>): Pick<Socket, 'ws
 
 // The input to send: only what follows the previous request and its
 // reply, when everything else is unchanged; else everything.
-function continuation(s: Socket, fields: string, full: unknown[], req: ProviderRequest, items: (req: ProviderRequest) => unknown[]) {
+function continuation(
+	s: Socket,
+	fields: string,
+	full: unknown[],
+	req: ProviderRequest,
+	items: (req: ProviderRequest) => unknown[],
+) {
 	let last = s.last
 	if (!last || last.fields !== fields) return undefined
 	let reply = req.messages[last.count]
@@ -97,7 +105,11 @@ function continuation(s: Socket, fields: string, full: unknown[], req: ProviderR
 
 // A stream of SSE bytes for this request over the session's socket, or
 // undefined to use HTTP.
-async function open(http: HttpRequest, req: ProviderRequest, items: (req: ProviderRequest) => unknown[]): Promise<ReadableStream<Uint8Array> | undefined> {
+async function open(
+	http: HttpRequest,
+	req: ProviderRequest,
+	items: (req: ProviderRequest) => unknown[],
+): Promise<ReadableStream<Uint8Array> | undefined> {
 	let id = req.sessionId
 	if (!state.enabled || !id || Date.now() < state.httpUntil || state.httpSessions.has(id)) return undefined
 	let { input: full, ...rest } = http.body as { input: unknown[] } & Record<string, unknown>
@@ -124,7 +136,12 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 	let fields = JSON.stringify(rest)
 	let next = continuation(socket, fields, full, req, items)
 	let body = { type: 'response.create', ...rest, ...(next ?? { input: full }) }
-	let sent = { fields, input: full.map((item) => JSON.stringify(item)), count: req.messages.length, calls: [] as string[] }
+	let sent = {
+		fields,
+		input: full.map((item) => JSON.stringify(item)),
+		count: req.messages.length,
+		calls: [] as string[],
+	}
 	socket.last = undefined
 	let ws = socket.ws
 	let encoder = new TextEncoder()
@@ -159,21 +176,27 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 			// A stale continuation or the 60-minute socket limit: the retry
 			// sends the full input on a new socket.
 			if (RESTART.has(code)) return fail(`OpenAI WebSocket: ${ev.error?.message ?? code}`)
-		}
-		else if (ev.type === 'response.created') {
+		} else if (ev.type === 'response.created') {
 			// A socket can replay an older response; read only the one just asked for.
-			if ((ev.response?.previous_response_id ?? undefined) !== (body as { previous_response_id?: string }).previous_response_id) return
+			if (
+				(ev.response?.previous_response_id ?? undefined) !==
+				(body as { previous_response_id?: string }).previous_response_id
+			)
+				return
 			active = ev.response?.id
-		}
-		else if (!active || (ev.response?.id && ev.response.id !== active)) return
-		if (ev.type === 'response.output_item.done' && ev.item?.type === 'function_call' && typeof ev.item.call_id === 'string') sent.calls.push(ev.item.call_id)
+		} else if (!active || (ev.response?.id && ev.response.id !== active)) return
+		if (
+			ev.type === 'response.output_item.done' &&
+			ev.item?.type === 'function_call' &&
+			typeof ev.item.call_id === 'string'
+		)
+			sent.calls.push(ev.item.call_id)
 		ctrl.enqueue(encoder.encode(`data: ${data.replace(/\n/g, '\ndata: ')}\n\n`))
 		if (ev.type === 'response.completed' && active) {
 			socket.last = { ...sent, id: active }
 			stop(true)
 			ctrl.close()
-		}
-		else if (ev.type === 'error' || ev.type === 'response.failed' || ev.type === 'response.incomplete') {
+		} else if (ev.type === 'error' || ev.type === 'response.failed' || ev.type === 'response.incomplete') {
 			stop(false)
 			ctrl.close()
 		}

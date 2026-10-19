@@ -116,7 +116,14 @@ test('a completed turn is stored as prompt, blocks and a turn end with usage', a
 test('each block reaches disk once complete, before the turn ends', async () => {
 	let id = newSession()
 	history.submit(id, 'go')
-	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'tool_call', id: 't', name: 'x', input: {} }, { type: 'done', reason: 'tool_use' }))
+	let it = ended(
+		id,
+		events(
+			{ type: 'text', text: 'a' },
+			{ type: 'tool_call', id: 't', name: 'x', input: {} },
+			{ type: 'done', reason: 'tool_use' },
+		),
+	)
 	await it.next()
 	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user'])
 	await it.next() // the tool call has been yielded: the text before it is complete
@@ -128,7 +135,11 @@ test('each block reaches disk once complete, before the turn ends', async () => 
 test('a consumer that stops early still ends the turn, as paused', async () => {
 	let id = newSession()
 	history.submit(id, 'x')
-	for await (let _ of ended(id, events({ type: 'text', text: 'a' }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))) break
+	for await (let _ of ended(
+		id,
+		events({ type: 'text', text: 'a' }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }),
+	))
+		break
 	expect(strip(await history.read(id)).slice(1)).toEqual([
 		{ type: 'assistant', block: { type: 'text', text: 'a' } },
 		{ type: 'turn_end', status: 'paused', usage: {} },
@@ -138,14 +149,24 @@ test('a consumer that stops early still ends the turn, as paused', async () => {
 
 test('a prompt after a failed turn is its own message, told of the failure', async () => {
 	let id = newSession()
-	let sent = fakeStream((input) => (input.messages.length === 1 ? [{ type: 'error', message: 'HTTP 400 from fake', status: 400 }] : [{ type: 'done', reason: 'end' }]))
+	let sent = fakeStream((input) =>
+		input.messages.length === 1
+			? [{ type: 'error', message: 'HTTP 400 from fake', status: 400 }]
+			: [{ type: 'done', reason: 'end' }],
+	)
 	history.submit(id, 'Say just the word pong')
 	await drain(history.turn(id))
 	history.submit(id, 'k')
 	await drain(history.turn(id))
 	expect(sent[1]).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nSay just the word pong$/) }] },
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringContaining('The turn failed with an error: HTTP 400 from fake') }] },
+		{
+			role: 'user',
+			blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nSay just the word pong$/) }],
+		},
+		{
+			role: 'user',
+			blocks: [{ type: 'text', text: expect.stringContaining('The turn failed with an error: HTTP 400 from fake') }],
+		},
 		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nk$/) }] },
 	])
 })
@@ -155,7 +176,12 @@ test('thinking signatures live in blobs and replay exactly, rebuilt from disk al
 	let signature = `{"type":"reasoning","id":"rs_1","encrypted_content":"gAAA\\u0000'\`\${x}"}\n\t\\ ä😀 ${'z'.repeat(5000)}`
 	let sent = fakeStream((input) =>
 		input.messages.length === 1
-			? [{ type: 'thinking', text: 'why' }, { type: 'signature', value: signature }, { type: 'text', text: 'ok' }, { type: 'done', reason: 'end' }]
+			? [
+					{ type: 'thinking', text: 'why' },
+					{ type: 'signature', value: signature },
+					{ type: 'text', text: 'ok' },
+					{ type: 'done', reason: 'end' },
+				]
 			: [{ type: 'done', reason: 'end' }],
 	)
 	history.submit(id, 'q1')
@@ -209,7 +235,11 @@ test('a complete last record missing its newline is kept', async () => {
 test('a corrupt record mid-file is reported when read and the file left untouched', async () => {
 	let id = newSession()
 	history.submit(id, 'a')
-	appendFileSync(history.file(id), '{ type: @@ }\n' + lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }))
+	appendFileSync(
+		history.file(id),
+		'{ type: @@ }\n' +
+			lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }),
+	)
 	sessions.closeAll()
 	let before = readFileSync(history.file(id), 'utf8')
 	await expect(history.open(id)).rejects.toThrow(new RegExp(id))
@@ -231,7 +261,15 @@ test('open leaves an unfinished turn unfinished, for the host to continue', asyn
 test('a host exiting mid-turn writes the output so far and leaves the turn unfinished', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
-	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'usage', usage: { output: 1 } }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))
+	let it = ended(
+		id,
+		events(
+			{ type: 'text', text: 'a' },
+			{ type: 'usage', usage: { output: 1 } },
+			{ type: 'text', text: 'b' },
+			{ type: 'done', reason: 'end' },
+		),
+	)
 	await it.next()
 	await it.next()
 	history.stop(false)
@@ -244,7 +282,15 @@ test('a host exiting mid-turn writes the output so far and leaves the turn unfin
 test('the last Hal process quitting mid-turn records it paused, once', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
-	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'usage', usage: { output: 1 } }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))
+	let it = ended(
+		id,
+		events(
+			{ type: 'text', text: 'a' },
+			{ type: 'usage', usage: { output: 1 } },
+			{ type: 'text', text: 'b' },
+			{ type: 'done', reason: 'end' },
+		),
+	)
 	await it.next()
 	await it.next()
 	history.stop(true)
@@ -275,19 +321,37 @@ test('a stream that throws ends the turn as an error, yielded and recorded', asy
 test('live output and the file together always hold the whole turn once', async () => {
 	let id = newSession()
 	history.submit(id, 'go')
-	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'text', text: 'b' }, { type: 'tool_call', id: 't', name: 'x', input: {} }, { type: 'usage', usage: { output: 2 } }, { type: 'done', reason: 'tool_use' }))
-	let whole = () => [...history.readSync(id).flatMap((r) => (r.type === 'assistant' ? [r.block] : [])), ...(history.live(id)?.blocks ?? [])]
+	let it = ended(
+		id,
+		events(
+			{ type: 'text', text: 'a' },
+			{ type: 'text', text: 'b' },
+			{ type: 'tool_call', id: 't', name: 'x', input: {} },
+			{ type: 'usage', usage: { output: 2 } },
+			{ type: 'done', reason: 'tool_use' },
+		),
+	)
+	let whole = () => [
+		...history.readSync(id).flatMap((r) => (r.type === 'assistant' ? [r.block] : [])),
+		...(history.live(id)?.blocks ?? []),
+	]
 	await it.next()
 	expect(whole()).toEqual([{ type: 'text', text: 'a' }])
 	await it.next()
 	expect(whole()).toEqual([{ type: 'text', text: 'ab' }])
 	await it.next()
-	expect(whole()).toEqual([{ type: 'text', text: 'ab' }, { type: 'tool_call', id: 't', name: 'x', input: {} }])
+	expect(whole()).toEqual([
+		{ type: 'text', text: 'ab' },
+		{ type: 'tool_call', id: 't', name: 'x', input: {} },
+	])
 	await it.next()
 	expect(history.live(id)!.usage).toEqual({ output: 2 })
 	await drain(it)
 	expect(history.live(id)).toBeUndefined()
-	expect(whole()).toEqual([{ type: 'text', text: 'ab' }, { type: 'tool_call', id: 't', name: 'x', input: {} }])
+	expect(whole()).toEqual([
+		{ type: 'text', text: 'ab' },
+		{ type: 'tool_call', id: 't', name: 'x', input: {} },
+	])
 })
 
 test('readSync agrees with read, skipping a partial last record', async () => {
@@ -301,7 +365,7 @@ test('readSync agrees with read, skipping a partial last record', async () => {
 	appendFileSync(history.file(id), "{ type: 'user', blo")
 	expect(history.readSync(id)).toEqual(await history.read(id))
 	expect(history.readSync(id)).toHaveLength(3)
-	appendFileSync(history.file(id), "\n{ type: @@ }\n")
+	appendFileSync(history.file(id), '\n{ type: @@ }\n')
 	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 })
 
@@ -309,11 +373,23 @@ test('a turn spans tool rounds: one turn end with the usage of all rounds', asyn
 	let id = newSession()
 	history.submit(id, 'q')
 	let call = { type: 'tool_call' as const, id: 't1', name: 'read', input: {} }
-	await drain(history.record(id, 'fake', events(call, { type: 'usage', usage: { input: 10, output: 1 } }, { type: 'done', reason: 'tool_use' })))
+	await drain(
+		history.record(
+			id,
+			'fake',
+			events(call, { type: 'usage', usage: { input: 10, output: 1 } }, { type: 'done', reason: 'tool_use' }),
+		),
+	)
 	// Between rounds the turn is still running: open leaves it alone.
 	await history.open(id)
 	history.results(id, [{ type: 'tool_result', id: 't1', output: 'x' }])
-	await drain(history.record(id, 'fake', events({ type: 'usage', usage: { input: 12, output: 2 } }, { type: 'done', reason: 'end' })))
+	await drain(
+		history.record(
+			id,
+			'fake',
+			events({ type: 'usage', usage: { input: 12, output: 2 } }, { type: 'done', reason: 'end' }),
+		),
+	)
 	history.end(id, { type: 'done', reason: 'end' })
 	history.end(id, { type: 'done', reason: 'end' })
 	expect(strip(await history.read(id)).slice(1)).toEqual([
@@ -329,7 +405,17 @@ test('a turn spans tool rounds: one turn end with the usage of all rounds', asyn
 test('a host quitting between tool rounds pauses the turn once; late results are dropped', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
-	await drain(history.record(id, 'fake', events({ type: 'tool_call', id: 't1', name: 'read', input: {} }, { type: 'usage', usage: { output: 4 } }, { type: 'done', reason: 'tool_use' })))
+	await drain(
+		history.record(
+			id,
+			'fake',
+			events(
+				{ type: 'tool_call', id: 't1', name: 'read', input: {} },
+				{ type: 'usage', usage: { output: 4 } },
+				{ type: 'done', reason: 'tool_use' },
+			),
+		),
+	)
 	history.stop(true)
 	history.results(id, [{ type: 'tool_result', id: 't1', output: 'late' }])
 	history.end(id, undefined)
@@ -364,12 +450,16 @@ test('every record is numbered once; a streamed block keeps the number it starte
 	let id = newSession()
 	history.submit(id, 'go')
 	let gate = Promise.withResolvers<void>()
-	let it = history.record(id, 'fake', (async function* (): AsyncGenerator<StreamEvent> {
-		yield { type: 'text', text: 'wor' }
-		await gate.promise
-		yield { type: 'text', text: 'king' }
-		yield { type: 'done', reason: 'end' }
-	})())
+	let it = history.record(
+		id,
+		'fake',
+		(async function* (): AsyncGenerator<StreamEvent> {
+			yield { type: 'text', text: 'wor' }
+			await gate.promise
+			yield { type: 'text', text: 'king' }
+			yield { type: 'done', reason: 'end' }
+		})(),
+	)
 	await it.next()
 	let streaming = history.streaming(id)
 	expect(history.live(id)?.ns).toEqual([streaming!])
@@ -391,7 +481,8 @@ test('every record is numbered once; a streamed block keeps the number it starte
 
 test('records of an old history without numbers are numbered by place, and new ones past them', async () => {
 	let id = newSession()
-	let line = (text: string) => lines.encode({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
+	let line = (text: string) =>
+		lines.encode({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
 	writeFileSync(history.file(id), line('a') + line('b'))
 	forget()
 	let old = history.readSync(id).map((r) => r.n)
@@ -417,7 +508,11 @@ test('a failed turn stores the provider body with the message, never just a head
 	fakeStream(() => [{ type: 'error', message: 'Invalid JSON input', body: '{"command": "ls' }])
 	history.submit(id, 'go')
 	await drain(history.turn(id))
-	expect((await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'error', error: 'Invalid JSON input\n{"command": "ls' })
+	expect((await history.read(id)).at(-1)).toMatchObject({
+		type: 'turn_end',
+		status: 'error',
+		error: 'Invalid JSON input\n{"command": "ls',
+	})
 })
 
 test('a host notice reaches the next request once and never starts a turn', async () => {
@@ -460,13 +555,24 @@ test('returning to a model marks its last input end beyond the lookback', async 
 	history.append(id, { type: 'round', usage: { input: 1 }, model: opus, block: answer.n })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'ask another model' }] })
 	for (let i = 0; i < 15; i++) {
-		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: `c${i}`, name: 'bash', input: { command: 'ls' } } })
+		history.append(id, {
+			type: 'assistant',
+			block: { type: 'tool_call', id: `c${i}`, name: 'bash', input: { command: 'ls' } },
+		})
 		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: `c${i}`, output: 'x' }] })
 		history.append(id, { type: 'round', usage: { input: 1 }, model: 'openai/gpt-6-astra' })
 	}
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'back' }] })
-	let marked = (messages: Message[]) => anthropic.toMessages({ model: 'claude-opus-5-5', messages }).flatMap((m) => m.content).filter((b: any) => b.cache_control).map((b: any) => b.text ?? b.type)
-	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('first question'), expect.stringContaining('back')])
+	let marked = (messages: Message[]) =>
+		anthropic
+			.toMessages({ model: 'claude-opus-5-5', messages })
+			.flatMap((m) => m.content)
+			.filter((b: any) => b.cache_control)
+			.map((b: any) => b.text ?? b.type)
+	expect(marked(await history.messages(id, { model: opus }))).toEqual([
+		expect.stringContaining('first question'),
+		expect.stringContaining('back'),
+	])
 	// Once this model has the latest round, the newest marker reaches it.
 	history.append(id, { type: 'round', usage: { input: 1 }, model: opus })
 	expect(marked(await history.messages(id, { model: opus }))).toEqual([expect.stringContaining('back')])

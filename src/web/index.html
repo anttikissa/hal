@@ -1,771 +1,3338 @@
 <!doctype html>
 <html lang="en" class="page" data-version="/*VERSION*/">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>Hal</title>
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<style>
-/* Italic is Source Code Pro: the app never loads Plex italic. */
-@font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/IBMPlexMono-Light.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
-@font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/SourceCodePro-LightItalic.woff2') format('woff2'); font-weight: 300; font-style: italic; font-display: swap; }
-@font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: 'IBM Plex Mono'; src: url('/fonts/SourceCodePro-MediumItalic.woff2') format('woff2'); font-weight: 500; font-style: italic; font-display: swap; }
-/* The one stylesheet: layout only. Colors come from the theme below
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+		/>
+		<title>Hal</title>
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="/icon-192.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<style>
+			/* Italic is Source Code Pro: the app never loads Plex italic. */
+			@font-face {
+				font-family: 'IBM Plex Mono';
+				src: url('/fonts/IBMPlexMono-Light.woff2') format('woff2');
+				font-weight: 300;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IBM Plex Mono';
+				src: url('/fonts/SourceCodePro-LightItalic.woff2') format('woff2');
+				font-weight: 300;
+				font-style: italic;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IBM Plex Mono';
+				src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+				font-weight: 500;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IBM Plex Mono';
+				src: url('/fonts/SourceCodePro-MediumItalic.woff2') format('woff2');
+				font-weight: 500;
+				font-style: italic;
+				font-display: swap;
+			}
+			/* The one stylesheet: layout only. Colors come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
-/* --snap-ms: a frequent change (typing starts: 3 frames at 60 Hz);
+			/* --snap-ms: a frequent change (typing starts: 3 frames at 60 Hz);
    --back-ms: its rare reverse (the box empties again). */
-:root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; --snap-ms: 50ms; --back-ms: 300ms; }
-/* Icons (icons.ts): one stroke width, in 24-grid units, for both grids. */
-:root { --icon-stroke: 1.5; }
-.icon { width: 1.25em; height: 1.25em; flex: none; fill: currentColor; vertical-align: -0.3em; }
-.icon .s { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: calc(var(--icon-stroke) * 256 / 24); }
-.icon.g24 .s { stroke-width: var(--icon-stroke); }
-button:has(> .icon) { display: inline-flex; align-items: center; justify-content: center; gap: 0.75ch; }
-* { box-sizing: border-box; }
-/* Selection is reverse video in the text's own color (each theme class
+			:root {
+				color-scheme: dark;
+				--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+				--fade-ms: 300ms;
+				--toggle-ms: 250ms;
+				--snap-ms: 50ms;
+				--back-ms: 300ms;
+			}
+			/* Icons (icons.ts): one stroke width, in 24-grid units, for both grids. */
+			:root {
+				--icon-stroke: 1.5;
+			}
+			.icon {
+				width: 1.25em;
+				height: 1.25em;
+				flex: none;
+				fill: currentColor;
+				vertical-align: -0.3em;
+			}
+			.icon .s {
+				fill: none;
+				stroke: currentColor;
+				stroke-linecap: round;
+				stroke-linejoin: round;
+				stroke-width: calc(var(--icon-stroke) * 256 / 24);
+			}
+			.icon.g24 .s {
+				stroke-width: var(--icon-stroke);
+			}
+			button:has(> .icon) {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.75ch;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			/* Selection is reverse video in the text's own color (each theme class
    sets --sel-back, as does each rule that recolors text); a solid block
    (bg in its color) reverses back. */
-.page { --sel-text: var(--canvas); }
-::selection { background-color: var(--sel-back); color: var(--sel-text); -webkit-text-fill-color: var(--sel-text); }
-.Question button[aria-pressed="true"], .Question mark, .Card.question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
-/* Focus: one style, 2px in the control's own color, outside it. Inside
+			.page {
+				--sel-text: var(--canvas);
+			}
+			::selection {
+				background-color: var(--sel-back);
+				color: var(--sel-text);
+				-webkit-text-fill-color: var(--sel-text);
+			}
+			.Question button[aria-pressed='true'],
+			.Question mark,
+			.Card.question mark {
+				--sel-back: var(--canvas);
+				--sel-text: var(--fg);
+			}
+			/* Focus: one style, 2px in the control's own color, outside it. Inside
    where a clipping strip or list would cut it off; flush against a
    control that already draws a border, so it reads as a thicker one. */
-:where(:focus-visible) { outline: 2px solid currentColor; outline-offset: 2px; }
-html { background: var(--canvas); color: var(--text); overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-html, body { margin: 0; }
-/* The document is 1px taller than the screen and rests scrolled 1px
+			:where(:focus-visible) {
+				outline: 2px solid currentColor;
+				outline-offset: 2px;
+			}
+			html {
+				background: var(--canvas);
+				color: var(--text);
+				overscroll-behavior: none;
+				-webkit-text-size-adjust: 100%;
+				text-size-adjust: 100%;
+			}
+			html,
+			body {
+				margin: 0;
+			}
+			/* The document is 1px taller than the screen and rests scrolled 1px
    down: iOS answers a status-bar tap by scrolling it to 0, which
    viewport.statusTap turns into scrolling the transcript to the top.
    The app is fixed, so this 1px never moves it. */
-html { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
-html::-webkit-scrollbar { display: none; }
-/* Keep the document geometry still while Safari pans its visual viewport
+			html {
+				overflow-x: hidden;
+				overflow-y: auto;
+				scrollbar-width: none;
+			}
+			html::-webkit-scrollbar {
+				display: none;
+			}
+			/* Keep the document geometry still while Safari pans its visual viewport
    for the focused field. Move the app, not a fixed body whose layout top
    changes underneath Safari's focus scrolling. */
-body { height: calc(100dvh + 1px); overflow: hidden; }
-body, textarea, input, button { font: 300 14px/1.5 'IBM Plex Mono', monospace; font-synthesis: none; }
-body, textarea { tab-size: 4; }
-.App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.App { position: fixed; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
-/* While typing, the keyboard's panning is handled by viewport.page, so
+			body {
+				height: calc(100dvh + 1px);
+				overflow: hidden;
+			}
+			body,
+			textarea,
+			input,
+			button {
+				font:
+					300 14px/1.5 'IBM Plex Mono',
+					monospace;
+				font-synthesis: none;
+			}
+			body,
+			textarea {
+				tab-size: 4;
+			}
+			.App,
+			.Chat {
+				height: 100%;
+				min-height: 0;
+				overflow: hidden;
+				display: flex;
+				flex-direction: column;
+			}
+			.App {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: var(--app-width, 100%);
+				max-width: 100%;
+				height: var(--app-height, 100dvh);
+				transform: translate(var(--app-left, 0px), var(--app-top, 0px));
+			}
+			/* While typing, the keyboard's panning is handled by viewport.page, so
    the old locked layout returns: no document scroll, app absolute. */
-html.typing { overflow: hidden; }
-html.typing body { height: 100dvh; }
-html.typing .App { position: absolute; }
-/* The keyboard closing: the app grows on an S curve in 360 ms (viewport.ts). */
-@media (prefers-reduced-motion: no-preference) {
-  html.easing .App { transition: height 360ms cubic-bezier(0.65, 0, 0.35, 1), transform 360ms cubic-bezier(0.65, 0, 0.35, 1); }
-  html.easing .Composer { transition: padding-bottom 360ms cubic-bezier(0.65, 0, 0.35, 1); }
-}
-/* Zero-height anchor: reload floats over text without moving it. */
-.source-update { position: relative; flex: none; height: 0; z-index: 2; pointer-events: none; }
-.source-update button { position: absolute; top: 4px; right: max(1ch, env(safe-area-inset-right)); pointer-events: auto; font-size: 16px; line-height: 1; min-height: 44px; min-width: 44px; padding: 4px 8px; border: 0; color: var(--text); background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); }
-/* The one scroller: nothing inside it scrolls; long lines wrap. */
-/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
+			html.typing {
+				overflow: hidden;
+			}
+			html.typing body {
+				height: 100dvh;
+			}
+			html.typing .App {
+				position: absolute;
+			}
+			/* The keyboard closing: the app grows on an S curve in 360 ms (viewport.ts). */
+			@media (prefers-reduced-motion: no-preference) {
+				html.easing .App {
+					transition:
+						height 360ms cubic-bezier(0.65, 0, 0.35, 1),
+						transform 360ms cubic-bezier(0.65, 0, 0.35, 1);
+				}
+				html.easing .Composer {
+					transition: padding-bottom 360ms cubic-bezier(0.65, 0, 0.35, 1);
+				}
+			}
+			/* Zero-height anchor: reload floats over text without moving it. */
+			.source-update {
+				position: relative;
+				flex: none;
+				height: 0;
+				z-index: 2;
+				pointer-events: none;
+			}
+			.source-update button {
+				position: absolute;
+				top: 4px;
+				right: max(1ch, env(safe-area-inset-right));
+				pointer-events: auto;
+				font-size: 16px;
+				line-height: 1;
+				min-height: 44px;
+				min-width: 44px;
+				padding: 4px 8px;
+				border: 0;
+				color: var(--text);
+				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
+			}
+			/* The one scroller: nothing inside it scrolls; long lines wrap. */
+			/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow: hidden auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(1ch, env(safe-area-inset-left)); padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
-.Transcript { container: transcript / inline-size; }
-.Transcript :is(.Card, .Question) { --leading: 20px; line-height: var(--leading); }
-@container transcript (width > calc(102ch + 3px)) {
-  .Transcript :is(.Card, .Question) { --leading: 22px; }
-}
-.Transcript > * { margin: 0 0 0.5lh; }
-/* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
+			.Transcript {
+				flex: 1;
+				min-height: 0;
+				overflow: hidden auto;
+				overflow-anchor: none;
+				overscroll-behavior: contain;
+				--gut: max(1ch, env(safe-area-inset-left));
+				padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut);
+			}
+			.Transcript {
+				container: transcript / inline-size;
+			}
+			.Transcript :is(.Card, .Question) {
+				--leading: 20px;
+				line-height: var(--leading);
+			}
+			@container transcript (width > calc(102ch + 3px)) {
+				.Transcript :is(.Card, .Question) {
+					--leading: 22px;
+				}
+			}
+			.Transcript > * {
+				margin: 0 0 0.5lh;
+			}
+			/* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
    it shares the cards' left edge; a 52px target from the screen edge
    (the gutter clips anything further left) whose upright rectangle,
    75% black like the notice outline, is centered on their
    3px bar, just above the transcript's foot. */
-.Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
-.to-bottom button { position: absolute; bottom: calc(4px - 0.5lh); left: calc(-1 * var(--gut)); width: 52px; height: 52px; padding: 0 0 0 calc(var(--gut) + 1.5px - 4px); border: 0; background: none; display: flex; align-items: center; justify-content: flex-start; color: var(--text); animation: fade-in 150ms var(--ease-out); }
-.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 8px; height: 52px; background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-.to-bottom svg { flex: none; width: 10px; height: 14px; fill: currentColor; }
-@keyframes fade-in { from { opacity: 0; } }
-/* Cards and the open question share one shape: square, a lit bar on
+			.Transcript > .to-bottom {
+				position: sticky;
+				bottom: 0;
+				height: 0;
+				margin: 0;
+				z-index: 1;
+			}
+			.to-bottom button {
+				position: absolute;
+				bottom: calc(4px - 0.5lh);
+				left: calc(-1 * var(--gut));
+				width: 52px;
+				height: 52px;
+				padding: 0 0 0 calc(var(--gut) + 1.5px - 4px);
+				border: 0;
+				background: none;
+				display: flex;
+				align-items: center;
+				justify-content: flex-start;
+				color: var(--text);
+				animation: fade-in 150ms var(--ease-out);
+			}
+			.to-bottom .pill {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 8px;
+				height: 52px;
+				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
+				-webkit-backdrop-filter: blur(2px);
+				backdrop-filter: blur(2px);
+			}
+			.to-bottom svg {
+				flex: none;
+				width: 10px;
+				height: 14px;
+				fill: currentColor;
+			}
+			@keyframes fade-in {
+				from {
+					opacity: 0;
+				}
+			}
+			/* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
-.Card, .Question { border-left: 3px solid currentColor; }
-/* Shared compact insets; touch targets extend without enlarging rows. */
-.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 4); }
-.Card .content { padding: 0.25lh 1ch var(--card-inset); }
-.Card.tool .content, .Card.background-result .content { color: var(--output); --sel-back: var(--output); }
-.Card.thinking .content, .Card.thinking:not(.open) .label { font-style: italic; }
-.Card.thinking .Markdown { font-weight: 300; font-style: italic; }
-.Card .result-text { color: var(--output, inherit); --sel-back: var(--output, var(--fg)); }
-.Card .result-text.error { background: none; }
-.result-output .CardHeader { min-height: 0; padding: 0; color: inherit; }
-.result-output .CardHeader.inline :is(.title, .stamp, .status) { padding-block: 0; }
-.Card .sender { color: var(--quiet); --sel-back: var(--quiet); margin-bottom: 0.25lh; }
-.Card .who { color: var(--title-fg); --sel-back: var(--title-fg); }
-.Card .who .call { color: inherit; text-decoration: underline; }
-.Card .exit { background: none; }
-.Card .change > :not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
-.ToolPresentation { white-space: normal; }
-.ToolPresentation section + section, .raw-tool { margin-top: 1lh; }
-.ToolPresentation .path { overflow-wrap: anywhere; margin-bottom: 0.25lh; }
-.ToolPresentation pre, .raw-tool pre { margin: 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ToolPresentation code { font: inherit; }
-.ToolPresentation .diff { overflow-x: auto; }
-.ToolPresentation .diff > div { white-space: pre; width: max-content; min-width: 100%; }
-.ToolPresentation .add { color: var(--add-fg); --sel-back: var(--add-fg); }
-.ToolPresentation .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
-.ToolPresentation .dim { color: var(--quiet); --sel-back: var(--quiet); }
-.raw-tool button { background: none; color: inherit; padding: 0.5lh 1ch; min-height: 44px; text-decoration: underline; }
-/* An opened diff keeps whole lines and scrolls sideways as one box, its
+			.Card,
+			.Question {
+				border-left: 3px solid currentColor;
+			}
+			/* Shared compact insets; touch targets extend without enlarging rows. */
+			.Card {
+				position: relative;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				--card-inset: calc((44px - 1lh) / 4);
+			}
+			.Card .content {
+				padding: 0.25lh 1ch var(--card-inset);
+			}
+			.Card.tool .content,
+			.Card.background-result .content {
+				color: var(--output);
+				--sel-back: var(--output);
+			}
+			.Card.thinking .content,
+			.Card.thinking:not(.open) .label {
+				font-style: italic;
+			}
+			.Card.thinking .Markdown {
+				font-weight: 300;
+				font-style: italic;
+			}
+			.Card .result-text {
+				color: var(--output, inherit);
+				--sel-back: var(--output, var(--fg));
+			}
+			.Card .result-text.error {
+				background: none;
+			}
+			.result-output .CardHeader {
+				min-height: 0;
+				padding: 0;
+				color: inherit;
+			}
+			.result-output .CardHeader.inline :is(.title, .stamp, .status) {
+				padding-block: 0;
+			}
+			.Card .sender {
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+				margin-bottom: 0.25lh;
+			}
+			.Card .who {
+				color: var(--title-fg);
+				--sel-back: var(--title-fg);
+			}
+			.Card .who .call {
+				color: inherit;
+				text-decoration: underline;
+			}
+			.Card .exit {
+				background: none;
+			}
+			.Card .change > :not(.lines) {
+				white-space: pre;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.ToolPresentation {
+				white-space: normal;
+			}
+			.ToolPresentation section + section,
+			.raw-tool {
+				margin-top: 1lh;
+			}
+			.ToolPresentation .path {
+				overflow-wrap: anywhere;
+				margin-bottom: 0.25lh;
+			}
+			.ToolPresentation pre,
+			.raw-tool pre {
+				margin: 0;
+				font: inherit;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+			}
+			.ToolPresentation code {
+				font: inherit;
+			}
+			.ToolPresentation .diff {
+				overflow-x: auto;
+			}
+			.ToolPresentation .diff > div {
+				white-space: pre;
+				width: max-content;
+				min-width: 100%;
+			}
+			.ToolPresentation .add {
+				color: var(--add-fg);
+				--sel-back: var(--add-fg);
+			}
+			.ToolPresentation .del {
+				color: var(--remove-fg);
+				--sel-back: var(--remove-fg);
+			}
+			.ToolPresentation .dim {
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+			}
+			.raw-tool button {
+				background: none;
+				color: inherit;
+				padding: 0.5lh 1ch;
+				min-height: 44px;
+				text-decoration: underline;
+			}
+			/* An opened diff keeps whole lines and scrolls sideways as one box, its
    right edge fading while more is off screen, like a wide table. */
-.Card .change .lines, .Card .edit-diff { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
-.Card .change .lines > div, .Card .edit-diff > div { white-space: pre; width: max-content; min-width: 100%; }
-.Card .change .add, .Card .edit-diff .add, .CardHeader .status .add, .Markdown pre[data-lang=diff] .add { color: var(--add-fg); --sel-back: var(--add-fg); }
-.Card .change .del, .Card .edit-diff .del, .CardHeader .status .del, .Markdown pre[data-lang=diff] .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
-.Card .change .dim, .Card .edit-diff .dim, .Markdown pre[data-lang=diff] .dim { color: var(--quiet); --sel-back: var(--quiet); }
-/* Removed text in the rows is struck through, as in the terminal. */
-.Card .change .row.del, .Card .change span.del { text-decoration: line-through; }
-.Card .change .head:not(:first-child) { margin-top: 0.5lh; }
-/* Shared first-line alignment, including wrapped titles. */
-.CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; }
-.Transcript > :is(.Card, .Question) { view-timeline: --sticky-card block; }
-.CardHeader { position: sticky; top: 0; z-index: 1; --sticky-bg: var(--card-bg, var(--canvas)); background: color-mix(in oklab, var(--sticky-bg) 65%, transparent); }
-@supports (animation-timeline: --sticky-card) {
-  .CardHeader:not(.inline), .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { animation: sticky-shade linear both; animation-timeline: --sticky-card; animation-range: exit-crossing 20px exit-crossing 40px; }
-}
-@keyframes sticky-shade { to { background-color: color-mix(in oklab, color-mix(in oklab, var(--sticky-bg) 80%, var(--overlay-bg)) 65%, transparent); } }
-.CardHeader.inline { position: static; background: none; grid-template-columns: auto minmax(0, 1fr); }
-.CardHeader.inline .flow { display: contents; }
-.CardHeader.inline .title { min-width: 0; padding-block: var(--card-inset); }
-.CardHeader.inline .stamp, .CardHeader.inline > :not(.flow) { position: sticky; top: 0; z-index: 1; align-self: start; background: color-mix(in oklab, var(--sticky-bg) 65%, transparent); }
-.Card:not(.tall) :is(.CardHeader, .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow)) { position: static; }
-.CardHeader.inline .stamp { padding-block: var(--card-inset); }
-.CardHeader .flow, .CardHeader .link, .CardHeader > .call { padding-block: var(--card-inset); }
-.CardHeader > .call { white-space: nowrap; }
-.CardHeader .flow { min-width: 0; }
-.CardHeader .stamp { padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
-.CardHeader .mark { position: relative; }
-@media (pointer: coarse) { .CardHeader .mark::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
-/* A flowing header (a question): time and label are one text, wrapping to the left edge. */
-.CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; vertical-align: top; opacity: 0.8; }
-.Card.folds:not(.open) .CardHeader .flow { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
-.CardHeader.head:not(.inline) .flow { overflow-x: clip; }
-.CardHeader.head:not(.inline) .title::after { content: '   open'; display: inline-block; width: 0; white-space: pre; opacity: 0; transition: opacity 250ms ease; }
-.Card.open > .CardHeader.head:not(.inline) .title::after { content: '   close'; }
-@media (hover: hover) and (pointer: fine) { .CardHeader.head:not(.inline):hover .title::after { opacity: 0.5; transition-duration: 100ms; } }
-.CardHeader > .peek { width: 0; margin-left: -1ch; display: flex; justify-content: flex-end; opacity: 0; transition: opacity 250ms ease; }
-.CardHeader > .peek > .status { padding-left: 1ch; background: var(--sticky-bg); }
-@media (hover: hover) and (pointer: fine) { .CardHeader:hover > .peek { opacity: 0.5; transition-duration: 100ms; } }
-/* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
-.CardHeader .error { background: none; margin-left: 1ch; }
-/* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
-.Card .receipt { opacity: .5; display: inline-flex; align-items: center; flex-shrink: 0; }
-.CardHeader > .receipt { padding-block: var(--card-inset); }
-.Card .link:has(.receipt) { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5ch; }
-.Card .link:has(.receipt)::before { order: 1; }
-.CardHeader .status { padding-block: var(--card-inset); --quiet: inherit; color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
-.CardHeader .status.diff { min-width: 0; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; }
-.Card.open .CardHeader:has(> .status.diff) { grid-template-columns: minmax(0, 1fr) auto auto; }
-.Card.open .CardHeader:has(> .status.diff) > .ticker { grid-column: 2; grid-row: 1; }
-.Card.open .CardHeader:has(> .status.diff) > .link { grid-column: 3; grid-row: 1; }
-.Card.open .CardHeader > .status.diff { grid-column: 1 / -1; grid-row: 2; max-width: none; white-space: normal; padding-top: 0; overflow: visible; }
-.Card.open .CardHeader:has(> .status.diff) > .line-count { grid-column: 3; grid-row: 2; padding-top: 0; }
-.Card.open .CardHeader:has(> .line-count) > .status.diff { grid-column: 1 / 3; }
-.CardHeader .unsafe { margin-left: 1ch; font-style: italic; white-space: nowrap; }
-.CardHeader .kill { padding: 0; background: transparent; font: inherit; }
-.CardHeader .kill:focus-visible { outline-offset: 0; }
-.CardHeader :is(.edit, .discard) { padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; }
-@media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
-.CardHeader:has(.receipt) .discard { padding-inline: 0; }
-.CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss) { position: relative; align-self: start; min-width: 44px; min-height: calc(1lh + 2 * var(--card-inset)); margin: 0; }
-@media (pointer: coarse) { .CardHeader :is(.edit,.discard,.send,.kill,.undo,.dismiss)::after { content: ''; position: absolute; inset: 50% 0 auto; height: 44px; transform: translateY(-50%); } }
-.EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(1ch, env(safe-area-inset-right)) 0 max(1ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
-.EditBar .text { flex: 1; min-width: 0; }
-.EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
-@media (pointer: coarse) { .EditBar .keys { display: none; } .EditBar button { min-height: 44px; min-width: 44px; } }
-@media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
-.CardHeader .link { position: relative; text-align: right; }
-.CardHeader .title a { padding-block: var(--card-inset); }
-.CardHeader a { color: inherit; }
-/* Context boundaries retain their rule above the shared card header. */
-.Card.divider > .CardHeader { border-top: 1px solid currentColor; }
-.Card.image .content > a { display: block; width: fit-content; touch-action: pan-y; }
-.Card.image img { display: block; max-width: 100%; max-height: 24rem; }
-/* A prompt the host hasn't taken yet looks sent; only one that stays
+			.Card .change .lines,
+			.Card .edit-diff {
+				overflow-x: auto;
+				mask-image: linear-gradient(to left, transparent, currentColor var(--fade));
+				animation: md-fade linear both;
+				animation-timeline: scroll(self inline);
+			}
+			.Card .change .lines > div,
+			.Card .edit-diff > div {
+				white-space: pre;
+				width: max-content;
+				min-width: 100%;
+			}
+			.Card .change .add,
+			.Card .edit-diff .add,
+			.CardHeader .status .add,
+			.Markdown pre[data-lang='diff'] .add {
+				color: var(--add-fg);
+				--sel-back: var(--add-fg);
+			}
+			.Card .change .del,
+			.Card .edit-diff .del,
+			.CardHeader .status .del,
+			.Markdown pre[data-lang='diff'] .del {
+				color: var(--remove-fg);
+				--sel-back: var(--remove-fg);
+			}
+			.Card .change .dim,
+			.Card .edit-diff .dim,
+			.Markdown pre[data-lang='diff'] .dim {
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+			}
+			/* Removed text in the rows is struck through, as in the terminal. */
+			.Card .change .row.del,
+			.Card .change span.del {
+				text-decoration: line-through;
+			}
+			.Card .change .head:not(:first-child) {
+				margin-top: 0.5lh;
+			}
+			/* Shared first-line alignment, including wrapped titles. */
+			.CardHeader {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr);
+				grid-auto-flow: column;
+				align-items: start;
+				column-gap: 1ch;
+				padding-inline: 1ch;
+			}
+			.Transcript > :is(.Card, .Question) {
+				view-timeline: --sticky-card block;
+			}
+			.CardHeader {
+				position: sticky;
+				top: 0;
+				z-index: 1;
+				--sticky-bg: var(--card-bg, var(--canvas));
+				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
+			}
+			@supports (animation-timeline: --sticky-card) {
+				.CardHeader:not(.inline),
+				.CardHeader.inline .stamp,
+				.CardHeader.inline > :not(.flow) {
+					animation: sticky-shade linear both;
+					animation-timeline: --sticky-card;
+					animation-range: exit-crossing 20px exit-crossing 40px;
+				}
+			}
+			@keyframes sticky-shade {
+				to {
+					background-color: color-mix(
+						in oklab,
+						color-mix(in oklab, var(--sticky-bg) 80%, var(--overlay-bg)) 65%,
+						transparent
+					);
+				}
+			}
+			.CardHeader.inline {
+				position: static;
+				background: none;
+				grid-template-columns: auto minmax(0, 1fr);
+			}
+			.CardHeader.inline .flow {
+				display: contents;
+			}
+			.CardHeader.inline .title {
+				min-width: 0;
+				padding-block: var(--card-inset);
+			}
+			.CardHeader.inline .stamp,
+			.CardHeader.inline > :not(.flow) {
+				position: sticky;
+				top: 0;
+				z-index: 1;
+				align-self: start;
+				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
+			}
+			.Card:not(.tall) :is(.CardHeader, .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow)) {
+				position: static;
+			}
+			.CardHeader.inline .stamp {
+				padding-block: var(--card-inset);
+			}
+			.CardHeader .flow,
+			.CardHeader .link,
+			.CardHeader > .call {
+				padding-block: var(--card-inset);
+			}
+			.CardHeader > .call {
+				white-space: nowrap;
+			}
+			.CardHeader .flow {
+				min-width: 0;
+			}
+			.CardHeader .stamp {
+				padding: 0;
+				background: none;
+				color: inherit;
+				font: inherit;
+				white-space: nowrap;
+			}
+			.CardHeader .mark {
+				position: relative;
+			}
+			@media (pointer: coarse) {
+				.CardHeader .mark::after {
+					content: '';
+					position: absolute;
+					inset: 50% auto auto 50%;
+					width: max(100%, 44px);
+					height: 44px;
+					transform: translate(-50%, -50%);
+				}
+			}
+			/* A flowing header (a question): time and label are one text, wrapping to the left edge. */
+			.CardHeader .title > .icon {
+				height: 1lh;
+				margin-right: 0.8ch;
+				vertical-align: top;
+				opacity: 0.8;
+			}
+			.Card.folds:not(.open) .CardHeader .flow {
+				overflow: clip visible;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.CardHeader.head:not(.inline) .flow {
+				overflow-x: clip;
+			}
+			.CardHeader.head:not(.inline) .title::after {
+				content: '   open';
+				display: inline-block;
+				width: 0;
+				white-space: pre;
+				opacity: 0;
+				transition: opacity 250ms ease;
+			}
+			.Card.open > .CardHeader.head:not(.inline) .title::after {
+				content: '   close';
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.CardHeader.head:not(.inline):hover .title::after {
+					opacity: 0.5;
+					transition-duration: 100ms;
+				}
+			}
+			.CardHeader > .peek {
+				width: 0;
+				margin-left: -1ch;
+				display: flex;
+				justify-content: flex-end;
+				opacity: 0;
+				transition: opacity 250ms ease;
+			}
+			.CardHeader > .peek > .status {
+				padding-left: 1ch;
+				background: var(--sticky-bg);
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.CardHeader:hover > .peek {
+					opacity: 0.5;
+					transition-duration: 100ms;
+				}
+			}
+			/* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
+			.CardHeader .error {
+				background: none;
+				margin-left: 1ch;
+			}
+			/* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
+			.Card .receipt {
+				opacity: 0.5;
+				display: inline-flex;
+				align-items: center;
+				flex-shrink: 0;
+			}
+			.CardHeader > .receipt {
+				padding-block: var(--card-inset);
+			}
+			.Card .link:has(.receipt) {
+				display: inline-flex;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 0.5ch;
+			}
+			.Card .link:has(.receipt)::before {
+				order: 1;
+			}
+			.CardHeader .status {
+				padding-block: var(--card-inset);
+				--quiet: inherit;
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+				white-space: nowrap;
+			}
+			.CardHeader .status.diff {
+				min-width: 0;
+				max-width: 30vw;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.Card.open .CardHeader:has(> .status.diff) {
+				grid-template-columns: minmax(0, 1fr) auto auto;
+			}
+			.Card.open .CardHeader:has(> .status.diff) > .ticker {
+				grid-column: 2;
+				grid-row: 1;
+			}
+			.Card.open .CardHeader:has(> .status.diff) > .link {
+				grid-column: 3;
+				grid-row: 1;
+			}
+			.Card.open .CardHeader > .status.diff {
+				grid-column: 1 / -1;
+				grid-row: 2;
+				max-width: none;
+				white-space: normal;
+				padding-top: 0;
+				overflow: visible;
+			}
+			.Card.open .CardHeader:has(> .status.diff) > .line-count {
+				grid-column: 3;
+				grid-row: 2;
+				padding-top: 0;
+			}
+			.Card.open .CardHeader:has(> .line-count) > .status.diff {
+				grid-column: 1 / 3;
+			}
+			.CardHeader .unsafe {
+				margin-left: 1ch;
+				font-style: italic;
+				white-space: nowrap;
+			}
+			.CardHeader .kill {
+				padding: 0;
+				background: transparent;
+				font: inherit;
+			}
+			.CardHeader .kill:focus-visible {
+				outline-offset: 0;
+			}
+			.CardHeader :is(.edit, .discard) {
+				padding: 0 1ch;
+				background: transparent;
+				color: inherit;
+				font: inherit;
+				text-decoration: underline;
+				text-underline-offset: 0.2em;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) {
+					opacity: 0;
+				}
+			}
+			.CardHeader:has(.receipt) .discard {
+				padding-inline: 0;
+			}
+			.CardHeader :is(.edit, .discard, .send, .kill, .undo, .dismiss) {
+				position: relative;
+				align-self: start;
+				min-width: 44px;
+				min-height: calc(1lh + 2 * var(--card-inset));
+				margin: 0;
+			}
+			@media (pointer: coarse) {
+				.CardHeader :is(.edit, .discard, .send, .kill, .undo, .dismiss)::after {
+					content: '';
+					position: absolute;
+					inset: 50% 0 auto;
+					height: 44px;
+					transform: translateY(-50%);
+				}
+			}
+			.EditBar {
+				flex: none;
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				margin: 0 max(1ch, env(safe-area-inset-right)) 0 max(1ch, env(safe-area-inset-left));
+				padding: 0.25lh 1ch;
+				border-left: 3px solid var(--attention-fg);
+			}
+			.EditBar .text {
+				flex: 1;
+				min-width: 0;
+			}
+			.EditBar button {
+				flex: none;
+				padding: 0 1ch;
+				background: transparent;
+				color: inherit;
+				font: inherit;
+				box-shadow: inset 0 0 0 1px currentColor;
+			}
+			@media (pointer: coarse) {
+				.EditBar .keys {
+					display: none;
+				}
+				.EditBar button {
+					min-height: 44px;
+					min-width: 44px;
+				}
+			}
+			@media (max-width: 40rem) {
+				.EditBar {
+					margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right));
+				}
+			}
+			.CardHeader .link {
+				position: relative;
+				text-align: right;
+			}
+			.CardHeader .title a {
+				padding-block: var(--card-inset);
+			}
+			.CardHeader a {
+				color: inherit;
+			}
+			/* Context boundaries retain their rule above the shared card header. */
+			.Card.divider > .CardHeader {
+				border-top: 1px solid currentColor;
+			}
+			.Card.image .content > a {
+				display: block;
+				width: fit-content;
+				touch-action: pan-y;
+			}
+			.Card.image img {
+				display: block;
+				max-width: 100%;
+				max-height: 24rem;
+			}
+			/* A prompt the host hasn't taken yet looks sent; only one that stays
    pending grays, after a delay, so a normal round trip shows nothing. */
-.Card.user { transition: color 300ms var(--ease-out); }
-.Transcript > .Card.queued.user:has(+ .Card.queued.user), .Transcript > .Card.queued.message:has(+ .Card.queued.message) { margin-bottom: 0; }
-.Card.queued { cursor: pointer; }
-.Card.queued:not(.open) .CardHeader .flow { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
-.CardHeader .send { padding: 0; background: none; color: inherit; }
-.Card.pending { color: var(--quiet); --sel-back: var(--quiet); transition-delay: 300ms; }
-.Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
-.Card.folds { cursor: pointer; }
-/* Each card links to itself (task 0z): a # in its top right corner,
+			.Card.user {
+				transition: color 300ms var(--ease-out);
+			}
+			.Transcript > .Card.queued.user:has(+ .Card.queued.user),
+			.Transcript > .Card.queued.message:has(+ .Card.queued.message) {
+				margin-bottom: 0;
+			}
+			.Card.queued {
+				cursor: pointer;
+			}
+			.Card.queued:not(.open) .CardHeader .flow {
+				overflow: clip visible;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.CardHeader .send {
+				padding: 0;
+				background: none;
+				color: inherit;
+			}
+			.Card.pending {
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+				transition-delay: 300ms;
+			}
+			.Chat.offline .Card.pending .who::after {
+				content: ' (waiting to reconnect)';
+			}
+			.Card.folds {
+				cursor: pointer;
+			}
+			/* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card flashes (flash.ts). */
-.CardHeader .link { color: var(--title-fg); text-decoration: none; user-select: none; white-space: nowrap; }
-.CardHeader .link::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
-.CardHeader .link::before { content: attr(data-ref); }
-.CardHeader .link:focus-visible { color: inherit; text-decoration: underline; }
-@media (hover: hover) and (pointer: fine) { .CardHeader .link:hover { color: inherit; text-decoration: underline; } }
-.Card.target { scroll-margin-top: 0.5lh; }
-.Card .command-toggle { display: block; position: relative; margin: 0.25lh 0 0 2ch; padding: 0; background: none; color: inherit; font: inherit; }
-.Card .command-toggle .label { text-decoration: underline; text-underline-offset: 0.2em; }
-@media (pointer: coarse) { .Card .command-toggle::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
-.ToolCommand { margin-bottom: 0.5lh; }
-.ToolCommand .command.clipped { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Open and close animate the height (a one-row grid, 0fr to 1fr);
+			.CardHeader .link {
+				color: var(--title-fg);
+				text-decoration: none;
+				user-select: none;
+				white-space: nowrap;
+			}
+			.CardHeader .link::after {
+				content: '';
+				position: absolute;
+				inset: 50% auto auto 50%;
+				width: max(100%, 44px);
+				height: max(100%, 44px);
+				transform: translate(-50%, -50%);
+			}
+			.CardHeader .link::before {
+				content: attr(data-ref);
+			}
+			.CardHeader .link:focus-visible {
+				color: inherit;
+				text-decoration: underline;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.CardHeader .link:hover {
+					color: inherit;
+					text-decoration: underline;
+				}
+			}
+			.Card.target {
+				scroll-margin-top: 0.5lh;
+			}
+			.Card .command-toggle {
+				display: block;
+				position: relative;
+				margin: 0.25lh 0 0 2ch;
+				padding: 0;
+				background: none;
+				color: inherit;
+				font: inherit;
+			}
+			.Card .command-toggle .label {
+				text-decoration: underline;
+				text-underline-offset: 0.2em;
+			}
+			@media (pointer: coarse) {
+				.Card .command-toggle::after {
+					content: '';
+					position: absolute;
+					inset: 50% auto auto 50%;
+					width: max(100%, 44px);
+					height: 44px;
+					transform: translate(-50%, -50%);
+				}
+			}
+			.ToolCommand {
+				margin-bottom: 0.5lh;
+			}
+			.ToolCommand .command.clipped {
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			/* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
-.Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
-.Card.open .body { grid-template-rows: 1fr; transition-duration: var(--toggle-ms); }
-.Card .contents { min-height: 0; overflow: hidden; }
-/* Hal's cursor: inside the card that streams, right after its last
+			.Card .body {
+				display: grid;
+				grid-template-rows: 0fr;
+				transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out);
+			}
+			.Card.open .body {
+				grid-template-rows: 1fr;
+				transition-duration: var(--toggle-ms);
+			}
+			.Card .contents {
+				min-height: 0;
+				overflow: hidden;
+			}
+			/* Hal's cursor: inside the card that streams, right after its last
    character (dimmed while thinking), else on a line after the last
    item. */
-.cursor-line { min-height: 1.25lh; padding: 0.25lh 0 0 calc(3px + 1ch); color: var(--cursor); }
-.cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
-.Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
-.Card.thinking .cursor { background: var(--quiet); }
-.CardHeader .cursor { vertical-align: top; }
-/* Task hyt: a live block's elapsed time and spinner. */
-.CardHeader .ticker { display: flex; gap: 1ch; padding-block: var(--card-inset); color: var(--quiet); --sel-back: var(--quiet); white-space: nowrap; }
-.CardHeader .spinner { display: inline-block; width: 1ch; }
-.CardHeader .spinner:not(.on), .CardHeader .ticker:not(:has(.on)) { display: none; }
-.CardHeader .spinner.on::after { content: '⠁'; animation: spin 2s steps(1, end) infinite; }
-@keyframes spin { 0% { content: '⠁'; } 12.5% { content: '⠈'; } 25% { content: '⠐'; } 37.5% { content: '⠠'; } 50% { content: '⢀'; } 62.5% { content: '⡀'; } 75% { content: '⠄'; } 87.5% { content: '⠂'; } }
-.CardHeader .latest { margin-left: 1ch; color: var(--quiet); --sel-back: var(--quiet); }
-.CardHeader .secondary { color: var(--fg); --sel-back: var(--fg); }
-.CardHeader { color: var(--title-fg); --sel-back: var(--title-fg); }
-.CardHeader.inline .label { color: var(--fg); --sel-back: var(--fg); }
-@media (prefers-reduced-motion: reduce) { .CardHeader .spinner.on::after { animation: none; content: '·'; } }
-/* Model text as markdown (task fn). Each source line is a row, a blank
+			.cursor-line {
+				min-height: 1.25lh;
+				padding: 0.25lh 0 0 calc(3px + 1ch);
+				color: var(--cursor);
+			}
+			.cursor-line span,
+			.Card .cursor {
+				display: block;
+				width: 1ch;
+				height: 1lh;
+				background: currentColor;
+				animation: blink 1s steps(1, end) infinite;
+			}
+			.Card .cursor {
+				display: inline-block;
+				vertical-align: text-bottom;
+				margin-left: 0.2ch;
+				background: var(--cursor);
+			}
+			.Card.thinking .cursor {
+				background: var(--quiet);
+			}
+			.CardHeader .cursor {
+				vertical-align: top;
+			}
+			/* Task hyt: a live block's elapsed time and spinner. */
+			.CardHeader .ticker {
+				display: flex;
+				gap: 1ch;
+				padding-block: var(--card-inset);
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+				white-space: nowrap;
+			}
+			.CardHeader .spinner {
+				display: inline-block;
+				width: 1ch;
+			}
+			.CardHeader .spinner:not(.on),
+			.CardHeader .ticker:not(:has(.on)) {
+				display: none;
+			}
+			.CardHeader .spinner.on::after {
+				content: '⠁';
+				animation: spin 2s steps(1, end) infinite;
+			}
+			@keyframes spin {
+				0% {
+					content: '⠁';
+				}
+				12.5% {
+					content: '⠈';
+				}
+				25% {
+					content: '⠐';
+				}
+				37.5% {
+					content: '⠠';
+				}
+				50% {
+					content: '⢀';
+				}
+				62.5% {
+					content: '⡀';
+				}
+				75% {
+					content: '⠄';
+				}
+				87.5% {
+					content: '⠂';
+				}
+			}
+			.CardHeader .latest {
+				margin-left: 1ch;
+				color: var(--quiet);
+				--sel-back: var(--quiet);
+			}
+			.CardHeader .secondary {
+				color: var(--fg);
+				--sel-back: var(--fg);
+			}
+			.CardHeader {
+				color: var(--title-fg);
+				--sel-back: var(--title-fg);
+			}
+			.CardHeader.inline .label {
+				color: var(--fg);
+				--sel-back: var(--fg);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.CardHeader .spinner.on::after {
+					animation: none;
+					content: '·';
+				}
+			}
+			/* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
    table too wide scrolls sideways in its own box, and while more of it
    is off to the right, that edge fades (a scroll-driven --fade). */
-.Markdown .line { min-height: 1lh; }
-.Markdown .line.tail { display: inline; }
-.Card:not(.thinking) .Markdown .line.p:has(> span:empty) { height: 0.5lh; min-height: 0; }
-.Prose { display: block; }
-.Prose .row { display: block; min-height: 1lh; }
-.Prose .row.blank { height: 0.5lh; min-height: 0; }
-.Prose a { color: inherit; }
-.Markdown .interrupted { background: transparent; white-space: pre-wrap; }
-.Markdown .interrupted::after { content: attr(data-tail); }
-.Markdown .h { margin-top: 0.25lh; }
-/* Inline flow keeps native selection from separating marker and body. */
-.Markdown .li { padding-left: 2ch; text-indent: -2ch; }
-.Markdown .quote { border-left: 2px solid color-mix(in oklab, currentColor var(--mix-quote), transparent); padding-left: 1ch; }
-.Markdown .b { font-weight: bold; }
-.Markdown .i { font-style: italic; }
-.Markdown .code, .Markdown pre { font-family: 'IBM Plex Mono', monospace; }
-.Markdown .code, .Markdown pre code { color: var(--code, inherit); --sel-back: var(--code, var(--fg)); }
-.Markdown a { color: inherit; }
-.Markdown pre { margin: 0.25lh 0; white-space: pre-wrap; }
-.Markdown pre[data-lang]::before { content: attr(data-lang); display: block; color: var(--quiet); }
-.Markdown .table { overflow-x: auto; margin: 0.25lh 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
-.Markdown table { border-collapse: collapse; }
-.Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor var(--mix-table), transparent); padding: 0 1ch; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
-.Markdown td { white-space: pre-line; }
-.Markdown .meter { background: color-mix(in oklab, currentColor 25%, transparent); }
-@property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
-@keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
-@keyframes blink { 50% { opacity: 0; } }
-/* Opt-in scroll-follow debug marker (web/drift.ts, task 981), desktop only. */
-.ScrollMark { position: fixed; top: 2lh; right: 1ch; z-index: 3; padding: 0.25lh 1ch; border-left: 3px solid; background: var(--overlay-bg); pointer-events: none; }
-.ScrollMark.heat-0, .ScrollMark.heat-100 { font-weight: bold; background: color-mix(in oklab, var(--heat) 20%, var(--overlay-bg)); }
-@media (pointer: coarse) { .ScrollMark { display: none; } }
-/* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
-.Notices { position: relative; flex: none; height: 0; z-index: 2; }
-.Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); }
-@media (max-width: 40rem) { .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); } }
-.Notices .stack { position: absolute; right: var(--gr); bottom: 0.5lh; width: min(24rem, calc(100% - var(--gl) - var(--gr))); display: flex; flex-direction: column; gap: 0.25lh; }
-.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 4px color-mix(in oklab, var(--overlay-bg) 75%, transparent); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
-.Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); --sel-back: var(--done-fg); }
-.Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); --sel-back: var(--failed-fg); }
-.Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); --sel-back: var(--attention-fg); }
-.Notices .card.commit { border-color: var(--commit-fg); } .Notices .card.commit strong { color: var(--commit-fg); --sel-back: var(--commit-fg); }
-.Notices .card.tinted { border-color: var(--bar); background-color: var(--tint); } .Notices .card.tinted strong { color: var(--bar); --sel-back: var(--bar); }
-.Notices .card .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Notices .more { align-self: flex-end; padding: 0 1ch; }
-@media (pointer: coarse) { .Notices .card { min-height: 44px; } }
-@keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
-/* Two explicit lines, no accidental wrapping; the whole overview is a target. */
-/* --gutter: the composer's side padding in its own font, as a length, so
+			.Markdown .line {
+				min-height: 1lh;
+			}
+			.Markdown .line.tail {
+				display: inline;
+			}
+			.Card:not(.thinking) .Markdown .line.p:has(> span:empty) {
+				height: 0.5lh;
+				min-height: 0;
+			}
+			.Prose {
+				display: block;
+			}
+			.Prose .row {
+				display: block;
+				min-height: 1lh;
+			}
+			.Prose .row.blank {
+				height: 0.5lh;
+				min-height: 0;
+			}
+			.Prose a {
+				color: inherit;
+			}
+			.Markdown .interrupted {
+				background: transparent;
+				white-space: pre-wrap;
+			}
+			.Markdown .interrupted::after {
+				content: attr(data-tail);
+			}
+			.Markdown .h {
+				margin-top: 0.25lh;
+			}
+			/* Inline flow keeps native selection from separating marker and body. */
+			.Markdown .li {
+				padding-left: 2ch;
+				text-indent: -2ch;
+			}
+			.Markdown .quote {
+				border-left: 2px solid color-mix(in oklab, currentColor var(--mix-quote), transparent);
+				padding-left: 1ch;
+			}
+			.Markdown .b {
+				font-weight: bold;
+			}
+			.Markdown .i {
+				font-style: italic;
+			}
+			.Markdown .code,
+			.Markdown pre {
+				font-family: 'IBM Plex Mono', monospace;
+			}
+			.Markdown .code,
+			.Markdown pre code {
+				color: var(--code, inherit);
+				--sel-back: var(--code, var(--fg));
+			}
+			.Markdown a {
+				color: inherit;
+			}
+			.Markdown pre {
+				margin: 0.25lh 0;
+				white-space: pre-wrap;
+			}
+			.Markdown pre[data-lang]::before {
+				content: attr(data-lang);
+				display: block;
+				color: var(--quiet);
+			}
+			.Markdown .table {
+				overflow-x: auto;
+				margin: 0.25lh 0;
+				white-space: normal;
+				mask-image: linear-gradient(to left, transparent, currentColor var(--fade));
+				animation: md-fade linear both;
+				animation-timeline: scroll(self inline);
+			}
+			.Markdown table {
+				border-collapse: collapse;
+			}
+			.Markdown th,
+			.Markdown td {
+				border: 1px solid color-mix(in oklab, currentColor var(--mix-table), transparent);
+				padding: 0 1ch;
+				text-align: left;
+				vertical-align: top;
+				overflow-wrap: normal;
+				min-width: 6ch;
+			}
+			.Markdown td {
+				white-space: pre-line;
+			}
+			.Markdown .meter {
+				background: color-mix(in oklab, currentColor 25%, transparent);
+			}
+			@property --fade {
+				syntax: '<length>';
+				inherits: false;
+				initial-value: 0px;
+			}
+			@keyframes md-fade {
+				from {
+					--fade: 2.5rem;
+				}
+				99% {
+					--fade: 2.5rem;
+				}
+				to {
+					--fade: 0px;
+				}
+			}
+			@keyframes blink {
+				50% {
+					opacity: 0;
+				}
+			}
+			/* Opt-in scroll-follow debug marker (web/drift.ts, task 981), desktop only. */
+			.ScrollMark {
+				position: fixed;
+				top: 2lh;
+				right: 1ch;
+				z-index: 3;
+				padding: 0.25lh 1ch;
+				border-left: 3px solid;
+				background: var(--overlay-bg);
+				pointer-events: none;
+			}
+			.ScrollMark.heat-0,
+			.ScrollMark.heat-100 {
+				font-weight: bold;
+				background: color-mix(in oklab, var(--heat) 20%, var(--overlay-bg));
+			}
+			@media (pointer: coarse) {
+				.ScrollMark {
+					display: none;
+				}
+			}
+			/* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
+			.Notices {
+				position: relative;
+				flex: none;
+				height: 0;
+				z-index: 2;
+			}
+			.Notices {
+				--gl: max(1ch, env(safe-area-inset-left));
+				--gr: max(1ch, env(safe-area-inset-right));
+			}
+			@media (max-width: 40rem) {
+				.Notices {
+					--gl: max(1ch, env(safe-area-inset-left));
+					--gr: max(1ch, env(safe-area-inset-right));
+				}
+			}
+			.Notices .stack {
+				position: absolute;
+				right: var(--gr);
+				bottom: 0.5lh;
+				width: min(24rem, calc(100% - var(--gl) - var(--gr)));
+				display: flex;
+				flex-direction: column;
+				gap: 0.25lh;
+			}
+			.Notices .card {
+				display: flex;
+				flex-direction: column;
+				padding: 0.25lh 1ch;
+				border-left: 3px solid;
+				box-shadow: 0 0 0 4px color-mix(in oklab, var(--overlay-bg) 75%, transparent);
+				text-decoration: none;
+				animation: notice-in 200ms var(--ease-out);
+			}
+			.Notices .card.done {
+				border-color: var(--done-fg);
+			}
+			.Notices .card.done strong {
+				color: var(--done-fg);
+				--sel-back: var(--done-fg);
+			}
+			.Notices .card.failed {
+				border-color: var(--failed-fg);
+			}
+			.Notices .card.failed strong {
+				color: var(--failed-fg);
+				--sel-back: var(--failed-fg);
+			}
+			.Notices .card.attention {
+				border-color: var(--attention-fg);
+			}
+			.Notices .card.attention strong {
+				color: var(--attention-fg);
+				--sel-back: var(--attention-fg);
+			}
+			.Notices .card.commit {
+				border-color: var(--commit-fg);
+			}
+			.Notices .card.commit strong {
+				color: var(--commit-fg);
+				--sel-back: var(--commit-fg);
+			}
+			.Notices .card.tinted {
+				border-color: var(--bar);
+				background-color: var(--tint);
+			}
+			.Notices .card.tinted strong {
+				color: var(--bar);
+				--sel-back: var(--bar);
+			}
+			.Notices .card .line {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.Notices .more {
+				align-self: flex-end;
+				padding: 0 1ch;
+			}
+			@media (pointer: coarse) {
+				.Notices .card {
+					min-height: 44px;
+				}
+			}
+			@keyframes notice-in {
+				from {
+					transform: translateY(0.5rem);
+					opacity: 0;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.Notices .card {
+					animation: none;
+				}
+			}
+			/* Two explicit lines, no accidental wrapping; the whole overview is a target. */
+			/* --gutter: the composer's side padding in its own font, as a length, so
    the smaller status row lines up with it (the cwd strip, task 22). */
-@property --gutter { syntax: '<length>'; inherits: true; initial-value: 0px; }
-.Chat { --gutter: 1ch; }
-.StatusRow { flex: none; padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left)); font-size: 12px; }
-.StatusRow .overview { position: relative; display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
-.StatusRow .details-target { position: absolute; inset: 0; width: 100%; height: 100%; background: none; }
-.StatusRow .budget { flex: none; position: relative; }
-.StatusRow .budget.pile { top: var(--lift, 0); }
-.StatusRow .budget:empty { display: none; }
-.StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
-.StatusRow { container-type: inline-size; }
-.StatusRow .secondary { display: flex; gap: 1ch; justify-content: space-between; }
-.StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model, .StatusRow .windows { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.StatusRow .activity { max-width: 40vw; }
-.StatusRow .cwd { flex: 1; direction: rtl; text-align: left; }
-.StatusRow .cwd[style*="--project"] { border-left: 3px solid var(--project); padding-left: 1ch; }
-.StatusRow .model { flex: 0 1 auto; max-width: 75%; }
-/* The official model name where it fits, the short one when narrow (task r7r). */
-.StatusRow .model .short { display: none; }
-.StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
-.StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
-.StatusRow .window .bar > span { display: block; height: 100%; background: var(--heat); }
-/* A window another full window outlasts cannot bind: quiet, no heat. */
-.StatusRow .id { display: none; }
-/* Wide: id and windows; detail drops as room shrinks. */
-@container (min-width: 60ch) { .StatusRow .id { display: inline; } }
-@container (max-width: 140ch) { .StatusRow .window .reset { display: none; } }
-@container (max-width: 110ch) { .StatusRow .window .bar { display: none; } }
-@container (min-width: 80ch) { .StatusRow .model.quota { color: inherit; } }
-/* Narrow, without the windows: the model name fills with the quota left,
+			@property --gutter {
+				syntax: '<length>';
+				inherits: true;
+				initial-value: 0px;
+			}
+			.Chat {
+				--gutter: 1ch;
+			}
+			.StatusRow {
+				flex: none;
+				padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left));
+				font-size: 12px;
+			}
+			.StatusRow .overview {
+				position: relative;
+				display: block;
+				width: 100%;
+				min-height: 44px;
+				padding: 0.125lh 0;
+				background: none;
+				color: inherit;
+				font: inherit;
+				text-align: left;
+				touch-action: manipulation;
+			}
+			.StatusRow .details-target {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				background: none;
+			}
+			.StatusRow .budget {
+				flex: none;
+				position: relative;
+			}
+			.StatusRow .budget.pile {
+				top: var(--lift, 0);
+			}
+			.StatusRow .budget:empty {
+				display: none;
+			}
+			.StatusRow .primary {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto;
+				align-items: baseline;
+				gap: 1ch;
+			}
+			.StatusRow {
+				container-type: inline-size;
+			}
+			.StatusRow .secondary {
+				display: flex;
+				gap: 1ch;
+				justify-content: space-between;
+			}
+			.StatusRow .name,
+			.StatusRow .activity,
+			.StatusRow .cwd,
+			.StatusRow .model,
+			.StatusRow .windows {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				min-width: 0;
+			}
+			.StatusRow .activity {
+				max-width: 40vw;
+			}
+			.StatusRow .cwd {
+				flex: 1;
+				direction: rtl;
+				text-align: left;
+			}
+			.StatusRow .cwd[style*='--project'] {
+				border-left: 3px solid var(--project);
+				padding-left: 1ch;
+			}
+			.StatusRow .model {
+				flex: 0 1 auto;
+				max-width: 75%;
+			}
+			/* The official model name where it fits, the short one when narrow (task r7r). */
+			.StatusRow .model .short {
+				display: none;
+			}
+			.StatusRow .windows {
+				flex: 0 1 auto;
+				display: flex;
+				gap: 2ch;
+			}
+			.StatusRow .window .bar {
+				display: inline-block;
+				width: 6ch;
+				height: 0.7em;
+				border: 1px solid var(--heat);
+				vertical-align: baseline;
+			}
+			.StatusRow .window .bar > span {
+				display: block;
+				height: 100%;
+				background: var(--heat);
+			}
+			/* A window another full window outlasts cannot bind: quiet, no heat. */
+			.StatusRow .id {
+				display: none;
+			}
+			/* Wide: id and windows; detail drops as room shrinks. */
+			@container (min-width: 60ch) {
+				.StatusRow .id {
+					display: inline;
+				}
+			}
+			@container (max-width: 140ch) {
+				.StatusRow .window .reset {
+					display: none;
+				}
+			}
+			@container (max-width: 110ch) {
+				.StatusRow .window .bar {
+					display: none;
+				}
+			}
+			@container (min-width: 80ch) {
+				.StatusRow .model.quota {
+					color: inherit;
+				}
+			}
+			/* Narrow, without the windows: the model name fills with the quota left,
    a hard stop clipped to the glyphs. */
-@container (max-width: 80ch) {
-  .StatusRow .windows { display: none; }
-  .StatusRow .model .full { display: none; }
-  .StatusRow .model .short { display: inline; }
-  .StatusRow .model.quota { color: transparent; background: linear-gradient(to right, var(--heat) var(--fill), var(--fg) var(--fill)); -webkit-background-clip: text; background-clip: text; }
-}
-.hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0; overflow-wrap: anywhere; }
-.StatusDetails .body { padding: 0.5lh 1ch; }
-.StatusDetails .fact { margin: 0; padding-block: 0.125lh; }
-.StatusDetails a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 0.2em; touch-action: manipulation; }
-@media (hover: hover) and (pointer: fine) { .StatusDetails a:hover { text-decoration-color: currentColor; } }
-@media (pointer: coarse) { .StatusDetails .fact > a { display: flex; align-items: center; min-height: 44px; } }
-@media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
-@media (max-width: 40rem) { .Chat { --gutter: 1ch; } }
-.TouchDebug, .TouchCrosshair { display: none; }
-.ComposerDebug { position: fixed; top: env(safe-area-inset-top); left: 0; z-index: 10; max-width: 100vw; padding: 0 4px; font-size: 10px; background: var(--canvas); color: var(--error-fg); pointer-events: none; }
-.TouchHistory { width: min(60rem, calc(var(--app-width, 100vw) - 1rem)); }
-.TouchHistory[open] { display: flex; flex-direction: column; }
-.TouchHistory .top { flex-wrap: wrap; }
-.TouchHistory h2 { flex-basis: 100%; margin: 0; font: inherit; }
-.TouchHistory button { flex: none; white-space: nowrap; }
-.TouchHistory pre { min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(1ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(1ch, env(safe-area-inset-left)); }
-.Composer > #notice:empty { display: none; }
-.Composer > #notice { display: flex; flex-wrap: wrap; gap: 0 1ch; align-items: baseline; }
-.Composer > #notice > span { min-width: 0; overflow-wrap: anywhere; }
-.Composer .clear-notice { margin-left: auto; padding: 0; background: transparent; color: inherit; white-space: nowrap; }
-.Composer .status { padding: 0.125lh 0; }
-/* Completions: a quiet floating panel tinted with the box's own color,
+			@container (max-width: 80ch) {
+				.StatusRow .windows {
+					display: none;
+				}
+				.StatusRow .model .full {
+					display: none;
+				}
+				.StatusRow .model .short {
+					display: inline;
+				}
+				.StatusRow .model.quota {
+					color: transparent;
+					background: linear-gradient(to right, var(--heat) var(--fill), var(--fg) var(--fill));
+					-webkit-background-clip: text;
+					background-clip: text;
+				}
+			}
+			.hidden-text {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				overflow: hidden;
+				clip-path: inset(50%);
+				white-space: nowrap;
+			}
+			.StatusDetails {
+				width: min(32rem, calc(var(--app-width, 100vw) - 1rem));
+				max-height: calc(var(--app-height, 100dvh) - 1rem);
+				overflow-y: auto;
+				padding: 0;
+				overflow-wrap: anywhere;
+			}
+			.StatusDetails .body {
+				padding: 0.5lh 1ch;
+			}
+			.StatusDetails .fact {
+				margin: 0;
+				padding-block: 0.125lh;
+			}
+			.StatusDetails a {
+				color: inherit;
+				text-decoration: underline;
+				text-decoration-color: var(--line);
+				text-underline-offset: 0.2em;
+				touch-action: manipulation;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.StatusDetails a:hover {
+					text-decoration-color: currentColor;
+				}
+			}
+			@media (pointer: coarse) {
+				.StatusDetails .fact > a {
+					display: flex;
+					align-items: center;
+					min-height: 44px;
+				}
+			}
+			@media (pointer: coarse) {
+				.StatusDetails {
+					position: fixed;
+					top: auto;
+					bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem);
+					left: calc(var(--app-left, 0px) + 0.5rem);
+					right: auto;
+					margin: 0;
+					width: calc(var(--app-width, 100vw) - 1rem);
+				}
+			}
+			@media (max-width: 40rem) {
+				.Chat {
+					--gutter: 1ch;
+				}
+			}
+			.TouchDebug,
+			.TouchCrosshair {
+				display: none;
+			}
+			.ComposerDebug {
+				position: fixed;
+				top: env(safe-area-inset-top);
+				left: 0;
+				z-index: 10;
+				max-width: 100vw;
+				padding: 0 4px;
+				font-size: 10px;
+				background: var(--canvas);
+				color: var(--error-fg);
+				pointer-events: none;
+			}
+			.TouchHistory {
+				width: min(60rem, calc(var(--app-width, 100vw) - 1rem));
+			}
+			.TouchHistory[open] {
+				display: flex;
+				flex-direction: column;
+			}
+			.TouchHistory .top {
+				flex-wrap: wrap;
+			}
+			.TouchHistory h2 {
+				flex-basis: 100%;
+				margin: 0;
+				font: inherit;
+			}
+			.TouchHistory button {
+				flex: none;
+				white-space: nowrap;
+			}
+			.TouchHistory pre {
+				min-height: 0;
+				overflow-y: auto;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: inherit;
+			}
+			.Composer {
+				position: relative;
+				z-index: 1;
+				flex: none;
+				padding: 0.25lh max(1ch, env(safe-area-inset-right))
+					max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh))))
+					max(1ch, env(safe-area-inset-left));
+			}
+			.Composer > #notice:empty {
+				display: none;
+			}
+			.Composer > #notice {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0 1ch;
+				align-items: baseline;
+			}
+			.Composer > #notice > span {
+				min-width: 0;
+				overflow-wrap: anywhere;
+			}
+			.Composer .clear-notice {
+				margin-left: auto;
+				padding: 0;
+				background: transparent;
+				color: inherit;
+				white-space: nowrap;
+			}
+			.Composer .status {
+				padding: 0.125lh 0;
+			}
+			/* Completions: a quiet floating panel tinted with the box's own color,
    lifted off the entry by a gap and a soft shadow. Rows are one line on
    wide screens (name, then the dimmer description), two on phones; the
    selected row is a soft tint with a lit left bar, its text unchanged. */
-.Composer .completions { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; padding: 4px 0; background: color-mix(in oklab, currentColor 6%, var(--canvas)); box-shadow: 0 0 0 1px color-mix(in oklab, currentColor 18%, transparent), 0 -12px 32px -8px color-mix(in oklab, var(--overlay-bg) 70%, transparent); scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent; animation: completions-in 140ms var(--ease-out); }
-@keyframes completions-in { from { opacity: 0; transform: translateY(4px); } }
-.Composer .completions button { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-height: 32px; padding: 0.2lh 1.5ch; text-align: left; background: transparent; color: inherit; transition: background 80ms; }
-@media (pointer: coarse) { .Composer .completions button { min-height: 44px; } }
-@media (hover: hover) and (pointer: fine) { .Composer .completions button:hover { background: color-mix(in oklab, currentColor 7%, transparent); } }
-.Composer .completions button[aria-selected="true"] { background: color-mix(in oklab, currentColor 14%, transparent); box-shadow: inset 2px 0 0 currentColor; }
-.Composer .completions strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-.Composer .completions span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--quiet); font-size: 0.85em; }
-@media (prefers-reduced-motion: reduce) { .Composer .completions { animation: none; } }
-.status .busy { color: var(--highlight); }
-.status .warning, .status .error { background: none; }
-.status .dot.busy { animation: pulse 1s steps(2) infinite; }
-@keyframes pulse { 50% { opacity: var(--mix-pulse); } }
-.entry { position: relative; display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor var(--mix-entry), transparent); }
-.entry:focus-within { border-left-color: var(--cursor); }
-.entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
-.entry .actions { display: flex; }
-.chips { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0 0 0.25lh; padding: 0; list-style: none; }
-.chips li { display: flex; align-items: stretch; border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
-.chips a { display: flex; align-items: center; padding: 0 1ch; color: inherit; }
-.chips img { display: block; height: 3lh; width: 12ch; object-fit: cover; margin: 0 -1ch; }
-/* Until it loads (or while its upload is in flight) a thumbnail is a
+			.Composer .completions {
+				position: absolute;
+				bottom: calc(100% + 6px);
+				left: 0;
+				right: 0;
+				max-height: min(35dvh, 20rem);
+				overflow-y: auto;
+				padding: 4px 0;
+				background: color-mix(in oklab, currentColor 6%, var(--canvas));
+				box-shadow:
+					0 0 0 1px color-mix(in oklab, currentColor 18%, transparent),
+					0 -12px 32px -8px color-mix(in oklab, var(--overlay-bg) 70%, transparent);
+				scrollbar-width: thin;
+				scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent;
+				animation: completions-in 140ms var(--ease-out);
+			}
+			@keyframes completions-in {
+				from {
+					opacity: 0;
+					transform: translateY(4px);
+				}
+			}
+			.Composer .completions button {
+				display: flex;
+				flex-direction: column;
+				align-items: stretch;
+				width: 100%;
+				min-height: 32px;
+				padding: 0.2lh 1.5ch;
+				text-align: left;
+				background: transparent;
+				color: inherit;
+				transition: background 80ms;
+			}
+			@media (pointer: coarse) {
+				.Composer .completions button {
+					min-height: 44px;
+				}
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Composer .completions button:hover {
+					background: color-mix(in oklab, currentColor 7%, transparent);
+				}
+			}
+			.Composer .completions button[aria-selected='true'] {
+				background: color-mix(in oklab, currentColor 14%, transparent);
+				box-shadow: inset 2px 0 0 currentColor;
+			}
+			.Composer .completions strong {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-weight: 700;
+			}
+			.Composer .completions span {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				color: var(--quiet);
+				font-size: 0.85em;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.Composer .completions {
+					animation: none;
+				}
+			}
+			.status .busy {
+				color: var(--highlight);
+			}
+			.status .warning,
+			.status .error {
+				background: none;
+			}
+			.status .dot.busy {
+				animation: pulse 1s steps(2) infinite;
+			}
+			@keyframes pulse {
+				50% {
+					opacity: var(--mix-pulse);
+				}
+			}
+			.entry {
+				position: relative;
+				display: flex;
+				align-items: stretch;
+				border-left: 3px solid color-mix(in oklab, currentColor var(--mix-entry), transparent);
+			}
+			.entry:focus-within {
+				border-left-color: var(--cursor);
+			}
+			.entry.dropping {
+				outline: 2px dashed var(--cursor);
+				outline-offset: 2px;
+			}
+			.entry .actions {
+				display: flex;
+			}
+			.chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 1ch;
+				margin: 0 0 0.25lh;
+				padding: 0;
+				list-style: none;
+			}
+			.chips li {
+				display: flex;
+				align-items: stretch;
+				border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent);
+			}
+			.chips a {
+				display: flex;
+				align-items: center;
+				padding: 0 1ch;
+				color: inherit;
+			}
+			.chips img {
+				display: block;
+				height: 3lh;
+				width: 12ch;
+				object-fit: cover;
+				margin: 0 -1ch;
+			}
+			/* Until it loads (or while its upload is in flight) a thumbnail is a
    blank tile of its final size, not a broken-image icon and alt text. */
-.chips img:not([data-loaded]) { opacity: 0; }
-.chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
-@media (hover: hover) and (pointer: fine) { .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.entry .actions button { flex: 1; min-height: 44px; }
-/* Attach on the left; on the right a narrow, quiet pause (turn control)
+			.chips img:not([data-loaded]) {
+				opacity: 0;
+			}
+			.chips button {
+				min-width: 44px;
+				min-height: 44px;
+				background: transparent;
+				color: var(--quiet);
+				border: 0;
+				border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent);
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.chips button:hover {
+					color: inherit;
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			.entry .actions button {
+				flex: 1;
+				min-height: 44px;
+			}
+			/* Attach on the left; on the right a narrow, quiet pause (turn control)
    apart from the send actions, and steer/send in the accent color. */
-.entry > button.attach { order: -1; border-left: 0; border-right: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); padding: 0; width: 44px; }
-.entry .actions button { padding: 0 4px; min-width: 44px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
-/* Each action's name under its icon (task 02s): small caps, a quiet extra.
+			.entry > button.attach {
+				order: -1;
+				border-left: 0;
+				border-right: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent);
+				padding: 0;
+				width: 44px;
+			}
+			.entry .actions button {
+				padding: 0 4px;
+				min-width: 44px;
+				flex: none;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 1px;
+			}
+			/* Each action's name under its icon (task 02s): small caps, a quiet extra.
    The icon stays vertically centered like attach as the draft grows;
    the name hangs below. The top padding (name height + gap) centers
    the icon, not the pair. */
-.entry .actions button { padding-top: 10px; }
-.entry .actions button > .icon { transform: translateY(1.5px); }
-.entry .actions button small { font-size: 9px; font-weight: 500; letter-spacing: 0.06em; line-height: 1; opacity: 0.8; transform: translateY(2.5px); }
-.entry .actions button.toggle { min-width: 44px; color: var(--quiet); }
-/* Inside, so the composer edge and the caption never clip the ring. */
-.entry .actions button:focus-visible { outline-offset: -2px; }
-/* The caption overlays the help row under the buttons, right-aligned,
+			.entry .actions button {
+				padding-top: 10px;
+			}
+			.entry .actions button > .icon {
+				transform: translateY(1.5px);
+			}
+			.entry .actions button small {
+				font-size: 9px;
+				font-weight: 500;
+				letter-spacing: 0.06em;
+				line-height: 1;
+				opacity: 0.8;
+				transform: translateY(2.5px);
+			}
+			.entry .actions button.toggle {
+				min-width: 44px;
+				color: var(--quiet);
+			}
+			/* Inside, so the composer edge and the caption never clip the ring. */
+			.entry .actions button:focus-visible {
+				outline-offset: -2px;
+			}
+			/* The caption overlays the help row under the buttons, right-aligned,
    so hovering never moves the layout. */
-.entry .caption { position: absolute; top: 100%; right: 0; z-index: 1; padding: 0.25lh 0 0 1ch; background: var(--canvas); color: var(--cursor); font-size: 0.85em; white-space: nowrap; pointer-events: none; }
-.entry:has(button:disabled:hover) .caption { color: var(--quiet); }
-.entry .actions button.go:not(:disabled) { color: var(--cursor); }
-.entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
-/* The example request: the input's faint blue, as in the terminal. It
+			.entry .caption {
+				position: absolute;
+				top: 100%;
+				right: 0;
+				z-index: 1;
+				padding: 0.25lh 0 0 1ch;
+				background: var(--canvas);
+				color: var(--cursor);
+				font-size: 0.85em;
+				white-space: nowrap;
+				pointer-events: none;
+			}
+			.entry:has(button:disabled:hover) .caption {
+				color: var(--quiet);
+			}
+			.entry .actions button.go:not(:disabled) {
+				color: var(--cursor);
+			}
+			.entry .field {
+				flex: 1;
+				min-width: 0;
+				position: relative;
+				display: flex;
+			}
+			/* The example request: the input's faint blue, as in the terminal. It
    erases from its left as typing starts and fades back in when the box
    empties. */
-/* One line of text sits centered in the 44px row the buttons set. */
-.entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity var(--back-ms) var(--ease-out); }
-.entry .hint.gone { opacity: 0; transition-duration: var(--snap-ms); }
-/* An erased start keeps the rest in its columns; the edge being erased
+			/* One line of text sits centered in the 44px row the buttons set. */
+			.entry .hint {
+				position: absolute;
+				inset: calc((44px - 1lh) / 2) 1ch auto;
+				color: var(--faint);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				pointer-events: none;
+				transition: opacity var(--back-ms) var(--ease-out);
+			}
+			.entry .hint.gone {
+				opacity: 0;
+				transition-duration: var(--snap-ms);
+			}
+			/* An erased start keeps the rest in its columns; the edge being erased
    fades over 3ch, like the terminal's last 3 glyphs (placeholders.ts). */
-.entry .hint .cut { visibility: hidden; }
-.entry .hint.right .text { -webkit-mask-image: linear-gradient(to left, transparent, currentColor 3ch); mask-image: linear-gradient(to left, transparent, currentColor 3ch); }
-.entry .hint.left .text { -webkit-mask-image: linear-gradient(to right, transparent, currentColor 7ch); mask-image: linear-gradient(to right, transparent, currentColor 7ch); }
-.entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
-/* The hidden copy Composer.tsx measures: the box's width and text, no height. */
-.entry textarea.measure { position: absolute; inset: 0 0 auto; height: 0; min-height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
-.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color var(--snap-ms) var(--ease-out); }
-@media (hover: hover) and (pointer: fine) { .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-/* Typing turns Send on (frequent) and emptying the box turns it off
+			.entry .hint .cut {
+				visibility: hidden;
+			}
+			.entry .hint.right .text {
+				-webkit-mask-image: linear-gradient(to left, transparent, currentColor 3ch);
+				mask-image: linear-gradient(to left, transparent, currentColor 3ch);
+			}
+			.entry .hint.left .text {
+				-webkit-mask-image: linear-gradient(to right, transparent, currentColor 7ch);
+				mask-image: linear-gradient(to right, transparent, currentColor 7ch);
+			}
+			.entry textarea {
+				overscroll-behavior: none;
+				touch-action: pan-y pinch-zoom;
+				max-height: calc(var(--app-height, 100dvh) * 0.4);
+				flex: 1;
+				min-width: 0;
+				margin: 0;
+				background: transparent;
+				color: inherit;
+				border: 0;
+				padding: calc((44px - 1lh) / 2) 1ch;
+			}
+			/* The hidden copy Composer.tsx measures: the box's width and text, no height. */
+			.entry textarea.measure {
+				position: absolute;
+				inset: 0 0 auto;
+				height: 0;
+				min-height: 0;
+				overflow: hidden;
+				visibility: hidden;
+				pointer-events: none;
+			}
+			.entry > button,
+			.entry .actions button {
+				background: transparent;
+				color: inherit;
+				font-weight: 600;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				padding: 0 2ch;
+				border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent);
+				transition:
+					background-color 120ms var(--ease-out),
+					color var(--snap-ms) var(--ease-out);
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.entry > button:hover:not(:disabled),
+				.entry .actions button:hover:not(:disabled) {
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			/* Typing turns Send on (frequent) and emptying the box turns it off
    (rare); Nudge the other way round. */
-.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; transition-duration: 120ms, var(--back-ms); }
-/* Faded contents, not the button, so the divider keeps its color. */
-.entry > button > *, .entry .actions button > * { transition: opacity var(--snap-ms) var(--ease-out); }
-.entry > button:disabled > *, .entry .actions button:disabled > * { opacity: 0.4; transition-duration: var(--back-ms); }
-.entry .actions button.toggle > * { transition-duration: var(--back-ms); }
-.entry .actions button.toggle:disabled > * { transition-duration: var(--snap-ms); }
-.help { display: flex; gap: 0 1ch; padding-top: 0.25lh; color: var(--description); white-space: nowrap; overflow: hidden; }
-.help-hints { display: flex; flex-wrap: wrap; gap: 0 1ch; flex: 1; min-width: 0; height: 1lh; overflow: hidden; }
-.help-hints::before { content: ''; flex: none; width: 0; height: 1lh; margin-right: -1ch; }
-.help-hints > * { flex: none; }
-/* 'key: description, …' as in the terminal's help row; /keys sits right. */
-.help-hints > :not(:last-child)::after { content: ','; color: var(--description); }
-.help .keys, .help .update { flex: none; }
-.help b { color: var(--key); font-weight: inherit; }
-/* Reads as a hint, acts as a button: the update reload (task 7t). */
-.help .update { padding: 0; border: 0; background: none; font: inherit; color: var(--update); cursor: pointer; }
-.help .update b { color: inherit; }
-.help .update:hover { text-decoration: underline; }
-@media not (pointer: coarse) { .source-update { display: none; } }
-textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.25lh 1ch; resize: none; outline: none; }
-textarea:focus, input:focus { border-color: var(--accent); }
-.input textarea { caret-color: var(--cursor); }
-button { background: var(--button); color: var(--text); border: 0; padding: 0.25lh 1ch; cursor: pointer; }
-button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
-/* Phones: 16px fields, or iOS zooms in on focus. */
-/* Touch keyboards: Enter is a newline and Send sends, so the key hints
+			.entry > button:disabled,
+			.entry .actions button:disabled {
+				color: var(--quiet);
+				cursor: default;
+				transition-duration: 120ms, var(--back-ms);
+			}
+			/* Faded contents, not the button, so the divider keeps its color. */
+			.entry > button > *,
+			.entry .actions button > * {
+				transition: opacity var(--snap-ms) var(--ease-out);
+			}
+			.entry > button:disabled > *,
+			.entry .actions button:disabled > * {
+				opacity: 0.4;
+				transition-duration: var(--back-ms);
+			}
+			.entry .actions button.toggle > * {
+				transition-duration: var(--back-ms);
+			}
+			.entry .actions button.toggle:disabled > * {
+				transition-duration: var(--snap-ms);
+			}
+			.help {
+				display: flex;
+				gap: 0 1ch;
+				padding-top: 0.25lh;
+				color: var(--description);
+				white-space: nowrap;
+				overflow: hidden;
+			}
+			.help-hints {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0 1ch;
+				flex: 1;
+				min-width: 0;
+				height: 1lh;
+				overflow: hidden;
+			}
+			.help-hints::before {
+				content: '';
+				flex: none;
+				width: 0;
+				height: 1lh;
+				margin-right: -1ch;
+			}
+			.help-hints > * {
+				flex: none;
+			}
+			/* 'key: description, …' as in the terminal's help row; /keys sits right. */
+			.help-hints > :not(:last-child)::after {
+				content: ',';
+				color: var(--description);
+			}
+			.help .keys,
+			.help .update {
+				flex: none;
+			}
+			.help b {
+				color: var(--key);
+				font-weight: inherit;
+			}
+			/* Reads as a hint, acts as a button: the update reload (task 7t). */
+			.help .update {
+				padding: 0;
+				border: 0;
+				background: none;
+				font: inherit;
+				color: var(--update);
+				cursor: pointer;
+			}
+			.help .update b {
+				color: inherit;
+			}
+			.help .update:hover {
+				text-decoration: underline;
+			}
+			@media not (pointer: coarse) {
+				.source-update {
+					display: none;
+				}
+			}
+			textarea,
+			input {
+				width: 100%;
+				background: var(--field);
+				color: var(--text);
+				border: 1px solid var(--border);
+				padding: 0.25lh 1ch;
+				resize: none;
+				outline: none;
+			}
+			textarea:focus,
+			input:focus {
+				border-color: var(--accent);
+			}
+			.input textarea {
+				caret-color: var(--cursor);
+			}
+			button {
+				background: var(--button);
+				color: var(--text);
+				border: 0;
+				padding: 0.25lh 1ch;
+				cursor: pointer;
+			}
+			button[aria-pressed='true'] {
+				background: var(--accent);
+				color: var(--canvas);
+			}
+			/* Phones: 16px fields, or iOS zooms in on focus. */
+			/* Touch keyboards: Enter is a newline and Send sends, so the key hints
    do not apply. */
-@media (pointer: coarse) { .help { display: none; } textarea, input, .entry .hint { font-size: 16px; } }
-@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript { --gut: max(1ch, env(safe-area-inset-left)); } .Transcript, .Composer { padding-left: max(1ch, env(safe-area-inset-left)); padding-right: max(1ch, env(safe-area-inset-right)); } }
-/* Phone landscape preserves scarce height without shrinking touch targets. */
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
-  .Transcript { font-size: 12px; line-height: 1.4; padding-block: 6px; }
-  .StatusRow { padding-block: 0; }
-  .StatusRow .overview { font-size: 11px; padding-block: 2px; line-height: 16px; }
-  .StatusDetails { font-size: 11px; }
-  .Composer { padding-top: 4px; gap: 4px; }
-  .entry textarea { max-height: min(80px, calc(var(--app-height, 100dvh) * .25)); overflow-y: auto; }
-}
-@media (pointer: coarse) {
-  /* iOS drops taps in the band just above the keyboard's bar (task s37):
+			@media (pointer: coarse) {
+				.help {
+					display: none;
+				}
+				textarea,
+				input,
+				.entry .hint {
+					font-size: 16px;
+				}
+			}
+			@media (max-width: 40rem) {
+				textarea,
+				input,
+				.entry .hint {
+					font-size: 16px;
+				}
+				.Transcript {
+					--gut: max(1ch, env(safe-area-inset-left));
+				}
+				.Transcript,
+				.Composer {
+					padding-left: max(1ch, env(safe-area-inset-left));
+					padding-right: max(1ch, env(safe-area-inset-right));
+				}
+			}
+			/* Phone landscape preserves scarce height without shrinking touch targets. */
+			@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+				.Transcript {
+					font-size: 12px;
+					line-height: 1.4;
+					padding-block: 6px;
+				}
+				.StatusRow {
+					padding-block: 0;
+				}
+				.StatusRow .overview {
+					font-size: 11px;
+					padding-block: 2px;
+					line-height: 16px;
+				}
+				.StatusDetails {
+					font-size: 11px;
+				}
+				.Composer {
+					padding-top: 4px;
+					gap: 4px;
+				}
+				.entry textarea {
+					max-height: min(80px, calc(var(--app-height, 100dvh) * 0.25));
+					overflow-y: auto;
+				}
+			}
+			@media (pointer: coarse) {
+				/* iOS drops taps in the band just above the keyboard's bar (task s37):
      with the keyboard up, the buttons keep 28px clear of it. */
-  .Composer { padding-bottom: max(28px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))); }
-  .entry .actions.nudge-actions { position: relative; isolation: isolate; flex: none; width: 88px; min-height: 44px; background-color: inherit; }
-  .entry .actions.nudge-actions button { position: absolute; top: 0; bottom: 0; width: 44px; }
-  .entry .actions.nudge-actions .go { right: 0; z-index: 1; background-color: inherit; }
-  /* Each direction uses the transition of the state it enters: tucking
+				.Composer {
+					padding-bottom: max(
+						28px,
+						calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))
+					);
+				}
+				.entry .actions.nudge-actions {
+					position: relative;
+					isolation: isolate;
+					flex: none;
+					width: 88px;
+					min-height: 44px;
+					background-color: inherit;
+				}
+				.entry .actions.nudge-actions button {
+					position: absolute;
+					top: 0;
+					bottom: 0;
+					width: 44px;
+				}
+				.entry .actions.nudge-actions .go {
+					right: 0;
+					z-index: 1;
+					background-color: inherit;
+				}
+				/* Each direction uses the transition of the state it enters: tucking
      slides behind Send, then hides; returning jumps back and fades in. */
-  .entry .actions.nudge-actions .toggle { right: 44px; transition: opacity var(--back-ms) var(--ease-out); }
-  .entry .actions.nudge-actions.tucked { width: 44px; }
-  .entry .actions.nudge-actions.tucked .toggle { transform: translateX(44px); opacity: 0; transition: transform var(--snap-ms) var(--ease-out), opacity 0s var(--snap-ms); }
-}
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .entry button > *, .entry .actions.nudge-actions .toggle, .entry .actions.nudge-actions.tucked .toggle { transition: none; } .cursor-line span, .Card .cursor, .status .dot { animation: none; } }
-.Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
-.Question { position: relative; margin: 0 0 0.5lh; padding: 0 0 0.25lh; display: flex; flex-direction: column; gap: 0.25lh; --card-inset: calc((44px - 1lh) / 2); }
-.Question > :not(.CardHeader) { margin-inline: 1ch; }
-/* Options: a hairline in the card's color; the chosen one solid in it,
+				.entry .actions.nudge-actions .toggle {
+					right: 44px;
+					transition: opacity var(--back-ms) var(--ease-out);
+				}
+				.entry .actions.nudge-actions.tucked {
+					width: 44px;
+				}
+				.entry .actions.nudge-actions.tucked .toggle {
+					transform: translateX(44px);
+					opacity: 0;
+					transition:
+						transform var(--snap-ms) var(--ease-out),
+						opacity 0s var(--snap-ms);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.Card .body,
+				.entry .hint,
+				.entry button,
+				.entry button > *,
+				.entry .actions.nudge-actions .toggle,
+				.entry .actions.nudge-actions.tucked .toggle {
+					transition: none;
+				}
+				.cursor-line span,
+				.Card .cursor,
+				.status .dot {
+					animation: none;
+				}
+			}
+			.Login {
+				max-width: 20rem;
+				margin: 20vh auto;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5lh;
+			}
+			.Question {
+				position: relative;
+				margin: 0 0 0.5lh;
+				padding: 0 0 0.25lh;
+				display: flex;
+				flex-direction: column;
+				gap: 0.25lh;
+				--card-inset: calc((44px - 1lh) / 2);
+			}
+			.Question > :not(.CardHeader) {
+				margin-inline: 1ch;
+			}
+			/* Options: a hairline in the card's color; the chosen one solid in it,
    its text the canvas color (text-fill keeps currentColor the card's).
    Focus follows the choice, so its ring is a hairline halo, not a
    second, thicker border. */
-.Question button:not(.dismiss) { padding: 0.125lh 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 55%, transparent); }
-.Question button[aria-pressed="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); font-weight: 600; }
-@media (hover: hover) and (pointer: fine) { .Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); } }
-/* Options wrap with the same gap across and down. */
-.Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5lh 1ch; }
-/* Answer: the options' colors, a button's shape. */
-.Question button.answer { align-self: flex-start; min-height: 36px; padding: 0 2ch; font-weight: 600; }
-.Question button:not(.dismiss):focus-visible { outline-width: 1px; outline-offset: 2px; }
-.Question .dismiss { position: relative; background: none; color: inherit; padding: 0.25lh 1ch; }
-@media (hover: hover) and (pointer: fine) { .Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.Question > .CardHeader { white-space: pre-wrap; overflow-wrap: anywhere; }
-.Question > .CardHeader .label a { color: inherit; text-decoration: underline; }
-@media (pointer: coarse) { .Question button, .Question button.answer { min-width: 44px; min-height: 44px; } }
-.Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Question mark, .Card.question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }
-.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); border: 1px solid var(--line); padding: 0.5lh 1ch; }
-.Picker button:not([aria-pressed="true"], .close) { background: var(--pick); color: inherit; }
-.Picker.find { width: calc(100vw - 2rem); height: calc(var(--app-height, 100dvh) - 2rem); }
-.Picker[open] { display: flex; flex-direction: column; gap: 0.25lh; }
-.Picker > .top { margin: -0.5lh -1ch 0.25lh; }
-.Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.Picker li { padding: 0 1ch; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Picker li[aria-selected="true"] { background: var(--pick); }
-.Picker li .match { color: var(--title-fg); font-weight: bold; }
-.Picker li.row { display: grid; grid-template-columns: var(--label) auto 1fr; column-gap: 2ch; align-items: baseline; }
-.Picker li.row .label { overflow: hidden; text-overflow: ellipsis; }
-.Picker li.model-row { display: grid; grid-template-columns: var(--columns, 1fr); column-gap: 3ch; }
-.Picker li.model-row .label { min-width: 0; overflow: visible; }
-.Picker li.model-row .effort { white-space: pre; }
-.Picker li.model-row .value { min-width: 0; }
-@media (max-width: 40rem) { .Picker li.model-row { display: flex; flex-wrap: wrap; gap: 0 1ch; } .Picker li.model-row .effort:empty { display: none; } }
-.Picker li.model-row .note { display: none; }
-.Picker li.row .value.input { font: inherit; min-width: 20ch; }
-.Picker li.row .note { visibility: hidden; min-width: 0; overflow-wrap: anywhere; }
-.Picker li.row[aria-selected="true"] .note, .Picker li.row:hover .note, .Picker li.row:focus-within .note { visibility: visible; }
-.Picker .details, .Picker .refused { flex: none; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Picker .refused { color: var(--error-fg); }
-.Picker .invalid { color: var(--warning-fg); }
-.Picker .effort-controls { display: flex; gap: 1ch; flex: none; }
-.Picker .effort-controls button { min-height: 44px; min-width: 44px; }
-.Picker { max-height: calc(var(--app-height, 100dvh) - 1rem); overflow: hidden; }
-.Picker .input, .Picker .top, .Picker .filters, .Picker .log { flex: none; }
-.Picker .filters { display: flex; flex-wrap: wrap; gap: 0.25lh 1ch; margin-bottom: 0.75lh; }
-.Picker .question { flex: none; margin: 0 0 0.75lh; }
-.Picker .filters button { min-height: 44px; }
-.Picker ul { min-height: 0; overscroll-behavior: contain; }
-.Picker li a { display: block; min-height: 44px; padding-block: 0.25lh; color: inherit; text-decoration: none; }
-.Picker li :focus-visible, .Picker li:focus-visible { outline-offset: -2px; }
-/* Ctrl-O (task v8y): as tall as its field, hint and help. */
-.Picker.compact, .Picker.compact[open] { height: fit-content; max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; }
-.Picker .blocks-help { flex: none; color: var(--description); }
-.Picker .blocks-help dl { margin: 0 0 1lh; display: grid; grid-template-columns: max-content 1fr; column-gap: 2ch; }
-.Picker .blocks-help dl > div { display: contents; }
-.Picker .blocks-help dt { color: var(--key); }
-.Picker .blocks-help dd { margin: 0; }
-.Picker .blocks-help p { margin: 0; }
-.Picker .blocks-help b { color: var(--key); font-weight: inherit; }
-.Picker .blocks-hint { flex: none; overflow-wrap: anywhere; margin-block: 0.75lh; }
-.Picker ul.blocks-ids { flex: none; display: flex; flex-wrap: wrap; gap: 0 2ch; overflow: visible; color: var(--key); }
-.Picker ul.blocks-ids li { padding: 0; min-height: 0; cursor: auto; }
-/* Apple HIG: touch targets at least 44x44pt. */
-@media (pointer: coarse) {
-  .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }
-  .Picker li { min-height: 44px; padding-block: 0.25lh; }
-  .Picker li:has(> a) { padding-block: 0; }
-  .Picker .close { min-width: 44px; min-height: 44px; }
-}
-/* Dialogs share one frame: neutral like the transcript (their .plain
+			.Question button:not(.dismiss) {
+				padding: 0.125lh 1ch;
+				background: transparent;
+				color: inherit;
+				box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 55%, transparent);
+			}
+			.Question button[aria-pressed='true'] {
+				background: currentColor;
+				-webkit-text-fill-color: var(--canvas);
+				font-weight: 600;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Question button:hover:not([aria-pressed='true']) {
+					background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent);
+				}
+			}
+			/* Options wrap with the same gap across and down. */
+			.Question [role='group'] {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: baseline;
+				gap: 0.5lh 1ch;
+			}
+			/* Answer: the options' colors, a button's shape. */
+			.Question button.answer {
+				align-self: flex-start;
+				min-height: 36px;
+				padding: 0 2ch;
+				font-weight: 600;
+			}
+			.Question button:not(.dismiss):focus-visible {
+				outline-width: 1px;
+				outline-offset: 2px;
+			}
+			.Question .dismiss {
+				position: relative;
+				background: none;
+				color: inherit;
+				padding: 0.25lh 1ch;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Question .dismiss:hover {
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			.Question > .CardHeader {
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+			}
+			.Question > .CardHeader .label a {
+				color: inherit;
+				text-decoration: underline;
+			}
+			@media (pointer: coarse) {
+				.Question button,
+				.Question button.answer {
+					min-width: 44px;
+					min-height: 44px;
+				}
+			}
+			.Question pre.quote {
+				margin: 0 0 0 2ch;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: inherit;
+			}
+			.Question mark,
+			.Card.question mark {
+				background: currentColor;
+				color: inherit;
+				-webkit-text-fill-color: var(--canvas);
+			}
+			.Picker {
+				width: min(80vw, 60rem);
+				height: min(80vh, 50rem);
+				border: 1px solid var(--line);
+				padding: 0.5lh 1ch;
+			}
+			.Picker button:not([aria-pressed='true'], .close) {
+				background: var(--pick);
+				color: inherit;
+			}
+			.Picker.find {
+				width: calc(100vw - 2rem);
+				height: calc(var(--app-height, 100dvh) - 2rem);
+			}
+			.Picker[open] {
+				display: flex;
+				flex-direction: column;
+				gap: 0.25lh;
+			}
+			.Picker > .top {
+				margin: -0.5lh -1ch 0.25lh;
+			}
+			.Picker ul {
+				flex: 1;
+				overflow-y: auto;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			.Picker li {
+				padding: 0 1ch;
+				cursor: pointer;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+			}
+			.Picker li[aria-selected='true'] {
+				background: var(--pick);
+			}
+			.Picker li .match {
+				color: var(--title-fg);
+				font-weight: bold;
+			}
+			.Picker li.row {
+				display: grid;
+				grid-template-columns: var(--label) auto 1fr;
+				column-gap: 2ch;
+				align-items: baseline;
+			}
+			.Picker li.row .label {
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.Picker li.model-row {
+				display: grid;
+				grid-template-columns: var(--columns, 1fr);
+				column-gap: 3ch;
+			}
+			.Picker li.model-row .label {
+				min-width: 0;
+				overflow: visible;
+			}
+			.Picker li.model-row .effort {
+				white-space: pre;
+			}
+			.Picker li.model-row .value {
+				min-width: 0;
+			}
+			@media (max-width: 40rem) {
+				.Picker li.model-row {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 0 1ch;
+				}
+				.Picker li.model-row .effort:empty {
+					display: none;
+				}
+			}
+			.Picker li.model-row .note {
+				display: none;
+			}
+			.Picker li.row .value.input {
+				font: inherit;
+				min-width: 20ch;
+			}
+			.Picker li.row .note {
+				visibility: hidden;
+				min-width: 0;
+				overflow-wrap: anywhere;
+			}
+			.Picker li.row[aria-selected='true'] .note,
+			.Picker li.row:hover .note,
+			.Picker li.row:focus-within .note {
+				visibility: visible;
+			}
+			.Picker .details,
+			.Picker .refused {
+				flex: none;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+			}
+			.Picker .refused {
+				color: var(--error-fg);
+			}
+			.Picker .invalid {
+				color: var(--warning-fg);
+			}
+			.Picker .effort-controls {
+				display: flex;
+				gap: 1ch;
+				flex: none;
+			}
+			.Picker .effort-controls button {
+				min-height: 44px;
+				min-width: 44px;
+			}
+			.Picker {
+				max-height: calc(var(--app-height, 100dvh) - 1rem);
+				overflow: hidden;
+			}
+			.Picker .input,
+			.Picker .top,
+			.Picker .filters,
+			.Picker .log {
+				flex: none;
+			}
+			.Picker .filters {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.25lh 1ch;
+				margin-bottom: 0.75lh;
+			}
+			.Picker .question {
+				flex: none;
+				margin: 0 0 0.75lh;
+			}
+			.Picker .filters button {
+				min-height: 44px;
+			}
+			.Picker ul {
+				min-height: 0;
+				overscroll-behavior: contain;
+			}
+			.Picker li a {
+				display: block;
+				min-height: 44px;
+				padding-block: 0.25lh;
+				color: inherit;
+				text-decoration: none;
+			}
+			.Picker li :focus-visible,
+			.Picker li:focus-visible {
+				outline-offset: -2px;
+			}
+			/* Ctrl-O (task v8y): as tall as its field, hint and help. */
+			.Picker.compact,
+			.Picker.compact[open] {
+				height: fit-content;
+				max-height: calc(var(--app-height, 100dvh) - 1rem);
+				overflow-y: auto;
+			}
+			.Picker .blocks-help {
+				flex: none;
+				color: var(--description);
+			}
+			.Picker .blocks-help dl {
+				margin: 0 0 1lh;
+				display: grid;
+				grid-template-columns: max-content 1fr;
+				column-gap: 2ch;
+			}
+			.Picker .blocks-help dl > div {
+				display: contents;
+			}
+			.Picker .blocks-help dt {
+				color: var(--key);
+			}
+			.Picker .blocks-help dd {
+				margin: 0;
+			}
+			.Picker .blocks-help p {
+				margin: 0;
+			}
+			.Picker .blocks-help b {
+				color: var(--key);
+				font-weight: inherit;
+			}
+			.Picker .blocks-hint {
+				flex: none;
+				overflow-wrap: anywhere;
+				margin-block: 0.75lh;
+			}
+			.Picker ul.blocks-ids {
+				flex: none;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0 2ch;
+				overflow: visible;
+				color: var(--key);
+			}
+			.Picker ul.blocks-ids li {
+				padding: 0;
+				min-height: 0;
+				cursor: auto;
+			}
+			/* Apple HIG: touch targets at least 44x44pt. */
+			@media (pointer: coarse) {
+				.Picker {
+					width: calc(var(--app-width, 100vw) - 1rem);
+					left: calc(var(--app-left, 0px) + 0.5rem);
+					right: auto;
+					max-width: none;
+					height: calc(var(--app-height, 100dvh) - 1rem);
+					max-height: none;
+					top: calc(var(--app-top, 0px) + 0.5rem);
+					bottom: auto;
+					margin: 0;
+				}
+				.Picker li {
+					min-height: 44px;
+					padding-block: 0.25lh;
+				}
+				.Picker li:has(> a) {
+					padding-block: 0;
+				}
+				.Picker .close {
+					min-width: 44px;
+					min-height: 44px;
+				}
+			}
+			/* Dialogs share one frame: neutral like the transcript (their .plain
    class), not the amber page colors; a 44px header bar with the title
    and close button; actions in a footer under a line. They fade in
    and out briefly (ui-craft: under 300 ms, strong ease-out); no scale,
    so their geometry is final at once. */
-.Changes, .Picker, .StatusDetails { --line: color-mix(in oklab, currentColor 25%, transparent); --pick: color-mix(in oklab, currentColor 14%, transparent); --pick-hover: color-mix(in oklab, currentColor 22%, transparent); border: 1px solid var(--line); box-shadow: 0 1rem 3rem color-mix(in oklab, var(--overlay-bg) 60%, transparent); }
-:is(.Changes, .Picker, .StatusDetails)::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
-:is(.Changes, .Picker, .StatusDetails) > .top { flex: none; display: flex; align-items: center; gap: 1ch; min-height: 44px; padding: 0 0 0 1ch; border-bottom: 1px solid var(--line); }
-:is(.Changes, .Picker, .StatusDetails) > .top .title { flex: 1; min-width: 0; padding-block: 0.25lh; color: var(--title-fg); font-weight: 500; overflow-wrap: anywhere; }
-:is(.Changes, .Picker, .StatusDetails) > .top button { flex: none; min-width: 44px; min-height: 44px; padding: 0 1ch; background: none; color: var(--quiet); font: inherit; }
-:is(.Changes, .Picker, .StatusDetails) > .top .close { padding: 0; }
-.StatusDetails > .footer { display: flex; flex-wrap: wrap; gap: 0.5lh 1ch; padding: 0.5lh 1ch; border-top: 1px solid var(--line); }
-.StatusDetails > .footer button { min-height: 44px; padding: 0 1.5ch; background: var(--pick); color: var(--title-fg); font: inherit; }
-@media (hover: hover) and (pointer: fine) {
-  :is(.Changes, .Picker, .StatusDetails) > .top button:hover { background: var(--pick); color: var(--title-fg); }
-  .StatusDetails > .footer button:hover { background: var(--pick-hover); }
-}
-:is(.Changes, .Picker, .StatusDetails), :is(.Changes, .Picker, .StatusDetails)::backdrop { transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1), overlay 160ms allow-discrete, display 160ms allow-discrete; }
-:is(.Changes, .Picker, .StatusDetails):not([open]) { opacity: 0; }
-:is(.Changes, .Picker, .StatusDetails):not([open])::backdrop { opacity: 0; }
-@starting-style {
-  :is(.Changes, .Picker, .StatusDetails)[open] { opacity: 0; }
-  :is(.Changes, .Picker, .StatusDetails)[open]::backdrop { opacity: 0; }
-}
-/* Changes window (task ahr): file list beside the diff; one pane at a
+			.Changes,
+			.Picker,
+			.StatusDetails {
+				--line: color-mix(in oklab, currentColor 25%, transparent);
+				--pick: color-mix(in oklab, currentColor 14%, transparent);
+				--pick-hover: color-mix(in oklab, currentColor 22%, transparent);
+				border: 1px solid var(--line);
+				box-shadow: 0 1rem 3rem color-mix(in oklab, var(--overlay-bg) 60%, transparent);
+			}
+			:is(.Changes, .Picker, .StatusDetails)::backdrop {
+				background: color-mix(in oklab, var(--canvas) 70%, transparent);
+			}
+			:is(.Changes, .Picker, .StatusDetails) > .top {
+				flex: none;
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				min-height: 44px;
+				padding: 0 0 0 1ch;
+				border-bottom: 1px solid var(--line);
+			}
+			:is(.Changes, .Picker, .StatusDetails) > .top .title {
+				flex: 1;
+				min-width: 0;
+				padding-block: 0.25lh;
+				color: var(--title-fg);
+				font-weight: 500;
+				overflow-wrap: anywhere;
+			}
+			:is(.Changes, .Picker, .StatusDetails) > .top button {
+				flex: none;
+				min-width: 44px;
+				min-height: 44px;
+				padding: 0 1ch;
+				background: none;
+				color: var(--quiet);
+				font: inherit;
+			}
+			:is(.Changes, .Picker, .StatusDetails) > .top .close {
+				padding: 0;
+			}
+			.StatusDetails > .footer {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5lh 1ch;
+				padding: 0.5lh 1ch;
+				border-top: 1px solid var(--line);
+			}
+			.StatusDetails > .footer button {
+				min-height: 44px;
+				padding: 0 1.5ch;
+				background: var(--pick);
+				color: var(--title-fg);
+				font: inherit;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				:is(.Changes, .Picker, .StatusDetails) > .top button:hover {
+					background: var(--pick);
+					color: var(--title-fg);
+				}
+				.StatusDetails > .footer button:hover {
+					background: var(--pick-hover);
+				}
+			}
+			:is(.Changes, .Picker, .StatusDetails),
+			:is(.Changes, .Picker, .StatusDetails)::backdrop {
+				transition:
+					opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+					overlay 160ms allow-discrete,
+					display 160ms allow-discrete;
+			}
+			:is(.Changes, .Picker, .StatusDetails):not([open]) {
+				opacity: 0;
+			}
+			:is(.Changes, .Picker, .StatusDetails):not([open])::backdrop {
+				opacity: 0;
+			}
+			@starting-style {
+				:is(.Changes, .Picker, .StatusDetails)[open] {
+					opacity: 0;
+				}
+				:is(.Changes, .Picker, .StatusDetails)[open]::backdrop {
+					opacity: 0;
+				}
+			}
+			/* Changes window (task ahr): file list beside the diff; one pane at a
    time below 50rem. Neutral like the transcript (.plain): only the
    diff is colored. */
-.Changes { width: calc(var(--app-width, 100vw) - 2rem); max-width: 110rem; height: calc(var(--app-height, 100dvh) - 2rem); max-height: none; padding: 0; overflow: hidden; }
-.Changes[open] { display: flex; flex-direction: column; }
-.Changes .quiet { color: var(--quiet); }
-.Changes .add { color: var(--add-fg); --sel-back: var(--add-fg); }
-.Changes .del { color: var(--remove-fg); --sel-back: var(--remove-fg); }
-.Changes .refused { flex: none; margin: 0; padding: 0.5lh 1ch; color: var(--error-fg); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Changes .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(16rem, 22rem) 1fr; }
-.Changes .files { overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); }
-.Changes .files ul { margin: 0; padding: 0; list-style: none; }
-.Changes .files a { display: flex; flex-direction: column; justify-content: center; min-height: 44px; padding: 0.25lh 1ch; color: inherit; text-decoration: none; }
-.Changes .files .path, .Changes .file h2, .Changes .top .title { color: var(--title-fg); }
-.Changes .files .path { overflow-wrap: anywhere; }
-.Changes .files li[aria-current] a { background: var(--pick); }
-@media (hover: hover) and (pointer: fine) { .Changes .files li:not([aria-current]) a:hover { background: color-mix(in oklab, currentColor 7%, transparent); } }
-.Changes .files p, .Changes .file > p { margin: 0; padding: 0.5lh 1ch; }
-.Changes .file { min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
-.Changes .file header { padding: 0.5lh 1ch; border-bottom: 1px solid var(--line); }
-.Changes .file h2 { margin: 0; font-size: inherit; font-weight: 500; overflow-wrap: anywhere; }
-.Changes .file header p { margin: 0; }
-.Changes .links { display: flex; flex-wrap: wrap; align-items: center; column-gap: 1.5ch; }
-.Changes .links a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; overflow-wrap: anywhere; }
-@media (pointer: fine) { .Changes .links a { min-height: 0; } }
-.Changes .lines { display: grid; grid-template-columns: auto auto 2ch 1fr; padding-block: 0.25lh; }
-.Changes .line { display: contents; }
-.Changes .line > span { padding-inline: 0.5ch; }
-.Changes .line .no { color: var(--quiet); text-align: right; user-select: none; }
-.Changes .line .sign { user-select: none; padding: 0; text-align: center; }
-.Changes .line .text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; padding-right: 1ch; }
-.Changes .line.add > span { background: color-mix(in oklab, var(--add-fg) 10%, transparent); color: var(--add-fg); }
-.Changes .line.del > span { background: color-mix(in oklab, var(--remove-fg) 10%, transparent); color: var(--remove-fg); }
-.Changes .line.hunk > span, .Changes .line.note > span { color: var(--quiet); }
-.Changes .line.hunk > .text, .Changes .line.note > .text { grid-column: 1 / -1; padding: 0.5lh 1ch 0.25lh; }
-.Changes .line.hunk > .no, .Changes .line.hunk > .sign, .Changes .line.note > .no, .Changes .line.note > .sign { display: none; }
-.Changes .file h3 { margin: 0; padding: 0.5lh 1ch 0.25lh; font-size: inherit; font-weight: 500; border-top: 1px solid var(--line); }
-.Changes details > summary { min-height: 44px; display: flex; align-items: center; gap: 1ch; padding-inline: 1ch; cursor: pointer; }
-@media (max-width: 50rem) {
-  .Changes { width: calc(var(--app-width, 100vw) - 1rem); height: calc(var(--app-height, 100dvh) - 1rem); }
-  .Changes .body { grid-template-columns: 1fr; }
-  .Changes .files { border-right: none; }
-  .Changes.picked .files, .Changes:not(.picked) .file { display: none; }
-}
-@media (pointer: coarse) { .Changes { position: fixed; top: calc(var(--app-top, 0px) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); margin: 0; width: calc(var(--app-width, 100vw) - 1rem); height: calc(var(--app-height, 100dvh) - 1rem); } }
-/* Tabs (tasks 3k, ce): one row with native momentum scrolling between
+			.Changes {
+				width: calc(var(--app-width, 100vw) - 2rem);
+				max-width: 110rem;
+				height: calc(var(--app-height, 100dvh) - 2rem);
+				max-height: none;
+				padding: 0;
+				overflow: hidden;
+			}
+			.Changes[open] {
+				display: flex;
+				flex-direction: column;
+			}
+			.Changes .quiet {
+				color: var(--quiet);
+			}
+			.Changes .add {
+				color: var(--add-fg);
+				--sel-back: var(--add-fg);
+			}
+			.Changes .del {
+				color: var(--remove-fg);
+				--sel-back: var(--remove-fg);
+			}
+			.Changes .refused {
+				flex: none;
+				margin: 0;
+				padding: 0.5lh 1ch;
+				color: var(--error-fg);
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: inherit;
+			}
+			.Changes .body {
+				flex: 1;
+				min-height: 0;
+				display: grid;
+				grid-template-columns: minmax(16rem, 22rem) 1fr;
+			}
+			.Changes .files {
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				border-right: 1px solid var(--line);
+			}
+			.Changes .files ul {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			.Changes .files a {
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				min-height: 44px;
+				padding: 0.25lh 1ch;
+				color: inherit;
+				text-decoration: none;
+			}
+			.Changes .files .path,
+			.Changes .file h2,
+			.Changes .top .title {
+				color: var(--title-fg);
+			}
+			.Changes .files .path {
+				overflow-wrap: anywhere;
+			}
+			.Changes .files li[aria-current] a {
+				background: var(--pick);
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Changes .files li:not([aria-current]) a:hover {
+					background: color-mix(in oklab, currentColor 7%, transparent);
+				}
+			}
+			.Changes .files p,
+			.Changes .file > p {
+				margin: 0;
+				padding: 0.5lh 1ch;
+			}
+			.Changes .file {
+				min-width: 0;
+				overflow-y: auto;
+				overscroll-behavior: contain;
+			}
+			.Changes .file header {
+				padding: 0.5lh 1ch;
+				border-bottom: 1px solid var(--line);
+			}
+			.Changes .file h2 {
+				margin: 0;
+				font-size: inherit;
+				font-weight: 500;
+				overflow-wrap: anywhere;
+			}
+			.Changes .file header p {
+				margin: 0;
+			}
+			.Changes .links {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				column-gap: 1.5ch;
+			}
+			.Changes .links a {
+				display: inline-flex;
+				align-items: center;
+				min-height: 44px;
+				color: inherit;
+				overflow-wrap: anywhere;
+			}
+			@media (pointer: fine) {
+				.Changes .links a {
+					min-height: 0;
+				}
+			}
+			.Changes .lines {
+				display: grid;
+				grid-template-columns: auto auto 2ch 1fr;
+				padding-block: 0.25lh;
+			}
+			.Changes .line {
+				display: contents;
+			}
+			.Changes .line > span {
+				padding-inline: 0.5ch;
+			}
+			.Changes .line .no {
+				color: var(--quiet);
+				text-align: right;
+				user-select: none;
+			}
+			.Changes .line .sign {
+				user-select: none;
+				padding: 0;
+				text-align: center;
+			}
+			.Changes .line .text {
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				min-width: 0;
+				padding-right: 1ch;
+			}
+			.Changes .line.add > span {
+				background: color-mix(in oklab, var(--add-fg) 10%, transparent);
+				color: var(--add-fg);
+			}
+			.Changes .line.del > span {
+				background: color-mix(in oklab, var(--remove-fg) 10%, transparent);
+				color: var(--remove-fg);
+			}
+			.Changes .line.hunk > span,
+			.Changes .line.note > span {
+				color: var(--quiet);
+			}
+			.Changes .line.hunk > .text,
+			.Changes .line.note > .text {
+				grid-column: 1 / -1;
+				padding: 0.5lh 1ch 0.25lh;
+			}
+			.Changes .line.hunk > .no,
+			.Changes .line.hunk > .sign,
+			.Changes .line.note > .no,
+			.Changes .line.note > .sign {
+				display: none;
+			}
+			.Changes .file h3 {
+				margin: 0;
+				padding: 0.5lh 1ch 0.25lh;
+				font-size: inherit;
+				font-weight: 500;
+				border-top: 1px solid var(--line);
+			}
+			.Changes details > summary {
+				min-height: 44px;
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				padding-inline: 1ch;
+				cursor: pointer;
+			}
+			@media (max-width: 50rem) {
+				.Changes {
+					width: calc(var(--app-width, 100vw) - 1rem);
+					height: calc(var(--app-height, 100dvh) - 1rem);
+				}
+				.Changes .body {
+					grid-template-columns: 1fr;
+				}
+				.Changes .files {
+					border-right: none;
+				}
+				.Changes.picked .files,
+				.Changes:not(.picked) .file {
+					display: none;
+				}
+			}
+			@media (pointer: coarse) {
+				.Changes {
+					position: fixed;
+					top: calc(var(--app-top, 0px) + 0.5rem);
+					left: calc(var(--app-left, 0px) + 0.5rem);
+					margin: 0;
+					width: calc(var(--app-width, 100vw) - 1rem);
+					height: calc(var(--app-height, 100dvh) - 1rem);
+				}
+			}
+			/* Tabs (tasks 3k, ce): one row with native momentum scrolling between
    narrow secondary chevrons; menu and new-tab stay fixed. Equal cell
    widths are set by Tabs.tsx. The shown tab's
    cell is tinted with a lit bar under it; its content is centered, and a
    marker that appears widens it smoothly. Under 50px tall. */
-.Tabs { flex: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
-.Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }
-.Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; overflow: hidden; }
-.Tabs .track { display: flex; flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain; touch-action: pan-x pinch-zoom; }
-.Tabs .track .tab { scroll-snap-align: start; }
-.Tabs .track:not(:has(.name)) .tab { flex-grow: 1; }
-.Tabs .edge:disabled { opacity: .5; cursor: default; }
-.Tabs .edge.offscreen { color: var(--active-fg); font-weight: 700; }
-.Tabs .strip .edge { padding-inline: 0; min-width: 24px; min-height: 44px; }
-.Tabs .probe { position: absolute; visibility: hidden; pointer-events: none; }
-.Tabs .tab { display: flex; flex: none; align-items: center; justify-content: center; width: var(--cell); padding: 0.25lh 0; background: none; text-decoration: none; color: var(--inactive-fg); }
-.Tabs .sheet .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }
-.Tabs .tab[aria-current] { color: var(--active-fg); }
-/* Project color (task 22): a bar over the tab number, a strip left of the cwd. */
-.Tabs .strip .tab { position: relative; }
-.Tabs .strip .tab[style*="--project"]::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 3px; background: var(--project); }
-.Tabs .strip .tab[aria-current] { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 0 -3px 0 var(--active-fg); }
-.Tabs .sheet .tab[aria-current] .n { font-weight: 600; }
-.Tabs .tab .n { text-box: trim-both cap alphabetic; }
-.Tabs .marker { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1ch; height: 1cap; margin-left: 0.25ch; }
-.Tabs .marker.working::before, .Tabs .marker.jobs::before, .Tabs .marker.retrying::before { content: ''; width: 0.4em; height: 0.4em; background: currentColor; }
-.Tabs .strip .marker { overflow: hidden; }
-.Tabs .strip .marker:not([aria-label]) { width: 0; margin-left: 0; }
-.Tabs .strip :focus-visible { outline-offset: -2px; }
-.Tabs .strip .name { width: 12ch; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; }
-.Tabs .edge { display: flex; flex: none; align-items: center; justify-content: center; width: var(--edge); padding: 0.25lh 0; text-decoration: none; color: var(--inactive-fg); }
-.Tabs .edge[hidden] { display: none; }
-.Tabs .marker { color: var(--mark-lit); }
-.Tabs .marker.blink { animation: marker-blink 2s steps(1, end) infinite; }
-.Tabs .marker.working.with-jobs { --mark-alt: var(--jobs-fg); }
-@keyframes marker-blink {
-  0%, 100% { color: var(--mark-lit); }
-  25%, 75% { color: var(--mark-dark); }
-  50% { color: var(--mark-alt, var(--mark-lit)); }
-}
-.Tabs .marker.blocked, .Tabs .marker.paused { font-weight: 600; }
-.Tabs button { flex: none; background: transparent; color: inherit; padding: 0.25lh 1ch; }
-@media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }
-.Tabs .menu, .Tabs .close { color: var(--inactive-fg); }
-@media (pointer: coarse) { .Tabs .strip { min-height: 44px; } .Tabs button { min-width: 44px; } }
-.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.5lh 1ch max(0.5lh, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
-.Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.25lh; }
-.Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
-/* Initial dialog focus is structural, not another selected tab. */
-.Tabs .sheet ul:focus { outline: none; }
-/* Notification history (task py): newest first, scrolls inside the sheet. */
-.Notifications .history { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 0 1 auto; min-height: 3lh; }
-.Notifications .history a { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; color: inherit; text-decoration: none; min-height: 44px; justify-content: center; }
-.Notifications .history .done a { border-color: var(--done-fg); } .Notifications .history .failed a { border-color: var(--failed-fg); }
-.Notifications .history .attention a { border-color: var(--attention-fg); } .Notifications .history .commit a { border-color: var(--commit-fg); }
-.Notifications .history .line { overflow-wrap: anywhere; }
-.Tabs .sheet li { display: flex; align-items: stretch; justify-content: space-between; }
-/* The shown tab in the list is lit like a card: bar on the left, tint. */
-.Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
-.Tabs .sheet .tab { flex: 1; width: auto; justify-content: flex-start; gap: 1ch; padding: 0.5lh 1ch; }
-.Tabs .sheet .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-/* The tab list shows each cwd in a column, its project strip left of it
+			.Tabs {
+				flex: none;
+				padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+			}
+			.Tabs .strip {
+				display: flex;
+				align-items: stretch;
+				white-space: nowrap;
+				overflow: hidden;
+			}
+			.Tabs .pages {
+				position: relative;
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				overflow: hidden;
+			}
+			.Tabs .track {
+				display: flex;
+				flex: 1;
+				min-width: 0;
+				overflow-x: auto;
+				overflow-y: hidden;
+				scrollbar-width: none;
+				scroll-snap-type: x proximity;
+				overscroll-behavior-x: contain;
+				touch-action: pan-x pinch-zoom;
+			}
+			.Tabs .track .tab {
+				scroll-snap-align: start;
+			}
+			.Tabs .track:not(:has(.name)) .tab {
+				flex-grow: 1;
+			}
+			.Tabs .edge:disabled {
+				opacity: 0.5;
+				cursor: default;
+			}
+			.Tabs .edge.offscreen {
+				color: var(--active-fg);
+				font-weight: 700;
+			}
+			.Tabs .strip .edge {
+				padding-inline: 0;
+				min-width: 24px;
+				min-height: 44px;
+			}
+			.Tabs .probe {
+				position: absolute;
+				visibility: hidden;
+				pointer-events: none;
+			}
+			.Tabs .tab {
+				display: flex;
+				flex: none;
+				align-items: center;
+				justify-content: center;
+				width: var(--cell);
+				padding: 0.25lh 0;
+				background: none;
+				text-decoration: none;
+				color: var(--inactive-fg);
+			}
+			.Tabs .sheet .tab .n {
+				display: inline-block;
+				width: calc(var(--digits) * 1ch);
+				text-align: right;
+			}
+			.Tabs .tab[aria-current] {
+				color: var(--active-fg);
+			}
+			/* Project color (task 22): a bar over the tab number, a strip left of the cwd. */
+			.Tabs .strip .tab {
+				position: relative;
+			}
+			.Tabs .strip .tab[style*='--project']::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 20%;
+				right: 20%;
+				height: 3px;
+				background: var(--project);
+			}
+			.Tabs .strip .tab[aria-current] {
+				background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent);
+				box-shadow: inset 0 -3px 0 var(--active-fg);
+			}
+			.Tabs .sheet .tab[aria-current] .n {
+				font-weight: 600;
+			}
+			.Tabs .tab .n {
+				text-box: trim-both cap alphabetic;
+			}
+			.Tabs .marker {
+				display: inline-flex;
+				flex: none;
+				align-items: center;
+				justify-content: center;
+				width: 1ch;
+				height: 1cap;
+				margin-left: 0.25ch;
+			}
+			.Tabs .marker.working::before,
+			.Tabs .marker.jobs::before,
+			.Tabs .marker.retrying::before {
+				content: '';
+				width: 0.4em;
+				height: 0.4em;
+				background: currentColor;
+			}
+			.Tabs .strip .marker {
+				overflow: hidden;
+			}
+			.Tabs .strip .marker:not([aria-label]) {
+				width: 0;
+				margin-left: 0;
+			}
+			.Tabs .strip :focus-visible {
+				outline-offset: -2px;
+			}
+			.Tabs .strip .name {
+				width: 12ch;
+				margin-left: 1ch;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.Tabs .edge {
+				display: flex;
+				flex: none;
+				align-items: center;
+				justify-content: center;
+				width: var(--edge);
+				padding: 0.25lh 0;
+				text-decoration: none;
+				color: var(--inactive-fg);
+			}
+			.Tabs .edge[hidden] {
+				display: none;
+			}
+			.Tabs .marker {
+				color: var(--mark-lit);
+			}
+			.Tabs .marker.blink {
+				animation: marker-blink 2s steps(1, end) infinite;
+			}
+			.Tabs .marker.working.with-jobs {
+				--mark-alt: var(--jobs-fg);
+			}
+			@keyframes marker-blink {
+				0%,
+				100% {
+					color: var(--mark-lit);
+				}
+				25%,
+				75% {
+					color: var(--mark-dark);
+				}
+				50% {
+					color: var(--mark-alt, var(--mark-lit));
+				}
+			}
+			.Tabs .marker.blocked,
+			.Tabs .marker.paused {
+				font-weight: 600;
+			}
+			.Tabs button {
+				flex: none;
+				background: transparent;
+				color: inherit;
+				padding: 0.25lh 1ch;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Tabs button:hover,
+				.Tabs .tab:hover,
+				.Tabs .edge:hover {
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			.Tabs .tab,
+			.Tabs .edge,
+			.Tabs button {
+				touch-action: manipulation;
+			}
+			.Tabs .menu,
+			.Tabs .close {
+				color: var(--inactive-fg);
+			}
+			@media (pointer: coarse) {
+				.Tabs .strip {
+					min-height: 44px;
+				}
+				.Tabs button {
+					min-width: 44px;
+				}
+			}
+			.Tabs .sheet {
+				width: 100%;
+				max-width: 100%;
+				max-height: 80dvh;
+				margin: auto 0 0;
+				padding: 0.5lh 1ch max(0.5lh, env(safe-area-inset-bottom));
+				background: var(--canvas);
+				color: var(--text);
+				border: 0;
+				border-top: 1px solid var(--border);
+			}
+			.Tabs .sheet[open] {
+				display: flex;
+				flex-direction: column;
+				gap: 0.25lh;
+			}
+			.Tabs .sheet ul {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+				overflow-y: auto;
+			}
+			/* Initial dialog focus is structural, not another selected tab. */
+			.Tabs .sheet ul:focus {
+				outline: none;
+			}
+			/* Notification history (task py): newest first, scrolls inside the sheet. */
+			.Notifications .history {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+				overflow-y: auto;
+				flex: 0 1 auto;
+				min-height: 3lh;
+			}
+			.Notifications .history a {
+				display: flex;
+				flex-direction: column;
+				padding: 0.25lh 1ch;
+				border-left: 3px solid;
+				color: inherit;
+				text-decoration: none;
+				min-height: 44px;
+				justify-content: center;
+			}
+			.Notifications .history .done a {
+				border-color: var(--done-fg);
+			}
+			.Notifications .history .failed a {
+				border-color: var(--failed-fg);
+			}
+			.Notifications .history .attention a {
+				border-color: var(--attention-fg);
+			}
+			.Notifications .history .commit a {
+				border-color: var(--commit-fg);
+			}
+			.Notifications .history .line {
+				overflow-wrap: anywhere;
+			}
+			.Tabs .sheet li {
+				display: flex;
+				align-items: stretch;
+				justify-content: space-between;
+			}
+			/* The shown tab in the list is lit like a card: bar on the left, tint. */
+			.Tabs .sheet li:has([aria-current]) {
+				background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent);
+				box-shadow: inset 3px 0 0 var(--active-fg);
+			}
+			.Tabs .sheet .tab {
+				flex: 1;
+				width: auto;
+				justify-content: flex-start;
+				gap: 1ch;
+				padding: 0.5lh 1ch;
+			}
+			.Tabs .sheet .name {
+				flex: 1;
+				min-width: 0;
+				overflow-wrap: anywhere;
+			}
+			/* The tab list shows each cwd in a column, its project strip left of it
    as in the status row; narrow screens keep only the bar over the number. */
-.Tabs .sheet .dir { flex: none; width: min(40%, 32ch); padding-left: 1ch; border-left: 3px solid transparent; color: var(--inactive-fg); overflow-wrap: anywhere; }
-.Tabs .sheet .tab[style*="--project"] .dir { border-left-color: var(--project); }
-@media (max-width: 40rem) { .Tabs .sheet .dir { display: none; } .Tabs .sheet .n { position: relative; } .Tabs .sheet .tab[style*="--project"] .n::before { content: ''; position: absolute; top: -5px; left: 0; right: 0; height: 3px; background: var(--project); } }
-.Tabs .sheet :focus-visible { outline-offset: -2px; }
-.Tabs .sheet .close { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; font-size: 1.5em; padding: 0.25lh 1ch; }
-.Tabs .sheet .new { padding: 0.5lh 1ch; background: var(--button); }
-.Tabs .sheet .reload { padding: 0.5lh 1ch; background: var(--button); }
-.Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent); }
-/* The /rebase view (task bzf): a full-height modal over the app, its row
+			.Tabs .sheet .dir {
+				flex: none;
+				width: min(40%, 32ch);
+				padding-left: 1ch;
+				border-left: 3px solid transparent;
+				color: var(--inactive-fg);
+				overflow-wrap: anywhere;
+			}
+			.Tabs .sheet .tab[style*='--project'] .dir {
+				border-left-color: var(--project);
+			}
+			@media (max-width: 40rem) {
+				.Tabs .sheet .dir {
+					display: none;
+				}
+				.Tabs .sheet .n {
+					position: relative;
+				}
+				.Tabs .sheet .tab[style*='--project'] .n::before {
+					content: '';
+					position: absolute;
+					top: -5px;
+					left: 0;
+					right: 0;
+					height: 3px;
+					background: var(--project);
+				}
+			}
+			.Tabs .sheet :focus-visible {
+				outline-offset: -2px;
+			}
+			.Tabs .sheet .close {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-width: 44px;
+				min-height: 44px;
+				font-size: 1.5em;
+				padding: 0.25lh 1ch;
+			}
+			.Tabs .sheet .new {
+				padding: 0.5lh 1ch;
+				background: var(--button);
+			}
+			.Tabs .sheet .reload {
+				padding: 0.5lh 1ch;
+				background: var(--button);
+			}
+			.Tabs .sheet::backdrop {
+				background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent);
+			}
+			/* The /rebase view (task bzf): a full-height modal over the app, its row
    list the one scroller; header, quick actions and footer stay put, and
    the footer rides above the phone keyboard (--app-height). */
-.Rebase { position: fixed; inset: auto; top: var(--app-top, 0px); left: var(--app-left, 0px); width: var(--app-width, 100vw); height: var(--app-height, 100dvh); max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--canvas); color: var(--text); overflow: hidden; --gut: max(2ch, env(safe-area-inset-left)); --gut-r: max(2ch, env(safe-area-inset-right)); }
-.Rebase[open] { display: flex; flex-direction: column; }
-.Rebase::backdrop { background: var(--canvas); }
-.Rebase > .top, .Rebase > .quick, .Rebase > .foot { flex: none; padding-inline: var(--gut) var(--gut-r); }
-.Rebase > .top { display: flex; align-items: center; gap: 1ch; padding-top: env(safe-area-inset-top); border-bottom: 1px solid var(--border); }
-.Rebase .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--accent); }
-.Rebase .title .id { color: var(--text); }
-.Rebase .close { min-width: 44px; min-height: 44px; background: transparent; color: inherit; }
-.Rebase > .quick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25lh 1ch; padding-block: 0.25lh; }
-.Rebase .quick input { width: 9ch; padding-block: 0; min-height: 36px; }
-.Rebase .quick button { min-height: 36px; }
-.Rebase .quick .hint { color: var(--quiet); }
-.Rebase .quick .range { display: none; }
-@media (pointer: coarse) { .Rebase .quick .range { display: inline-block; } .Rebase .quick .hint { display: none; } .Rebase .quick input, .Rebase .quick button { min-height: 44px; } }
-.Rebase .rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 var(--gut-r) 0.5lh var(--gut); list-style: none; border-top: 1px solid var(--border); }
-.Rebase .date { padding: 0.5lh 0 0 calc(3px + 1ch); color: var(--accent); }
-.Rebase .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 1ch; border-left: 3px solid transparent; border-bottom: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
-.Rebase .row.drop, .Rebase .row.group { border-left-color: var(--remove-fg); }
-.Rebase .row.edit { border-left-color: var(--add-fg); }
-.Rebase .info { display: grid; grid-template-columns: 6ch 5ch 10ch 6ch 12ch minmax(0, 1fr); column-gap: 1ch; align-items: baseline; min-width: 0; min-height: 44px; padding: calc((44px - 1lh) / 2) 1ch; text-align: left; background: transparent; color: inherit; }
-@media (hover: hover) and (pointer: fine) { .Rebase .info:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.Rebase .info:focus-visible, .Rebase .acts button:focus-visible { outline-offset: -2px; }
-.Rebase .info > span { min-width: 0; }
-.Rebase .n, .Rebase .time { color: var(--quiet); }
-.Rebase .kind, .Rebase .summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Rebase .tokens { text-align: right; font-weight: 600; }
-.Rebase .bar { align-self: center; height: 0.6lh; }
-.Rebase .bar > span { display: block; height: 100%; background: currentColor; }
-.Rebase .carries { grid-column: 6; color: var(--quiet); overflow-wrap: anywhere; }
-.Rebase .row.drop .summary, .Rebase .row.group .summary { text-decoration: line-through; color: var(--remove-fg); }
-.Rebase .acts { display: flex; align-self: start; }
-.Rebase .acts button { min-width: 44px; min-height: 44px; padding: 0 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor var(--mix-divider), transparent); }
-@media (hover: hover) and (pointer: fine) { .Rebase .acts button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.Rebase .acts button:disabled { color: var(--quiet); cursor: default; text-decoration: line-through; }
-.Rebase .acts .keep[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
-.Rebase .acts .drop[aria-pressed="true"] { background: var(--remove-fg); color: var(--canvas); }
-.Rebase .acts .edit[aria-pressed="true"] { background: var(--add-fg); color: var(--canvas); }
-.Rebase .edit:is(textarea) { grid-column: 1 / -1; margin: 0 0 0.5lh calc(3px + 1ch); width: calc(100% - 1ch - 3px); max-height: 50dvh; field-sizing: content; min-height: 3lh; resize: vertical; }
-.Rebase .detail { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.5lh; padding: 0 1ch 0.5lh; }
-.Rebase .part pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Rebase .part pre.error { color: var(--remove-fg); }
-.Rebase .part .label, .Rebase .part.label { color: var(--quiet); }
-.Rebase .part a { color: inherit; }
-.Rebase .part img { display: block; max-width: 100%; max-height: 24rem; margin-top: 0.25lh; }
-.Rebase .before { align-self: flex-start; min-height: 44px; }
-.Rebase > .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25lh 2ch; padding-block: 0.25lh max(0.5lh, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
-.Rebase .foot .error { flex: 1 0 100%; display: flex; align-items: flex-start; gap: 1ch; color: var(--remove-fg); max-height: 30dvh; overflow-y: auto; }
-.Rebase .foot .error pre { flex: 1; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Rebase .foot .error button { min-height: 44px; flex: none; }
-.Rebase .sums { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 0 2ch; }
-.Rebase .sums span { white-space: nowrap; }
-.Rebase .sums b { color: var(--accent); }
-.Rebase .buttons { display: flex; gap: 1ch; margin-left: auto; }
-.Rebase .buttons button { min-height: 44px; padding: 0 2ch; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
-.Rebase .buttons .apply:not(:disabled) { background: var(--accent); color: var(--canvas); }
-.Rebase .buttons button:disabled { background: transparent; color: var(--quiet); box-shadow: inset 0 0 0 1px currentColor; cursor: default; }
-/* Phones: the meta on one line, the summary under it, the size bar a
+			.Rebase {
+				position: fixed;
+				inset: auto;
+				top: var(--app-top, 0px);
+				left: var(--app-left, 0px);
+				width: var(--app-width, 100vw);
+				height: var(--app-height, 100dvh);
+				max-width: none;
+				max-height: none;
+				margin: 0;
+				padding: 0;
+				border: 0;
+				background: var(--canvas);
+				color: var(--text);
+				overflow: hidden;
+				--gut: max(2ch, env(safe-area-inset-left));
+				--gut-r: max(2ch, env(safe-area-inset-right));
+			}
+			.Rebase[open] {
+				display: flex;
+				flex-direction: column;
+			}
+			.Rebase::backdrop {
+				background: var(--canvas);
+			}
+			.Rebase > .top,
+			.Rebase > .quick,
+			.Rebase > .foot {
+				flex: none;
+				padding-inline: var(--gut) var(--gut-r);
+			}
+			.Rebase > .top {
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				padding-top: env(safe-area-inset-top);
+				border-bottom: 1px solid var(--border);
+			}
+			.Rebase .title {
+				flex: 1;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-weight: 600;
+				color: var(--accent);
+			}
+			.Rebase .title .id {
+				color: var(--text);
+			}
+			.Rebase .close {
+				min-width: 44px;
+				min-height: 44px;
+				background: transparent;
+				color: inherit;
+			}
+			.Rebase > .quick {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 0.25lh 1ch;
+				padding-block: 0.25lh;
+			}
+			.Rebase .quick input {
+				width: 9ch;
+				padding-block: 0;
+				min-height: 36px;
+			}
+			.Rebase .quick button {
+				min-height: 36px;
+			}
+			.Rebase .quick .hint {
+				color: var(--quiet);
+			}
+			.Rebase .quick .range {
+				display: none;
+			}
+			@media (pointer: coarse) {
+				.Rebase .quick .range {
+					display: inline-block;
+				}
+				.Rebase .quick .hint {
+					display: none;
+				}
+				.Rebase .quick input,
+				.Rebase .quick button {
+					min-height: 44px;
+				}
+			}
+			.Rebase .rows {
+				flex: 1;
+				min-height: 0;
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				margin: 0;
+				padding: 0 var(--gut-r) 0.5lh var(--gut);
+				list-style: none;
+				border-top: 1px solid var(--border);
+			}
+			.Rebase .date {
+				padding: 0.5lh 0 0 calc(3px + 1ch);
+				color: var(--accent);
+			}
+			.Rebase .row {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) auto;
+				column-gap: 1ch;
+				border-left: 3px solid transparent;
+				border-bottom: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent);
+			}
+			.Rebase .row.drop,
+			.Rebase .row.group {
+				border-left-color: var(--remove-fg);
+			}
+			.Rebase .row.edit {
+				border-left-color: var(--add-fg);
+			}
+			.Rebase .info {
+				display: grid;
+				grid-template-columns: 6ch 5ch 10ch 6ch 12ch minmax(0, 1fr);
+				column-gap: 1ch;
+				align-items: baseline;
+				min-width: 0;
+				min-height: 44px;
+				padding: calc((44px - 1lh) / 2) 1ch;
+				text-align: left;
+				background: transparent;
+				color: inherit;
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Rebase .info:hover {
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			.Rebase .info:focus-visible,
+			.Rebase .acts button:focus-visible {
+				outline-offset: -2px;
+			}
+			.Rebase .info > span {
+				min-width: 0;
+			}
+			.Rebase .n,
+			.Rebase .time {
+				color: var(--quiet);
+			}
+			.Rebase .kind,
+			.Rebase .summary {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.Rebase .tokens {
+				text-align: right;
+				font-weight: 600;
+			}
+			.Rebase .bar {
+				align-self: center;
+				height: 0.6lh;
+			}
+			.Rebase .bar > span {
+				display: block;
+				height: 100%;
+				background: currentColor;
+			}
+			.Rebase .carries {
+				grid-column: 6;
+				color: var(--quiet);
+				overflow-wrap: anywhere;
+			}
+			.Rebase .row.drop .summary,
+			.Rebase .row.group .summary {
+				text-decoration: line-through;
+				color: var(--remove-fg);
+			}
+			.Rebase .acts {
+				display: flex;
+				align-self: start;
+			}
+			.Rebase .acts button {
+				min-width: 44px;
+				min-height: 44px;
+				padding: 0 1ch;
+				background: transparent;
+				color: inherit;
+				box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor var(--mix-divider), transparent);
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Rebase .acts button:hover:not(:disabled) {
+					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
+				}
+			}
+			.Rebase .acts button:disabled {
+				color: var(--quiet);
+				cursor: default;
+				text-decoration: line-through;
+			}
+			.Rebase .acts .keep[aria-pressed='true'] {
+				background: var(--accent);
+				color: var(--canvas);
+			}
+			.Rebase .acts .drop[aria-pressed='true'] {
+				background: var(--remove-fg);
+				color: var(--canvas);
+			}
+			.Rebase .acts .edit[aria-pressed='true'] {
+				background: var(--add-fg);
+				color: var(--canvas);
+			}
+			.Rebase .edit:is(textarea) {
+				grid-column: 1 / -1;
+				margin: 0 0 0.5lh calc(3px + 1ch);
+				width: calc(100% - 1ch - 3px);
+				max-height: 50dvh;
+				field-sizing: content;
+				min-height: 3lh;
+				resize: vertical;
+			}
+			.Rebase .detail {
+				grid-column: 1 / -1;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5lh;
+				padding: 0 1ch 0.5lh;
+			}
+			.Rebase .part pre {
+				margin: 0;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: inherit;
+			}
+			.Rebase .part pre.error {
+				color: var(--remove-fg);
+			}
+			.Rebase .part .label,
+			.Rebase .part.label {
+				color: var(--quiet);
+			}
+			.Rebase .part a {
+				color: inherit;
+			}
+			.Rebase .part img {
+				display: block;
+				max-width: 100%;
+				max-height: 24rem;
+				margin-top: 0.25lh;
+			}
+			.Rebase .before {
+				align-self: flex-start;
+				min-height: 44px;
+			}
+			.Rebase > .foot {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 0.25lh 2ch;
+				padding-block: 0.25lh max(0.5lh, env(safe-area-inset-bottom));
+				border-top: 1px solid var(--border);
+			}
+			.Rebase .foot .error {
+				flex: 1 0 100%;
+				display: flex;
+				align-items: flex-start;
+				gap: 1ch;
+				color: var(--remove-fg);
+				max-height: 30dvh;
+				overflow-y: auto;
+			}
+			.Rebase .foot .error pre {
+				flex: 1;
+				margin: 0;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: inherit;
+			}
+			.Rebase .foot .error button {
+				min-height: 44px;
+				flex: none;
+			}
+			.Rebase .sums {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0 2ch;
+			}
+			.Rebase .sums span {
+				white-space: nowrap;
+			}
+			.Rebase .sums b {
+				color: var(--accent);
+			}
+			.Rebase .buttons {
+				display: flex;
+				gap: 1ch;
+				margin-left: auto;
+			}
+			.Rebase .buttons button {
+				min-height: 44px;
+				padding: 0 2ch;
+				font-weight: 600;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+			.Rebase .buttons .apply:not(:disabled) {
+				background: var(--accent);
+				color: var(--canvas);
+			}
+			.Rebase .buttons button:disabled {
+				background: transparent;
+				color: var(--quiet);
+				box-shadow: inset 0 0 0 1px currentColor;
+				cursor: default;
+			}
+			/* Phones: the meta on one line, the summary under it, the size bar a
    strip along the row's foot; the actions keep their 44px. */
-@media (max-width: 40rem) {
-  .Rebase { --gut: max(1ch, env(safe-area-inset-left)); --gut-r: max(1ch, env(safe-area-inset-right)); }
-  .Rebase .info { position: relative; grid-template-columns: auto auto minmax(0, 1fr) auto; padding-inline: 0.5ch; }
-  .Rebase .summary, .Rebase .carries { grid-column: 1 / -1; }
-  .Rebase .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
-  .Rebase .acts button { padding: 0 0.5ch; }
-}
-/* A history rewrite's divider offers Undo (task z71). */
-.Card.divider .undo { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
-@media (pointer: coarse) { .Card.divider .undo { min-height: 44px; min-width: 44px; } }
-/* The theme (src/common/colors.ts), put here by the host. */
-/*COLORS*/
-</style>
-</head>
-<body>
-<!-- The browser's settings from config.ason, put here per request. -->
-<script type="application/json" id="settings">/*SETTINGS*/</script>
-<script type="application/json" id="send-keys">/*SEND_KEYS*/</script>
-<script type="application/json" id="push-key">/*PUSH_KEY*/</script>
-<script>/*APP*/</script>
-</body>
+			@media (max-width: 40rem) {
+				.Rebase {
+					--gut: max(1ch, env(safe-area-inset-left));
+					--gut-r: max(1ch, env(safe-area-inset-right));
+				}
+				.Rebase .info {
+					position: relative;
+					grid-template-columns: auto auto minmax(0, 1fr) auto;
+					padding-inline: 0.5ch;
+				}
+				.Rebase .summary,
+				.Rebase .carries {
+					grid-column: 1 / -1;
+				}
+				.Rebase .bar {
+					position: absolute;
+					left: 0;
+					right: 0;
+					bottom: 0;
+					height: 3px;
+				}
+				.Rebase .acts button {
+					padding: 0 0.5ch;
+				}
+			}
+			/* A history rewrite's divider offers Undo (task z71). */
+			.Card.divider .undo {
+				margin-left: 1ch;
+				padding: 0 1ch;
+				background: transparent;
+				color: inherit;
+				box-shadow: inset 0 0 0 1px currentColor;
+			}
+			@media (pointer: coarse) {
+				.Card.divider .undo {
+					min-height: 44px;
+					min-width: 44px;
+				}
+			}
+			/* The theme (src/common/colors.ts), put here by the host. */
+			/*COLORS*/
+		</style>
+	</head>
+	<body>
+		<!-- The browser's settings from config.ason, put here per request. -->
+		<script type="application/json" id="settings">
+			/*SETTINGS*/
+		</script>
+		<script type="application/json" id="send-keys">
+			/*SEND_KEYS*/
+		</script>
+		<script type="application/json" id="push-key">
+			/*PUSH_KEY*/
+		</script>
+		<script>
+			/*APP*/
+		</script>
+	</body>
 </html>

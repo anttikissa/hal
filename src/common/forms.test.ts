@@ -2,7 +2,10 @@ import { expect, test } from 'bun:test'
 import { forms, type Field, type Form, type FormState, type Key } from './forms.ts'
 import type { HistoryRecord } from './replay.ts'
 
-const name: Form = { text: 'How should I call you?', fields: [{ type: 'text', name: 'name', placeholder: 'leave empty to stay nameless' }] }
+const name: Form = {
+	text: 'How should I call you?',
+	fields: [{ type: 'text', name: 'name', placeholder: 'leave empty to stay nameless' }],
+}
 const yesNo: Form = { text: 'Create it?', fields: [{ type: 'choice', name: 'ok', options: ['yes', 'no'], initial: 1 }] }
 const login: Form = {
 	text: 'Log in',
@@ -13,7 +16,11 @@ const login: Form = {
 	],
 }
 
-const k = (key: string, text?: string, mods: Partial<Key> = {}): Key => ({ key, ...(text === undefined ? {} : { text }), ...mods })
+const k = (key: string, text?: string, mods: Partial<Key> = {}): Key => ({
+	key,
+	...(text === undefined ? {} : { text }),
+	...mods,
+})
 const typed = (s: string) => [...s].map((c) => k(c, c))
 
 // Presses keys in order; the last action, if any.
@@ -24,7 +31,15 @@ function press(st: FormState, keys: Key[]) {
 }
 
 test('a text answer is typed, edited by grapheme and submitted with Enter', () => {
-	let { st, action } = press(forms.start('q1', name), [...typed('Dav'), k('paste', 'e👍🏽'), k('backspace'), k('left'), k('home'), k('x', 'x'), k('enter')])
+	let { st, action } = press(forms.start('q1', name), [
+		...typed('Dav'),
+		k('paste', 'e👍🏽'),
+		k('backspace'),
+		k('left'),
+		k('home'),
+		k('x', 'x'),
+		k('enter'),
+	])
 	expect(action).toEqual({ type: 'submit', answers: { name: 'xDave' } })
 	expect(st.values).toEqual(['xDave'])
 })
@@ -34,7 +49,10 @@ test('an empty text is a valid answer', () => {
 })
 
 test('a pasted newline stays one line', () => {
-	expect(press(forms.start('q1', name), [k('paste', 'a\nb'), k('enter')]).action).toEqual({ type: 'submit', answers: { name: 'a b' } })
+	expect(press(forms.start('q1', name), [k('paste', 'a\nb'), k('enter')]).action).toEqual({
+		type: 'submit',
+		answers: { name: 'a b' },
+	})
 })
 
 test('a text field has the prompt basic line keys', () => {
@@ -42,7 +60,10 @@ test('a text field has the prompt basic line keys', () => {
 	let run = (keys: Key[]) => press(forms.start('q1', name), [...typed('one two three'), ...keys]).st
 	expect(run([k('left'), k('left'), ctrl('u')])).toMatchObject({ values: ['ee'], cursor: 0 })
 	expect(run([ctrl('a'), k('right'), ctrl('k')])).toMatchObject({ values: ['o'], cursor: 1 })
-	expect(run([ctrl('a'), ctrl('e'), k('backspace', undefined, { alt: true })])).toMatchObject({ values: ['one two '], cursor: 8 })
+	expect(run([ctrl('a'), ctrl('e'), k('backspace', undefined, { alt: true })])).toMatchObject({
+		values: ['one two '],
+		cursor: 8,
+	})
 })
 
 test('y/N: Enter takes the default, y answers at once, arrows change it', () => {
@@ -56,7 +77,14 @@ test('y/N: Enter takes the default, y answers at once, arrows change it', () => 
 })
 
 test('choice options form a column: arrows move down it and past its ends to other fields', () => {
-	let form: Form = { text: 'Pick', fields: [{ type: 'text', name: 'who' }, { type: 'choice', name: 'c', options: ['a', 'b', 'c'] }, { type: 'text', name: 'why' }] }
+	let form: Form = {
+		text: 'Pick',
+		fields: [
+			{ type: 'text', name: 'who' },
+			{ type: 'choice', name: 'c', options: ['a', 'b', 'c'] },
+			{ type: 'text', name: 'why' },
+		],
+	}
 	let st = press(forms.start('q', form), [k('down')]).st
 	expect(st).toMatchObject({ focus: 1, values: ['', 'a', ''] })
 	// Right is down and left is up, and neither wraps round.
@@ -71,28 +99,57 @@ test('choice options form a column: arrows move down it and past its ends to oth
 })
 
 test('inline choices: left/right change the value, up/down move between rows; cards preview the values', () => {
-	let row = (name: string, cards: string): Field => ({ type: 'choice', name, options: ['short', 'medium', 'long'], initial: 1, inline: true, cards })
+	let row = (name: string, cards: string): Field => ({
+		type: 'choice',
+		name,
+		options: ['short', 'medium', 'long'],
+		initial: 1,
+		inline: true,
+		cards,
+	})
 	let st = forms.start('q', { text: 'How verbose?', fields: [row('tool', 'tool'), row('thinking', 'thinking')] })
 	expect(press(st, [k('right'), k('right')]).st.values).toEqual(['long', 'medium'])
 	expect(press(st, [k('left'), k('left')]).st.values).toEqual(['short', 'medium'])
 	let down = press(st, [k('down'), k('left')]).st
 	expect(down).toMatchObject({ focus: 1, values: ['medium', 'short'] })
 	expect(press(down, [k('up')]).st.focus).toBe(0)
-	expect(forms.cards<Record<string, string>>(down, { bash: 'long' })).toEqual({ bash: 'long', tool: 'medium', thinking: 'short' })
+	expect(forms.cards<Record<string, string>>(down, { bash: 'long' })).toEqual({
+		bash: 'long',
+		tool: 'medium',
+		thinking: 'short',
+	})
 	expect(forms.cards(undefined, { bash: 'long' })).toEqual({ bash: 'long' })
 })
 
 test('a single option is "press Enter"', () => {
 	let form: Form = { text: 'Welcome', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] }
-	expect(press(forms.start('q', form), [k('right'), k('enter')]).action).toEqual({ type: 'submit', answers: { go: 'continue' } })
+	expect(press(forms.start('q', form), [k('right'), k('enter')]).action).toEqual({
+		type: 'submit',
+		answers: { go: 'continue' },
+	})
 })
 
 test('several fields: Enter and Tab go to the next, Shift-Tab and up back; the last Enter submits', () => {
-	let { st, action } = press(forms.start('q', login), [...typed('ann'), k('enter'), ...typed('sk-1'), k('tab'), k('n', 'n')])
+	let { st, action } = press(forms.start('q', login), [
+		...typed('ann'),
+		k('enter'),
+		...typed('sk-1'),
+		k('tab'),
+		k('n', 'n'),
+	])
 	// A typed initial on a multi-field form only selects.
 	expect(action).toBeUndefined()
 	expect(st.focus).toBe(2)
-	;({ st, action } = press(st, [k('tab', undefined, { shift: true }), k('backspace'), k('up'), k('end'), ...typed('e'), k('down'), k('down'), k('enter')]))
+	;({ st, action } = press(st, [
+		k('tab', undefined, { shift: true }),
+		k('backspace'),
+		k('up'),
+		k('end'),
+		...typed('e'),
+		k('down'),
+		k('down'),
+		k('enter'),
+	]))
 	expect(action).toEqual({ type: 'submit', answers: { user: 'anne', key: 'sk-', save: 'no' } })
 })
 
@@ -101,7 +158,12 @@ test('Escape cancels; the client sends a pause', () => {
 	let { action } = forms.step(st, k('escape'))
 	expect(action).toEqual({ type: 'cancel' })
 	expect(forms.command('s1', st, action!)).toEqual({ type: 'pause', sessionId: 's1' })
-	expect(forms.command('s1', st, { type: 'submit', answers: { name: 'D' } })).toEqual({ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'D' } })
+	expect(forms.command('s1', st, { type: 'submit', answers: { name: 'D' } })).toEqual({
+		type: 'answer',
+		sessionId: 's1',
+		question: 'q1',
+		answers: { name: 'D' },
+	})
 })
 
 test('check refuses answers that do not fit the form', () => {
@@ -119,7 +181,15 @@ test('invalid refuses forms no client could fill in', () => {
 	expect(forms.invalid(login)).toBeUndefined()
 	expect(forms.invalid({ text: 'x', fields: [] })).toBeString()
 	expect(forms.invalid({ text: 'x', fields: [{ type: 'choice', name: 'a', options: [] }] })).toBeString()
-	expect(forms.invalid({ text: 'x', fields: [{ type: 'text', name: 'a' }, { type: 'text', name: 'a' }] })).toBeString()
+	expect(
+		forms.invalid({
+			text: 'x',
+			fields: [
+				{ type: 'text', name: 'a' },
+				{ type: 'text', name: 'a' },
+			],
+		}),
+	).toBeString()
 	let field = { type: 'text' as const, name: 'a' }
 	expect(forms.invalid({ text: 'x', quote: { text: 'rm -rf x', marks: [[0, 8]] }, fields: [field] })).toBeUndefined()
 	for (let marks of [[[0, 9]], [[3, 2]], [[-1, 2]], [[0.5, 2]], [0, 1]] as any[]) {
@@ -146,7 +216,9 @@ test('the open question is the last one in the unfinished turn, until answered',
 	let cmd: HistoryRecord = { type: 'question', id: 'c1', form: name, from: { command: 'cd', args: 'x' }, ts }
 	let end = { type: 'turn_end' as const, status: 'completed' as const, usage: {}, ts }
 	expect(forms.open([cmd, prompt, end])?.id).toBe('c1')
-	expect(forms.open([cmd, { type: 'answer', question: 'c1', answers: {}, canceled: true, ts }, prompt, end])).toBeUndefined()
+	expect(
+		forms.open([cmd, { type: 'answer', question: 'c1', answers: {}, canceled: true, ts }, prompt, end]),
+	).toBeUndefined()
 })
 
 test('a client keeps what was typed while the same question is open, and starts afresh for the next', () => {
@@ -157,7 +229,14 @@ test('a client keeps what was typed while the same question is open, and starts 
 })
 
 test('a quote cuts into plain and marked parts in order, overlapping marks merged', () => {
-	let parts = forms.quoteParts({ text: 'ls; rm -rf a; git reset --hard', marks: [[14, 30], [4, 12], [6, 9]] })
+	let parts = forms.quoteParts({
+		text: 'ls; rm -rf a; git reset --hard',
+		marks: [
+			[14, 30],
+			[4, 12],
+			[6, 9],
+		],
+	})
 	expect(parts).toEqual([
 		{ text: 'ls; ', marked: false },
 		{ text: 'rm -rf a', marked: true },

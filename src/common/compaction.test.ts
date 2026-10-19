@@ -6,8 +6,18 @@ const ts = '2026-01-01T10:00:00.000Z'
 let n = 0
 const prompt = (text: string): HistoryRecord => ({ type: 'user', blocks: [{ type: 'text', text }], ts, n: ++n })
 const say = (text: string): HistoryRecord => ({ type: 'assistant', block: { type: 'text', text }, ts, n: ++n })
-const call = (id: string): HistoryRecord => ({ type: 'assistant', block: { type: 'tool_call', id, name: 'bash', input: {} }, ts, n: ++n })
-const result = (id: string): HistoryRecord => ({ type: 'user', blocks: [{ type: 'tool_result', id, output: 'x' }], ts, n: ++n })
+const call = (id: string): HistoryRecord => ({
+	type: 'assistant',
+	block: { type: 'tool_call', id, name: 'bash', input: {} },
+	ts,
+	n: ++n,
+})
+const result = (id: string): HistoryRecord => ({
+	type: 'user',
+	blocks: [{ type: 'tool_result', id, output: 'x' }],
+	ts,
+	n: ++n,
+})
 const end = (): HistoryRecord => ({ type: 'turn_end', status: 'completed', usage: {}, ts, n: ++n })
 
 // A turn: the prompt, one tool call and result, the answer.
@@ -22,13 +32,29 @@ function session(turnsCount: number): HistoryRecord[] {
 
 test('keeps the first prompt and answer, the last three prompts and answers, and counts the rest', () => {
 	let records = session(6)
-	for (let i = 0; i < 3; i++) records.push({ type: 'user', blocks: [], notices: [{ source: ++n, text: '<meta>A setting changed.</meta>' }], ts, n: ++n })
+	for (let i = 0; i < 3; i++)
+		records.push({
+			type: 'user',
+			blocks: [],
+			notices: [{ source: ++n, text: '<meta>A setting changed.</meta>' }],
+			ts,
+			n: ++n,
+		})
 	let made = compaction.summary(records, '/h/history.asonl')!
 	expect(made.prompts).toBe(6)
 	let lines = made.summary.split('\n')
 	expect(lines[0]).toBe('Context was compacted to avoid exceeding the token limit. Verify before assuming.')
 	let kept = lines.filter((l) => /^\[\d+\] (user|assistant):/.test(l)).map((l) => l.replace(/^\[\d+\] /, ''))
-	expect(kept).toEqual(['user: p1', 'assistant: a1', 'user: p4', 'assistant: a4', 'user: p5', 'assistant: a5', 'user: p6', 'assistant: a6'])
+	expect(kept).toEqual([
+		'user: p1',
+		'assistant: a1',
+		'user: p4',
+		'assistant: a4',
+		'user: p5',
+		'assistant: a5',
+		'user: p6',
+		'assistant: a6',
+	])
 	// Turns 2 and 3, and each kept turn's call and result, are one line
 	// each, under the omitted records' numbers.
 	expect(made.summary).toContain('\n[6-14] 2 tool calls, 2 tool results, 2 assistant blocks, 2 prompts omitted\n')
@@ -39,7 +65,10 @@ test('keeps the first prompt and answer, the last three prompts and answers, and
 test('empty history has no summary; protected-prompt context still summarizes remaining blocks', () => {
 	n = 0
 	expect(compaction.summary([], '/h')).toBeUndefined()
-	expect(compaction.summary([say('hi')], '/h')).toMatchObject({ prompts: 0, summary: expect.stringContaining('1 assistant block omitted') })
+	expect(compaction.summary([say('hi')], '/h')).toMatchObject({
+		prompts: 0,
+		summary: expect.stringContaining('1 assistant block omitted'),
+	})
 })
 
 test('long assistant text keeps its head and tail with a size marker', () => {

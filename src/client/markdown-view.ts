@@ -10,7 +10,6 @@ import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { ansi } from './ansi.ts'
 
-
 // Code in the style's code color, then back to its fg; plain in a
 // monochrome terminal or a style without one.
 function code(text: string, style: Style | undefined): string {
@@ -79,9 +78,14 @@ function fit(natural: number[], words: number[], room: number): number[] {
 function table(rows: Run[][][], width: number, style?: Style): string[] {
 	let n = Math.max(...rows.map((r) => r.length))
 	let plain = (c: Run[] | undefined) => (c ?? []).map((r) => r.text).join('')
-	let col = (f: (s: string) => number) => Array.from({ length: n }, (_, i) => Math.max(1, ...rows.flatMap((r) => plain(r[i]).split('\n').map(f))))
+	let col = (f: (s: string) => number) =>
+		Array.from({ length: n }, (_, i) => Math.max(1, ...rows.flatMap((r) => plain(r[i]).split('\n').map(f))))
 	let words = col((s) => Math.max(0, ...s.split(/\s+/).map((w) => strings.visLen(w))))
-	let w = markdownView.fit(col((s) => strings.visLen(s)), words, width - 3 * n - 1)
+	let w = markdownView.fit(
+		col((s) => strings.visLen(s)),
+		words,
+		width - 3 * n - 1,
+	)
 	let rule = (l: string, m: string, r: string) => ansi.quiet(l + w.map((x) => '─'.repeat(x + 2)).join(m) + r, style)
 	let bar = ansi.quiet('│', style)
 	let out = [rule('┌', '┬', '┐')]
@@ -116,7 +120,15 @@ function block(b: Block, width: number, style?: Style): string[] {
 		// The closing fence's row stays blank so a streaming reply never loses
 		// a row; lines() drops the blank line after it, avoiding a double gap.
 		let close = b.close === undefined ? [] : ['']
-		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => b.lang === 'diff' ? diffView.paint(r, diff.tone(l), style) : markdownView.code(r, style))), ...close]
+		return [
+			...lang,
+			...b.lines.flatMap((l) =>
+				ansi
+					.wrap(l, width)
+					.map((r) => (b.lang === 'diff' ? diffView.paint(r, diff.tone(l), style) : markdownView.code(r, style))),
+			),
+			...close,
+		]
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)

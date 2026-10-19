@@ -34,7 +34,11 @@ function run(name: string, args = ''): void {
 	if (local && (!args || args === commandList.byName(name)?.keyArgs)) return local.run()
 	let id = app.state.transcript?.meta.id
 	if (id === undefined) return
-	app.send(name === 'model' ? { type: 'models', sessionId: id } : { type: 'submit', sessionId: id, text: `/${name}${args ? ` ${args}` : ''}` })
+	app.send(
+		name === 'model'
+			? { type: 'models', sessionId: id }
+			: { type: 'submit', sessionId: id, text: `/${name}${args ? ` ${args}` : ''}` },
+	)
 }
 
 // A command's key: true if `k` was one (and it ran).
@@ -54,7 +58,12 @@ function typed(text: string): boolean {
 	// Bare /restart means all and goes to the host; only `local` is ours.
 	if (t === '/restart') return false
 	let name = /^\/restart\s+local$/.test(t) ? 'restart' : /^\/([a-z][a-z0-9-]*)$/.exec(t)?.[1]
-	if (name !== 'restart' && name !== 'redraw' && (!name || !commandList.byName(name)?.clientOnly || !clientCommands.all[name])) return false
+	if (
+		name !== 'restart' &&
+		name !== 'redraw' &&
+		(!name || !commandList.byName(name)?.clientOnly || !clientCommands.all[name])
+	)
+		return false
 	let id = app.state.transcript?.meta.id
 	if (id !== undefined) drafts.edit(id, '')
 	clientCommands.run(name)

@@ -16,7 +16,12 @@ function strip(s: string): string {
 }
 
 function view(state: SessionState, text = '', items: Item[] = []): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
+	let transcript: Transcript = {
+		meta: { id: 's', cwd: '/', model: 'm', createdAt: '' },
+		state,
+		inbox: [],
+		items: items.map((item, i) => ({ ...item, key: `~${i}` })),
+	}
 	return { transcript, prompt: { text, cursor: text.length } }
 }
 
@@ -31,7 +36,9 @@ test('each state shows its key hints, with /keys at the right', () => {
 	// Blank text is no text.
 	expect(help(view(idle, '  \n'))).toBe('/keys: shortcuts')
 	expect(help(view(running))).toMatch(/^esc: pause +\/keys/)
-	expect(help(view(running, 'more'), 140)).toMatch(/^enter: steer, ctrl-enter: soft-steer, shift-enter: newline, alt-enter: queue, esc: pause +\/keys/)
+	expect(help(view(running, 'more'), 140)).toMatch(
+		/^enter: steer, ctrl-enter: soft-steer, shift-enter: newline, alt-enter: queue, esc: pause +\/keys/,
+	)
 	expect(help(view({ type: 'retrying', at: '', reason: 'overloaded' }))).toMatch(/^enter: retry now, esc: pause /)
 	expect(help(view({ type: 'paused' }))).toMatch(/^enter: continue +\/keys/)
 	expect(help(view({ type: 'error', message: 'boom' }))).toMatch(/^enter: retry +\/keys/)
@@ -43,7 +50,10 @@ test('each state shows its key hints, with /keys at the right', () => {
 
 test('a question, then editing, then completion choices outrank the key hints', () => {
 	let form = { text: 'Run?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
-	let asked = { ...view({ type: 'blocked', reason: 'question' }, 'x', [{ type: 'question', id: 'q', form }]), form: forms.start('q', form) }
+	let asked = {
+		...view({ type: 'blocked', reason: 'question' }, 'x', [{ type: 'question', id: 'q', form }]),
+		form: forms.start('q', form),
+	}
 	let all: View = { ...asked, editing: 'editing the last prompt', choices: ['/cd a', '/cd b'] }
 	expect(help(all)).toMatch(/choose.*enter: submit, esc: pause/)
 	expect(help({ ...all, form: undefined })).toBe('editing the last prompt')
@@ -59,7 +69,12 @@ test('the chrome keeps its height: choices, a question and working change only t
 	expect(chrome({ ...idle, choices: many })).toBe(base)
 	expect(strings.visLen(frame.build({ ...idle, choices: many }, 60).lines.at(-1)!)).toBeLessThanOrEqual(60)
 	expect(chrome({ ...view(running, '/c'), activity: 'processing' })).toBe(base)
-	expect(chrome({ ...idle, editing: 'editing the last prompt: Enter sends it, Down or Escape continues, and more words than fit' })).toBe(base)
+	expect(
+		chrome({
+			...idle,
+			editing: 'editing the last prompt: Enter sends it, Down or Escape continues, and more words than fit',
+		}),
+	).toBe(base)
 	// A question adds its own rows above the chrome, never below it.
 	let form = { text: 'Name?', fields: [{ type: 'text' as const, name: 'n' }] }
 	let q: Item = { type: 'question', id: 'q', form }

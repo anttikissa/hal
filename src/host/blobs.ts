@@ -42,7 +42,8 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 
 // The bytes of an attachment's base64 `data`; throws why it is refused.
 function decode(mediaType: string, data: string): Buffer {
-	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream') throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
+	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream')
+		throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
 	let max = attachments.maxBytes
 	// Checked before decoding: base64 is 4 characters per 3 bytes.
 	if (data.length > Math.ceil(max / 3) * 4) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
@@ -71,7 +72,8 @@ function store(sessionId: string, mediaType: string, data: string): Stored {
 // paths.fileDir(name)/<name>; throws why it is refused. The same bytes
 // again (a resend) are fine; other bytes under a taken name are not.
 function stage(name: string, mediaType: string, data: string): Stored {
-	if (attachments.nameType(name) !== mediaType) throw new Error(`file name ${JSON.stringify(name)} does not fit ${mediaType}`)
+	if (attachments.nameType(name) !== mediaType)
+		throw new Error(`file name ${JSON.stringify(name)} does not fit ${mediaType}`)
 	let bytes = blobs.decode(mediaType, data)
 	let path = `${paths.fileDir(name)}/${name}`
 	if (existsSync(path)) {
@@ -142,7 +144,15 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 	let found = blobs.find(sessionId, m.blob)
 	if (m.file) {
 		let mediaType = attachments.nameType(m.file)
-		if (!mediaType || (m.kind === 'paste' ? mediaType !== 'text/plain' : m.kind === 'file' ? mediaType !== 'application/octet-stream' : !mediaType.startsWith('image/'))) return undefined
+		if (
+			!mediaType ||
+			(m.kind === 'paste'
+				? mediaType !== 'text/plain'
+				: m.kind === 'file'
+					? mediaType !== 'application/octet-stream'
+					: !mediaType.startsWith('image/'))
+		)
+			return undefined
 		let own = `${blobs.dir(sessionId)}/${m.file}`
 		if (mediaType && existsSync(own)) found = { path: own, mediaType }
 		if (found) return found.mediaType === mediaType ? found : undefined
@@ -153,7 +163,14 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 		writeFileSync(path, fresh.bytes, { mode: 0o600 })
 		return { path, mediaType: fresh.mediaType }
 	}
-	return found && (m.kind === 'paste' ? found.mediaType === 'text/plain' : m.kind === 'file' ? found.mediaType === 'application/octet-stream' : found.mediaType.startsWith('image/')) ? found : undefined
+	return found &&
+		(m.kind === 'paste'
+			? found.mediaType === 'text/plain'
+			: m.kind === 'file'
+				? found.mediaType === 'application/octet-stream'
+				: found.mediaType.startsWith('image/'))
+		? found
+		: undefined
 }
 
 // The markers in `text` that name no blob of the session.
@@ -176,7 +193,8 @@ function resolve(sessionId: string, texts: string[]): { blocks: UserBlock[]; unk
 		for (let m of attachments.markers(text)) {
 			let found = blobs.named(sessionId, m)
 			if (!found) unknown.push(m.text)
-			else if (m.kind === 'image' && !images.some((b) => b.blob === m.blob)) images.push({ type: 'image', blob: m.blob, mediaType: found.mediaType, bytes: statSync(found.path).size })
+			else if (m.kind === 'image' && !images.some((b) => b.blob === m.blob))
+				images.push({ type: 'image', blob: m.blob, mediaType: found.mediaType, bytes: statSync(found.path).size })
 		}
 	}
 	return { blocks: [...texts.map((text) => ({ type: 'text' as const, text })), ...images], unknown }
@@ -191,8 +209,12 @@ function expand(sessionId: string, text: string): string {
 		if (m.kind !== 'paste' && m.kind !== 'file') continue
 		let found = blobs.named(sessionId, m)
 		if (!found) continue
-		let path = m.file && existsSync(`${paths.fileDir(m.file)}/${m.file}`) ? `${paths.fileDir(m.file)}/${m.file}` : found.path
-		parts.push(text.slice(from, m.at), m.kind === 'file' ? `${m.text} (read with bash: ${path})` : readFileSync(found.path, 'utf8'))
+		let path =
+			m.file && existsSync(`${paths.fileDir(m.file)}/${m.file}`) ? `${paths.fileDir(m.file)}/${m.file}` : found.path
+		parts.push(
+			text.slice(from, m.at),
+			m.kind === 'file' ? `${m.text} (read with bash: ${path})` : readFileSync(found.path, 'utf8'),
+		)
 		from = m.at + m.text.length
 	}
 	if (!from) return text
@@ -218,8 +240,34 @@ function storeOutput(sessionId: string, text: string): { blob: string; path: str
 // allows (file checks), only text, at most pasteMax bytes.
 function pasteText(sessionId: string, name: string): Event & { type: 'paste-text' } {
 	let found = blobs.file(name)
-	let error = !found || found.mediaType !== 'text/plain' ? `no paste ${name}` : found.bytes.length > blobs.pasteMax ? `paste ${name} is too big to show inline (${found.bytes.length} bytes): ${found.tmp ?? found.blobs[0]}` : undefined
-	return error ? { type: 'paste-text', sessionId, name, error } : { type: 'paste-text', sessionId, name, text: found!.bytes.toString('utf8') }
+	let error =
+		!found || found.mediaType !== 'text/plain'
+			? `no paste ${name}`
+			: found.bytes.length > blobs.pasteMax
+				? `paste ${name} is too big to show inline (${found.bytes.length} bytes): ${found.tmp ?? found.blobs[0]}`
+				: undefined
+	return error
+		? { type: 'paste-text', sessionId, name, error }
+		: { type: 'paste-text', sessionId, name, text: found!.bytes.toString('utf8') }
 }
 
-export const blobs = { pasteMax: 1_000_000, pasteText, dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, text, base64, named, unknown, resolve, expand }
+export const blobs = {
+	pasteMax: 1_000_000,
+	pasteText,
+	dir,
+	looksLike,
+	decode,
+	store,
+	storeOutput,
+	stage,
+	staged,
+	file,
+	find,
+	read,
+	text,
+	base64,
+	named,
+	unknown,
+	resolve,
+	expand,
+}

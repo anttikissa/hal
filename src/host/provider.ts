@@ -35,7 +35,13 @@ export type ProviderRequest = {
 // (rate limits are per account; a 401 is reported back by name).
 // `encoding` compresses the body, for endpoints verified to accept it:
 // HTTP re-sends the whole conversation every round.
-export type HttpRequest = { url: string; headers: Record<string, string>; body: unknown; account?: string; encoding?: 'zstd' | 'gzip' }
+export type HttpRequest = {
+	url: string
+	headers: Record<string, string>
+	body: unknown
+	account?: string
+	encoding?: 'zstd' | 'gzip'
+}
 
 type Failure = NonNullable<ErrorEvent['failure']>
 
@@ -173,14 +179,19 @@ function failure(status: number | undefined): Failure | undefined {
 // with 429) and Anthropic (400 "credit balance is too low") say it.
 function noCredits(e: ErrorEvent): boolean {
 	if (e.status === 402) return true
-	return /insufficient_quota|billing_hard_limit_reached|billing_not_active|credit balance is too low/i.test(`${e.body ?? ''} ${e.message}`)
+	return /insufficient_quota|billing_hard_limit_reached|billing_not_active|credit balance is too low/i.test(
+		`${e.body ?? ''} ${e.message}`,
+	)
 }
 
 // The model is refused for this account's plan, not for everyone: OpenAI
 // answers 400 "model is not supported when using Codex with a ChatGPT
 // account" once a subscription lapses to free.
 function notOnAccount(e: ErrorEvent): boolean {
-	return (e.status === 400 || e.status === 403) && /not supported when using Codex with a ChatGPT account/i.test(`${e.body ?? ''} ${e.message}`)
+	return (
+		(e.status === 400 || e.status === 403) &&
+		/not supported when using Codex with a ChatGPT account/i.test(`${e.body ?? ''} ${e.message}`)
+	)
 }
 
 // The provider's own words from an error body, for the user.
@@ -224,7 +235,10 @@ async function who(kind: string, name: string | undefined, status: number): Prom
 	let find = () => auth.all(kind).list.find((a) => a.name === name)
 	let account = find()
 	if (!account) return ` (${name})`
-	let changed = kind === 'openai' && (status === 400 || status === 403) ? await statusUsage.refresh(kind, account).catch(() => undefined) : undefined
+	let changed =
+		kind === 'openai' && (status === 400 || status === 403)
+			? await statusUsage.refresh(kind, account).catch(() => undefined)
+			: undefined
 	let entry = find()?.entry ?? account.entry
 	let label = [entry.email ?? name, entry.plan].filter(Boolean).join(', ')
 	return ` (${label}${changed ? `; plan changed ${changed}` : ''})`
@@ -234,7 +248,9 @@ async function who(kind: string, name: string | undefined, status: number): Prom
 // the 429 itself may not say, and guessing a minute retries the
 // account every minute for hours.
 function spentUntil(kind: string, account: string): number | undefined {
-	let times = Object.values(usage.windows(kind, account)).filter((w) => w.used >= 100 && w.resets).map((w) => Date.parse(w.resets!))
+	let times = Object.values(usage.windows(kind, account))
+		.filter((w) => w.used >= 100 && w.resets)
+		.map((w) => Date.parse(w.resets!))
 	return times.length ? Math.max(...times) : undefined
 }
 
@@ -262,7 +278,10 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 			// A subscription's models share one quota, except a model with
 			// its own credits (Anthropic credits_required: Fable).
 			let own = /credits_required/.test(e.body ?? '') ? modelId : modelId.split('/')[0]!
-			limits.set(limits.key(own, account), reset ?? spentUntil(modelId.split('/')[0]!, account) ?? now + provider.accountLimitMs)
+			limits.set(
+				limits.key(own, account),
+				reset ?? spentUntil(modelId.split('/')[0]!, account) ?? now + provider.accountLimitMs,
+			)
 			e.retryAt = now
 		} else if (reset !== undefined) {
 			limits.set(limits.key(modelId), reset)
@@ -290,8 +309,12 @@ async function* stream(
 		return
 	}
 	let p: Provider | undefined
-	try { p = Object.hasOwn(provider.state.providers, id.provider) ? provider.state.providers[id.provider] : undefined }
-	catch (e) { yield { type: 'error', message: errorText(e) }; return }
+	try {
+		p = Object.hasOwn(provider.state.providers, id.provider) ? provider.state.providers[id.provider] : undefined
+	} catch (e) {
+		yield { type: 'error', message: errorText(e) }
+		return
+	}
 	if (!p) {
 		let known = Object.keys(provider.state.providers).join(', ') || 'none'
 		yield { type: 'error', message: `Unknown provider '${id.provider}' (known: ${known})` }
@@ -318,12 +341,18 @@ async function* stream(
 		let socket = await p.open?.(http, { ...input, model: id.model })
 		let res: Response
 		try {
-			res = socket ? new Response(socket) : await provider.fetch(http.url, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', ...(http.encoding && { 'content-encoding': http.encoding }), ...http.headers },
-				body: encode(JSON.stringify(http.body), http.encoding),
-				signal: conn.signal,
-			})
+			res = socket
+				? new Response(socket)
+				: await provider.fetch(http.url, {
+						method: 'POST',
+						headers: {
+							'content-type': 'application/json',
+							...(http.encoding && { 'content-encoding': http.encoding }),
+							...http.headers,
+						},
+						body: encode(JSON.stringify(http.body), http.encoding),
+						signal: conn.signal,
+					})
 		} catch (e) {
 			if (e instanceof Error) (e as { failure?: Failure }).failure ??= 'temporary'
 			throw e
@@ -334,7 +363,13 @@ async function* stream(
 			let message = `HTTP ${res.status} from ${id.provider}${await who(id.provider, http.account, res.status)}`
 			let text = provider.detail(body)
 			if (text) message += `: ${text}`
-			yield failed(p, modelId, http.account, { type: 'error', message, status: res.status, body }, provider.resetAt(res.headers, body))
+			yield failed(
+				p,
+				modelId,
+				http.account,
+				{ type: 'error', message, status: res.status, body },
+				provider.resetAt(res.headers, body),
+			)
 			return
 		}
 		let counted: { input?: number; cacheRead?: number; cacheWrite?: number } = {}
@@ -348,9 +383,21 @@ async function* stream(
 				Object.assign(counted, event.usage)
 				if (http.account) event = { ...event, account: http.account }
 			}
-			if (event.type === 'done' && !input.messages.some((m) => m.blocks.some((b) => b.type === 'image' || (b.type === 'tool_result' && blocks.resultImages(b).length)))) {
-				let chars = tokenEstimates.characters(input.messages, (input.system?.length ?? 0) + JSON.stringify(input.tools ?? []).length)
-				tokenCalibration.observe(modelId, chars, (counted.input ?? 0) + (counted.cacheRead ?? 0) + (counted.cacheWrite ?? 0))
+			if (
+				event.type === 'done' &&
+				!input.messages.some((m) =>
+					m.blocks.some((b) => b.type === 'image' || (b.type === 'tool_result' && blocks.resultImages(b).length)),
+				)
+			) {
+				let chars = tokenEstimates.characters(
+					input.messages,
+					(input.system?.length ?? 0) + JSON.stringify(input.tools ?? []).length,
+				)
+				tokenCalibration.observe(
+					modelId,
+					chars,
+					(counted.input ?? 0) + (counted.cacheRead ?? 0) + (counted.cacheWrite ?? 0),
+				)
 			}
 			yield event
 			if (event.type === 'done') return

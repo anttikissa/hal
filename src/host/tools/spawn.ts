@@ -22,7 +22,11 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 export const tool: Tool = {
 	name: 'spawn',
 	// task is required unless kind is interactive, so the schema cannot require it.
-	syntax: { summary: false, aliases: { title: 'name', goal: 'task' }, usage: ['SPAWN { task, [ kind, mode, model, cwd, name, limit ] }       // "[ ]" here means optional, not an array'] },
+	syntax: {
+		summary: false,
+		aliases: { title: 'name', goal: 'task' },
+		usage: ['SPAWN { task, [ kind, mode, model, cwd, name, limit ] }       // "[ ]" here means optional, not an array'],
+	},
 	description:
 		'Open a session in the tab after this one. subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a session for the user. A <question> keeps a subagent open; answer through SEND. HELP SUBAGENTS covers coordination and resuming.',
 	parameters: {
@@ -30,11 +34,20 @@ export const tool: Tool = {
 		properties: {
 			task: { type: 'string', description: 'What the session should do. Required unless kind is interactive.' },
 			kind: { type: 'string', enum: kinds, description: 'Default subagent.' },
-			mode: { type: 'string', enum: ['fork', 'fresh'], description: 'fresh (default) starts with only the task; fork copies this session’s history so far.' },
+			mode: {
+				type: 'string',
+				enum: ['fork', 'fresh'],
+				description: 'fresh (default) starts with only the task; fork copies this session’s history so far.',
+			},
 			model: { type: 'string', description: 'Model for the session; default this session’s.' },
 			cwd: { type: 'string', description: 'Working directory; default this session’s.' },
 			name: { type: 'string', description: 'Brief, descriptive session name, e.g. "Review rendering regression".' },
-			limit: { type: 'integer', minimum: 0, description: 'Child spawn budget; default 0, at most this session’s slots left minus 1. Each subagent spawn costs one slot from this session and every owner ancestor. Interactive sessions are free and use the configured budget.' },
+			limit: {
+				type: 'integer',
+				minimum: 0,
+				description:
+					'Child spawn budget; default 0, at most this session’s slots left minus 1. Each subagent spawn costs one slot from this session and every owner ancestor. Interactive sessions are free and use the configured budget.',
+			},
 		},
 	},
 	async run(input, ctx) {
@@ -43,16 +56,32 @@ export const tool: Tool = {
 		let mode = input.mode ?? 'fresh'
 		if (mode !== 'fork' && mode !== 'fresh') throw new Error('mode must be fork or fresh')
 		let limit = input.limit ?? 0
-		if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0) throw new Error('limit must be a non-negative integer')
+		if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0)
+			throw new Error('limit must be a non-negative integer')
 		let task = text(input, 'task') ?? ''
 		if (!task && kind !== 'interactive') throw new Error('task is required unless kind is interactive')
 		let model = text(input, 'model')
 		let note = ''
-		if (model !== undefined) { let selected = models.selection(model); if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`); model = models.qualified(selected.id, selected.effort); if (selected.note) note = ` Effort: ${selected.note}.` }
+		if (model !== undefined) {
+			let selected = models.selection(model)
+			if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`)
+			model = models.qualified(selected.id, selected.effort)
+			if (selected.note) note = ` Effort: ${selected.note}.`
+		}
 		let cwd = resolve(ctx.cwd, text(input, 'cwd') ?? '.')
 		if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${cwd} is not a directory`)
-		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit, callId: ctx.callId })
-		if (kind === 'interactive') return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.${note}`
+		let id = subagents.spawn(ctx.sessionId, {
+			kind,
+			task,
+			fork: mode === 'fork',
+			cwd,
+			model,
+			name: text(input, 'name'),
+			limit,
+			callId: ctx.callId,
+		})
+		if (kind === 'interactive')
+			return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.${note}`
 		return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.${note}`
 	},
 }

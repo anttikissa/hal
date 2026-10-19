@@ -44,8 +44,16 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 	let wake = () => {}
 	// Tool result headers (task c2t) have their own contract test in
 	// replay.test.ts; tests here check what the tools said.
-	let bare = (b: any) => b?.type === 'tool_result' && typeof b.output === 'string' ? { ...b, output: b.output.replace(/^\[[^\]\n]* [a-z]\d+[^\]\n]*\]\n/, '') } : b
-	input = input?.messages ? { ...input, messages: input.messages.map((m: any) => Array.isArray(m.blocks) ? { ...m, blocks: m.blocks.map(bare) } : m) } : input
+	let bare = (b: any) =>
+		b?.type === 'tool_result' && typeof b.output === 'string'
+			? { ...b, output: b.output.replace(/^\[[^\]\n]* [a-z]\d+[^\]\n]*\]\n/, '') }
+			: b
+	input = input?.messages
+		? {
+				...input,
+				messages: input.messages.map((m: any) => (Array.isArray(m.blocks) ? { ...m, blocks: m.blocks.map(bare) } : m)),
+			}
+		: input
 	let call: Call = {
 		model,
 		input,
@@ -169,17 +177,25 @@ export function restartHost() {
 // tests of what was said need not repeat.
 const HEAD = '\\[[\\d -]+:\\d\\d[^\\]\\n]*\\]\\n'
 // A tab label as a replay header names it (task c2t).
-export const heard = (label: string) => label.replace(/^(tab \d+) · ([^ ]+)(?: · (.*))?$/, (_, t, id, name) => `${t} (${id})${name ? `, ${name}` : ''}`)
-export const stamped = (text: string) => expect.stringMatching(new RegExp(`^${HEAD}${text.replaceAll('\n\n', `\n\n(?:${HEAD})?`)}$`))
+export const heard = (label: string) =>
+	label.replace(/^(tab \d+) · ([^ ]+)(?: · (.*))?$/, (_, t, id, name) => `${t} (${id})${name ? `, ${name}` : ''}`)
+export const stamped = (text: string) =>
+	expect.stringMatching(new RegExp(`^${HEAD}${text.replaceAll('\n\n', `\n\n(?:${HEAD})?`)}$`))
 
 // Items as shown, without their keys (task w5), for comparing with
 // literals; a live transcript and a fresh one compare keys too.
 // Items without key and header facts (time, model, effort: task hp),
 // which tests of what happened need not repeat.
-export const shown = (items: Item[] | undefined) => items?.map(({ key: _key, ...s }) => {
-	let { ts: _ts, model: _model, effort: _effort, ...rest } = s as typeof s & { ts?: string; model?: string; effort?: string }
-	return rest
-})
+export const shown = (items: Item[] | undefined) =>
+	items?.map(({ key: _key, ...s }) => {
+		let {
+			ts: _ts,
+			model: _model,
+			effort: _effort,
+			...rest
+		} = s as typeof s & { ts?: string; model?: string; effort?: string }
+		return rest
+	})
 
 export const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, n: _n, ...r }) => r)
 
@@ -189,4 +205,9 @@ export function toolSession(c: ReturnType<typeof client>): string {
 	return created(c, testHome())
 }
 
-export const readCall = (id = 't1'): StreamEvent => ({ type: 'tool_call', id, name: 'read', input: { path: 'notes.txt' } })
+export const readCall = (id = 't1'): StreamEvent => ({
+	type: 'tool_call',
+	id,
+	name: 'read',
+	input: { path: 'notes.txt' },
+})

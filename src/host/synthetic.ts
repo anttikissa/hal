@@ -10,7 +10,13 @@ import type { StreamEvent } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 
-export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; after?: () => void }
+export type Reply = {
+	say?: string
+	stream?: AsyncGenerator<StreamEvent>
+	ask?: Form
+	pause?: string
+	after?: () => void
+}
 export type Synthetic = (records: HistoryRecord[], answers?: Answers, sessionId?: string) => Reply
 
 function find(model: string): Synthetic | undefined {
@@ -23,7 +29,11 @@ const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms))
 // Text as a stream, like someone typing: word by word, a tenth of
 // pauseMs apart, and paragraphs a pause apart. Scripted scenes that
 // return raw events use it too, so they type like every other reply.
-async function* typed(say: string | undefined, kind: 'text' | 'thinking' = 'text', signal?: AbortSignal): AsyncGenerator<StreamEvent> {
+async function* typed(
+	say: string | undefined,
+	kind: 'text' | 'thinking' = 'text',
+	signal?: AbortSignal,
+): AsyncGenerator<StreamEvent> {
 	for (let [i, text] of (say?.split('\n\n') ?? []).entries()) {
 		if (i) await sleep(synthetic.pauseMs)
 		for (let [j, word] of text.split(/(?<=\s)/).entries()) {
@@ -43,11 +53,18 @@ async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenera
 
 export const synthetic = {
 	models: {
-		tool: (records, _answers, id) => (require('./tool-model.ts') as typeof import('./tool-model.ts')).toolModel.run(records, id!),
-		intro: (records, answers, id) => (require('./intro.ts') as typeof import('./intro.ts')).intro.run(records, answers, id),
-		'scroll-test': (records) => (require('./scroll-test.ts') as typeof import('./scroll-test.ts')).scrollTest.run(records),
+		tool: (records, _answers, id) =>
+			(require('./tool-model.ts') as typeof import('./tool-model.ts')).toolModel.run(records, id!),
+		intro: (records, answers, id) =>
+			(require('./intro.ts') as typeof import('./intro.ts')).intro.run(records, answers, id),
+		'scroll-test': (records) =>
+			(require('./scroll-test.ts') as typeof import('./scroll-test.ts')).scrollTest.run(records),
 		'queue-test': (records) => (require('./queue-test.ts') as typeof import('./queue-test.ts')).queueTest.run(records),
-		'plugin-sync': (_records, answers, id) => (require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.run(answers, id!),
+		'plugin-sync': (_records, answers, id) =>
+			(require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.run(
+				answers,
+				id!,
+			),
 	} as Record<string, Synthetic>,
 	descriptions: {
 		tool: 'Tool protocol server - no AI',

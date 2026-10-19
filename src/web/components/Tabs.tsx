@@ -24,16 +24,29 @@ const NAME = 12
 
 function Marker(props: { mark: Mark | undefined }) {
 	let marker!: HTMLSpanElement
-	createEffect(() => props.mark, (mark) => {
-		if (!mark?.blinks) return
-		let frame = requestAnimationFrame(() => {
-			for (let animation of marker.getAnimations()) animation.startTime = performance.now() - Date.now() % 2000
-		})
-		return () => cancelAnimationFrame(frame)
-	})
+	createEffect(
+		() => props.mark,
+		(mark) => {
+			if (!mark?.blinks) return
+			let frame = requestAnimationFrame(() => {
+				for (let animation of marker.getAnimations()) animation.startTime = performance.now() - (Date.now() % 2000)
+			})
+			return () => cancelAnimationFrame(frame)
+		},
+	)
 	return (
-		<span ref={(e) => (marker = e)} class={['marker', ...(props.mark ? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])] : [])]} role="img" aria-label={props.mark?.label}>
-			{props.mark?.glyph === '▪' ? '' : props.mark?.glyph ?? ''}
+		<span
+			ref={(e) => (marker = e)}
+			class={[
+				'marker',
+				...(props.mark
+					? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])]
+					: []),
+			]}
+			role="img"
+			aria-label={props.mark?.label}
+		>
+			{props.mark?.glyph === '▪' ? '' : (props.mark?.glyph ?? '')}
 		</span>
 	)
 }
@@ -83,25 +96,33 @@ function EdgeButton(props: { edge: Edge; left: boolean; active: boolean; onClick
 export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
 	let [touchProbe, setTouchProbe] = createSignal(false)
 	let [requested, setRequested] = createSignal(false)
-	let enable = () => void push.enable().then(() => setRequested(true)).catch((e) => alert(`Notifications: ${e.message}`))
+	let enable = () =>
+		void push
+			.enable()
+			.then(() => setRequested(true))
+			.catch((e) => alert(`Notifications: ${e.message}`))
 	let [open, setOpen] = createSignal(false)
 	let [alerts, setAlerts] = createSignal(false)
 	let sheet!: HTMLDialogElement
 	// showModal()/close() move focus, running focus handlers (Composer's
 	// dismissMenu reads state) inside this effect: untracked, as of the event.
-	createEffect(open, (o) => untrack(() => {
-		if (o && !sheet.open) {
-			sheet.showModal()
-			// The list opens on the shown tab, however far down it is.
-			sheet.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' })
-		}
-		if (!o && sheet.open) sheet.close()
-	}))
+	createEffect(open, (o) =>
+		untrack(() => {
+			if (o && !sheet.open) {
+				sheet.showModal()
+				// The list opens on the shown tab, however far down it is.
+				sheet.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' })
+			}
+			if (!o && sheet.open) sheet.close()
+		}),
+	)
 	let pages!: HTMLElement
 	let track!: HTMLElement
 	let probe!: HTMLElement
 	let byId = createMemo(() => new Map(props.tabs.map((tab) => [tab.id, tab])))
-	let ids = createMemo(() => props.tabs.map((tab) => tab.id), { equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]) })
+	let ids = createMemo(() => props.tabs.map((tab) => tab.id), {
+		equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
+	})
 	let [room, setRoom] = createSignal({ width: 0, ch: 8 })
 	// start..end-1 are fully visible; edge marks come only from tabs under 10% visible.
 	let [visible, setVisible] = createSignal({ start: 0, end: 0, markStart: 0, markEnd: 0 })
@@ -128,14 +149,14 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let right = track.scrollLeft + track.clientWidth
 		let start = Math.max(0, Math.ceil((track.scrollLeft - 1) / cell))
 		let end = right >= track.scrollWidth - 1 ? n : Math.min(n, Math.floor((right + 1) / cell))
-		let markStart = Math.max(0, Math.ceil(track.scrollLeft / cell - .9))
-		let markEnd = Math.max(end, Math.min(n, Math.floor(right / cell - .1) + 1))
+		let markStart = Math.max(0, Math.ceil(track.scrollLeft / cell - 0.9))
+		let markEnd = Math.max(end, Math.min(n, Math.floor(right / cell - 0.1) + 1))
 		setVisible({ start, end, markStart: Math.min(start, markStart), markEnd })
 	}
 	let center = (smooth: boolean) => {
 		if (!track) return
 		let cell = layout().cell
-		let target = Math.round(((current() + .5) * cell - track.clientWidth / 2) / cell) * cell
+		let target = Math.round(((current() + 0.5) * cell - track.clientWidth / 2) / cell) * cell
 		smooth &&= !matchMedia('(prefers-reduced-motion: reduce)').matches
 		track.scrollTo({ left: Math.max(0, target), behavior: smooth ? 'smooth' : 'instant' })
 		measureVisible()
@@ -151,14 +172,17 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	// Status/mark updates must not reset a manually scrolled strip.
 	let centered = ''
 	// Only a tab switch in an already laid-out strip animates; first paint and resizes jump.
-	createEffect(() => `${props.shown}:${room().width}:${layout().cell}:${props.tabs.length}`, (key) => {
-		if (key === centered) return
-		let [was, ...rest] = centered.split(':')
-		let smooth = !!was && was !== 'undefined' && rest.join(':') === key.slice(key.indexOf(':') + 1)
-		centered = key
-		let frame = requestAnimationFrame(() => center(smooth))
-		return () => cancelAnimationFrame(frame)
-	})
+	createEffect(
+		() => `${props.shown}:${room().width}:${layout().cell}:${props.tabs.length}`,
+		(key) => {
+			if (key === centered) return
+			let [was, ...rest] = centered.split(':')
+			let smooth = !!was && was !== 'undefined' && rest.join(':') === key.slice(key.indexOf(':') + 1)
+			centered = key
+			let frame = requestAnimationFrame(() => center(smooth))
+			return () => cancelAnimationFrame(frame)
+		},
+	)
 	let edge = (left: boolean): Edge => {
 		let { start, end, markStart, markEnd } = visible()
 		let hidden = left ? props.tabs.slice(0, start) : props.tabs.slice(end)
@@ -171,39 +195,75 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let target = left ? (start + 1) * cell - track.clientWidth : (end - 1) * cell
 		// Even a one-cell viewport must make progress.
 		if (end - start <= 1) target = track.scrollLeft + (left ? -cell : cell)
-		track.scrollTo({ left: target, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+		track.scrollTo({
+			left: target,
+			behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+		})
 	}
 	let newTab = () => {
 		setOpen(false)
 		tabs.newTab()
 	}
 	return (
-		<header class="Tabs tab" style={{ '--digits': layout().d, '--cell': `${layout().cell}px`, '--edge': `${layout().edge}px` }}>
+		<header
+			class="Tabs tab"
+			style={{ '--digits': layout().d, '--cell': `${layout().cell}px`, '--edge': `${layout().edge}px` }}
+		>
 			<nav class="strip" aria-label="Tabs">
-				<button type="button" class="menu" aria-label="All tabs" aria-haspopup="dialog" aria-expanded={open() ? 'true' : 'false'} onClick={() => void setOpen(true)}>
+				<button
+					type="button"
+					class="menu"
+					aria-label="All tabs"
+					aria-haspopup="dialog"
+					aria-expanded={open() ? 'true' : 'false'}
+					onClick={() => void setOpen(true)}
+				>
 					<Icon name="menu" />
 				</button>
 				<div class="pages" ref={(e) => (pages = e)}>
 					<span class="probe" ref={(e) => (probe = e)} aria-hidden="true">
 						0000000000
 					</span>
-					{layout().overflow && <EdgeButton edge={edge(true)} left active={current() >= 0 && current() < visible().start} onClick={() => page(true)} />}
+					{layout().overflow && (
+						<EdgeButton
+							edge={edge(true)}
+							left
+							active={current() >= 0 && current() < visible().start}
+							onClick={() => page(true)}
+						/>
+					)}
 					<div class="track" ref={(e) => (track = e)} onScroll={measureVisible}>
 						<For each={ids()}>
 							{(id, i) => {
 								let tab = () => byId().get(id)!
-								return <Link tab={tab()} n={i() + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(() => center(true))} />
+								return (
+									<Link
+										tab={tab()}
+										n={i() + 1}
+										shown={id === props.shown}
+										name={layout().names}
+										onPick={() => requestAnimationFrame(() => center(true))}
+									/>
+								)
 							}}
 						</For>
 					</div>
-					{layout().overflow && <EdgeButton edge={edge(false)} left={false} active={current() >= visible().end} onClick={() => page(false)} />}
+					{layout().overflow && (
+						<EdgeButton
+							edge={edge(false)}
+							left={false}
+							active={current() >= visible().end}
+							onClick={() => page(false)}
+						/>
+					)}
 				</div>
 				<button type="button" class="new" aria-label="New tab" onClick={newTab}>
 					<Icon name="plus" />
 				</button>
 				{props.pushReady && !requested() && push.available() && (
 					<button type="button" class="notify" onClick={enable}>
-						<Icon name="bell" />Notify
+						<Icon name="bell" />
+						Notify
 					</button>
 				)}
 			</nav>
@@ -223,7 +283,12 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 							return (
 								<li>
 									<Link tab={tab()} n={i() + 1} shown={id === props.shown} name dir onPick={() => setOpen(false)} />
-									<button type="button" class="close" aria-label={`Close ${tab().name}`} onClick={() => tabs.closeTab(id)}>
+									<button
+										type="button"
+										class="close"
+										aria-label={`Close ${tab().name}`}
+										onClick={() => tabs.closeTab(id)}
+									>
 										<Icon name="close" />
 									</button>
 								</li>
@@ -232,20 +297,57 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					</For>
 				</ul>
 				<button type="button" class="new" onClick={newTab}>
-					<Icon name="plus" />New tab
+					<Icon name="plus" />
+					New tab
 				</button>
-				<button type="button" onClick={() => { setOpen(false); setAlerts(true) }}><Icon name="bell" />Notifications</button>
+				<button
+					type="button"
+					onClick={() => {
+						setOpen(false)
+						setAlerts(true)
+					}}
+				>
+					<Icon name="bell" />
+					Notifications
+				</button>
 				<Show when={settings.webDiagnostics()}>
-					<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}><Icon name="bug" />Send diagnostics</button>
+					<button
+						type="button"
+						onClick={() => {
+							diagnostics.record('manual')
+							diagnostics.report()
+						}}
+					>
+						<Icon name="bug" />
+						Send diagnostics
+					</button>
 				</Show>
-				<button type="button" aria-pressed={touchProbe() ? 'true' : 'false'} onClick={() => {
-					if (touchProbe()) touchDebug.stop(); else touchDebug.start()
-					setTouchProbe(!touchProbe())
-					setOpen(false)
-				}}><Icon name="bug" />Touch debug {touchProbe() ? 'on' : 'off'}</button>
-				<button type="button" onClick={() => { setOpen(false); touchDebug.inspect() }}><Icon name="bug" />Touch debug logs</button>
+				<button
+					type="button"
+					aria-pressed={touchProbe() ? 'true' : 'false'}
+					onClick={() => {
+						if (touchProbe()) touchDebug.stop()
+						else touchDebug.start()
+						setTouchProbe(!touchProbe())
+						setOpen(false)
+					}}
+				>
+					<Icon name="bug" />
+					Touch debug {touchProbe() ? 'on' : 'off'}
+				</button>
+				<button
+					type="button"
+					onClick={() => {
+						setOpen(false)
+						touchDebug.inspect()
+					}}
+				>
+					<Icon name="bug" />
+					Touch debug logs
+				</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
-					<Icon name="reload" />Reload page
+					<Icon name="reload" />
+					Reload page
 				</button>
 			</dialog>
 			<Notifications open={alerts()} onClose={() => setAlerts(false)} />

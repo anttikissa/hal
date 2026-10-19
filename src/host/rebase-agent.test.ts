@@ -12,17 +12,24 @@ import { prompts } from './prompts.ts'
 import { contextTransitions } from './context-transitions.ts'
 
 useHost()
-const command = (text: string, id = 'rebase') => ({ type: 'tool_call' as const, id, name: 'command', input: { command: text } })
+const command = (text: string, id = 'rebase') => ({
+	type: 'tool_call' as const,
+	id,
+	name: 'command',
+	input: { command: text },
+})
 
 test('self-rebase open tail removes its own exchange, keeps original prompt, and continues without replay', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'original prompt' })
 	await until(() => calls.length === 1)
 	rebaseAgent.show(id)
 	let n = history.readSync(id).at(-1)!.n! + 1
 	calls[0]!.push(command(`/rebase run drop ${n}-`), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
-	let raw = await records(id), current = replay.current(history.readSync(id))
+	let raw = await records(id),
+		current = replay.current(history.readSync(id))
 	expect(raw.some((r) => r.type === 'rebase')).toBe(true)
 	expect(current.some((r) => r.type === 'assistant' && r.block.type === 'tool_call')).toBe(false)
 	let messages = JSON.stringify(calls[1]!.input.messages)
@@ -34,7 +41,8 @@ test('self-rebase open tail removes its own exchange, keeps original prompt, and
 })
 
 test('self-removed paused rebase keeps a durable report with drop ranges and edited IDs', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'before' })
 	await until(() => calls.length === 1)
 	let n = history.readSync(id).find((r) => r.type === 'user')!.n!
@@ -56,7 +64,8 @@ test('self-removed paused rebase keeps a durable report with drop ranges and edi
 })
 
 test('retained rebase call receives actual result and paused stops before another request', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'before' })
 	await until(() => calls.length === 1)
 	let n = history.readSync(id).find((r) => r.type === 'user')!.n
@@ -66,11 +75,14 @@ test('retained rebase call receives actual result and paused stops before anothe
 	expect(c.views.get(id)!.state.type).toBe('paused')
 	let current = replay.current(history.readSync(id))
 	expect(current.find((r) => r.type === 'user')).toMatchObject({ blocks: [{ text: 'after' }] })
-	expect(current.findLast((r) => r.type === 'user')).toMatchObject({ blocks: [{ type: 'tool_result', output: expect.stringContaining('Rebase applied (') }] })
+	expect(current.findLast((r) => r.type === 'user')).toMatchObject({
+		blocks: [{ type: 'tool_result', output: expect.stringContaining('Rebase applied (') }],
+	})
 })
 
 test('append activity is allowed after show, but intervening context rewrite refuses without dropping', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	history.submit(id, 'one')
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'two' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
@@ -83,30 +95,47 @@ test('append activity is allowed after show, but intervening context rewrite ref
 })
 
 test('user sparse and editor rebase automatically continue trailing prompts, paused suppresses it', async () => {
-	for (let editor of [false, true]) for (let paused of [false, true]) {
-		let c = client(), id = created(c), before = calls.length
-		history.submit(id, 'try again')
-		history.append(id, { type: 'assistant', block: { type: 'text', text: 'remove me' } })
-		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
-		let snapshot = rebaseRows.build(history.readSync(id)), target = snapshot.rows.find((r) => r.kind === 'assistant')!.n
-		if (editor) rebasePlans.apply({ type: 'rebase-apply', id: 'apply', sessionId: id, base: snapshot.base, plan: { base: snapshot.base, drop: [target], edit: [] }, paused })
-		else rebaseAgent.request(id, `drop ${target}`, false, paused)
-		if (paused) { expect(calls.length).toBe(before); expect(turns.state.running.has(id)).toBe(false) }
-		else {
-			await until(() => calls.length === before + 1)
-			expect(JSON.stringify(calls.at(-1)!.input.messages)).toContain('try again')
-			expect(JSON.stringify(calls.at(-1)!.input.messages)).not.toContain('remove me')
-			calls.at(-1)!.push({ type: 'done', reason: 'end' })
-			await until(() => !turns.state.running.has(id))
+	for (let editor of [false, true])
+		for (let paused of [false, true]) {
+			let c = client(),
+				id = created(c),
+				before = calls.length
+			history.submit(id, 'try again')
+			history.append(id, { type: 'assistant', block: { type: 'text', text: 'remove me' } })
+			history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+			let snapshot = rebaseRows.build(history.readSync(id)),
+				target = snapshot.rows.find((r) => r.kind === 'assistant')!.n
+			if (editor)
+				rebasePlans.apply({
+					type: 'rebase-apply',
+					id: 'apply',
+					sessionId: id,
+					base: snapshot.base,
+					plan: { base: snapshot.base, drop: [target], edit: [] },
+					paused,
+				})
+			else rebaseAgent.request(id, `drop ${target}`, false, paused)
+			if (paused) {
+				expect(calls.length).toBe(before)
+				expect(turns.state.running.has(id)).toBe(false)
+			} else {
+				await until(() => calls.length === before + 1)
+				expect(JSON.stringify(calls.at(-1)!.input.messages)).toContain('try again')
+				expect(JSON.stringify(calls.at(-1)!.input.messages)).not.toContain('remove me')
+				calls.at(-1)!.push({ type: 'done', reason: 'end' })
+				await until(() => !turns.state.running.has(id))
+			}
 		}
-	}
 })
 
 test('intervening rewrite after accepted model plan produces complete tool error and drops nothing', async () => {
-	let c = client(), id = created(c), original = tools.run
+	let c = client(),
+		id = created(c),
+		original = tools.run
 	tools.run = async (call, ctx) => {
 		let result = await original(call, ctx)
-		if (call.name === 'command' && contextTransitions.pending(id)?.kind === 'rebase') history.append(id, { type: 'reset' })
+		if (call.name === 'command' && contextTransitions.pending(id)?.kind === 'rebase')
+			history.append(id, { type: 'reset' })
 		return result
 	}
 	try {
@@ -117,17 +146,24 @@ test('intervening rewrite after accepted model plan produces complete tool error
 		await until(() => calls.length === 2)
 		let raw = await records(id)
 		expect(raw.some((r) => r.type === 'rebase')).toBe(false)
-		expect(raw.findLast((r) => r.type === 'user')).toMatchObject({ blocks: [{ type: 'tool_result', isError: true, output: expect.stringContaining('context was rewritten') }] })
+		expect(raw.findLast((r) => r.type === 'user')).toMatchObject({
+			blocks: [{ type: 'tool_result', isError: true, output: expect.stringContaining('context was rewritten') }],
+		})
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => !turns.state.running.has(id))
-	} finally { tools.run = original }
+	} finally {
+		tools.run = original
+	}
 })
 
 test('boundary serializes steering, advisory and queued inbox delivery after a retained rebase result', async () => {
-	let c = client(), id = created(c), original = tools.run, release!: () => void
+	let c = client(),
+		id = created(c),
+		original = tools.run,
+		release!: () => void
 	tools.run = async (call, ctx) => {
 		let result = await original(call, ctx)
-		if (call.id === 'rebase') await new Promise<void>((resolve) => release = resolve)
+		if (call.id === 'rebase') await new Promise<void>((resolve) => (release = resolve))
 		return result
 	}
 	try {
@@ -152,47 +188,66 @@ test('boundary serializes steering, advisory and queued inbox delivery after a r
 		expect(JSON.stringify(calls[2]!.input.messages)).toContain('queued message')
 		calls[2]!.push({ type: 'done', reason: 'end' })
 		await until(() => !turns.state.running.has(id))
-	} finally { tools.run = original }
+	} finally {
+		tools.run = original
+	}
 })
 
 test('durable rebase recovery applies once, settles self-removed results and resumes or stays paused', async () => {
-	for (let gap of ['intent', 'applied'] as const) for (let paused of [false, true]) {
-		let c = client(), id = created(c), before = calls.length
-		history.submit(id, 'recover this prompt')
-		let snapshot = rebaseRows.build(history.readSync(id))
-		history.append(id, { type: 'assistant', block: command('/rebase drop 2-') })
-		let intent = { id: `recover-${gap}-${paused}`, kind: 'rebase' as const, sender: { origin: 'model' as const }, rebase: { sparse: rebaseSparse.parse('drop 2-', snapshot), resume: true as const, ...(paused && { paused: true as const }), call: 'rebase' } }
-		contextTransitions.output(id, '/rebase accepted', { transition: intent })
-		if (gap === 'applied') {
-			history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'rebase', output: 'settled' }] })
-			let prepared = rebaseAgent.prepare(id, intent.rebase)
-			history.append(id, { type: 'rebase', ...prepared.plan, transition: intent.id })
+	for (let gap of ['intent', 'applied'] as const)
+		for (let paused of [false, true]) {
+			let c = client(),
+				id = created(c),
+				before = calls.length
+			history.submit(id, 'recover this prompt')
+			let snapshot = rebaseRows.build(history.readSync(id))
+			history.append(id, { type: 'assistant', block: command('/rebase drop 2-') })
+			let intent = {
+				id: `recover-${gap}-${paused}`,
+				kind: 'rebase' as const,
+				sender: { origin: 'model' as const },
+				rebase: {
+					sparse: rebaseSparse.parse('drop 2-', snapshot),
+					resume: true as const,
+					...(paused && { paused: true as const }),
+					call: 'rebase',
+				},
+			}
+			contextTransitions.output(id, '/rebase accepted', { transition: intent })
+			if (gap === 'applied') {
+				history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'rebase', output: 'settled' }] })
+				let prepared = rebaseAgent.prepare(id, intent.rebase)
+				history.append(id, { type: 'rebase', ...prepared.plan, transition: intent.id })
+			}
+			restartHost()
+			await turns.recover()
+			if (paused) expect(calls.length).toBe(before)
+			else {
+				await until(() => calls.length === before + 1)
+				expect(JSON.stringify(calls.at(-1)!.input.messages)).toContain('recover this prompt')
+				expect(JSON.stringify(calls.at(-1)!.input.messages)).not.toContain('/rebase')
+				calls.at(-1)!.push({ type: 'done', reason: 'end' })
+				await until(() => !turns.state.running.has(id))
+			}
+			expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(1)
+			expect(contextTransitions.pending(id)).toBeUndefined()
 		}
-		restartHost()
-		await turns.recover()
-		if (paused) expect(calls.length).toBe(before)
-		else {
-			await until(() => calls.length === before + 1)
-			expect(JSON.stringify(calls.at(-1)!.input.messages)).toContain('recover this prompt')
-			expect(JSON.stringify(calls.at(-1)!.input.messages)).not.toContain('/rebase')
-			calls.at(-1)!.push({ type: 'done', reason: 'end' })
-			await until(() => !turns.state.running.has(id))
-		}
-		expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(1)
-		expect(contextTransitions.pending(id)).toBeUndefined()
-	}
 })
 
 test('dropping a final reply continues the exposed unfinished turn; a completed reply stays idle', async () => {
 	for (let dropReply of [true, false]) {
-		let c = client(), id = created(c), before = calls.length
+		let c = client(),
+			id = created(c),
+			before = calls.length
 		history.submit(id, 'task')
 		history.append(id, { type: 'assistant', block: { type: 'text', text: 'commentary' } })
 		history.append(id, { type: 'assistant', block: { type: 'text', text: 'final reply' } })
 		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 		history.append(id, { type: 'notice', text: 'later' })
 		let snapshot = rebaseRows.build(history.readSync(id))
-		let target = snapshot.rows.find((r) => r.kind === 'assistant' && r.text === (dropReply ? 'final reply' : 'commentary'))!.n
+		let target = snapshot.rows.find(
+			(r) => r.kind === 'assistant' && r.text === (dropReply ? 'final reply' : 'commentary'),
+		)!.n
 		rebaseAgent.request(id, `drop ${target}`, false, false)
 		let report = history.readSync(id).findLast((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))
 		if (dropReply) {
@@ -208,7 +263,8 @@ test('dropping a final reply continues the exposed unfinished turn; a completed 
 })
 
 test('a running turn that drops itself back to a completed reply ends without another request', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'first' })
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'final reply' }, { type: 'done', reason: 'end' })
@@ -221,6 +277,8 @@ test('a running turn that drops itself back to a completed reply ends without an
 	expect(calls).toHaveLength(2)
 	let current = replay.current(history.readSync(id))
 	expect(current.findLast((r) => r.type === 'assistant')).toMatchObject({ block: { text: 'final reply' } })
-	expect(current.findLast((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))).toMatchObject({ text: expect.not.stringContaining('continuing') })
+	expect(current.findLast((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))).toMatchObject({
+		text: expect.not.stringContaining('continuing'),
+	})
 	expect(history.unfinished(id)).toBe(false)
 })

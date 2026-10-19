@@ -19,10 +19,21 @@ import { turns } from './turns.ts'
 
 function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let records = [...tail.earlier, ...tail.history]
-	let snap: Snapshot = { meta: { ...sessions.open(id), slots: sessions.open(id).slots ?? settings.subagentSlots() }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
+	let snap: Snapshot = {
+		meta: { ...sessions.open(id), slots: sessions.open(id).slots ?? settings.subagentSlots() },
+		history: tail.history,
+		state: status.stateOf(id, records),
+		inbox: status.inboxOf(id, records),
+		stats: stats.of(id, records),
+	}
 	if (pages.marks(id).rebase !== undefined) {
 		let c = pages.rebased(id)
-		c.display ??= { rewrites: rebaseDisplay.dividers(c.records), dropped: replay.current(c.records.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !c.shown.has(r.n) ? [r.n] : []) }
+		c.display ??= {
+			rewrites: rebaseDisplay.dividers(c.records),
+			dropped: replay
+				.current(c.records.filter((r) => r.type !== 'rebase'))
+				.flatMap((r) => (r.n !== undefined && !c.shown.has(r.n) ? [r.n] : [])),
+		}
 		if (c.display.rewrites?.length) snap.rewrites = c.display.rewrites
 		if (c.display.dropped.length) snap.dropped = c.display.dropped
 	}
@@ -41,7 +52,13 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let running = turns.state.running.get(id)
 	if (running) {
 		let live = history.live(id)
-		snap.turn = { provider: running.provider, blocks: live?.blocks ?? [], usage: live?.usage ?? {}, ns: live?.ns ?? [], ts: live?.ts ?? [] }
+		snap.turn = {
+			provider: running.provider,
+			blocks: live?.blocks ?? [],
+			usage: live?.usage ?? {},
+			ns: live?.ns ?? [],
+			ts: live?.ts ?? [],
+		}
 		if (running.model !== undefined) snap.turn.model = running.model
 		if (running.effort !== undefined) snap.turn.effort = running.effort
 	}

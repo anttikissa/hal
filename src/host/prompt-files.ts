@@ -22,7 +22,9 @@ import { tabs } from './tabs.ts'
 type Watcher = { deliver: (event: any) => void; visible?: string; shown?: string }
 
 function read(path: string): string | null {
-	try { return readFileSync(path, 'utf8') } catch (e: any) {
+	try {
+		return readFileSync(path, 'utf8')
+	} catch (e: any) {
 		if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return null
 		throw e
 	}
@@ -33,9 +35,13 @@ function read(path: string): string | null {
 // CLAUDE.md candidates for its cwd, present or not.
 function files(id: string): Set<string> {
 	let meta = sessions.open(id)
-	let local = systemPrompt.candidates(meta.cwd).flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
+	let local = systemPrompt
+		.candidates(meta.cwd)
+		.flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
 	let used: string[] = [systemPrompt.file()]
-	try { used = systemPrompt.inspect(promptCache.input(id)).sources.map((s) => s.path) } catch {}
+	try {
+		used = systemPrompt.inspect(promptCache.input(id)).sources.map((s) => s.path)
+	} catch {}
 	return new Set([...used, ...local])
 }
 
@@ -45,7 +51,9 @@ function check(clients: Iterable<Watcher>): void {
 	if (!watching.length) return promptFiles.watchDirs(new Set())
 	let applies = new Map<Watcher, Set<string>>()
 	for (let c of watching) {
-		try { applies.set(c, promptFiles.files((c.shown ?? c.visible)!)) } catch (e: any) {
+		try {
+			applies.set(c, promptFiles.files((c.shown ?? c.visible)!))
+		} catch (e: any) {
 			diag.log(`prompt files: ${c.shown ?? c.visible}: ${e?.message ?? e}`)
 			applies.set(c, new Set([systemPrompt.file()]))
 		}
@@ -59,7 +67,10 @@ function check(clients: Iterable<Watcher>): void {
 	promptFiles.state.hooks = hooks
 	for (let path of all) {
 		let text = read(path)
-		if (!seen.has(path)) { seen.set(path, text); continue }
+		if (!seen.has(path)) {
+			seen.set(path, text)
+			continue
+		}
 		let before = seen.get(path)
 		if (before === text) continue
 		seen.set(path, text)
@@ -70,8 +81,20 @@ function check(clients: Iterable<Watcher>): void {
 		let seq = ++promptFiles.state.seq
 		diag.log(`prompt files: ${path} ${what}; told ${to.map((c) => c.shown ?? c.visible).join(', ')}`)
 		for (let c of to) {
-			let notice: NoticeEvent = { type: 'notice', session: (c.shown ?? c.visible)!, name: basename(path), kind: 'update', what, line: paths.display(path), key: `prompt-file:${path}:${seq}` }
-			try { c.deliver(notice) } catch (e: any) { diag.log(`prompt files: deliver: ${e?.message ?? e}`) }
+			let notice: NoticeEvent = {
+				type: 'notice',
+				session: (c.shown ?? c.visible)!,
+				name: basename(path),
+				kind: 'update',
+				what,
+				line: paths.display(path),
+				key: `prompt-file:${path}:${seq}`,
+			}
+			try {
+				c.deliver(notice)
+			} catch (e: any) {
+				diag.log(`prompt files: deliver: ${e?.message ?? e}`)
+			}
 		}
 	}
 	// The transcript note (task ar); each open tab records only what
@@ -84,15 +107,22 @@ function check(clients: Iterable<Watcher>): void {
 // editors save by rename.
 function watchDirs(dirs: Set<string>): void {
 	let w = promptFiles.state.watchers
-	for (let [dir, watcher] of w) if (!dirs.has(dir)) { watcher.close(); w.delete(dir) }
+	for (let [dir, watcher] of w)
+		if (!dirs.has(dir)) {
+			watcher.close()
+			w.delete(dir)
+		}
 	for (let dir of dirs) {
 		if (w.has(dir)) continue
 		try {
-			w.set(dir, watch(dir, { persistent: false }, (_e, name) => {
-				if (name && !promptFiles.state.seen.has(`${dir === '/' ? '' : dir}/${name}`)) return
-				clearTimeout(promptFiles.state.soon)
-				promptFiles.state.soon = setTimeout(() => promptFiles.state.tick?.(), 30)
-			}))
+			w.set(
+				dir,
+				watch(dir, { persistent: false }, (_e, name) => {
+					if (name && !promptFiles.state.seen.has(`${dir === '/' ? '' : dir}/${name}`)) return
+					clearTimeout(promptFiles.state.soon)
+					promptFiles.state.soon = setTimeout(() => promptFiles.state.tick?.(), 30)
+				}),
+			)
 		} catch {}
 	}
 }
@@ -103,7 +133,11 @@ function start(clients: Iterable<Watcher>): void {
 	// sliceMs so many open tabs never block the event loop (task 7j).
 	void promptFiles.catchUp(tabs.file().open)
 	promptFiles.state.tick = () => {
-		try { promptFiles.check(clients) } catch (e: any) { diag.log(`prompt files: ${e?.message ?? e}`) }
+		try {
+			promptFiles.check(clients)
+		} catch (e: any) {
+			diag.log(`prompt files: ${e?.message ?? e}`)
+		}
 	}
 	promptFiles.state.timer = setInterval(() => promptFiles.state.tick?.(), promptFiles.intervalMs)
 	promptFiles.state.timer.unref?.()
@@ -125,12 +159,33 @@ function stop(): void {
 	clearInterval(promptFiles.state.timer)
 	clearTimeout(promptFiles.state.soon)
 	for (let w of promptFiles.state.watchers.values()) w.close()
-	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map(), seq: 0, hooks: undefined }
+	promptFiles.state = {
+		seen: new Map(),
+		timer: undefined,
+		soon: undefined,
+		tick: undefined,
+		watchers: new Map(),
+		seq: 0,
+		hooks: undefined,
+	}
 }
 
 export const promptFiles = {
-	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0, hooks: undefined as unknown },
+	state: {
+		seen: new Map<string, string | null>(),
+		timer: undefined as ReturnType<typeof setInterval> | undefined,
+		soon: undefined as ReturnType<typeof setTimeout> | undefined,
+		tick: undefined as (() => void) | undefined,
+		watchers: new Map<string, FSWatcher>(),
+		seq: 0,
+		hooks: undefined as unknown,
+	},
 	intervalMs: 1000,
 	sliceMs: 4,
-	files, check, watchDirs, start, catchUp, stop,
+	files,
+	check,
+	watchDirs,
+	start,
+	catchUp,
+	stop,
 }

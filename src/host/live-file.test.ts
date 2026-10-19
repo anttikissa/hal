@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	renameSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { liveFiles } from './live-file.ts'
@@ -9,7 +20,11 @@ let errors: Error[] = []
 const origOnError = liveFiles.onError
 const open: object[] = []
 
-function live<T extends Record<string, any>>(path: string, defaults: T, opts?: Parameters<typeof liveFiles.liveFile>[2]): T {
+function live<T extends Record<string, any>>(
+	path: string,
+	defaults: T,
+	opts?: Parameters<typeof liveFiles.liveFile>[2],
+): T {
 	let data = liveFiles.liveFile(path, defaults, opts)
 	open.push(data)
 	return data

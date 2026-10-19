@@ -71,7 +71,11 @@ async function loadPlugins(): Promise<void> {
 	plugins.report = (text, path) => void pluginReports.report(text, path)
 	plugins.changed = pluginReports.changed
 	// An old color-theme.ts link becomes the portable theme.ts (task 4c1).
-	try { theme.migrate() } catch (e) { plugins.report(`theme migration: ${e instanceof Error ? e.message : e}`) }
+	try {
+		theme.migrate()
+	} catch (e) {
+		plugins.report(`theme migration: ${e instanceof Error ? e.message : e}`)
+	}
 	await plugins.init()
 }
 
@@ -109,8 +113,11 @@ function init(): void {
 	let exit = terminal.restart
 	let restartNow = (): void => {
 		if (server.state.listener) {
-			let shown = main.state.kept.split('\n')[0], on = ''
-			try { if (shown) on = ` on ${tabs.label(shown)}` } catch {}
+			let shown = main.state.kept.split('\n')[0],
+				on = ''
+			try {
+				if (shown) on = ` on ${tabs.label(shown)}`
+			} catch {}
 			restartNote.write(`Ctrl-R in the terminal${on}`)
 		}
 		exit()
@@ -135,7 +142,12 @@ function initTerminal(remote?: string): void {
 	terminal.init()
 	render.init()
 	// Full mode or not is decided by the first paint (task 7j).
-	if (!remote) try { render.startTabs = (ason.parse(readFileSync(join(paths.stateDir(), 'tabs.ason'), 'utf8')) as { open: unknown[] }).open.length } catch {}
+	if (!remote)
+		try {
+			render.startTabs = (
+				ason.parse(readFileSync(join(paths.stateDir(), 'tabs.ason'), 'utf8')) as { open: unknown[] }
+			).open.length
+		} catch {}
 	render.painted = (view) => {
 		if (main.state.shown) return
 		perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
@@ -155,7 +167,8 @@ function initTerminal(remote?: string): void {
 // Host events for the terminal: the version goes to versions.ts, a peer's
 // unusable --no-user is told, the rest go to the app.
 function onEvent(event: Event): void {
-	if (event.type === 'host-mode' && promptCache.state.noUser && !event.noUser) app.state.notice = '--no-user: another Hal process hosts this home with USER.md'
+	if (event.type === 'host-mode' && promptCache.state.noUser && !event.noUser)
+		app.state.notice = '--no-user: another Hal process hosts this home with USER.md'
 	if (event.type !== 'version') return app.onEvent(event)
 	versions.state.host = event.version
 	versions.report(app.send)
@@ -186,7 +199,12 @@ async function becomeHost(): Promise<boolean> {
 		find.init()
 		resources.init()
 		web.start()
-		if (web.state.server && web.state.server.port !== settings.webPort() && !main.state.headless && terminal.available()) {
+		if (
+			web.state.server &&
+			web.state.server.port !== settings.webPort() &&
+			!main.state.headless &&
+			terminal.available()
+		) {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
 			app.show()
 		}
@@ -275,7 +293,12 @@ async function remote(typed: string | undefined): Promise<void> {
 	let origin: string
 	let token: string
 	try {
-		;({ origin, token } = await remoteClient.signIn(typed, saved, (q) => prompt(q), (text) => process.stderr.write(text)))
+		;({ origin, token } = await remoteClient.signIn(
+			typed,
+			saved,
+			(q) => prompt(q),
+			(text) => process.stderr.write(text),
+		))
 	} catch (e: any) {
 		process.stderr.write(`hal: ${e?.message ?? e}\n`)
 		process.exit(1)
@@ -322,12 +345,29 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 		if (++tries !== 2 || !main.mayHost()) return false
 		let file = join(paths.stateDir(), 'serve.log')
 		let log = openSync(file, 'a', 0o600)
-		let serve = Bun.spawn([process.execPath, import.meta.path, '--home', paths.home(), 'serve', ...(promptCache.state.noUser ? ['--no-user'] : [])], { env: process.env, stdio: ['ignore', log, log], detached: true })
+		let serve = Bun.spawn(
+			[
+				process.execPath,
+				import.meta.path,
+				'--home',
+				paths.home(),
+				'serve',
+				...(promptCache.state.noUser ? ['--no-user'] : []),
+			],
+			{ env: process.env, stdio: ['ignore', log, log], detached: true },
+		)
 		serve.unref()
-		void serve.exited.then((code) => code && (process.stderr.write(`hal: hal serve exited with ${code}; see ${file}\n`), process.exit(1)))
+		void serve.exited.then(
+			(code) => code && (process.stderr.write(`hal: hal serve exited with ${code}; see ${file}\n`), process.exit(1)),
+		)
 		return false
 	}
-	await link.start({ socketPath: server.socketPath(), tryHost, local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
+	await link.start({
+		socketPath: server.socketPath(),
+		tryHost,
+		local: (deliver) => host.connect(deliver),
+		onEvent: run.onEvent,
+	})
 	run.begin()
 	process.exit(await run.done)
 }
@@ -337,7 +377,8 @@ async function start(): Promise<void> {
 	let parsed = args.parse(process.argv.slice(2))
 	if (parsed.kind === 'help') process.exit((process.stdout.write(args.usage()), 0))
 	// The release check loads only here; the checkout is this file's (task jjr).
-	if (parsed.kind === 'version') process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
+	if (parsed.kind === 'version')
+		process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
 	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
 	if ('noUser' in parsed && parsed.noUser) promptCache.state.noUser = true
 	if (parsed.home) paths.state.home = toolView.home = resolve(parsed.home)
@@ -383,7 +424,13 @@ async function start(): Promise<void> {
 }
 
 export const main = {
-	state: { kept: '', shown: false, headless: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
+	state: {
+		kept: '',
+		shown: false,
+		headless: false,
+		later: [] as (() => void)[],
+		fallback: undefined as Timer | undefined,
+	},
 	laterMs: 1000,
 	authWaitMs: 5000,
 	lastTab,
@@ -404,22 +451,35 @@ export const main = {
 			clients: [...host.state.clients].length,
 			running: turns.state.running.size,
 			host: serverLog.mb(process.memoryUsage().rss),
-			...(resources.state.sample && { memory: `${serverLog.gb(resources.state.sample.memory)} available`, disk: `${serverLog.gb(resources.state.sample.disk)} free` }),
+			...(resources.state.sample && {
+				memory: `${serverLog.gb(resources.state.sample.memory)} available`,
+				disk: `${serverLog.gb(resources.state.sample.disk)} free`,
+			}),
 		}))
 		main.initHost()
-		serverLog.log('hal serve', { home: paths.home(), state: paths.stateDir(), pid: process.pid, ...(process.argv.length > 3 && { args: process.argv.slice(2) }) })
-		void version.current().then(async ({ loaded }) => serverLog.log(`version ${await (await import('./host/release.ts')).release.line(loaded)}`))
+		serverLog.log('hal serve', {
+			home: paths.home(),
+			state: paths.stateDir(),
+			pid: process.pid,
+			...(process.argv.length > 3 && { args: process.argv.slice(2) }),
+		})
+		void version
+			.current()
+			.then(async ({ loaded }) =>
+				serverLog.log(`version ${await (await import('./host/release.ts')).release.line(loaded)}`),
+			)
 		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
 		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)
 		web.state.fixedPort = port
 		await lifecycle.serve(main.becomeHost, link.dial)
 		main.shown()
 		// After becomeHost's web.start: --port allows no other port.
-		if (port) main.later(() => {
-			if (web.state.server) return
-			process.stderr.write(`hal: web ${web.state.error ?? `cannot listen on port ${port}`}\n`)
-			process.exit(1)
-		})
+		if (port)
+			main.later(() => {
+				if (web.state.server) return
+				process.stderr.write(`hal: web ${web.state.error ?? `cannot listen on port ${port}`}\n`)
+				process.exit(1)
+			})
 	},
 	refreshModels,
 	later,

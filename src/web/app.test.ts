@@ -17,7 +17,15 @@ const ts = '2026-09-26T00:00:01Z'
 let sent: any[] = []
 let stored = new Map<string, Local>()
 let redraws = 0
-const orig = { send: connection.send, connected: connection.connected, store: drafts.store, href: router.href, write: router.write, tabStore: { ...router.store }, mac: tabs.mac }
+const orig = {
+	send: connection.send,
+	connected: connection.connected,
+	store: drafts.store,
+	href: router.href,
+	write: router.write,
+	tabStore: { ...router.store },
+	mac: tabs.mac,
+}
 let address = 'http://h/'
 let history: string[] = []
 let lastTab = undefined as string | undefined
@@ -57,8 +65,11 @@ afterEach(() => {
 	app.reset()
 })
 
-const press = (key: string, target: Target, mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {}) =>
-	keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
+const press = (
+	key: string,
+	target: Target,
+	mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {},
+) => keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
 const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
 const snapshot = (state: object, history: object[] = [], draft?: object): Event =>
 	({ type: 'snapshot', sessionId, snapshot: { meta, history, state, ...(draft ? { draft } : {}) } }) as Event
@@ -110,7 +121,11 @@ test('typing is the session draft, and a snapshot brings the kept draft back', (
 })
 
 test('Up on the first row while the model works edits the last prompt; Down unchanged brings the draft back', () => {
-	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }, [{ type: 'user', blocks: [{ type: 'text', text: 'fix ti' }], ts }]))
+	app.onEvent(
+		snapshot({ type: 'running', phase: 'streaming' }, [
+			{ type: 'user', blocks: [{ type: 'text', text: 'fix ti' }], ts },
+		]),
+	)
 	app.input('draft\nmore')
 	expect(press('ArrowUp', message('draft\nmore'))).toBe(false)
 	expect(press('ArrowUp', message('draft\nmore', 2))).toBe(true)
@@ -155,7 +170,13 @@ test('typing opens host completions; keyboard choice is not sent, stale answers 
 test('a completion menu remains identical across input and an unchanged host reply', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	app.input('/model gp')
-	app.onEvent({ type: 'completions', sessionId, text: '/model gp', items: ['/model gpt-6.1'], descriptions: ['openai/gpt-6.1-sol'] })
+	app.onEvent({
+		type: 'completions',
+		sessionId,
+		text: '/model gp',
+		items: ['/model gpt-6.1'],
+		descriptions: ['openai/gpt-6.1-sol'],
+	})
 	let shown = app.state.menu
 	expect(shown?.choices[0]?.description).toBe('openai/gpt-6.1-sol')
 	app.input('/model gpt')
@@ -163,7 +184,13 @@ test('a completion menu remains identical across input and an unchanged host rep
 	expect(sent.at(-1)).toMatchObject({ type: 'complete', text: '/model gpt' })
 	app.onEvent({ type: 'completions', sessionId, text: '/model gp', items: [] })
 	expect(app.state.menu).toBe(shown)
-	app.onEvent({ type: 'completions', sessionId, text: '/model gpt', items: ['/model gpt-6.1'], descriptions: ['openai/gpt-6.1-sol'] })
+	app.onEvent({
+		type: 'completions',
+		sessionId,
+		text: '/model gpt',
+		items: ['/model gpt-6.1'],
+		descriptions: ['openai/gpt-6.1-sol'],
+	})
 	expect(app.state.menu).toBe(shown)
 })
 
@@ -200,7 +227,12 @@ test('an open choice question leaves Cmd and Ctrl keys to the browser; a letter 
 	let form = { text: 'Method?', fields: [{ type: 'choice' as const, name: 'm', options: ['Claude', 'Router'] }] }
 	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
 	app.onEvent({ type: 'question', sessionId, id: 'q1', form })
-	for (let [key, mods] of [['r', { metaKey: true }], ['l', { metaKey: true }], ['a', { ctrlKey: true }]] as const) expect(press(key, { kind: 'button', submits: false }, mods)).toBe(false)
+	for (let [key, mods] of [
+		['r', { metaKey: true }],
+		['l', { metaKey: true }],
+		['a', { ctrlKey: true }],
+	] as const)
+		expect(press(key, { kind: 'button', submits: false }, mods)).toBe(false)
 	expect(sent.filter((c) => c.type === 'answer')).toEqual([])
 	expect(press('r', { kind: 'button', submits: false })).toBe(true)
 	expect(sent.at(-1)).toMatchObject({ type: 'answer', answers: { m: 'Router' } })
@@ -256,7 +288,12 @@ test('the link state shows as a notice until connected', () => {
 test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the shared editor, as native edits', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	let edits: unknown[] = []
-	let box = (text: string, cursor: number): Target => ({ kind: 'message', text, cursor, write: (e, at) => void edits.push([e, at]) })
+	let box = (text: string, cursor: number): Target => ({
+		kind: 'message',
+		text,
+		cursor,
+		write: (e, at) => void edits.push([e, at]),
+	})
 	expect(press('k', box('hello world', 5), { ctrlKey: true })).toBe(true)
 	expect(app.state.text).toBe('hello')
 	expect(edits).toEqual([[{ start: 5, end: 11, text: '' }, 5]])
@@ -280,14 +317,24 @@ test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the s
 	edits.length = 0
 	expect(press('ArrowLeft', box('a b\n\nc', 5), { altKey: true })).toBe(true)
 	expect(edits).toEqual([[{ start: 6, end: 6, text: '' }, 2]])
-	press('ArrowLeft', { kind: 'message', text: 'a b', cursor: 3, write: (...a) => void edits.push(a) }, { altKey: true, shiftKey: true })
+	press(
+		'ArrowLeft',
+		{ kind: 'message', text: 'a b', cursor: 3, write: (...a) => void edits.push(a) },
+		{ altKey: true, shiftKey: true },
+	)
 	expect(edits[1]).toEqual([{ start: 3, end: 3, text: '' }, 2, 3])
 })
 
 test('Tab and Shift-Tab indent a selection that spans lines; otherwise they move focus', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	let edits: unknown[] = []
-	let box = (text: string, cursor: number, anchor?: number): Target => ({ kind: 'message', text, cursor, anchor, write: (...a) => void edits.push(a) })
+	let box = (text: string, cursor: number, anchor?: number): Target => ({
+		kind: 'message',
+		text,
+		cursor,
+		anchor,
+		write: (...a) => void edits.push(a),
+	})
 	expect(press('Tab', box('one two', 2))).toBe(false)
 	expect(press('Tab', box('one two', 2, 5))).toBe(false)
 	expect(press('Tab', box('one\ntwo', 0), { shiftKey: true })).toBe(false)
@@ -310,25 +357,52 @@ test('Ctrl-Y replaces the selection in the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	press('k', { kind: 'message', text: 'ab', cursor: 1 }, { ctrlKey: true })
 	let edits: unknown[] = []
-	press('y', { kind: 'message', text: 'a', cursor: 0, anchor: 1, write: (...a) => void edits.push(a) }, { ctrlKey: true })
+	press(
+		'y',
+		{ kind: 'message', text: 'a', cursor: 0, anchor: 1, write: (...a) => void edits.push(a) },
+		{ ctrlKey: true },
+	)
 	expect(app.state.text).toBe('b')
 	expect(edits).toEqual([[{ start: 0, end: 1, text: 'b' }, 1, 1]])
 })
 
 test('keys the browser already handles stay native in the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
-	for (let [key, mods] of [['ArrowRight', { altKey: true }], ['Backspace', {}], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
+	for (let [key, mods] of [
+		['ArrowRight', { altKey: true }],
+		['Backspace', {}],
+		['a', { ctrlKey: true }],
+		['e', { ctrlKey: true }],
+		['z', { metaKey: true }],
+	] as const)
 		expect(press(key, message('hello world', 5), mods)).toBe(false)
 	expect(app.state.text).toBe('hello world')
 })
 
 // ── Tabs ──
 
-const tab = (id: string, extra: object = {}) => ({ id, name: `name ${id}`, cwd: `/cwd/${id}`, model: 'fake/m', state: { type: 'idle' }, ...extra })
+const tab = (id: string, extra: object = {}) => ({
+	id,
+	name: `name ${id}`,
+	cwd: `/cwd/${id}`,
+	model: 'fake/m',
+	state: { type: 'idle' },
+	...extra,
+})
 const tabsEvent = (...tabs: object[]) => ({ type: 'tabs', tabs }) as Event
 const snapOf = (id: string, draft?: string): Event =>
-	({ type: 'snapshot', sessionId: id, snapshot: { meta: { ...meta, id }, history: [], state: { type: 'idle' }, ...(draft ? { draft: { text: draft, rev: 1 } } : {}) } }) as Event
-const alt = (digit: number) => press(String(digit), message(app.state.text), { altKey: true, code: `Digit${digit}` } as any)
+	({
+		type: 'snapshot',
+		sessionId: id,
+		snapshot: {
+			meta: { ...meta, id },
+			history: [],
+			state: { type: 'idle' },
+			...(draft ? { draft: { text: draft, rev: 1 } } : {}),
+		},
+	}) as Event
+const alt = (digit: number) =>
+	press(String(digit), message(app.state.text), { altKey: true, code: `Digit${digit}` } as any)
 
 test('the empty box shows an example request, from the Hal list in a tab the host marks hal', () => {
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { hal: true })))
@@ -345,7 +419,12 @@ test('a block address resumes even a closed session, retaining its hash and hist
 	address = 'http://h/2-bbb#5'
 	history = [address]
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent).toContainEqual({ type: 'tab-resume', id: expect.any(String), sessionId: '2-bbb', timezone: expect.any(String) })
+	expect(sent).toContainEqual({
+		type: 'tab-resume',
+		id: expect.any(String),
+		sessionId: '2-bbb',
+		timezone: expect.any(String),
+	})
 	app.onEvent(tabsEvent(tab('1-aaa')))
 	expect(app.state.shown).toBeUndefined()
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
@@ -365,7 +444,12 @@ test('with no valid id the page lands on the tab shown last, else the first, rep
 	lastTab = '2-bbb'
 	app.onState({ type: 'connected', role: 'client' })
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
-	app.onEvent({ type: 'rejected', id: sent.find((c) => c.type === 'tab-resume').id, command: 'tab-resume', reason: 'no such session' })
+	app.onEvent({
+		type: 'rejected',
+		id: sent.find((c) => c.type === 'tab-resume').id,
+		command: 'tab-resume',
+		reason: 'no such session',
+	})
 	expect(history).toEqual(['http://h/2-bbb'])
 	app.reset()
 	address = 'http://h/'
@@ -472,7 +556,7 @@ test('the shown tab wanting attention is marked seen; other tabs keep theirs', (
 	expect(sent.filter((c) => c.type === 'tab-seen').at(-1)).toEqual({ type: 'tab-seen', sessionId: '2-bbb' })
 })
 
-test('Ctrl-T/W/N/P stay the browser\'s off macOS', () => {
+test("Ctrl-T/W/N/P stay the browser's off macOS", () => {
 	tabs.mac = () => false
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
 	sent = []
@@ -548,7 +632,11 @@ test('scrolling near the top fetches the page before; it goes in front', () => {
 	]
 	let open = { type: 'question', id: 'q', form: { text: 'Ok?', fields: [{ type: 'text', name: 'x' }] }, ts }
 	// The tail is turn 3; the open question and the last prompt are further back.
-	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [...turn(3)], state: { type: 'idle' }, older: 200, earlier: [] } } as Event)
+	app.onEvent({
+		type: 'snapshot',
+		sessionId,
+		snapshot: { meta, history: [...turn(3)], state: { type: 'idle' }, older: 200, earlier: [] },
+	} as Event)
 	app.older()
 	app.older()
 	expect(sent.filter((c) => c.type === 'history')).toEqual([expect.objectContaining({ sessionId, before: 200 })])
@@ -557,10 +645,22 @@ test('scrolling near the top fetches the page before; it goes in front', () => {
 	expect(app.state.pages).toBe(0)
 	app.onEvent({ type: 'history', sessionId, before: 200, records: turn(2), older: 100 } as Event)
 	expect(app.state.pages).toBe(1)
-	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type)).toEqual(['p2', 'a2', 'turn-end', 'p3', 'a3', 'turn-end'])
+	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type)).toEqual([
+		'p2',
+		'a2',
+		'turn-end',
+		'p3',
+		'a3',
+		'turn-end',
+	])
 	app.older()
 	app.onEvent({ type: 'history', sessionId, before: 100, records: [...turn(1), open] } as Event)
-	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type).slice(0, 4)).toEqual(['p1', 'a1', 'turn-end', 'question'])
+	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type).slice(0, 4)).toEqual([
+		'p1',
+		'a1',
+		'turn-end',
+		'question',
+	])
 	sent = []
 	app.older()
 	expect(sent).toEqual([])
@@ -676,21 +776,22 @@ test('/go shows a cached destination draft updated by another client without wri
 	expect(sent.find((c) => c.type === 'draft')).toMatchObject({ sessionId: '2-bbb', text: 'from terminal!', base: 5 })
 })
 
-for (let restore of ['delete', 'undo']) test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
-	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
-	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('second'), user('third')]))
-	press('ArrowUp', message(''))
-	press('ArrowUp', message('third'))
-	expect(app.state.text).toBe('second')
-	app.input('second!')
-	// Native deletion and native undo both report restored text via input.
-	if (restore === 'undo') expect(press('z', message('second!'), { metaKey: true })).toBe(false)
-	app.input('second')
-	expect(press('ArrowUp', message('second'))).toBe(true)
-	expect(app.state.text).toBe('first')
-	press('ArrowDown', message('first'))
-	press('ArrowDown', message('second'))
-	press('ArrowDown', message('third'))
-	expect(app.state.text).toBe('second')
-	expect(stored.get(sessionId)?.text).toBe('second')
-})
+for (let restore of ['delete', 'undo'])
+	test(`history continues after a recalled entry is edited and restored by ${restore}`, () => {
+		let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
+		app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('second'), user('third')]))
+		press('ArrowUp', message(''))
+		press('ArrowUp', message('third'))
+		expect(app.state.text).toBe('second')
+		app.input('second!')
+		// Native deletion and native undo both report restored text via input.
+		if (restore === 'undo') expect(press('z', message('second!'), { metaKey: true })).toBe(false)
+		app.input('second')
+		expect(press('ArrowUp', message('second'))).toBe(true)
+		expect(app.state.text).toBe('first')
+		press('ArrowDown', message('first'))
+		press('ArrowDown', message('second'))
+		press('ArrowDown', message('third'))
+		expect(app.state.text).toBe('second')
+		expect(stored.get(sessionId)?.text).toBe('second')
+	})

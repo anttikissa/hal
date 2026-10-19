@@ -21,12 +21,34 @@ import type { Answers, Form } from '../common/forms.ts'
 // (tasks/w4/forms.md, Provenance): 'models' is the model picker.
 // `show`: said like `say` but never recorded, so it is gone on the next
 // snapshot (a one-time code, /auth).
-export type Reply = { result?: string; say?: string; synthetic?: string; show?: string; error?: string; ask?: Form; askArgs?: string; open?: 'models' | 'settings'; rebase?: import('../common/rebase-rows.ts').RebaseRows }
+export type Reply = {
+	result?: string
+	say?: string
+	synthetic?: string
+	show?: string
+	error?: string
+	ask?: Form
+	askArgs?: string
+	open?: 'models' | 'settings'
+	rebase?: import('../common/rebase-rows.ts').RebaseRows
+}
 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say
 // records output while the command still runs (a login that waits).
-export type Context = { sessionId: string; sender?: Sender; command?: string; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): string | void; setName?(name?: string): void; say(text: string): void }
+export type Context = {
+	sessionId: string
+	sender?: Sender
+	command?: string
+	cwd: string
+	previousCwd?: string
+	model: string
+	effort?: string
+	setCwd(cwd: string): void
+	setModel(model: string): string | void
+	setName?(name?: string): void
+	say(text: string): void
+}
 
 export type Candidate = { value: string; description: string }
 
@@ -60,12 +82,20 @@ function all(): Map<string, SlashCommand> {
 	let found = new Map<string, SlashCommand>()
 	for (let file of readdirSync(commands.dir()).sort()) {
 		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
-		let name = file.slice(0, -3), path = `${commands.dir()}/${file}`
+		let name = file.slice(0, -3),
+			path = `${commands.dir()}/${file}`
 		// One module that fails to load (e.g. it needs code newer than the
 		// running host's module cache) breaks only its own command, which
 		// reports the full error, never every other command.
-		try { found.set(name, require(path).command) }
-		catch (e) { found.set(name, { run: () => ({ error: `/${name} failed to load from ${path}: ${e instanceof Error ? e.stack ?? e.message : String(e)}` }) } as SlashCommand) }
+		try {
+			found.set(name, require(path).command)
+		} catch (e) {
+			found.set(name, {
+				run: () => ({
+					error: `/${name} failed to load from ${path}: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`,
+				}),
+			} as SlashCommand)
+		}
 	}
 	return found
 }
@@ -75,7 +105,7 @@ function all(): Map<string, SlashCommand> {
 function parse(text: string): { name: string; args: string } | undefined {
 	let m = /^\/([a-z][a-z0-9-]*)(?:\s([\s\S]*))?$/i.exec(text)
 	let name = m?.[1]!.toLowerCase()
-	return m ? { name: name!, args: name === 'clear' ? m[2] ?? '' : (m[2] ?? '').trim() } : undefined
+	return m ? { name: name!, args: name === 'clear' ? (m[2] ?? '') : (m[2] ?? '').trim() } : undefined
 }
 
 // Every full text `text` may complete to: a command name, or what the
@@ -83,30 +113,43 @@ function parse(text: string): { name: string; args: string } | undefined {
 function candidates(text: string, ctx: Context): (string | Candidate)[] {
 	let bare = /^\/([a-z0-9-]*)$/.exec(text)
 	if (bare && commandList.byName(bare[1]!)?.defaultArgs !== undefined) text += ' '
-	else if (bare) return commandList.all().filter((c) => !c.hidden).map((c) => c.name).filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
+	else if (bare)
+		return commandList
+			.all()
+			.filter((c) => !c.hidden)
+			.map((c) => c.name)
+			.filter((n) => n.startsWith(bare[1]!))
+			.map((n) => `/${n} `)
 	let m = /^\/([a-z][a-z0-9-]*)\s([\s\S]*)$/.exec(text)
 	let cmd = m && commands.all().get(m[1]!)
 	if (!m || commandList.byName(m[1]!)?.hidden || !cmd?.complete) return []
 	try {
-		return cmd.complete(m[2]!, ctx).map((a) => typeof a === 'string' ? `/${m[1]} ${a}` : { value: `/${m[1]} ${a.value}`, description: a.description })
+		return cmd
+			.complete(m[2]!, ctx)
+			.map((a) =>
+				typeof a === 'string' ? `/${m[1]} ${a}` : { value: `/${m[1]} ${a.value}`, description: a.description },
+			)
 	} catch {
 		return []
 	}
 }
 
 function complete(text: string, ctx: Context): string[] {
-	return commands.candidates(text, ctx).map((c) => typeof c === 'string' ? c : c.value)
+	return commands.candidates(text, ctx).map((c) => (typeof c === 'string' ? c : c.value))
 }
 
 // Keep replacement strings compatible with terminal completion; optional
 // aligned descriptions let richer clients show the actual host-side choice.
 function suggestions(text: string, ctx: Context): { items: string[]; descriptions?: string[] } {
 	let found = commands.candidates(text, ctx)
-	let items = found.map((c) => typeof c === 'string' ? c : c.value)
-	if (found.some((c) => typeof c !== 'string')) return { items, descriptions: found.map((c) => typeof c === 'string' ? '' : c.description) }
+	let items = found.map((c) => (typeof c === 'string' ? c : c.value))
+	if (found.some((c) => typeof c !== 'string'))
+		return { items, descriptions: found.map((c) => (typeof c === 'string' ? '' : c.description)) }
 	let parsed = commands.parse(text)
 	let cmd = parsed && commands.all().get(parsed.name)
-	return cmd?.describeCompletion ? { items, descriptions: items.map((item) => cmd.describeCompletion!(commands.parse(item)!.args, ctx)) } : { items }
+	return cmd?.describeCompletion
+		? { items, descriptions: items.map((item) => cmd.describeCompletion!(commands.parse(item)!.args, ctx)) }
+		: { items }
 }
 
 // `path` as an absolute path: ~ is the home directory, and a relative

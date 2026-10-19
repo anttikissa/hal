@@ -5,7 +5,10 @@ import { nativeTool } from './native-tool.ts'
 import { sessions } from './sessions.ts'
 
 async function* call(cmd: string, sessionId: string): AsyncGenerator<StreamEvent> {
-	yield* nativeTool.expand({ type: 'tool_call', id: `tool-${crypto.randomUUID()}`, name: 'tool', input: { cmd } }, { sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/tool' })
+	yield* nativeTool.expand(
+		{ type: 'tool_call', id: `tool-${crypto.randomUUID()}`, name: 'tool', input: { cmd } },
+		{ sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/tool' },
+	)
 	yield { type: 'done', reason: 'tool_use' }
 }
 
@@ -14,7 +17,10 @@ function run(records: HistoryRecord[], sessionId: string): Reply {
 		let r = records[i]!
 		if (r.type === 'assistant' && r.block.type === 'tool_call') return {}
 		if (r.type !== 'user' || r.blocks.some((b) => b.type === 'tool_result')) continue
-		let cmd = r.blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n')
+		let cmd = r.blocks
+			.filter((b) => b.type === 'text')
+			.map((b) => b.text)
+			.join('\n')
 		if (cmd) return { stream: toolModel.call(cmd, sessionId) }
 	}
 	return { say: toolModel.welcome }

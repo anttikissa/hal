@@ -5,7 +5,18 @@
 // parent's records from before the fork (the old loadAllHistory), with
 // blob contents written inline. Old formats: ~/.hal/src/common/history.ts.
 
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, writeFileSync, appendFileSync } from 'fs'
+import {
+	closeSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readdirSync,
+	readFileSync,
+	readSync,
+	writeFileSync,
+	appendFileSync,
+} from 'fs'
 import { ason } from './common/ason.ts'
 import { lines } from './common/lines.ts'
 import { attachments } from './common/attachments.ts'
@@ -16,9 +27,24 @@ type Old = Record<string, any>
 type Rec = HistoryRecord & { ts?: string }
 export type Counts = { sessions: number; open: number; records: number; bytes: number; dropped: Record<string, number> }
 
-const statuses: Record<string, TurnStatus> = { completed: 'completed', aborted: 'paused', stopped: 'paused', failed: 'error', error: 'error', paused: 'paused' }
+const statuses: Record<string, TurnStatus> = {
+	completed: 'completed',
+	aborted: 'paused',
+	stopped: 'paused',
+	failed: 'error',
+	error: 'error',
+	paused: 'paused',
+}
 // Old records that carry nothing the transcript or the model needs.
-const dropped = new Set(['usage', 'input_history', 'pending_tools', 'forked_to', 'rebased_from', 'rebased_to', 'session'])
+const dropped = new Set([
+	'usage',
+	'input_history',
+	'pending_tools',
+	'forked_to',
+	'rebased_from',
+	'rebased_to',
+	'session',
+])
 
 function readAson(path: string): Old | undefined {
 	try {
@@ -58,7 +84,10 @@ function importOld(oldState: string, home: string): Counts {
 	let oldDir = `${oldState}/sessions`
 	let newDir = `${home}/sessions`
 	if (existsSync(newDir) && readdirSync(newDir).length) throw new Error(`${newDir} already has sessions`)
-	let ids = readdirSync(oldDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort()
+	let ids = readdirSync(oldDir, { withFileTypes: true })
+		.filter((e) => e.isDirectory())
+		.map((e) => e.name)
+		.sort()
 	let metas = new Map(ids.map((id) => [id, readAson(`${oldDir}/${id}/session.ason`) ?? {}]))
 	let logOf = (id: string) => `${oldDir}/${id}/${metas.get(id)?.currentLog ?? 'history.asonl'}`
 	let parentOf = new Map<string, string>()
@@ -116,7 +145,16 @@ function importOld(oldState: string, home: string): Counts {
 				let blocks: UserBlock[] = []
 				for (let p of e.parts ?? []) {
 					if (p.type === 'text' && typeof p.text === 'string') {
-						blocks.push(e.source ? { type: 'text', text: p.text, from: String(e.source), label: [e.sourceTab, e.source, e.sourceName].filter((x) => x !== undefined).join(' ') } : { type: 'text', text: p.text })
+						blocks.push(
+							e.source
+								? {
+										type: 'text',
+										text: p.text,
+										from: String(e.source),
+										label: [e.sourceTab, e.source, e.sourceName].filter((x) => x !== undefined).join(' '),
+									}
+								: { type: 'text', text: p.text },
+						)
 					} else if (p.type === 'image') {
 						let data = blobOf(id, p.blobId)
 						let ext = attachments.types[data?.media_type]
@@ -141,21 +179,47 @@ function importOld(oldState: string, home: string): Counts {
 				let m = e.model ?? model
 				let provider = typeof m === 'string' ? m.split('/')[0] : undefined
 				let block = { type: 'thinking', text, ...(signature ? { signature } : {}), ...(provider ? { provider } : {}) }
-				out.push({ type: 'assistant', block, ...(m ? { model: m } : {}), ...(e.thinkingEffort ? { effort: e.thinkingEffort } : {}), ts } as Rec)
+				out.push({
+					type: 'assistant',
+					block,
+					...(m ? { model: m } : {}),
+					...(e.thinkingEffort ? { effort: e.thinkingEffort } : {}),
+					ts,
+				} as Rec)
 			} else if (e.type === 'assistant') {
 				if (e.synthetic || e.visibility === 'ui') push({ type: 'output', text: String(e.text ?? ''), ts } as Rec)
-				else if (e.text) out.push({ type: 'assistant', block: { type: 'text', text: String(e.text) }, ...(e.model ? { model: e.model } : {}), ts } as Rec)
+				else if (e.text)
+					out.push({
+						type: 'assistant',
+						block: { type: 'text', text: String(e.text) },
+						...(e.model ? { model: e.model } : {}),
+						ts,
+					} as Rec)
 				if (e.model) model = e.model
 			} else if (e.type === 'tool_call') {
 				if (e.visibility === 'ui') continue
 				let input = e.input ?? blobOf(id, e.blobId)?.call?.input ?? {}
 				pending.add(e.toolId)
-				out.push({ type: 'assistant', block: { type: 'tool_call', id: e.toolId, name: e.name, input: typeof input === 'object' && input ? input : { input } }, ts } as Rec)
+				out.push({
+					type: 'assistant',
+					block: {
+						type: 'tool_call',
+						id: e.toolId,
+						name: e.name,
+						input: typeof input === 'object' && input ? input : { input },
+					},
+					ts,
+				} as Rec)
 			} else if (e.type === 'tool_result') {
 				if (e.visibility === 'ui' || !pending.has(e.toolId)) continue
 				let result = blobOf(id, e.blobId)?.result
 				let output = e.output ?? result?.content ?? '[interrupted]'
-				let block = { type: 'tool_result' as const, id: e.toolId, output: typeof output === 'string' ? output : ason.stringify(output), ...(e.isError || result?.status === 'error' ? { isError: true } : {}) }
+				let block = {
+					type: 'tool_result' as const,
+					id: e.toolId,
+					output: typeof output === 'string' ? output : ason.stringify(output),
+					...(e.isError || result?.status === 'error' ? { isError: true } : {}),
+				}
 				let last = out.at(-1)
 				if (last?.type === 'user' && last.blocks.every((x) => x.type === 'tool_result')) last.blocks.push(block)
 				else out.push({ type: 'user', blocks: [block], ts } as Rec)
@@ -176,7 +240,14 @@ function importOld(oldState: string, home: string): Counts {
 				push({ type: 'output', text: String(e.text ?? ''), ts } as Rec)
 			} else if (e.type === 'answer') {
 				let v = e.value ?? {}
-				let text = v.kind === 'text' ? v.text : v.kind === 'choice' ? v.choiceId : v.kind === 'aborted' ? '(no answer)' : '(secret)'
+				let text =
+					v.kind === 'text'
+						? v.text
+						: v.kind === 'choice'
+							? v.choiceId
+							: v.kind === 'aborted'
+								? '(no answer)'
+								: '(secret)'
 				push({ type: 'output', text: `→ ${text}`, ts } as Rec)
 			} else if (e.type !== 'forked_from') {
 				counts.dropped[e.type] = (counts.dropped[e.type] ?? 0) + (dropped.has(e.type) ? 0 : 1)
@@ -194,7 +265,8 @@ function importOld(oldState: string, home: string): Counts {
 		// Every history ends idle: a turn with no end would be continued
 		// by the first host (turns.recover), running the model unasked.
 		let lastEnd = recs.findLastIndex((r) => r.type === 'turn_end')
-		if (recs.slice(lastEnd + 1).some((r) => r.type === 'user' || r.type === 'assistant')) recs = [...recs, { type: 'turn_end', status: 'paused', usage: {} } as Rec]
+		if (recs.slice(lastEnd + 1).some((r) => r.type === 'user' || r.type === 'assistant'))
+			recs = [...recs, { type: 'turn_end', status: 'paused', usage: {} } as Rec]
 		let ts = typeof meta.createdAt === 'string' ? meta.createdAt : new Date(0).toISOString()
 		let chunks: string[] = []
 		let n = 0
@@ -212,13 +284,15 @@ function importOld(oldState: string, home: string): Counts {
 				size = 0
 			}
 			counts.bytes += Buffer.byteLength(line)
-			if (r.type === 'user') for (let b of r.blocks) if (b.type === 'image' && !existsSync(`${dir}/blobs/${b.blob}.${attachments.types[b.mediaType]}`)) {
-				let from = images.get(b.blob)
-				if (from) {
-					mkdirSync(`${dir}/blobs`, { recursive: true })
-					copyFileSync(from, `${dir}/blobs/${b.blob}.${attachments.types[b.mediaType]}`)
-				}
-			}
+			if (r.type === 'user')
+				for (let b of r.blocks)
+					if (b.type === 'image' && !existsSync(`${dir}/blobs/${b.blob}.${attachments.types[b.mediaType]}`)) {
+						let from = images.get(b.blob)
+						if (from) {
+							mkdirSync(`${dir}/blobs`, { recursive: true })
+							copyFileSync(from, `${dir}/blobs/${b.blob}.${attachments.types[b.mediaType]}`)
+						}
+					}
 		}
 		appendFileSync(path, chunks.join(''))
 		counts.records += n
@@ -251,6 +325,13 @@ if (import.meta.main) {
 	}
 	let t0 = performance.now()
 	let c = importer.importOld(oldState, home)
-	console.log(`${c.sessions} sessions (${c.open} open), ${c.records} records, ${(c.bytes / 1e6).toFixed(1)} MB in ${((performance.now() - t0) / 1000).toFixed(1)} s`)
-	if (Object.keys(c.dropped).length) console.log(`unknown record types skipped: ${Object.entries(c.dropped).map(([k, v]) => `${k} ${v}`).join(', ')}`)
+	console.log(
+		`${c.sessions} sessions (${c.open} open), ${c.records} records, ${(c.bytes / 1e6).toFixed(1)} MB in ${((performance.now() - t0) / 1000).toFixed(1)} s`,
+	)
+	if (Object.keys(c.dropped).length)
+		console.log(
+			`unknown record types skipped: ${Object.entries(c.dropped)
+				.map(([k, v]) => `${k} ${v}`)
+				.join(', ')}`,
+		)
 }

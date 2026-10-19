@@ -2,7 +2,14 @@
 // key credentials from src/host/auth.ts. Wire mapping:
 // tasks/7f/mapping.md; OAuth contract: tasks/ya/anthropic.ts.
 
-import { blocks, type ReplayBlock, type StopReason, type StreamEvent, type Usage, type UserBlock } from '../common/blocks.ts'
+import {
+	blocks,
+	type ReplayBlock,
+	type StopReason,
+	type StreamEvent,
+	type Usage,
+	type UserBlock,
+} from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
@@ -43,7 +50,9 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
 	}
 	let images = b.isError ? [] : blocks.resultImages(b)
-	let content = images.length ? [{ type: 'text', text: b.output }, ...images.map((image) => userBlock(image, req))] : b.output
+	let content = images.length
+		? [{ type: 'text', text: b.output }, ...images.map((image) => userBlock(image, req))]
+		: b.output
 	return { type: 'tool_result', tool_use_id: b.id, content, ...(b.isError ? { is_error: true } : {}) }
 }
 
@@ -54,7 +63,9 @@ function assistantBlock(b: ReplayBlock): unknown {
 	if (b.type === 'tool_call') return { type: 'tool_use', id: b.id, name: b.name, input: b.input }
 	if (b.provider !== 'anthropic' || !b.signature) return undefined
 	let data = redactedData(b.signature)
-	return data !== undefined ? { type: 'redacted_thinking', data } : { type: 'thinking', thinking: b.text, signature: b.signature }
+	return data !== undefined
+		? { type: 'redacted_thinking', data }
+		: { type: 'thinking', thinking: b.text, signature: b.signature }
 }
 
 function toMessages(req: ProviderRequest): any[] {
@@ -62,7 +73,12 @@ function toMessages(req: ProviderRequest): any[] {
 	let earlier: any
 	for (let m of req.messages) {
 		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
-		if (m.role === 'user') content.push(...m.blocks.flatMap((b) => b.type === 'tool_result' && b.isError ? blocks.resultImages(b).map((image) => userBlock(image, req)) : []))
+		if (m.role === 'user')
+			content.push(
+				...m.blocks.flatMap((b) =>
+					b.type === 'tool_result' && b.isError ? blocks.resultImages(b).map((image) => userBlock(image, req)) : [],
+				),
+			)
 		// The API rejects empty text blocks and empty messages.
 		let keep = (b: any) => b && (b.type !== 'text' || b.text !== '')
 		// The old input ended at its last block sent: foreign thinking and
@@ -91,16 +107,36 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	if (oauth) system.push({ type: 'text', text: IDENTITY })
 	// The model reads the blocks joined with no separator; a blank line
 	// keeps ours a paragraph of its own (constant, so caching holds).
-	if (req.system) system.push({ type: 'text', text: oauth ? `\n\n${req.system}` : req.system, cache_control: ephemeral })
-	let b: Record<string, unknown> = { model: req.model, max_tokens: maxTokens, stream: true, messages: anthropic.toMessages(req) }
+	if (req.system)
+		system.push({ type: 'text', text: oauth ? `\n\n${req.system}` : req.system, cache_control: ephemeral })
+	let b: Record<string, unknown> = {
+		model: req.model,
+		max_tokens: maxTokens,
+		stream: true,
+		messages: anthropic.toMessages(req),
+	}
 	if (system.length) b.system = system
-	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, ...(t.name === 'bash' ? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } } : { input_schema: t.inputSchema }) }))
-	if (req.tools?.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model) && (!auth.serperKey() || !registry.all().has('google'))) {
-		(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
+	if (req.tools?.length)
+		b.tools = req.tools.map((t) => ({
+			name: t.name,
+			description: t.description,
+			...(t.name === 'bash'
+				? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } }
+				: { input_schema: t.inputSchema }),
+		}))
+	if (
+		req.tools?.some((t) => t.name === 'tool') &&
+		catalog.webSearchModels.includes(req.model) &&
+		(!auth.serperKey() || !registry.all().has('google'))
+	) {
+		;(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
 	}
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
-		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget, maxTokens - 1024)) }
+		b.thinking = {
+			type: 'enabled',
+			budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget, maxTokens - 1024)),
+		}
 	}
 	Object.assign(b, effort.wire('anthropic', req.model, req.effort, maxTokens))
 	return b
@@ -108,7 +144,10 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 
 // Headers for the next usable account (auth.ts), which may be chosen
 // for `model`.
-async function headers(model?: string, req?: ProviderRequest): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
+async function headers(
+	model?: string,
+	req?: ProviderRequest,
+): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
 	let cred = await auth.anthropic(model, { session: req?.sessionId })
 	let oauth = cred.type === 'token'
 	let headers: Record<string, string> = oauth
@@ -198,21 +237,42 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			}
 			case 'content_block_start': {
 				let b = ev.content_block
-				if (b?.type === 'tool_use' || b?.type === 'server_tool_use') tools.set(ev.index, { id: b.id, name: b.name, json: '', input: b.input, ...(b.type === 'server_tool_use' && { server: true as const }) })
-				else if (b?.type === 'redacted_thinking') yield { type: 'signature', value: JSON.stringify({ redacted: b.data }) }
+				if (b?.type === 'tool_use' || b?.type === 'server_tool_use')
+					tools.set(ev.index, {
+						id: b.id,
+						name: b.name,
+						json: '',
+						input: b.input,
+						...(b.type === 'server_tool_use' && { server: true as const }),
+					})
+				else if (b?.type === 'redacted_thinking')
+					yield { type: 'signature', value: JSON.stringify({ redacted: b.data }) }
 				else if (b?.type === 'web_search_tool_result') {
 					let results: any[] = Array.isArray(b.content) ? b.content : []
 					let urls = results.map((r) => r?.url).filter((u): u is string => typeof u === 'string')
 					let failed = !Array.isArray(b.content)
-					let output = failed ? `Web search failed: ${b.content?.error_code ?? 'unknown error'}\n${m.data}` : urls.length ? ['Sources:', ...urls].join('\n') : ''
-					yield { type: 'hosted_tool', id: b.tool_use_id, name: 'web_search', input: searches.get(b.tool_use_id) ?? {}, output, ...(failed && { isError: true }) }
+					let output = failed
+						? `Web search failed: ${b.content?.error_code ?? 'unknown error'}\n${m.data}`
+						: urls.length
+							? ['Sources:', ...urls].join('\n')
+							: ''
+					yield {
+						type: 'hosted_tool',
+						id: b.tool_use_id,
+						name: 'web_search',
+						input: searches.get(b.tool_use_id) ?? {},
+						output,
+						...(failed && { isError: true }),
+					}
 				}
 				break
 			}
 			case 'content_block_delta': {
 				let d = ev.delta
-				if (d?.type === 'text_delta') { written += d.text; yield { type: 'text', text: d.text } }
-				else if (d?.type === 'citations_delta' && typeof d.citation?.url === 'string') cited.add(d.citation.url)
+				if (d?.type === 'text_delta') {
+					written += d.text
+					yield { type: 'text', text: d.text }
+				} else if (d?.type === 'citations_delta' && typeof d.citation?.url === 'string') cited.add(d.citation.url)
 				else if (d?.type === 'thinking_delta') yield { type: 'thinking', text: d.thinking }
 				else if (d?.type === 'signature_delta') yield { type: 'signature', value: d.signature }
 				else if (d?.type === 'input_json_delta') {
@@ -235,7 +295,8 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					}
 				}
 				if (t.server) {
-					if (input && typeof input === 'object' && !Array.isArray(input)) searches.set(t.id, input as Record<string, unknown>)
+					if (input && typeof input === 'object' && !Array.isArray(input))
+						searches.set(t.id, input as Record<string, unknown>)
 					break
 				}
 				if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -273,7 +334,14 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), spent: (account) => auth.spent(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels })
+	provider.register('anthropic', {
+		request: anthropic.request,
+		parse: anthropic.parse,
+		rejected: (account) => auth.rejected(account),
+		spent: (account) => auth.spent(account),
+		models: (signal) => anthropic.models(signal),
+		known: () => anthropic.knownModels,
+	})
 }
 
 export const anthropic = {
@@ -284,8 +352,12 @@ export const anthropic = {
 	maxTokens: 64_000,
 	thinkingBudget: 10_000,
 	// Offered when neither the account's list nor models.dev has any.
-	get knownModels() { return catalog.knownModels },
-	set knownModels(value: string[]) { catalog.knownModels = value },
+	get knownModels() {
+		return catalog.knownModels
+	},
+	set knownModels(value: string[]) {
+		catalog.knownModels = value
+	},
 	toMessages,
 	body,
 	headers,

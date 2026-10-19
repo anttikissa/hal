@@ -37,8 +37,18 @@ process.exit(n < 3 ? terminal.restartCode : 7)
 		let run = () => Bun.spawnSync(['./run', '--home', home], { cwd: `${import.meta.dir}/..` })
 		expect(run().exitCode).toBe(7)
 		expect(run().exitCode).toBe(7)
-		let starts = readFileSync(join(home, 'starts'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-		expect(starts).toEqual([{}, { last: 't1', cwd: '/c1' }, { last: 't2', cwd: '/c2' }, {}, { last: 't1', cwd: '/c1' }, { last: 't2', cwd: '/c2' }])
+		let starts = readFileSync(join(home, 'starts'), 'utf8')
+			.trim()
+			.split('\n')
+			.map((l) => JSON.parse(l))
+		expect(starts).toEqual([
+			{},
+			{ last: 't1', cwd: '/c1' },
+			{ last: 't2', cwd: '/c2' },
+			{},
+			{ last: 't1', cwd: '/c1' },
+			{ last: 't2', cwd: '/c2' },
+		])
 	} finally {
 		rmSync(home, { recursive: true, force: true })
 	}

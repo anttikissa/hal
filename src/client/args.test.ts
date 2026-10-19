@@ -2,7 +2,22 @@ import { expect, test } from 'bun:test'
 import { args } from './args.ts'
 
 test('unknown arguments are errors, never the terminal', () => {
-	for (let bad of [['--auth'], ['help', 'x'], ['foo'], ['-p'], ['-p', 'a', 'b'], ['-p', 'a', '-m'], ['-p', 'a', '-d', 'x', '-d', 'y'], ['-p', 'a', '-x'], ['-r', 'a', 'b'], ['auth', 'x'], ['serve', 'x'], ['serve', '--port'], ['serve', '--port', '0'], ['serve', '--port', '9001', 'x']])
+	for (let bad of [
+		['--auth'],
+		['help', 'x'],
+		['foo'],
+		['-p'],
+		['-p', 'a', 'b'],
+		['-p', 'a', '-m'],
+		['-p', 'a', '-d', 'x', '-d', 'y'],
+		['-p', 'a', '-x'],
+		['-r', 'a', 'b'],
+		['auth', 'x'],
+		['serve', 'x'],
+		['serve', '--port'],
+		['serve', '--port', '0'],
+		['serve', '--port', '9001', 'x'],
+	])
 		expect(args.parse(bad).kind).toBe('error')
 })
 
@@ -15,22 +30,53 @@ test('known forms parse, print options in any order', () => {
 	expect(args.parse(['serve', '--port', '9001'])).toEqual({ kind: 'serve', port: 9001 })
 	expect(args.parse(['-r'])).toEqual({ kind: 'remote' })
 	expect(args.parse(['-r', 'example.com'])).toEqual({ kind: 'remote', host: 'example.com' })
-	expect(args.parse(['-p', 'Tee raportti', '-d', '~/x', '-m', 'opus-5.5'])).toEqual({ kind: 'print', prompt: 'Tee raportti', dir: '~/x', model: 'opus-5.5' })
+	expect(args.parse(['-p', 'Tee raportti', '-d', '~/x', '-m', 'opus-5.5'])).toEqual({
+		kind: 'print',
+		prompt: 'Tee raportti',
+		dir: '~/x',
+		model: 'opus-5.5',
+	})
 	expect(args.parse(['-m', 'gpt', 'hi', '--print'])).toEqual({ kind: 'print', prompt: 'hi', model: 'gpt' })
 })
 
 test('print target and delivery flags validate combinations', () => {
-	expect(args.parse(['-p', 'answer', '--session', '07-bah', '--soft-steer'])).toEqual({ kind: 'print', prompt: 'answer', session: '07-bah', delivery: 'soft-steer' })
-	expect(args.parse(['-p', 'answer', '-s', '12', '--queue'])).toEqual({ kind: 'print', prompt: 'answer', session: '12', delivery: 'queue' })
+	expect(args.parse(['-p', 'answer', '--session', '07-bah', '--soft-steer'])).toEqual({
+		kind: 'print',
+		prompt: 'answer',
+		session: '07-bah',
+		delivery: 'soft-steer',
+	})
+	expect(args.parse(['-p', 'answer', '-s', '12', '--queue'])).toEqual({
+		kind: 'print',
+		prompt: 'answer',
+		session: '12',
+		delivery: 'queue',
+	})
 	expect(args.parse(['-p', 'answer', '--keep'])).toEqual({ kind: 'print', prompt: 'answer', keep: true })
-	expect(args.parse(['-p', 'answer', '--no-user', '--session', '12'])).toEqual({ kind: 'print', prompt: 'answer', session: '12', noUser: true })
+	expect(args.parse(['-p', 'answer', '--no-user', '--session', '12'])).toEqual({
+		kind: 'print',
+		prompt: 'answer',
+		session: '12',
+		noUser: true,
+	})
 	expect(args.parse(['--no-user'])).toEqual({ kind: 'terminal', noUser: true })
 	expect(args.parse(['serve', '--no-user'])).toEqual({ kind: 'serve', noUser: true })
 	expect(args.parse(['--home', '/h', '--no-user'])).toEqual({ kind: 'terminal', noUser: true, home: '/h' })
 	expect(args.parse(['-r', 'x', '--home', '/h'])).toEqual({ kind: 'remote', host: 'x', home: '/h' })
-	for (let bad of [['--home'], ['--home', '-p', 'x'], ['--home', '/a', '--home', '/b']]) expect(args.parse(bad).kind).toBe('error')
-	for (let bad of [['-r', '--no-user'], ['auth', '--no-user'], ['--no-user', '--no-user']]) expect(args.parse(bad).kind).toBe('error')
-	for (let flags of [['--session'], ['--session', '12', '--keep'], ['--steer', '--queue'], ['--session', '12', '-d', '/tmp']])
+	for (let bad of [['--home'], ['--home', '-p', 'x'], ['--home', '/a', '--home', '/b']])
+		expect(args.parse(bad).kind).toBe('error')
+	for (let bad of [
+		['-r', '--no-user'],
+		['auth', '--no-user'],
+		['--no-user', '--no-user'],
+	])
+		expect(args.parse(bad).kind).toBe('error')
+	for (let flags of [
+		['--session'],
+		['--session', '12', '--keep'],
+		['--steer', '--queue'],
+		['--session', '12', '-d', '/tmp'],
+	])
 		expect(args.parse(['-p', 'answer', ...flags]).kind).toBe('error')
 })
 
@@ -54,7 +100,8 @@ test('declarations reject duplicate aliases, missing values and wrong modes', ()
 		['serve', '--port', '1.5'],
 		['serve', '--port', '65536'],
 		['serve', '--port', 'no'],
-	]) expect(args.parse(bad).kind).toBe('error')
+	])
+		expect(args.parse(bad).kind).toBe('error')
 })
 
 test('command names remain values and parsing does not mutate argv or retain state', () => {

@@ -30,23 +30,42 @@ function validate(id: string, data: Record<string, any>): void {
 	for (let key of ['cwd', 'model', 'createdAt']) {
 		if (typeof data[key] !== 'string') throw new Error(`${path}: missing or invalid ${key}`)
 	}
-	if (data.closedAt !== undefined && (typeof data.closedAt !== 'string' || !Number.isFinite(Date.parse(data.closedAt)))) throw new Error(`${path}: invalid closedAt`)
+	if (data.closedAt !== undefined && (typeof data.closedAt !== 'string' || !Number.isFinite(Date.parse(data.closedAt))))
+		throw new Error(`${path}: invalid closedAt`)
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
-	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
-	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
-	if (data.slots !== undefined && (!Number.isSafeInteger(data.slots) || data.slots < 0)) throw new Error(`${path}: invalid slots`)
-	if (data.ownerCall !== undefined && (!Number.isSafeInteger(data.ownerCall) || data.ownerCall < 1 || !data.owner)) throw new Error(`${path}: invalid ownerCall`)
-	for (let key of ['owner', 'parent']) if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key]))) throw new Error(`${path}: invalid ${key}`)
+	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual')
+		throw new Error(`${path}: invalid nameOwner`)
+	for (let key of ['nameVersion', 'nameTurns'])
+		if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0))
+			throw new Error(`${path}: invalid ${key}`)
+	if (data.slots !== undefined && (!Number.isSafeInteger(data.slots) || data.slots < 0))
+		throw new Error(`${path}: invalid slots`)
+	if (data.ownerCall !== undefined && (!Number.isSafeInteger(data.ownerCall) || data.ownerCall < 1 || !data.owner))
+		throw new Error(`${path}: invalid ownerCall`)
+	for (let key of ['owner', 'parent'])
+		if (data[key] !== undefined && (typeof data[key] !== 'string' || !session.isId(data[key])))
+			throw new Error(`${path}: invalid ${key}`)
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
-	if (data.interactive !== undefined && typeof data.interactive !== 'boolean') throw new Error(`${path}: invalid interactive`)
-	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
+	if (data.interactive !== undefined && typeof data.interactive !== 'boolean')
+		throw new Error(`${path}: invalid interactive`)
+	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string')
+		throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
-	if (data.startingState !== undefined && (!data.startingState || typeof data.startingState.cwd !== 'string' || typeof data.startingState.model !== 'string' || typeof data.startingState.autoclose !== 'boolean')) throw new Error(`${path}: invalid startingState`)
+	if (
+		data.startingState !== undefined &&
+		(!data.startingState ||
+			typeof data.startingState.cwd !== 'string' ||
+			typeof data.startingState.model !== 'string' ||
+			typeof data.startingState.autoclose !== 'boolean')
+	)
+		throw new Error(`${path}: invalid startingState`)
 	// Unknown kinds and levels are ignored: card.verbosity falls back to the setting.
 	let blocks = data.blocks
-	if (blocks !== undefined && (!blocks || typeof blocks !== 'object' || Array.isArray(blocks))) throw new Error(`${path}: invalid blocks`)
+	if (blocks !== undefined && (!blocks || typeof blocks !== 'object' || Array.isArray(blocks)))
+		throw new Error(`${path}: invalid blocks`)
 	let bg = data.background
-	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
+	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string')))
+		throw new Error(`${path}: background must be a list of ids`)
 }
 
 // Loads and validates metadata as a liveFile. Throws if missing/invalid.
@@ -91,11 +110,26 @@ function claimId(now = new Date()): string {
 	let dayNo = Math.max(1, date - halDay(epoch).date + 1)
 	let day = String(dayNo).padStart(2, '0')
 	let extra = { 3: ['cpo'], 49: ['ers'], 123: ['ntp'], 179: ['bgp'], 445: ['smb'], 631: ['ipp'] }[dayNo] ?? []
-	let words = [...new Set([...readFileSync(`${import.meta.dir}/session-words.txt`, 'utf8').split(/\s+/).filter(Boolean), ...extra])].sort()
+	let words = [
+		...new Set([
+			...readFileSync(`${import.meta.dir}/session-words.txt`, 'utf8')
+				.split(/\s+/)
+				.filter(Boolean),
+			...extra,
+		]),
+	].sort()
 	let slot = (h: number) => words.slice(Math.floor((h * words.length) / 24), Math.floor(((h + 1) * words.length) / 24))
 	for (let attempt = 0; ; attempt++) {
-		let pool = attempt < 3 ? slot(hour) : attempt < 5 ? [hour - 1, hour, hour + 1].flatMap((h) => (h < 0 || h > 23 ? [] : slot(h))) : words
-		let word = attempt < 10 ? pool[Math.floor(Math.random() * pool.length)] : Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
+		let pool =
+			attempt < 3
+				? slot(hour)
+				: attempt < 5
+					? [hour - 1, hour, hour + 1].flatMap((h) => (h < 0 || h > 23 ? [] : slot(h)))
+					: words
+		let word =
+			attempt < 10
+				? pool[Math.floor(Math.random() * pool.length)]
+				: Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
 		let id = `${day}-${word}`
 		try {
 			mkdirSync(paths.sessionDir(id))
@@ -106,7 +140,13 @@ function claimId(now = new Date()): string {
 	}
 }
 
-function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean; interactive?: boolean }): SessionMeta {
+function create(init: {
+	cwd: string
+	model?: string
+	name?: string
+	autoclose?: boolean
+	interactive?: boolean
+}): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
 	let meta: SessionMeta = {
@@ -115,7 +155,11 @@ function create(init: { cwd: string; model?: string; name?: string; autoclose?: 
 		model: selection.id,
 		...(selection.effort !== undefined && { effort: selection.effort }),
 		createdAt: new Date().toISOString(),
-		startingState: { cwd: init.cwd, model: models.qualified(selection.id, selection.effort), autoclose: init.autoclose ?? false },
+		startingState: {
+			cwd: init.cwd,
+			model: models.qualified(selection.id, selection.effort),
+			autoclose: init.autoclose ?? false,
+		},
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
@@ -137,8 +181,12 @@ function open(id: string): SessionMeta {
 	let existing = sessions.state.open.get(id)
 	if (existing) return existing
 	let meta = sessions.load(id, false)
-	try { if (sessionSettings.recover(meta)) liveFiles.save(meta) }
-	catch (error) { liveFiles.close(meta); throw error }
+	try {
+		if (sessionSettings.recover(meta)) liveFiles.save(meta)
+	} catch (error) {
+		liveFiles.close(meta)
+		throw error
+	}
 	sessions.state.open.set(id, meta)
 	if (!meta.name?.trim() || meta.name === id) meta.name = names.fallback(id)
 	liveFiles.save(meta)
@@ -168,7 +216,9 @@ function openIds(): string[] {
 // named like a session id are sessions.
 function ids(): string[] {
 	if (!existsSync(paths.sessionsDir())) return []
-	return readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory() && session.isId(e.name)).map((e) => e.name)
+	return readdirSync(paths.sessionsDir(), { withFileTypes: true })
+		.filter((e) => e.isDirectory() && session.isId(e.name))
+		.map((e) => e.name)
 }
 
 // Every session directory on disk, open or not. Read-only: a broken one
@@ -198,7 +248,9 @@ function list(): SessionListing[] {
 // read, and the latest createdAt wins.
 function newest(): string | undefined {
 	if (!existsSync(paths.sessionsDir())) return undefined
-	let dirs = readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory() && /^\d+-/.test(e.name))
+	let dirs = readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter(
+		(e) => e.isDirectory() && /^\d+-/.test(e.name),
+	)
 	let best: { id: string; at: string } | undefined
 	for (let id of dirs.map((e) => e.name).sort((a, b) => parseInt(b) - parseInt(a))) {
 		if (best && parseInt(id) < parseInt(best.id)) break

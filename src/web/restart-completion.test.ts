@@ -10,7 +10,15 @@ import { restart } from './restart.ts'
 const sessionId = 'restart-test'
 const items = ['/restart all', '/restart host', '/restart both', '/restart local']
 let sent: any[] = []
-const original = { send: connection.send, connected: connection.connected, store: drafts.store, href: router.href, write: router.write, changed: app.changed, typed: restart.typed }
+const original = {
+	send: connection.send,
+	connected: connection.connected,
+	store: drafts.store,
+	href: router.href,
+	write: router.write,
+	changed: app.changed,
+	typed: restart.typed,
+}
 
 beforeEach(() => {
 	app.reset()
@@ -22,7 +30,15 @@ beforeEach(() => {
 	router.href = () => 'http://example.com/'
 	router.write = () => {}
 	app.changed = () => {}
-	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta: { id: sessionId, cwd: '/tmp', model: 'fake/m', createdAt: '2026-10-02T00:00:00Z' }, history: [], state: { type: 'idle' } } } as Event)
+	app.onEvent({
+		type: 'snapshot',
+		sessionId,
+		snapshot: {
+			meta: { id: sessionId, cwd: '/tmp', model: 'fake/m', createdAt: '2026-10-02T00:00:00Z' },
+			history: [],
+			state: { type: 'idle' },
+		},
+	} as Event)
 })
 
 afterEach(() => {
@@ -37,8 +53,19 @@ afterEach(() => {
 	app.reset()
 })
 
-const press = (key: string) => keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, { kind: 'message', text: app.state.text, cursor: app.state.text.length })
-const reply = (text: string) => app.onEvent({ type: 'completions', sessionId, text, items, descriptions: ['restart all (default)', 'restart the host', 'restart both', 'restart this client'] })
+const press = (key: string) =>
+	keys.key(
+		{ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false },
+		{ kind: 'message', text: app.state.text, cursor: app.state.text.length },
+	)
+const reply = (text: string) =>
+	app.onEvent({
+		type: 'completions',
+		sessionId,
+		text,
+		items,
+		descriptions: ['restart all (default)', 'restart the host', 'restart both', 'restart this client'],
+	})
 
 test('restart Tab fills all before or after suggestions arrive, without submission', () => {
 	for (let text of ['/restart', '/restart ']) {
@@ -70,7 +97,10 @@ test('Tab respects deliberately selected scope and stale replies cannot replace 
 
 test('passive restart scopes leave Enter running the original command, like cd', () => {
 	let run: string[] = []
-	restart.typed = (text) => { run.push(text); return text.trim() === '/restart' }
+	restart.typed = (text) => {
+		run.push(text)
+		return text.trim() === '/restart'
+	}
 	for (let text of ['/restart', '/restart ']) {
 		app.input(text)
 		reply(text)
@@ -94,8 +124,17 @@ test('Tab completes prefixes, not passive highlights, before or after model sugg
 	for (let ready of [false, true]) {
 		for (let { input, expected, candidates } of scenarios) {
 			app.input(input)
-			let event = { type: 'completions' as const, sessionId, text: input, items: candidates, descriptions: candidates.map((s) => s.slice(7)) }
-			if (ready) { app.onEvent(event); expect(app.state.text).toBe(input) }
+			let event = {
+				type: 'completions' as const,
+				sessionId,
+				text: input,
+				items: candidates,
+				descriptions: candidates.map((s) => s.slice(7)),
+			}
+			if (ready) {
+				app.onEvent(event)
+				expect(app.state.text).toBe(input)
+			}
 			press('Tab')
 			if (!ready) app.onEvent(event)
 			expect(app.state.text).toBe(expected)

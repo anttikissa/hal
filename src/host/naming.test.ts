@@ -8,7 +8,8 @@ import { names } from '../common/names.ts'
 useHost(true)
 
 test('absent model rename keeps placeholder and legacy backfill never copies a prompt', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	naming.manual(id)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'A long first request that must never become a session title' })
 	await until(() => calls.length > 0)

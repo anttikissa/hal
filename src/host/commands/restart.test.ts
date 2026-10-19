@@ -25,12 +25,21 @@ test('restart exposes described scopes but explicit completion fills its default
 })
 
 test('a flagged background job makes a model ask the user: two restarts refused, the third goes through', async () => {
-	let exits = 0, asks = 0, exit = restartProcess.run, write = restartNote.write, broadcast = host.broadcast, label = tabs.label
+	let exits = 0,
+		asks = 0,
+		exit = restartProcess.run,
+		write = restartNote.write,
+		broadcast = host.broadcast,
+		label = tabs.label
 	tabs.label = () => 's'
 	restartProcess.run = () => void exits++
 	restartNote.write = () => {}
 	host.broadcast = (_id, event) => void (event.type === 'restart-ask' && asks++)
-	jobs.state.running.set('s:7', { sessionId: 's', stop() {}, unsafe: { input: { command: 'migrate', unsafeToStop: true, background: true }, at: Date.now() } })
+	jobs.state.running.set('s:7', {
+		sessionId: 's',
+		stop() {},
+		unsafe: { input: { command: 'migrate', unsafeToStop: true, background: true }, at: Date.now() },
+	})
 	try {
 		let model = { ...ctx, sender: { origin: 'model' } } as any
 		let first = (await command.run('host', undefined, model)) as any

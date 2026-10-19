@@ -35,7 +35,12 @@ export type LinkOptions = {
 	onMessage?: (ms: number, bytes: number, event: Event) => void
 }
 
-function transport(dial: () => Socket, reload: () => void = () => {}, authorized?: () => Promise<boolean>, onMessage?: LinkOptions['onMessage']): Transport {
+function transport(
+	dial: () => Socket,
+	reload: () => void = () => {},
+	authorized?: () => Promise<boolean>,
+	onMessage?: LinkOptions['onMessage'],
+): Transport {
 	return {
 		connect: (on) =>
 			new Promise((resolve) => {
@@ -43,7 +48,10 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 				let open = false
 				// A dial into a dead network may hang for minutes: give up and retry.
 				let timer = setTimeout(() => open || socket.close(), wsLink.connectMs)
-				let conn: Conn = { send: (command) => socket.send(ason.stringify(command, 'short')), close: () => socket.close() }
+				let conn: Conn = {
+					send: (command) => socket.send(ason.stringify(command, 'short')),
+					close: () => socket.close(),
+				}
 				socket.onopen = () => {
 					open = true
 					clearTimeout(timer)
@@ -57,7 +65,8 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 					} catch {
 						return
 					}
-					if (event.type === 'snapshot') onMessage?.(performance.now() - start, new TextEncoder().encode(String(m.data)).byteLength, event)
+					if (event.type === 'snapshot')
+						onMessage?.(performance.now() - start, new TextEncoder().encode(String(m.data)).byteLength, event)
 					on.event(event)
 				}
 				socket.onclose = (ev) => {

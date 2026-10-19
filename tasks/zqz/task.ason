@@ -1,0 +1,10 @@
+{
+	title: 'Code is formatted with oxfmt',
+	spec: 'oxfmt (pinned devDependency) formats code and JSON with .oxfmtrc.json: tabs, no semicolons, single quotes, width 120, package.json key order kept. Markdown and tasks/ are excluded: their wrapping is hand-made and tasks hold artifacts. AGENTS.md tells agents to run bunx oxfmt. The style matches the old Hal Prettier setup (tabs, no semicolons, single quotes, 120).',
+	status: 'done',
+	notes: [
+		'Formatting at width 120 put 20 modules over the 450-line limit in conventions.test.ts. The user accepted that: the limit will be revised separately. oxfmt 0.73.0 needed a second pass for src/host/find-worker.ts and intro-fun.ts. Run it until --check passes.'
+	],
+	needs: ['5t'],
+	foldInto: ['5t']
+}

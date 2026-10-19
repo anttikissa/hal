@@ -36,12 +36,19 @@ function view(): View {
 	// An example request over the prompt (placeholders.follow); none for
 	// the intro or while a question waits: neither takes requests.
 	let t = st.transcript
-	let list = t && t.meta.model !== 'hal/intro' && !st.form ? (app.focusedTab()?.hal ? placeholders.hal : placeholders.general) : undefined
+	let list =
+		t && t.meta.model !== 'hal/intro' && !st.form
+			? app.focusedTab()?.hal
+				? placeholders.hal
+				: placeholders.general
+			: undefined
 	let example = placeholders.follow(appView.state.example, t?.meta.id ?? '', list, st.prompt.text, pulse.now())
 	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
-	if (v.tabs && tabBar.blinks(st.tabs)) Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
-	let stopped = t && appView.why(t), notice = st.notice ?? (t && (queueEdit.notice(t) ?? inbox.heldNotice(t))) ?? versions.notice()
+	if (v.tabs && tabBar.blinks(st.tabs))
+		Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
+	let stopped = t && appView.why(t),
+		notice = st.notice ?? (t && (queueEdit.notice(t) ?? inbox.heldNotice(t))) ?? versions.notice()
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
 	if (st.notice) v.noticeClearable = true
@@ -57,7 +64,15 @@ function view(): View {
 	let tick = t && appView.tick(t, Date.now())
 	if (tick) v.tick = tick
 	let now = pulse.now()
-	if (t?.items.slice(-20).some((i) => i.type === 'tool' && i.name === 'bash' && bashCard.scrolling(i.input.command, now - Date.parse(i.ts ?? '')))) v.now = now
+	if (
+		t?.items
+			.slice(-20)
+			.some(
+				(i) =>
+					i.type === 'tool' && i.name === 'bash' && bashCard.scrolling(i.input.command, now - Date.parse(i.ts ?? '')),
+			)
+	)
+		v.now = now
 	if (t) v.status = appView.status(t)
 	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
 	return v
@@ -94,7 +109,8 @@ function activity(t: Transcript): string | undefined {
 
 // Why a stopped session waits and what the user can do, in full.
 function why(t: Transcript): string | undefined {
-	if (queueEdit.waiting(t)) return 'The next queued message is being edited. It is sent when the edit is saved or canceled.'
+	if (queueEdit.waiting(t))
+		return 'The next queued message is being edited. It is sent when the edit is saved or canceled.'
 	let s = t.state
 	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
 	// Paused. and the help row's enter: continue say the rest.
@@ -120,7 +136,9 @@ function tick(t: Transcript, now: number, beat = pulse.beat()): View['tick'] {
 // a ticking time counts.
 function blinks(view: View): string {
 	let lit = view.tabs?.lit
-	return view.hal || lit !== undefined || view.tick || view.now !== undefined ? JSON.stringify([view.hal, lit, view.tabs?.alt, view.tick, view.now]) : ''
+	return view.hal || lit !== undefined || view.tick || view.now !== undefined
+		? JSON.stringify([view.hal, lit, view.tabs?.alt, view.tick, view.now])
+		: ''
 }
 
 export const appView = {
@@ -129,7 +147,12 @@ export const appView = {
 	// `plugins`: the plugin sync indicator of a remote terminal (b81).
 	// `example`: the prompt example's clock (placeholders.follow).
 	// `noUser`: the host runs with --no-user (host-mode event).
-	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined, example: {} as PromptExample, noUser: false },
+	state: {
+		remote: undefined as string | undefined,
+		plugins: undefined as string | undefined,
+		example: {} as PromptExample,
+		noUser: false,
+	},
 	view,
 	status,
 	activity,

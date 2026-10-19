@@ -30,7 +30,9 @@ function row(keys: string, description: string, sums?: string[]): KeyRow {
 // The rows of command `name`, one per binding.
 function command(name: string): KeyRow[] {
 	let c = commandList.byName(name)!
-	return commandList.bindings(c).map((b) => ({ ...row(b.key, c.description), command: b.args ? `${name} ${b.args}` : name }))
+	return commandList
+		.bindings(c)
+		.map((b) => ({ ...row(b.key, c.description), command: b.args ? `${name} ${b.args}` : name }))
 }
 
 const digits = [...'1234567890'].map((d) => `alt-${d}`)
@@ -41,8 +43,14 @@ function sections(): KeySection[] {
 			title: 'Prompt',
 			rows: [
 				row('enter', 'send the prompt; on an empty prompt, continue'),
-				row(sendKeys.key('steer') ?? 'no key', 'while working: steer, stopping the reply and tools (not unsafe-to-stop or background ones); on an empty prompt, send the next queued message so'),
-				row(sendKeys.key('soft-steer') ?? 'no key', 'while working: soft-steer, sent at the next step without stopping anything; on an empty prompt, send the next queued message so'),
+				row(
+					sendKeys.key('steer') ?? 'no key',
+					'while working: steer, stopping the reply and tools (not unsafe-to-stop or background ones); on an empty prompt, send the next queued message so',
+				),
+				row(
+					sendKeys.key('soft-steer') ?? 'no key',
+					'while working: soft-steer, sent at the next step without stopping anything; on an empty prompt, send the next queued message so',
+				),
 				row('shift-enter', 'new line'),
 				row(sendKeys.key('queue') ?? 'no key', 'queue the prompt to run after the turn'),
 				row('escape', 'pause the turn; leave editing the last prompt'),
@@ -61,7 +69,14 @@ function sections(): KeySection[] {
 				row('up / down', 'move by row; past the edges, browse sent prompts'),
 				row('home / end / ctrl-a / ctrl-e', 'start or end of the line'),
 				row('cmd-left / cmd-right / alt-up / alt-down', 'start or end of the text'),
-				row('shift-<move>', 'extend the selection', ['shift-left', 'shift-right', 'shift-up', 'shift-down', 'shift-home', 'shift-end']),
+				row('shift-<move>', 'extend the selection', [
+					'shift-left',
+					'shift-right',
+					'shift-up',
+					'shift-down',
+					'shift-home',
+					'shift-end',
+				]),
 				row('backspace / delete / ctrl-d', 'delete a character (ctrl-d on an empty prompt quits)'),
 				row('alt-backspace', 'delete the previous word'),
 				row('ctrl-k / ctrl-u / alt-d', 'kill to line end, line start, word end'),
@@ -110,7 +125,8 @@ function render(): string {
 	let parts = ['Keys:']
 	for (let section of keyHelp.sections()) {
 		parts.push('', `${section.title}:`)
-		for (let r of section.rows) parts.push(`  ${r.keys.padEnd(keys)}  ${(r.command ? `/${r.command}` : '').padEnd(names)}  ${r.description}`)
+		for (let r of section.rows)
+			parts.push(`  ${r.keys.padEnd(keys)}  ${(r.command ? `/${r.command}` : '').padEnd(names)}  ${r.description}`)
 	}
 	return parts.join('\n')
 }

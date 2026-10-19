@@ -6,8 +6,13 @@ import { view, type ViewState } from './view.ts'
 import { hrefs } from './hrefs.ts'
 
 let originalNames: Record<string, string>
-beforeEach(() => { originalNames = titles.names; titles.names = {} })
-afterEach(() => { titles.names = originalNames })
+beforeEach(() => {
+	originalNames = titles.names
+	titles.names = {}
+})
+afterEach(() => {
+	titles.names = originalNames
+})
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -18,12 +23,24 @@ const shown = (st: ViewState) => st.transcript!.items.map((i) => view.show(i)).f
 
 test('events fold into what the page shows, like the terminal transcript', () => {
 	let st = fold([
-		{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } },
+		{
+			type: 'snapshot',
+			sessionId,
+			snapshot: {
+				meta,
+				history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }],
+				state: { type: 'idle' },
+			},
+		},
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
 		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'he' } },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'llo' } },
-		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 't', name: 'bash', input: { command: 'ls -l', description: 'List files' } } },
+		{
+			type: 'stream',
+			sessionId,
+			event: { type: 'tool_call', id: 't', name: 'bash', input: { command: 'ls -l', description: 'List files' } },
+		},
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't', output: 'a\nb\n' }] },
 		{ type: 'turn-end', sessionId, status: 'paused' },
 		{ type: 'turn-start', sessionId, prompt: 'again', provider: 'fake' },
@@ -78,7 +95,10 @@ test('Enter and Escape follow the session state', () => {
 	let busy = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'running', phase: 'streaming' } })
 	expect(view.submit(busy, '')).toEqual({ keep: false })
 	expect(view.submit(busy, 'more')).toEqual({ command: { type: 'submit', sessionId, text: 'more' }, keep: false })
-	expect(view.submit(busy, 'later', 'queue')).toEqual({ command: { type: 'submit', sessionId, text: 'later', delivery: 'queue' }, keep: false })
+	expect(view.submit(busy, 'later', 'queue')).toEqual({
+		command: { type: 'submit', sessionId, text: 'later', delivery: 'queue' },
+		keep: false,
+	})
 	expect(view.pause(busy)).toEqual({ type: 'pause', sessionId })
 	let paused = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'paused' } })
 	expect(view.submit(paused, '')).toEqual({ command: { type: 'continue', sessionId }, keep: false })
@@ -95,12 +115,22 @@ test('idle Continue still nudges after a directory command following the final a
 	])
 	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
 	expect(view.nudge(empty, 0)).toBeTruthy()
-	let greeting = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'output', text: 'Hello.', synthetic: true, ts }], state: { type: 'idle' } } }])
+	let greeting = fold([
+		{
+			type: 'snapshot',
+			sessionId,
+			snapshot: { meta, history: [{ type: 'output', text: 'Hello.', synthetic: true, ts }], state: { type: 'idle' } },
+		},
+	])
 	expect(view.nudge(greeting, 0)).toBeTruthy()
 	let text = view.nudge(st, 0)!
 	expect(text).toBeTruthy()
 	expect(view.submit(st, text)).toEqual({ command: { type: 'submit', sessionId, text }, keep: false })
-	for (let state of [{ type: 'running', phase: 'streaming' }, { type: 'paused' }, { type: 'blocked', reason: 'question' }] as const) {
+	for (let state of [
+		{ type: 'running', phase: 'streaming' },
+		{ type: 'paused' },
+		{ type: 'blocked', reason: 'question' },
+	] as const) {
 		expect(view.nudge(view.onEvent(st, { type: 'state', sessionId, state }), 0)).toBeUndefined()
 	}
 })
@@ -112,13 +142,18 @@ test('a tool gets a class for its name that no name can break out of', () => {
 })
 
 test('the open question is filled in with browser keys and answered; afterwards it shows its quote and the answer', () => {
-	let form = { text: 'Create it?', quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }] }
+	let form = {
+		text: 'Create it?',
+		quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] },
+		fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }],
+	}
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } },
 		{ type: 'question', sessionId, id: 'q1', form },
 	])
 	expect(st.form?.id).toBe('q1')
-	let browser = (key: string, mods = {}) => view.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods })
+	let browser = (key: string, mods = {}) =>
+		view.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods })
 	expect(browser('Shift')).toBeUndefined()
 	let left = view.formKey(st, browser('ArrowLeft')!)
 	expect(left.command).toBeUndefined()
@@ -140,11 +175,18 @@ test('Up on an empty input while the model works edits the last prompt; Enter se
 	expect(up).toMatchObject({ command: { type: 'pause', sessionId }, text: 'fix ti' })
 	let editing = fold([{ type: 'state', sessionId, state: { type: 'paused' } }], up.view)
 	expect(view.hints(editing, 'fix ti').some(([key]) => key === 'enter')).toBe(false)
-	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: '/edit 5\nfix it' }, keep: false })
+	expect(view.submit(editing, 'fix it')).toEqual({
+		command: { type: 'submit', sessionId, text: '/edit 5\nfix it' },
+		keep: false,
+	})
 	expect(view.editKey(editing, 'down', 'fix it')).toBeUndefined()
 	let down = view.editKey(editing, 'down', 'fix ti')!
 	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
-	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
+	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({
+		view: { ...editing, editing: undefined },
+		command: { type: 'continue', sessionId },
+		text: '',
+	})
 })
 
 test('commands show who sent them, and their output; a canceled question says so', () => {
@@ -180,8 +222,12 @@ test('Tab asks the host to complete a command; its answer fills the box only if 
 
 test('Ctrl-M opens the model picker from the host list; typing filters, Enter switches, Escape closes', () => {
 	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
-	expect(view.commandKey(st, view.key({ key: 'm', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false })!, false)).toEqual({ type: 'models', sessionId })
-	expect(view.commandKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!, false)).toBeUndefined()
+	expect(
+		view.commandKey(st, view.key({ key: 'm', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false })!, false),
+	).toEqual({ type: 'models', sessionId })
+	expect(
+		view.commandKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!, false),
+	).toBeUndefined()
 	let items = ['fake/m', 'x/step-3.5-flash', 'anthropic/claude-opus-5-5']
 	st = view.onEvent(st, { type: 'models', sessionId, current: 'fake/m', items })
 	expect(st.modal?.tree?.rows[st.modal.selected]?.id).toBe('fake/m')
@@ -203,7 +249,9 @@ const running = (items: Event[], state: object) =>
 	fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
-		...items, { type: 'state', sessionId, state } as Event] as Event[])
+		...items,
+		{ type: 'state', sessionId, state } as Event,
+	] as Event[])
 
 test('the status line says what the session is doing, like the terminal', () => {
 	let line = (st: ViewState, connected = true) => view.line(st, connected)
@@ -211,7 +259,10 @@ test('the status line says what the session is doing, like the terminal', () => 
 	expect(line(idle)).toEqual({ text: 'idle', tone: 'idle' })
 	let asking = running([], { type: 'running', phase: 'requesting' })
 	expect(line(asking)).toEqual({ text: 'processing', tone: 'busy' })
-	let thinking = running([{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } }] as Event[], { type: 'running', phase: 'streaming' })
+	let thinking = running([{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } }] as Event[], {
+		type: 'running',
+		phase: 'streaming',
+	})
 	expect(line(thinking)).toEqual({ text: 'thinking', tone: 'busy' })
 	expect(view.streaming(thinking)).toBe('thinking')
 	let writing = running(
@@ -228,12 +279,22 @@ test('the status line says what the session is doing, like the terminal', () => 
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
 	] as Event[]
-	expect(line(running(calls, { type: 'running', phase: 'tools' }))).toEqual({ text: 'running bash, read', tone: 'busy' })
+	expect(line(running(calls, { type: 'running', phase: 'tools' }))).toEqual({
+		text: 'running bash, read',
+		tone: 'busy',
+	})
 	// Nothing streams into a tool call or while idle: the cursor has a
 	// line of its own.
 	expect(view.streaming(running(calls, { type: 'running', phase: 'streaming' }))).toBeUndefined()
-	expect(view.streaming(running([{ type: 'stream', sessionId, event: { type: 'text', text: 'hi' } }] as Event[], { type: 'idle' }))).toBeUndefined()
-	let one = running([...calls, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: '' }] }] as Event[], { type: 'running', phase: 'tools' })
+	expect(
+		view.streaming(
+			running([{ type: 'stream', sessionId, event: { type: 'text', text: 'hi' } }] as Event[], { type: 'idle' }),
+		),
+	).toBeUndefined()
+	let one = running(
+		[...calls, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: '' }] }] as Event[],
+		{ type: 'running', phase: 'tools' },
+	)
 	expect(line(one)).toEqual({ text: 'running read', tone: 'busy' })
 	let paused = running([], { type: 'paused' })
 	expect(line(paused).text).toMatch(/^paused/)
@@ -251,7 +312,14 @@ test('rows pair each tool call with its result and drop completed turn ends', ()
 		[
 			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
 			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
-			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'b', output: 'B' }, { type: 'tool_result', id: 'a', output: 'A' }] },
+			{
+				type: 'tool-results',
+				sessionId,
+				results: [
+					{ type: 'tool_result', id: 'b', output: 'B' },
+					{ type: 'tool_result', id: 'a', output: 'A' },
+				],
+			},
 			{ type: 'stream', sessionId, event: { type: 'text', text: 'done' } },
 			{ type: 'turn-end', sessionId, status: 'completed' },
 		] as Event[],
@@ -285,10 +353,13 @@ test('rows only grow at the end as items arrive', () => {
 })
 
 test('streaming updates only its row; results replace their call row without mutating it', () => {
-	let st = running([
-		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'one' } },
-	] as Event[], { type: 'idle' })
+	let st = running(
+		[
+			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'one' } },
+		] as Event[],
+		{ type: 'idle' },
+	)
 	let before = view.rows(st.transcript!.items)
 	st = view.onEvent(st, { type: 'stream', sessionId, event: { type: 'text', text: ' two' } })
 	let streamed = view.rows(st.transcript!.items, st.sent, before)
@@ -296,7 +367,11 @@ test('streaming updates only its row; results replace their call row without mut
 	expect(streamed[1]).toBe(before[1])
 	expect(streamed.at(-1)).not.toBe(before.at(-1))
 	expect(view.rows(st.transcript!.items, st.sent, streamed)).toBe(streamed)
-	st = view.onEvent(st, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'done' }] })
+	st = view.onEvent(st, {
+		type: 'tool-results',
+		sessionId,
+		results: [{ type: 'tool_result', id: 'a', output: 'done' }],
+	})
 	let completed = view.rows(st.transcript!.items, st.sent, streamed)
 	expect(completed[1]).not.toBe(streamed[1])
 	expect(completed[1]!.result?.output).toBe('done')
@@ -325,8 +400,17 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 })
 
 test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {
-	expect(hrefs.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123.png', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' }, '!'])
-	expect(hrefs.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
+	expect(hrefs.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual([
+		'see ',
+		{ href: '/image/abc123.png', text: '[image/abc123.png]' },
+		' and ',
+		{ href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' },
+		'!',
+	])
+	expect(hrefs.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([
+		{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' },
+		' [paste/0005ab.png]',
+	])
 	expect(hrefs.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })
 
@@ -341,18 +425,24 @@ test('Bash headers own status; output and original source data remain complete',
 })
 
 test('question URLs preserve OAuth parameters and plain text, excluding prose punctuation', () => {
-	let url = 'https://example.com/oauth/authorize?client_id=abc-def&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=user%3Aprofile&state=a_b#fragment'
+	let url =
+		'https://example.com/oauth/authorize?client_id=abc-def&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=user%3Aprofile&state=a_b#fragment'
 	let text = `Open (${url}).\nThen paste code#state; **literal** <script>bad()</script> javascript:bad() data:text/html,bad`
 	let parts = hrefs.urlParts(text)
 	expect(parts.filter((p) => typeof p !== 'string')).toEqual([{ href: url, text: url }])
-	expect(parts.map((p) => typeof p === 'string' ? p : p.text).join('')).toBe(text)
+	expect(parts.map((p) => (typeof p === 'string' ? p : p.text)).join('')).toBe(text)
 	expect(hrefs.urlParts('See http://example.org/a_(b), then https://example.net/!')).toEqual([
-		'See ', { href: 'http://example.org/a_(b)', text: 'http://example.org/a_(b)' }, ', then ',
-		{ href: 'https://example.net/', text: 'https://example.net/' }, '!',
+		'See ',
+		{ href: 'http://example.org/a_(b)', text: 'http://example.org/a_(b)' },
+		', then ',
+		{ href: 'https://example.net/', text: 'https://example.net/' },
+		'!',
 	])
 })
 
 test('legacy rename suffixes stay hidden without a naming flag', () => {
-	expect(view.show({ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' })?.text).toBe('Done.')
+	expect(
+		view.show({ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' })?.text,
+	).toBe('Done.')
 	expect(view.show({ type: 'text', text: '<summary>Stopped.</summary>' })?.text).toBe('Stopped.')
 })

@@ -11,7 +11,8 @@ function isDir(path: string): boolean {
 }
 
 export const command: SlashCommand = {
-	help: () => '/cd <dir>: change this session\'s working directory and safely interrupt and continue active work (~ is home; relative to the current one). Offers to create a missing directory.\n/cd alone goes to the Hal home.\n/cd - goes back.',
+	help: () =>
+		"/cd <dir>: change this session's working directory and safely interrupt and continue active work (~ is home; relative to the current one). Offers to create a missing directory.\n/cd alone goes to the Hal home.\n/cd - goes back.",
 	complete(args: string, ctx: Context): string[] {
 		if (args === '~') return ['~/']
 		let head = args.slice(0, args.lastIndexOf('/') + 1)
@@ -20,7 +21,9 @@ export const command: SlashCommand = {
 		// Sorted, so an exact match precedes its longer siblings (.hal before .hal-fresh).
 		return readdirSync(dir)
 			.sort()
-			.filter((name) => name.startsWith(base) && (base.startsWith('.') || !name.startsWith('.')) && isDir(`${dir}/${name}`))
+			.filter(
+				(name) => name.startsWith(base) && (base.startsWith('.') || !name.startsWith('.')) && isDir(`${dir}/${name}`),
+			)
 			.map((name) => `${head}${name}/`)
 	},
 	run(args, answers, ctx) {
@@ -29,7 +32,13 @@ export const command: SlashCommand = {
 		let stat = statSync(path, { throwIfNoEntry: false })
 		if (stat && !stat.isDirectory()) return { error: `${path}: not a directory` }
 		if (!stat) {
-			if (!answers) return { ask: { text: `${path}: directory not found. Create it?`, fields: [{ type: 'choice', name: 'create', options: ['yes', 'no'], initial: 0 }] } }
+			if (!answers)
+				return {
+					ask: {
+						text: `${path}: directory not found. Create it?`,
+						fields: [{ type: 'choice', name: 'create', options: ['yes', 'no'], initial: 0 }],
+					},
+				}
 			if (answers.create !== 'yes') return { say: `still in ${ctx.cwd}` }
 			mkdirSync(path, { recursive: true })
 		}

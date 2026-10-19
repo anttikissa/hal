@@ -2,11 +2,26 @@ import { expect, test } from 'bun:test'
 import { findDialog } from './find-dialog.ts'
 import type { FindKind, FindResult } from './find.ts'
 
-const hit = (blockId: string, score: number, kind: FindKind = 'user'): FindResult => ({ sessionId: '1-abc', name: 'Example', blockId, kind, age: 0, score, snippet: 'needle', href: `/1-abc#${blockId}` })
+const hit = (blockId: string, score: number, kind: FindKind = 'user'): FindResult => ({
+	sessionId: '1-abc',
+	name: 'Example',
+	blockId,
+	kind,
+	age: 0,
+	score,
+	snippet: 'needle',
+	href: `/1-abc#${blockId}`,
+})
 test('stream replacements rank before navigation, then preserve rows and ignore stale/done batches', () => {
 	let m = findDialog.input(findDialog.open([...findDialog.filters]), 'needle')
 	m.find!.request = 'a'
-	let batch = (results: FindResult[], tier: FindKind = 'user', done = false) => ({ type: 'find-results' as const, request: 'a', tier, results, done })
+	let batch = (results: FindResult[], tier: FindKind = 'user', done = false) => ({
+		type: 'find-results' as const,
+		request: 'a',
+		tier,
+		results,
+		done,
+	})
 	m = findDialog.batch(m, batch([hit('1', 1)]))
 	m = findDialog.batch(m, batch([hit('2', 5), hit('1', 1)]))
 	expect(m.find!.results.map((r) => r.blockId)).toEqual(['2', '1'])

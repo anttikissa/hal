@@ -15,7 +15,8 @@ afterEach(() => config.reset())
 test('bare /config opens the modal with values and what config.ason holds; a change refreshes it', async () => {
 	config.state.data!.extra = 'kept'
 	config.state.data!.push = false
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config' })
 	await until(() => c.of('settings').length)
 	let opened = c.of('settings')[0]
@@ -25,12 +26,17 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 	expect(history.readSync(id).some((r) => r.type === 'question' || r.type === 'command')).toBe(false)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config webPort 4321' })
 	await until(() => c.of('settings').length === 2)
-	expect(c.of('settings')[1]).toMatchObject({ refresh: true, stored: { push: 'push: false', webPort: 'webPort: 4321' } })
+	expect(c.of('settings')[1]).toMatchObject({
+		refresh: true,
+		stored: { push: 'push: false', webPort: 'webPort: 4321' },
+	})
 	// The file points to /config; other keys and the user's comments stay.
 	let text = readFileSync(`${testHome()}/config.ason`, 'utf8')
 	expect(text).toStartWith('{\n\t// Every setting, its default and meaning: /config\n')
 	// A key /config writes carries its description and default.
-	expect(text).toContain('\t// Preferred port for the browser client (127.0.0.1); tries through 9100\n\t// if busy. Default: 9001.\n\twebPort: 4321')
+	expect(text).toContain(
+		'\t// Preferred port for the browser client (127.0.0.1); tries through 9100\n\t// if busy. Default: 9001.\n\twebPort: 4321',
+	)
 	expect(ason.parse(text)).toEqual({ model: 'anthropic/claude-opus-5-5', extra: 'kept', push: false, webPort: 4321 })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config push true' })
 	await until(() => c.of('settings').length === 3)
@@ -40,7 +46,8 @@ test('bare /config opens the modal with values and what config.ason holds; a cha
 })
 
 test('direct commands validate values, and a malformed config is never overwritten', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config push false' })
 	await until(() => settings.push() === false)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/config webPort nope' })

@@ -21,7 +21,12 @@ import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
 const saved = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
-const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
+const orig = {
+	apiUrl: openai.apiUrl,
+	codexUrl: openai.codexUrl,
+	codexModelsUrl: openai.codexModelsUrl,
+	tokenUrl: auth.tokenUrl,
+}
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: { path: string; headers: Headers; body: any }[] = []
@@ -35,15 +40,26 @@ let wsOutput: object[] = []
 
 const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
-const sse = (...events: object[]) => new Response(events.map((e) => `event: ${(e as any).type}\ndata: ${JSON.stringify(e)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } })
-const completed = (usage?: object) => ({ type: 'response.completed', response: { status: 'completed', ...(usage && { usage }) } })
-const writeAuth = (data: object) => writeFileSync(`${home}/secrets/auth.ason`, ason.stringify(data) + '\n', { mode: 0o600 })
+const sse = (...events: object[]) =>
+	new Response(events.map((e) => `event: ${(e as any).type}\ndata: ${JSON.stringify(e)}\n\n`).join(''), {
+		headers: { 'content-type': 'text/event-stream' },
+	})
+const completed = (usage?: object) => ({
+	type: 'response.completed',
+	response: { status: 'completed', ...(usage && { usage }) },
+})
+const writeAuth = (data: object) =>
+	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify(data) + '\n', { mode: 0o600 })
 
 // Bodies arrive compressed, as the real APIs take them.
 const bodyOf = async (req: Request) => {
 	let bytes = new Uint8Array(await req.arrayBuffer())
 	let enc = req.headers.get('content-encoding')
-	return JSON.parse(new TextDecoder().decode(enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes))
+	return JSON.parse(
+		new TextDecoder().decode(
+			enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes,
+		),
+	)
 }
 
 beforeEach(() => {
@@ -68,16 +84,35 @@ beforeEach(() => {
 				wsSeen!.push(body)
 				let id = `resp-${wsSeen!.length}`
 				let response = { id, previous_response_id: body.previous_response_id }
-				for (let e of [...wsBefore, { type: 'response.created', response }, ...wsOutput, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
+				for (let e of [
+					...wsBefore,
+					{ type: 'response.created', response },
+					...wsOutput,
+					{ type: 'response.output_text.delta', delta: 'ok' },
+					{ type: 'response.completed', response: { ...response, status: 'completed' } },
+				])
+					ws.send(JSON.stringify(e))
 			},
 		},
 		async fetch(req, srv) {
 			let path = new URL(req.url).pathname
-			if (req.headers.get('upgrade') === 'websocket') return wsSeen && srv.upgrade(req, { data: null }) ? (undefined as unknown as Response) : new Response('no', { status: 426 })
-			if (path === '/token') return Response.json({ access_token: subscriptionToken, refresh_token: 'r2', expires_in: 3600 })
+			if (req.headers.get('upgrade') === 'websocket')
+				return wsSeen && srv.upgrade(req, { data: null })
+					? (undefined as unknown as Response)
+					: new Response('no', { status: 426 })
+			if (path === '/token')
+				return Response.json({ access_token: subscriptionToken, refresh_token: 'r2', expires_in: 3600 })
 			if (path === '/codex/models') {
 				seen.push({ path, headers: req.headers, body: null })
-				return catalogReply?.(req) ?? Response.json({ models: [{ slug: 'gpt-6-sol', visibility: 'list' }, { slug: 'gpt-reserve', visibility: 'hide' }] })
+				return (
+					catalogReply?.(req) ??
+					Response.json({
+						models: [
+							{ slug: 'gpt-6-sol', visibility: 'list' },
+							{ slug: 'gpt-reserve', visibility: 'hide' },
+						],
+					})
+				)
 			}
 			seen.push({ path, headers: req.headers, body: await bodyOf(req) })
 			return reply()
@@ -125,7 +160,14 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	expect(seen[0]!.headers.get('session_id')).toBe('sess-1')
 	expect(seen[0]!.headers.get('content-encoding')).toBe('zstd')
-	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1', text: { verbosity: 'low' } })
+	expect(seen[0]!.body).toMatchObject({
+		model: 'gpt-5.5',
+		store: false,
+		stream: true,
+		instructions: 'be brief',
+		prompt_cache_key: 'sess-1',
+		text: { verbosity: 'low' },
+	})
 	expect(seen[0]!.body.max_output_tokens).toBeUndefined()
 
 	rmSync(`${home}/secrets/auth.ason`)
@@ -162,24 +204,49 @@ test('a token with the Responses scope goes to api.openai.com; one naming no acc
 test('history maps to Responses input, replaying only its own reasoning', async () => {
 	process.env.OPENAI_API_KEY = 'sk-test'
 	let messages: Message[] = [
-		{ role: 'user', blocks: [{ type: 'text', text: 'look' }, { type: 'image', blob: 'b1', mediaType: 'image/png' }] },
+		{
+			role: 'user',
+			blocks: [
+				{ type: 'text', text: 'look' },
+				{ type: 'image', blob: 'b1', mediaType: 'image/png' },
+			],
+		},
 		{
 			role: 'assistant',
 			blocks: [
 				{ type: 'thinking', text: 'claude thought', signature: 'sig', provider: 'anthropic' },
-				{ type: 'thinking', text: 'gpt thought', signature: JSON.stringify({ encrypted_content: 'enc' }), provider: 'openai' },
+				{
+					type: 'thinking',
+					text: 'gpt thought',
+					signature: JSON.stringify({ encrypted_content: 'enc' }),
+					provider: 'openai',
+				},
 				{ type: 'text', text: 'running it' },
 				{ type: 'tool_call', id: 'c1', name: 'bash', input: { command: 'ls' } },
 			],
 		},
 		{ role: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: 'boom', isError: true }] },
 	]
-	await run(messages, { image: (blob: string) => (blob === 'b1' ? 'AAAA' : undefined), tools: [{ name: 'bash', description: 'run', inputSchema: { type: 'object' } }] })
+	await run(messages, {
+		image: (blob: string) => (blob === 'b1' ? 'AAAA' : undefined),
+		tools: [{ name: 'bash', description: 'run', inputSchema: { type: 'object' } }],
+	})
 	let body = seen[0]!.body
 	expect(body.input).toEqual([
-		{ role: 'user', content: [{ type: 'input_text', text: 'look' }, { type: 'input_image', detail: 'auto', image_url: 'data:image/png;base64,AAAA' }] },
+		{
+			role: 'user',
+			content: [
+				{ type: 'input_text', text: 'look' },
+				{ type: 'input_image', detail: 'auto', image_url: 'data:image/png;base64,AAAA' },
+			],
+		},
 		{ type: 'reasoning', summary: [{ type: 'summary_text', text: 'gpt thought' }], encrypted_content: 'enc' },
-		{ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'running it', annotations: [] }] },
+		{
+			type: 'message',
+			role: 'assistant',
+			status: 'completed',
+			content: [{ type: 'output_text', text: 'running it', annotations: [] }],
+		},
 		{ type: 'function_call', call_id: 'c1', name: 'bash', arguments: '{"command":"ls"}' },
 		{ type: 'function_call_output', call_id: 'c1', output: 'Error: boom' },
 	])
@@ -196,9 +263,15 @@ test('native search requires an allowlisted model, Hal tools, and absent or disa
 	expect(openai.body(req, true).tools).not.toContainEqual({ type: 'web_search' })
 	let all = tools.all
 	try {
-		tools.all = () => { let found = all(); found.delete('google'); return found }
+		tools.all = () => {
+			let found = all()
+			found.delete('google')
+			return found
+		}
 		expect(openai.body(req, true).tools).toContainEqual({ type: 'web_search' })
-	} finally { tools.all = all }
+	} finally {
+		tools.all = all
+	}
 	process.env.SERPER_API_KEY = 'env-serper-test'
 	rmSync(`${home}/secrets/auth.ason`)
 	auth.close()
@@ -212,12 +285,23 @@ test('recorded native search becomes readable history without a local tool round
 	let turn = blocks.collect(await run(), 'openai')
 	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
 	let [search, answer] = turn.blocks
-	expect(search).toEqual({ type: 'hosted_tool', id: 'ws_058c1f3ca83fd353016acf3141fb4087d2917c750504b6797f', name: 'web_search', input: { query: 'VALO Hotel Helsinki official website' }, output: '' })
+	expect(search).toEqual({
+		type: 'hosted_tool',
+		id: 'ws_058c1f3ca83fd353016acf3141fb4087d2917c750504b6797f',
+		name: 'web_search',
+		input: { query: 'VALO Hotel Helsinki official website' },
+		output: '',
+	})
 	if (answer?.type !== 'text') throw new Error('expected answer text')
 	let text = answer.text
 	expect(text).toStartWith('Official website: https://valo.fi/en/')
 	expect(text.match(/https:\/\/valo\.fi\/en\/\?utm_source=openai/g)).toHaveLength(1)
-	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: [answer] }] })).toContainEqual({ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] })
+	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: [answer] }] })).toContainEqual({
+		type: 'message',
+		role: 'assistant',
+		status: 'completed',
+		content: [{ type: 'output_text', text, annotations: [] }],
+	})
 })
 
 test('text, reasoning, tool calls and usage fold into a turn that ends in tool_use', async () => {
@@ -232,15 +316,28 @@ test('text, reasoning, tool calls and usage fold into a turn that ends in tool_u
 			{ type: 'response.output_item.done', output_index: 0, item: { type: 'reasoning', encrypted_content: 'enc-1' } },
 			{ type: 'response.output_text.delta', output_index: 1, delta: 'Hel' },
 			{ type: 'response.output_text.delta', output_index: 1, delta: 'lo' },
-			{ type: 'response.output_item.added', output_index: 2, item: { type: 'function_call', call_id: 'call-1', name: 'read' } },
+			{
+				type: 'response.output_item.added',
+				output_index: 2,
+				item: { type: 'function_call', call_id: 'call-1', name: 'read' },
+			},
 			{ type: 'response.function_call_arguments.delta', output_index: 2, delta: '{"path":' },
 			{ type: 'response.function_call_arguments.delta', output_index: 2, delta: '"a.ts"}' },
-			{ type: 'response.output_item.done', output_index: 2, item: { type: 'function_call', call_id: 'call-1', name: 'read' } },
+			{
+				type: 'response.output_item.done',
+				output_index: 2,
+				item: { type: 'function_call', call_id: 'call-1', name: 'read' },
+			},
 			completed({ input_tokens: 100, output_tokens: 7, input_tokens_details: { cached_tokens: 60 } }),
 		)
 	let turn = blocks.collect(await run(), 'openai')
 	expect(turn.blocks).toEqual([
-		{ type: 'thinking', text: 'think\n\nmore', signature: JSON.stringify({ encrypted_content: 'enc-1' }), provider: 'openai' },
+		{
+			type: 'thinking',
+			text: 'think\n\nmore',
+			signature: JSON.stringify({ encrypted_content: 'enc-1' }),
+			provider: 'openai',
+		},
 		{ type: 'text', text: 'Hello' },
 		{ type: 'tool_call', id: 'call-1', name: 'read', input: { path: 'a.ts' } },
 	])
@@ -248,11 +345,23 @@ test('text, reasoning, tool calls and usage fold into a turn that ends in tool_u
 	expect(turn.end).toEqual({ type: 'done', reason: 'tool_use' })
 })
 
-test('incomplete responses stop for their reason; a failed one is an error with the provider\'s words', async () => {
+test("incomplete responses stop for their reason; a failed one is an error with the provider's words", async () => {
 	process.env.OPENAI_API_KEY = 'sk-test'
-	reply = () => sse({ type: 'response.incomplete', response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } } })
+	reply = () =>
+		sse({
+			type: 'response.incomplete',
+			response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } },
+		})
 	expect((await run()).at(-1)).toEqual({ type: 'done', reason: 'max_tokens' })
-	reply = () => sse({ type: 'response.failed', response: { status: 'failed', instructions: 'SYSTEM PROMPT', error: { code: 'server_error', message: 'try later' } } })
+	reply = () =>
+		sse({
+			type: 'response.failed',
+			response: {
+				status: 'failed',
+				instructions: 'SYSTEM PROMPT',
+				error: { code: 'server_error', message: 'try later' },
+			},
+		})
 	let end = (await run()).at(-1) as any
 	expect(end).toMatchObject({ type: 'error', message: 'try later', failure: 'temporary' })
 	expect(end.body).not.toContain('SYSTEM PROMPT')
@@ -260,8 +369,17 @@ test('incomplete responses stop for their reason; a failed one is an error with 
 
 test('a 429 limits that account until resets_in_seconds and the next account takes over', async () => {
 	let other = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } })
-	writeAuth({ openai: [{ accessToken: subscriptionToken, email: 'a@x' }, { accessToken: other, email: 'b@x' }] })
-	reply = () => Response.json({ error: { type: 'usage_limit_reached', message: 'limit reached', resets_in_seconds: 3600 } }, { status: 429 })
+	writeAuth({
+		openai: [
+			{ accessToken: subscriptionToken, email: 'a@x' },
+			{ accessToken: other, email: 'b@x' },
+		],
+	})
+	reply = () =>
+		Response.json(
+			{ error: { type: 'usage_limit_reached', message: 'limit reached', resets_in_seconds: 3600 } },
+			{ status: 429 },
+		)
 	let before = Date.now()
 	let end = (await run()).at(-1) as any
 	expect(end).toMatchObject({ type: 'error', failure: 'limited' })
@@ -307,12 +425,19 @@ test('the picker offers models.dev ids and the known GPT ids; a subscription cap
 test('model discovery unions account catalogs rather than the request account and survives one failure', async () => {
 	let other = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } })
 	writeAuth({ openai: [{ accessToken: subscriptionToken }, { accessToken: other }, { apiKey: 'sk-test' }] })
-	catalogReply = (req) => Response.json({ models: (req.headers.get('chatgpt-account-id') === 'acct-1'
-		? ['gpt-6-luna'] : ['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol']).map((slug) => ({ slug, visibility: 'list' })) })
+	catalogReply = (req) =>
+		Response.json({
+			models: (req.headers.get('chatgpt-account-id') === 'acct-1'
+				? ['gpt-6-luna']
+				: ['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol']
+			).map((slug) => ({ slug, visibility: 'list' })),
+		})
 	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol'])
 	let key = openai.modelsKey()
-	catalogReply = (req) => req.headers.get('chatgpt-account-id') === 'acct-1'
-		? new Response(null, { status: 401 }) : Response.json({ models: [{ slug: 'gpt-6-astra', visibility: 'list' }] })
+	catalogReply = (req) =>
+		req.headers.get('chatgpt-account-id') === 'acct-1'
+			? new Response(null, { status: 401 })
+			: Response.json({ models: [{ slug: 'gpt-6-astra', visibility: 'list' }] })
 	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-astra'])
 	auth.close()
 	writeAuth({ openai: { accessToken: other } })
@@ -326,11 +451,21 @@ test('over a WebSocket, a request that extends the last one sends only the new i
 	openaiWs.state.enabled = true
 	wsSeen = []
 	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'one' }] }]
-	let text = async () => (await run(messages, { system: 's', sessionId: 'ws-1' })).filter((e) => e.type === 'text').map((e: any) => e.text).join('')
+	let text = async () =>
+		(await run(messages, { system: 's', sessionId: 'ws-1' }))
+			.filter((e) => e.type === 'text')
+			.map((e: any) => e.text)
+			.join('')
 	expect(await text()).toBe('ok')
-	messages.push({ role: 'assistant', blocks: [{ type: 'text', text: 'ok' }] }, { role: 'user', blocks: [{ type: 'text', text: 'two' }] })
+	messages.push(
+		{ role: 'assistant', blocks: [{ type: 'text', text: 'ok' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: 'two' }] },
+	)
 	expect(await text()).toBe('ok')
-	expect(wsSeen.map((b) => [b.type, b.previous_response_id, b.input.length])).toEqual([['response.create', undefined, 1], ['response.create', 'resp-1', 1]])
+	expect(wsSeen.map((b) => [b.type, b.previous_response_id, b.input.length])).toEqual([
+		['response.create', undefined, 1],
+		['response.create', 'resp-1', 1],
+	])
 	expect(wsSeen[1].input[0].content[0].text).toBe('two')
 	// An edited earlier message breaks the chain: everything goes again.
 	messages[0] = { role: 'user', blocks: [{ type: 'text', text: 'one, edited' }] }
@@ -350,31 +485,54 @@ test.each([false, true])('WebSocket replay pairs results with backend calls when
 	openaiWs.state.enabled = true
 	wsSeen = []
 	let recording = await Bun.file(`${import.meta.dir}/../fixtures/openai-compound.sse`).text()
-	wsOutput = recording.split('\n').filter((line) => line.startsWith('data: ')).map((line) => JSON.parse(line.slice(6)))
+	wsOutput = recording
+		.split('\n')
+		.filter((line) => line.startsWith('data: '))
+		.map((line) => JSON.parse(line.slice(6)))
 	let messages: Message[] = [...hi]
 	let turn = blocks.collect(await run(messages, { sessionId: 'ws-calls', tools: [nativeTool.def()] }), 'openai')
 	let call = turn.blocks.find((b) => b.type === 'tool_call')!
 	expect(call.type).toBe('tool_call')
 	if (call.type !== 'tool_call') throw new Error('recording has no tool call')
 	let calls = expanded ? nativeTool.expand(call).map(replay.asNative) : [call]
-	messages.push({ role: 'assistant', blocks: calls }, { role: 'user', blocks: calls.map((c) => ({ type: 'tool_result', id: c.id, output: 'Transport probe only; command not executed.' })) })
+	messages.push(
+		{ role: 'assistant', blocks: calls },
+		{
+			role: 'user',
+			blocks: calls.map((c) => ({
+				type: 'tool_result',
+				id: c.id,
+				output: 'Transport probe only; command not executed.',
+			})),
+		},
+	)
 	wsOutput = []
 	await run(messages, { sessionId: 'ws-calls', tools: [nativeTool.def()] })
 	let sent = wsSeen[1]
 	expect(sent.previous_response_id).toBe(expanded ? undefined : 'resp-1')
-	let effective = [...(expanded ? [] : wsSeen[0].input.concat([{ type: 'function_call', call_id: call.id }])), ...sent.input]
+	let effective = [
+		...(expanded ? [] : wsSeen[0].input.concat([{ type: 'function_call', call_id: call.id }])),
+		...sent.input,
+	]
 	let invoked = new Set(effective.filter((i: any) => i.type === 'function_call').map((i: any) => i.call_id))
 	let results = effective.filter((i: any) => i.type === 'function_call_output')
 	expect(results).toHaveLength(expanded ? 2 : 1)
 	expect(results.every((r: any) => invoked.has(r.call_id))).toBe(true)
 })
 
-test('over a WebSocket, codex.rate_limits updates the account\'s shared usage windows; a metered limit does not', async () => {
+test("over a WebSocket, codex.rate_limits updates the account's shared usage windows; a metered limit does not", async () => {
 	writeAuth({ openai: { accessToken: subscriptionToken, refreshToken: 'r', expires: Date.now() + 3_600_000 } })
 	openaiWs.state.enabled = true
 	wsSeen = []
 	let reset = Math.floor(Date.now() / 1000) + 3600
-	let limits = (limit: object, used: number) => ({ type: 'codex.rate_limits', ...limit, rate_limits: { primary: { used_percent: used, window_minutes: 300, reset_at: reset }, secondary: { used_percent: 40, window_minutes: 10080, reset_at: reset + 86400 } } })
+	let limits = (limit: object, used: number) => ({
+		type: 'codex.rate_limits',
+		...limit,
+		rate_limits: {
+			primary: { used_percent: used, window_minutes: 300, reset_at: reset },
+			secondary: { used_percent: 40, window_minutes: 10080, reset_at: reset + 86400 },
+		},
+	})
 	wsBefore = [limits({}, 12), limits({ metered_limit_name: 'codex_other' }, 99)]
 	await run(hi, { system: 's', sessionId: 'ws-q' })
 	let [windows] = Object.values(usage.store().openai ?? {})

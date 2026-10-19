@@ -13,7 +13,8 @@ import { fileChanges } from '../src/host/file-changes.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 import { tool as bashTool } from '../src/host/tools/bash.ts'
 
-const source = (path: string) => /\.(ts|tsx)$/.test(path) && !/(\.test\.tsx?$|\/tests?\/|test-|\.d\.ts$|^tasks\/|^docs\/)/.test(path)
+const source = (path: string) =>
+	/\.(ts|tsx)$/.test(path) && !/(\.test\.tsx?$|\/tests?\/|test-|\.d\.ts$|^tasks\/|^docs\/)/.test(path)
 
 // Tested once, then the tests were deleted. If you change this code, first
 // write tests for: blank lines, // and /* */ comment lines (a changed line
@@ -23,9 +24,16 @@ function code(lines: string[]): boolean[] {
 	let inblock = false
 	return lines.map((raw) => {
 		let line = raw
-		if (inblock) { if (!line.includes('*/')) return false; inblock = false; line = line.replace(/.*\*\//, '') }
+		if (inblock) {
+			if (!line.includes('*/')) return false
+			inblock = false
+			line = line.replace(/.*\*\//, '')
+		}
 		line = line.trim()
-		if (line.startsWith('/*')) { if (!line.includes('*/')) inblock = true; return false }
+		if (line.startsWith('/*')) {
+			if (!line.includes('*/')) inblock = true
+			return false
+		}
 		return !!line && !line.startsWith('//')
 	})
 }
@@ -35,30 +43,50 @@ function code(lines: string[]): boolean[] {
 // is a comment.
 function changed(rows: string[]): { added: number; removed: number } {
 	let start = rows.findIndex((r) => r.startsWith('@@'))
-	let before: { text: string; changed: boolean }[] = [], after: { text: string; changed: boolean }[] = []
+	let before: { text: string; changed: boolean }[] = [],
+		after: { text: string; changed: boolean }[] = []
 	for (let r of start < 0 ? [] : rows.slice(start)) {
 		let text = r.slice(1)
-		if (r[0] === ' ') { before.push({ text, changed: false }); after.push({ text, changed: false }) }
+		if (r[0] === ' ') {
+			before.push({ text, changed: false })
+			after.push({ text, changed: false })
+		}
 		if (r[0] === '-') before.push({ text, changed: true })
 		if (r[0] === '+') after.push({ text, changed: true })
 	}
-	let count = (side: typeof before) => { let isCode = code(side.map((l) => l.text)); return side.filter((l, i) => l.changed && isCode[i]).length }
+	let count = (side: typeof before) => {
+		let isCode = code(side.map((l) => l.text))
+		return side.filter((l, i) => l.changed && isCode[i]).length
+	}
 	return { added: count(after), removed: count(before) }
 }
 
 export default (plugin: Plugin) => {
 	plugin.around(bashTool, 'run', (next, input, ctx) => {
-		if (input.background === true && typeof input.command === 'string' && /git\s+commit/.test(input.command)) throw new Error('git commit must run in the foreground so the user sees the commit; the command did not run. Retry without background.')
+		if (input.background === true && typeof input.command === 'string' && /git\s+commit/.test(input.command))
+			throw new Error(
+				'git commit must run in the foreground so the user sees the commit; the command did not run. Retry without background.',
+			)
 		return next(input, ctx)
 	})
 	plugin.around(commits, 'committed', async (next, info) => {
 		let lines = await next(info)
 		// One Git call for the whole commit: each process costs ~17 ms.
-		let out = await fileChanges.git(info.root, ['show', '--format=', '--no-renames', '--no-ext-diff', '--no-textconv', '--no-color', '-U1000000', info.hash])
+		let out = await fileChanges.git(info.root, [
+			'show',
+			'--format=',
+			'--no-renames',
+			'--no-ext-diff',
+			'--no-textconv',
+			'--no-color',
+			'-U1000000',
+			info.hash,
+		])
 		if (out.code) throw new Error(out.error)
 		// Sections come in numstat order, one per file.
 		let sections = out.text.split(/^diff --git /m).slice(1)
-		if (sections.length !== info.files.length) throw new Error(`${info.short}: ${sections.length} diff sections for ${info.files.length} files`)
+		if (sections.length !== info.files.length)
+			throw new Error(`${info.short}: ${sections.length} diff sections for ${info.files.length} files`)
 		let net = 0
 		info.files.forEach((f, i) => {
 			if (f.added === -1) return

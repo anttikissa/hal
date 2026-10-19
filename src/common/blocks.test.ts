@@ -39,7 +39,13 @@ test('a signature closes its thinking block', () => {
 })
 
 test('a signature with no thinking text still makes a thinking block', () => {
-	let turn = run([{ type: 'text', text: 'hi' }, { type: 'signature', value: 'enc' }], 'openai')
+	let turn = run(
+		[
+			{ type: 'text', text: 'hi' },
+			{ type: 'signature', value: 'enc' },
+		],
+		'openai',
+	)
 	expect(turn.blocks).toEqual([
 		{ type: 'text', text: 'hi' },
 		{ type: 'thinking', text: '', signature: 'enc', provider: 'openai' },
@@ -56,7 +62,10 @@ test('usage fields are cumulative: later events overwrite what they carry', () =
 })
 
 test('an error ends the turn but keeps the partial blocks', () => {
-	let turn = run([{ type: 'text', text: 'part' }, { type: 'error', message: 'overloaded', status: 529 }])
+	let turn = run([
+		{ type: 'text', text: 'part' },
+		{ type: 'error', message: 'overloaded', status: 529 },
+	])
 	expect(turn.blocks).toEqual([{ type: 'text', text: 'part' }])
 	expect(turn.end).toEqual({ type: 'error', message: 'overloaded', status: 529 })
 })
@@ -66,7 +75,13 @@ test('a stream without a terminal event leaves the turn open', () => {
 })
 
 test('parseModelId splits on the first slash only', () => {
-	expect(blocks.parseModelId('anthropic/claude-sonnet-4-5')).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-5' })
-	expect(blocks.parseModelId('openrouter/anthropic/claude-4.5')).toEqual({ provider: 'openrouter', model: 'anthropic/claude-4.5' })
+	expect(blocks.parseModelId('anthropic/claude-sonnet-4-5')).toEqual({
+		provider: 'anthropic',
+		model: 'claude-sonnet-4-5',
+	})
+	expect(blocks.parseModelId('openrouter/anthropic/claude-4.5')).toEqual({
+		provider: 'openrouter',
+		model: 'anthropic/claude-4.5',
+	})
 	for (let bad of ['claude', '/model', 'anthropic/', '']) expect(blocks.parseModelId(bad)).toBeUndefined()
 })

@@ -48,11 +48,14 @@ function run(job: Job): Promise<Reply> {
 // else a promise that resolves once done. A failure leaves the file to
 // pages.load().
 function upgrade(ids: string[]): Promise<void> | undefined {
-	let big = ids.map((id) => pages.marksPath(id)).filter((path) => !pages.state.marks.has(path) && existsSync(path) && statSync(path).size > marksWorker.bigMarks)
+	let big = ids
+		.map((id) => pages.marksPath(id))
+		.filter((path) => !pages.state.marks.has(path) && existsSync(path) && statSync(path).size > marksWorker.bigMarks)
 	if (!big.length) return undefined
 	return Promise.all(
 		big.map(async (path) => {
-			if (!(await readFile(path, 'utf8').catch(() => '')).includes('changedPaths') || pages.state.marks.has(path)) return
+			if (!(await readFile(path, 'utf8').catch(() => '')).includes('changedPaths') || pages.state.marks.has(path))
+				return
 			await marksWorker.run({ upgrade: path }).catch(() => {})
 		}),
 	).then(() => {})

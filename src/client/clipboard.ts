@@ -12,7 +12,11 @@ type Env = { platform: string; ssh: boolean; wayland: boolean }
 
 function env(): Env {
 	let e = process.env
-	return { platform: process.platform, ssh: !!e.SSH_TTY, wayland: !!e.WAYLAND_DISPLAY || e.XDG_SESSION_TYPE === 'wayland' }
+	return {
+		platform: process.platform,
+		ssh: !!e.SSH_TTY,
+		wayland: !!e.WAYLAND_DISPLAY || e.XDG_SESSION_TYPE === 'wayland',
+	}
 }
 
 // Commands to try, in order; the first that runs wins.
@@ -57,7 +61,8 @@ function osc52(text: string): string {
 	return `\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`
 }
 
-const missing = (what: string) => `no clipboard tool to ${what} (install ${process.platform === 'darwin' ? 'pbcopy' : 'wl-clipboard or xclip'})`
+const missing = (what: string) =>
+	`no clipboard tool to ${what} (install ${process.platform === 'darwin' ? 'pbcopy' : 'wl-clipboard or xclip'})`
 
 /** Puts `text` on the clipboard; a notice if it could not. */
 async function write(text: string): Promise<string | undefined> {

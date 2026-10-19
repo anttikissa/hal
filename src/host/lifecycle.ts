@@ -34,17 +34,23 @@ function mayHost(): boolean {
 // A service supervisor owns restarts; no terminal client or daemon fork.
 // Stop preserves unfinished work for the next start, unlike terminal quit.
 // `dial`: the host socket's client (client/link.ts), to ask for handover.
-async function serve(becomeHost: () => Promise<boolean>, dial: (path: string, on: { event(event: Event): void; dropped(): void }) => Promise<Conn | null>): Promise<void> {
+async function serve(
+	becomeHost: () => Promise<boolean>,
+	dial: (path: string, on: { event(event: Event): void; dropped(): void }) => Promise<Conn | null>,
+): Promise<void> {
 	process.on('SIGHUP', () => {})
 	let stopping = false
 	let stop = (signal: string) => {
 		if (stopping) return
 		stopping = true
 		serverLog.log(`stopping (${signal})`)
-		void server.stop().then(() => process.exit(0), (e) => {
-			process.stderr.write(`hal: ${e?.stack ?? e}\n`)
-			process.exit(1)
-		})
+		void server.stop().then(
+			() => process.exit(0),
+			(e) => {
+				process.stderr.write(`hal: ${e?.stack ?? e}\n`)
+				process.exit(1)
+			},
+		)
 	}
 	process.on('SIGTERM', () => stop('SIGTERM'))
 	process.on('SIGINT', () => stop('SIGINT'))
@@ -52,7 +58,10 @@ async function serve(becomeHost: () => Promise<boolean>, dial: (path: string, on
 	if (!(await becomeHost())) {
 		// A peer host hands over; another hal serve refuses, and the first prevails.
 		let conn = await dial(server.socketPath(), {
-			event: (e) => e.type === 'rejected' && e.command === 'handover' && (process.stderr.write(`hal: ${e.reason}\n`), process.exit(1)),
+			event: (e) =>
+				e.type === 'rejected' &&
+				e.command === 'handover' &&
+				(process.stderr.write(`hal: ${e.reason}\n`), process.exit(1)),
 			dropped: () => {},
 		})
 		conn?.send({ type: 'handover' })

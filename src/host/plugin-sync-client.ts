@@ -18,7 +18,13 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { connection, type LinkState } from '../common/connection.ts'
-import { pluginSyncWire, type PluginSyncCommand, type PluginSyncEvent, type SyncHead, type SyncVersion } from '../common/plugin-sync.ts'
+import {
+	pluginSyncWire,
+	type PluginSyncCommand,
+	type PluginSyncEvent,
+	type SyncHead,
+	type SyncVersion,
+} from '../common/plugin-sync.ts'
 import type { Event } from '../common/protocol.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
@@ -28,10 +34,22 @@ import { textDiff } from './text-diff.ts'
 export type Relation = 'client-ahead' | 'server-ahead' | 'divergent' | 'unrelated'
 // missing: no history of the file on that side; deleted: a recorded
 // deletion; empty: a zero-byte file.
-export type SideInfo = { id?: string; hash?: string; ts?: string; status: 'present' | 'empty' | 'deleted' | 'missing'; offline?: true }
+export type SideInfo = {
+	id?: string
+	hash?: string
+	ts?: string
+	status: 'present' | 'empty' | 'deleted' | 'missing'
+	offline?: true
+}
 // `suggest`: the side with the later recorded time, when both have one
 // and they differ.
-export type Discrepancy = { file: string; relation: Relation; client: SideInfo; server: SideInfo; suggest?: 'client' | 'server' }
+export type Discrepancy = {
+	file: string
+	relation: Relation
+	client: SideInfo
+	server: SideInfo
+	suggest?: 'client' | 'server'
+}
 export type Excluded = { file: string; by: 'client' | 'server' | 'both' }
 export type Choice = 'client' | 'server'
 export type Expected = { client?: string; server?: string }
@@ -85,7 +103,8 @@ function event(e: Event): boolean {
 		return true
 	}
 	if ((e.type === 'ack' || e.type === 'rejected') && e.id !== undefined && reqs.has(e.id)) {
-		if (e.type === 'rejected') reqs.get(e.id)!.reject(new Error(`${pluginSyncClient.state.name} refused plugin sync: ${e.reason}`))
+		if (e.type === 'rejected')
+			reqs.get(e.id)!.reject(new Error(`${pluginSyncClient.state.name} refused plugin sync: ${e.reason}`))
 		reqs.delete(e.id)
 		return true
 	}
@@ -134,7 +153,13 @@ async function compare(): Promise<void> {
 function side(h: SyncHead | undefined): SideInfo {
 	if (!h?.id) return { status: 'missing' }
 	let status: SideInfo['status'] = h.deleted ? 'deleted' : h.hash === pluginSync.sha('') ? 'empty' : 'present'
-	return { id: h.id, ts: h.ts!, status, ...(h.hash ? { hash: h.hash } : {}), ...(h.offline ? { offline: true as const } : {}) }
+	return {
+		id: h.id,
+		ts: h.ts!,
+		status,
+		...(h.hash ? { hash: h.hash } : {}),
+		...(h.offline ? { offline: true as const } : {}),
+	}
 }
 
 const absent = (h: SyncHead) => !h.id || !!h.deleted
@@ -151,7 +176,8 @@ function relation(c: SyncHead, s: SyncHead, theirs: SyncVersion[]): Relation {
 		for (let at: string | undefined = id; at && !seen.has(at); at = parents.get(at)) seen.add(at)
 		return seen
 	}
-	let mine = line(c.id), other = line(s.id)
+	let mine = line(c.id),
+		other = line(s.id)
 	if (mine.has(s.id)) return 'client-ahead'
 	if (other.has(c.id)) return 'server-ahead'
 	return [...mine].some((id) => other.has(id)) ? 'divergent' : 'unrelated'
@@ -162,26 +188,41 @@ async function run(): Promise<void> {
 	let st = pluginSyncClient.state
 	let ignore = new Set(pluginSync.ignored())
 	let mine = pluginSync.portable()
-	let inv = await pluginSyncClient.request({ type: 'plugin-sync', op: 'inventory', home: pluginSync.home(), names: mine.filter((n) => !ignore.has(n)) })
+	let inv = await pluginSyncClient.request({
+		type: 'plugin-sync',
+		op: 'inventory',
+		home: pluginSync.home(),
+		names: mine.filter((n) => !ignore.has(n)),
+	})
 	st.same = inv.home === pluginSync.home()
 	if (st.same) return void ((st.discrepancies = []), (st.excluded = []))
 	let theirs = new Map((inv.heads ?? []).map((h) => [h.file, h]))
 	let ignoredThere = new Set(inv.ignored ?? [])
 	let names = [...new Set([...mine, ...theirs.keys()])].sort()
 	st.excluded = names.flatMap((file): Excluded[] => {
-		let here = ignore.has(file), there = ignoredThere.has(file)
+		let here = ignore.has(file),
+			there = ignoredThere.has(file)
 		return here || there ? [{ file, by: here && there ? 'both' : here ? 'client' : 'server' }] : []
 	})
 	let differ = names.filter((f) => {
 		if (ignore.has(f) || ignoredThere.has(f)) return false
-		let c = pluginSync.headOf(f), s = theirs.get(f) ?? { file: f }
+		let c = pluginSync.headOf(f),
+			s = theirs.get(f) ?? { file: f }
 		return absent(c) && absent(s) ? false : c.hash !== s.hash || absent(c) !== absent(s)
 	})
-	let versions = differ.length ? ((await pluginSyncClient.request({ type: 'plugin-sync', op: 'history', files: differ })).versions ?? []) : []
+	let versions = differ.length
+		? ((await pluginSyncClient.request({ type: 'plugin-sync', op: 'history', files: differ })).versions ?? [])
+		: []
 	st.server = new Map(differ.map((f) => [f, versions.filter((v) => v.file === f)]))
 	st.discrepancies = differ.map((file) => {
-		let c = pluginSync.headOf(file), s = theirs.get(file) ?? { file }
-		let d: Discrepancy = { file, relation: pluginSyncClient.relation(c, s, st.server.get(file)!), client: side(c), server: side(s) }
+		let c = pluginSync.headOf(file),
+			s = theirs.get(file) ?? { file }
+		let d: Discrepancy = {
+			file,
+			relation: pluginSyncClient.relation(c, s, st.server.get(file)!),
+			client: side(c),
+			server: side(s),
+		}
 		if (c.ts && s.ts && c.ts !== s.ts) d.suggest = c.ts > s.ts ? 'client' : 'server'
 		return d
 	})
@@ -200,16 +241,24 @@ async function diff(file: string): Promise<{ client?: string; server?: string; d
 	let client = d.client.hash ? pluginHistory.content(d.client.hash).toString('utf8') : undefined
 	let server: string | undefined
 	if (d.server.hash) {
-		let got = (await pluginSyncClient.request({ type: 'plugin-sync', op: 'content', hashes: [d.server.hash] })).contents?.[d.server.hash]
-		if (got === undefined) throw new Error(`plugin sync: ${pluginSyncClient.state.name} did not send ${file} (${d.server.hash})`)
+		let got = (await pluginSyncClient.request({ type: 'plugin-sync', op: 'content', hashes: [d.server.hash] }))
+			.contents?.[d.server.hash]
+		if (got === undefined)
+			throw new Error(`plugin sync: ${pluginSyncClient.state.name} did not send ${file} (${d.server.hash})`)
 		server = Buffer.from(got, 'base64').toString('utf8')
 	}
-	return { ...(client !== undefined ? { client } : {}), ...(server !== undefined ? { server } : {}), diff: textDiff.text(server ?? '', client ?? '') }
+	return {
+		...(client !== undefined ? { client } : {}),
+		...(server !== undefined ? { server } : {}),
+		diff: textDiff.text(server ?? '', client ?? ''),
+	}
 }
 
 async function stale(file: string, where: Choice): Promise<never> {
 	await pluginSyncClient.compare()
-	throw new StaleError(`${file} changed on the ${where} since it was compared; nothing was written. Review the revised comparison.`)
+	throw new StaleError(
+		`${file} changed on the ${where} since it was compared; nothing was written. Review the revised comparison.`,
+	)
 }
 
 // Makes `choice`'s version of `file` the other side's, if both heads
@@ -218,20 +267,37 @@ async function stale(file: string, where: Choice): Promise<never> {
 async function apply(file: string, choice: Choice, expected: Expected): Promise<void> {
 	let st = pluginSyncClient.state
 	if (!pluginSyncWire.isName(file)) throw new Error(`plugin sync: not a plugin filename: ${file}`)
-	if (!st.connected) throw new Error(`plugin sync: not connected to ${st.name}; nothing was written. Try again once it reconnects.`)
+	if (!st.connected)
+		throw new Error(`plugin sync: not connected to ${st.name}; nothing was written. Try again once it reconnects.`)
 	let mineNow = () => pluginSync.headOf(file).id
 	if (mineNow() !== expected.client) return pluginSyncClient.stale(file, 'client')
 	if (choice === 'server') {
 		let known = pluginSync.versionsOf(file).map((v) => v.id)
-		let r = await pluginSyncClient.request({ type: 'plugin-sync', op: 'fetch', file, known, ...(expected.server ? { expect: expected.server } : {}) })
+		let r = await pluginSyncClient.request({
+			type: 'plugin-sync',
+			op: 'fetch',
+			file,
+			known,
+			...(expected.server ? { expect: expected.server } : {}),
+		})
 		if (r.stale) return pluginSyncClient.stale(file, 'server')
 		if (mineNow() !== expected.client) return pluginSyncClient.stale(file, 'client')
 		pluginSync.install(file, r.versions ?? [], r.contents ?? {}, expected.server, `server ${st.name}`, 'client')
 	} else {
 		let sent = new Set((st.server.get(file) ?? []).map((v) => v.id))
 		let versions = pluginSync.versionsOf(file).filter((v) => !sent.has(v.id))
-		let contents = Object.fromEntries(versions.flatMap((v) => (v.hash ? [[v.hash, pluginHistory.content(v.hash).toString('base64')]] : [])))
-		let r = await pluginSyncClient.request({ type: 'plugin-sync', op: 'apply', file, versions, contents, ...(expected.client ? { target: expected.client } : {}), ...(expected.server ? { expect: expected.server } : {}) })
+		let contents = Object.fromEntries(
+			versions.flatMap((v) => (v.hash ? [[v.hash, pluginHistory.content(v.hash).toString('base64')]] : [])),
+		)
+		let r = await pluginSyncClient.request({
+			type: 'plugin-sync',
+			op: 'apply',
+			file,
+			versions,
+			contents,
+			...(expected.client ? { target: expected.client } : {}),
+			...(expected.server ? { expect: expected.server } : {}),
+		})
 		if (r.stale) return pluginSyncClient.stale(file, 'server')
 	}
 	await pluginSyncClient.compare()

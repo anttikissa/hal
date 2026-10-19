@@ -20,7 +20,13 @@ import { existsSync, readFileSync, realpathSync, unlinkSync } from 'fs'
 import { hostname } from 'os'
 import { basename, dirname, join } from 'path'
 import type { Command, Event } from '../common/protocol.ts'
-import { pluginSyncWire, type PluginSyncCommand, type PluginSyncEvent, type SyncHead, type SyncVersion } from '../common/plugin-sync.ts'
+import {
+	pluginSyncWire,
+	type PluginSyncCommand,
+	type PluginSyncEvent,
+	type SyncHead,
+	type SyncVersion,
+} from '../common/plugin-sync.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
@@ -35,14 +41,17 @@ const sha = (bytes: Uint8Array | string): string => new Bun.CryptoHasher('sha256
 // one's own host) compares nothing.
 function home(): string {
 	let at = paths.home()
-	try { at = realpathSync(at) } catch {}
+	try {
+		at = realpathSync(at)
+	} catch {}
 	return sha(`${hostname()}\n${at}`).slice(0, 16)
 }
 
 // The plugins directory history follows; throws while history is off.
 function dir(): string {
 	let st = pluginHistory.state
-	if (!st.dir || st.error) throw new Error(`plugin sync needs plugin history, which is unavailable: ${st.error ?? 'not started'}`)
+	if (!st.dir || st.error)
+		throw new Error(`plugin sync needs plugin history, which is unavailable: ${st.error ?? 'not started'}`)
 	return st.dir
 }
 
@@ -55,13 +64,23 @@ function ignored(): string[] {
 // Loaded top-level plugins marked portable, expired ones included.
 function portable(): string[] {
 	let d = pluginSync.dir()
-	return [...plugins.state.files.values()].filter((f) => f.portable && dirname(f.path) === d).map((f) => basename(f.path)).sort()
+	return [...plugins.state.files.values()]
+		.filter((f) => f.portable && dirname(f.path) === d)
+		.map((f) => basename(f.path))
+		.sort()
 }
 
 function headOf(file: string): SyncHead {
 	let v = pluginHistory.head(file)
 	if (!v) return { file }
-	return { file, id: v.id, ts: v.ts, ...(v.hash ? { hash: v.hash } : {}), ...(v.deleted ? { deleted: true as const } : {}), ...(v.offline ? { offline: true as const } : {}) }
+	return {
+		file,
+		id: v.id,
+		ts: v.ts,
+		...(v.hash ? { hash: v.hash } : {}),
+		...(v.deleted ? { deleted: true as const } : {}),
+		...(v.offline ? { offline: true as const } : {}),
+	}
 }
 
 // Every recorded version of `file`, as the wire carries it.
@@ -75,12 +94,20 @@ function versionsOf(file: string): SyncVersion[] {
 	return out
 }
 
-const encode = (hashes: Iterable<string>): Record<string, string> => Object.fromEntries([...new Set(hashes)].map((h) => [h, pluginHistory.content(h).toString('base64')]))
+const encode = (hashes: Iterable<string>): Record<string, string> =>
+	Object.fromEntries([...new Set(hashes)].map((h) => [h, pluginHistory.content(h).toString('base64')]))
 
 // Makes version `target` (undefined: no file) this home's `file`,
 // after receiving `versions` (with `contents`, base64 by hash) into
 // history. `source` and `side` name the change in its notice.
-function install(file: string, versions: SyncVersion[], contents: Record<string, string>, target: string | undefined, source: string, side: 'client' | 'server'): void {
+function install(
+	file: string,
+	versions: SyncVersion[],
+	contents: Record<string, string>,
+	target: string | undefined,
+	source: string,
+	side: 'client' | 'server',
+): void {
 	let path = join(pluginSync.dir(), file)
 	let bytes = new Map(Object.entries(contents).map(([h, b]) => [h, Buffer.from(b, 'base64') as Uint8Array]))
 	pluginHistory.receive(versions, bytes)
@@ -107,7 +134,9 @@ function holds(file: string, target: string | undefined): boolean {
 
 // A host's answer to a plugin-sync command; throws to refuse it.
 function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): { reply: Event } {
-	let reply = (fields: Omit<PluginSyncEvent, 'type'>): { reply: Event } => ({ reply: { type: 'plugin-sync', ...(c.id !== undefined ? { request: c.id } : {}), ...fields } })
+	let reply = (fields: Omit<PluginSyncEvent, 'type'>): { reply: Event } => ({
+		reply: { type: 'plugin-sync', ...(c.id !== undefined ? { request: c.id } : {}), ...fields },
+	})
 	let ignore = new Set(pluginSync.ignored())
 	let open = (file: string) => {
 		if (ignore.has(file)) throw new Error(`plugin sync: ${file} is excluded by the server's plugins/.syncignore`)
@@ -118,10 +147,17 @@ function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): 
 		let names = [...new Set([...pluginSync.portable(), ...cmd.names])].filter((n) => !ignore.has(n)).sort()
 		return reply({ home: pluginSync.home(), heads: names.map(pluginSync.headOf), ignored: [...ignore] })
 	}
-	if (cmd.op === 'step') return (require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.step(cmd), reply({})
-	if (cmd.op === 'history') return reply({ versions: cmd.files.filter((f) => !ignore.has(f)).flatMap(pluginSync.versionsOf) })
+	if (cmd.op === 'step')
+		return (
+			(require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.step(cmd),
+			reply({})
+		)
+	if (cmd.op === 'history')
+		return reply({ versions: cmd.files.filter((f) => !ignore.has(f)).flatMap(pluginSync.versionsOf) })
 	if (cmd.op === 'content') {
-		let allowed = new Set([...pluginHistory.state.versions.values()].filter((v) => v.hash && !ignore.has(v.file)).map((v) => v.hash!))
+		let allowed = new Set(
+			[...pluginHistory.state.versions.values()].filter((v) => v.hash && !ignore.has(v.file)).map((v) => v.hash!),
+		)
 		return reply({ contents: encode(cmd.hashes.filter((h) => allowed.has(h))) })
 	}
 	open(cmd.file)

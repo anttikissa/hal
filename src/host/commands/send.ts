@@ -13,11 +13,18 @@ export const command: SlashCommand = {
 		let match = /^(\S+)\s+([\s\S]*\S)$/.exec(args)
 		if (!match) return { error: 'give a tab number or session id and a message' }
 		let [, target, text] = match
-		let id = /^\d+$/.test(target!) ? tabs.file().open[Number(target) - 1] : session.isId(target!) && existsSync(`${paths.sessionDir(target!)}/session.ason`) ? target : undefined
+		let id = /^\d+$/.test(target!)
+			? tabs.file().open[Number(target) - 1]
+			: session.isId(target!) && existsSync(`${paths.sessionDir(target!)}/session.ason`)
+				? target
+				: undefined
 		if (!id) return { error: `no session ${target}` }
 		if (id === ctx.sessionId) return { error: 'cannot send to this session itself' }
 		await (host.ready(id) ?? Promise.resolve())
-		let refused = prompts.submit(id, text!, undefined, 'steer', { from: ctx.sessionId, label: tabs.label(ctx.sessionId) })
+		let refused = prompts.submit(id, text!, undefined, 'steer', {
+			from: ctx.sessionId,
+			label: tabs.label(ctx.sessionId),
+		})
 		return refused ? { error: refused } : { say: `sent to ${tabs.label(id)}` }
 	},
 }

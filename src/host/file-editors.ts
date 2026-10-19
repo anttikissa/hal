@@ -18,7 +18,11 @@ export type Editor = { id: string; call?: number; ts: string; after: FileSnapsho
 // The file's path with its directory's symlinks resolved; the file
 // itself may already be renamed away.
 function canonical(path: string): string {
-	try { return `${realpathSync(dirname(path))}/${basename(path)}` } catch { return resolve(path) }
+	try {
+		return `${realpathSync(dirname(path))}/${basename(path)}`
+	} catch {
+		return resolve(path)
+	}
 }
 
 // Each session's newest declared step per canonical path, newest first,
@@ -29,13 +33,14 @@ async function all(): Promise<Map<string, Editor[]>> {
 		if (s.error) continue
 		await pages.slices(pages.catchUp(s.id))
 		for (let file of changes.list(s.id)) {
-			let step = file.steps.at(-1)!, key = fileEditors.canonical(file.path)
+			let step = file.steps.at(-1)!,
+				key = fileEditors.canonical(file.path)
 			let list = out.get(key) ?? []
 			list.push({ id: s.id, call: step.call, ts: step.ts, after: step.change.after })
 			out.set(key, list)
 		}
 	}
-	for (let list of out.values()) list.sort((a, b) => a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)
+	for (let list of out.values()) list.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
 	return out
 }
 
@@ -59,21 +64,28 @@ async function committedAt(root: string, path: string): Promise<string | undefin
 // mtime for a metadata-only snapshot.
 async function current(path: string, snapshot: FileSnapshot): Promise<boolean> {
 	let info
-	try { info = await stat(path) } catch (e: any) {
+	try {
+		info = await stat(path)
+	} catch (e: any) {
 		if (e.code === 'ENOENT') return snapshot === null
 		throw e
 	}
 	if (snapshot === null) return false
 	if (typeof snapshot !== 'string') return info.size === snapshot.size && info.mtimeMs === snapshot.mtime
 	if (!info.isFile() || info.size > fileChanges.maxBytes) return false
-	return createHash('sha256').update(Buffer.from(await Bun.file(path).arrayBuffer())).digest('hex') === snapshot
+	return (
+		createHash('sha256')
+			.update(Buffer.from(await Bun.file(path).arrayBuffer()))
+			.digest('hex') === snapshot
+	)
 }
 
 // Absolute paths of the uncommitted files under a Git root, untracked included.
 async function uncommitted(root: string): Promise<string[]> {
 	let result = await fileChanges.git(root, ['status', '-z', '--porcelain', '--untracked-files=all'])
 	if (result.code) throw new Error(`git status in ${root} failed: ${result.error.trim()}`)
-	let entries = result.text.split('\0'), out: string[] = []
+	let entries = result.text.split('\0'),
+		out: string[] = []
 	for (let i = 0; i < entries.length; i++) {
 		let entry = entries[i]!
 		if (!entry) continue
@@ -85,27 +97,35 @@ async function uncommitted(root: string): Promise<string[]> {
 }
 
 async function exists(path: string): Promise<boolean> {
-	try { await stat(path); return true } catch (e: any) { if (e.code === 'ENOENT') return false; throw e }
+	try {
+		await stat(path)
+		return true
+	} catch (e: any) {
+		if (e.code === 'ENOENT') return false
+		throw e
+	}
 }
 
 // One line per file: every session that changed it since its last
 // commit, newest first, or that none did.
 async function report(cwd: string, scope: 'project' | 'all', timeZone?: string): Promise<string> {
 	let root = await fileTracking.repo(cwd)
-	if (!root && scope === 'project') return `${cwd} is not in a Git repository. INSPECT { what: "files", scope: "all" } lists every existing file Hal sessions changed.`
+	if (!root && scope === 'project')
+		return `${cwd} is not in a Git repository. INSPECT { what: "files", scope: "all" } lists every existing file Hal sessions changed.`
 	let editors = await fileEditors.all()
 	let files = root ? await fileEditors.uncommitted(root) : []
 	let seen = new Set(files.map(fileEditors.canonical))
 	let project = root ? realpathSync(root) : undefined
 	if (scope === 'all') {
 		for (let path of editors.keys()) {
-			if (seen.has(path) || (project && fileTracking.inside(path, project)) || !await exists(path)) continue
+			if (seen.has(path) || (project && fileTracking.inside(path, project)) || !(await exists(path))) continue
 			files.push(path)
 			seen.add(path)
 		}
 	}
 	if (!files.length) return root ? `No uncommitted files in ${root}.` : 'No existing files changed by Hal sessions.'
-	let open = tabs.list(), base = await fileChanges.canonical(cwd)
+	let open = tabs.list(),
+		base = await fileChanges.canonical(cwd)
 	let who = (e: Editor) => {
 		let i = open.findIndex((t) => t.id === e.id)
 		let tab = i < 0 ? `${e.id} (closed)` : `${e.id} (tab ${i + 1}, "${open[i]!.name}")`
@@ -118,8 +138,11 @@ async function report(cwd: string, scope: 'project' | 'all', timeZone?: string):
 		let inRoot = root && project && fileTracking.inside(path, project)
 		let since = inRoot ? await fileEditors.committedAt(root!, path) : undefined
 		let list = (editors.get(fileEditors.canonical(path)) ?? []).filter((e) => since === undefined || e.ts > since)
-		if (!list.length) { lines.push(`${name}: no Hal record${since ? ' since its last commit' : ''}`); continue }
-		let state = await fileEditors.current(path, list[0]!.after) ? 'current' : 'changed since'
+		if (!list.length) {
+			lines.push(`${name}: no Hal record${since ? ' since its last commit' : ''}`)
+			continue
+		}
+		let state = (await fileEditors.current(path, list[0]!.after)) ? 'current' : 'changed since'
 		let earlier = list.slice(1).map(who)
 		lines.push(`${name}: ${who(list[0]!)} - ${state}${earlier.length ? `; earlier: ${earlier.join(', ')}` : ''}`)
 	}

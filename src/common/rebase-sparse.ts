@@ -17,30 +17,46 @@ function letter(row: RebaseRow): string {
 }
 
 function targets(text: string): RebaseTarget[] {
-	let parts = text.trim().replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean)
+	let parts = text
+		.trim()
+		.replace(/\s*-\s*/g, '-')
+		.split(/[\s,]+/)
+		.filter(Boolean)
 	if (!parts.length) throw new Error('drop needs at least one target')
 	return parts.map((part) => {
 		let m = /^#?([traumsq]*)(?:(\d+)(?:(-)(?:#?([traumsq]*)(\d+))?)?|(\*))$/i.exec(part)
 		if (!m) throw new Error(`Invalid rebase target: ${part}`)
-		let kinds = m[1]!.toLowerCase(), endKinds = (m[4] ?? '').toLowerCase()
+		let kinds = m[1]!.toLowerCase(),
+			endKinds = (m[4] ?? '').toLowerCase()
 		if (endKinds && endKinds !== kinds) throw new Error(`Range kind prefixes must agree: ${part}`)
-		let from = m[6] ? 0 : Number(m[2]), to = m[6] || (m[3] && !m[5]) ? undefined : Number(m[5] ?? m[2])
-		if (!Number.isSafeInteger(from) || (to !== undefined && !Number.isSafeInteger(to))) throw new Error(`Invalid rebase number: ${part}`)
+		let from = m[6] ? 0 : Number(m[2]),
+			to = m[6] || (m[3] && !m[5]) ? undefined : Number(m[5] ?? m[2])
+		if (!Number.isSafeInteger(from) || (to !== undefined && !Number.isSafeInteger(to)))
+			throw new Error(`Invalid rebase number: ${part}`)
 		if (to !== undefined && from > to) [from, to] = [to, from]
 		return { kinds, from, ...(to !== undefined && { to }) }
 	})
 }
 
 function matches(row: RebaseRow, target: RebaseTarget): boolean {
-	return row.n >= target.from && row.n <= (target.to ?? Infinity) && (!target.kinds || target.kinds.includes(rebaseSparse.letter(row)))
+	return (
+		row.n >= target.from &&
+		row.n <= (target.to ?? Infinity) &&
+		(!target.kinds || target.kinds.includes(rebaseSparse.letter(row)))
+	)
 }
 
 // Only an edit's quoted operand treats semicolons as literal text. The
 // scanner rejects all unknown escapes rather than silently changing text.
 function parse(text: string, snapshot: RebaseRows): SparseRebase {
-	let at = 0, out: SparseRebase = { plan: { base: snapshot.base, drop: [], edit: [] }, tails: [] }
-	let space = () => { while (/\s/.test(text[at] ?? '') && at < text.length) at++ }
-	let fail = (message: string): never => { throw new Error(`Rebase at character ${at + 1}: ${message}\n${text}`) }
+	let at = 0,
+		out: SparseRebase = { plan: { base: snapshot.base, drop: [], edit: [] }, tails: [] }
+	let space = () => {
+		while (/\s/.test(text[at] ?? '') && at < text.length) at++
+	}
+	let fail = (message: string): never => {
+		throw new Error(`Rebase at character ${at + 1}: ${message}\n${text}`)
+	}
 	space()
 	if (at === text.length) fail('expected drop or edit')
 	while (at < text.length) {
@@ -65,11 +81,16 @@ function parse(text: string, snapshot: RebaseRows): SparseRebase {
 			if (!row?.editable || row.editN === undefined) fail(`entry ${target![1]} is absent or not editable`)
 			at += target![0].length
 			let quote = text[at++]
-			if (quote !== '"' && quote !== "'" && quote !== '`') fail('replacement must use double, single or backtick quotes')
-			let value = '', closed = false
+			if (quote !== '"' && quote !== "'" && quote !== '`')
+				fail('replacement must use double, single or backtick quotes')
+			let value = '',
+				closed = false
 			while (at < text.length) {
 				let c = text[at++]!
-				if (c === quote) { closed = true; break }
+				if (c === quote) {
+					closed = true
+					break
+				}
 				if (c === '\\') {
 					let escaped = text[at++]
 					if (escaped === 'n') c = '\n'
@@ -96,7 +117,14 @@ function parse(text: string, snapshot: RebaseRows): SparseRebase {
 }
 
 function resolve(sparse: SparseRebase, current: RebaseRows): RebasePlan {
-	let drop = [...new Set([...sparse.plan.drop, ...current.rows.filter((row) => sparse.tails.some((target) => rebaseSparse.matches(row, target))).flatMap((row) => row.ns)])]
+	let drop = [
+		...new Set([
+			...sparse.plan.drop,
+			...current.rows
+				.filter((row) => sparse.tails.some((target) => rebaseSparse.matches(row, target)))
+				.flatMap((row) => row.ns),
+		]),
+	]
 	return { ...sparse.plan, drop }
 }
 

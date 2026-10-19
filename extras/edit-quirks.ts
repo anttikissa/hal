@@ -23,8 +23,12 @@ type Quirk = keyof typeof quirks
 
 const N = '\n'
 const header = / (replace|insert-before|insert-after|delete|create|write)(?: \d+(?:-\d+)?)?\s*$/
-const known = (l: string) => { const m = /^([A-Z][A-Z_]*)(?=\s|\/\*|$)/.exec(l)?.[1]; return !!m && tools.all().has(m.toLowerCase()) }
-const applies = (q: Quirk, ctx?: CallContext) => !!ctx?.model && quirks[q].some((p) => new Bun.Glob(p).match(ctx.model!))
+const known = (l: string) => {
+	const m = /^([A-Z][A-Z_]*)(?=\s|\/\*|$)/.exec(l)?.[1]
+	return !!m && tools.all().has(m.toLowerCase())
+}
+const applies = (q: Quirk, ctx?: CallContext) =>
+	!!ctx?.model && quirks[q].some((p) => new Bun.Glob(p).match(ctx.model!))
 
 // Indexes of lines outside !!OLD/!!NEW ... !!END blocks.
 function outside(lines: string[]): number[] {
@@ -32,8 +36,14 @@ function outside(lines: string[]): number[] {
 	let open = false
 	for (const [i, l] of lines.entries()) {
 		const m = /^!!(OLD|NEW|END)$/.exec(l)?.[1]
-		if (open) { if (m === 'END') open = false; continue }
-		if (m === 'OLD' || m === 'NEW') { open = true; continue }
+		if (open) {
+			if (m === 'END') open = false
+			continue
+		}
+		if (m === 'OLD' || m === 'NEW') {
+			open = true
+			continue
+		}
 		out.push(i)
 	}
 	return out
@@ -41,7 +51,9 @@ function outside(lines: string[]): number[] {
 
 // The rewrite of an EDIT text a strict error points at, and its quirk.
 export function fix(text: string, error: string): [string, Quirk] | undefined {
-	const raw = text.split(N), lines = raw.map((l) => l.replace(/\r$/, '')), out = outside(lines)
+	const raw = text.split(N),
+		lines = raw.map((l) => l.replace(/\r$/, '')),
+		out = outside(lines)
 	const headers = out.filter((i) => header.test(lines[i]!))
 	const after = (i: number) => headers.some((h) => h < i)
 	const got = /expected "<path>@<version> <operation> \[lines\]", got ("(?:[^"\\]|\\.)*")/.exec(error)
@@ -51,27 +63,48 @@ export function fix(text: string, error: string): [string, Quirk] | undefined {
 		if (k === undefined) return
 		const line = lines[k]!.trim()
 		if (/^\$ \S/.test(line)) {
-			for (let j = k; j < raw.length; j++) if (/^\s*\$ \S/.test(lines[j]!)) raw[j] = `BASH ${JSON.stringify(lines[j]!.trim().slice(2))}`
+			for (let j = k; j < raw.length; j++)
+				if (/^\s*\$ \S/.test(lines[j]!)) raw[j] = `BASH ${JSON.stringify(lines[j]!.trim().slice(2))}`
 			return [raw.join(N), 'shell']
 		}
 		if (/^<\/?(invoke|parameter|function_calls|antml:)/.test(line)) {
-			const rest = raw.slice(k).join(N), held: string[] = []
-			for (const m of rest.matchAll(/<(?:antml:)?parameter name="cmd">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g)) if (m[1]!.trim()) held.push(m[1]!.trim())
+			const rest = raw.slice(k).join(N),
+				held: string[] = []
+			for (const m of rest.matchAll(/<(?:antml:)?parameter name="cmd">([\s\S]*?)(?:<\/(?:antml:)?parameter>|$)/g))
+				if (m[1]!.trim()) held.push(m[1]!.trim())
 			return [[...raw.slice(0, k), ...held].join(N), 'markup']
 		}
 		if (/^\S+$/.test(line) && !/[@/.]/.test(line)) {
 			const next = lines.slice(k + 1).find((l) => l.trim())
-			if (next === undefined || known(next) || /^!!+[A-Z]+$/.test(next.trim())) return [raw.filter((_, j) => j !== k).join(N), 'stray']
+			if (next === undefined || known(next) || /^!!+[A-Z]+$/.test(next.trim()))
+				return [raw.filter((_, j) => j !== k).join(N), 'stray']
 		}
 		return
 	}
 	if (/EDIT line \d+: replace needs nonempty old text/.test(error)) {
-		const h = headers.find((i) => / replace\s*$/.test(lines[i]!) && lines[i + 1] === '!!OLD' && lines[i + 2] === '!!NEW' && lines[i + 3] === '!!END')
+		const h = headers.find(
+			(i) =>
+				/ replace\s*$/.test(lines[i]!) &&
+				lines[i + 1] === '!!OLD' &&
+				lines[i + 2] === '!!NEW' &&
+				lines[i + 3] === '!!END',
+		)
 		return h === undefined ? undefined : [raw.filter((_, j) => j < h || j > h + 3).join(N), 'emptyReplace']
 	}
 	if (error.startsWith('EDIT: the tool call after the last !!END is invalid')) {
-		const last = headers.at(-1) ?? -1, alone = (i: number) => { const n = lines.slice(i + 1).find((l) => l.trim()); return n === undefined || known(n) }
-		const bare = out.find((i) => i > last && /^[A-Z][A-Z_]*$/.test(lines[i]!.trim()) && lines[i]!.trim() !== 'EDIT' && known(lines[i]!.trim()) && alone(i))
+		const last = headers.at(-1) ?? -1,
+			alone = (i: number) => {
+				const n = lines.slice(i + 1).find((l) => l.trim())
+				return n === undefined || known(n)
+			}
+		const bare = out.find(
+			(i) =>
+				i > last &&
+				/^[A-Z][A-Z_]*$/.test(lines[i]!.trim()) &&
+				lines[i]!.trim() !== 'EDIT' &&
+				known(lines[i]!.trim()) &&
+				alone(i),
+		)
 		if (bare !== undefined) return [raw.filter((_, j) => j !== bare).join(N), 'emptyCall']
 		// An EDIT after the last operation header takes the rest of the text.
 		const edit = out.find((i) => i > last && /^EDIT\b/.test(lines[i]!))
@@ -81,24 +114,48 @@ export function fix(text: string, error: string): [string, Quirk] | undefined {
 
 export default function (plugin: Plugin) {
 	plugin.around(nativeTool, 'resolve', (next, text, ctx) => {
-		if (typeof text !== 'string' || !/^\s*EDIT(?=\s|\/\*|$)/.test(text) || !(Object.keys(quirks) as Quirk[]).some((q) => applies(q, ctx))) return next(text, ctx)
+		if (
+			typeof text !== 'string' ||
+			!/^\s*EDIT(?=\s|\/\*|$)/.test(text) ||
+			!(Object.keys(quirks) as Quirk[]).some((q) => applies(q, ctx))
+		)
+			return next(text, ctx)
 		const fired: Quirk[] = []
-		let current = text, first: unknown
+		let current = text,
+			first: unknown
 		for (;;) {
 			let r: ReturnType<typeof next>
-			try { r = next(current, ctx) } catch (e: any) {
+			try {
+				r = next(current, ctx)
+			} catch (e: any) {
 				first ??= e
 				const f = fired.length < 50 ? fix(current, String(e?.message ?? e)) : undefined
 				if (!f || !applies(f[1], ctx)) throw first
-				current = f[0]; fired.push(f[1])
+				current = f[0]
+				fired.push(f[1])
 				continue
 			}
 			const edits = r.input.edits
-			if (applies('barePath', ctx) && Array.isArray(edits) && edits.some((e) => typeof e?.path === 'string' && e.path.endsWith('@'))) {
-				r = { ...r, input: { ...r.input, edits: edits.map((e) => typeof e?.path === 'string' && e.path.endsWith('@') ? { ...e, path: e.path.slice(0, -1) } : e) } }
+			if (
+				applies('barePath', ctx) &&
+				Array.isArray(edits) &&
+				edits.some((e) => typeof e?.path === 'string' && e.path.endsWith('@'))
+			) {
+				r = {
+					...r,
+					input: {
+						...r.input,
+						edits: edits.map((e) =>
+							typeof e?.path === 'string' && e.path.endsWith('@') ? { ...e, path: e.path.slice(0, -1) } : e,
+						),
+					},
+				}
 				fired.push('barePath')
 			}
-			for (const q of fired) try { diag.log(`edit-quirks: ${q} fired for ${ctx!.model} in ${ctx!.sessionId}`) } catch {}
+			for (const q of fired)
+				try {
+					diag.log(`edit-quirks: ${q} fired for ${ctx!.model} in ${ctx!.sessionId}`)
+				} catch {}
 			return r
 		}
 	})

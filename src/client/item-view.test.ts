@@ -28,7 +28,8 @@ test('answers with only hidden controls or whitespace have no terminal card', ()
 
 test('tool errors without exit codes or timings remain visible in the title status', () => {
 	let error = { output: 'Error: malformed arguments', isError: true }
-	let status = (item: typeof error & { interrupted?: 'canceled' | 'stopped' }, bash = false) => Bun.stripANSI(toolView.resultStatus(item, bash, undefined))
+	let status = (item: typeof error & { interrupted?: 'canceled' | 'stopped' }, bash = false) =>
+		Bun.stripANSI(toolView.resultStatus(item, bash, undefined))
 	expect(status(error)).toBe('(failed)')
 	expect(status(error, true)).toBe('(failed)')
 	expect(status({ ...error, output: '[exit 2]\ncommand failed' }, true)).toBe('(exit 2)')
@@ -37,7 +38,12 @@ test('tool errors without exit codes or timings remain visible in the title stat
 })
 
 test('interrupted text decorates its end, preserving trailing spaces and line breaks', () => {
-	for (let [text, end] of [['partial', 'partial --'], ['partial ', 'partial --'], ['partial\n', 'partial\n--'], ['', '--']] as const) {
+	for (let [text, end] of [
+		['partial', 'partial --'],
+		['partial ', 'partial --'],
+		['partial\n', 'partial\n--'],
+		['', '--'],
+	] as const) {
 		let item = { type: 'text' as const, text: text!, interrupted: true as const }
 		let rows = itemView.itemLines(item, 60)
 		let plain = rows.join('\n').replace(/\x1b\[[0-9;]*m/g, '')
@@ -47,12 +53,27 @@ test('interrupted text decorates its end, preserving trailing spaces and line br
 })
 
 test('expanded tool cards preserve wrapped headlines, complete arguments and multiline shell commands', () => {
-	let render = (name: string, input: Record<string, unknown>, fold: 'long' | 'short' = 'long') => itemView.itemLines({ type: 'tool', name, input, id: 'internal' }, 30, false, undefined, undefined, undefined, [], { fold }).map(Bun.stripANSI).join('\n')
-	let spawn = render('spawn', { name: 'A long session name that must not be clipped', task: 'First instruction\nSecond instruction', model: 'fake/model' })
+	let render = (name: string, input: Record<string, unknown>, fold: 'long' | 'short' = 'long') =>
+		itemView
+			.itemLines({ type: 'tool', name, input, id: 'internal' }, 30, false, undefined, undefined, undefined, [], {
+				fold,
+			})
+			.map(Bun.stripANSI)
+			.join('\n')
+	let spawn = render('spawn', {
+		name: 'A long session name that must not be clipped',
+		task: 'First instruction\nSecond instruction',
+		model: 'fake/model',
+	})
 	expect(spawn.replace(/\n/g, ' ')).toContain('must not be clipped')
 	expect(spawn).toContain('task: First instruction\n  Second instruction')
 	expect(spawn).toContain('model: fake/model')
-	let bash = render('bash', { command: 'echo first\necho second', description: 'Two commands', modifies: ['a.ts'], timeout: 5 })
+	let bash = render('bash', {
+		command: 'echo first\necho second',
+		description: 'Two commands',
+		modifies: ['a.ts'],
+		timeout: 5,
+	})
 	expect(bash).toContain('$ Two commands\necho first\necho second')
 	expect(bash).toContain('Edits a.ts')
 	expect(bash).not.toContain('Timeout')
@@ -61,17 +82,35 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 
 test('A short Bash card shows its command in its rows, with stable live and finished height', () => {
 	let ts = '2026-10-15T07:00:00.000Z'
-	let item = { type: 'tool' as const, name: 'bash', input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' }, id: 'bash', ts }
+	let item = {
+		type: 'tool' as const,
+		name: 'bash',
+		input: { command: 'echo first\n' + 'echo later\n'.repeat(20), description: 'Run commands' },
+		id: 'bash',
+		ts,
+	}
 	let rows = (partial?: string) => toolView.call({ ...item, partial }, 40, 'short', {}).map(Bun.stripANSI)
 	expect(rows()[1]).toBe('echo first ↵ … ↵ echo later')
 	expect(rows()).toHaveLength(2)
 	let output = 'first\nsecond'
-	let finished = toolView.result({ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output }, 40, 'short', { head: 2 }, undefined, '1', 'bash')
+	let finished = toolView.result(
+		{ type: 'tool-result', id: 'bash', output: '[exit 0]\n' + output },
+		40,
+		'short',
+		{ head: 2 },
+		undefined,
+		'1',
+		'bash',
+	)
 	expect(rows(output).length).toBe(rows().length + finished.length)
 	// A short one-line command goes after the title; a long one scrolls
 	// from its start to its end, then stays there.
-	expect(toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/List: ls$/)])
-	expect(toolView.call({ ...item, input: { command: 'ls' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([expect.stringMatching(/\$ ls$/)])
+	expect(
+		toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI),
+	).toEqual([expect.stringMatching(/List: ls$/)])
+	expect(toolView.call({ ...item, input: { command: 'ls' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([
+		expect.stringMatching(/\$ ls$/),
+	])
 	let long = { ...item, input: { command: 'echo ' + 'x'.repeat(60) + ' end', description: 'Echo' } }
 	let at = (ms: number) => Bun.stripANSI(toolView.call(long, 20, 'short', { now: Date.parse(ts) + ms })[1]!)
 	expect(at(0)).toMatch(/^echo x+…$/)
@@ -84,16 +123,26 @@ test('A short Bash card shows its command in its rows, with stable live and fini
 
 test('background successes collapse, failures stay open, and thinking and SEND keep their controls', () => {
 	for (let label of ['bash #t19', 'bash b123abc']) {
-		let item = { type: 'prompt' as const, text: '[exit 0]\nfirst\nsecond\nthird\nlast', from: 'self', label, delivery: 'next-round' as const }
+		let item = {
+			type: 'prompt' as const,
+			text: '[exit 0]\nfirst\nsecond\nthird\nlast',
+			from: 'self',
+			label,
+			delivery: 'next-round' as const,
+		}
 		expect(itemView.itemLines(item, 100).join('\n')).not.toContain('first')
-		expect(itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
+		expect(
+			itemView.itemLines(item, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n'),
+		).toContain('last')
 		expect(itemView.receipt(item)).toBe('')
 		for (let output of ['[exit 1]\nfirst\n\nlast', '[timed out]\nfirst\n\nlast']) {
 			let failed = { ...item, text: output }
 			expect(itemView.itemLines(failed, 100).map(Bun.stripANSI)).toContain('last')
 		}
 		let spaced = { ...item, text: '[exit 0]\nfirst\n\nsecond\n\nthird\nlast' }
-		expect(itemView.itemLines(spaced, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).map(Bun.stripANSI)).toContain('')
+		expect(
+			itemView.itemLines(spaced, 100, false, undefined, undefined, undefined, [], { fold: 'long' }).map(Bun.stripANSI),
+		).toContain('')
 	}
 	let thinking = { type: 'thinking' as const, text: 'first\n\nsecond\n\nlast' }
 	for (let streaming of [false, true]) {
@@ -102,7 +151,9 @@ test('background successes collapse, failures stay open, and thinking and SEND k
 		expect(preview).not.toContain('first')
 		expect(preview).toContain('earlier lines')
 	}
-	expect(itemView.itemLines(thinking, 80, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n')).toContain('last')
+	expect(
+		itemView.itemLines(thinking, 80, false, undefined, undefined, undefined, [], { fold: 'long' }).join('\n'),
+	).toContain('last')
 	let send = { type: 'tool' as const, id: 's', name: 'send', input: { to: '42', text: '/close' } }
 	expect(itemView.itemLines(send, 24)[0]).toContain('/close')
 })

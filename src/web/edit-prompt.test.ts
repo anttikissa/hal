@@ -44,8 +44,10 @@ const history = [
 	{ type: 'user', blocks: [{ type: 'text', text: 'two' }], n: 5, ts },
 	{ type: 'assistant', block: { type: 'text', text: 'ok' }, n: 6, ts },
 ]
-const open = (state: object) => app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history, state } } as Event)
-const escape = () => keys.key({ key: 'Escape', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, { kind: 'other' })
+const open = (state: object) =>
+	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history, state } } as Event)
+const escape = () =>
+	keys.key({ key: 'Escape', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, { kind: 'other' })
 
 test('editing an earlier prompt pauses, keeps the draft, and Escape continues with the draft back', () => {
 	open({ type: 'running', phase: 'streaming' })

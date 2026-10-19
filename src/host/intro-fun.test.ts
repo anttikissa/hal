@@ -7,19 +7,28 @@ import { profile } from './profile.ts'
 const ts = '2026-10-13T12:00:00Z'
 const user = (text: string): HistoryRecord => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
 const assistant = (text: string): HistoryRecord => ({ type: 'assistant', block: { type: 'text', text }, ts })
-const history = (...records: HistoryRecord[]): HistoryRecord[] => [
-	assistant('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'),
-	assistant("I saved your language and tone.\n\nYou're all set. A few tips:"),
-	...records,
-].map((r, i) => ({ ...r, n: i + 1 }))
+const history = (...records: HistoryRecord[]): HistoryRecord[] =>
+	[
+		assistant('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'),
+		assistant("I saved your language and tone.\n\nYou're all set. A few tips:"),
+		...records,
+	].map((r, i) => ({ ...r, n: i + 1 }))
 const ask = (form: Form, id: string): HistoryRecord => ({ type: 'question', id, form, ts })
-const answer = (form: Form, id: string, value: string): HistoryRecord => ({ type: 'answer', question: id, answers: { [form.fields[0]!.name]: value }, ts })
+const answer = (form: Form, id: string, value: string): HistoryRecord => ({
+	type: 'answer',
+	question: id,
+	answers: { [form.fields[0]!.name]: value },
+	ts,
+})
 
 function run(records: HistoryRecord[]) {
 	let text = profile.text
 	profile.text = () => ''
-	try { return intro.run(JSON.parse(JSON.stringify(records))) }
-	finally { profile.text = text }
+	try {
+		return intro.run(JSON.parse(JSON.stringify(records)))
+	} finally {
+		profile.text = text
+	}
 }
 
 test('ELIZA survives replay, keyword help, and rebase follows surviving activation', () => {

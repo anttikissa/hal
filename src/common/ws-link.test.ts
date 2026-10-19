@@ -46,13 +46,22 @@ function setup(authorized?: () => Promise<boolean>) {
 }
 
 test('optional snapshot parsing diagnostics report UTF-8 size before delivery', async () => {
-	let socket = new FakeSocket(), order: string[] = [], bytes = 0
-	let connected = link.transport(() => socket, undefined, undefined, (ms, size, event) => {
-		expect(ms).toBeGreaterThanOrEqual(0)
-		expect(event.type).toBe('snapshot')
-		bytes = size
-		order.push('parsed')
-	}).connect({ event: () => order.push('delivered'), dropped: () => {} })
+	let socket = new FakeSocket(),
+		order: string[] = [],
+		bytes = 0
+	let connected = link
+		.transport(
+			() => socket,
+			undefined,
+			undefined,
+			(ms, size, event) => {
+				expect(ms).toBeGreaterThanOrEqual(0)
+				expect(event.type).toBe('snapshot')
+				bytes = size
+				order.push('parsed')
+			},
+		)
+		.connect({ event: () => order.push('delivered'), dropped: () => {} })
 	socket.onopen!()
 	await connected
 	let data = ason.stringify({ type: 'snapshot', sessionId: '1-abc', snapshot: { text: 'ä' } }, 'short')

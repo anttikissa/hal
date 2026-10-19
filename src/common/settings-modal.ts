@@ -34,9 +34,14 @@ function refilter(st: ModalState, keep?: string): ModalState {
 	let data = st.settings!
 	let labels = Object.fromEntries(settings.table.map((s) => [s.name, s.label]))
 	let query = st.form?.values[0] ?? ''
-	let names = picker.rank(settings.table.map((s) => s.name), query, labels)
+	let names = picker.rank(
+		settings.table.map((s) => s.name),
+		query,
+		labels,
+	)
 	let rows = names.map((n) => find(n)!)
-	let selected = keep && names.includes(keep) ? names.indexOf(keep) : Math.min(st.selected, Math.max(0, names.length - 1))
+	let selected =
+		keep && names.includes(keep) ? names.indexOf(keep) : Math.min(st.selected, Math.max(0, names.length - 1))
 	let next: ModalState = {
 		...st,
 		items: rows.map((s) => s.label),
@@ -52,7 +57,11 @@ function refilter(st: ModalState, keep?: string): ModalState {
 }
 
 function open(data: Data): ModalState {
-	let st = modals.open({ title: 'Settings', hint: HINT, form: { text: 'Settings', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
+	let st = modals.open({
+		title: 'Settings',
+		hint: HINT,
+		form: { text: 'Settings', fields: [{ type: 'text', name: 'search', label: 'Search' }] },
+	})
 	return refilter({ ...st, settings: { ...data, names: [] } })
 }
 
@@ -73,7 +82,10 @@ function without(st: ModalState): ModalState {
 }
 
 function send(sessionId: string, s: Setting, text: string): ModalAction {
-	return { type: 'send', command: { type: 'submit', sessionId, text: `/config ${s.name} ${text === '' ? '""' : text}` } }
+	return {
+		type: 'send',
+		command: { type: 'submit', sessionId, text: `/config ${s.name} ${text === '' ? '""' : text}` },
+	}
 }
 
 function step(st: ModalState, key: Key, sessionId: string): Step {
@@ -96,7 +108,8 @@ function step(st: ModalState, key: Key, sessionId: string): Step {
 		let now = st.settings!.values[s.name] ?? ''
 		let text: string | undefined
 		if (s.type.kind === 'boolean') text = String(key.key === 'right')
-		if (s.type.kind === 'integer') text = String(Math.max(s.type.min, Math.min(s.type.max, Number(now) + (key.key === 'right' ? 1 : -1))))
+		if (s.type.kind === 'integer')
+			text = String(Math.max(s.type.min, Math.min(s.type.max, Number(now) + (key.key === 'right' ? 1 : -1))))
 		if (text !== undefined) return { state: st, ...(text !== now && { action: send(sessionId, s, text) }) }
 	}
 	if (s && plain && (key.key === 'enter' || key.text === ' ')) {
@@ -107,7 +120,13 @@ function step(st: ModalState, key: Key, sessionId: string): Step {
 			return { state: st, action: send(sessionId, s, options[(options.indexOf(now) + 1) % options.length]!) }
 		}
 		let field = { type: 'text' as const, name: s.name, label: s.label, initial: now }
-		return { state: { ...st, edit: { index: st.selected, form: forms.start('setting', { text: s.label, fields: [field] }) }, hint: EDIT_HINT } }
+		return {
+			state: {
+				...st,
+				edit: { index: st.selected, form: forms.start('setting', { text: s.label, fields: [field] }) },
+				hint: EDIT_HINT,
+			},
+		}
 	}
 	let r = modals.step(st, key)
 	if (r.action?.type === 'cancel') return r

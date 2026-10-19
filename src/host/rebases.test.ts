@@ -17,7 +17,9 @@ import { systemPrompt } from './system-prompt.ts'
 import { slash } from './slash.ts'
 import { liveFiles } from './live-file.ts'
 
-let savedHome = paths.state.home, home = '', id = ''
+let savedHome = paths.state.home,
+	home = '',
+	id = ''
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-rebase-`)
 	paths.state.home = home
@@ -25,8 +27,10 @@ beforeEach(() => {
 	id = sessions.create({ cwd: '/', model: 'fake/m' }).id
 })
 afterEach(() => {
-	findIndex.state.db?.close(); findIndex.state.db = undefined
-	host.reset(); sessions.closeAll()
+	findIndex.state.db?.close()
+	findIndex.state.db = undefined
+	host.reset()
+	sessions.closeAll()
 	if (savedHome === undefined) paths.state.home = undefined
 	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
@@ -41,7 +45,8 @@ function seed() {
 test('apply is append-only; provider input, pages, index and links project edits and drops; undo restores', async () => {
 	seed()
 	let prefix = readFileSync(history.file(id))
-	findIndex.init(); await findIndex.catchup(id)
+	findIndex.init()
+	await findIndex.catchup(id)
 	let applied = rebases.apply(id, { base: 4, drop: [2], edit: [{ n: 1, text: 'newneedle' }] })
 	expect(applied.n).toBe(6)
 	expect(snapshots.build(id).dropped).toEqual([2])
@@ -70,7 +75,12 @@ test('stale, running and question-bound plans are refused without appending', ()
 	status.state.states.set(id, { type: 'running', phase: 'tools' })
 	expect(() => rebases.apply(id, plan)).toThrow('Pause')
 	status.state.states.set(id, { type: 'idle' })
-	history.append(id, { type: 'question', id: 'q', form: { text: 'Question', fields: [] }, from: { command: 'example', args: '' } })
+	history.append(id, {
+		type: 'question',
+		id: 'q',
+		form: { text: 'Question', fields: [] },
+		from: { command: 'example', args: '' },
+	})
 	expect(() => rebases.apply(id, { ...plan, base: 5 })).toThrow('question')
 	expect(history.readSync(id).at(-1)?.type).toBe('question')
 })
@@ -94,7 +104,13 @@ test('dropping a model state transition independently restores the starting mode
 test('rebase restores cwd, qualified model and autoclose without replaying commands; undo restores edited settings', async () => {
 	seed()
 	history.append(id, { type: 'notice', text: 'Old project instructions', sectionUpdate: true })
-	let transition = history.append(id, { type: 'change', cwd: '/new', model: 'openai/gpt-6-sol:max', autoclose: true, previous: { cwd: '/', model: 'fake/m', autoclose: false } })
+	let transition = history.append(id, {
+		type: 'change',
+		cwd: '/new',
+		model: 'openai/gpt-6-sol:max',
+		autoclose: true,
+		previous: { cwd: '/', model: 'fake/m', autoclose: false },
+	})
 	let note = history.append(id, { type: 'notice', text: 'New project instructions', sectionUpdate: true })
 	Object.assign(sessions.open(id), { cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
 	await history.messages(id)
@@ -113,11 +129,17 @@ test('rebase restores cwd, qualified model and autoclose without replaying comma
 })
 
 test('dropping a cwd transition and its update restores historical project instructions even after disk edits', async () => {
-	let a = `${home}/a`, b = `${home}/b`, file = `${home}/SYSTEM.md`
-	mkdirSync(a); mkdirSync(b)
+	let a = `${home}/a`,
+		b = `${home}/b`,
+		file = `${home}/SYSTEM.md`
+	mkdirSync(a)
+	mkdirSync(b)
 	writeFileSync(`${a}/AGENTS.md`, 'Original project A rules')
 	writeFileSync(`${b}/AGENTS.md`, 'Project B rules')
-	writeFileSync(file, 'Static instructions\n:: section "Cwd" update="diff"\n$cwd\n::\n:: section "Local instructions" update="diff"\n$agents\n::')
+	writeFileSync(
+		file,
+		'Static instructions\n:: section "Cwd" update="diff"\n$cwd\n::\n:: section "Local instructions" update="diff"\n$agents\n::',
+	)
 	let original = systemPrompt.file
 	systemPrompt.file = () => file
 	try {
@@ -129,7 +151,8 @@ test('dropping a cwd transition and its update restores historical project instr
 		promptCache.prepare(id, { cwd: b, model: 'fake/m', now: 2000 })
 		await history.messages(id)
 		let raw = history.readSync(id)
-		let transition = raw.findLast((r) => r.type === 'change')!, note = raw.findLast((r) => r.type === 'notice' && r.sectionUpdate)!
+		let transition = raw.findLast((r) => r.type === 'change')!,
+			note = raw.findLast((r) => r.type === 'notice' && r.sectionUpdate)!
 		expect(note.type === 'notice' && note.text).toContain('Project B rules')
 		writeFileSync(`${a}/AGENTS.md`, 'A disk change after the transition')
 		rebases.apply(id, { base: raw.at(-1)!.n!, drop: [transition.n!, note.n!], edit: [] })
@@ -143,7 +166,9 @@ test('dropping a cwd transition and its update restores historical project instr
 		writeFileSync(`${a}/AGENTS.md`, 'Genuine later source edit')
 		promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 4000 })
 		expect(JSON.stringify(await history.messages(id))).toContain('Genuine later source edit')
-	} finally { systemPrompt.file = original }
+	} finally {
+		systemPrompt.file = original
+	}
 })
 
 test('invalid setting edits fail before pausing or writing; a note-only edit leaves host settings intact', async () => {
@@ -151,8 +176,11 @@ test('invalid setting edits fail before pausing or writing; a note-only edit lea
 	let change = history.append(id, { type: 'change', cwd: '/new', previous: { cwd: '/' } })
 	let note = history.append(id, { type: 'notice', text: 'Original rules', sectionUpdate: true })
 	sessions.open(id).cwd = '/new'
-	let base = note.n!, bytes = readFileSync(history.file(id))
-	expect(() => rebases.apply(id, { base, drop: [], edit: [{ n: change.n!, text: '{cwd: 42}' }] })).toThrow('invalid session setting')
+	let base = note.n!,
+		bytes = readFileSync(history.file(id))
+	expect(() => rebases.apply(id, { base, drop: [], edit: [{ n: change.n!, text: '{cwd: 42}' }] })).toThrow(
+		'invalid session setting',
+	)
 	expect(readFileSync(history.file(id))).toEqual(bytes)
 	rebases.apply(id, { base, drop: [], edit: [{ n: note.n!, text: 'User injected instructions' }] })
 	expect(sessions.open(id).cwd).toBe('/new')
@@ -165,10 +193,16 @@ test('committed settings recover after metadata synchronization fails without re
 	sessions.open(id).cwd = '/new'
 	liveFiles.save(sessions.open(id))
 	let save = liveFiles.save
-	liveFiles.save = () => { throw new Error('metadata disk full at session.ason') }
+	liveFiles.save = () => {
+		throw new Error('metadata disk full at session.ason')
+	}
 	try {
-		expect(() => rebases.apply(id, { base: transition.n!, drop: [transition.n!], edit: [] })).toThrow(/Rebase applied as s\d+; settings synchronization failed[\s\S]*metadata disk full at session.ason/)
-	} finally { liveFiles.save = save }
+		expect(() => rebases.apply(id, { base: transition.n!, drop: [transition.n!], edit: [] })).toThrow(
+			/Rebase applied as s\d+; settings synchronization failed[\s\S]*metadata disk full at session.ason/,
+		)
+	} finally {
+		liveFiles.save = save
+	}
 	expect(history.readSync(id).at(-1)).toMatchObject({ type: 'rebase', contextChanged: true })
 	Object.assign(sessions.open(id), { cwd: '/new' })
 	liveFiles.save(sessions.open(id))
@@ -190,24 +224,32 @@ test('missing starting state refuses setting surgery without migration but permi
 
 test('dropped signed blocks are never expanded', async () => {
 	history.submit(id, 'go')
-	history.append(id, { type: 'assistant', block: { type: 'thinking', text: 'reason', signatureBlob: 'abcdef123456', provider: 'anthropic' } })
+	history.append(id, {
+		type: 'assistant',
+		block: { type: 'thinking', text: 'reason', signatureBlob: 'abcdef123456', provider: 'anthropic' },
+	})
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	rebases.apply(id, { base: 4, drop: [2], edit: [] })
 	expect(JSON.stringify(await history.messages(id))).not.toContain('reason')
 })
 
-
 test('edited tool output survives an omission saved before the rebase', async () => {
- history.submit(id, 'go')
- history.append(id, {type:'assistant',block:{type:'tool_call',id:'call',name:'bash',input:{}}})
- history.append(id, {type:'user',blocks:[{type:'tool_result',id:'call',output:'long original '.repeat(1000)}]})
- history.append(id, {type:'turn_end',status:'completed',usage:{}})
- writeFileSync(`${paths.sessionDir(id)}/projection.ason`, '{boundary:0, checkpoint:0, pressure:-1, omitted:[3], consumed:[2,3]}')
- expect(JSON.stringify(await history.messages(id))).toContain('[pruned')
- rebases.apply(id, {base:4, drop:[], edit:[{n:3,text:'retained edit'}]})
- expect(JSON.stringify(await history.messages(id))).toContain('retained edit')
- expect(JSON.stringify(await history.messages(id))).not.toContain('[pruned tool output')
+	history.submit(id, 'go')
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'call', name: 'bash', input: {} } })
+	history.append(id, {
+		type: 'user',
+		blocks: [{ type: 'tool_result', id: 'call', output: 'long original '.repeat(1000) }],
+	})
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	writeFileSync(
+		`${paths.sessionDir(id)}/projection.ason`,
+		'{boundary:0, checkpoint:0, pressure:-1, omitted:[3], consumed:[2,3]}',
+	)
+	expect(JSON.stringify(await history.messages(id))).toContain('[pruned')
+	rebases.apply(id, { base: 4, drop: [], edit: [{ n: 3, text: 'retained edit' }] })
+	expect(JSON.stringify(await history.messages(id))).toContain('retained edit')
+	expect(JSON.stringify(await history.messages(id))).not.toContain('[pruned tool output')
 })
 
 test('failed rewrite commit keeps original content even when it must pause before committing', async () => {
@@ -218,9 +260,13 @@ test('failed rewrite commit keeps original content even when it must pause befor
 		return append(id, record)
 	}
 	try {
-		expect(() => rebases.apply(id, { base: 4, drop: [2], edit: [] })).toThrow('Rebase was not applied; the session is paused.\ndisk full at history path')
+		expect(() => rebases.apply(id, { base: 4, drop: [2], edit: [] })).toThrow(
+			'Rebase was not applied; the session is paused.\ndisk full at history path',
+		)
 		expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
 		expect(snapshots.build(id).state.type).toBe('paused')
 		expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
-	} finally { history.append = append }
+	} finally {
+		history.append = append
+	}
 })

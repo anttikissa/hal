@@ -47,4 +47,3 @@ test("other clients' tabs never move focus", () => {
 	// Re-acking the focused tab (a reconnect) keeps the opener.
 	expect(tabs.focus(['a', 'b'], ['a', 'b'], f, 'b')).toBe(f)
 })
-

@@ -13,7 +13,15 @@ import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
 
 type Line = { path: string; line: number; text: string; match: boolean }
 type Search = { lines: Line[]; matches: number; files: Set<string>; more: boolean }
-type Query = { regex?: string; literals?: string[]; roots: string[]; glob?: string; context: number; cwd: string; signal: AbortSignal }
+type Query = {
+	regex?: string
+	literals?: string[]
+	roots: string[]
+	glob?: string
+	context: number
+	cwd: string
+	signal: AbortSignal
+}
 
 const maxMatches = 100
 const maxFiles = 200
@@ -25,13 +33,17 @@ const stopAfter = 5000
 function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = callText.values(raw)
 	let [pattern, ...rest] = values
-	if (typeof pattern !== 'string' || !pattern) throw new Error('GREP needs a pattern first, e.g. GREP "foo|bar" { in: "src" }')
+	if (typeof pattern !== 'string' || !pattern)
+		throw new Error('GREP needs a pattern first, e.g. GREP "foo|bar" { in: "src" }')
 	let input: Record<string, unknown> = { pattern }
 	let paths: string[] = []
 	for (let v of rest) {
 		if (typeof v === 'string') paths.push(v)
 		else if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(input, v)
-		else throw new Error('GREP takes a pattern, optional paths and an options object, e.g. GREP "foo" { in: ["src", "test"], glob: "*.ts" }')
+		else
+			throw new Error(
+				'GREP takes a pattern, optional paths and an options object, e.g. GREP "foo" { in: ["src", "test"], glob: "*.ts" }',
+			)
 	}
 	if (paths.length) input.in = [...paths, ...[input.in ?? []].flat()]
 	return { name: 'grep', input }
@@ -39,10 +51,13 @@ function resolveCall(raw: string): { name: string; input: Record<string, unknown
 
 // Splits on unescaped |; \| stands for a literal |.
 function alternatives(pattern: string): string[] {
-	let parts = [''], i = 0
+	let parts = [''],
+		i = 0
 	for (; i < pattern.length; i++) {
-		if (pattern[i] === '\\' && pattern[i + 1] === '|') { parts[parts.length - 1] += '|'; i++ }
-		else if (pattern[i] === '|') parts.push('')
+		if (pattern[i] === '\\' && pattern[i + 1] === '|') {
+			parts[parts.length - 1] += '|'
+			i++
+		} else if (pattern[i] === '|') parts.push('')
 		else parts[parts.length - 1] += pattern[i]!
 	}
 	return parts.filter(Boolean)
@@ -73,7 +88,11 @@ async function withRg(bin: string, q: Query): Promise<Search | { invalid: string
 		buffer = lines.pop()!
 		for (let l of lines) {
 			let e: any
-			try { e = JSON.parse(l) } catch { continue }
+			try {
+				e = JSON.parse(l)
+			} catch {
+				continue
+			}
 			if (e.type !== 'match' && e.type !== 'context') continue
 			let path = (e.data.path.text ?? Buffer.from(e.data.path.bytes, 'base64').toString()).replace(/^\.\//, '')
 			let text = (e.data.lines.text ?? '').replace(/\r?\n$/, '')
@@ -81,7 +100,11 @@ async function withRg(bin: string, q: Query): Promise<Search | { invalid: string
 			if (match) {
 				out.matches++
 				out.files.add(path)
-				if (out.matches > stopAfter) { out.more = true; proc.kill(); break reading }
+				if (out.matches > stopAfter) {
+					out.more = true
+					proc.kill()
+					break reading
+				}
 			}
 			out.lines.push({ path, line: e.data.line_number, text, match })
 		}
@@ -97,8 +120,16 @@ async function withRg(bin: string, q: Query): Promise<Search | { invalid: string
 // non-ignored files inside a repository; every file but .git outside one.
 function listFiles(q: Query): string[] {
 	let rel = q.roots.map((r) => relative(q.cwd, r) || '.')
-	let git = Bun.spawnSync(['git', 'ls-files', '-co', '--exclude-standard', '-z', '--', ...rel], { cwd: q.cwd, stdout: 'pipe', stderr: 'pipe' })
-	if (git.exitCode === 0) return git.stdout.toString().split('\0').filter((f) => f && existsSync(resolve(q.cwd, f)))
+	let git = Bun.spawnSync(['git', 'ls-files', '-co', '--exclude-standard', '-z', '--', ...rel], {
+		cwd: q.cwd,
+		stdout: 'pipe',
+		stderr: 'pipe',
+	})
+	if (git.exitCode === 0)
+		return git.stdout
+			.toString()
+			.split('\0')
+			.filter((f) => f && existsSync(resolve(q.cwd, f)))
 	let files: string[] = []
 	let walk = (abs: string) => {
 		let st = statSync(abs)
@@ -156,9 +187,14 @@ function format(found: Search, filesOnly: boolean, separated: boolean): string {
 	let total = `${found.more ? 'more than ' : ''}${found.matches} match${found.matches === 1 ? '' : 'es'} in ${found.files.size} file${found.files.size === 1 ? '' : 's'}`
 	if (filesOnly) {
 		let files = [...found.files]
-		return [...files.slice(0, maxFiles), ...(files.length > maxFiles ? [`[+${files.length - maxFiles} more files]`] : [])].join('\n')
+		return [
+			...files.slice(0, maxFiles),
+			...(files.length > maxFiles ? [`[+${files.length - maxFiles} more files]`] : []),
+		].join('\n')
 	}
-	let out: string[] = [], shown = 0, prev: Line | undefined
+	let out: string[] = [],
+		shown = 0,
+		prev: Line | undefined
 	for (let l of found.lines) {
 		if (l.match && shown === maxMatches) break
 		if (l.match) shown++
@@ -173,7 +209,8 @@ function format(found: Search, filesOnly: boolean, separated: boolean): string {
 
 export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 	name: 'grep',
-	description: 'Search file contents under paths (default cwd), skipping git-ignored files. The pattern is a regex (rg syntax); an invalid regex is searched as literal |-separated alternatives. Prints path:line: text, at most 100 matches.',
+	description:
+		'Search file contents under paths (default cwd), skipping git-ignored files. The pattern is a regex (rg syntax); an invalid regex is searched as literal |-separated alternatives. Prints path:line: text, at most 100 matches.',
 	readOnly: true,
 	syntax: {
 		summary: false,
@@ -199,7 +236,8 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 		if (!wanted.every((p) => typeof p === 'string' && p)) throw new Error('in must be a path or a list of paths')
 		if (input.glob !== undefined && typeof input.glob !== 'string') throw new Error('glob must be a string')
 		let context = input.context ?? 0
-		if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 20) throw new Error('context must be an integer from 0 to 20')
+		if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 20)
+			throw new Error('context must be an integer from 0 to 20')
 		let notes: string[] = []
 		let roots: string[] = []
 		for (let p of wanted as string[]) {
@@ -208,9 +246,16 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 			else roots.push(abs)
 		}
 		if (!roots.length) return { text: notes.join('\n'), isError: true }
-		let q: Query = { regex: pattern, roots, glob: input.glob as string | undefined, context, cwd: ctx.cwd, signal: ctx.signal }
+		let q: Query = {
+			regex: pattern,
+			roots,
+			glob: input.glob as string | undefined,
+			context,
+			cwd: ctx.cwd,
+			signal: ctx.signal,
+		}
 		let bin = tool.rg()
-		let search = (q: Query) => bin ? withRg(bin, q) : builtIn(q)
+		let search = (q: Query) => (bin ? withRg(bin, q) : builtIn(q))
 		let found = await search(q)
 		if ('invalid' in found) {
 			let literals = alternatives(pattern)

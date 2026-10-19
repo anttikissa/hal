@@ -20,7 +20,13 @@ function spin(beat: number, tool = false): string {
 // height grows to `n` and stays there. Done, the last row says how
 // many rows follow, at its right. `n` defaults to the rows a short card
 // leaves under its title row.
-function short(body: string[], width: number, streaming: boolean, style: Style | undefined, n = settings.shortRows() - 1): string[] {
+function short(
+	body: string[],
+	width: number,
+	streaming: boolean,
+	style: Style | undefined,
+	n = settings.shortRows() - 1,
+): string[] {
 	if (n <= 0) return []
 	if (body.length <= n) return body
 	if (streaming) return body.slice(-n)

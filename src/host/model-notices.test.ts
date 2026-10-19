@@ -11,7 +11,8 @@ import { calls, client, created, fresh, restartHost, until, useHost } from './ho
 
 useHost()
 
-const texts = (messages: any[]) => messages.flatMap((m) => m.blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text)).join('\n')
+const texts = (messages: any[]) =>
+	messages.flatMap((m) => m.blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text)).join('\n')
 
 test('switching from the intro and skipping its question sends the change on the first real request', async () => {
 	let c = client()
@@ -36,16 +37,26 @@ test('switching from the intro and skipping its question sends the change on the
 })
 
 test('changes interrupt streaming, settle pending calls and preserve earlier request prefixes', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'Inspect.' })
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'Working.' })
 	await until(() => c.of('stream').length)
-	calls[0]!.push({ type: 'tool_call', id: 'read', name: 'read', input: { path: '/tmp/this-hal-test-file-does-not-exist' } })
+	calls[0]!.push({
+		type: 'tool_call',
+		id: 'read',
+		name: 'read',
+		input: { path: '/tmp/this-hal-test-file-does-not-exist' },
+	})
 	await until(() => c.of('stream').some((e) => e.event.type === 'tool_call'))
 	slash.change(id, { model: 'fake/m2' })
 	slash.change(id, { model: 'fake/m3' })
-	history.append(id, { type: 'output', text: 'Rules changed.', change: { name: 'AGENTS.md', what: 'changed', diff: '+new rule' } })
+	history.append(id, {
+		type: 'output',
+		text: 'Rules changed.',
+		change: { name: 'AGENTS.md', what: 'changed', diff: '+new rule' },
+	})
 	// The pending next-round message uses the same safe boundary as notices.
 	prompts.submit(id, 'Another session update.', undefined, 'steer', { from: id, advisory: true })
 	// Late old-model output must not enter the continuation.
@@ -76,7 +87,8 @@ test('changes interrupt streaming, settle pending calls and preserve earlier req
 })
 
 test('notice delivery remains once across compact, prompt edits and recovery without waking an idle turn', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	history.submit(id, 'Earlier prompt.')
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Earlier answer.' }, model: 'fake/m1' })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
@@ -91,7 +103,11 @@ test('notice delivery remains once across compact, prompt edits and recovery wit
 	expect(await history.messages(id)).toEqual(first)
 	// Editing a prompt keeps instruction changes, without keeping the old answer.
 	history.submit(id, 'Typo.')
-	history.append(id, { type: 'output', text: 'New instructions.', change: { name: 'AGENTS.md', what: 'changed', diff: '+rule' } })
+	history.append(id, {
+		type: 'output',
+		text: 'New instructions.',
+		change: { name: 'AGENTS.md', what: 'changed', diff: '+rule' },
+	})
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Discarded answer.' } })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Corrected.' }], replaces: true })
 	let edited = texts(await history.messages(id))
@@ -101,15 +117,21 @@ test('notice delivery remains once across compact, prompt edits and recovery wit
 })
 
 test('absolute context crossings reach the next round once and re-arm after decreases and compaction', async () => {
-	let c = client(), id = created(c)
-	let notices = () => history.readSync(id).flatMap((r) => r.type === 'notice' && r.text.startsWith('Context usage crossed') ? [r] : [])
+	let c = client(),
+		id = created(c)
+	let notices = () =>
+		history.readSync(id).flatMap((r) => (r.type === 'notice' && r.text.startsWith('Context usage crossed') ? [r] : []))
 	c.conn.send({ type: 'submit', sessionId: id, text: 'Work.' })
 	let levels = [149_999, 150_000, 180_000, 200_000, 250_000, 260_000, 149_999, 251_000]
 	let counts = [0, 1, 1, 2, 3, 3, 3, 4]
 	for (let [i, input] of levels.entries()) {
 		await until(() => calls.length === i + 1)
 		let before = calls[i]!.input.messages
-		calls[i]!.push({ type: 'tool_call', id: `t${i}`, name: 'nope', input: {} }, { type: 'usage', usage: { input: input - 100_000, cacheRead: 90_000, cacheWrite: 10_000, output: 1 } }, { type: 'done', reason: 'tool_use' })
+		calls[i]!.push(
+			{ type: 'tool_call', id: `t${i}`, name: 'nope', input: {} },
+			{ type: 'usage', usage: { input: input - 100_000, cacheRead: 90_000, cacheWrite: 10_000, output: 1 } },
+			{ type: 'done', reason: 'tool_use' },
+		)
 		await until(() => calls.length === i + 2)
 		expect(notices()).toHaveLength(counts[i]!)
 		let after = calls[i + 1]!.input.messages
@@ -119,7 +141,9 @@ test('absolute context crossings reach the next round once and re-arm after decr
 			expect(text).toContain(`${input} input tokens`)
 			expect(texts(after).split(text)).toHaveLength(2)
 			let blocks = after.flatMap((m: any) => m.blocks)
-			expect(blocks.findLastIndex((b: any) => b.type === 'text' && b.text.includes(text))).toBeGreaterThan(blocks.findLastIndex((b: any) => b.type === 'tool_result'))
+			expect(blocks.findLastIndex((b: any) => b.type === 'text' && b.text.includes(text))).toBeGreaterThan(
+				blocks.findLastIndex((b: any) => b.type === 'tool_result'),
+			)
 		}
 	}
 	expect(notices().at(-1)!.text).toContain('150k, 200k, 250k')

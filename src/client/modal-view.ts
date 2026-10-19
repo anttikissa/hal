@@ -30,7 +30,10 @@ function modalBox(rows: number, cols: number, max = 100): { height: number; widt
 function border(l: string, r: string, text: string, right: string, width: number): string {
 	let inner = width - 2
 	right = right && right.length + 2 <= inner - 2 ? ` ${right} ` : ''
-	text = strings.clipVisual(text ? ` ${ansi.clean(text).replace(/[\r\n\t]+/g, ' ')} ` : '', Math.max(0, inner - 2 - strings.visLen(right)))
+	text = strings.clipVisual(
+		text ? ` ${ansi.clean(text).replace(/[\r\n\t]+/g, ' ')} ` : '',
+		Math.max(0, inner - 2 - strings.visLen(right)),
+	)
 	let fill = Math.max(0, inner - 2 - strings.visLen(text) - strings.visLen(right))
 	return l + (inner > 0 ? '─' : '') + text + '─'.repeat(fill) + right + (inner > 1 ? '─' : '') + r
 }
@@ -45,8 +48,12 @@ function border(l: string, r: string, text: string, right: string, width: number
  * effort, name and ID, as many as fit in `inner` with three-space gaps. */
 function table(m: ModalState, inner: number): number[] {
 	let model = m.items.map((_, i) => !!m.values?.[i])
-	let widths = [Math.max(0, ...m.items.map((s, i) => (model[i] ? 2 + strings.visLen(ansi.clean(s)) : 0))), picker.effortWidth(m)]
-	for (let k = 1; k < 3; k++) widths.push(Math.max(0, ...(m.values ?? []).map((v) => strings.visLen(ansi.clean(v).split('\t')[k] ?? ''))))
+	let widths = [
+		Math.max(0, ...m.items.map((s, i) => (model[i] ? 2 + strings.visLen(ansi.clean(s)) : 0))),
+		picker.effortWidth(m),
+	]
+	for (let k = 1; k < 3; k++)
+		widths.push(Math.max(0, ...(m.values ?? []).map((v) => strings.visLen(ansi.clean(v).split('\t')[k] ?? ''))))
 	while (widths.length > 1 && widths.reduce((a, b) => a + b, 0) + 3 * (widths.length - 1) > inner) widths.pop()
 	return widths
 }
@@ -62,11 +69,15 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		// The filters: the focused one lit like a picker's selection, the
 		// cursor on its box.
 		let lit = ansi.sgr(colors.popupCurrent(colors.popup().neutralFg!)) || ansi.INVERSE
-		let row = '', col = 0
+		let row = '',
+			col = 0
 		findDialog.labels.forEach((label, i) => {
 			let cell = `[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`
 			if (i) row += '   '
-			if (m.find!.focus === i + 1) { col = strings.visLen(ansi.clean(row)) + 1; cell = lit + cell + ansi.UNCOLOR + ansi.UNINVERSE }
+			if (m.find!.focus === i + 1) {
+				col = strings.visLen(ansi.clean(row)) + 1
+				cell = lit + cell + ansi.UNCOLOR + ansi.UNINVERSE
+			}
 			row += cell
 		})
 		if (m.find.focus > 0 && m.find.focus < 5) fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
@@ -77,8 +88,13 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// a link to its block on the web (task ker).
 	if (m.restart) {
 		let r = modals.restartLines(m.restart.calls)
-		let link = (c: (typeof r.calls)[number]) => (c.href ? `\x1b]8;;${ansi.webUrl(c.href)}\x07${c.block}${ansi.LINK_OFF}` : c.block)
-		content.push(strings.clipVisual(r.head, inner), ...r.calls.map((c) => strings.clipVisual(link(c) + ansi.clean(c.rest), inner)), '')
+		let link = (c: (typeof r.calls)[number]) =>
+			c.href ? `\x1b]8;;${ansi.webUrl(c.href)}\x07${c.block}${ansi.LINK_OFF}` : c.block
+		content.push(
+			strings.clipVisual(r.head, inner),
+			...r.calls.map((c) => strings.clipVisual(link(c) + ansi.clean(c.rest), inner)),
+			'',
+		)
 	}
 	let current = colors.popupCurrent(colors.popup().neutralFg!)
 	let below = modalView.footer(m, inner)
@@ -92,7 +108,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// name and ID, each column as wide as its longest model row. Columns
 	// that do not fit drop from the right.
 	let table = m.tree ? modalView.table(m, inner) : undefined
-	let column = m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
+	let column =
+		m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
 	let labels = m.find ? findDialog.rows(m.find.results, m.find.tabs, inner - 2, m.query) : m.items
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
@@ -103,15 +120,31 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
 		let value = m.tree ? undefined : modalView.cell(m, i, current)
 		if (table && m.values?.[i]) {
-			let cells = ansi.clean(m.values[i]!).split('\t').slice(0, table.length - 1)
-			let line = cells.map((c, k) => c.padEnd(k < cells.length - 1 ? table[k + 1]! : 0)).join('   ').trimEnd()
-			if (line) row = strings.clipVisual(row, table[0]!).padEnd(table[0]!) + '   ' + (m.query ? modalView.highlight(line, m.query, i === m.selected ? current : undefined) : line)
+			let cells = ansi
+				.clean(m.values[i]!)
+				.split('\t')
+				.slice(0, table.length - 1)
+			let line = cells
+				.map((c, k) => c.padEnd(k < cells.length - 1 ? table[k + 1]! : 0))
+				.join('   ')
+				.trimEnd()
+			if (line)
+				row =
+					strings.clipVisual(row, table[0]!).padEnd(table[0]!) +
+					'   ' +
+					(m.query ? modalView.highlight(line, m.query, i === m.selected ? current : undefined) : line)
 		} else if (value) row += strings.clipVisual(value.text, Math.max(0, inner - 2 - column))
-		if (value?.cursor !== undefined) cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
+		if (value?.cursor !== undefined)
+			cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
 			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight color.
-			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + ansi.UNCOLOR + ansi.UNINVERSE
+			row =
+				(ansi.sgr(current) || ansi.INVERSE) +
+				row +
+				' '.repeat(inner - strings.visLen(row)) +
+				ansi.UNCOLOR +
+				ansi.UNINVERSE
 		}
 		content.push(row)
 	}
@@ -157,24 +190,42 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 // the question if any and a blank row, the field flush with the left
 // edge, and a blank row.
 function head(m: ModalState, inner: number): { rows: string[]; cursor?: Cursor } {
-	let fields: { rows: string[]; cursor?: Cursor } = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [] }
+	let fields: { rows: string[]; cursor?: Cursor } = m.form
+		? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! })
+		: { rows: [] }
 	if (!m.question && !m.tree) return fields
 	let top = m.question ? ['', ...strings.wordWrap(m.question, inner), ''] : ['']
-	return { rows: [...top, ...fields.rows.map((r) => r.slice(2)), ''], cursor: fields.cursor && { row: fields.cursor.row + top.length, col: fields.cursor.col - 2 } }
+	return {
+		rows: [...top, ...fields.rows.map((r) => r.slice(2)), ''],
+		cursor: fields.cursor && { row: fields.cursor.row + top.length, col: fields.cursor.col - 2 },
+	}
 }
 
 // The Ctrl-O dialog's rows below its field (task v8y): the live hint,
 // then the help area, or Tab's block ids packed in as many rows.
 function blocksLines(m: ModalState, width: number): string[] {
 	let h = colors.help()
-	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
-	let hint = strings.wordWrap(m.blocks!.hint, width).map((r) => m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + ansi.UNCOLOR : r)
+	let key = ansi.sgr({ fg: h.key! }),
+		desc = ansi.sgr({ fg: h.description! })
+	let hint = strings
+		.wordWrap(m.blocks!.hint, width)
+		.map((r) => (m.blocks!.invalid ? ansi.sgr({ fg: colors.warning().fg! }) + r + ansi.UNCOLOR : r))
 	let col = Math.max(...m.blocks!.help.map(([k]) => k.length)) + 2
-	let rows = m.blocks!.help.flatMap(([k, d]) => strings.wordWrap(d, Math.max(1, width - col)).map((line, i) => key + (i ? '' : k).padEnd(col) + desc + line + ansi.UNCOLOR))
+	let rows = m.blocks!.help.flatMap(([k, d]) =>
+		strings
+			.wordWrap(d, Math.max(1, width - col))
+			.map((line, i) => key + (i ? '' : k).padEnd(col) + desc + line + ansi.UNCOLOR),
+	)
 	rows.push('', ...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + ansi.UNCOLOR))
 	// Each kind's first letter is its kind letter: bright and bold.
 	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
-	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + ansi.UNCOLOR))
+	rows.push(
+		...strings
+			.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width)
+			.map(
+				(r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + ansi.UNCOLOR,
+			),
+	)
 	let ids = m.blocks!.choices
 	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + ansi.UNCOLOR)
 	return [...hint, '', ...rows.map((r) => strings.clipVisual(r, width))]
@@ -186,7 +237,12 @@ function footer(m: ModalState, width: number): string[] {
 	let detail = m.details?.[m.selected]
 	let rows: string[] = []
 	if (detail) rows.push('', ...strings.wordWrap(ansi.clean(detail), width))
-	if (m.error) rows.push(...strings.wordWrap(strings.expandTabs(ansi.clean(m.error.replace(/\r\n?/g, '\n'))), width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR))
+	if (m.error)
+		rows.push(
+			...strings
+				.wordWrap(strings.expandTabs(ansi.clean(m.error.replace(/\r\n?/g, '\n'))), width)
+				.map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR),
+		)
 	return rows
 }
 
@@ -233,7 +289,13 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 		box.height = Math.min(rows, Math.max(3, rows - 2))
 	}
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
-	if (m.compact && m.form) box.height = Math.min(box.height, 3 + modalView.head(m, box.width - 4).rows.length + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
+	if (m.compact && m.form)
+		box.height = Math.min(
+			box.height,
+			3 +
+				modalView.head(m, box.width - 4).rows.length +
+				(m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0),
+		)
 	while (lines.length < box.height) lines.push('')
 	let screen = Math.min(lines.length, rows)
 	let top = lines.length - screen + Math.floor((screen - box.height) / 2)
@@ -242,4 +304,17 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { table, modalBox, border, modalLines, cell, head, blocksLines, footer, highlight, modalScroll, overlay, withModal }
+export const modalView = {
+	table,
+	modalBox,
+	border,
+	modalLines,
+	cell,
+	head,
+	blocksLines,
+	footer,
+	highlight,
+	modalScroll,
+	overlay,
+	withModal,
+}

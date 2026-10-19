@@ -14,7 +14,8 @@ function notice(): string | undefined {
 // /version shows both; the host ignores it from its own process.
 function report(send: (c: Command) => void): void {
 	let { own, host, newCode } = versions.state
-	if (own && host && own !== 'unknown') send({ type: 'hello', pid: process.pid, version: own, ...(newCode && { newCode: true as const }) })
+	if (own && host && own !== 'unknown')
+		send({ type: 'hello', pid: process.pid, version: own, ...(newCode && { newCode: true as const }) })
 }
 
 export const versions = {

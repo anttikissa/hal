@@ -35,7 +35,8 @@ async function until(at: number, signal?: AbortSignal): Promise<void> {
 	let off = clock.onWake(() => (woke = true))
 	try {
 		// Guard for sleep: short slices, each re-reading wall time.
-		while (!woke && !signal?.aborted && clock.now() < at) await clock.sleep(Math.min(at - clock.now(), clock.tickMs), signal)
+		while (!woke && !signal?.aborted && clock.now() < at)
+			await clock.sleep(Math.min(at - clock.now(), clock.tickMs), signal)
 	} finally {
 		off()
 	}
@@ -92,5 +93,9 @@ export const clock = {
 	wake,
 	init,
 	stop,
-	state: { listeners: new Set<Listener>(), last: null as number | null, timer: null as ReturnType<typeof setInterval> | null },
+	state: {
+		listeners: new Set<Listener>(),
+		last: null as number | null,
+		timer: null as ReturnType<typeof setInterval> | null,
+	},
 }

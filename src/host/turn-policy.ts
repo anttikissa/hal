@@ -16,14 +16,20 @@ import { turns } from './turns.ts'
 // tool calls runs; any other end stands.
 function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
 	if (done.reason === 'max_tokens') return { type: 'error', message: 'Response stopped: max_tokens' }
-	if (done.reason === 'refusal') return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
+	if (done.reason === 'refusal')
+		return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
 	return done
 }
 
 // Steering canceled or stopped a call (task ker): not a failure, but
 // the model reads what happened.
 function canceled(id: string): ToolResultBlock {
-	return { type: 'tool_result', id, output: `Tool call did not run: canceled ${jobs.byMessage}.`, interrupted: 'canceled' }
+	return {
+		type: 'tool_result',
+		id,
+		output: `Tool call did not run: canceled ${jobs.byMessage}.`,
+		interrupted: 'canceled',
+	}
 }
 // A steer stopped the call if it failed (a tool's own abort error, any
 // wording) or is bash's stop line, built from the same `byMessage`; a
@@ -56,21 +62,33 @@ async function waitOut(id: string, error: ErrorEvent, failures: number, outer: A
 	let rewait = new AbortController()
 	if (running) running.rewait = rewait
 	let signal = AbortSignal.any([outer, rewait.signal])
-	try { await turnPolicy.waitFor(id, error, failures, signal) }
-	finally { if (running?.rewait === rewait) delete running.rewait }
+	try {
+		await turnPolicy.waitFor(id, error, failures, signal)
+	} finally {
+		if (running?.rewait === rewait) delete running.rewait
+	}
 }
 
 // What the model reads when a provider error cut its response off and
 // the host retries: status, kind and the complete error.
 function retryNotice(error: ErrorEvent): string {
-	let kind = [error.status && !error.message.includes(`${error.status}`) && `HTTP ${error.status}`, error.failure && { temporary: 'temporary', limited: 'rate limited', auth: 'login problem' }[error.failure]].filter(Boolean).join(', ')
+	let kind = [
+		error.status && !error.message.includes(`${error.status}`) && `HTTP ${error.status}`,
+		error.failure && { temporary: 'temporary', limited: 'rate limited', auth: 'login problem' }[error.failure],
+	]
+		.filter(Boolean)
+		.join(', ')
 	let body = error.body && !error.message.includes(error.body) ? `\n${error.body}` : ''
 	return `Your response was cut off by an error${kind ? ` (${kind})` : ''}: ${error.message}${body}\nRetrying. Continue without repeating what you already wrote.`
 }
 
 async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
 	// Partial output can be followed by usage/bookkeeping, not only an assistant record.
-	if (history.readSync(id).findLast((r) => r.type === 'assistant' || r.type === 'user' || r.type === 'continue')?.type === 'assistant') history.append(id, { type: 'continue', reason: turnPolicy.retryNotice(error) })
+	if (
+		history.readSync(id).findLast((r) => r.type === 'assistant' || r.type === 'user' || r.type === 'continue')?.type ===
+		'assistant'
+	)
+		history.append(id, { type: 'continue', reason: turnPolicy.retryNotice(error) })
 	if (error.failure === 'auth' && error.retryAt === undefined) {
 		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
 		await auth.changed(signal)
@@ -95,8 +113,11 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 	// A new account can lift quota before the old account's reset time.
 	let waiting = new AbortController()
 	let either = AbortSignal.any([signal, waiting.signal])
-	try { await Promise.race([clock.until(at, either), auth.changed(either)]) }
-	finally { waiting.abort() }
+	try {
+		await Promise.race([clock.until(at, either), auth.changed(either)])
+	} finally {
+		waiting.abort()
+	}
 }
 
 // The wait before the next try after `failures` failed rounds in a

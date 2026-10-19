@@ -25,7 +25,10 @@ function attach<T extends ToolCallBlock | ToolResultBlock>(call: ToolCallBlock, 
 			return { ...target, presentation }
 		}
 	} catch (error) {
-		return { ...target, presentationError: `Tool presentation failed for ${call.name}: ${error instanceof Error ? error.stack ?? error.message : String(error)}\nInput: ${ason.stringify(call.input, 'short')}${presentation === undefined ? '' : `\nPresentation: ${Bun.inspect(presentation, { depth: Infinity, colors: false })}`}` }
+		return {
+			...target,
+			presentationError: `Tool presentation failed for ${call.name}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\nInput: ${ason.stringify(call.input, 'short')}${presentation === undefined ? '' : `\nPresentation: ${Bun.inspect(presentation, { depth: Infinity, colors: false })}`}`,
+		}
 	}
 	return target
 }

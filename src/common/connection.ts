@@ -18,7 +18,10 @@ import { eventCheck } from './event-check.ts'
 
 export type Role = 'host' | 'client'
 export type Conn = { send(command: object): void; close(): void }
-export type LinkState = { type: 'joining' } | { type: 'connected'; role: Role } | { type: 'disconnected'; retryAt: number }
+export type LinkState =
+	| { type: 'joining' }
+	| { type: 'connected'; role: Role }
+	| { type: 'disconnected'; retryAt: number }
 
 // One attempt to reach the host: a connection, or null if nobody
 // answered. After resolving a connection, the transport calls dropped()
@@ -178,7 +181,11 @@ function receive(event: Event): void {
 		st.pending.delete(event.id)
 		if (command?.type === 'open' && command.sessionId) st.followed.delete(command.sessionId)
 	}
-	st.opts?.onEvent(event.type === 'history-rewritten' ? { type: 'snapshot', sessionId: event.sessionId, snapshot: event.snapshot } : event)
+	st.opts?.onEvent(
+		event.type === 'history-rewritten'
+			? { type: 'snapshot', sessionId: event.sessionId, snapshot: event.snapshot }
+			: event,
+	)
 }
 
 function nextId(): string {

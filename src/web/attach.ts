@@ -14,7 +14,10 @@ import { app } from './app.ts'
 
 type Insert = (text: string) => void
 // What a paste event's clipboardData offers.
-export type Pasted = { items?: ArrayLike<{ kind: string; type: string; getAsFile(): Blob | null }>; getData(type: string): string }
+export type Pasted = {
+	items?: ArrayLike<{ kind: string; type: string; getAsFile(): Blob | null }>
+	getData(type: string): string
+}
 
 // Starts uploading `blob` for the session shown; `from`: its file name.
 function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
@@ -26,7 +29,8 @@ function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 	insert(uploads.begin(id, command, mediaType, from))
 	b.arrayBuffer().then(
 		(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
-		(e) => app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
+		(e) =>
+			app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
 	)
 }
 
@@ -48,7 +52,8 @@ function paste(data: Pasted, insert: Insert): boolean {
 	let item = Array.from(data.items ?? []).find((i) => i.kind === 'file')
 	let file = item?.getAsFile()
 	if (file) {
-		let name = 'name' in file && typeof file.name === 'string' ? file.name : `attachment.${item!.type.split('/')[1] ?? 'bin'}`
+		let name =
+			'name' in file && typeof file.name === 'string' ? file.name : `attachment.${item!.type.split('/')[1] ?? 'bin'}`
 		attach.blob(file, attachments.fileKind(name, item!.type) ?? 'application/octet-stream', insert, name)
 		return true
 	}

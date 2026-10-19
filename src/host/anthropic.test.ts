@@ -37,7 +37,11 @@ function writeAuth(entry: unknown) {
 const bodyOf = async (req: Request) => {
 	let bytes = new Uint8Array(await req.arrayBuffer())
 	let enc = req.headers.get('content-encoding')
-	return JSON.parse(new TextDecoder().decode(enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes))
+	return JSON.parse(
+		new TextDecoder().decode(
+			enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes,
+		),
+	)
 }
 
 beforeEach(() => {
@@ -51,7 +55,8 @@ beforeEach(() => {
 		port: 0,
 		async fetch(req) {
 			let url = new URL(req.url)
-			if (url.pathname === '/token') return Response.json({ access_token: 'refreshed-token', refresh_token: 'r2', expires_in: 3600 })
+			if (url.pathname === '/token')
+				return Response.json({ access_token: 'refreshed-token', refresh_token: 'r2', expires_in: 3600 })
 			if (req.method === 'GET') {
 				seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: undefined })
 				return models()
@@ -77,14 +82,21 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-async function run(messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }], extra = {}, model = 'anthropic/claude-opus-4-5') {
+async function run(
+	messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }],
+	extra = {},
+	model = 'anthropic/claude-opus-4-5',
+) {
 	let out: StreamEvent[] = []
 	for await (let e of provider.stream(model, { messages, ...extra })) out.push(e)
 	return out
 }
 
 const start = (usage = {}) => ({ type: 'message_start', message: { usage } })
-const stop = (reason: string, usage = {}) => [{ type: 'message_delta', delta: { stop_reason: reason }, usage }, { type: 'message_stop' }]
+const stop = (reason: string, usage = {}) => [
+	{ type: 'message_delta', delta: { stop_reason: reason }, usage },
+	{ type: 'message_stop' },
+]
 const endTurn = () => sse(start(), ...stop('end_turn'))
 
 test('OAuth request: endpoint, headers and the required Agent SDK system identity', async () => {
@@ -101,7 +113,10 @@ test('OAuth request: endpoint, headers and the required Agent SDK system identit
 	expect(s.headers.get('user-agent')).toMatch(/^claude-cli\/\S+ \(external, hal/)
 	expect(s.headers.get('x-app')).toBe('cli')
 	// The identity must be the first system block, on its own.
-	expect(s.body.system[0]).toEqual({ type: 'text', text: "You are a Claude agent, built on Anthropic's Claude Agent SDK." })
+	expect(s.body.system[0]).toEqual({
+		type: 'text',
+		text: "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+	})
 	expect(s.body.system.slice(1).map((b: any) => b.text.trim())).toEqual(['Be brief.'])
 	// The model reads the blocks joined with no separator: they must
 	// still read as separate paragraphs.
@@ -151,12 +166,30 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 			],
 		},
 	]
-	let tools = [{ name: 'ls', description: 'List', inputSchema: { type: 'object' } }, { name: bash.name, description: bash.description, inputSchema: bash.parameters }]
+	let tools = [
+		{ name: 'ls', description: 'List', inputSchema: { type: 'object' } },
+		{ name: bash.name, description: bash.description, inputSchema: bash.parameters },
+	]
 	await run(messages, { tools, maxTokens: 20_000 })
 	let body = seen[0]!.body
 	expect(body.max_tokens).toBe(20_000)
-	expect(body.tools).toEqual([{ name: 'ls', description: 'List', input_schema: { type: 'object' } }, { name: 'bash', description: bash.description, strict: true, input_schema: { ...bash.parameters, additionalProperties: false } }])
-	let strip = (m: any) => ({ role: m.role, content: m.content.map((b: any) => { let c = { ...b }; delete c.cache_control; return c }) })
+	expect(body.tools).toEqual([
+		{ name: 'ls', description: 'List', input_schema: { type: 'object' } },
+		{
+			name: 'bash',
+			description: bash.description,
+			strict: true,
+			input_schema: { ...bash.parameters, additionalProperties: false },
+		},
+	])
+	let strip = (m: any) => ({
+		role: m.role,
+		content: m.content.map((b: any) => {
+			let c = { ...b }
+			delete c.cache_control
+			return c
+		}),
+	})
 	expect(body.messages.map(strip)).toEqual([
 		{ role: 'user', content: [{ type: 'text', text: 'list files' }] },
 		{
@@ -183,15 +216,37 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 
 test('failed tool results keep text and move all images after sibling results', () => {
 	let image = (blob: string) => ({ type: 'image' as const, blob, mediaType: 'image/png' })
-	let messages: Message[] = [{ role: 'user', blocks: [
-		{ type: 'tool_result', id: 'failed', output: 'complete failure\n/path/missing', isError: true, images: [image('one'), image('two')] },
-		{ type: 'tool_result', id: 'ok', output: 'success', image: image('nested') },
-		{ type: 'tool_result', id: 'legacy', output: 'another failure', isError: true, image: image('gone') },
-	] }]
-	let content = anthropic.toMessages({ model: 'claude-test', messages, image: (blob) => blob === 'gone' ? undefined : blob })[0].content
+	let messages: Message[] = [
+		{
+			role: 'user',
+			blocks: [
+				{
+					type: 'tool_result',
+					id: 'failed',
+					output: 'complete failure\n/path/missing',
+					isError: true,
+					images: [image('one'), image('two')],
+				},
+				{ type: 'tool_result', id: 'ok', output: 'success', image: image('nested') },
+				{ type: 'tool_result', id: 'legacy', output: 'another failure', isError: true, image: image('gone') },
+			],
+		},
+	]
+	let content = anthropic.toMessages({
+		model: 'claude-test',
+		messages,
+		image: (blob) => (blob === 'gone' ? undefined : blob),
+	})[0].content
 	expect(content.slice(0, 3)).toEqual([
 		{ type: 'tool_result', tool_use_id: 'failed', content: 'complete failure\n/path/missing', is_error: true },
-		{ type: 'tool_result', tool_use_id: 'ok', content: [{ type: 'text', text: 'success' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'nested' } }] },
+		{
+			type: 'tool_result',
+			tool_use_id: 'ok',
+			content: [
+				{ type: 'text', text: 'success' },
+				{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'nested' } },
+			],
+		},
 		{ type: 'tool_result', tool_use_id: 'legacy', content: 'another failure', is_error: true },
 	])
 	expect(content.slice(3)).toEqual([
@@ -205,7 +260,9 @@ test('thinking is enabled within max_tokens, and skipped when there is no room f
 	reply = endTurn
 	await run(undefined, { maxTokens: 20_000 })
 	let t = seen[0]!.body.thinking
-	expect(t.type === 'adaptive' || (t.type === 'enabled' && t.budget_tokens >= 1024 && t.budget_tokens < 20_000)).toBe(true)
+	expect(t.type === 'adaptive' || (t.type === 'enabled' && t.budget_tokens >= 1024 && t.budget_tokens < 20_000)).toBe(
+		true,
+	)
 
 	await run(undefined, { maxTokens: 500 })
 	expect(seen[1]!.body.thinking).toBeUndefined()
@@ -258,7 +315,11 @@ test('redacted thinking survives a round trip', async () => {
 	let turn = blocks.collect(await run(), 'anthropic')
 	expect(turn.blocks[0]).toMatchObject({ type: 'thinking', text: '' })
 	reply = endTurn
-	await run([{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }, { role: 'assistant', blocks: turn.blocks as ReplayBlock[] }, { role: 'user', blocks: [{ type: 'text', text: 'again' }] }])
+	await run([
+		{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] },
+		{ role: 'assistant', blocks: turn.blocks as ReplayBlock[] },
+		{ role: 'user', blocks: [{ type: 'text', text: 'again' }] },
+	])
 	expect(seen[1]!.body.messages[1].content).toEqual([
 		{ type: 'redacted_thinking', data: 'OPAQUE' },
 		{ type: 'text', text: 'ok' },
@@ -266,7 +327,10 @@ test('redacted thinking survives a round trip', async () => {
 })
 
 test('stop reasons map to neutral ones; a call cut off by max_tokens keeps its raw input; a refusal keeps its explanation', async () => {
-	for (let [wire, reason] of [['end_turn', 'end'], ['stop_sequence', 'end']]) {
+	for (let [wire, reason] of [
+		['end_turn', 'end'],
+		['stop_sequence', 'end'],
+	]) {
 		reply = () => sse(start(), ...stop(wire!))
 		expect(await run()).toEqual([{ type: 'done', reason: reason as any }])
 	}
@@ -277,30 +341,63 @@ test('stop reasons map to neutral ones; a call cut off by max_tokens keeps its r
 	]
 	// A call cut off by max_tokens is kept with its raw input, never dropped.
 	reply = () => sse(start(), ...tool('{"pa'), ...stop('max_tokens'))
-	expect(await run()).toEqual([{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } }, { type: 'done', reason: 'max_tokens' }])
-	reply = () => sse(start(), { type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: { explanation: 'No.' } }, usage: {} }, { type: 'message_stop' })
+	expect(await run()).toEqual([
+		{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } },
+		{ type: 'done', reason: 'max_tokens' },
+	])
+	reply = () =>
+		sse(
+			start(),
+			{ type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: { explanation: 'No.' } }, usage: {} },
+			{ type: 'message_stop' },
+		)
 	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
 })
 
 test('native search is offered to allowlisted models without Serper and becomes a hosted card with sources', async () => {
 	let search = { type: 'web_search_20250305', name: 'web_search' }
-	let req = { model: 'claude-opus-5-5', messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'hi' }] }], tools: [nativeTool.def()] }
+	let req = {
+		model: 'claude-opus-5-5',
+		messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'hi' }] }],
+		tools: [nativeTool.def()],
+	}
 	expect(anthropic.body(req, true).tools).toContainEqual(search)
 	expect(anthropic.body({ ...req, model: 'claude-old-1' }, true).tools).not.toContainEqual(search)
-	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'sk-test' }, serper: { apiKey: 'serper-test' } }) + '\n', { mode: 0o600 })
+	writeFileSync(
+		`${home}/secrets/auth.ason`,
+		ason.stringify({ anthropic: { apiKey: 'sk-test' }, serper: { apiKey: 'serper-test' } }) + '\n',
+		{ mode: 0o600 },
+	)
 	auth.close()
 	expect(anthropic.body(req, true).tools).not.toContainEqual(search)
 	let recording = await Bun.file(`${import.meta.dir}/../fixtures/anthropic-search.sse`).text()
 	reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
 	let turn = blocks.collect(await run(), 'anthropic')
 	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
-	expect(turn.blocks[0]).toEqual({ type: 'hosted_tool', id: 'srvtoolu_01Ngy267NcSomnQgRzd2G7wD', name: 'web_search', input: { query: 'VALO Hotel Helsinki' }, output: 'Sources:\nhttps://valo.fi/en/hotel/\nhttps://valo.fi/en/' })
-	expect(turn.blocks[1]).toMatchObject({ type: 'text', text: expect.stringContaining('\n\nSources:\nhttps://valo.fi/en/\nhttps://valo.fi/en/hotel/') })
+	expect(turn.blocks[0]).toEqual({
+		type: 'hosted_tool',
+		id: 'srvtoolu_01Ngy267NcSomnQgRzd2G7wD',
+		name: 'web_search',
+		input: { query: 'VALO Hotel Helsinki' },
+		output: 'Sources:\nhttps://valo.fi/en/hotel/\nhttps://valo.fi/en/',
+	})
+	expect(turn.blocks[1]).toMatchObject({
+		type: 'text',
+		text: expect.stringContaining('\n\nSources:\nhttps://valo.fi/en/\nhttps://valo.fi/en/hotel/'),
+	})
 })
 
 test('errors: HTTP status, error event mid-stream, stream cut short', async () => {
-	reply = () => new Response('{"type":"error","error":{"type":"authentication_error","message":"bad token"}}', { status: 401 })
-	expect(await run()).toEqual([expect.objectContaining({ type: 'error', status: 401, failure: 'auth', body: expect.stringContaining('bad token') })])
+	reply = () =>
+		new Response('{"type":"error","error":{"type":"authentication_error","message":"bad token"}}', { status: 401 })
+	expect(await run()).toEqual([
+		expect.objectContaining({
+			type: 'error',
+			status: 401,
+			failure: 'auth',
+			body: expect.stringContaining('bad token'),
+		}),
+	])
 	// The rejected token is refreshed for the next request.
 	reply = () => sse(start(), ...stop('end_turn'))
 	expect(await run()).toEqual([{ type: 'done', reason: 'end' }])
@@ -313,7 +410,10 @@ test('errors: HTTP status, error event mid-stream, stream cut short', async () =
 			{ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'x' } },
 			{ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } },
 		)
-	expect(await run()).toEqual([{ type: 'text', text: 'x' }, expect.objectContaining({ type: 'error', message: expect.stringContaining('Overloaded'), status: 529 })])
+	expect(await run()).toEqual([
+		{ type: 'text', text: 'x' },
+		expect.objectContaining({ type: 'error', message: expect.stringContaining('Overloaded'), status: 529 }),
+	])
 
 	reply = () =>
 		sse(
@@ -323,7 +423,10 @@ test('errors: HTTP status, error event mid-stream, stream cut short', async () =
 			{ type: 'content_block_stop', index: 0 },
 			...stop('tool_use'),
 		)
-	expect(await run()).toEqual([{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } }, { type: 'done', reason: 'tool_use' }])
+	expect(await run()).toEqual([
+		{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } },
+		{ type: 'done', reason: 'tool_use' },
+	])
 
 	reply = () => sse(start(), { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
 	expect((await run()).map((e) => e.type)).toEqual(['error'])

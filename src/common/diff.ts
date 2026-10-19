@@ -13,8 +13,14 @@ function fence(text: string): string {
 // changed lines, "lines 25–27, 37"; a removal alone marks the line now
 // in its place (the last line when it ended the file).
 function stats(text: string): { added: number; removed: number; lines: string } {
-	let added = 0, removed = 0, at = 1, gone = false, marks: number[] = []
-	let mark = (n: number) => { if (marks.at(-1) !== n) marks.push(n) }
+	let added = 0,
+		removed = 0,
+		at = 1,
+		gone = false,
+		marks: number[] = []
+	let mark = (n: number) => {
+		if (marks.at(-1) !== n) marks.push(n)
+	}
 	for (let row of text.split('\n')) {
 		let m = /^([ +-]) *(\d+)(?::)? /.exec(row)
 		if (!m) continue

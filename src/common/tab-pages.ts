@@ -22,7 +22,17 @@ export type Sizes = { cell: number; named?: number; edge: number }
 const digits = (count: number): number => String(Math.max(1, count)).length
 
 // Failed over questions and blockers over paused over retrying and work.
-const rank: Record<MarkKind, number> = { failed: 5, approval: 4, blocked: 4, asking: 4, paused: 3, retrying: 2, working: 1, jobs: 1, done: 0 }
+const rank: Record<MarkKind, number> = {
+	failed: 5,
+	approval: 4,
+	blocked: 4,
+	asking: 4,
+	paused: 3,
+	retrying: 2,
+	working: 1,
+	jobs: 1,
+	done: 0,
+}
 
 function urgent(tabs: Tab[]): Mark | undefined {
 	let best: Mark | undefined

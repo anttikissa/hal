@@ -65,4 +65,3 @@ test('until ends early on a wake or an abort', async () => {
 	await clock.until(now + 3600_000, ac.signal)
 	expect(now).toBe(start)
 })
-

@@ -14,21 +14,37 @@ import { type CallContext, type Tool, tools } from './tools.ts'
 
 const name = 'tool'
 
-type Schema = { properties?: Record<string, { type?: string; description?: string; default?: unknown; items?: { type?: string } }>; required?: string[] }
+type Schema = {
+	properties?: Record<string, { type?: string; description?: string; default?: unknown; items?: { type?: string } }>
+	required?: string[]
+}
 const schema = (tool: Tool<unknown>) => tool.parameters as Schema
 
 function def(): ToolDef {
 	return {
 		name,
 		description: 'Call tool(s). You must use parallel calls for file reading and research.',
-		inputSchema: { type: 'object', properties: { cmd: { type: 'string', description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Read-only tools are run in parallel.` } }, required: ['cmd'], additionalProperties: false },
+		inputSchema: {
+			type: 'object',
+			properties: {
+				cmd: {
+					type: 'string',
+					description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Read-only tools are run in parallel.`,
+				},
+			},
+			required: ['cmd'],
+			additionalProperties: false,
+		},
 	}
 }
 
 function find(id: string): Tool<unknown> {
 	// READ_BLOB was READ_ENTRY's name; old notices in histories still say it.
 	let tool = tools.all().get(id === 'read_blob' ? 'read_entry' : id)
-	if (!tool) throw new Error(`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`)
+	if (!tool)
+		throw new Error(
+			`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`,
+		)
 	return tool
 }
 
@@ -45,26 +61,41 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 	let usage = () => `Usage: ${nativeTool.usage(tool).join(' | ')}`
 	for (let value of values) {
 		// [{ … }] stands for { … }.
-		if (Array.isArray(value) && value.length === 1 && value[0] && typeof value[0] === 'object' && !Array.isArray(value[0])) value = value[0]
+		if (
+			Array.isArray(value) &&
+			value.length === 1 &&
+			value[0] &&
+			typeof value[0] === 'object' &&
+			!Array.isArray(value[0])
+		)
+			value = value[0]
 		if (value && typeof value === 'object' && !Array.isArray(value)) {
 			for (let [field, v] of Object.entries(value)) {
 				let alias = tool.syntax?.aliases?.[field]
 				if (alias === null || (field === 'description' && !Object.hasOwn(properties, field))) continue
 				let key = alias !== undefined && !Object.hasOwn(properties, field) ? alias : field
-				if (!Object.hasOwn(properties, key)) throw new Error(`${tool.name.toUpperCase()} has no field '${key}'. ${usage()}`)
+				if (!Object.hasOwn(properties, key))
+					throw new Error(`${tool.name.toUpperCase()} has no field '${key}'. ${usage()}`)
 				if (Object.hasOwn(input, key)) throw new Error(`${tool.name.toUpperCase()} got '${key}' twice. ${usage()}`)
 				input[key] = v
 			}
 			continue
 		}
 		let key = positional[next++]
-		if (key === undefined) throw new Error(`${tool.name.toUpperCase()} takes ${positional.length} plain argument${positional.length === 1 ? '' : 's'}, got another: ${JSON.stringify(value)}. ${usage()}`)
+		if (key === undefined)
+			throw new Error(
+				`${tool.name.toUpperCase()} takes ${positional.length} plain argument${positional.length === 1 ? '' : 's'}, got another: ${JSON.stringify(value)}. ${usage()}`,
+			)
 		if (Object.hasOwn(input, key)) throw new Error(`${tool.name.toUpperCase()} got '${key}' twice. ${usage()}`)
 		input[key] = value
 	}
-	if (purpose && Object.hasOwn(properties, 'description') && input.description === undefined) input.description = purpose
+	if (purpose && Object.hasOwn(properties, 'description') && input.description === undefined)
+		input.description = purpose
 	let missing = required.filter((k) => input[k] === undefined)
-	if (missing.length) throw new Error(`${tool.name.toUpperCase()} is missing ${missing.join(', ')}${unclosed ? ' (an unclosed /* comment ran to its line end; close it with */)' : ''}. ${usage()}`)
+	if (missing.length)
+		throw new Error(
+			`${tool.name.toUpperCase()} is missing ${missing.join(', ')}${unclosed ? ' (an unclosed /* comment ran to its line end; close it with */)' : ''}. ${usage()}`,
+		)
 	return input
 }
 
@@ -73,8 +104,11 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 function resolve(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
 	let parsed = callText.parse(text)
 	let tool = nativeTool.find(parsed.name)
-	let resolved = tool.syntax?.resolve ? tool.syntax.resolve(parsed.raw, ctx) : { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
-	if (parsed.purpose && schema(tool).properties?.description) resolved.input.description = [resolved.input.description, parsed.purpose].filter(Boolean).join(' ')
+	let resolved = tool.syntax?.resolve
+		? tool.syntax.resolve(parsed.raw, ctx)
+		: { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
+	if (parsed.purpose && schema(tool).properties?.description)
+		resolved.input.description = [resolved.input.description, parsed.purpose].filter(Boolean).join(' ')
 	return resolved
 }
 
@@ -82,10 +116,11 @@ function resolve(text: unknown, ctx?: CallContext): { name: string; input: Recor
 // the text, or unchanged when it does not resolve (tools.run then
 // reports why).
 function arrived(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock {
-	if (call.name === name && call.cmd === undefined) try {
-		let { name: tool, input } = nativeTool.resolve(call.input.cmd, ctx)
-		call = { type: 'tool_call', id: call.id, name: tool, input, cmd: call.input.cmd as string }
-	} catch {}
+	if (call.name === name && call.cmd === undefined)
+		try {
+			let { name: tool, input } = nativeTool.resolve(call.input.cmd, ctx)
+			call = { type: 'tool_call', id: call.id, name: tool, input, cmd: call.input.cmd as string }
+		} catch {}
 	return toolPresentations.attach(call, call)
 }
 
@@ -94,22 +129,31 @@ function multiple(text: string, ctx?: CallContext) {
 }
 
 function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
-	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string') return [nativeTool.arrived(call, ctx)]
+	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string')
+		return [nativeTool.arrived(call, ctx)]
 	try {
 		let commands = callText.split(call.input.cmd)
 		if (commands.length < 2) return [nativeTool.arrived(call, ctx)]
 		let resolved = commands.map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
 		return resolved.map((resolved, i) => {
-			let member: ToolCallBlock = { type: 'tool_call', id: i ? crypto.randomUUID() : call.id, ...resolved, sequence: call.id }
+			let member: ToolCallBlock = {
+				type: 'tool_call',
+				id: i ? crypto.randomUUID() : call.id,
+				...resolved,
+				sequence: call.id,
+			}
 			return toolPresentations.attach(member, member)
 		})
-	} catch { return [toolPresentations.attach(call, call)] }
+	} catch {
+		return [toolPresentations.attach(call, call)]
+	}
 }
 
 // HELP's tool list follows a multi-line usage (EDIT) with an empty row so it
 // stands out; markers must start their lines, so it is never indented.
 function shown(tool: Tool<unknown>, interactive = false): string[] {
-	let lines = usage(tool, interactive), name = tool.name.toUpperCase()
+	let lines = usage(tool, interactive),
+		name = tool.name.toUpperCase()
 	return lines.every((u) => u === name || u.startsWith(`${name} `)) ? lines : [...lines, '']
 }
 
@@ -124,9 +168,13 @@ function align(lines: string[]): string[] {
 // also see where the purpose comment goes, for tools that keep it (task 2bq).
 function usage(tool: Tool<unknown>, interactive = false): string[] {
 	if (interactive) {
-		let lines = usage(tool), name = tool.name.toUpperCase()
-		if (!Object.hasOwn(schema(tool).properties ?? {}, 'description') || lines.some((u) => u.includes('/*'))) return lines
-		return lines.map((u) => (u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <description> */`) : u))
+		let lines = usage(tool),
+			name = tool.name.toUpperCase()
+		if (!Object.hasOwn(schema(tool).properties ?? {}, 'description') || lines.some((u) => u.includes('/*')))
+			return lines
+		return lines.map((u) =>
+			u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <description> */`) : u,
+		)
 	}
 	if (tool.syntax?.usage) return tool.syntax.usage
 	let { properties = {}, required = [] } = schema(tool)
@@ -134,8 +182,13 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
 	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `[ "<${k}>" ]`))
 	if (rest.length) {
-		let req = rest.filter((k) => required.includes(k)), opt = rest.filter((k) => !required.includes(k))
-		args.push(!req.length ? `[ { ${opt.join(', ')} } ]` : `{ ${[...req, ...(opt.length ? [`[ ${opt.join(', ')} ]`] : [])].join(', ')} }`)
+		let req = rest.filter((k) => required.includes(k)),
+			opt = rest.filter((k) => !required.includes(k))
+		args.push(
+			!req.length
+				? `[ { ${opt.join(', ')} } ]`
+				: `{ ${[...req, ...(opt.length ? [`[ ${opt.join(', ')} ]`] : [])].join(', ')} }`,
+		)
 	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }
@@ -144,18 +197,43 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 // without a description is internal, e.g. one a tool's own parser fills.
 function help(tool: Tool<unknown>, interactive = false): string {
 	let { properties = {}, required = [] } = schema(tool)
-	let fields = Object.entries(properties).filter(([, p]) => p.description).map(([key, p]) => {
-		let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : p.type ?? 'value'
-		let text = p.description
-		let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
-		return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
-	})
-	return [`${tool.name.toUpperCase()}: ${tool.description}`, '', 'Usage:', ...align(usage(tool, interactive)).map((u) => `  ${u}`), ...(fields.length ? ['', 'Fields:', ...fields] : [])].join('\n')
+	let fields = Object.entries(properties)
+		.filter(([, p]) => p.description)
+		.map(([key, p]) => {
+			let type = p.type === 'array' ? `${p.items?.type ?? 'value'} list` : (p.type ?? 'value')
+			let text = p.description
+			let extra = `${required.includes(key) ? ', required' : ''}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ''}`
+			return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
+		})
+	return [
+		`${tool.name.toUpperCase()}: ${tool.description}`,
+		'',
+		'Usage:',
+		...align(usage(tool, interactive)).map((u) => `  ${u}`),
+		...(fields.length ? ['', 'Fields:', ...fields] : []),
+	].join('\n')
 }
 
 // One line per tool the system prompt does not explain, for $other_tools.
 function summary(): string {
-	return [...tools.all().values()].filter((t) => t.syntax?.summary !== false).map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`).join('\n')
+	return [...tools.all().values()]
+		.filter((t) => t.syntax?.summary !== false)
+		.map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`)
+		.join('\n')
 }
 
-export const nativeTool = { name, def, find, generic, resolve, arrived, multiple, expand, usage, shown, align, help, summary }
+export const nativeTool = {
+	name,
+	def,
+	find,
+	generic,
+	resolve,
+	arrived,
+	multiple,
+	expand,
+	usage,
+	shown,
+	align,
+	help,
+	summary,
+}

@@ -16,7 +16,8 @@ function step(ids: string[], tab: string | undefined, by: number): string | unde
 // last tab), or undefined if `k` is no tab-switching key.
 function key(k: Binding, tab: string, ids: string[]): { focus?: string } | undefined {
 	if (k.cmd) return undefined
-	if (k.ctrl && !k.alt && !k.shift && (k.key === 'n' || k.key === 'p')) return { focus: step(ids, tab, k.key === 'n' ? 1 : -1) }
+	if (k.ctrl && !k.alt && !k.shift && (k.key === 'n' || k.key === 'p'))
+		return { focus: step(ids, tab, k.key === 'n' ? 1 : -1) }
 	if (k.alt && !k.ctrl && !k.shift && /^[0-9]$/.test(k.key)) return { focus: ids[(Number(k.key) + 9) % 10] }
 	return undefined
 }

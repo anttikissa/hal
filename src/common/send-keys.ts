@@ -61,7 +61,11 @@ export const sendKeys = {
 		if (commandDraft(text)) return [['enter', 'run'], ['shift-enter', 'newline'], ...esc]
 		let send = chords.find((c) => sendKeys[c] && sendKeys[c] !== 'queue')
 		// Busy: each bound chord named by its delivery, Enter's first.
-		let pairs = working ? (['steer', 'soft-steer'] as const).map((d) => [sendKeys.key(d), d]).sort((a, b) => chords.indexOf(a[0] as Chord) - chords.indexOf(b[0] as Chord)) : [[send, 'send']]
+		let pairs = working
+			? (['steer', 'soft-steer'] as const)
+					.map((d) => [sendKeys.key(d), d])
+					.sort((a, b) => chords.indexOf(a[0] as Chord) - chords.indexOf(b[0] as Chord))
+			: [[send, 'send']]
 		pairs.push(['shift-enter', 'newline'], [sendKeys.key('queue'), 'queue'], ...esc)
 		return pairs.filter((p): p is [string, string] => !!p[0])
 	},

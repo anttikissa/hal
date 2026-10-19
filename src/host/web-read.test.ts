@@ -22,7 +22,13 @@ beforeEach(() => {
 	mkdirSync(paths.sessionDir('s'), { recursive: true })
 	requested = []
 	response = () => new Response('ok')
-	server = Bun.serve({ port: 0, fetch(req) { requested.push(new URL(req.url).pathname); return response(req) } })
+	server = Bun.serve({
+		port: 0,
+		fetch(req) {
+			requested.push(new URL(req.url).pathname)
+			return response(req)
+		},
+	})
 })
 afterEach(() => {
 	server.stop(true)
@@ -32,7 +38,13 @@ afterEach(() => {
 })
 
 test('HTML title, blocks, entities and redirects; plain text and JSON pass through', async () => {
-	response = (req) => new URL(req.url).pathname === '/redirect' ? Response.redirect(url('/page')) : new Response('<html><head><title>A &amp; B</title><style>secret</style></head><body><h2>Hello</h2><p>One&nbsp;two &#65;<br>next</p><script>evil()</script></body></html>', { headers: { 'content-type': 'text/html' } })
+	response = (req) =>
+		new URL(req.url).pathname === '/redirect'
+			? Response.redirect(url('/page'))
+			: new Response(
+					'<html><head><title>A &amp; B</title><style>secret</style></head><body><h2>Hello</h2><p>One&nbsp;two &#65;<br>next</p><script>evil()</script></body></html>',
+					{ headers: { 'content-type': 'text/html' } },
+				)
 	let out = await tool.run({ url: url('/redirect') }, ctx())
 	expect(out).toBe('A & B\n\nHello\n\nOne two A\nnext')
 	expect(requested).toEqual(['/redirect', '/page'])
@@ -43,7 +55,11 @@ test('HTML title, blocks, entities and redirects; plain text and JSON pass throu
 })
 
 test('server-rendered shadow DOM retains listing details, not inert template content', async () => {
-	response = () => new Response('<html><head><title>Listing</title></head><body><listing-page><template shadowrootmode="open"><style>hidden style</style><h1>Apple Pencil</h1><p>69 €</p><template>inert content</template><p>Pickup in Tampere</p><script>hidden script</script></template></listing-page></body></html>', { headers: { 'content-type': 'text/html' } })
+	response = () =>
+		new Response(
+			'<html><head><title>Listing</title></head><body><listing-page><template shadowrootmode="open"><style>hidden style</style><h1>Apple Pencil</h1><p>69 €</p><template>inert content</template><p>Pickup in Tampere</p><script>hidden script</script></template></listing-page></body></html>',
+			{ headers: { 'content-type': 'text/html' } },
+		)
 	let out = await tool.run({ url: url() }, ctx())
 	expect(out).toContain('Apple Pencil')
 	expect(out).toContain('69 €')
@@ -52,7 +68,10 @@ test('server-rendered shadow DOM retains listing details, not inert template con
 })
 
 test('an empty HTML app shell or empty text tells the model nothing was read', async () => {
-	response = () => new Response('<html><head><script src="/app.js"></script></head><body><div id="app"></div></body></html>', { headers: { 'content-type': 'text/html' } })
+	response = () =>
+		new Response('<html><head><script src="/app.js"></script></head><body><div id="app"></div></body></html>', {
+			headers: { 'content-type': 'text/html' },
+		})
 	let shell = await tool.run({ url: url('/article') }, ctx())
 	expect(shell).toContain('No readable content found')
 	expect(shell).toContain(url('/article'))
@@ -61,7 +80,8 @@ test('an empty HTML app shell or empty text tells the model nothing was read', a
 })
 
 test('bad schemes and HTTP errors cannot masquerade as successful content', async () => {
-	for (let bad of ['file:///etc/passwd', 'data:text/plain,hi', 'javascript:alert(1)']) await expect(tool.run({ url: bad }, ctx())).rejects.toThrow(/http or https/)
+	for (let bad of ['file:///etc/passwd', 'data:text/plain,hi', 'javascript:alert(1)'])
+		await expect(tool.run({ url: bad }, ctx())).rejects.toThrow(/http or https/)
 	expect(requested).toEqual([])
 	response = () => new Response('Denied', { status: 403 })
 	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read', input: { url: url() } }, ctx())
@@ -86,7 +106,14 @@ test('image is a stored image result replayable to Anthropic, not base64 history
 	expect(result.output).not.toContain(png.toString('base64'))
 	let { anthropic } = await import('./anthropic.ts')
 	let { blobs } = await import('./blobs.ts')
-	let messages = anthropic.toMessages({ model: 'claude-test', messages: [{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read', input: {} }] }, { role: 'user', blocks: [result] }], image: (id) => blobs.base64('s', id) })
+	let messages = anthropic.toMessages({
+		model: 'claude-test',
+		messages: [
+			{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read', input: {} }] },
+			{ role: 'user', blocks: [result] },
+		],
+		image: (id) => blobs.base64('s', id),
+	})
 	expect(messages[1].content[0].content[1].source.data).toBe(png.toString('base64'))
 	response = () => new Response(Buffer.alloc(attachments.maxBytes + 1), { headers: { 'content-type': 'image/png' } })
 	let huge = await tools.run({ type: 'tool_call', id: '2', name: 'read', input: { url: url() } }, ctx())
@@ -123,7 +150,16 @@ test('an endless text body is read only up to its limit, and the cut is said', a
 	let limit = tool.maxTextBytes
 	tool.maxTextBytes = 100_000
 	let pulls = 0
-	response = () => new Response(new ReadableStream({ pull: (c) => { pulls++; c.enqueue(new TextEncoder().encode('y'.repeat(10_000))) } }), { headers: { 'content-type': 'text/plain' } })
+	response = () =>
+		new Response(
+			new ReadableStream({
+				pull: (c) => {
+					pulls++
+					c.enqueue(new TextEncoder().encode('y'.repeat(10_000)))
+				},
+			}),
+			{ headers: { 'content-type': 'text/plain' } },
+		)
 	try {
 		let out = await tool.run({ url: url() }, ctx())
 		expect(out).toContain('more than 100000 bytes')

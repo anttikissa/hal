@@ -48,7 +48,11 @@ function imageDir(): string {
 function fileDir(name?: string): string {
 	if (name === undefined) return `${paths.tmpDir()}/file`
 	let type = attachments.nameType(name)
-	return type === 'text/plain' ? `${paths.tmpDir()}/paste` : type === 'application/octet-stream' ? `${paths.tmpDir()}/file` : paths.imageDir()
+	return type === 'text/plain'
+		? `${paths.tmpDir()}/paste`
+		: type === 'application/octet-stream'
+			? `${paths.tmpDir()}/file`
+			: paths.imageDir()
 }
 
 // Everything else without credentials: socket, host lock, diagnostics,
@@ -98,4 +102,21 @@ function expand(path: string): string {
 	return path.replace(/^~(?=\/|$)/, paths.userHome())
 }
 
-export const paths = { state: { home: undefined as string | undefined }, repoRoot: (): string => repoRoot, home, userHome, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display, expand }
+export const paths = {
+	state: { home: undefined as string | undefined },
+	repoRoot: (): string => repoRoot,
+	home,
+	userHome,
+	sessionsDir,
+	sessionDir,
+	tmpDir,
+	imageDir,
+	fileDir,
+	stateDir,
+	secretsDir,
+	authFile,
+	configFile,
+	init,
+	display,
+	expand,
+}

@@ -90,7 +90,8 @@ async function opened(id: string) {
 	return c
 }
 
-const outputs = (t: Transcript) => t.items.flatMap((i) => (i.type === 'output' || (i.type === 'text' && i.synthetic) ? [i.text] : []))
+const outputs = (t: Transcript) =>
+	t.items.flatMap((i) => (i.type === 'output' || (i.type === 'text' && i.synthetic) ? [i.text] : []))
 
 test('/cd changes the session cwd for every follower; a relative path resolves from the old cwd', async () => {
 	let a = client()
@@ -104,9 +105,21 @@ test('/cd changes the session cwd for every follower; a relative path resolves f
 	expect(a.views.get(id)!.state).toEqual({ type: 'idle' })
 	expect(a.of('turn-start')).toEqual([])
 	// Commands and what they said are shown, not sent to the model.
-	expect(b.views.get(id)!.items.filter((i) => i.type === 'command').map((i: any) => i.text)).toEqual(['/cd projects/a', '/cd ~/projection'])
-	expect(JSON.stringify(await history.messages(id))).toContain(`Working directory changed from ${work}/projects/a to ${work}/projection.`)
-	expect(history.readSync(id).filter((r) => r.type === 'change').map((r) => r.cwd)).toEqual([`${work}/projects/a`, `${work}/projection`])
+	expect(
+		b.views
+			.get(id)!
+			.items.filter((i) => i.type === 'command')
+			.map((i: any) => i.text),
+	).toEqual(['/cd projects/a', '/cd ~/projection'])
+	expect(JSON.stringify(await history.messages(id))).toContain(
+		`Working directory changed from ${work}/projects/a to ${work}/projection.`,
+	)
+	expect(
+		history
+			.readSync(id)
+			.filter((r) => r.type === 'change')
+			.map((r) => r.cwd),
+	).toEqual([`${work}/projects/a`, `${work}/projection`])
 	expect((await opened(id)).views.get(id)).toEqual(b.views.get(id))
 })
 
@@ -175,12 +188,15 @@ test('a command question asked while a turn streams leaves the turn streaming; a
 	expect(a.views.get(id)!.items.find((i) => i.type === 'question' && i.id === first)).toMatchObject({ canceled: true })
 	release()
 	await until(() => a.of('turn-end').length)
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'text' && !i.synthetic).map((i: any) => i.text)).toEqual(['working done'])
+	expect(
+		a.views
+			.get(id)!
+			.items.filter((i) => i.type === 'text' && !i.synthetic)
+			.map((i: any) => i.text),
+	).toEqual(['working done'])
 	expect(transcript.question(a.views.get(id))).toBeTruthy()
 	expect((await opened(id)).views.get(id)).toEqual(a.views.get(id))
 })
-
-
 
 test('an unknown command is refused; text that only starts with a path is a prompt', async () => {
 	let a = client()
@@ -240,7 +256,10 @@ test('completion runs on the host against its files, answering only the asker', 
 test('commands are the files in the commands directory', () => {
 	let dir = `${home}/cmds`
 	mkdirSync(dir)
-	writeFileSync(`${dir}/hello-there.ts`, `export const command = { description: 'says hi', category: 'fun', run: () => ({ say: 'hi' }) }\n`)
+	writeFileSync(
+		`${dir}/hello-there.ts`,
+		`export const command = { description: 'says hi', category: 'fun', run: () => ({ say: 'hi' }) }\n`,
+	)
 	writeFileSync(`${dir}/hello.test.ts`, '')
 	commands.dir = () => dir
 	expect([...commands.all().keys()]).toEqual(['hello-there'])
@@ -250,7 +269,13 @@ test('commands are the files in the commands directory', () => {
 
 test('each listed command is run by exactly one side: a host file unless client-only', () => {
 	let files = [...commands.all().keys()].sort()
-	expect(files).toEqual(commandList.all().filter((c) => !c.clientOnly).map((c) => c.name).sort())
+	expect(files).toEqual(
+		commandList
+			.all()
+			.filter((c) => !c.clientOnly)
+			.map((c) => c.name)
+			.sort(),
+	)
 	for (let c of commands.all().values()) expect(c.run).toBeFunction()
 })
 
@@ -290,7 +315,12 @@ test('a bare /login chatgpt never turns an idle tab into a working turn, includi
 		expect(status.stateOf(id)).toEqual({ type: 'idle' })
 		expect(c.views.get(id)!.state).toEqual({ type: 'idle' })
 		expect(tabs.list().find((t) => t.id === id)?.state).toEqual({ type: 'idle' })
-		expect(c.of('tabs').at(-1)?.tabs.find((t: { id: string }) => t.id === id)?.state).toEqual({ type: 'idle' })
+		expect(
+			c
+				.of('tabs')
+				.at(-1)
+				?.tabs.find((t: { id: string }) => t.id === id)?.state,
+		).toEqual({ type: 'idle' })
 		let reopened = await opened(id)
 		expect(reopened.views.get(id)!.state).toEqual({ type: 'idle' })
 	} finally {
@@ -300,5 +330,8 @@ test('a bare /login chatgpt never turns an idle tab into a working turn, includi
 
 test('ordinary arguments keep whitespace normalization; clear preserves its literal raw tail', () => {
 	expect(commands.parse('/cd   src  ')).toEqual({ name: 'cd', args: 'src' })
-	expect(commands.parse('/clear   /rename literal\n"quotes" @file\n')).toEqual({ name: 'clear', args: '  /rename literal\n"quotes" @file\n' })
+	expect(commands.parse('/clear   /rename literal\n"quotes" @file\n')).toEqual({
+		name: 'clear',
+		args: '  /rename literal\n"quotes" @file\n',
+	})
 })

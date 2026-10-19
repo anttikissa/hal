@@ -24,7 +24,8 @@ function value(raw: string | undefined): string | undefined {
 
 function field(text: string, label: string): string | undefined {
 	return [...text.matchAll(new RegExp(`^${label}:[ \t]*(.*)$`, 'gmi'))]
-		.map((m) => profile.value(m[1])).findLast((v) => v !== undefined)
+		.map((m) => profile.value(m[1]))
+		.findLast((v) => v !== undefined)
 }
 
 // Writes the given fields: each replaces its first line in place (later
@@ -35,12 +36,16 @@ function save(fields: Fields): void {
 	let given = labels.filter((l) => profile.value(fields[l] ?? undefined) !== undefined)
 	let removed = labels.filter((l) => fields[l] === null)
 	if (!given.length && !removed.length) return
-	let lines = (profile.text() || '<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n').split('\n')
+	let lines = (
+		profile.text() ||
+		'<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n'
+	).split('\n')
 	let at = (label: string) => lines.findIndex((l) => new RegExp(`^${label}:`, 'i').test(l))
-	for (let label of removed) for (let i = at(label); i >= 0; i = at(label)) {
-		// A field line sits between blank lines: take one blank with it.
-		lines.splice(i, lines[i + 1] === '' && (i === 0 || lines[i - 1] === '') ? 2 : 1)
-	}
+	for (let label of removed)
+		for (let i = at(label); i >= 0; i = at(label)) {
+			// A field line sits between blank lines: take one blank with it.
+			lines.splice(i, lines[i + 1] === '' && (i === 0 || lines[i - 1] === '') ? 2 : 1)
+		}
 	for (let label of given) {
 		let line = `${label}: ${profile.value(fields[label] ?? undefined)}`
 		let i = at(label)

@@ -15,13 +15,21 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
+	let transcript: Transcript = {
+		meta: { id: 's', cwd: '/', model: 'm', createdAt: '' },
+		state: { type: 'idle' },
+		inbox: [],
+		items: items.map((item, i) => ({ ...item, key: `~${i}` })),
+	}
 	return { transcript, prompt: { text, cursor } }
 }
 
 // A modal over a transcript of full rows of x, so every column the box
 // leaves free shows transcript.
-const modalView = (spec: Parameters<typeof modals.open>[0], n = 40): View => ({ ...view([{ type: 'text', text: 'x'.repeat(58 * n) }]), modal: modals.open(spec) })
+const modalView = (spec: Parameters<typeof modals.open>[0], n = 40): View => ({
+	...view([{ type: 'text', text: 'x'.repeat(58 * n) }]),
+	modal: modals.open(spec),
+})
 const search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
 const names = (n: number) => Array.from({ length: n }, (_, i) => `model ${i}`)
 
@@ -67,7 +75,11 @@ test('a modal keeps its height whatever it holds or is typed into it', () => {
 		return box(frame.build(v, 60, rows).lines)
 	}
 	let first = at({ title: 'Models', form: search, items: names(300) })
-	for (let spec of [{ title: 'Models', form: search }, { title: 'Models', items: names(2) }]) expect(at(spec)).toEqual(first)
+	for (let spec of [
+		{ title: 'Models', form: search },
+		{ title: 'Models', items: names(2) },
+	])
+		expect(at(spec)).toEqual(first)
 	expect(at({ title: 'Models', form: search, items: names(300) }, 'a long search '.repeat(9))).toEqual(first)
 	// 80% of the rows, at most 36.
 	let tall = at({ title: 'Models', items: names(2) }, '', 100)
@@ -97,7 +109,10 @@ test('a modal over a short frame still gets its full height', () => {
 test('a modal never makes a row wider than the terminal, however small', () => {
 	for (let cols = 3; cols < 70; cols++) {
 		for (let rows of [1, 2, 3, 5, 30]) {
-			let v = modalView({ title: 'A title longer than small boxes', hint: 'enter: pick', form: search, items: names(40) }, 3)
+			let v = modalView(
+				{ title: 'A title longer than small boxes', hint: 'enter: pick', form: search, items: names(40) },
+				3,
+			)
 			v.modal = { ...v.modal!, selected: 20 }
 			let f = frame.build(v, cols, rows)
 			for (let line of f.lines) expect(strings.visLen(line)).toBeLessThanOrEqual(cols)
@@ -106,4 +121,3 @@ test('a modal never makes a row wider than the terminal, however small', () => {
 		}
 	}
 })
-

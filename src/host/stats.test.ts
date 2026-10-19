@@ -14,7 +14,11 @@ import { statusUsage } from './status-usage.ts'
 
 useHost()
 
-async function turn(c: ReturnType<typeof client>, id: string, ...rounds: { input: number; cacheRead?: number; output: number }[]) {
+async function turn(
+	c: ReturnType<typeof client>,
+	id: string,
+	...rounds: { input: number; cacheRead?: number; output: number }[]
+) {
 	let before = c.of('turn-end').length
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	for (let [i, u] of rounds.entries()) {
@@ -33,7 +37,9 @@ test('turn ends carry the last round’s context, which a new host keeps', async
 	let id = created(c)
 	expect(c.of('snapshot').at(-1).snapshot.stats).toEqual({})
 	// Two rounds: the context is the last round's intake, cache included.
-	expect(await turn(c, id, { input: 900, output: 10 }, { input: 50, cacheRead: 1000, output: 20 })).toEqual({ context: 1050 })
+	expect(await turn(c, id, { input: 900, output: 10 }, { input: 50, cacheRead: 1000, output: 20 })).toEqual({
+		context: 1050,
+	})
 	expect(await turn(c, id, { input: 7, cacheRead: 2000, output: 5 })).toEqual({ context: 2007 })
 	expect((await fresh(id)).stats).toEqual({ context: 2007 })
 	restartHost()
@@ -41,10 +47,15 @@ test('turn ends carry the last round’s context, which a new host keeps', async
 })
 
 test('the context follows each provider round while tools run', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 't1', name: 'nope', input: {} }, { type: 'usage', usage: { input: 900, output: 5 } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{ type: 'tool_call', id: 't1', name: 'nope', input: {} },
+		{ type: 'usage', usage: { input: 900, output: 5 } },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => calls.length === 2)
 	expect(c.of('turn-end')).toHaveLength(0)
 	expect(c.views.get(id)!.stats).toMatchObject({ context: 900 })
@@ -78,12 +89,26 @@ test('the plan is the subscription account the next request takes, with its wind
 		let id = created(c)
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toBeUndefined()
 		paths.init()
-		writeFileSync(paths.authFile(), ason.stringify({ anthropic: [{ accessToken: 'a', email: 'one' }, { accessToken: 'b', email: 'two' }, { apiKey: 'k' }] }), { mode: 0o600 })
-		let h = (u5: string, u7: string) => new Headers({ 'anthropic-ratelimit-unified-5h-utilization': u5, 'anthropic-ratelimit-unified-7d-utilization': u7 })
+		writeFileSync(
+			paths.authFile(),
+			ason.stringify({
+				anthropic: [{ accessToken: 'a', email: 'one' }, { accessToken: 'b', email: 'two' }, { apiKey: 'k' }],
+			}),
+			{ mode: 0o600 },
+		)
+		let h = (u5: string, u7: string) =>
+			new Headers({
+				'anthropic-ratelimit-unified-5h-utilization': u5,
+				'anthropic-ratelimit-unified-7d-utilization': u7,
+			})
 		usage.observe('anthropic', 'one', h('0.9', '0.5'))
 		usage.observe('anthropic', 'two', h('0.18', '0.574'))
 		// A key, however unused, waits behind the least-used subscription.
-		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({ account: 2, accounts: 2, key: subscriptions.key('anthropic', 'two') })
+		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({
+			account: 2,
+			accounts: 2,
+			key: subscriptions.key('anthropic', 'two'),
+		})
 		usage.observe('anthropic', 'two', h('0.3', '0.4'))
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.key).toBe(subscriptions.key('anthropic', 'two'))
 		// The plan is the account requests use: a broken login is passed over.
@@ -105,18 +130,39 @@ test('the plan is the subscription account the next request takes, with its wind
 	}
 })
 
-
 test('each status read updates master quota and idle followers even when the previous reading is fresh', async () => {
-	let credential = auth.credential, fetchOld = globalThis.fetch
+	let credential = auth.credential,
+		fetchOld = globalThis.fetch
 	try {
 		paths.init()
-		writeFileSync(paths.authFile(), ason.stringify({ anthropic: [{ accessToken: 'token', email: 'sub@example.test' }] }), { mode: 0o600 })
-		auth.credential = (async () => ({ type: 'token', value: 'token', account: 'sub@example.test' })) as typeof credential
-		let c = client(), id = created(c), other = client()
+		writeFileSync(
+			paths.authFile(),
+			ason.stringify({ anthropic: [{ accessToken: 'token', email: 'sub@example.test' }] }),
+			{ mode: 0o600 },
+		)
+		auth.credential = (async () => ({
+			type: 'token',
+			value: 'token',
+			account: 'sub@example.test',
+		})) as typeof credential
+		let c = client(),
+			id = created(c),
+			other = client()
 		other.conn.send({ type: 'open', sessionId: id })
-		usage.observe('anthropic', 'sub@example.test', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.95', 'anthropic-ratelimit-unified-7d-utilization': '0.4' }))
-		let used = 24, reads = 0
-		globalThis.fetch = (async () => { reads++; return Response.json({ five_hour: { utilization: used } }) }) as unknown as typeof fetch
+		usage.observe(
+			'anthropic',
+			'sub@example.test',
+			new Headers({
+				'anthropic-ratelimit-unified-5h-utilization': '0.95',
+				'anthropic-ratelimit-unified-7d-utilization': '0.4',
+			}),
+		)
+		let used = 24,
+			reads = 0
+		globalThis.fetch = (async () => {
+			reads++
+			return Response.json({ five_hour: { utilization: used } })
+		}) as unknown as typeof fetch
 		let key = subscriptions.key('anthropic', 'sub@example.test')
 		expect(await statusUsage.show(id, 'anthropic/claude-opus-5-5')).toContain('24% used')
 		expect(usage.windows('anthropic', 'sub@example.test')).toMatchObject({ '5h': { used: 24 } })

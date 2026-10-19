@@ -13,19 +13,31 @@ const id = (block: string) => block.replace(/^#/, '')
 
 function Counts(props: { text: string }) {
 	let m = () => /^\+(\d+) -(\d+)$/.exec(props.text)
-	return <Show when={m()} fallback={<span class="quiet">{props.text}</span>}>{(n) => <span class="counts"><span class="add">+{n()[1]}</span> <span class="del">-{n()[2]}</span></span>}</Show>
+	return (
+		<Show when={m()} fallback={<span class="quiet">{props.text}</span>}>
+			{(n) => (
+				<span class="counts">
+					<span class="add">+{n()[1]}</span> <span class="del">-{n()[2]}</span>
+				</span>
+			)}
+		</Show>
+	)
 }
 
 function Diff(props: { text: string }) {
 	let rows = createMemo(() => changesView.lines(props.text))
 	return (
 		<div class="lines">
-			<For each={rows()}>{(l: DiffLine) => (
-				<div class={['line', l.kind]}>
-					<span class="no">{l.old ?? ''}</span><span class="no">{l.new ?? ''}</span>
-					<span class="sign">{l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : ''}</span><span class="text">{l.text}</span>
-				</div>
-			)}</For>
+			<For each={rows()}>
+				{(l: DiffLine) => (
+					<div class={['line', l.kind]}>
+						<span class="no">{l.old ?? ''}</span>
+						<span class="no">{l.new ?? ''}</span>
+						<span class="sign">{l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : ''}</span>
+						<span class="text">{l.text}</span>
+					</div>
+				)}
+			</For>
 		</div>
 	)
 }
@@ -76,25 +88,32 @@ export function Changes(props: { shown?: string }) {
 			document.removeEventListener('click', onClick, true)
 		}
 	})
-	createEffect(open, (o) => untrack(() => {
-		if (o && !box.open) box.showModal()
-		if (!o && box.open) box.close()
-	}))
+	createEffect(open, (o) =>
+		untrack(() => {
+			if (o && !box.open) box.showModal()
+			if (!o && box.open) box.close()
+		}),
+	)
 	// Fresh data each time the window opens: these are request-time views.
 	createEffect(session, (s) => {
 		setList(undefined)
 		if (!s) return
-		void changesView.list(s).then((l) => { if (session() === s) setList(l) })
-	})
-	createEffect(() => [session(), selected()] as const, ([s, path]) => {
-		setFile(undefined)
-		if (!s || path === undefined) return
-		void changesView.file(s, path).then((f) => {
-			if (session() !== s || selected() !== path) return
-			setFile(f)
-			pane?.scrollTo({ top: 0 })
+		void changesView.list(s).then((l) => {
+			if (session() === s) setList(l)
 		})
 	})
+	createEffect(
+		() => [session(), selected()] as const,
+		([s, path]) => {
+			setFile(undefined)
+			if (!s || path === undefined) return
+			void changesView.file(s, path).then((f) => {
+				if (session() !== s || selected() !== path) return
+				setFile(f)
+				pane?.scrollTo({ top: 0 })
+			})
+		},
+	)
 	let title = () => {
 		let l = list()?.data
 		return `Changes · ${route()?.id ?? ''}${l?.name ? `: ${l.name}` : ''}`
@@ -112,65 +131,121 @@ export function Changes(props: { shown?: string }) {
 		changesView.select(next.path)
 		box.querySelector(`.files a[data-path="${CSS.escape(next.path)}"]`)?.scrollIntoView({ block: 'nearest' })
 	}
-	let cancel = (e: Event) => { e.preventDefault(); changesView.close() }
+	let cancel = (e: Event) => {
+		e.preventDefault()
+		changesView.close()
+	}
 	let outside = (e: MouseEvent) => {
 		let r = box.getBoundingClientRect()
-		if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) changesView.close()
+		if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom))
+			changesView.close()
 	}
 	return (
-		<dialog ref={(e) => (box = e)} class={['Changes', 'plain', 'diff', { picked: selected() !== undefined }]} aria-label="File changes" onCancel={cancel} onClick={outside} onKeyDown={onKey}>
+		<dialog
+			ref={(e) => (box = e)}
+			class={['Changes', 'plain', 'diff', { picked: selected() !== undefined }]}
+			aria-label="File changes"
+			onCancel={cancel}
+			onClick={outside}
+			onKeyDown={onKey}
+		>
 			<div class="top">
 				<Show when={!wide() && selected() !== undefined}>
-					<button type="button" class="back" onClick={() => changesView.select(undefined)}>← Files</button>
+					<button type="button" class="back" onClick={() => changesView.select(undefined)}>
+						← Files
+					</button>
 				</Show>
 				<strong class="title">{title()}</strong>
 				<span class="quiet">{count()}</span>
-				<button type="button" class="close" aria-label="Close file changes" onClick={() => changesView.close()}><Icon name="close" /></button>
+				<button type="button" class="close" aria-label="Close file changes" onClick={() => changesView.close()}>
+					<Icon name="close" />
+				</button>
 			</div>
-			<Show when={list()?.error}>{(err) => <pre class="refused" role="alert">{err()}</pre>}</Show>
+			<Show when={list()?.error}>
+				{(err) => (
+					<pre class="refused" role="alert">
+						{err()}
+					</pre>
+				)}
+			</Show>
 			<div class="body">
 				<nav class="files" aria-label="Changed files">
 					<Show when={list()?.data} fallback={<p class="quiet">{list()?.error ? '' : 'Loading…'}</p>}>
 						<Show when={files().length} fallback={<p class="quiet">No file changes since the last /changes clear.</p>}>
 							<ul>
-								<For each={files()}>{(f) => (
-									<li aria-current={f.path === selected() ? 'true' : undefined}>
-										<a href={router.changesHref(list()!.data!.id, f.path)} data-path={f.path} title={f.path}>
-											<span class="path">{f.shown}</span>
-											<span class="meta"><Counts text={f.counts} /> <span class="quiet">{f.time}</span></span>
-										</a>
-									</li>
-								)}</For>
+								<For each={files()}>
+									{(f) => (
+										<li aria-current={f.path === selected() ? 'true' : undefined}>
+											<a href={router.changesHref(list()!.data!.id, f.path)} data-path={f.path} title={f.path}>
+												<span class="path">{f.shown}</span>
+												<span class="meta">
+													<Counts text={f.counts} /> <span class="quiet">{f.time}</span>
+												</span>
+											</a>
+										</li>
+									)}
+								</For>
 							</ul>
 						</Show>
 					</Show>
 				</nav>
 				<section ref={(e) => (pane = e)} class="file" aria-label="Selected file">
-					<Show when={file()?.error}>{(err) => <pre class="refused" role="alert">{err()}</pre>}</Show>
-					<Show when={file()?.data} fallback={<p class="quiet">{selected() === undefined || file()?.error ? '' : 'Loading…'}</p>}>{(f) => (
-						<>
-							<header>
-								<h2>{f().shown}</h2>
-								<p><Counts text={f().counts} /> <span class="quiet">{f().time}</span><Show when={f().commit}>{(c) => <span class="quiet"> · committed in {c()}</span>}</Show></p>
-								<Show when={f().calls.length}>
-									<p class="links"><span class="quiet">Calls </span><For each={f().calls}>{(c) => <a href={c.href}>{id(c.block)}</a>}</For></p>
+					<Show when={file()?.error}>
+						{(err) => (
+							<pre class="refused" role="alert">
+								{err()}
+							</pre>
+						)}
+					</Show>
+					<Show
+						when={file()?.data}
+						fallback={<p class="quiet">{selected() === undefined || file()?.error ? '' : 'Loading…'}</p>}
+					>
+						{(f) => (
+							<>
+								<header>
+									<h2>{f().shown}</h2>
+									<p>
+										<Counts text={f().counts} /> <span class="quiet">{f().time}</span>
+										<Show when={f().commit}>{(c) => <span class="quiet"> · committed in {c()}</span>}</Show>
+									</p>
+									<Show when={f().calls.length}>
+										<p class="links">
+											<span class="quiet">Calls </span>
+											<For each={f().calls}>{(c) => <a href={c.href}>{id(c.block)}</a>}</For>
+										</p>
+									</Show>
+									<Show when={f().others.length}>
+										<p class="links">
+											<span class="quiet">Also changed by </span>
+											<For each={f().others}>
+												{(o) => (
+													<a href={router.changesHref(o.id, f().path)}>
+														{o.id}
+														{o.name ? `: ${o.name}` : ''}
+													</a>
+												)}
+											</For>
+										</p>
+									</Show>
+								</header>
+								<Diff text={f().diff} />
+								<Show when={f().steps.length > 1}>
+									<h3>Steps per call</h3>
+									<For each={f().steps}>
+										{(s) => (
+											<details>
+												<summary>
+													{s.block ?? 'Call'} <span class="quiet">· {s.time}</span>
+												</summary>
+												<Diff text={s.diff} />
+											</details>
+										)}
+									</For>
 								</Show>
-								<Show when={f().others.length}>
-									<p class="links"><span class="quiet">Also changed by </span><For each={f().others}>{(o) => <a href={router.changesHref(o.id, f().path)}>{o.id}{o.name ? `: ${o.name}` : ''}</a>}</For></p>
-								</Show>
-							</header>
-							<Diff text={f().diff} />
-							<Show when={f().steps.length > 1}>
-								<h3>Steps per call</h3>
-								<For each={f().steps}>{(s) => (
-									<details>
-										<summary>{s.block ?? 'Call'} <span class="quiet">· {s.time}</span></summary>
-										<Diff text={s.diff} />
-									</details>
-								)}</For>
-							</Show>
-						</>
-					)}</Show>
+							</>
+						)}
+					</Show>
 				</section>
 			</div>
 		</dialog>

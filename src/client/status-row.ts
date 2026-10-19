@@ -19,7 +19,20 @@ import { ansi } from './ansi.ts'
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
 // `color`: the tab's project color (task 22).
 // `plugins`: the plugin sync indicator of a remote terminal (task b81).
-export type StatusInfo = { id: string; name?: string; autoclose?: boolean; slots?: number; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
+export type StatusInfo = {
+	id: string
+	name?: string
+	autoclose?: boolean
+	slots?: number
+	cwd: string
+	hal?: boolean
+	color?: Oklch
+	model: string
+	role?: string
+	stats?: Stats
+	home?: string
+	plugins?: string
+}
 
 type Part = { text: string; fg?: Oklch; href?: string }
 
@@ -36,17 +49,37 @@ function percent(s: Stats | undefined): number | undefined {
 // The left side's groups: session, cwd, model, context.
 function left(info: StatusInfo, full = true): Part[][] {
 	let hi = colors.status().highlight!
-	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name) + (info.autoclose ? ' ↧' : ''), fg: hi }] : [{ text: info.id + (info.autoclose ? ' ↧' : '') }]]
+	let out: Part[][] = [
+		info.name
+			? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name) + (info.autoclose ? ' ↧' : ''), fg: hi }]
+			: [{ text: info.id + (info.autoclose ? ' ↧' : '') }],
+	]
 	let home = info.home
-	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
+	let cwd =
+		home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : (info.color ?? hi) }])
-	out.push([{ text: ansi.clean(info.model.startsWith('hal/') ? info.model : titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }, { text: titles.budget(info.slots ?? settings.subagentSlots()).replace(/^(?=.)/, ' '), href: '/budget' }])
+	out.push([
+		{
+			text: ansi.clean(
+				info.model.startsWith('hal/') ? info.model : titles.modelLabel(info.model, info.stats?.effort, full),
+			),
+			fg: hi,
+		},
+		{ text: titles.budget(info.slots ?? settings.subagentSlots()).replace(/^(?=.)/, ' '), href: '/budget' },
+	])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} file${s.files === 1 ? '' : 's'}`, href: `/${info.id}/changes` }])
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
 		let fg = colors.heat(pct)
-		out.push([{ text: kilo(s!.context ?? 0), fg }, { text: `/${kilo(s!.window!)} (` }, { text: `${pct}%`, fg }, { text: ')' }].map((p) => ({ ...p, href: `/context/${info.id}` })))
+		out.push(
+			[
+				{ text: kilo(s!.context ?? 0), fg },
+				{ text: `/${kilo(s!.window!)} (` },
+				{ text: `${pct}%`, fg },
+				{ text: ')' },
+			].map((p) => ({ ...p, href: `/context/${info.id}` })),
+		)
 	} else if (s?.context) out.push([{ text: kilo(s.context), href: `/context/${info.id}` }])
 	return out
 }
@@ -61,8 +94,14 @@ function right(info: StatusInfo): Part[][] {
 	let plan = s?.plan && { ...s.plan, ...subscriptions.plan(s.plan) }
 	if (plan) {
 		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		let moot = usageWindows.moot(Object.entries(plan.windows).map(([name, used]) => ({ name, used, resets: plan.resets?.[name] })))
-		Object.entries(plan.windows).filter(([name]) => !moot.has(name)).forEach(([name, pct], i) => parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: colors.heat(pct) }))
+		let moot = usageWindows.moot(
+			Object.entries(plan.windows).map(([name, used]) => ({ name, used, resets: plan.resets?.[name] })),
+		)
+		Object.entries(plan.windows)
+			.filter(([name]) => !moot.has(name))
+			.forEach(([name, pct], i) =>
+				parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: colors.heat(pct) }),
+			)
 		out.push(parts)
 	}
 	return out
@@ -104,7 +143,10 @@ function fit(info: StatusInfo, cols: number): Part[] {
 		let room = Math.max(1, cols - width([budget]) - SEP.length)
 		let pathRoom = Math.min(width([cwd]), Math.max(1, Math.floor(room / 2)))
 		let pathWidth = width([cwd])
-		let path = { ...cwd, text: pathWidth <= pathRoom ? cwd.text : '…' + strings.sliceVisual(cwd.text, pathWidth - pathRoom + 1, pathWidth) }
+		let path = {
+			...cwd,
+			text: pathWidth <= pathRoom ? cwd.text : '…' + strings.sliceVisual(cwd.text, pathWidth - pathRoom + 1, pathWidth),
+		}
 		if (cols <= width([budget]) + SEP.length) return clip([path], cols)
 		return join([[path], [...clip([model[0]!], room - pathRoom), budget]])
 	}
@@ -118,12 +160,15 @@ function row(info: StatusInfo, cols: number): string {
 	let parts = statusRow.fit(info, Math.max(1, cols - 2 * ansi.PAD.length))
 	// Neighboring parts with one href share a single link.
 	let link: string | undefined
-	let out = parts.map((p) => {
-		let text = p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text
-		let pre = p.href === link ? '' : (link ? ansi.LINK_OFF : '') + (p.href ? `\x1b]8;;${ansi.webUrl(p.href)}\x07` : '')
-		link = p.href
-		return pre + text
-	}).join('')
+	let out = parts
+		.map((p) => {
+			let text = p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text
+			let pre =
+				p.href === link ? '' : (link ? ansi.LINK_OFF : '') + (p.href ? `\x1b]8;;${ansi.webUrl(p.href)}\x07` : '')
+			link = p.href
+			return pre + text
+		})
+		.join('')
 	return ansi.PAD + base + out + (link ? ansi.LINK_OFF : '') + ansi.UNCOLOR
 }
 

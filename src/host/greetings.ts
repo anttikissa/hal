@@ -75,8 +75,16 @@ const pool: Record<Period, string[]> = {
 
 function period(timezone?: string, now = clock.now()): Period {
 	if (timezone !== undefined && !clients.zone(timezone)) return 'neutral'
-	let hour = Number(new Intl.DateTimeFormat('en', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }).format(now))
-	return hour >= 7 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 && hour < 23 ? 'evening' : 'neutral'
+	let hour = Number(
+		new Intl.DateTimeFormat('en', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }).format(now),
+	)
+	return hour >= 7 && hour < 12
+		? 'morning'
+		: hour >= 12 && hour < 18
+			? 'afternoon'
+			: hour >= 18 && hour < 23
+				? 'evening'
+				: 'neutral'
 }
 
 function name(value?: string): string | undefined {
@@ -117,9 +125,14 @@ Alternatively, try the model hal/tool, or one of the other internal models, for 
 	}
 	if (meta.model.startsWith('hal/')) return
 	mkdirSync(paths.stateDir(), { recursive: true })
-	let previous = liveFiles.liveFile<{ last?: string }>(`${paths.stateDir()}/greetings.ason`, {}, { watch: false, mode: 0o600 })
+	let previous = liveFiles.liveFile<{ last?: string }>(
+		`${paths.stateDir()}/greetings.ason`,
+		{},
+		{ watch: false, mode: 0o600 },
+	)
 	try {
-		if (previous.last !== undefined && typeof previous.last !== 'string') throw new Error('greetings.ason: invalid last greeting')
+		if (previous.last !== undefined && typeof previous.last !== 'string')
+			throw new Error('greetings.ason: invalid last greeting')
 		let text = greetings.choose(profile.text(), previous.last, timezone)
 		slash.output(id, text, false, undefined, true)
 		previous.last = text

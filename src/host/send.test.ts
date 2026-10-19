@@ -4,7 +4,19 @@
 import { expect, test } from 'bun:test'
 import { amend } from '../common/amend.ts'
 import { history } from './history.ts'
-import { amending, calls, client, created, fresh, heard, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
+import {
+	amending,
+	calls,
+	client,
+	created,
+	fresh,
+	heard,
+	readCall,
+	shown as unkeyed,
+	toolSession,
+	until,
+	useHost,
+} from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
@@ -13,7 +25,12 @@ useHost()
 type C = ReturnType<typeof client>
 const lastText = (n: number) => calls[n]!.input.messages.at(-1).blocks[0].text as string
 const resultOf = (n: number) => calls[n]!.input.messages.at(-1).blocks.find((b: any) => b.type === 'tool_result')
-const sendCall = (input: Record<string, unknown>, id = 's1') => ({ type: 'tool_call' as const, id, name: 'send', input: { description: 'Ask for checks', ...input } })
+const sendCall = (input: Record<string, unknown>, id = 's1') => ({
+	type: 'tool_call' as const,
+	id,
+	name: 'send',
+	input: { description: 'Ask for checks', ...input },
+})
 
 // Two sessions as tabs 1 and 2; the second, the sender, named.
 function pair(c: C, toolCwd = false): { a: string; b: string; by: string } {
@@ -49,21 +66,37 @@ test('an advisory message reaches a working session with its next request, frame
 	expect(resultOf(next).isError).toBeUndefined()
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
-	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' }])
+	expect(waiting).toMatchObject([
+		{ text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
+	])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)
-	expect(text).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<hal-note>[^\\n]+</hal-note>\\ncheck the tests$`))
+	expect(text).toMatch(
+		new RegExp(
+			`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<hal-note>[^\\n]+</hal-note>\\ncheck the tests$`,
+		),
+	)
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go', interactive: true },
-		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
+		{
+			type: 'prompt',
+			text: 'check the tests',
+			from: b,
+			label: by,
+			advisory: true,
+			delivery: 'next-round',
+			summary: 'Ask for checks',
+		},
 	])
 	calls[next + 1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.views.get(a)!.state.type === 'idle')
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 	// Up never recalls it: the human's last message is 'go'.
-	expect(amend.begin({ ...c.views.get(a)!, state: { type: 'running', phase: 'streaming' } })?.editing.original).toBe('go')
+	expect(amend.begin({ ...c.views.get(a)!, state: { type: 'running', phase: 'streaming' } })?.editing.original).toBe(
+		'go',
+	)
 })
 
 test('an idle session gets the message as a turn of its own, with full attention', async () => {
@@ -72,10 +105,16 @@ test('an idle session gets the message as a turn of its own, with full attention
 	await send(c, b, { to: a, text: 'please review' })
 	await until(() => calls.length === 3)
 	// The sender's next round and the recipient's own turn, in some order.
-	let theirs = calls.findIndex((call) => call.input.messages.length === 1 && !lastText(calls.indexOf(call)).endsWith('tell them'))
+	let theirs = calls.findIndex(
+		(call) => call.input.messages.length === 1 && !lastText(calls.indexOf(call)).endsWith('tell them'),
+	)
 	expect(resultOf(3 - theirs).isError).toBeUndefined()
-	expect(lastText(theirs)).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nplease review$`))
-	expect(unkeyed(c.views.get(a)!.items)).toEqual([{ type: 'prompt', text: 'please review', from: b, label: by, summary: 'Ask for checks' }])
+	expect(lastText(theirs)).toMatch(
+		new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nplease review$`),
+	)
+	expect(unkeyed(c.views.get(a)!.items)).toEqual([
+		{ type: 'prompt', text: 'please review', from: b, label: by, summary: 'Ask for checks' },
+	])
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 })
 
@@ -88,18 +127,22 @@ test('steer is read like the user steering; queue waits for the turn to end', as
 	calls[next]!.push(sendCall({ to: '1', text: 'now', delivery: 'steer' }, 's2'), { type: 'done', reason: 'tool_use' })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a && lastText(i).endsWith('now'))
 	await until(() => recipient() >= 0)
-	expect(c.views.get(a)!.inbox.map((m) => [m.text, (m.delivery === 'after-turn'), m.advisory])).toEqual([
+	expect(c.views.get(a)!.inbox.map((m) => [m.text, m.delivery === 'after-turn', m.advisory])).toEqual([
 		['later', true, undefined],
 	])
 	let queuedAt = c.views.get(a)!.inbox[0]!.ts!
 	let steered = recipient()
-	expect(lastText(steered)).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nnow$`))
+	expect(lastText(steered)).toMatch(
+		new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nnow$`),
+	)
 	calls[steered]!.push({ type: 'done', reason: 'end' })
 	// Only after the interrupted turn completes: the queued own turn.
 	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
 	await until(() => queued() >= 0)
 	expect(lastText(queued())).toMatch(`message from ${heard(by)}`)
-	expect(lastText(queued())).toContain(`]\n<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`)
+	expect(lastText(queued())).toContain(
+		`]\n<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`,
+	)
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {
@@ -135,7 +178,9 @@ test("an edit of the human's delivered message leaves another session's message 
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === next + 2)
 	let delivered = lastText(next + 1)
-	expect(delivered).toMatch(/\[[^\]\n]*message from [^\n]+\]\n<hal-note>[^\n]+<\/hal-note>\nfyi\n\n\[[^\]\n]*\]\nand hury$/)
+	expect(delivered).toMatch(
+		/\[[^\]\n]*message from [^\n]+\]\n<hal-note>[^\n]+<\/hal-note>\nfyi\n\n\[[^\]\n]*\]\nand hury$/,
+	)
 	// Up edits the human's text, not the later one from the other session.
 	expect(amend.begin(c.views.get(a)!)?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
@@ -144,8 +189,23 @@ test("an edit of the human's delivered message leaves another session's message 
 	// The edit is a new record, so its block ids differ (task c2t).
 	let body = (t: string) => t.replace(/^\[[^\]\n]*\]$/gm, '[]')
 	expect(body(lastText(next + 2))).toBe(body(delivered.replace('hury', 'hurry')))
-	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
-		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, delivery: 'next-round', summary: 'Ask for checks' },
+	expect(
+		unkeyed(
+			c.views
+				.get(a)!
+				.items.filter((i) => i.type === 'prompt')
+				.slice(-2),
+		),
+	).toEqual([
+		{
+			type: 'prompt',
+			text: 'fyi',
+			from: b,
+			label: by,
+			advisory: true,
+			delivery: 'next-round',
+			summary: 'Ask for checks',
+		},
 		{ type: 'prompt', text: 'and hurry', edited: true },
 	])
 })
@@ -159,7 +219,9 @@ test('an ordinary send respects a pause and offers explicit continuation', async
 	await until(() => c.of('turn-end').length === 1)
 	let next = await send(c, b, { to: '1', text: 'fyi' })
 	expect(resultOf(next).output).toContain(`Waiting in ${tabs.label(a)}: it is paused`)
-	expect(resultOf(next).output).toContain(`SEND "${a}" "Continue your work and read pending messages" { delivery: "steer" }`)
+	expect(resultOf(next).output).toContain(
+		`SEND "${a}" "Continue your work and read pending messages" { delivery: "steer" }`,
+	)
 	expect(c.views.get(a)!.state.type).toBe('paused')
 	expect(c.views.get(a)!.inbox.map((m) => m.text)).toEqual(['fyi'])
 	c.conn.send({ type: 'continue', sessionId: a })
@@ -175,8 +237,12 @@ test('a default send behind a human question is read with the answer, not after 
 	calls[0]!.push({ type: 'text', text: '<question>Continue?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
 	let next = await send(c, b, { to: '1', text: 'use these references' })
-	expect(resultOf(next).output).toBe(`Waiting in ${tabs.label(a)}: it waits for the user's answer, then reads this with that answer`)
-	expect(c.views.get(a)!.inbox).toMatchObject([{ text: 'use these references', delivery: 'next-round', advisory: true }])
+	expect(resultOf(next).output).toBe(
+		`Waiting in ${tabs.label(a)}: it waits for the user's answer, then reads this with that answer`,
+	)
+	expect(c.views.get(a)!.inbox).toMatchObject([
+		{ text: 'use these references', delivery: 'next-round', advisory: true },
+	])
 	expect(calls.filter((call) => call.input.sessionId === a)).toHaveLength(1)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'continue' })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a)
@@ -186,7 +252,9 @@ test('a default send behind a human question is read with the answer, not after 
 	expect(c.views.get(a)!.inbox).toEqual([])
 })
 
-test.each(['steer', 'emergency'].flatMap((delivery) => ['pause', 'failure', 'question'].map((stop) => [delivery, stop])))('%s resumes a recipient after %s instead of waiting for a human', async (delivery, stop) => {
+test.each(
+	['steer', 'emergency'].flatMap((delivery) => ['pause', 'failure', 'question'].map((stop) => [delivery, stop])),
+)('%s resumes a recipient after %s instead of waiting for a human', async (delivery, stop) => {
 	let c = client()
 	let { a, b } = pair(c)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })

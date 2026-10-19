@@ -11,7 +11,9 @@ useHost()
 
 function gate() {
 	let release!: () => void
-	let promise = new Promise<void>((resolve) => { release = resolve })
+	let promise = new Promise<void>((resolve) => {
+		release = resolve
+	})
 	return { promise, release }
 }
 
@@ -20,7 +22,10 @@ test('durable receipt aborts a provider; late tool calls cannot dispatch before 
 	let signal: AbortSignal | undefined
 	let original = tools.run
 	let dispatched: string[] = []
-	tools.run = async (call) => { dispatched.push(call.id); return { type: 'tool_result', id: call.id, output: 'ran' } }
+	tools.run = async (call) => {
+		dispatched.push(call.id)
+		return { type: 'tool_result', id: call.id, output: 'ran' }
+	}
 	let requests = 0
 	turns.stream = (model, input, current) => {
 		if (requests++) return fakeStream(model, input, current)
@@ -38,7 +43,9 @@ test('durable receipt aborts a provider; late tool calls cannot dispatch before 
 		a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 		await until(() => a.of('stream').length)
 		let durableAtAbort = false
-		signal!.addEventListener('abort', () => { durableAtAbort = history.readSync(id).some((r) => r.type === 'inbox' && r.id === 's1') })
+		signal!.addEventListener('abort', () => {
+			durableAtAbort = history.readSync(id).some((r) => r.type === 'inbox' && r.id === 's1')
+		})
 		a.conn.send({ type: 'submit', sessionId: id, text: 'stop', id: 's1' })
 		a.conn.send({ type: 'submit', sessionId: id, text: 'instead do this', id: 's2' })
 		expect(signal!.aborted).toBe(true)
@@ -48,11 +55,16 @@ test('durable receipt aborts a provider; late tool calls cannot dispatch before 
 		await until(() => calls.length === 1)
 		expect(dispatched).toEqual([])
 		expect(calls[0]!.input.messages.at(-1).blocks.at(-1).text).toEqual(stamped('stop\n\ninstead do this'))
-		expect((await records(id)).some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text === 'partial')).toBe(true)
+		expect(
+			(await records(id)).some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text === 'partial'),
+		).toBe(true)
 		calls[0]!.push({ type: 'done', reason: 'end' })
 		await until(() => a.of('turn-end').length)
 		expect(await fresh(id)).toEqual(a.views.get(id)!)
-	} finally { settling.release(); tools.run = original }
+	} finally {
+		settling.release()
+		tools.run = original
+	}
 })
 
 for (let stop of ['none', 'pause', 'close'] as const) {
@@ -70,7 +82,10 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 		try {
 			let a = client()
 			let id = created(a)
-			if (stop === 'close') { tabs.insert(id, 0); tabs.insert(created(a), 1) }
+			if (stop === 'close') {
+				tabs.insert(id, 0)
+				tabs.insert(created(a), 1)
+			}
 			a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 			await until(() => calls.length === 1)
 			calls[0]!.push(
@@ -100,7 +115,10 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 				expect(a.views.get(id)!.state.type).toBe('paused')
 				expect(a.views.get(id)!.inbox.map((m) => m.text)).toEqual(['one', 'two'])
 			}
-		} finally { settling.release(); tools.run = original }
+		} finally {
+			settling.release()
+			tools.run = original
+		}
 	})
 }
 
@@ -143,7 +161,12 @@ for (let escape of [false, true]) {
 			a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 			await until(() => calls.length === 1)
 			calls[0]!.push(
-				{ type: 'tool_call', id: 'flagged', name: 'bash', input: { command: 'migrate', description: 'Migrate', unsafeToStop: true } },
+				{
+					type: 'tool_call',
+					id: 'flagged',
+					name: 'bash',
+					input: { command: 'migrate', description: 'Migrate', unsafeToStop: true },
+				},
 				{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'concurrent' } },
 				{ type: 'done', reason: 'tool_use' },
 			)
@@ -154,7 +177,10 @@ for (let escape of [false, true]) {
 			// Restarting the host asks first; nothing restarts (task ker).
 			a.conn.send({ type: 'submit', sessionId: id, text: '/restart host' })
 			await until(() => a.of('restart-ask').length)
-			expect(a.of('restart-ask')[0]).toMatchObject({ scope: 'host', calls: [{ block: expect.stringMatching(/^t\d+$/), title: '$ Migrate' }] })
+			expect(a.of('restart-ask')[0]).toMatchObject({
+				scope: 'host',
+				calls: [{ block: expect.stringMatching(/^t\d+$/), title: '$ Migrate' }],
+			})
 			if (escape) {
 				a.conn.send({ type: 'pause', sessionId: id })
 				expect(toolSignal!.aborted).toBe(true)
@@ -163,8 +189,16 @@ for (let escape of [false, true]) {
 			if (!escape) {
 				await until(() => calls.length === 2)
 				let messages = calls[1]!.input.messages
-				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'flagged', output: 'migrated' })
-				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'pending', output: 'migrated' })
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({
+					type: 'tool_result',
+					id: 'flagged',
+					output: 'migrated',
+				})
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({
+					type: 'tool_result',
+					id: 'pending',
+					output: 'migrated',
+				})
 				expect(messages.at(-1).blocks.at(-1).text).toEqual(stamped('steer'))
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}
@@ -176,6 +210,10 @@ for (let escape of [false, true]) {
 			a.conn.send({ type: 'submit', sessionId: id, text: '/restart host' })
 			await until(() => restarts === 1)
 			expect(a.of('restart-ask')).toHaveLength(1)
-		} finally { settling.release(); tools.run = original; restartProcess.run = exit }
+		} finally {
+			settling.release()
+			tools.run = original
+			restartProcess.run = exit
+		}
 	})
 }

@@ -32,7 +32,9 @@ function pick(event: Event & { type: 'models' }): void {
 	if (event.refresh && !app.state.modal?.tree) return
 	let id = event.sessionId
 	app.open(
-		event.refresh ? picker.refresh(app.state.modal!, event.items, event.names, event.capabilities) : picker.open(event.current, event.items, event.names, event.capabilities, event.effort),
+		event.refresh
+			? picker.refresh(app.state.modal!, event.items, event.names, event.capabilities)
+			: picker.open(event.current, event.items, event.names, event.capabilities, event.effort),
 		(action, modal) => picker.command(id, modal, action),
 		(modal, key) => picker.step(modal, key, event.items, event.names),
 	)
@@ -40,9 +42,16 @@ function pick(event: Event & { type: 'models' }): void {
 
 // The /config modal for the session on screen, or an update of it.
 function configure(event: Event & { type: 'settings' }): void {
-	let modal = app.state.modal, id = app.state.transcript?.meta.id
-	if (event.refresh) return modal?.settings ? ((app.state.modal = settingsModal.refresh(modal, event)), app.show()) : undefined
-	if (id && event.sessionId === id) app.open(settingsModal.open(event), () => undefined, (m, key) => settingsModal.step(m, key, id))
+	let modal = app.state.modal,
+		id = app.state.transcript?.meta.id
+	if (event.refresh)
+		return modal?.settings ? ((app.state.modal = settingsModal.refresh(modal, event)), app.show()) : undefined
+	if (id && event.sessionId === id)
+		app.open(
+			settingsModal.open(event),
+			() => undefined,
+			(m, key) => settingsModal.step(m, key, id),
+		)
 }
 
 export const appModals = { open, close, pick, configure }

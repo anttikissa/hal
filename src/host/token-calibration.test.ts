@@ -31,14 +31,23 @@ test('successful rounds merge cumulative usage, count cached input, and persist 
 		{ type: 'usage', usage: { output: 9, cacheWrite: 10 } },
 		{ type: 'done', reason: 'end' },
 	]
-	provider.state.providers = { fake: {
-		request: () => ({ url: 'https://example.test', headers: {}, body: {} }),
-		async *parse() { yield* events },
-	} }
+	provider.state.providers = {
+		fake: {
+			request: () => ({ url: 'https://example.test', headers: {}, body: {} }),
+			async *parse() {
+				yield* events
+			},
+		},
+	}
 	provider.fetch = async () => new Response('data: ignored\n\n')
-	let input = { system: 'system', messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'x'.repeat(500) }] }] }
+	let input = {
+		system: 'system',
+		messages: [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'x'.repeat(500) }] }],
+	}
 	let before = pruning.estimate('none', input.messages, input.system.length + 2, 'fake/a')
-	for await (let _event of provider.stream('fake/a', input)) { /* drain */ }
+	for await (let _event of provider.stream('fake/a', input)) {
+		/* drain */
+	}
 	let chars = tokenEstimates.characters(input.messages, input.system.length + 2)
 	expect(tokenCalibration.ratios()['fake/a']).toBe(chars / 50)
 	expect(pruning.estimate('none', input.messages, input.system.length + 2, 'fake/a')).toBe(50)
@@ -47,10 +56,22 @@ test('successful rounds merge cumulative usage, count cached input, and persist 
 	tokenCalibration.observe('fake/a', 1e9, 1)
 	expect(tokenCalibration.ratios()['fake/a']).toBeCloseTo(previous * 1.025)
 	// Errors and image rounds cannot poison the text ratio.
-	events = [{ type: 'usage', usage: { input: 1 } }, { type: 'error', message: 'broken' }]
-	for await (let _event of provider.stream('fake/b', input)) { /* drain */ }
-	events = [{ type: 'usage', usage: { input: 1 } }, { type: 'done', reason: 'end' }]
-	for await (let _event of provider.stream('fake/b', { messages: [{ role: 'user', blocks: [{ type: 'image', blob: 'img', mediaType: 'image/png' }] }] })) { /* drain */ }
+	events = [
+		{ type: 'usage', usage: { input: 1 } },
+		{ type: 'error', message: 'broken' },
+	]
+	for await (let _event of provider.stream('fake/b', input)) {
+		/* drain */
+	}
+	events = [
+		{ type: 'usage', usage: { input: 1 } },
+		{ type: 'done', reason: 'end' },
+	]
+	for await (let _event of provider.stream('fake/b', {
+		messages: [{ role: 'user', blocks: [{ type: 'image', blob: 'img', mediaType: 'image/png' }] }],
+	})) {
+		/* drain */
+	}
 	expect(tokenCalibration.ratios()['fake/b']).toBeUndefined()
 })
 

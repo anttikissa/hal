@@ -87,34 +87,38 @@ function open(): void {
 	app.close()
 	draft = draftPastes.create(id, app.state.prompt.text)
 	requested = false
-	app.open(hinted(blocksDialog.open(), toggle.items(t), at), (action) => {
-		if (action.answers.target?.trim() === 'p' && draft && app.state.transcript?.meta.id === id) {
-			let expanded = draft.expand(app.state.prompt)
-			if (typeof expanded === 'string') app.state.notice = expanded
-			else {
-				app.state.prompt = prompt.withoutTyped(promptUndo.record(expanded, app.state.prompt))
-				if (!queueEdit.input(id, expanded.text) && recall.typed(id, expanded.text)) drafts.edit(id, expanded.text)
+	app.open(
+		hinted(blocksDialog.open(), toggle.items(t), at),
+		(action) => {
+			if (action.answers.target?.trim() === 'p' && draft && app.state.transcript?.meta.id === id) {
+				let expanded = draft.expand(app.state.prompt)
+				if (typeof expanded === 'string') app.state.notice = expanded
+				else {
+					app.state.prompt = prompt.withoutTyped(promptUndo.record(expanded, app.state.prompt))
+					if (!queueEdit.input(id, expanded.text) && recall.typed(id, expanded.text)) drafts.edit(id, expanded.text)
+				}
+				draft = undefined
+				app.show()
+				return undefined
 			}
 			draft = undefined
-			app.show()
+			let error = folds.run(id, action.answers.target ?? '')
+			if (error) app.state.notice = error
 			return undefined
-		}
-		draft = undefined
-		let error = folds.run(id, action.answers.target ?? '')
-		if (error) app.state.notice = error
-		return undefined
-	}, (m, k) => {
-		let t = folds.transcriptOf(id)
-		let items = t ? toggle.items(t) : []
-		if (k.key === 'escape') draft = undefined
-		if (k.key === 'enter' && m.form!.values[0]!.trim() === 'p') {
-			let next = hinted(m, items, at)
-			if (next.blocks!.invalid) return { state: next }
-		}
-		if (k.key === 'tab' && !k.shift && !k.ctrl && !k.alt) return { state: blocksDialog.complete(m, items, at) }
-		let r = modals.step(m, k)
-		return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: hinted(r.state, items, at) } : r
-	})
+		},
+		(m, k) => {
+			let t = folds.transcriptOf(id)
+			let items = t ? toggle.items(t) : []
+			if (k.key === 'escape') draft = undefined
+			if (k.key === 'enter' && m.form!.values[0]!.trim() === 'p') {
+				let next = hinted(m, items, at)
+				if (next.blocks!.invalid) return { state: next }
+			}
+			if (k.key === 'tab' && !k.shift && !k.ctrl && !k.alt) return { state: blocksDialog.complete(m, items, at) }
+			let r = modals.step(m, k)
+			return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: hinted(r.state, items, at) } : r
+		},
+	)
 }
 
 // The model's command, or a draft paste's text arriving.

@@ -21,7 +21,9 @@ function create(sessionId: string, text: string) {
 			if (p.text === undefined) return { hint: 'Load paste contents…', invalid: true }
 			lines += p.text.split('\n').length
 		}
-		return { hint: `Replace ${markers.length} paste marker${markers.length === 1 ? '' : 's'} with their contents (${lines} lines).` }
+		return {
+			hint: `Replace ${markers.length} paste marker${markers.length === 1 ? '' : 's'} with their contents (${lines} lines).`,
+		}
 	}
 	function accept(e: Event & { type: 'paste-text' }): boolean {
 		if (e.sessionId !== sessionId || !pastes.has(e.name)) return false
@@ -32,10 +34,13 @@ function create(sessionId: string, text: string) {
 		let status = hint(draft.text)
 		if (status.invalid) return status.hint
 		let out = { ...draft }
-		for (let m of attachments.markers(draft.text).filter((m) => m.kind === 'paste').reverse()) {
+		for (let m of attachments
+			.markers(draft.text)
+			.filter((m) => m.kind === 'paste')
+			.reverse()) {
 			let text = pastes.get(m.file!)!.text!
 			let end = m.at + m.text.length
-			let move = (n: number) => n <= m.at ? n : n >= end ? n + text.length - m.text.length : m.at + text.length
+			let move = (n: number) => (n <= m.at ? n : n >= end ? n + text.length - m.text.length : m.at + text.length)
 			out.text = out.text.slice(0, m.at) + text + out.text.slice(end)
 			out.cursor = move(out.cursor)
 			if (out.anchor !== undefined) out.anchor = move(out.anchor)

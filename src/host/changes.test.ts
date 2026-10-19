@@ -13,7 +13,8 @@ import { stats } from './stats.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 
-let home = '', id = ''
+let home = '',
+	id = ''
 let saved = paths.state.home
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-changes-`)
@@ -41,9 +42,24 @@ test('changes retain first/latest and steps through commits, exact content match
 	await changes.run(['git', 'init', '-q', home])
 	await changes.run(['git', 'config', 'user.name', 'Example'], home)
 	await changes.run(['git', 'config', 'user.email', 'example@example.org'], home)
-	let before = blob('old\n'), middle = blob('middle\n'), after = blob('+++ new\nnext\n')
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'one', files: [{ path: 'a.txt', before, after: middle }] })
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'two', files: [{ path: 'a.txt', before: middle, after }, { path: 'other', undeclared: true, statusBefore: null, statusAfter: '??' } as any] })
+	let before = blob('old\n'),
+		middle = blob('middle\n'),
+		after = blob('+++ new\nnext\n')
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'one',
+		files: [{ path: 'a.txt', before, after: middle }],
+	})
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'two',
+		files: [
+			{ path: 'a.txt', before: middle, after },
+			{ path: 'other', undeclared: true, statusBefore: null, statusAfter: '??' } as any,
+		],
+	})
 	let file = changes.list(id)[0]!
 	expect(file.before).toBe(before)
 	expect(file.after).toBe(after)
@@ -56,11 +72,15 @@ test('changes retain first/latest and steps through commits, exact content match
 	expect(changes.counts(diff)).toBe('+2 -1')
 	writeFileSync(`${home}/a.txt`, 'different\n')
 	await changes.run(['git', 'add', 'a.txt'], home)
-	expect((await changes.run(['git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Different content'], home)).code).toBe(0)
+	expect(
+		(await changes.run(['git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Different content'], home)).code,
+	).toBe(0)
 	expect(await changes.committed(id, file)).toBeUndefined()
 	writeFileSync(`${home}/a.txt`, '+++ new\nnext\n')
 	await changes.run(['git', 'add', 'a.txt'], home)
-	expect((await changes.run(['git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Captured content'], home)).code).toBe(0)
+	expect(
+		(await changes.run(['git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Captured content'], home)).code,
+	).toBe(0)
 	expect(await changes.committed(id, file)).toMatch(/^[a-f0-9]{8}$/)
 	// Calls may observe temporary files outside their Git cwd.
 	expect(await changes.committed(id, { ...file, path: `${home}-backup.txt` })).toBeUndefined()
@@ -68,29 +88,57 @@ test('changes retain first/latest and steps through commits, exact content match
 	// Marks keep only the count: a restarted host rebuilds the paths from
 	// the records to count distinct ones.
 	pages.state.marks.clear()
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'four', files: [{ path: 'b.txt', before: null, after }] })
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'four',
+		files: [{ path: 'b.txt', before: null, after }],
+	})
 	expect(stats.of(id).files).toBe(2)
 	history.append(id, { type: 'command', text: '/changes clear' })
 	expect(changes.list(id)).toHaveLength(0)
 	expect(stats.of(id).files).toBeUndefined()
 	expect(history.readSync(id).filter((r) => r.type === 'file_changes')).toHaveLength(3)
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'three', files: [{ path: 'a.txt', before: after, after: null }] })
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'three',
+		files: [{ path: 'a.txt', before: after, after: null }],
+	})
 	expect(changes.list(id)[0]!.before).toBe(after)
 })
 
 test('diff data requires login, validates selection, shows overlapping sessions and unavailable snapshots; the old address redirects', async () => {
-	let before = blob('old\n'), after = blob('<script>alert(1)</script>\n')
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'call', files: [{ path: 'a.txt', before, after }, { path: '.env', before: null, after: { size: 8, mtime: 1 } }] })
+	let before = blob('old\n'),
+		after = blob('<script>alert(1)</script>\n')
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'call',
+		files: [
+			{ path: 'a.txt', before, after },
+			{ path: '.env', before: null, after: { size: 8, mtime: 1 } },
+		],
+	})
 	let other = sessions.create({ cwd: home, name: 'Neighbor' }).id
-	history.append(other, { type: 'file_changes', cwd: home, toolId: 'other', files: [{ path: 'a.txt', before: null, after: blob('neighbor\n') }] })
+	history.append(other, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'other',
+		files: [{ path: 'a.txt', before: null, after: blob('neighbor\n') }],
+	})
 	let server = {} as any
 	let route = `http://localhost/${id}/changes.json`
 	expect((await web.fetch(new Request(route), server))!.status).toBe(401)
 	let token = webAuth.redeem(webAuth.issue())
 	if (!('token' in token)) throw new Error('login failed')
-	let get = async (url: string) => (await web.fetch(new Request(url, { headers: { cookie: `hal=${token.token}` } }), server))!
+	let get = async (url: string) =>
+		(await web.fetch(new Request(url, { headers: { cookie: `hal=${token.token}` } }), server))!
 	let list = await (await get(route)).json()
-	expect(list.files.map((f: any) => f.counts)).toEqual(['+1 -1', 'metadata only (sensitive, large or non-regular file)'])
+	expect(list.files.map((f: any) => f.counts)).toEqual([
+		'+1 -1',
+		'metadata only (sensitive, large or non-regular file)',
+	])
 	let file = await (await get(`${route}?path=${encodeURIComponent(`${home}/a.txt`)}`)).json()
 	expect(file.diff).toContain('+<script>alert(1)</script>')
 	expect(file.others.map((s: any) => s.id)).toEqual([other])
@@ -101,19 +149,38 @@ test('diff data requires login, validates selection, shows overlapping sessions 
 
 test('/changes lists a file once with the cards of the calls that changed it, never provider ids', async () => {
 	let { command } = await import('./commands/changes.ts')
-	let a = blob('one\n'), b = blob('two\n'), c = blob('three\n')
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'toolu_a', call: 5, files: [{ path: 'src/x.ts', before: a, after: b }] })
-	history.append(id, { type: 'file_changes', cwd: home, toolId: 'toolu_b', call: 9, files: [{ path: 'src/x.ts', before: b, after: c }] })
+	let a = blob('one\n'),
+		b = blob('two\n'),
+		c = blob('three\n')
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'toolu_a',
+		call: 5,
+		files: [{ path: 'src/x.ts', before: a, after: b }],
+	})
+	history.append(id, {
+		type: 'file_changes',
+		cwd: home,
+		toolId: 'toolu_b',
+		call: 9,
+		files: [{ path: 'src/x.ts', before: b, after: c }],
+	})
 	let say = ((await command.run('', {}, { sessionId: id } as any)) as { say: string }).say
 	let rows = say.split('\n').filter((l) => l.startsWith('- '))
 	expect(rows).toHaveLength(1)
-	expect(rows[0]).toMatch(new RegExp(`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[#t5\\]\\([^)]*/${id}#t5\\) \\[#t9\\]\\([^)]*/${id}#t9\\)$`))
+	expect(rows[0]).toMatch(
+		new RegExp(
+			`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[#t5\\]\\([^)]*/${id}#t5\\) \\[#t9\\]\\([^)]*/${id}#t9\\)$`,
+		),
+	)
 	expect(say).not.toContain('toolu_')
 })
 
 test('a big history rebuilds its changed paths in a worker and counts the records that came meanwhile', async () => {
 	let after = blob('x\n')
-	let change = (path: string) => history.append(id, { type: 'file_changes', cwd: home, toolId: path, files: [{ path, before: null, after }] })
+	let change = (path: string) =>
+		history.append(id, { type: 'file_changes', cwd: home, toolId: path, files: [{ path, before: null, after }] })
 	change('a.txt')
 	change('b.txt')
 	pages.reset()

@@ -77,9 +77,18 @@ function settle(event: Event): Settled | undefined {
 	let st = uploads.state
 	if (event.type === 'rejected') {
 		st.waiting.delete(up.sessionId)
-		return { sessionId: up.sessionId, placeholder: up.placeholder, text: `[upload failed: ${event.reason}]`, error: event.reason }
+		return {
+			sessionId: up.sessionId,
+			placeholder: up.placeholder,
+			text: `[upload failed: ${event.reason}]`,
+			error: event.reason,
+		}
 	}
-	let done: Settled = { sessionId: up.sessionId, placeholder: up.placeholder, text: (event as Event & { type: 'attached' }).marker }
+	let done: Settled = {
+		sessionId: up.sessionId,
+		placeholder: up.placeholder,
+		text: (event as Event & { type: 'attached' }).marker,
+	}
 	let delivery = st.waiting.get(up.sessionId)
 	if (delivery !== undefined && !uploads.pending(up.sessionId)) {
 		st.waiting.delete(up.sessionId)
@@ -115,4 +124,18 @@ function reset(): void {
 	uploads.state = createState()
 }
 
-export const uploads = { state: createState(), begin, pad, command, tooBig, inFlight, pending, wait, settle, swap, long, base64, reset }
+export const uploads = {
+	state: createState(),
+	begin,
+	pad,
+	command,
+	tooBig,
+	inFlight,
+	pending,
+	wait,
+	settle,
+	swap,
+	long,
+	base64,
+	reset,
+}

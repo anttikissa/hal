@@ -23,8 +23,16 @@ type F<T, K extends keyof T> = Extract<T[K], Fn>
 // Plugins, for local redraw requests after setup and cleanup.
 export type Plugin = {
 	before<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (...args: Parameters<F<T, K>>) => void): void
-	after<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void): void
-	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>): void
+	after<T extends object, K extends Keys<T>>(
+		obj: T,
+		key: K,
+		fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void,
+	): void
+	around<T extends object, K extends Keys<T>>(
+		obj: T,
+		key: K,
+		fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>,
+	): void
 	set<T extends object, K extends Exclude<keyof T & string, Keys<T>>>(obj: T, key: K, value: NoInfer<T[K]>): void
 	// Switches this file off until it changes (task hvk): the body stops
 	// here and what it registered so far goes.
@@ -42,7 +50,19 @@ type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 // A value patch (set) holds the value it applied instead of a wrapper.
 type Patch = { original: any; wrapper: Fn; hooks: Hook[]; run: Run; value?: true; applied?: unknown }
 // open: the registration body is running, so hooks may register.
-export type Loaded = { path: string; hash: string; expires?: string; portable?: true; expired?: true; disabled?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
+export type Loaded = {
+	path: string
+	hash: string
+	expires?: string
+	portable?: true
+	expired?: true
+	disabled?: true
+	error?: string
+	hooks: Hook[]
+	cleanup?: () => unknown
+	open?: true
+	timer?: Timer
+}
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -75,7 +95,8 @@ function targetName(obj: object, key: string): string {
 // A returned Promise is not awaited, but its rejection is reported.
 function observe(fn: Fn, args: unknown[], what: string): void {
 	let out = fn(...args)
-	if (out && typeof out.then === 'function') out.then(undefined, (e: any) => plugins.report(`plugin ${what} failed: ${e?.stack ?? e}`))
+	if (out && typeof out.then === 'function')
+		out.then(undefined, (e: any) => plugins.report(`plugin ${what} failed: ${e?.stack ?? e}`))
 }
 
 function patchOf(obj: any, key: string): Patch {
@@ -95,7 +116,8 @@ function patchOf(obj: any, key: string): Patch {
 		wrapper: function (this: unknown, ...args: unknown[]) {
 			let { befores, arounds, afters } = p.run
 			for (let fn of befores) observe(fn, args, `before ${key}`)
-			let call = (i: number, a: unknown[]): unknown => (i < arounds.length ? arounds[i]!((...x: unknown[]) => call(i + 1, x), ...a) : original.apply(this, a))
+			let call = (i: number, a: unknown[]): unknown =>
+				i < arounds.length ? arounds[i]!((...x: unknown[]) => call(i + 1, x), ...a) : original.apply(this, a)
 			let result = call(0, args)
 			for (let fn of afters) observe(fn, [result, args], `after ${key}`)
 			return result
@@ -151,7 +173,10 @@ function deactivate(entry: Loaded): void {
 // Registration is final once the body returns.
 function register(entry: Loaded, h: Omit<Hook, 'file' | 'seq' | 'target'>): void {
 	let target = `${targetName(h.obj, h.key)} ${h.kind}`
-	if (!entry.open) throw new Error(`${entry.path}: ${target} registered after the registration function returned; register in its body`)
+	if (!entry.open)
+		throw new Error(
+			`${entry.path}: ${target} registered after the registration function returned; register in its body`,
+		)
 	let hook: Hook = { ...h, file: basename(entry.path), seq: entry.hooks.length, target }
 	entry.hooks.push(hook)
 	let patch = plugins.patchOf(h.obj, h.key)
@@ -160,12 +185,14 @@ function register(entry: Loaded, h: Omit<Hook, 'file' | 'seq' | 'target'>): void
 }
 
 function hook(entry: Loaded, kind: Kind, obj: any, key: string, fn: Fn): void {
-	if (!obj || typeof obj[key] !== 'function') throw new Error(`${entry.path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
+	if (!obj || typeof obj[key] !== 'function')
+		throw new Error(`${entry.path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
 	plugins.register(entry, { kind, obj, key, fn })
 }
 
 function override(entry: Loaded, obj: any, key: string, value: unknown): void {
-	if (!obj || !(key in obj) || typeof obj[key] === 'function') throw new Error(`${entry.path}: set target ${obj ? targetName(obj, key) : key} is not a plain value; use around`)
+	if (!obj || !(key in obj) || typeof obj[key] === 'function')
+		throw new Error(`${entry.path}: set target ${obj ? targetName(obj, key) : key} is not a plain value; use around`)
 	plugins.register(entry, { kind: 'set', obj, key, fn: () => value, value })
 }
 
@@ -195,7 +222,10 @@ function api(entry: Loaded): Plugin {
 // days, so a later expiry re-arms.
 function arm(entry: Loaded): void {
 	let ms = Date.parse(entry.expires!) - Date.now()
-	entry.timer = setTimeout(() => (Date.parse(entry.expires!) <= Date.now() ? plugins.expire(entry.path) : plugins.arm(entry)), Math.min(Math.max(ms, 0), 2 ** 31 - 1))
+	entry.timer = setTimeout(
+		() => (Date.parse(entry.expires!) <= Date.now() ? plugins.expire(entry.path) : plugins.arm(entry)),
+		Math.min(Math.max(ms, 0), 2 ** 31 - 1),
+	)
 	entry.timer.unref?.()
 }
 
@@ -254,7 +284,8 @@ async function load(path: string): Promise<void> {
 		// cannot find a file created after it first resolved there.
 		mod = await import(`${realpathSync(path)}?v=${gen}`)
 		if (mod.expires !== undefined) {
-			if (typeof mod.expires !== 'string' || !mod.expires.endsWith('Z') || Number.isNaN(Date.parse(mod.expires))) throw new Error(`${path}: expires must be a UTC ISO time like '2026-09-29T16:00:00Z'`)
+			if (typeof mod.expires !== 'string' || !mod.expires.endsWith('Z') || Number.isNaN(Date.parse(mod.expires)))
+				throw new Error(`${path}: expires must be a UTC ISO time like '2026-09-29T16:00:00Z'`)
 			entry.expires = mod.expires
 		}
 		if (mod.portable !== undefined && mod.portable !== true) throw new Error(`${path}: portable must be true or absent`)
@@ -268,13 +299,19 @@ async function load(path: string): Promise<void> {
 	let old = st.files.get(path)
 	if (old) plugins.deactivate(old)
 	st.files.set(path, entry)
-	if (entry.expires && Date.parse(entry.expires) <= Date.now()) return void ((entry.expired = true), plugins.changed(path, 'expired'))
+	if (entry.expires && Date.parse(entry.expires) <= Date.now())
+		return void ((entry.expired = true), plugins.changed(path, 'expired'))
 	entry.open = true
 	try {
 		let out = mod.default(plugins.api(entry))
 		if (out !== undefined && typeof out !== 'function') {
-			if (typeof out?.then === 'function') out.then(undefined, (e: any) => plugins.report(`plugin ${path}: its async registration failed: ${e?.stack ?? e}`))
-			throw new Error(`${path}: the registration function returned ${typeof out?.then === 'function' ? 'a Promise' : typeof out}; return a cleanup function or nothing, and start async work from the body`)
+			if (typeof out?.then === 'function')
+				out.then(undefined, (e: any) =>
+					plugins.report(`plugin ${path}: its async registration failed: ${e?.stack ?? e}`),
+				)
+			throw new Error(
+				`${path}: the registration function returned ${typeof out?.then === 'function' ? 'a Promise' : typeof out}; return a cleanup function or nothing, and start async work from the body`,
+			)
 		}
 		entry.cleanup = out
 	} catch (e) {

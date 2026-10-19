@@ -20,14 +20,14 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true, owner: '01-abc', kind: 'subagent', autoclose: true }
 	let interactive = systemPrompt.inspect(input)
 	expect(interactive.text).toContain('BASH /*')
-	expect(interactive.sections.find(s => s.title === 'BASH')?.body).toContain('so user messages')
+	expect(interactive.sections.find((s) => s.title === 'BASH')?.body).toContain('so user messages')
 	let unattended = systemPrompt.inspect({ ...input, interactive: false })
 	expect(unattended.problems).toEqual([])
 	expect(unattended.text).not.toContain('/*')
 	expect(unattended.text).toContain('unsafeToStop')
 	expect(unattended.text).toContain('modifies')
 	expect(unattended.text).toContain('path')
-	let bash = unattended.sections.find(s => s.title === 'BASH')?.body
+	let bash = unattended.sections.find((s) => s.title === 'BASH')?.body
 	expect(bash).not.toContain('user messages')
 	expect(bash).toContain('foreground')
 	expect(bash).toContain('parallel work')
@@ -36,16 +36,27 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 
 test('a hook that rewrites a tool guide changes only that section; a removed heading withdraws its section', () => {
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true }
-	let plain = systemPrompt.inspect(input), assemble = systemPrompt.assemble
-	systemPrompt.assemble = (...args) => assemble(...args).replace(/(# EDIT\n)[\s\S]*?(?=\n\n# )/, '$1- Use EDIT blocks.\n  !!NEW example').replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# )/, '')
+	let plain = systemPrompt.inspect(input),
+		assemble = systemPrompt.assemble
+	systemPrompt.assemble = (...args) =>
+		assemble(...args)
+			.replace(/(# EDIT\n)[\s\S]*?(?=\n\n# )/, '$1- Use EDIT blocks.\n  !!NEW example')
+			.replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# )/, '')
 	try {
 		let hooked = systemPrompt.inspect(input)
-		let outside = (r: typeof plain) => r.sections.filter((s) => s.body.trim()).reduceRight((t, s) => t.slice(0, s.start) + t.slice(s.end), r.text).replace(/\n{3,}/g, '\n\n')
+		let outside = (r: typeof plain) =>
+			r.sections
+				.filter((s) => s.body.trim())
+				.reduceRight((t, s) => t.slice(0, s.start) + t.slice(s.end), r.text)
+				.replace(/\n{3,}/g, '\n\n')
 		expect(outside(hooked)).toBe(outside(plain))
 		expect(hooked.sections.find((s) => s.title === 'EDIT')?.body).toBe('- Use EDIT blocks.\n  !!NEW example')
 		expect(hooked.sections.some((s) => s.title === 'WRITE')).toBe(false)
-		for (let s of hooked.sections.filter((s) => s.body.trim())) expect(hooked.text.slice(s.start, s.end)).toBe(`# ${s.title}\n${s.body}`)
-	} finally { systemPrompt.assemble = assemble }
+		for (let s of hooked.sections.filter((s) => s.body.trim()))
+			expect(hooked.text.slice(s.start, s.end)).toBe(`# ${s.title}\n${s.body}`)
+	} finally {
+		systemPrompt.assemble = assemble
+	}
 })
 
 test('says who, when and where: date, cwd and model', () => {
@@ -65,7 +76,9 @@ test('in Git, one file per directory from the repo root down to the cwd, outermo
 	writeFileSync(`${root}/repo/b/c/AGENTS.md`, 'INNER RULE')
 	writeFileSync(`${root}/repo/b/c/CLAUDE.md`, 'INNER CLAUDE')
 	let text = systemPrompt.build({ cwd: `${root}/repo/b/c`, model: 'm/x', now: at })
-	let outer = text.indexOf('OUTER RULE'), middle = text.indexOf('MIDDLE CLAUDE'), inner = text.indexOf('INNER RULE')
+	let outer = text.indexOf('OUTER RULE'),
+		middle = text.indexOf('MIDDLE CLAUDE'),
+		inner = text.indexOf('INNER RULE')
 	expect(outer).toBeGreaterThanOrEqual(0)
 	expect(middle).toBeGreaterThan(outer)
 	expect(inner).toBeGreaterThan(middle)
@@ -167,7 +180,10 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
-		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if $session_model like "anthropic/*"\nCLAUDE ONLY\n:::\n::: if $session_model like "openai/*"\nOPENAI ONLY\n:::\n${session_model} ${unknown}\n$agents')
+		writeFileSync(
+			`${root}/SYSTEM.md`,
+			'You are Hal.<!-- secret\non another line -->\n::: if $session_model like "anthropic/*"\nCLAUDE ONLY\n:::\n::: if $session_model like "openai/*"\nOPENAI ONLY\n:::\n${session_model} ${unknown}\n$agents',
+		)
 		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if $session_model like "openai/*"')
 		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
 		expect(text).toContain('CLAUDE ONLY')
@@ -177,7 +193,9 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 		expect(text).toContain('<!-- gone -->kept')
 		expect(text).toContain('::: if $session_model like "openai/*"')
 		expect(systemPrompt.build({ cwd: root, model: 'openai/gpt', now: at })).toContain('OPENAI ONLY')
-	} finally { systemPrompt.file = old }
+	} finally {
+		systemPrompt.file = old
+	}
 })
 
 test('bad SYSTEM directives never throw: each is reported with its line and the rest of the prompt applies', () => {
@@ -187,7 +205,10 @@ test('bad SYSTEM directives never throw: each is reported with its line and the 
 		let build = (body: string) => {
 			writeFileSync(`${root}/SYSTEM.md`, body)
 			let problems: string[] = []
-			return { text: systemPrompt.build({ cwd: root, model: 'other/x', now: at }, problems), problems: problems.join('\n') }
+			return {
+				text: systemPrompt.build({ cwd: root, model: 'other/x', now: at }, problems),
+				problems: problems.join('\n'),
+			}
 		}
 		let unknown = build('Hello\n::: if $unknown == "true"\nDROPPED\n:::\nAfter')
 		expect(unknown.problems).toMatch(/SYSTEM.md:2: unknown key unknown/)
@@ -196,7 +217,9 @@ test('bad SYSTEM directives never throw: each is reported with its line and the 
 		let unclosed = build('Hello\n::: if $session_model like "*"\ntext')
 		expect(unclosed.problems).toMatch(/SYSTEM.md:2: unclosed/)
 		expect(unclosed.text).toContain('Hello\ntext')
-	} finally { systemPrompt.file = old }
+	} finally {
+		systemPrompt.file = old
+	}
 })
 
 test('SYSTEM includes are templates resolved relative to their file', () => {
@@ -205,7 +228,10 @@ test('SYSTEM includes are templates resolved relative to their file', () => {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		mkdirSync(`${root}/more`)
 		writeFileSync(`${root}/more/inner.md`, 'inner ${session_model}')
-		writeFileSync(`${root}/more/part.md`, '<!-- note\nfor me -->::: if $session_model like "wrong/*"\nhidden\n:::\n@inner.md\n@?missing.md\n')
+		writeFileSync(
+			`${root}/more/part.md`,
+			'<!-- note\nfor me -->::: if $session_model like "wrong/*"\nhidden\n:::\n@inner.md\n@?missing.md\n',
+		)
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
 		expect(text).toContain('Hello\ninner m/x')
@@ -216,7 +242,9 @@ test('SYSTEM includes are templates resolved relative to their file', () => {
 		let problems: string[] = []
 		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: at }, problems)).toContain('Before\nAfter')
 		expect(problems.join()).toMatch(/SYSTEM.md:2: include: .*missing.md/)
-	} finally { systemPrompt.file = old }
+	} finally {
+		systemPrompt.file = old
+	}
 })
 
 test('the home USER.md appears in the real SYSTEM prompt when present, with no residue when absent', () => {
@@ -242,7 +270,10 @@ test('the home USER.md appears in the real SYSTEM prompt when present, with no r
 })
 
 test('skills are listed by name: Hal and user skills always, project skills only along the cwd chain', () => {
-	let skill = (dir: string) => (mkdirSync(dir, { recursive: true }), writeFileSync(`${dir}/SKILL.md`, '---\nname: x\n---\nBODY TEXT'))
+	let skill = (dir: string) => (
+		mkdirSync(dir, { recursive: true }),
+		writeFileSync(`${dir}/SKILL.md`, '---\nname: x\n---\nBODY TEXT')
+	)
 	let userHome = paths.userHome
 	paths.userHome = () => `${root}/user`
 	try {
@@ -257,13 +288,17 @@ test('skills are listed by name: Hal and user skills always, project skills only
 		mkdirSync(`${root}/repo/sub/deep`, { recursive: true })
 		writeFileSync(`${root}/repo/AGENTS.md`, 'PROJECT RULE')
 		let rendered = systemPrompt.inspect({ cwd: `${root}/repo/sub/deep`, model: 'm/x', now: at })
-		let text = rendered.sections.find(s => s.title === 'Skills')!.body
-		let instructions = rendered.sections.find(s => s.title === 'Local instructions')!.body
+		let text = rendered.sections.find((s) => s.title === 'Skills')!.body
+		let instructions = rendered.sections.find((s) => s.title === 'Local instructions')!.body
 		expect(rendered.problems).toEqual([])
 		expect(instructions).toContain('PROJECT RULE')
 		expect(instructions).not.toContain('/skills/')
 		expect(text).not.toContain('PROJECT RULE')
-		expect(text).toMatch(new RegExp(`Skills - read <dir>/SKILL.md when appropriate: \\S+/skills/\\S*hal-server-install\\S* ${root}/user/.agents/skills/mine ${root}/user/.claude/skills/claude-mine ${root}/repo/.agents/skills/\\{alpha,zeta\\} ${root}/repo/sub/.claude/skills/inner$`))
+		expect(text).toMatch(
+			new RegExp(
+				`Skills - read <dir>/SKILL.md when appropriate: \\S+/skills/\\S*hal-server-install\\S* ${root}/user/.agents/skills/mine ${root}/user/.claude/skills/claude-mine ${root}/repo/.agents/skills/\\{alpha,zeta\\} ${root}/repo/sub/.claude/skills/inner$`,
+			),
+		)
 		// Folders without SKILL.md, projects off the chain and skill bodies stay out.
 		expect(text).not.toContain('no-skill-file')
 		expect(text).not.toContain('elsewhere')

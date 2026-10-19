@@ -40,11 +40,27 @@ describe('single chunks', () => {
 
 	test('editor keys in legacy and kitty forms', () => {
 		// Home/End: xterm, SS3, vt220 and rxvt forms, and with modifiers.
-		expect(decode('\x1b[H\x1b[F\x1bOH\x1bOF\x1b[1~\x1b[4~\x1b[7~\x1b[8~')).toEqual(['home', 'end', 'home', 'end', 'home', 'end', 'home', 'end'])
+		expect(decode('\x1b[H\x1b[F\x1bOH\x1bOF\x1b[1~\x1b[4~\x1b[7~\x1b[8~')).toEqual([
+			'home',
+			'end',
+			'home',
+			'end',
+			'home',
+			'end',
+			'home',
+			'end',
+		])
 		expect(decode('\x1b[1;2H', '\x1b[1;5F')).toEqual(['S-home', 'C-end'])
 		expect(decode('\x1b[3~', '\x1b[3;3~')).toEqual(['delete', 'M-delete'])
 		// Alt-arrows: xterm modifiers, ESC-prefixed CSI, readline ESC b / ESC f.
-		expect(decode('\x1b[1;3D\x1b[1;3C', '\x1b\x1b[D\x1b\x1b[C', '\x1bb\x1bf')).toEqual(['M-left', 'M-right', 'M-left', 'M-right', 'M-left', 'M-right'])
+		expect(decode('\x1b[1;3D\x1b[1;3C', '\x1b\x1b[D\x1b\x1b[C', '\x1bb\x1bf')).toEqual([
+			'M-left',
+			'M-right',
+			'M-left',
+			'M-right',
+			'M-left',
+			'M-right',
+		])
 		expect(decode('\x1b\x7f', '\x1b\b', '\x1b[127;3u')).toEqual(['M-backspace', 'M-backspace', 'M-backspace'])
 		// Cmd only exists in kitty's modifier bits.
 		expect(decode('\x1b[1;9D\x1b[1;9C')).toEqual(['s-left', 's-right'])

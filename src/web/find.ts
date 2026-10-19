@@ -10,12 +10,20 @@ import { app } from './app.ts'
 const hooks = {
 	get: () => app.state.view.modal,
 	set: (modal: ModalState) => app.setView({ ...app.state.view, modal }),
-	send: (c: unknown) => connection.send(c), id: () => connection.nextId(),
+	send: (c: unknown) => connection.send(c),
+	id: () => connection.nextId(),
 }
 function open(): void {
 	if (hooks.get()?.find) find.close()
 	// An empty query lists the recently updated tabs.
-	findController.update(find.state, hooks, findDialog.open(find.state.filters, app.state.tabs.map((t) => t.id)))
+	findController.update(
+		find.state,
+		hooks,
+		findDialog.open(
+			find.state.filters,
+			app.state.tabs.map((t) => t.id),
+		),
+	)
 }
 function close(): void {
 	app.setView({ ...app.state.view, modal: undefined })
@@ -43,4 +51,14 @@ function focus(index: number): void {
 	let m = hooks.get()
 	if (m?.find && m.find.focus !== index) hooks.set(findDialog.focus(m, index))
 }
-export const find = { state: findController.create(), open, close, input, toggle, key, focus, cancel: (): void => findController.close(find.state, hooks), event: (b: FindBatch): void => findController.event(hooks, b) }
+export const find = {
+	state: findController.create(),
+	open,
+	close,
+	input,
+	toggle,
+	key,
+	focus,
+	cancel: (): void => findController.close(find.state, hooks),
+	event: (b: FindBatch): void => findController.event(hooks, b),
+}

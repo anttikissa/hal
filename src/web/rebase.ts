@@ -17,11 +17,22 @@ export type Action = 'keep' | 'drop' | 'edit'
 // next action spans from the anchor). `sending`: the apply command's id
 // until its result; `error`: the host's refusal, whole.
 export type RebaseState = {
-	sessionId: string; snapshot: RebaseRows; actions: Record<number, Action>; texts: Record<number, string>
-	open: Record<number, true>; anchor?: number; range: boolean; threshold: number; sending?: string; error?: string
+	sessionId: string
+	snapshot: RebaseRows
+	actions: Record<number, Action>
+	texts: Record<number, string>
+	open: Record<number, true>
+	anchor?: number
+	range: boolean
+	threshold: number
+	sending?: string
+	error?: string
 }
 // What an opened row shows: its records' text, images and blobs.
-export type Part = { kind: 'text'; label: string; text: string } | { kind: 'image'; blob: string; bytes?: number } | { kind: 'blob'; id: string; size: string }
+export type Part =
+	| { kind: 'text'; label: string; text: string }
+	| { kind: 'image'; blob: string; bytes?: number }
+	| { kind: 'blob'; id: string; size: string }
 
 const kinds = new Set(['prompt', 'assistant', 'thinking', 'compact', 'reset'])
 
@@ -35,8 +46,17 @@ function set(next: RebaseState | undefined): void {
 function open(event: Event & { type: 'rebase-plan' }): void {
 	let old = rebaseView.state?.sessionId === event.sessionId ? rebaseView.state : undefined
 	let has = new Set(event.snapshot.rows.map((r) => r.n))
-	let keepOld = <T>(m: Record<number, T> | undefined) => Object.fromEntries(Object.entries(m ?? {}).filter(([n]) => has.has(Number(n)))) as Record<number, T>
-	set({ sessionId: event.sessionId, snapshot: event.snapshot, actions: keepOld(old?.actions), texts: keepOld(old?.texts), open: keepOld(old?.open), range: false, threshold: old?.threshold ?? 5000 })
+	let keepOld = <T>(m: Record<number, T> | undefined) =>
+		Object.fromEntries(Object.entries(m ?? {}).filter(([n]) => has.has(Number(n)))) as Record<number, T>
+	set({
+		sessionId: event.sessionId,
+		snapshot: event.snapshot,
+		actions: keepOld(old?.actions),
+		texts: keepOld(old?.texts),
+		open: keepOld(old?.open),
+		range: false,
+		threshold: old?.threshold ?? 5000,
+	})
 }
 
 // Record numbers a row's own drop takes out: its group (signed thinking
@@ -55,7 +75,15 @@ function shown(st: RebaseState, row: RebaseRow, gone = rebaseView.dropped(st)): 
 function plan(st: RebaseState): RebasePlan {
 	let gone = rebaseView.dropped(st)
 	let drop = [...new Set(st.snapshot.rows.filter((r) => st.actions[r.n] === 'drop').flatMap((r) => r.ns))]
-	let edit = st.snapshot.rows.flatMap((r) => st.actions[r.n] === 'edit' && r.editN !== undefined && !gone.has(r.editN) && st.texts[r.n] !== undefined && st.texts[r.n] !== r.text ? [{ n: r.editN, text: st.texts[r.n]! }] : [])
+	let edit = st.snapshot.rows.flatMap((r) =>
+		st.actions[r.n] === 'edit' &&
+		r.editN !== undefined &&
+		!gone.has(r.editN) &&
+		st.texts[r.n] !== undefined &&
+		st.texts[r.n] !== r.text
+			? [{ n: r.editN, text: st.texts[r.n]! }]
+			: [],
+	)
 	return { base: st.snapshot.base, drop, edit }
 }
 
@@ -65,16 +93,21 @@ function plan(st: RebaseState): RebasePlan {
 function act(n: number, action: Action, extend = false): void {
 	let st = rebaseView.state
 	if (!st) return
-	let rows = st.snapshot.rows, at = rows.findIndex((r) => r.n === n)
+	let rows = st.snapshot.rows,
+		at = rows.findIndex((r) => r.n === n)
 	if (at < 0) return
 	extend ||= st.range && st.anchor !== undefined
 	let from = extend && st.anchor !== undefined ? rows.findIndex((r) => r.n === st.anchor) : at
 	if (from < 0) from = at
 	let targets = action === 'edit' ? [rows[at]!] : rows.slice(Math.min(from, at), Math.max(from, at) + 1)
-	let actions = { ...st.actions }, texts = { ...st.texts }
+	let actions = { ...st.actions },
+		texts = { ...st.texts }
 	for (let row of targets) {
 		if (action === 'edit' && !row.editable) continue
-		if (action !== 'drop') for (let other of rows) if (actions[other.n] === 'drop' && other.n !== row.n && row.ns.some((x) => other.group.includes(x))) delete actions[other.n]
+		if (action !== 'drop')
+			for (let other of rows)
+				if (actions[other.n] === 'drop' && other.n !== row.n && row.ns.some((x) => other.group.includes(x)))
+					delete actions[other.n]
 		if (action === 'keep') delete actions[row.n]
 		else actions[row.n] = action
 		if (action === 'edit') texts[row.n] ??= row.text ?? ''
@@ -131,7 +164,14 @@ function apply(): void {
 	if (!st || st.sending || !rebaseView.dirty(st)) return
 	let id = connection.nextId()
 	set({ ...st, sending: id, error: undefined })
-	connection.send({ type: 'rebase-apply', id, sessionId: st.sessionId, base: st.snapshot.base, ...(st.snapshot.paused && { paused: true }), plan: rebaseView.plan(st) })
+	connection.send({
+		type: 'rebase-apply',
+		id,
+		sessionId: st.sessionId,
+		base: st.snapshot.base,
+		...(st.snapshot.paused && { paused: true }),
+		plan: rebaseView.plan(st),
+	})
 }
 
 // Asks the host for fresh rows (after a stale base); choices carry over.
@@ -165,25 +205,30 @@ function onEvent(event: Event): boolean {
 
 // One row's records as readable parts, never JSON.
 function parts(st: RebaseState, row: RebaseRow): Part[] {
-	let out: Part[] = [], text = (label: string, t: string) => t && out.push({ kind: 'text', label, text: t })
+	let out: Part[] = [],
+		text = (label: string, t: string) => t && out.push({ kind: 'text', label, text: t })
 	for (let n of row.ns) {
 		let r = st.snapshot.records.find((r) => r.n === n)
 		if (!r) continue
-		if (r.type === 'user') for (let b of r.blocks) {
-			if (b.type === 'text') text('', b.text)
-			else if (b.type === 'image') out.push({ kind: 'image', blob: b.blob, bytes: b.bytes })
-			else if (b.type === 'tool_result') {
-				text(b.isError ? 'error' : 'output', b.output)
-				for (let image of blocks.resultImages(b)) out.push({ kind: 'image', blob: image.blob, bytes: image.bytes })
+		if (r.type === 'user')
+			for (let b of r.blocks) {
+				if (b.type === 'text') text('', b.text)
+				else if (b.type === 'image') out.push({ kind: 'image', blob: b.blob, bytes: b.bytes })
+				else if (b.type === 'tool_result') {
+					text(b.isError ? 'error' : 'output', b.output)
+					for (let image of blocks.resultImages(b)) out.push({ kind: 'image', blob: image.blob, bytes: image.bytes })
+				}
 			}
-		} else if (r.type === 'assistant') {
+		else if (r.type === 'assistant') {
 			let b = r.block
 			// Bash's lines start with its $ command; other tools' with the rest.
 			let lines = b.type === 'tool_call' || b.type === 'hosted_tool' ? toolDetails.lines(b.name, b.input) : []
-			if (b.type === 'tool_call' || b.type === 'hosted_tool') text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))
+			if (b.type === 'tool_call' || b.type === 'hosted_tool')
+				text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))
 			else text('', b.text)
 		} else if (r.type === 'command' || r.type === 'output') text(r.type === 'output' ? 'output' : '', r.text)
-		else if (r.type === 'notice' || r.type === 'change') text(r.type === 'change' ? 'settings' : 'internal note', rebase.text(r)!)
+		else if (r.type === 'notice' || r.type === 'change')
+			text(r.type === 'change' ? 'settings' : 'internal note', rebase.text(r)!)
 		else if (r.type === 'compact') text('summary', r.summary)
 	}
 	for (let c of row.carries) {
@@ -200,7 +245,22 @@ export const rebaseView = {
 	state: undefined as RebaseState | undefined,
 	// main/Chat points this at a redraw.
 	changed: (): void => {},
-	onEvent, open, act, edit, toggle, dropOver, dropBefore, apply, rebuild, result, plan, shown, dropped, parts, dirty, kilo,
+	onEvent,
+	open,
+	act,
+	edit,
+	toggle,
+	dropOver,
+	dropBefore,
+	apply,
+	rebuild,
+	result,
+	plan,
+	shown,
+	dropped,
+	parts,
+	dirty,
+	kilo,
 	threshold: (tokens: number): void => patch({ threshold: Math.max(0, Math.round(tokens) || 0) }),
 	range: (on: boolean): void => patch({ range: on, anchor: on ? undefined : rebaseView.state?.anchor }),
 	cancel: (): void => set(undefined),

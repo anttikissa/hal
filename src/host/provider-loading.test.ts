@@ -22,10 +22,17 @@ function isolated(body: string): void {
 			${body}
 			process.exit(0);
 		`
-		let result = Bun.spawnSync([process.execPath, '-e', script], { cwd: `${import.meta.dir}/../..`, env: { ...env, TMPDIR: home }, stdout: 'pipe', stderr: 'pipe' })
+		let result = Bun.spawnSync([process.execPath, '-e', script], {
+			cwd: `${import.meta.dir}/../..`,
+			env: { ...env, TMPDIR: home },
+			stdout: 'pipe',
+			stderr: 'pipe',
+		})
 		expect(result.stderr.toString()).toBe('')
 		expect(result.exitCode).toBe(0)
-	} finally { rmSync(home, { recursive: true, force: true }) }
+	} finally {
+		rmSync(home, { recursive: true, force: true })
+	}
 }
 
 test('startup, command discovery and catalog metadata do not load model implementations', () => {
@@ -48,7 +55,12 @@ test('startup, command discovery and catalog metadata do not load model implemen
 })
 
 test('one provider loads only its own adapter, reused on subsequent calls', () => {
-	for (let [name, implementation] of [['anthropic', 'anthropic'], ['openai', 'openai'], ['ollama', 'openai-compat']]) isolated(`
+	for (let [name, implementation] of [
+		['anthropic', 'anthropic'],
+		['openai', 'openai'],
+		['ollama', 'openai-compat'],
+	])
+		isolated(`
 		const p = provider.state.providers[${JSON.stringify(name)}];
 		p.parse((async function* () {})());
 		assert(loaded(${JSON.stringify(implementation)}));

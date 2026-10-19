@@ -5,7 +5,21 @@ import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
 import { titles } from '../common/titles.ts'
-import { amending, calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
+import {
+	amending,
+	calls,
+	client,
+	created,
+	fresh,
+	readCall,
+	records,
+	restartHost,
+	stamped,
+	toolSession,
+	until,
+	useHost,
+	shown,
+} from './host-fixture.test.ts'
 import { prompts } from './prompts.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
@@ -15,7 +29,13 @@ useHost()
 const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
 const inboxOf = (c: ReturnType<typeof client>, id: string) => c.views.get(id)!.inbox.map((m) => m.text)
 
-for (let [input, output] of [['/ hello', 'hello'], ['/ /hello world', '/hello world'], ['/  /hello', ' /hello'], ['/ / /hello', '/ /hello'], [' /hello world', ' /hello world']]) {
+for (let [input, output] of [
+	['/ hello', 'hello'],
+	['/ /hello world', '/hello world'],
+	['/  /hello', ' /hello'],
+	['/ / /hello', '/ /hello'],
+	[' /hello world', ' /hello world'],
+]) {
 	test(`literal slash prompt: ${JSON.stringify(input)}`, async () => {
 		let a = client()
 		let id = created(a)
@@ -54,7 +74,12 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
+	expect(
+		a.views
+			.get(id)!
+			.items.filter((i) => i.type === 'prompt')
+			.map(titles.who),
+	).toEqual(['You', 'You (steering)', 'You (steering)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -76,7 +101,12 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual([
+		'You',
+		'You (steering)',
+		'You (steering)',
+		'You (steering)',
+	])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -93,7 +123,12 @@ test('steering before tool dispatch suppresses its call and pairs replay results
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(-2)).toEqual([
-		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: expect.stringContaining('did not run'), interrupted: 'canceled' }] },
+		{
+			role: 'user',
+			blocks: [
+				{ type: 'tool_result', id: 't1', output: expect.stringContaining('did not run'), interrupted: 'canceled' },
+			],
+		},
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('and hurry') }] },
 	])
 	calls[1]!.push({ type: 'done', reason: 'end' })
@@ -110,8 +145,22 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	let queuedAt = a.views.get(id)!.inbox.find((m) => m.delivery === 'after-turn')!.ts!
 	a.conn.send({ type: 'submit', sessionId: id, text: 'now' })
 	expect(a.views.get(id)!.inbox).toEqual([
-		{ id: expect.any(String), text: 'now', delivery: 'now', ts: expect.any(String), n: expect.any(Number), interactive: true },
-		{ id: expect.any(String), text: 'later', delivery: 'after-turn', ts: expect.any(String), n: expect.any(Number), interactive: true },
+		{
+			id: expect.any(String),
+			text: 'now',
+			delivery: 'now',
+			ts: expect.any(String),
+			n: expect.any(Number),
+			interactive: true,
+		},
+		{
+			id: expect.any(String),
+			text: 'later',
+			delivery: 'after-turn',
+			ts: expect.any(String),
+			n: expect.any(Number),
+			interactive: true,
+		},
 	])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
@@ -120,7 +169,11 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	calls[1]!.push({ type: 'text', text: 'first done' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
 	expect(a.of('turn-end')).toHaveLength(1)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([
+		expect.stringContaining(
+			`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`,
+		),
+	])
 	expect(inboxOf(a, id)).toEqual([])
 	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
 	expect(delivered).toMatchObject({ delivery: 'after-turn', queuedAt })
@@ -130,7 +183,10 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	let view = await fresh(id)
 	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'prompt', 'text', 'turn-end', 'prompt', 'turn-end'])
 	expect(a.views.get(id)).toEqual(view)
-	expect(view.items.find((i) => i.type === 'prompt' && i.text === 'later')).toMatchObject({ delivery: 'after-turn', queuedAt })
+	expect(view.items.find((i) => i.type === 'prompt' && i.text === 'later')).toMatchObject({
+		delivery: 'after-turn',
+		queuedAt,
+	})
 })
 
 // Task nd6: a turn that ends with <question> waits for the user; queued
@@ -193,13 +249,17 @@ test('an empty Enter sends the next queued message early, undo queues it again, 
 	await until(() => queued() === 1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue next' })
 	await until(() => queued() === 0)
-	expect(a.views.get(id)!.inbox).toMatchObject([{ text: 'later', delivery: 'next-round', queuedAt: expect.any(String) }])
+	expect(a.views.get(id)!.inbox).toMatchObject([
+		{ text: 'later', delivery: 'next-round', queuedAt: expect.any(String) },
+	])
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue undo' })
 	await until(() => queued() === 1)
 	expect(calls.length).toBe(1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue now' })
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringMatching(/queued at [^\n]*\n<hal-note>Message was queued at [^<]+<\/hal-note>\nlater$/)])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([
+		expect.stringMatching(/queued at [^\n]*\n<hal-note>Message was queued at [^<]+<\/hal-note>\nlater$/),
+	])
 })
 
 test('the inbox survives a pause and a restart, and runs when the user continues', async () => {
@@ -229,7 +289,11 @@ test('the inbox survives a pause and a restart, and runs when the user continues
 	expect(inboxOf(b, id)).toEqual(['queued'])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nqueued`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([
+		expect.stringContaining(
+			`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nqueued`,
+		),
+	])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => b.of('turn-end').length === 2)
 	expect(await fresh(id)).toEqual(b.views.get(id)!)
@@ -254,7 +318,11 @@ test('a queued message left behind by a host dying after a turn end runs on the 
 	restartHost()
 	await turns.recover()
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`)])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([
+		expect.stringContaining(
+			`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\nlater`,
+		),
+	])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
@@ -304,7 +372,9 @@ test('a steer resent to the next host is not added twice', async () => {
 	b.conn.send({ type: 'submit', sessionId: id, text: 'more', id: 'm1' })
 	expect(b.of('ack').map((e) => e.id)).toEqual(['m1'])
 	let pending = inboxOf(b, id).filter((text) => text === 'more').length
-	let delivered = (await records(id)).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'more')).length
+	let delivered = (await records(id)).filter(
+		(r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'more'),
+	).length
 	expect(pending + delivered).toBe(1)
 })
 
@@ -335,7 +405,12 @@ test('/edit replaces a prompt quietly; /edit undo, even mid-turn, restores it wi
 	await until(() => a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'You no'))
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(shown(view.items)).toEqual([{ type: 'prompt', text: 'what did I ntoe?', interactive: true }, { type: 'text', text: 'You no', interrupted: true }, { type: 'turn-end', status: 'paused' }, { type: 'command', text: '/edit undo', output: `Edit undone: prompt u${n} and its partial output are back.` }])
+	expect(shown(view.items)).toEqual([
+		{ type: 'prompt', text: 'what did I ntoe?', interactive: true },
+		{ type: 'text', text: 'You no', interrupted: true },
+		{ type: 'turn-end', status: 'paused' },
+		{ type: 'command', text: '/edit undo', output: `Edit undone: prompt u${n} and its partial output are back.` },
+	])
 	expect(view.state.type).toBe('paused')
 })
 
@@ -354,7 +429,10 @@ test('an edit after only reading replaces the prompt: the model sees it as if wr
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
 	await pauseAndEdit(a, id, 'what did I note?')
 	await until(() => calls.length === 4)
-	let expected = [...calls[1]!.input.messages.slice(0, -1), { role: 'user', blocks: [{ type: 'text', text: stamped('what did I note\\?') }] }]
+	let expected = [
+		...calls[1]!.input.messages.slice(0, -1),
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('what did I note\\?') }] },
+	]
 	expect(calls[3]!.input.messages).toEqual(expected)
 	calls[3]!.push({ type: 'text', text: 'Milk.' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 3)
@@ -366,11 +444,18 @@ test('an edit after only reading replaces the prompt: the model sees it as if wr
 		{ type: 'turn-end', status: 'completed' },
 	])
 	// History is only appended to: the first attempt is still there.
-	expect((await records(id)).some((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'what did I ntoe?'))).toBe(true)
+	expect(
+		(await records(id)).some(
+			(r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'what did I ntoe?'),
+		),
+	).toBe(true)
 	// And the next turn builds on the edit.
 	a.conn.send({ type: 'submit', sessionId: id, text: 'thanks' })
 	await until(() => calls.length === 5)
-	expect(calls[4]!.input.messages.slice(0, 4)).toEqual([...expected, { role: 'assistant', blocks: [{ type: 'text', text: 'Milk.' }] }])
+	expect(calls[4]!.input.messages.slice(0, 4)).toEqual([
+		...expected,
+		{ role: 'assistant', blocks: [{ type: 'text', text: 'Milk.' }] },
+	])
 })
 
 test('an edit after a tool with side effects keeps history and is sent on top', async () => {
@@ -381,7 +466,12 @@ test('an edit after a tool with side effects keeps history and is sent on top', 
 		let id = created(a)
 		a.conn.send({ type: 'submit', sessionId: id, text: 'clean up' })
 		await until(() => calls.length === 1)
-		let rm: StreamEvent = { type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'rm x', description: 'Delete x' } }
+		let rm: StreamEvent = {
+			type: 'tool_call',
+			id: 'b1',
+			name: 'bash',
+			input: { command: 'rm x', description: 'Delete x' },
+		}
 		calls[0]!.push(rm, { type: 'done', reason: 'tool_use' })
 		await until(() => calls.length === 2)
 		await pauseAndEdit(a, id, 'clean up, but keep x')
@@ -415,7 +505,15 @@ test('an edit sent while the paused turn is still stopping waits for it to end',
 	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('right') }] }])
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
-	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'rebase', 'user', 'assistant', 'turn_end'])
+	expect((await records(id)).map((r) => r.type)).toEqual([
+		'user',
+		'assistant',
+		'turn_end',
+		'rebase',
+		'user',
+		'assistant',
+		'turn_end',
+	])
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
 	expect(shown(a.views.get(id)!.items)).toEqual([
 		{ type: 'prompt', text: 'right', edited: true },
@@ -441,7 +539,10 @@ test('an edited queued message runs as edited, in its place, and never as first 
 	expect(inboxOf(a, id)).toEqual(['test it', 'then ship'])
 	expect(a.views.get(id)!.state.type).toBe('running')
 	restartHost()
-	expect((await fresh(id)).inbox.map((m) => [m.text, (m.delivery === 'after-turn')])).toEqual([['test it', true], ['then ship', true]])
+	expect((await fresh(id)).inbox.map((m) => [m.text, m.delivery === 'after-turn'])).toEqual([
+		['test it', true],
+		['then ship', true],
+	])
 	// A resend of the edit, to the next host, is not applied again.
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
@@ -453,14 +554,22 @@ test('an edited queued message runs as edited, in its place, and never as first 
 	await until(() => calls.length === 2)
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\ntest it`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([
+		expect.stringContaining(
+			`<hal-note>Message was queued at ${queuedAt}, take that into account when reading it.</hal-note>\ntest it`,
+		),
+	])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 4)
 	calls[3]!.push({ type: 'done', reason: 'end' })
 	await until(() => b.views.get(id)!.state.type === 'idle')
 	let sent = calls.flatMap((c) => c.input.messages.flatMap((m: any) => m.blocks.map((x: any) => x.text ?? '')))
 	expect(sent.some((t: string) => t.includes('tset'))).toBe(false)
-	expect((await fresh(id)).items.filter((i) => i.type === 'prompt').map((i: any) => i.text)).toEqual(['go', 'test it', 'then ship'])
+	expect((await fresh(id)).items.filter((i) => i.type === 'prompt').map((i: any) => i.text)).toEqual([
+		'go',
+		'test it',
+		'then ship',
+	])
 })
 
 test('a waiting message edited into a slash command runs as that command instead', async () => {
@@ -486,7 +595,9 @@ test('a message another session sent waits unedited', async () => {
 	prompts.submit(id, 'from a peer', 'p1', 'steer', { from: 'other' })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'mine now', amend: true, edits: 'p1' })
 	expect(a.of('rejected')).toHaveLength(1)
-	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other', delivery: 'now', ts: expect.any(String), n: expect.any(Number) }])
+	expect(a.views.get(id)!.inbox).toEqual([
+		{ id: 'p1', text: 'from a peer', from: 'other', delivery: 'now', ts: expect.any(String), n: expect.any(Number) },
+	])
 })
 
 test('an edit of a delivered steering message replaces it when only reading happened since', async () => {
@@ -509,7 +620,12 @@ test('an edit of a delivered steering message replaces it when only reading happ
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.views.get(id)!.state.type === 'idle')
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map((i: any) => i.text)).toEqual(['look', 'and hurry'])
+	expect(
+		a.views
+			.get(id)!
+			.items.filter((i) => i.type === 'prompt')
+			.map((i: any) => i.text),
+	).toEqual(['look', 'and hurry'])
 })
 
 test('a resend of an edit still waiting for its paused turn to stop acks without a second prompt', async () => {
@@ -533,7 +649,9 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	await until(() => a.views.get(id)!.state.type === 'idle')
 	expect(calls).toHaveLength(2)
 	expect((await records(id)).filter((r) => r.type === 'user')).toHaveLength(2)
-	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([{ type: 'prompt', text: 'right', edited: true }])
+	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([
+		{ type: 'prompt', text: 'right', edited: true },
+	])
 })
 
 test('agent reports retain next-round delivery through a question and restart, arriving with the human answer', async () => {
@@ -541,7 +659,10 @@ test('agent reports retain next-round delivery through a question and restart, a
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'Recommendation.\n<question>A or B?</question>' }, { type: 'done', reason: 'end' })
+	calls[0]!.push(
+		{ type: 'text', text: 'Recommendation.\n<question>A or B?</question>' },
+		{ type: 'done', reason: 'end' },
+	)
 	await until(() => a.of('turn-end').length === 1)
 	prompts.submit(id, 'agent report', undefined, 'steer', { from: 'other', advisory: true })
 	prompts.submit(id, 'agent steer', undefined, 'soft-steer', { from: 'other' })
@@ -550,7 +671,9 @@ test('agent reports retain next-round delivery through a question and restart, a
 	expect(a.views.get(id)!.inbox.map((m) => m.delivery)).toEqual(['next-round', 'next-round', 'after-turn'])
 	restartHost()
 	expect((await fresh(id)).inbox.map((m) => [m.text, m.delivery])).toEqual([
-		['agent report', 'next-round'], ['agent steer', 'next-round'], ['explicit queue', 'after-turn'],
+		['agent report', 'next-round'],
+		['agent steer', 'next-round'],
+		['explicit queue', 'after-turn'],
 	])
 	expect(calls).toHaveLength(1)
 	let b = client()

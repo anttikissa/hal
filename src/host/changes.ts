@@ -5,8 +5,22 @@ import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
 
-export type Step = { toolId: string; n?: number; call?: number; ts: string; change: Exclude<FileChange, { undeclared: true }> }
-export type ChangedFile = { path: string; cwd: string; name: string; steps: Step[]; before: FileSnapshot; after: FileSnapshot; ts: string }
+export type Step = {
+	toolId: string
+	n?: number
+	call?: number
+	ts: string
+	change: Exclude<FileChange, { undeclared: true }>
+}
+export type ChangedFile = {
+	path: string
+	cwd: string
+	name: string
+	steps: Step[]
+	before: FileSnapshot
+	after: FileSnapshot
+	ts: string
+}
 
 // Older histories hold undeclared Git status observations; they are
 // not this session's changes and are skipped (task c4x).
@@ -42,13 +56,19 @@ function list(id: string): ChangedFile[] {
 }
 
 async function run(args: string[], cwd?: string): Promise<{ code: number; bytes: Buffer }> {
-	let p = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'ignore', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_NOSYSTEM: '1' } })
+	let p = Bun.spawn(args, {
+		cwd,
+		stdout: 'pipe',
+		stderr: 'ignore',
+		env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_NOSYSTEM: '1' },
+	})
 	let [bytes, code] = await Promise.all([new Response(p.stdout).arrayBuffer(), p.exited])
 	return { code, bytes: Buffer.from(bytes) }
 }
 
 async function diff(id: string, before: FileSnapshot, after: FileSnapshot): Promise<string> {
-	if ((before !== null && typeof before !== 'string') || (after !== null && typeof after !== 'string')) return 'Content unavailable: sensitive, large or non-regular file (metadata only).\n'
+	if ((before !== null && typeof before !== 'string') || (after !== null && typeof after !== 'string'))
+		return 'Content unavailable: sensitive, large or non-regular file (metadata only).\n'
 	let a = before === null ? '/dev/null' : fileChanges.blobPath(id, before)
 	let b = after === null ? '/dev/null' : fileChanges.blobPath(id, after)
 	if (a === b) return 'No net content change.\n'
@@ -56,10 +76,14 @@ async function diff(id: string, before: FileSnapshot, after: FileSnapshot): Prom
 	if (result.code > 1) throw new Error('cannot read captured diff')
 	// Do not expose private blob storage paths in the diff headers.
 	let hunk = false
-	return result.bytes.toString('utf8').split('\n').map((line) => {
-		if (line.startsWith('@@')) hunk = true
-		return hunk ? line : line.replaceAll(a, 'before').replaceAll(b, 'after')
-	}).join('\n')
+	return result.bytes
+		.toString('utf8')
+		.split('\n')
+		.map((line) => {
+			if (line.startsWith('@@')) hunk = true
+			return hunk ? line : line.replaceAll(a, 'before').replaceAll(b, 'after')
+		})
+		.join('\n')
 }
 
 function counts(diff: string): string {
@@ -67,7 +91,9 @@ function counts(diff: string): string {
 	if (diff === 'No net content change.\n') return '+0 -0'
 	if (diff.startsWith('Content unavailable')) return 'metadata only (sensitive, large or non-regular file)'
 	if (!lines.some((l) => l.startsWith('@@'))) return 'no textual diff'
-	let added = 0, removed = 0, hunk = false
+	let added = 0,
+		removed = 0,
+		hunk = false
 	for (let line of lines) {
 		if (line.startsWith('@@')) hunk = true
 		else if (hunk && line.startsWith('+')) added++
@@ -77,7 +103,7 @@ function counts(diff: string): string {
 }
 
 async function committed(_id: string, file: ChangedFile): Promise<string | undefined> {
-	if ((file.after !== null && typeof file.after !== 'string')) return
+	if (file.after !== null && typeof file.after !== 'string') return
 	let root = await changes.run(['git', '-C', file.cwd, 'rev-parse', '--show-toplevel'])
 	if (root.code) return
 	let cwd = root.bytes.toString().trim()
@@ -97,7 +123,8 @@ async function committed(_id: string, file: ChangedFile): Promise<string | undef
 			if (!tree.bytes.length) return hash.slice(0, 8)
 		} else {
 			let content = await changes.run(['git', 'show', `${hash}:${name}`], cwd)
-			if (content.code === 0 && new Bun.CryptoHasher('sha256').update(content.bytes).digest('hex') === file.after) return hash.slice(0, 8)
+			if (content.code === 0 && new Bun.CryptoHasher('sha256').update(content.bytes).digest('hex') === file.after)
+				return hash.slice(0, 8)
 		}
 	}
 }
@@ -128,4 +155,16 @@ function href(id: string, path?: string): string {
 	return `/${id}/changes${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`
 }
 
-export const changes = { state: { cache: new Map<string, { size: number; files: ChangedFile[] }>() }, collect, list, run, diff, counts, committed, time, shown, calls, href }
+export const changes = {
+	state: { cache: new Map<string, { size: number; files: ChangedFile[] }>() },
+	collect,
+	list,
+	run,
+	diff,
+	counts,
+	committed,
+	time,
+	shown,
+	calls,
+	href,
+}

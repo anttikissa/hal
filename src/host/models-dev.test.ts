@@ -23,7 +23,10 @@ const api = (models: Record<string, Record<string, { name?: string; limit?: { co
 	Object.fromEntries(Object.entries(models).map(([p, m]) => [p, { id: p, api: 'x', env: ['X'], models: m }]))
 
 const catalog1 = api({
-	anthropic: { 'claude-big-2': { name: 'Claude Big 2', limit: { context: 1_000_000 } }, 'claude-old-1': { name: 'Claude Old 1', limit: { context: 200_000 } } },
+	anthropic: {
+		'claude-big-2': { name: 'Claude Big 2', limit: { context: 1_000_000 } },
+		'claude-old-1': { name: 'Claude Old 1', limit: { context: 200_000 } },
+	},
 	openrouter: { 'acme/claude-big-2': { limit: { context: 900_000 } }, 'acme/solo-1': { limit: { context: 64_000 } } },
 })
 
@@ -73,14 +76,20 @@ test('a refresh is cached and serves context windows and lists offline, after a 
 	expect(modelsDev.contextWindow('work/claude-old-1')).toBe(200_000)
 	expect(modelsDev.contextWindow('anthropic/unknown-9')).toBeUndefined()
 	expect(modelsDev.ids('anthropic').sort()).toEqual(['claude-big-2', 'claude-old-1'])
-	expect(models.names(['anthropic/claude-big-2', 'openrouter/acme/solo-1'])).toEqual({ 'anthropic/claude-big-2': 'Claude Big 2' })
+	expect(models.names(['anthropic/claude-big-2', 'openrouter/acme/solo-1'])).toEqual({
+		'anthropic/claude-big-2': 'Claude Big 2',
+	})
 	expect(models.names(['work/claude-big-2', 'work/not-listed'])).toEqual({ 'work/claude-big-2': 'Claude Big 2' })
 })
 
 test('a failed fetch keeps the old cache and is noted only in diagnostics', async () => {
 	await modelsDev.refresh()
 	let before = readFileSync(modelsDev.file(), 'utf-8')
-	for (let fail of [() => new Response('down', { status: 503 }), () => Promise.reject(new Error('offline')), () => new Response('not json')]) {
+	for (let fail of [
+		() => new Response('down', { status: 503 }),
+		() => Promise.reject(new Error('offline')),
+		() => new Response('not json'),
+	]) {
 		answer = fail
 		expect(await modelsDev.refresh(['anthropic/claude-big-2'])).toEqual([])
 	}
@@ -92,7 +101,12 @@ test('a failed fetch keeps the old cache and is noted only in diagnostics', asyn
 test('a refresh reports picked models it listed before and no longer does', async () => {
 	await modelsDev.refresh()
 	answer = () => Response.json(api({ anthropic: { 'claude-big-2': { limit: { context: 1_000_000 } } } }))
-	let gone = await modelsDev.refresh(['anthropic/claude-big-2', 'anthropic/claude-old-1', 'openrouter/acme/solo-1', 'anthropic/never-listed'])
+	let gone = await modelsDev.refresh([
+		'anthropic/claude-big-2',
+		'anthropic/claude-old-1',
+		'openrouter/acme/solo-1',
+		'anthropic/never-listed',
+	])
 	expect(gone).toEqual(['anthropic/claude-old-1', 'openrouter/acme/solo-1'])
 	// The first fetch has nothing to compare with.
 	rmSync(modelsDev.file())
@@ -120,14 +134,23 @@ test('the picker lists a provider’s own models first, else models.dev plus its
 	await modelsDev.refresh()
 	models.state.lists.clear()
 	expect(await models.fetchList('anthropic')).toEqual(['anthropic/claude-own-3'])
-	expect((await models.fetchList('openrouter'))?.sort()).toEqual(['openrouter/acme/claude-big-2', 'openrouter/acme/solo-1'])
+	expect((await models.fetchList('openrouter'))?.sort()).toEqual([
+		'openrouter/acme/claude-big-2',
+		'openrouter/acme/solo-1',
+	])
 	provider.state.providers.anthropic = fake(async () => {
 		throw new Error('invalid_grant')
 	}, ['claude-builtin-1'])
 	models.state.lists.clear()
-	expect((await models.fetchList('anthropic'))?.sort()).toEqual(['anthropic/claude-big-2', 'anthropic/claude-builtin-1', 'anthropic/claude-old-1'])
+	expect((await models.fetchList('anthropic'))?.sort()).toEqual([
+		'anthropic/claude-big-2',
+		'anthropic/claude-builtin-1',
+		'anthropic/claude-old-1',
+	])
 	// Completion knows them without asking anyone.
-	expect(models.known()).toEqual(expect.arrayContaining(['anthropic/claude-old-1', 'openrouter/acme/solo-1', 'broken/builtin-1']))
+	expect(models.known()).toEqual(
+		expect.arrayContaining(['anthropic/claude-old-1', 'openrouter/acme/solo-1', 'broken/builtin-1']),
+	)
 	expect(existsSync(modelsDev.file())).toBe(true)
 })
 

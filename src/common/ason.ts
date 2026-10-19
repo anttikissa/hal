@@ -135,7 +135,8 @@ export type AsonObject = {
 // Characters a reader can't see or a UTF-8 file can't hold: control characters,
 // U+2028/U+2029 and lone surrogates. \r is escaped even in backticks: JS reads a
 // raw \r\n in a template as \n.
-const UNSAFE_RE = /[\0-\x08\x0b-\x1f\x7f\u2028\u2029]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
+const UNSAFE_RE =
+	/[\0-\x08\x0b-\x1f\x7f\u2028\u2029]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
 const SHORT_ESCAPES: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' }
 function escapeUnsafe(c: string): string {
 	const code = c.charCodeAt(0)
@@ -144,10 +145,17 @@ function escapeUnsafe(c: string): string {
 
 function quoteString(s: string, multiline = false): string {
 	if (multiline && s.includes('\n')) {
-		const escaped = s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(UNSAFE_RE, escapeUnsafe)
+		const escaped = s
+			.replace(/\\/g, '\\\\')
+			.replace(/`/g, '\\`')
+			.replace(/\$\{/g, '\\${')
+			.replace(UNSAFE_RE, escapeUnsafe)
 		return `\`${escaped}\``
 	}
-	const escaped = s.replace(/\\/g, '\\\\').replace(/[\n\r\t]/g, escapeUnsafe).replace(UNSAFE_RE, escapeUnsafe)
+	const escaped = s
+		.replace(/\\/g, '\\\\')
+		.replace(/[\n\r\t]/g, escapeUnsafe)
+		.replace(UNSAFE_RE, escapeUnsafe)
 	const hasSingle = s.includes("'")
 	const hasDouble = s.includes('"')
 	if (hasSingle && !hasDouble) return `"${escaped}"`
@@ -170,7 +178,17 @@ function commentPrefix(comment: string | undefined, pad: string): string {
 }
 
 // In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
-function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, unit: string, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
+function renderCollection(
+	open: string,
+	close: string,
+	inline: string,
+	col: number,
+	depth: number,
+	maxWidth: number,
+	unit: string,
+	hasComments: boolean,
+	buildLines: (pad: string, childDepth: number) => string[],
+): string {
 	if (maxWidth === Infinity) return inline // short strings already escape newlines
 	if (maxWidth > 0 && !hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 	const childDepth = depth + 1
@@ -187,14 +205,22 @@ function toJsonValue(value: unknown, key: string): unknown {
 	if (typeof v === 'symbol') return v.toString()
 	// Better than JSON's {}: say what it was. No stack traces; that's the logger's job.
 	if (v instanceof Error) return `[${v.name}: ${v.message}]`
-	if (v instanceof Map || v instanceof Set) return `[${v instanceof Map ? 'Map' : 'Set'} with ${v.size} ${v.size === 1 ? 'item' : 'items'}]`
+	if (v instanceof Map || v instanceof Set)
+		return `[${v instanceof Map ? 'Map' : 'Set'} with ${v.size} ${v.size === 1 ? 'item' : 'items'}]`
 	if (typeof v !== 'function') return v
 	if (/^class\b/.test(Function.prototype.toString.call(v))) return `[class ${v.name || '(anonymous)'}]`
 	return `[Function: ${v.name || '(anonymous)'}]`
 }
 
 // cols: the indent unit's width in columns, a tab counting as config.tabWidth.
-function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number, unit: string, cols: number): string {
+function stringifyValue(
+	obj: unknown,
+	col: number,
+	depth: number,
+	maxWidth: number,
+	unit: string,
+	cols: number,
+): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -212,9 +238,13 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (obj.length === 0) return '[]'
 		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const items = obj.map((v, i) => toJsonValue(v, String(i)))
-		const inline = maxWidth === 0 ? '' : `[${items.map((v) => stringifyValue(v, 0, depth, maxWidth, unit, cols)).join(', ')}]`
+		const inline =
+			maxWidth === 0 ? '' : `[${items.map((v) => stringifyValue(v, 0, depth, maxWidth, unit, cols)).join(', ')}]`
 		return renderCollection('[', ']', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			items.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * cols, childDepth, maxWidth, unit, cols)}${i < items.length - 1 ? ',' : ''}`),
+			items.map(
+				(v, i) =>
+					`${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * cols, childDepth, maxWidth, unit, cols)}${i < items.length - 1 ? ',' : ''}`,
+			),
 		)
 	}
 
@@ -223,9 +253,15 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		const entries = Object.keys(rec).map((k): [string, unknown] => [k, toJsonValue(rec[k], k)])
 		if (entries.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `{ ${entries.map(([k, v]) => `${quoteKey(k)}: ${stringifyValue(v, 0, depth, maxWidth, unit, cols)}`).join(', ')} }`
+		const inline =
+			maxWidth === 0
+				? ''
+				: `{ ${entries.map(([k, v]) => `${quoteKey(k)}: ${stringifyValue(v, 0, depth, maxWidth, unit, cols)}`).join(', ')} }`
 		return renderCollection('{', '}', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			entries.map(([k, v], i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(v, childDepth * cols + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit, cols)}${i < entries.length - 1 ? ',' : ''}`),
+			entries.map(
+				([k, v], i) =>
+					`${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(v, childDepth * cols + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit, cols)}${i < entries.length - 1 ? ',' : ''}`,
+			),
 		)
 	}
 
@@ -241,11 +277,25 @@ export const config = { indent: '\t' as string | number, tabWidth: 4 }
 
 /** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
 export function stringify(obj: unknown, opts: StringifyMode | StringifyOptions = 'smart'): string {
-	const { mode = 'smart', indent = config.indent, tabWidth = config.tabWidth } = typeof opts === 'string' ? { mode: opts } : opts
+	const {
+		mode = 'smart',
+		indent = config.indent,
+		tabWidth = config.tabWidth,
+	} = typeof opts === 'string' ? { mode: opts } : opts
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
 	const unit = typeof indent === 'number' ? ' '.repeat(indent) : indent
 	const lead = mode === 'short' ? undefined : (obj as { [LEAD]?: string } | null | undefined)?.[LEAD]
-	return commentPrefix(lead, '') + stringifyValue(toJsonValue(obj, ''), 0, 0, maxWidth, unit, unit.length + (tabWidth - 1) * (unit.split('\t').length - 1))
+	return (
+		commentPrefix(lead, '') +
+		stringifyValue(
+			toJsonValue(obj, ''),
+			0,
+			0,
+			maxWidth,
+			unit,
+			unit.length + (tabWidth - 1) * (unit.split('\t').length - 1),
+		)
+	)
 }
 
 // --- Parse ---
@@ -264,7 +314,9 @@ function fail(ctx: Ctx, msg: string): never {
 	}
 	const lineText = ctx.buf.split('\n')[line - 1] ?? ''
 	const pad = lineText.slice(0, col - 1).replace(/[^\t]/g, ' ')
-	throw Object.assign(new Error(`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`), { pos: ctx.pos }) as ParseError
+	throw Object.assign(new Error(`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`), {
+		pos: ctx.pos,
+	}) as ParseError
 }
 
 function isIdent(c: string): boolean {
@@ -293,7 +345,14 @@ function skipWhite(ctx: Ctx): string {
 		if (c === '/' && peek2(ctx) === '/') {
 			const start = ctx.pos
 			ctx.pos += 2
-			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n' && peek(ctx) !== '\r' && peek(ctx) !== '\u2028' && peek(ctx) !== '\u2029') ctx.pos++
+			while (
+				ctx.pos < ctx.buf.length &&
+				peek(ctx) !== '\n' &&
+				peek(ctx) !== '\r' &&
+				peek(ctx) !== '\u2028' &&
+				peek(ctx) !== '\u2029'
+			)
+				ctx.pos++
 			if (ctx.pos < ctx.buf.length) ctx.pos++ // include \n
 			if (ctx.comments) {
 				if (newlines >= 2) collected += '\n'
@@ -346,7 +405,15 @@ function eatWord(ctx: Ctx, word: string): void {
 	if (isIdent(peek(ctx))) fail(ctx, `Unexpected character after '${word}'`)
 }
 
-const SIMPLE_ESCAPES: Record<number, string> = { 0x6e: '\n', 0x74: '\t', 0x72: '\r', 0x76: '\v', 0x30: '\0', 0x62: '\b', 0x66: '\f' }
+const SIMPLE_ESCAPES: Record<number, string> = {
+	0x6e: '\n',
+	0x74: '\t',
+	0x72: '\r',
+	0x76: '\v',
+	0x30: '\0',
+	0x62: '\b',
+	0x66: '\f',
+}
 const HEX2_RE = /^[0-9a-fA-F]{2}$/
 const HEX4_RE = /^[0-9a-fA-F]{4}$/
 
@@ -404,14 +471,16 @@ function parseString(ctx: Ctx, quote: string): string {
 			case 0x78: {
 				const size = esc === 0x78 ? 2 : 4
 				const hex = buf.slice(ctx.pos + 1, ctx.pos + 1 + size)
-				if (!(size === 2 ? HEX2_RE : HEX4_RE).test(hex)) fail(ctx, size === 2 ? 'Invalid hex escape' : 'Invalid unicode escape')
+				if (!(size === 2 ? HEX2_RE : HEX4_RE).test(hex))
+					fail(ctx, size === 2 ? 'Invalid hex escape' : 'Invalid unicode escape')
 				segments.push(String.fromCharCode(parseInt(hex, 16)))
 				ctx.pos += size
 				break
 			}
 			default:
 				// Strict JS rejects legacy octal escapes (\1, \01): sloppy JS reads "\101" as "A".
-				if ((esc >= 0x31 && esc <= 0x39) || (esc === 0x30 && /[0-9]/.test(buf[ctx.pos + 1] ?? ''))) fail(ctx, 'Octal escapes are not allowed')
+				if ((esc >= 0x31 && esc <= 0x39) || (esc === 0x30 && /[0-9]/.test(buf[ctx.pos + 1] ?? '')))
+					fail(ctx, 'Octal escapes are not allowed')
 				segments.push(SIMPLE_ESCAPES[esc] ?? buf[ctx.pos]!)
 		}
 		ctx.pos++
@@ -425,7 +494,8 @@ const RADIX = '0(?:[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*|[oO][0-7]+(?:_[0-7]+)*|[bB
 const HEX_BIGINT_RE = new RegExp(`[+-]?${RADIX}n`, 'y')
 const INT_BIGINT_RE = /[+-]?[0-9]+(?:_[0-9]+)*n/y
 const HEX_RE = new RegExp(`[+-]?${RADIX}`, 'y')
-const NUM_RE = /[+-]?(?:[0-9]+(?:_[0-9]+)*(?:\.(?:[0-9]+(?:_[0-9]+)*)?)?|\.[0-9]+(?:_[0-9]+)*)(?:[eE][+-]?[0-9]+(?:_[0-9]+)*)?/y
+const NUM_RE =
+	/[+-]?(?:[0-9]+(?:_[0-9]+)*(?:\.(?:[0-9]+(?:_[0-9]+)*)?)?|\.[0-9]+(?:_[0-9]+)*)(?:[eE][+-]?[0-9]+(?:_[0-9]+)*)?/y
 
 function parseNumber(ctx: Ctx): number | bigint {
 	HEX_BIGINT_RE.lastIndex = ctx.pos
@@ -460,7 +530,8 @@ function parseNumber(ctx: Ctx): number | bigint {
 
 // Unquoted keys are what JS accepts: identifiers (Unicode, \uXXXX escapes) or
 // integers. The escaped form must still decode to an identifier.
-const KEY_RE = /(?:[\p{ID_Start}$_]|\\u[0-9a-fA-F]{4})(?:[\p{ID_Continue}$\u200C\u200D]|\\u[0-9a-fA-F]{4})*|0|[1-9][0-9]*/uy
+const KEY_RE =
+	/(?:[\p{ID_Start}$_]|\\u[0-9a-fA-F]{4})(?:[\p{ID_Continue}$\u200C\u200D]|\\u[0-9a-fA-F]{4})*|0|[1-9][0-9]*/uy
 const IDENT_FULL_RE = /^(?:[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*|0|[1-9][0-9]*)$/u
 
 function parseKey(ctx: Ctx): string {
@@ -477,7 +548,8 @@ function parseKey(ctx: Ctx): string {
 
 // obj['__proto__'] = v would replace the prototype; define an own key, as JSON.parse does.
 function setOwn(obj: Record<string, unknown>, key: string, value: unknown): void {
-	if (key === '__proto__') Object.defineProperty(obj, key, { value, enumerable: true, writable: true, configurable: true })
+	if (key === '__proto__')
+		Object.defineProperty(obj, key, { value, enumerable: true, writable: true, configurable: true })
 	else obj[key] = value
 }
 

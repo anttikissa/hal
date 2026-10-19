@@ -163,7 +163,7 @@ function blockAt(f: Shape, row: number): string {
 	let ends = f.ends ?? []
 	if (row < (ends.at(-1) ?? 0)) {
 		let lo = 0
-		for (let hi = ends.length - 1; lo < hi; ) {
+		for (let hi = ends.length - 1; lo < hi;) {
 			let mid = (lo + hi) >> 1
 			if (ends[mid]! > row) hi = mid
 			else lo = mid + 1
@@ -189,8 +189,11 @@ function sizes(f: Shape): Map<string, number> {
 // shrink first, at most 5.
 function changes(a: Shape | undefined, b: Shape): NonNullable<ClearReason['blocks']> {
 	if (!a) return []
-	let x = sizes(a), y = sizes(b)
-	let out = [...new Set([...x.keys(), ...y.keys()])].map((block) => ({ block, before: x.get(block) ?? 0, after: y.get(block) ?? 0 })).filter((c) => c.before !== c.after)
+	let x = sizes(a),
+		y = sizes(b)
+	let out = [...new Set([...x.keys(), ...y.keys()])]
+		.map((block) => ({ block, before: x.get(block) ?? 0, after: y.get(block) ?? 0 }))
+		.filter((c) => c.before !== c.after)
 	return out.sort((p, q) => p.after - p.before - (q.after - q.before)).slice(0, 5)
 }
 
@@ -228,13 +231,25 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 		trigger += ', with the frame top out of reach'
 	}
 	if (force && wasFull) {
-		body = canonical(lines, { kind: 'all', cause: 'forced', trigger, rows: size, text: `Cleared screen and scrollback and repainted everything because of ${trigger}.` })
+		body = canonical(lines, {
+			kind: 'all',
+			cause: 'forced',
+			trigger,
+			rows: size,
+			text: `Cleared screen and scrollback and repainted everything because of ${trigger}.`,
+		})
 		row = lines.length - 1
 	} else if (force || !prev.length) {
 		// Grow mode, or the first paint: from the top of our frame (the
 		// cursor, on a first paint) clear down and write everything.
 		let reason: ClearReason = force
-			? { kind: 'down', cause: 'forced', trigger, rows: size, text: `Repainted the frame from its top (scrollback untouched) because of ${trigger}.` }
+			? {
+					kind: 'down',
+					cause: 'forced',
+					trigger,
+					rows: size,
+					text: `Repainted the frame from its top (scrollback untouched) because of ${trigger}.`,
+				}
 			: { kind: 'down', cause: 'first paint', rows: size, text: 'Cleared below the cursor for the first paint.' }
 		body = ['\r' + move(st.cursorRow, 0) + render.clear(reason), ...rowParts(lines)]
 		row = lines.length - 1
@@ -255,15 +270,40 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 		let writableTop = Math.max(0, prev.length - rows)
 		let shrank = (): ClearReason => {
 			let blocks = changes(st.shape, shape)
-			return { kind: 'below', cause: 'shrink', rows: size, firstChanged: first, blocks, text: `Erased ${prev.length - lines.length} rows below the frame's new end${said(blocks)}.` }
+			return {
+				kind: 'below',
+				cause: 'shrink',
+				rows: size,
+				firstChanged: first,
+				blocks,
+				text: `Erased ${prev.length - lines.length} rows below the frame's new end${said(blocks)}.`,
+			}
 		}
 		if (wasFull && (first < writableTop || lines.length < prev.length)) {
 			let blocks = changes(st.shape, shape)
 			let changedBlock = st.shape ? blockAt(st.shape, first) : undefined
 			let reason: ClearReason =
 				first < writableTop
-					? { kind: 'all', cause: 'scrollback edit', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `Row ${first}, in ${changedBlock ?? 'an unknown block'}, changed in scrollback (rows above ${writableTop} cannot be rewritten in place)${lines.length < prev.length ? ` and the frame shrank from ${prev.length} to ${lines.length} rows` : ''}, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
-					: { kind: 'all', cause: 'shrink', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `The frame shrank from ${prev.length} to ${lines.length} rows; a terminal cannot pull scrollback back onto the screen, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
+					? {
+							kind: 'all',
+							cause: 'scrollback edit',
+							rows: size,
+							firstChanged: first,
+							writableTop,
+							changedBlock,
+							blocks,
+							text: `Row ${first}, in ${changedBlock ?? 'an unknown block'}, changed in scrollback (rows above ${writableTop} cannot be rewritten in place)${lines.length < prev.length ? ` and the frame shrank from ${prev.length} to ${lines.length} rows` : ''}, so Hal cleared screen and scrollback and repainted${said(blocks)}.`,
+						}
+					: {
+							kind: 'all',
+							cause: 'shrink',
+							rows: size,
+							firstChanged: first,
+							writableTop,
+							changedBlock,
+							blocks,
+							text: `The frame shrank from ${prev.length} to ${lines.length} rows; a terminal cannot pull scrollback back onto the screen, so Hal cleared screen and scrollback and repainted${said(blocks)}.`,
+						}
 			if (rebuild) {
 				next = rebuild()
 				lines = next.lines
@@ -318,13 +358,16 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 	st.prev = lines
 	st.shape = shape
 	st.cursorRow = next.cursor.row
-	return [SYNC_ON + HIDE_CURSOR, ...body, move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF]
+	return [
+		SYNC_ON + HIDE_CURSOR,
+		...body,
+		move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF,
+	]
 }
 
 function column(col: number): string {
 	return col > 0 ? `\r${CSI}${col + 1}G` : '\r'
 }
-
 
 /**
  * Erase the frame's last row (the help row), leave the cursor at its
@@ -337,7 +380,18 @@ function park(): void {
 	if (!st.out || st.parked) return
 	st.parked = true
 	let size = { before: st.prev.length, after: 0, screen: st.out.size().rows }
-	if (st.prev.length) st.out.write(move(st.cursorRow, st.prev.length - 1) + '\r' + render.clear({ kind: 'row', cause: 'park', rows: size, text: 'Erased the help row so the shell prompt takes it (suspend or quit).' }) + SHOW_CURSOR)
+	if (st.prev.length)
+		st.out.write(
+			move(st.cursorRow, st.prev.length - 1) +
+				'\r' +
+				render.clear({
+					kind: 'row',
+					cause: 'park',
+					rows: size,
+					text: 'Erased the help row so the shell prompt takes it (suspend or quit).',
+				}) +
+				SHOW_CURSOR,
+		)
 	st.prev = []
 	st.shape = undefined
 	st.cursorRow = 0

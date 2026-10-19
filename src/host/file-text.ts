@@ -64,23 +64,32 @@ function read(path: string, bytes: Uint8Array, offset = 1, limit?: number, hint 
 		out.push(line)
 		size += line.length + 1
 	}
-	let more = n <= end ? `\n[lines ${start}-${n - 1} of ${lines.length}; continue with READ "${path}:${n}-${end === lines.length ? '' : end}"]`
-		: hint && end < lines.length ? `\n[lines ${start}-${end} of ${lines.length}; READ "${path}:${end + 1}-${Math.min(lines.length, end + limit!)}" for more, "${path}:1-" for the whole file]`
-		: ''
+	let more =
+		n <= end
+			? `\n[lines ${start}-${n - 1} of ${lines.length}; continue with READ "${path}:${n}-${end === lines.length ? '' : end}"]`
+			: hint && end < lines.length
+				? `\n[lines ${start}-${end} of ${lines.length}; READ "${path}:${end + 1}-${Math.min(lines.length, end + limit!)}" for more, "${path}:1-" for the whole file]`
+				: ''
 	return `${header}\n${out.join('\n')}${more}`
 }
 
 // "1-2", "1,2", 7 or [1, 2]: an inclusive 1-based range.
 export type Range = { start: number; end: number }
 function range(value: unknown): Range {
-	let parts = typeof value === 'number' ? [value, value]
-		: Array.isArray(value) ? value
-		: typeof value === 'string' && /^\s*\d+\s*(?:[-,]\s*\d+\s*)?$/.test(value) ? value.split(/[-,]/).map(Number)
-		: undefined
+	let parts =
+		typeof value === 'number'
+			? [value, value]
+			: Array.isArray(value)
+				? value
+				: typeof value === 'string' && /^\s*\d+\s*(?:[-,]\s*\d+\s*)?$/.test(value)
+					? value.split(/[-,]/).map(Number)
+					: undefined
 	if (parts?.length === 1) parts = [parts[0], parts[0]]
 	let [start, end] = parts ?? []
 	if (parts?.length !== 2 || !Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
-		throw new Error(`range must be "start-end" (1-based, inclusive, start <= end) or one line number, got ${JSON.stringify(value)}`)
+		throw new Error(
+			`range must be "start-end" (1-based, inclusive, start <= end) or one line number, got ${JSON.stringify(value)}`,
+		)
 	}
 	return { start, end }
 }
@@ -94,16 +103,26 @@ export type Change = Range & { lines: string[] }
 function apply(before: Text, changes: Change[]): { after: string; shown: number[]; lines: string[] } {
 	let old = before.lines
 	let n = old.length
-	let clamped = changes.map((c) => ({ ...c, start: Math.min(c.start, n + 1), end: Math.min(c.end, n) })).sort((a, b) => a.start - b.start)
+	let clamped = changes
+		.map((c) => ({ ...c, start: Math.min(c.start, n + 1), end: Math.min(c.end, n) }))
+		.sort((a, b) => a.start - b.start)
 	for (let i = 1; i < clamped.length; i++) {
 		let [a, b] = [clamped[i - 1]!, clamped[i]!]
-		if (b.start <= Math.max(a.start, a.end)) throw new Error(`ranges ${a.start}-${a.end} and ${b.start}-${b.end} overlap (after clamping to the file's ${n} lines); nothing was written`)
+		if (b.start <= Math.max(a.start, a.end))
+			throw new Error(
+				`ranges ${a.start}-${a.end} and ${b.start}-${b.end} overlap (after clamping to the file's ${n} lines); nothing was written`,
+			)
 	}
 	let crlf = old.filter((l) => l.endsWith('\r\n')).length
 	let eol = crlf * 2 > old.filter((l) => l.endsWith('\n')).length ? '\r\n' : '\n'
 	let finalNewline = !n || old[n - 1]!.endsWith('\n')
 	let lines = [...old]
-	for (let c of [...clamped].reverse()) lines.splice(c.start - 1, Math.max(0, c.end - c.start + 1), ...c.lines.flatMap((l) => l.split(/\r?\n/)).map((l) => l + eol))
+	for (let c of [...clamped].reverse())
+		lines.splice(
+			c.start - 1,
+			Math.max(0, c.end - c.start + 1),
+			...c.lines.flatMap((l) => l.split(/\r?\n/)).map((l) => l + eol),
+		)
 	for (let i = 0; i < lines.length - 1; i++) if (!lines[i]!.endsWith('\n')) lines[i] += eol
 	if (lines.length && !finalNewline) lines[lines.length - 1] = strip(lines.at(-1)!)
 	// Where each change landed: two lines before its start and after its end.
@@ -112,7 +131,12 @@ function apply(before: Text, changes: Change[]): { after: string; shown: number[
 	for (let c of clamped) {
 		let count = c.lines.flatMap((l) => l.split(/\r?\n/)).length
 		let s = c.start + shift
-		let windows = count ? [[s - 2, s], [s + count - 1, s + count + 1]] : [[s - 2, s + 1]]
+		let windows = count
+			? [
+					[s - 2, s],
+					[s + count - 1, s + count + 1],
+				]
+			: [[s - 2, s + 1]]
 		for (let [a, b] of windows) for (let k = Math.max(1, a!); k <= Math.min(lines.length, b!); k++) shown.add(k)
 		shift += count - Math.max(0, c.end - c.start + 1)
 	}

@@ -16,7 +16,8 @@ import { webRead } from '../web-read.ts'
 function count(input: Record<string, unknown>, key: string, min: number): number | undefined {
 	let v = input[key]
 	if (v === undefined) return undefined
-	if (typeof v !== 'number' || !Number.isInteger(v) || v < min) throw new Error(`${key} must be an integer of at least ${min}`)
+	if (typeof v !== 'number' || !Number.isInteger(v) || v < min)
+		throw new Error(`${key} must be an integer of at least ${min}`)
 	return v
 }
 
@@ -25,9 +26,16 @@ function count(input: Record<string, unknown>, key: string, min: number): number
 // Several paths retain each file's version, ranges and images.
 function resolveCall(raw: string): { name: string; input: Record<string, unknown> } {
 	let { values } = callText.values(raw)
-	if (values.length > 1 && values.every((v) => typeof v === 'string' && v)) return { name: 'read', input: { paths: values.map((v) => /^https?:\/\//i.test(v as string) ? { url: v } : one(v as string).input) } }
+	if (values.length > 1 && values.every((v) => typeof v === 'string' && v))
+		return {
+			name: 'read',
+			input: { paths: values.map((v) => (/^https?:\/\//i.test(v as string) ? { url: v } : one(v as string).input)) },
+		}
 	let [path] = values
-	if (values.length !== 1 || typeof path !== 'string' || !path) throw new Error(`READ takes one path or several paths, e.g. READ "a.ts:1-100" "b.ts:1-100"; got ${values.length} arguments`)
+	if (values.length !== 1 || typeof path !== 'string' || !path)
+		throw new Error(
+			`READ takes one path or several paths, e.g. READ "a.ts:1-100" "b.ts:1-100"; got ${values.length} arguments`,
+		)
 	return one(path)
 }
 
@@ -35,9 +43,13 @@ function one(path: string): { name: string; input: Record<string, unknown> } {
 	if (/^https?:\/\//i.test(path)) return { name: 'read', input: { url: path } }
 	let m = /:(\d+)(?:(-)(\d+)?)?$/.exec(path)
 	if (!m) return { name: 'read', input: { path } }
-	let start = Number(m[1]), end = m[2] ? (m[3] === undefined ? undefined : Number(m[3])) : start
+	let start = Number(m[1]),
+		end = m[2] ? (m[3] === undefined ? undefined : Number(m[3])) : start
 	let offset = Math.max(1, start)
-	return { name: 'read', input: { path: path.slice(0, m.index), offset, ...(end !== undefined && { limit: Math.max(0, end - offset + 1) }) } }
+	return {
+		name: 'read',
+		input: { path: path.slice(0, m.index), offset, ...(end !== undefined && { limit: Math.max(0, end - offset + 1) }) },
+	}
 }
 
 export const tool: Tool<ToolOutput> = {
@@ -63,7 +75,8 @@ export const tool: Tool<ToolOutput> = {
 	},
 	async run(input, ctx) {
 		if (Array.isArray(input.paths)) {
-			let parts: string[] = [], errors: string[] = []
+			let parts: string[] = [],
+				errors: string[] = []
 			let images: { mediaType: string; data: string; source?: string }[] = []
 			for (let p of input.paths) {
 				try {
@@ -74,7 +87,9 @@ export const tool: Tool<ToolOutput> = {
 					if (typeof out !== 'string' && out.isError) errors.push(`== READ ${item.path ?? item.url} ==\n${out.text}`)
 					else parts.push(typeof out === 'string' ? out : out.text)
 				} catch (e: any) {
-					errors.push(`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`)
+					errors.push(
+						`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`,
+					)
 				}
 			}
 			let text = [...errors, ...parts].join('\n\n')
@@ -85,21 +100,34 @@ export const tool: Tool<ToolOutput> = {
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)
 		let path = resolve(ctx.cwd, paths.expand(input.path))
-		if (settings.security() !== 'none' && (approval.sensitive(path) || approval.sensitive(realpathSync(path)))) throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
+		if (settings.security() !== 'none' && (approval.sensitive(path) || approval.sensitive(realpathSync(path))))
+			throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
 		let st = statSync(path)
 		if (st.isDirectory()) {
 			let entries = readdirSync(path, { withFileTypes: true }).map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
-			return tools.page(entries.sort().map((e) => `${e}\n`).join(''), offset, limit)
+			return tools.page(
+				entries
+					.sort()
+					.map((e) => `${e}\n`)
+					.join(''),
+				offset,
+				limit,
+			)
 		}
 		let file = Bun.file(path)
 		let head = await file.slice(0, 12).bytes()
-		let mediaType = Object.keys(attachments.types).find((type) => type.startsWith('image/') && blobs.looksLike(type, head))
+		let mediaType = Object.keys(attachments.types).find(
+			(type) => type.startsWith('image/') && blobs.looksLike(type, head),
+		)
 		let max = mediaType ? attachments.maxBytes : tools.maxFileBytes
 		if (st.size > max) throw new Error(`${input.path} is too large to read (${st.size} bytes)`)
 		let bytes = await file.slice(0, max + 1).bytes()
 		if (bytes.length > max) throw new Error(`${input.path} is too large to read (${bytes.length} bytes)`)
 		if (mediaType) {
-			return { text: `Image from ${path} (${mediaType}, ${bytes.length} bytes)`, image: { mediaType, data: Buffer.from(bytes).toString('base64') } }
+			return {
+				text: `Image from ${path} (${mediaType}, ${bytes.length} bytes)`,
+				image: { mediaType, data: Buffer.from(bytes).toString('base64') },
+			}
 		}
 		if (bytes.subarray(0, 8192).includes(0)) throw new Error(`${input.path} looks like a binary file`)
 		let capped = offset === undefined && limit === undefined

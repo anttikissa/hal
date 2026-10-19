@@ -62,62 +62,62 @@ import type { Plugin } from '../src/host/plugins.ts'
 //
 // oxlint-disable-next-line no-unused-vars -- used once uncommented
 export default (plugin: Plugin) => {
-// 	// A setting: set a plain value, or around one read from config.
-// 	plugin.set(models, 'ttlMs', 600_000)
-// 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
-//
-// 	// Keys, e.g. in plugins/keys.ts (task 8kx): one Enter chord per line,
-// 	// each 'steer', 'soft-steer', 'queue' or null. Here Enter
-// 	// soft-steers and Cmd-Enter queues.
-// 	plugin.set(sendKeys, 'enter', 'soft-steer')
-// 	plugin.set(sendKeys, 'cmd-enter', 'queue')
-//
-// 	// Terminal transcript: frame.look decides how each block draws (fold,
-// 	// pad: false drops its padding rows, gap: false the blank row above;
-// 	// look.result is a call's result). toolDetails.headline(name, input,
-// 	// output) is a call's title. Here every call is one row until opened.
-// 	plugin.around(frame, 'look', (next, item, look) => (item.type === 'tool' || item.type === 'tool-result') && look.fold !== 'open' ? { ...next(item, look), fold: 'closed', pad: false, gap: false } : next(item, look))
-// 	plugin.around(toolDetails, 'headline', (next, name, input, output) => name === 'bash' ? { text: `run ${input.command}` } : next(name, input, output))
-//
-// 	// Observing: log every account choice.
-// 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))
-//
-// 	// A harmless extra tool, added to the registry's result.
-// 	plugin.after(tools, 'all', (found) => {
-// 		found.set('today', {
-// 			name: 'today',
-// 			description: "Today's date.",
-// 			parameters: { type: 'object', properties: {} },
-// 			readOnly: true,
-// 			run: async () => new Date().toDateString(),
-// 		})
-// 	})
-//
-// 	// A theme: colors are OKLCH [lightness, chroma, hue]. set replaces a
-// 	// shared value, around a style. Nothing repaints for you: redraw now
-// 	// with the new colors, and in cleanup once they are gone.
-// 	plugin.set(colors, 'fgL', 0.85)
-// 	plugin.around(colors, 'user', (fn) => ({ ...fn(), bg: [0.3, 0.06, 150] }))
-// 	plugin.set(colors, 'screen', [0.2, 0.01, 150])
-// 	terminal.redraw()
-//
-// 	// A sync target cannot wait for async work: fetch in the background
-// 	// (start it here, never await it) and let the sync hook read the
-// 	// cached value, which is undefined until the first fetch lands.
-// 	let preferred: string | undefined
-// 	let refresh = async () => (preferred = await fetchPreferred())
-// 	void refresh()
-// 	let timer = setInterval(refresh, 60_000)
-// 	plugin.around(auth, 'pickAccount', (fn, kind, list, who) => {
-// 		let out = fn(kind, list, who)
-// 		let i = out.findIndex((a) => a.name === preferred)
-// 		return kind === 'openai' && i > 0 ? [out[i]!, ...out.filter((_, j) => j !== i)] : out
-// 	})
-//
-// 	return () => {
-// 		clearInterval(timer)
-// 		terminal.redraw()
-// 	}
+	// 	// A setting: set a plain value, or around one read from config.
+	// 	plugin.set(models, 'ttlMs', 600_000)
+	// 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
+	//
+	// 	// Keys, e.g. in plugins/keys.ts (task 8kx): one Enter chord per line,
+	// 	// each 'steer', 'soft-steer', 'queue' or null. Here Enter
+	// 	// soft-steers and Cmd-Enter queues.
+	// 	plugin.set(sendKeys, 'enter', 'soft-steer')
+	// 	plugin.set(sendKeys, 'cmd-enter', 'queue')
+	//
+	// 	// Terminal transcript: frame.look decides how each block draws (fold,
+	// 	// pad: false drops its padding rows, gap: false the blank row above;
+	// 	// look.result is a call's result). toolDetails.headline(name, input,
+	// 	// output) is a call's title. Here every call is one row until opened.
+	// 	plugin.around(frame, 'look', (next, item, look) => (item.type === 'tool' || item.type === 'tool-result') && look.fold !== 'open' ? { ...next(item, look), fold: 'closed', pad: false, gap: false } : next(item, look))
+	// 	plugin.around(toolDetails, 'headline', (next, name, input, output) => name === 'bash' ? { text: `run ${input.command}` } : next(name, input, output))
+	//
+	// 	// Observing: log every account choice.
+	// 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))
+	//
+	// 	// A harmless extra tool, added to the registry's result.
+	// 	plugin.after(tools, 'all', (found) => {
+	// 		found.set('today', {
+	// 			name: 'today',
+	// 			description: "Today's date.",
+	// 			parameters: { type: 'object', properties: {} },
+	// 			readOnly: true,
+	// 			run: async () => new Date().toDateString(),
+	// 		})
+	// 	})
+	//
+	// 	// A theme: colors are OKLCH [lightness, chroma, hue]. set replaces a
+	// 	// shared value, around a style. Nothing repaints for you: redraw now
+	// 	// with the new colors, and in cleanup once they are gone.
+	// 	plugin.set(colors, 'fgL', 0.85)
+	// 	plugin.around(colors, 'user', (fn) => ({ ...fn(), bg: [0.3, 0.06, 150] }))
+	// 	plugin.set(colors, 'screen', [0.2, 0.01, 150])
+	// 	terminal.redraw()
+	//
+	// 	// A sync target cannot wait for async work: fetch in the background
+	// 	// (start it here, never await it) and let the sync hook read the
+	// 	// cached value, which is undefined until the first fetch lands.
+	// 	let preferred: string | undefined
+	// 	let refresh = async () => (preferred = await fetchPreferred())
+	// 	void refresh()
+	// 	let timer = setInterval(refresh, 60_000)
+	// 	plugin.around(auth, 'pickAccount', (fn, kind, list, who) => {
+	// 		let out = fn(kind, list, who)
+	// 		let i = out.findIndex((a) => a.name === preferred)
+	// 		return kind === 'openai' && i > 0 ? [out[i]!, ...out.filter((_, j) => j !== i)] : out
+	// 	})
+	//
+	// 	return () => {
+	// 		clearInterval(timer)
+	// 		terminal.redraw()
+	// 	}
 }
 
 // async function fetchPreferred(): Promise<string> {

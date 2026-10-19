@@ -31,7 +31,14 @@ import { view, type ViewState } from '../view.ts'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function Composer(props: { update?: boolean; view: ViewState; text: string; menu?: Menu; notice: string | undefined; dropping: boolean }) {
+export function Composer(props: {
+	update?: boolean
+	view: ViewState
+	text: string
+	menu?: Menu
+	notice: string | undefined
+	dropping: boolean
+}) {
 	let input!: HTMLTextAreaElement
 	let measure!: HTMLTextAreaElement
 	// The copy has height 0, so its scrollHeight is the text's height plus padding.
@@ -41,7 +48,10 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		let h = `${measure.scrollHeight}px`
 		if (input.style.height !== h) input.style.height = h
 	}
-	createEffect(() => props.text, () => fit())
+	createEffect(
+		() => props.text,
+		() => fit(),
+	)
 	// The example over the box (placeholders.follow), redrawn when its
 	// text next changes. With reduced motion its clock stands still: the
 	// first example stays, and typing hides it at once.
@@ -60,7 +70,11 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	// Text at the caret, replacing the selection, as if typed.
 	let insert = (text: string) => {
 		text = uploads.pad(text, input.value.slice(0, input.selectionStart))
-		editor.write(input, { start: input.selectionStart, end: input.selectionEnd, text }, input.selectionStart + text.length)
+		editor.write(
+			input,
+			{ start: input.selectionStart, end: input.selectionEnd, text },
+			input.selectionStart + text.length,
+		)
 	}
 	// An upload's answer edits the box in place when it has the focus, so
 	// the caret stays where the user is typing.
@@ -68,7 +82,9 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	let typing = false
 	// The box can hold text no handled input event reported (keys.ts does
 	// the same on keydown): the example and Send must use what it shows.
-	let sync = () => { if (input && input.value !== app.state.text) app.input(input.value) }
+	let sync = () => {
+		if (input && input.value !== app.state.text) app.input(input.value)
+	}
 	let box = (e: HTMLTextAreaElement) => {
 		input = e
 		for (let name of ['input', 'compositionend', 'keyup', 'blur']) e.addEventListener(name, sync)
@@ -85,27 +101,36 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	// picker opens or closes, never on other updates, so the focus never
 	// moves while the reader selects text.
 	let away = createMemo(() => !!props.view.form || !!props.view.modal)
-	createEffect(
-		away,
-		(away) => {
-			// Touch navigation is for reading; only deliberate editing opens the keyboard.
-			if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()
-		},
-	)
+	createEffect(away, (away) => {
+		// Touch navigation is for reading; only deliberate editing opens the keyboard.
+		if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()
+	})
 	onSettled(() => {
-		let inside = (t: EventTarget | null) => t === input || (t instanceof Element && !!t.closest('.Composer .completions'))
-		let outside = (e: PointerEvent | FocusEvent) => { if (!inside(e.target)) app.dismissMenu() }
-		let leaving = (e: FocusEvent) => { if (inside(e.target) && !inside(e.relatedTarget)) app.dismissMenu() }
+		let inside = (t: EventTarget | null) =>
+			t === input || (t instanceof Element && !!t.closest('.Composer .completions'))
+		let outside = (e: PointerEvent | FocusEvent) => {
+			if (!inside(e.target)) app.dismissMenu()
+		}
+		let leaving = (e: FocusEvent) => {
+			if (inside(e.target) && !inside(e.relatedTarget)) app.dismissMenu()
+		}
 		document.addEventListener('pointerdown', outside, true)
 		document.addEventListener('focusin', outside)
 		document.addEventListener('focusout', leaving)
 		// A click inside a dialog moves the page selection into its text;
 		// closing it gives the box focus back without a caret, so keys
 		// vanish (task 6cm). Refocusing restores the caret.
-		let closed = () => { if (document.activeElement === input) { input.blur(); input.focus() } }
+		let closed = () => {
+			if (document.activeElement === input) {
+				input.blur()
+				input.focus()
+			}
+		}
 		document.addEventListener('close', closed, true)
 		// iOS dictation writes the box without input events; its caret moves.
-		let moved = () => { if (document.activeElement === input) sync() }
+		let moved = () => {
+			if (document.activeElement === input) sync()
+		}
 		document.addEventListener('selectionchange', moved)
 		// A disabled button swallows its own pointer events; capture on the
 		// document syncs first, so Send is enabled before the tap ends.
@@ -114,22 +139,41 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		let touched: { button: Element; at: number; x: number; y: number } | undefined
 		let remember = (e: PointerEvent) => {
 			let button = e.target instanceof Element && e.target.closest('.Composer .actions button')
-			touched = e.pointerType === 'touch' && button ? { button, at: e.timeStamp, x: e.clientX, y: e.clientY } : undefined
+			touched =
+				e.pointerType === 'touch' && button ? { button, at: e.timeStamp, x: e.clientX, y: e.clientY } : undefined
 		}
 		let misplaced = (e: MouseEvent) => {
 			let tap = touched
 			touched = undefined
-			if (!tap || e.detail === 0 || e.timeStamp - tap.at > 1000 || Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 24 || tap.button.contains(e.target as Node)) return
+			if (
+				!tap ||
+				e.detail === 0 ||
+				e.timeStamp - tap.at > 1000 ||
+				Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 24 ||
+				tap.button.contains(e.target as Node)
+			)
+				return
 			e.preventDefault()
 			e.stopImmediatePropagation()
 		}
 		document.addEventListener('pointerdown', remember, true)
 		document.addEventListener('click', misplaced, true)
-		let finished = (e: PointerEvent) => { if (touched && e.pointerType === 'touch') { touched.at = e.timeStamp; touched.x = e.clientX; touched.y = e.clientY } }
+		let finished = (e: PointerEvent) => {
+			if (touched && e.pointerType === 'touch') {
+				touched.at = e.timeStamp
+				touched.x = e.clientX
+				touched.y = e.clientY
+			}
+		}
 		document.addEventListener('pointerup', finished, true)
 		// A new width can change how the text wraps.
 		let width = 0
-		let resized = new ResizeObserver(() => { if (input.clientWidth !== width) { width = input.clientWidth; fit() } })
+		let resized = new ResizeObserver(() => {
+			if (input.clientWidth !== width) {
+				width = input.clientWidth
+				fit()
+			}
+		})
 		resized.observe(input.parentElement!)
 		fit()
 		return () => {
@@ -154,14 +198,16 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	let remove = (index: number) => {
 		let m = [...input.value.matchAll(attachments.fileMarker)][index]
 		if (!m) return
-		let start = m.index, end = start + m[0].length + (input.value[start + m[0].length] === ' ' ? 1 : 0)
+		let start = m.index,
+			end = start + m[0].length + (input.value[start + m[0].length] === ' ' ? 1 : 0)
 		let c = input.selectionStart
 		editor.write(input, { start, end, text: '' }, c >= end ? c - (end - start) : Math.min(c, start))
 	}
 	// A thumbnail asked for before its upload finished is a 404: retry.
 	let retry = (img: HTMLImageElement) => {
 		let n = Number(img.dataset.tries ?? 0)
-		if (n < 20) setTimeout(() => ((img.dataset.tries = String(n + 1)), (img.src = `${img.src.split('?')[0]}?try=${n + 1}`)), 500)
+		if (n < 20)
+			setTimeout(() => ((img.dataset.tries = String(n + 1)), (img.src = `${img.src.split('?')[0]}?try=${n + 1}`)), 500)
 	}
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let queueEditing = () => !!props.view.editing?.queueEdit
@@ -192,14 +238,40 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 		let tapped = -Infinity
 		let up = (e: PointerEvent & { currentTarget: HTMLButtonElement }) => {
 			let r = e.currentTarget.getBoundingClientRect()
-			if (e.pointerType === 'mouse' || e.currentTarget.disabled || e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return
+			if (
+				e.pointerType === 'mouse' ||
+				e.currentTarget.disabled ||
+				e.clientX < r.left ||
+				e.clientX > r.right ||
+				e.clientY < r.top ||
+				e.clientY > r.bottom
+			)
+				return
 			tapped = e.timeStamp
 			p.onClick()
 		}
-		let click = (e: MouseEvent) => { if (e.timeStamp - tapped < 1000) tapped = -Infinity; else p.onClick() }
+		let click = (e: MouseEvent) => {
+			if (e.timeStamp - tapped < 1000) tapped = -Infinity
+			else p.onClick()
+		}
 		return (
-			<button type="button" class={p.class} data-diagnostic-action={p.kind} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onPointerUp={up} onClick={click}>
-				<Icon name={b().icon} /><small>{b().name}</small>
+			<button
+				type="button"
+				class={p.class}
+				data-diagnostic-action={p.kind}
+				aria-label={b().label}
+				title={`${b().label} — ${b().caption}`}
+				disabled={p.disabled}
+				onPointerDown={(e) => e.preventDefault()}
+				onPointerEnter={show}
+				onFocus={show}
+				onPointerLeave={() => setCaption('')}
+				onBlur={() => setCaption('')}
+				onPointerUp={up}
+				onClick={click}
+			>
+				<Icon name={b().icon} />
+				<small>{b().name}</small>
 			</button>
 		)
 	}
@@ -207,7 +279,8 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	// Send and after-this-turn delivery hide it so the reply is visible.
 	// A mouse keeps focus. The main button runs a command, steers a
 	// running turn or sends a message.
-	let action = (): keyof typeof BUTTONS => queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
+	let action = (): keyof typeof BUTTONS =>
+		queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		sync()
@@ -218,22 +291,41 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	return (
 		<footer class="Composer">
 			<div id="notice" class="log">
-				<Show when={props.notice}><span>{props.notice}</span></Show>
-				<Show when={props.view.notice}><button type="button" class="clear-notice" onClick={() => app.setNotice(undefined)}>(esc to clear)</button></Show>
+				<Show when={props.notice}>
+					<span>{props.notice}</span>
+				</Show>
+				<Show when={props.view.notice}>
+					<button type="button" class="clear-notice" onClick={() => app.setNotice(undefined)}>
+						(esc to clear)
+					</button>
+				</Show>
 			</div>
 			<Show when={chips().length}>
 				<ul class="chips" aria-label="Attachments">
-					<For each={chips()}>{(path, index) => {
-						let name = path.split('/')[1]!
-						return (
-							<li>
-								<a href={`/${path}`} target="_blank" rel="noopener" title={`Open ${path}`}>
-									{path.startsWith('image/') ? <img src={`/raw/${name}`} alt={path} onLoad={(e) => (e.currentTarget.dataset.loaded = '')} onError={(e) => retry(e.currentTarget)} /> : path}
-								</a>
-								<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}><Icon name="close" /></button>
-							</li>
-						)
-					}}</For>
+					<For each={chips()}>
+						{(path, index) => {
+							let name = path.split('/')[1]!
+							return (
+								<li>
+									<a href={`/${path}`} target="_blank" rel="noopener" title={`Open ${path}`}>
+										{path.startsWith('image/') ? (
+											<img
+												src={`/raw/${name}`}
+												alt={path}
+												onLoad={(e) => (e.currentTarget.dataset.loaded = '')}
+												onError={(e) => retry(e.currentTarget)}
+											/>
+										) : (
+											path
+										)}
+									</a>
+									<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}>
+										<Icon name="close" />
+									</button>
+								</li>
+							)
+						}}
+					</For>
 				</ul>
 			</Show>
 			<div class={['entry input', { dropping: props.dropping }]}>
@@ -242,11 +334,23 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 						{/* Keep the editor focused: iOS may blur without focusing the button,
 						    dismissing the menu before its click. Choose only on click, not
 						    pointerdown, so scrolling and canceled touches remain harmless. */}
-						<For each={props.menu.choices}>{(choice, index) => (
-							<button type="button" role="option" aria-selected={props.menu?.selected === index() ? 'true' : 'false'} onPointerDown={(e) => e.preventDefault()} onClick={() => { app.choose(index()); input.focus() }}>
-								<strong>{choice.label}</strong><span>{choice.description}</span>
-							</button>
-						)}</For>
+						<For each={props.menu.choices}>
+							{(choice, index) => (
+								<button
+									type="button"
+									role="option"
+									aria-selected={props.menu?.selected === index() ? 'true' : 'false'}
+									onPointerDown={(e) => e.preventDefault()}
+									onClick={() => {
+										app.choose(index())
+										input.focus()
+									}}
+								>
+									<strong>{choice.label}</strong>
+									<span>{choice.description}</span>
+								</button>
+							)}
+						</For>
 					</div>
 				)}
 				<input
@@ -261,44 +365,85 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 						e.currentTarget.value = ''
 						if (typing) input.focus()
 					}}
-					ref={(e) => { picker = e; e.addEventListener('cancel', () => { if (typing) input.focus() }) }}
+					ref={(e) => {
+						picker = e
+						e.addEventListener('cancel', () => {
+							if (typing) input.focus()
+						})
+					}}
 				/>
 				{/* Keep the keyboard: the tap leaves the draft focused, and the
 				    draft takes the focus back when the picker closes. */}
-				<button type="button" class="attach" data-diagnostic-action="attach" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
+				<button
+					type="button"
+					class="attach"
+					data-diagnostic-action="attach"
+					aria-label="Attach file"
+					title="Attach file"
+					disabled={!!props.view.form}
+					onPointerDown={(e) => {
+						typing = document.activeElement === input
+						e.preventDefault()
+					}}
+					onClick={() => picker.click()}
+				>
 					<Icon name="plus" />
 				</button>
 				{/* Our own placeholder, so it can erase and fade at its edges. */}
 				<div class="field">
-				<span class={['hint', example()?.fade, { gone: !example() }]} aria-hidden="true"><span class="cut">{example()?.cut}</span><span class="text">{example()?.text}</span></span>
-				<textarea
-					ref={box}
-					rows={1}
-					aria-label="Message"
-					value={props.text}
-					disabled={!!props.view.form || saving()}
-					onInput={(e) => { app.input(e.currentTarget.value); fit() }}
-					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
-				/>
-				<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
+					<span class={['hint', example()?.fade, { gone: !example() }]} aria-hidden="true">
+						<span class="cut">{example()?.cut}</span>
+						<span class="text">{example()?.text}</span>
+					</span>
+					<textarea
+						ref={box}
+						rows={1}
+						aria-label="Message"
+						value={props.text}
+						disabled={!!props.view.form || saving()}
+						onInput={(e) => {
+							app.input(e.currentTarget.value)
+							fit()
+						}}
+						onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
+					/>
+					<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
 				</div>
-				<div class={['actions', { 'nudge-actions': !busy() && !paused(), tucked: !busy() && !paused() && !nudgeable() }]}>
+				<div
+					class={['actions', { 'nudge-actions': !busy() && !paused(), tucked: !busy() && !paused() && !nudgeable() }]}
+				>
 					{/* Pause and continue without Escape (task v0g); the tap keeps the
 					    keyboard. Idle, Play nudges the model on (task yhn). */}
-					<Action kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'} class="toggle" disabled={!busy() && !paused() && !nudgeable()} onClick={toggle} />
+					<Action
+						kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'}
+						class="toggle"
+						disabled={!busy() && !paused() && !nudgeable()}
+						onClick={toggle}
+					/>
 					<Show when={busy() && !queueEditing() && !view.commandDraft(props.text)}>
 						<Action kind="queue" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)} />
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the
 					    click was lost. send() blurs afterwards. */}
-					<Action kind={action()} class="go" disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())} onClick={() => send()} />
+					<Action
+						kind={action()}
+						class="go"
+						disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())}
+						onClick={() => send()}
+					/>
 				</div>
-				<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
+				<Show when={caption()}>
+					<div class="caption" role="status">
+						{caption()}
+					</div>
+				</Show>
 			</div>
 			<div class="help">
 				<div class="help-hints">
-					<Show when={props.view.editing && !props.view.editing.aside && props.view.editing}>{(e) => <span style={{ color: 'var(--attention-fg)' }}>{amend.hint(e(), props.text).split(']')[0]}]</span>}</Show>
+					<Show when={props.view.editing && !props.view.editing.aside && props.view.editing}>
+						{(e) => <span style={{ color: 'var(--attention-fg)' }}>{amend.hint(e(), props.text).split(']')[0]}]</span>}
+					</Show>
 					<For each={view.hints(props.view, props.text, props.menu)}>
 						{(h) => (
 							<span>
@@ -327,7 +472,12 @@ const BUTTONS = {
 	continue: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Resume the paused turn.' },
 	nudge: { icon: 'play', name: 'Nudge', label: 'Nudge', caption: 'Ask the model to keep going.' },
 	queue: { icon: 'queue', name: 'Queue', label: 'Queue', caption: 'Sent after this turn ends.' },
-	steer: { icon: 'steer', name: 'Steer', label: 'Steer', caption: 'Send message immediately. Interrupts ongoing work.' },
+	steer: {
+		icon: 'steer',
+		name: 'Steer',
+		label: 'Steer',
+		caption: 'Send message immediately. Interrupts ongoing work.',
+	},
 	send: { icon: 'send', name: 'Send', label: 'Send', caption: 'Send message to start a turn.' },
 	run: { icon: 'run', name: 'Run', label: 'Run', caption: 'Run the command.' },
 	save: { icon: 'send', name: 'Save', label: 'Save queued message', caption: 'Keep its place in the queue.' },

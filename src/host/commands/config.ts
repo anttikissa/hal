@@ -21,7 +21,8 @@ function change(args: string): { s: Setting; next: unknown; why?: string } | und
 }
 
 export const command: SlashCommand = {
-	help: () => '/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
+	help: () =>
+		'/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
 	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
 	// Setting a stored key to its default removes it; the command line
 	// says so: one row, no echo.

@@ -38,7 +38,10 @@ function draw(force = false, trigger?: string): void {
 	let past = frame.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
 	if (!past) {
 		render.later()
-		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
+		past =
+			st.past && st.past.session === session
+				? st.past.past
+				: frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
 	}
 	st.past = { session, past }
 	// Full mode never shrinks between forced paints: rows given up turn
@@ -69,7 +72,7 @@ function tail(view: View, cols: number, rows: number): View {
 	let t = view.transcript
 	if (!t) return view
 	let at = t.items.length
-	for (let n = 0; at > 0 && n < rows; ) n += frame.itemRows(t.items[--at]!, cols, t.meta.id).length + 1
+	for (let n = 0; at > 0 && n < rows;) n += frame.itemRows(t.items[--at]!, cols, t.meta.id).length + 1
 	return { ...view, transcript: { ...t, items: t.items.slice(at) } }
 }
 

@@ -17,7 +17,12 @@ const long = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join('\n')
 const turn = (n: number, text: string): HistoryRecord[] =>
 	[
 		{ type: 'user', blocks: [{ type: 'text', text }], ts, n },
-		{ type: 'assistant', block: { type: 'tool_call', id: `c${n}`, name: 'bash', input: { command: 'seq 40' } }, ts, n: n + 1 },
+		{
+			type: 'assistant',
+			block: { type: 'tool_call', id: `c${n}`, name: 'bash', input: { command: 'seq 40' } },
+			ts,
+			n: n + 1,
+		},
 		{ type: 'user', blocks: [{ type: 'tool_result', id: `c${n}`, output: long }], ts, n: n + 2 },
 		{ type: 'turn', status: 'completed', ts, n: n + 3 },
 	] as HistoryRecord[]
@@ -25,7 +30,11 @@ const early = turn(1, 'first')
 const late = turn(5, 'second')
 
 const snapshot = (history: HistoryRecord[], older?: number): Event =>
-	({ type: 'snapshot', sessionId, snapshot: { meta, history, state: { type: 'idle' }, ...(older === undefined ? {} : { older }) } }) as Event
+	({
+		type: 'snapshot',
+		sessionId,
+		snapshot: { meta, history, state: { type: 'idle' }, ...(older === undefined ? {} : { older }) },
+	}) as Event
 
 let sent: any[] = []
 let address = ''
@@ -72,7 +81,8 @@ test('block ids are the same in the tail, in a page, after a reconnect and in a 
 	app.onEvent(snapshot([...early, ...late]))
 	expect(app.state.view.transcript!.items.map((i) => i.key)).toEqual(paged)
 	// Every key is linkable and names its own item.
-	for (let k of paged) expect(target.parse(`http://h${target.href(sessionId, k)}`, sessionId)).toEqual({ session: sessionId, key: k })
+	for (let k of paged)
+		expect(target.parse(`http://h${target.href(sessionId, k)}`, sessionId)).toEqual({ session: sessionId, key: k })
 })
 
 test('a block that is in no page gives up with a notice once every page is in', () => {

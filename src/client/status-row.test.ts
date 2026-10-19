@@ -5,8 +5,14 @@ import { strings } from '../common/strings.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 
 let originalNames: Record<string, string>
-beforeEach(() => { subscriptions.apply({ test: { '5h': { used: 18 }, '7d': { used: 57 } } }); originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5' } })
-afterEach(() => { titles.names = originalNames })
+beforeEach(() => {
+	subscriptions.apply({ test: { '5h': { used: 18 }, '7d': { used: 57 } } })
+	originalNames = titles.names
+	titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5' }
+})
+afterEach(() => {
+	titles.names = originalNames
+})
 
 const info: StatusInfo = {
 	id: '156-way',
@@ -18,7 +24,11 @@ const info: StatusInfo = {
 	stats: { effort: 'high', context: 87_000, window: 1_000_000, plan: { account: 1, accounts: 2, key: 'test' } },
 }
 
-const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
+const text = (i: StatusInfo, cols: number) =>
+	statusRow
+		.fit(i, cols)
+		.map((p) => p.text)
+		.join('')
 const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high ⣄ · 87k/1000k (9%)'
 
 test('a wide row shows every part, the right side flush right', () => {
@@ -51,7 +61,13 @@ test('the context is a heat-colored percentage of the window', () => {
 	// Hotter is redder: the hue falls from green towards red.
 	expect(high[0]!.fg![2]).toBeLessThan(low[0]!.fg![2])
 	// A new session: nothing used yet.
-	expect(statusRow.left({ ...info, stats: { window: 200_000 } }).at(-1)!.map((p) => p.text).join('')).toBe('0/200k (0%)')
+	expect(
+		statusRow
+			.left({ ...info, stats: { window: 200_000 } })
+			.at(-1)!
+			.map((p) => p.text)
+			.join(''),
+	).toBe('0/200k (0%)')
 })
 
 test('the painted row fits the terminal and ends its color', () => {

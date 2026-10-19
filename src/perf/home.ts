@@ -18,7 +18,10 @@ const shape = {
 	closed: { count: 2000, bytes: 20e3 },
 }
 
-const words = 'the a of to and in is it that for on with as this be are from by at or not an file host tab session test client state draft frame render model tool result line page key time error value task code change read write build open close run'.split(' ')
+const words =
+	'the a of to and in is it that for on with as this be are from by at or not an file host tab session test client state draft frame render model tool result line page key time error value task code change read write build open close run'.split(
+		' ',
+	)
 const tools = ['bash', 'read', 'grep', 'edit', 'glob']
 
 // mulberry32: small, fast, deterministic.
@@ -58,7 +61,11 @@ function reply(r: Rand): string {
 	let parts = [paragraph(r, int(r, 1, 4))]
 	if (r() < 0.4) parts.push(Array.from({ length: int(r, 2, 6) }, () => `- ${sentence(r)}`).join('\n'))
 	if (r() < 0.3) parts.push('```ts\n' + Array.from({ length: int(r, 3, 25) }, () => codeLine(r)).join('\n') + '\n```')
-	if (r() < 0.1) parts.push('| a | b |\n|---|---|\n' + Array.from({ length: int(r, 2, 8) }, () => `| ${pick(r, words)} | ${int(r, 0, 9999)} |`).join('\n'))
+	if (r() < 0.1)
+		parts.push(
+			'| a | b |\n|---|---|\n' +
+				Array.from({ length: int(r, 2, 8) }, () => `| ${pick(r, words)} | ${int(r, 0, 9999)} |`).join('\n'),
+		)
 	return parts.join('\n\n')
 }
 
@@ -85,18 +92,46 @@ function turn(r: Rand, calls: { n: number }): object[] {
 	let model = 'anthropic/claude-opus-5-5'
 	let rounds = int(r, 1, 8)
 	for (let i = 0; i < rounds; i++) {
-		recs.push({ type: 'assistant', block: { type: 'thinking', text: paragraph(r, int(r, 1, 12)), signature: 'sig', provider: 'anthropic' }, model })
+		recs.push({
+			type: 'assistant',
+			block: { type: 'thinking', text: paragraph(r, int(r, 1, 12)), signature: 'sig', provider: 'anthropic' },
+			model,
+		})
 		if (r() < 0.5) recs.push({ type: 'assistant', block: { type: 'text', text: reply(r) }, model })
 		if (i === rounds - 1) break
 		let ids = Array.from({ length: int(r, 1, 3) }, () => `call_${++calls.n}`)
 		for (let id of ids) {
 			let name = pick(r, tools)
-			recs.push({ type: 'assistant', block: { type: 'tool_call', id, name, input: name === 'bash' ? { command: `${pick(r, words)} ${pick(r, words)} | head` } : { path: `src/${pick(r, words)}.ts` } }, model })
+			recs.push({
+				type: 'assistant',
+				block: {
+					type: 'tool_call',
+					id,
+					name,
+					input:
+						name === 'bash'
+							? { command: `${pick(r, words)} ${pick(r, words)} | head` }
+							: { path: `src/${pick(r, words)}.ts` },
+				},
+				model,
+			})
 		}
-		recs.push({ type: 'user', blocks: ids.map((id) => ({ type: 'tool_result', id, output: output(r), ...(r() < 0.05 ? { isError: true } : {}) })) })
+		recs.push({
+			type: 'user',
+			blocks: ids.map((id) => ({
+				type: 'tool_result',
+				id,
+				output: output(r),
+				...(r() < 0.05 ? { isError: true } : {}),
+			})),
+		})
 	}
 	recs.push({ type: 'assistant', block: { type: 'text', text: reply(r) }, model })
-	recs.push({ type: 'turn_end', status: 'completed', usage: { input: int(r, 1000, 200000), output: int(r, 100, 8000) } })
+	recs.push({
+		type: 'turn_end',
+		status: 'completed',
+		usage: { input: int(r, 1000, 200000), output: int(r, 100, 8000) },
+	})
 	return recs
 }
 
@@ -104,10 +139,16 @@ function turn(r: Rand, calls: { n: number }): object[] {
 function session(dir: string, id: string, bytes: number, r: Rand, cwd: string): void {
 	mkdirSync(dir, { recursive: true })
 	let createdAt = new Date(Date.UTC(2026, 0, 1) + int(r, 0, 200) * 86400e3).toISOString()
-	writeFileSync(`${dir}/session.ason`, ason.stringify({ id, cwd, model: 'anthropic/claude-opus-5-5', name: sentence(r).slice(0, 40), createdAt }) + '\n')
+	writeFileSync(
+		`${dir}/session.ason`,
+		ason.stringify({ id, cwd, model: 'anthropic/claude-opus-5-5', name: sentence(r).slice(0, 40), createdAt }) + '\n',
+	)
 	let path = `${dir}/history.asonl`
 	writeFileSync(path, '')
-	let n = 0, size = 0, chunk: string[] = [], chunkSize = 0
+	let n = 0,
+		size = 0,
+		chunk: string[] = [],
+		chunkSize = 0
 	let ms = Date.parse(createdAt)
 	let calls = { n: 0 }
 	while (size < bytes) {
@@ -128,7 +169,10 @@ function session(dir: string, id: string, bytes: number, r: Rand, cwd: string): 
 }
 
 // Generates the home; `scale` shrinks counts and sizes for quick runs.
-function generate(home: string, opts: { scale?: number; seed?: number; cwd?: string } = {}): { open: string[]; sessions: number } {
+function generate(
+	home: string,
+	opts: { scale?: number; seed?: number; cwd?: string } = {},
+): { open: string[]; sessions: number } {
 	let scale = opts.scale ?? 1
 	let r = rng(opts.seed ?? 1)
 	let cwd = opts.cwd ?? home
@@ -136,7 +180,8 @@ function generate(home: string, opts: { scale?: number; seed?: number; cwd?: str
 	if (existsSync(dir) && readdirSync(dir).length) throw new Error(`${dir} already has sessions`)
 	let open: string[] = []
 	let n = 0
-	let id = () => `${++n}-${String.fromCharCode(97 + (n % 26))}${String.fromCharCode(97 + ((n * 7) % 26))}${String.fromCharCode(97 + ((n * 13) % 26))}`
+	let id = () =>
+		`${++n}-${String.fromCharCode(97 + (n % 26))}${String.fromCharCode(97 + ((n * 7) % 26))}${String.fromCharCode(97 + ((n * 13) % 26))}`
 	let closed = Math.max(1, Math.round(shape.closed.count * scale))
 	for (let i = 0; i < closed; i++) {
 		let s = id()

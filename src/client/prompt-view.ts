@@ -17,7 +17,12 @@ import { strings } from '../common/strings.ts'
  * column of the cursor offset. The selection `sel` shows in reverse
  * video; a selected tab is reverse spaces to its stop.
  */
-function layoutPrompt(text: string, cursor: number, width: number, sel?: { start: number; end: number }): { rows: string[]; row: number; col: number } {
+function layoutPrompt(
+	text: string,
+	cursor: number,
+	width: number,
+	sel?: { start: number; end: number },
+): { rows: string[]; row: number; col: number } {
 	let list = promptLayout.rows(text, width)
 	let clean = ansi.clean(text)
 	// A tab or wide glyph alone on a row narrower than itself is cut.
@@ -79,15 +84,17 @@ function example(ex: Shown, fg: Oklch, bg: Oklch, width: number, back: Oklch | u
 		fg = [bg[0] + (fg[0] - bg[0]) * t, bg[1] + (fg[1] - bg[1]) * t, fg[2]]
 	}
 	let end = back ? ansi.sgr({ fg: back }) : ''
-	if (!ex.fade || !ansi.fades() || strings.visLen(text) > room) return ' '.repeat(pad) + ansi.sgr({ fg }) + strings.clipVisual(text, room) + end
+	if (!ex.fade || !ansi.fades() || strings.visLen(text) > room)
+		return ' '.repeat(pad) + ansi.sgr({ fg }) + strings.clipVisual(text, room) + end
 	let g = placeholders.graphemes(text)
 	let n = Math.min(3, g.length)
 	let mix = (t: number): Oklch => [fg[0] + (bg[0] - fg[0]) * t, fg[1] + (bg[1] - fg[1]) * t, fg[2]]
 	let faded = (s: string[], t: (i: number) => number) => s.map((c, i) => ansi.sgr({ fg: mix(t(i)) }) + c).join('')
 	let body = ansi.sgr({ fg })
-	let out = ex.fade === 'right'
-		? body + g.slice(0, g.length - n).join('') + faded(g.slice(g.length - n), (i) => (i + 1) / (n + 1))
-		: faded(g.slice(0, n), (i) => (n - i) / (n + 1)) + body + g.slice(n).join('')
+	let out =
+		ex.fade === 'right'
+			? body + g.slice(0, g.length - n).join('') + faded(g.slice(g.length - n), (i) => (i + 1) / (n + 1))
+			: faded(g.slice(0, n), (i) => (n - i) / (n + 1)) + body + g.slice(n).join('')
 	return ' '.repeat(pad) + out + end
 }
 
@@ -100,15 +107,41 @@ function box(
 	st: PromptState,
 	width: number,
 	placeholder?: Shown,
-): { above: number; rows: string[]; below: number; total: number; limit: number; row: number; col: number; scroll: number } {
+): {
+	above: number
+	rows: string[]
+	below: number
+	total: number
+	limit: number
+	row: number
+	col: number
+	scroll: number
+} {
 	let p = promptView.layoutPrompt(st.text, st.cursor, Math.max(1, width), prompt.selection(st))
 	let height = st.rows ?? promptLayout.autoHeight(p.rows.length, settings.promptRows())
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
 	let shown = p.rows.slice(vp.top, vp.top + height)
 	while (shown.length < height) shown.push('')
 	let input = colors.input()
-	if (placeholder && (!st.text || p.rows.length === 1)) shown[0] += promptView.example(placeholder, input.placeholder!, input.bg!, width, input.fg, strings.visLen(shown[0]!))
-	return { above: vp.above, rows: shown, below: vp.below, total: p.rows.length, limit: st.rows ?? settings.promptRows(), row: p.row - vp.top, col: !st.text && placeholder ? 0 : p.col, scroll: vp.top }
+	if (placeholder && (!st.text || p.rows.length === 1))
+		shown[0] += promptView.example(
+			placeholder,
+			input.placeholder!,
+			input.bg!,
+			width,
+			input.fg,
+			strings.visLen(shown[0]!),
+		)
+	return {
+		above: vp.above,
+		rows: shown,
+		below: vp.below,
+		total: p.rows.length,
+		limit: st.rows ?? settings.promptRows(),
+		row: p.row - vp.top,
+		col: !st.text && placeholder ? 0 : p.col,
+		scroll: vp.top,
+	}
 }
 
 // Text rows marked as a prompt: the first with `FIRST`, the rest indented.

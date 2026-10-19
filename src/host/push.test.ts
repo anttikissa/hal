@@ -6,7 +6,11 @@ import { paths } from './paths.ts'
 import { push } from './push.ts'
 
 useHost()
-const subscription = { endpoint: 'https://push.example.test/s/abc', p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' }
+const subscription = {
+	endpoint: 'https://push.example.test/s/abc',
+	p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
+	auth: 'BTBZMqHH6r4Tts7J_aSIgg',
+}
 
 test('VAPID key survives restart and state files have owner-only permissions', async () => {
 	let first = await push.keys()
@@ -20,11 +24,17 @@ test('VAPID key survives restart and state files have owner-only permissions', a
 
 test('a user can test and remove a named device, and removal survives a restart', async () => {
 	push.subscribe({ ...subscription, device: 'iPhone · Home Screen app' })
-	expect(push.devices()).toEqual([{ endpoint: subscription.endpoint, device: 'iPhone · Home Screen app', added: expect.any(String) }])
+	expect(push.devices()).toEqual([
+		{ endpoint: subscription.endpoint, device: 'iPhone · Home Screen app', added: expect.any(String) },
+	])
 	let original = push.request
 	let sent = 0
 	push.request = async () => (sent++, new Response(null, { status: 201 }))
-	try { expect(await push.test(subscription.endpoint)).toStartWith('Test sent') } finally { push.request = original }
+	try {
+		expect(await push.test(subscription.endpoint)).toStartWith('Test sent')
+	} finally {
+		push.request = original
+	}
 	expect(sent).toBe(1)
 	push.unsubscribe(subscription.endpoint)
 	push.reset()
@@ -40,7 +50,9 @@ test('expired endpoint is removed after 410, surviving a restart', async () => {
 		expect(push.store().subscriptions).toEqual([])
 		push.reset()
 		expect(push.store().subscriptions).toEqual([])
-	} finally { push.request = original }
+	} finally {
+		push.request = original
+	}
 })
 
 test('an unseen completed turn is pushed encrypted to the subscription, unless push is off', async () => {
@@ -49,7 +61,10 @@ test('an unseen completed turn is pushed encrypted to the subscription, unless p
 	push.subscribe(subscription)
 	let sent: { url: string; body: any }[] = []
 	let original = push.request
-	push.request = async (url, init) => { sent.push({ url, body: init.body }); return new Response(null, { status: 201 }) }
+	push.request = async (url, init) => {
+		sent.push({ url, body: init.body })
+		return new Response(null, { status: 201 })
+	}
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 		await until(() => calls.length)
@@ -60,11 +75,18 @@ test('an unseen completed turn is pushed encrypted to the subscription, unless p
 		settings.state.raw = { push: false }
 		await push.notify(id, 'my session', 'done')
 		expect(sent).toHaveLength(1)
-	} finally { settings.state.raw = {}; push.request = original }
+	} finally {
+		settings.state.raw = {}
+		push.request = original
+	}
 })
 
 test('subscriptions reject malformed endpoints before fetching', () => {
-	for (let endpoint of ['http://localhost:8000/private', 'file:///etc/passwd', 'https://user:password@push.example.test/']) {
+	for (let endpoint of [
+		'http://localhost:8000/private',
+		'file:///etc/passwd',
+		'https://user:password@push.example.test/',
+	]) {
 		expect(() => push.subscribe({ ...subscription, endpoint })).toThrow('invalid push subscription')
 	}
 })

@@ -16,7 +16,13 @@ import { render } from './render.ts'
 let sent: any[] = []
 let clip: { text?: string; image?: Uint8Array } = {}
 let dir = ''
-const saved = { send: app.send, show: render.show, draftSend: drafts.send, read: clipboard.read, image: clipboard.image }
+const saved = {
+	send: app.send,
+	show: render.show,
+	draftSend: drafts.send,
+	read: clipboard.read,
+	image: clipboard.image,
+}
 
 beforeEach(() => {
 	sent = []
@@ -41,16 +47,34 @@ afterEach(() => {
 })
 
 const snapshot = (id = 's1'): Event => {
-	let snap: Snapshot = { meta: { id, cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state: { type: 'idle' } }
+	let snap: Snapshot = {
+		meta: { id, cwd: '/', model: 'anthropic/x', createdAt: '' },
+		history: [],
+		state: { type: 'idle' },
+	}
 	return { type: 'snapshot', sessionId: id, snapshot: snap }
 }
-const key = (key: string, text?: string, mods: Partial<KeyEvent> = {}): KeyEvent => ({ key, text, shift: false, alt: false, ctrl: false, cmd: false, ...mods })
+const key = (key: string, text?: string, mods: Partial<KeyEvent> = {}): KeyEvent => ({
+	key,
+	text,
+	shift: false,
+	alt: false,
+	ctrl: false,
+	cmd: false,
+	...mods,
+})
 const type = (s: string) => app.onKeys([...s].map((c) => key(c, c)))
 const text = () => appView.view().prompt.text
 const attaches = () => sent.filter((c) => c.type === 'attach')
 const submits = () => sent.filter((c) => c.type === 'submit').map((c) => c.text)
 const tick = () => new Promise((r) => setTimeout(r, 0))
-const attached = (command: string, marker: string): Event => ({ type: 'attached', sessionId: 's1', command, blob: 'b', marker })
+const attached = (command: string, marker: string): Event => ({
+	type: 'attached',
+	sessionId: 's1',
+	command,
+	blob: 'b',
+	marker,
+})
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
 
 async function pasteImage(): Promise<{ id: string; placeholder: string }> {
@@ -67,7 +91,9 @@ test('Ctrl-V with an image uploads it under the name its final marker shows', as
 	type('see ')
 	let { id, placeholder } = await pasteImage()
 	let name = placeholder.slice(7, -1)
-	expect(attaches()).toEqual([{ type: 'attach', id, sessionId: 's1', mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name }])
+	expect(attaches()).toEqual([
+		{ type: 'attach', id, sessionId: 's1', mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name },
+	])
 	type('and')
 	app.onEvent(attached(id, placeholder))
 	expect(text()).toBe(`see ${placeholder} and`)

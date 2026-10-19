@@ -8,16 +8,23 @@ import { paths } from './paths.ts'
 function store(): Record<string, number> {
 	let path = `${paths.stateDir()}/calibration.ason`
 	let data = liveFiles.liveFile<Record<string, number>>(path, {}, { watch: false })
-	for (let [model, ratio] of Object.entries(data)) if (!Number.isFinite(ratio) || ratio <= 0) {
-		liveFiles.close(data)
-		throw new Error(`${path}: invalid characters-per-token ratio for ${JSON.stringify(model)}: ${JSON.stringify(ratio)}`)
-	}
+	for (let [model, ratio] of Object.entries(data))
+		if (!Number.isFinite(ratio) || ratio <= 0) {
+			liveFiles.close(data)
+			throw new Error(
+				`${path}: invalid characters-per-token ratio for ${JSON.stringify(model)}: ${JSON.stringify(ratio)}`,
+			)
+		}
 	return data
 }
 
 function ratios(): Record<string, number> {
 	let data = tokenCalibration.store()
-	try { return { ...data } } finally { liveFiles.close(data) }
+	try {
+		return { ...data }
+	} finally {
+		liveFiles.close(data)
+	}
 }
 
 function observe(model: string, characters: number, tokens: number): void {
@@ -29,13 +36,18 @@ function observe(model: string, characters: number, tokens: number): void {
 		let previous = Object.hasOwn(data, model) ? data[model] : undefined
 		// Bound an outlier before smoothing: one odd round changes an
 		// established estimate by at most 2.5%, not by an arbitrary amount.
-		data[model] = previous === undefined ? sample : previous + tokenCalibration.weight * (Math.max(previous * .75, Math.min(previous * 1.25, sample)) - previous)
+		data[model] =
+			previous === undefined
+				? sample
+				: previous + tokenCalibration.weight * (Math.max(previous * 0.75, Math.min(previous * 1.25, sample)) - previous)
 		liveFiles.save(data)
-	} finally { liveFiles.close(data) }
+	} finally {
+		liveFiles.close(data)
+	}
 }
 
 function estimateTokens(characters: number, model?: string): number {
 	return tokenEstimates.estimate(characters, model, model ? tokenCalibration.ratios() : {})
 }
 
-export const tokenCalibration = { store, ratios, observe, estimateTokens, weight: .1 }
+export const tokenCalibration = { store, ratios, observe, estimateTokens, weight: 0.1 }

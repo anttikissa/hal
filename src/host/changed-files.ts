@@ -94,5 +94,10 @@ export const changedFiles = {
 	state: { paths: new WeakMap<object, Set<string>>(), waiting: new WeakMap<object, HistoryRecord[]>() },
 	// Histories bigger than this rebuild the paths in a worker.
 	syncBytes: 1024 * 1024,
-	add, fill, paths, apply, reset, upgrade,
+	add,
+	fill,
+	paths,
+	apply,
+	reset,
+	upgrade,
 }

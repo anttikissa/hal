@@ -23,8 +23,8 @@ afterEach(() => {
 	rmSync(dir, { recursive: true, force: true })
 })
 
-const read = (input: Record<string, unknown>) => tools.run({ type: 'tool_call', id: 'c1', name: 'read', input }, { cwd: dir, signal, sessionId: 's' })
-
+const read = (input: Record<string, unknown>) =>
+	tools.run({ type: 'tool_call', id: 'c1', name: 'read', input }, { cwd: dir, signal, sessionId: 's' })
 
 const echo = (name: string, readOnly: boolean) => `export const tool = {
 	name: '${name}', description: 'echo', parameters: { type: 'object', properties: {} }, ${readOnly ? 'readOnly: true,' : ''}
@@ -41,7 +41,10 @@ test('a tool file dropped into the tools directory is offered and run, nothing e
 	tools.dir = () => toolDir
 	expect(tools.defs()).toEqual([{ name: 'echo', description: 'echo', inputSchema: { type: 'object', properties: {} } }])
 	expect(tools.readOnly('echo')).toBe(true)
-	let result = await tools.run({ type: 'tool_call', id: 'e1', name: 'echo', input: { a: 1 } }, { cwd: dir, signal, sessionId: 's' })
+	let result = await tools.run(
+		{ type: 'tool_call', id: 'e1', name: 'echo', input: { a: 1 } },
+		{ cwd: dir, signal, sessionId: 's' },
+	)
 	expect(result).toEqual({ type: 'tool_result', id: 'e1', output: 'echo {"a":1}' })
 })
 
@@ -97,13 +100,23 @@ test('read lists a directory, marking subdirectories', async () => {
 
 test('failures are error results, never throws', async () => {
 	writeFileSync(`${dir}/bin`, Buffer.from([0x7f, 0x45, 0, 1, 2]))
-	for (let input of [{ path: 'missing.txt' }, {}, { path: 7 }, { path: 'bin' }, { path: '.', offset: 'x' }, { path: '.', offset: 0 }]) {
+	for (let input of [
+		{ path: 'missing.txt' },
+		{},
+		{ path: 7 },
+		{ path: 'bin' },
+		{ path: '.', offset: 'x' },
+		{ path: '.', offset: 0 },
+	]) {
 		let r = await read(input)
 		expect(r.id).toBe('c1')
 		expect(r.isError).toBe(true)
 		expect(r.output.length).toBeGreaterThan(0)
 	}
-	let unknown = await tools.run({ type: 'tool_call', id: 'c2', name: 'nope', input: {} }, { cwd: dir, signal, sessionId: 's' })
+	let unknown = await tools.run(
+		{ type: 'tool_call', id: 'c2', name: 'nope', input: {} },
+		{ cwd: dir, signal, sessionId: 's' },
+	)
 	expect(unknown).toMatchObject({ id: 'c2', isError: true })
 })
 
@@ -146,9 +159,15 @@ test('cancel stops a running command, pipelines included, and a canceled turn ru
 test('a stopped command is asked to end, then killed: a background job that ignores SIGTERM does not survive', async () => {
 	tools.killAfterMs = 300
 	let marker = `31.${process.pid}2`
-	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let alive = () =>
+		Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`])
+			.stdout.toString()
+			.trim() !== ''
 	let ac = new AbortController()
-	let pending = bash({ command: `trap '' TERM; sleep ${marker} >/dev/null & sleep ${marker}`, description: 'Leave a stubborn job' }, ac.signal)
+	let pending = bash(
+		{ command: `trap '' TERM; sleep ${marker} >/dev/null & sleep ${marker}`, description: 'Leave a stubborn job' },
+		ac.signal,
+	)
 	for (let i = 0; i < 100 && !alive(); i++) await Bun.sleep(20)
 	expect(alive()).toBe(true)
 	ac.abort()
@@ -161,10 +180,17 @@ test('a stopped command is asked to end, then killed: a background job that igno
 
 test('a command past its timeout is killed with its background jobs, keeping the output so far', async () => {
 	let marker = `33.${process.pid}4`
-	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let alive = () =>
+		Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`])
+			.stdout.toString()
+			.trim() !== ''
 	let started = Date.now()
 	// The background job holds stdout open: without the timeout the call would wait for it.
-	let r = await bash({ command: `echo before; sleep ${marker} &`, description: 'Leave a job holding stdout', timeout: 0.3 })
+	let r = await bash({
+		command: `echo before; sleep ${marker} &`,
+		description: 'Leave a job holding stdout',
+		timeout: 0.3,
+	})
 	expect(Date.now() - started).toBeLessThan(3000)
 	expect(r.output).toContain('timed out after 0.3s')
 	expect(r.output).toContain('before')
@@ -179,13 +205,20 @@ import { blobs } from './blobs.ts'
 import { history } from './history.ts'
 
 const originalHome = paths.home
-const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_entry', input: { id, ...options } }, { cwd: dir, signal, sessionId: 's' })
+const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) =>
+	tools.run(
+		{ type: 'tool_call', id: 'rb', name: 'read_entry', input: { id, ...options } },
+		{ cwd: dir, signal, sessionId: 's' },
+	)
 
 test('large bash output is bounded, keeps both ends and the whole result in a session blob', async () => {
 	paths.home = () => dir
 	try {
 		tools.maxChars = 1000
-		let result = await bash({ command: "printf 'START\\n'; yes middle | head -c 80000; printf '\\nEND\\n'; exit 7", description: 'Produce long output and fail' })
+		let result = await bash({
+			command: "printf 'START\\n'; yes middle | head -c 80000; printf '\\nEND\\n'; exit 7",
+			description: 'Produce long output and fail',
+		})
 		expect(result.output.length).toBeLessThanOrEqual(1200)
 		expect(result.output).toContain('START')
 		expect(result.output).toContain('END')
@@ -198,7 +231,9 @@ test('large bash output is bounded, keeps both ends and the whole result in a se
 		let end = (await blobRun(id!, { offset: total - 2 })).output
 		expect(end).toContain('END')
 		expect(total).toBeGreaterThan(1000)
-	} finally { paths.home = originalHome }
+	} finally {
+		paths.home = originalHome
+	}
 })
 
 test('bash output past 100 lines keeps both ends and says how to page the blob', async () => {
@@ -211,7 +246,9 @@ test('bash output past 100 lines keeps both ends and says how to page the blob',
 		let id = result.output.match(/READ_ENTRY "([0-9a-f]{12})" \{ offset: 1, limit: 100 \}/)?.[1]
 		expect(id).toBeDefined()
 		expect((await blobRun(id!, { offset: 151, limit: 1 })).output).toStartWith('150\n')
-	} finally { paths.home = originalHome }
+	} finally {
+		paths.home = originalHome
+	}
 })
 
 test('read_blob resolves text and images and rejects unknown or escaping references', async () => {
@@ -224,10 +261,20 @@ test('read_blob resolves text and images and rejects unknown or escaping referen
 		let r = await blobRun(image.blob)
 		expect(r.image?.mediaType).toBe('image/png')
 		expect(blobs.base64('s', r.image!.blob)).toBe(blobs.base64('s', image.blob))
-		for (let id of ['unknown', ' ../etc/passwd ', 's/../../etc/passwd', 's/missing', 'aaaaaaaaaaaa', `s/${text.blob}.png`, `s/ ${text.blob}`]) {
+		for (let id of [
+			'unknown',
+			' ../etc/passwd ',
+			's/../../etc/passwd',
+			's/missing',
+			'aaaaaaaaaaaa',
+			`s/${text.blob}.png`,
+			`s/ ${text.blob}`,
+		]) {
 			expect((await blobRun(id)).isError).toBe(true)
 		}
-	} finally { paths.home = originalHome }
+	} finally {
+		paths.home = originalHome
+	}
 })
 
 test('read_blob pages large text and history blocks within the result cap', async () => {
@@ -251,26 +298,51 @@ test('read_blob pages large text and history blocks within the result cap', asyn
 		expect(block.length).toBeLessThanOrEqual(tools.maxChars)
 		expect(block).toContain('continue with offset')
 		expect((await blobRun(id, { offset: 0 })).isError).toBe(true)
-	} finally { paths.home = originalHome; tools.maxChars = max }
+	} finally {
+		paths.home = originalHome
+		tools.maxChars = max
+	}
 })
 
 test('read_blob fetches a numbered tool call and its result from history', async () => {
 	paths.home = () => dir
 	try {
 		mkdirSync(paths.sessionDir('s'), { recursive: true })
-		let call = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } } })
-		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
+		let call = history.append('s', {
+			type: 'assistant',
+			block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } },
+		})
+		let result = history.append('s', {
+			type: 'user',
+			blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }],
+		})
 		expect((await blobRun(`t${call.n}`)).output).toBe('< example.txt\n\nResult:\nfile contents')
 		expect((await blobRun(`t${call.n}.1`)).output).toBe('file contents')
 		expect((await blobRun(`s/${call.n}-${result.n}`)).output).toContain('file contents')
-		let spawn = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'internal-provider-call-id', name: 'spawn', input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } } } })
-		expect((await blobRun(`s/${spawn.n}`)).output).toBe('Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true\n\nNo result recorded.')
+		let spawn = history.append('s', {
+			type: 'assistant',
+			block: {
+				type: 'tool_call',
+				id: 'internal-provider-call-id',
+				name: 'spawn',
+				input: { task: 'Find tasks\nPreserve results', name: 'Benchmark search', extra: { enabled: true } },
+			},
+		})
+		expect((await blobRun(`s/${spawn.n}`)).output).toBe(
+			'Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true\n\nNo result recorded.',
+		)
 		expect((await blobRun(`s/${result.n}`)).output).toContain('file contents')
 		expect((await blobRun('t999999')).isError).toBe(true)
-	} finally { paths.home = originalHome }
+	} finally {
+		paths.home = originalHome
+	}
 })
 
 test('a call whose input was not valid JSON becomes an error result the model can act on', async () => {
-	let r = await tools.run({ type: 'tool_call', id: 'x', name: 'bash', input: { invalidJson: '{"command": "ls' } }, { sessionId: 's', cwd: '/tmp', signal: new AbortController().signal } as any)
+	let r = await tools.run({ type: 'tool_call', id: 'x', name: 'bash', input: { invalidJson: '{"command": "ls' } }, {
+		sessionId: 's',
+		cwd: '/tmp',
+		signal: new AbortController().signal,
+	} as any)
 	expect(r).toMatchObject({ id: 'x', isError: true, output: expect.stringContaining('call it again') })
 })

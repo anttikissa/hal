@@ -24,7 +24,8 @@ type Client = { deliver(event: Event): void }
 type Step = { say: string; ask?: Form }
 
 const MODEL = 'hal/plugin-sync'
-const gone = 'The remote terminal reviewing plugins is not connected, so nothing was written here. Type /plugin-sync in it once it is connected to continue.'
+const gone =
+	'The remote terminal reviewing plugins is not connected, so nothing was written here. Type /plugin-sync in it once it is connected to continue.'
 
 // The review tab's name for client home `home`.
 const nameFor = (home: string): string => `Plugin sync ${home.slice(0, 6)}`
@@ -80,7 +81,12 @@ function step(c: { session: string; say: string; ask?: Form }): void {
 // The review tab for `name`: open, else reopened, else new after `after`.
 function find(name: string, after: string, cwd: string): string {
 	let ours = (id: string) => {
-		try { let m = sessions.open(id); return m.model === MODEL && m.name === name } catch { return false }
+		try {
+			let m = sessions.open(id)
+			return m.model === MODEL && m.name === name
+		} catch {
+			return false
+		}
 	}
 	let f = tabs.file()
 	let id = f.open.find(ours)
@@ -103,12 +109,18 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 	let rec = clients.state.senders.get(from)
 	let client = [...host.state.clients].find((c) => c.record === rec)
 	let home = client && pluginSync.state.followers.get(client)
-	if (!client || home === undefined) return { error: '/plugin-sync reviews portable plugins from a terminal started with ./run -r <host> on another Hal home; this client compares none with this host.' }
-	if (home === pluginSync.home()) return { say: 'This terminal runs on the host\'s own home: there is nothing to compare.' }
+	if (!client || home === undefined)
+		return {
+			error:
+				'/plugin-sync reviews portable plugins from a terminal started with ./run -r <host> on another Hal home; this client compares none with this host.',
+		}
+	if (home === pluginSync.home())
+		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
 	let id = find(nameFor(home), from, cwd)
 	pluginSyncSession.state.bound.set(id, { home, client })
 	let state = status.stateOf(id).type
-	if ((state === 'idle' || state === 'paused' || state === 'error') && !status.transition(id, { type: 'submit' })) turns.start(id)
+	if ((state === 'idle' || state === 'paused' || state === 'error') && !status.transition(id, { type: 'submit' }))
+		turns.start(id)
 	if (id !== from) host.broadcast(from, { type: 'go', sessionId: from, tab: id })
 	return {}
 }
@@ -116,7 +128,10 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 export const pluginSyncSession = {
 	// `bound`: the home (and terminal) each review session serves;
 	// `waiting`: settles a session's pending step.
-	state: { bound: new Map<string, { home: string; client: Client }>(), waiting: new Map<string, (s: Step | undefined) => void>() },
+	state: {
+		bound: new Map<string, { home: string; client: Client }>(),
+		waiting: new Map<string, (s: Step | undefined) => void>(),
+	},
 	checkMs: 5000,
 	MODEL,
 	nameFor,

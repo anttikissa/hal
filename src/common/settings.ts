@@ -17,11 +17,33 @@ export type SettingType =
 // `label`: what /config shows for it (the name is config.ason's key).
 // `browser`: the web page needs it too, so the host writes it into the
 // page it serves (host/web.ts); the page reads it with settings.load.
-export type Setting = { name: string; label: string; type: SettingType; default: unknown; description: string; browser?: true }
+export type Setting = {
+	name: string
+	label: string
+	type: SettingType
+	default: unknown
+	description: string
+	browser?: true
+}
 
 const table: Setting[] = [
-	{ name: 'subagentSlots', label: 'Spawn budget', type: { kind: 'integer', min: 0, max: Number.MAX_SAFE_INTEGER }, default: 3, description: 'Spawn slots for new sessions. Each subagent costs one slot from its owner and every owner ancestor; /budget changes only the current session.', browser: true },
-	{ name: 'model', label: 'Default model', type: { kind: 'text' }, default: 'hal/intro', description: 'Default model (provider/id or alias, optional :effort) for new sessions. Unset, new tabs run the first-run guide (hal/intro), which sets it. To switch only the current session, use Ctrl-M or /model.' },
+	{
+		name: 'subagentSlots',
+		label: 'Spawn budget',
+		type: { kind: 'integer', min: 0, max: Number.MAX_SAFE_INTEGER },
+		default: 3,
+		description:
+			'Spawn slots for new sessions. Each subagent costs one slot from its owner and every owner ancestor; /budget changes only the current session.',
+		browser: true,
+	},
+	{
+		name: 'model',
+		label: 'Default model',
+		type: { kind: 'text' },
+		default: 'hal/intro',
+		description:
+			'Default model (provider/id or alias, optional :effort) for new sessions. Unset, new tabs run the first-run guide (hal/intro), which sets it. To switch only the current session, use Ctrl-M or /model.',
+	},
 	{
 		name: 'security',
 		label: 'Security',
@@ -52,16 +74,35 @@ const table: Setting[] = [
 		default: 200,
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
-	{ name: 'webPort', label: 'Web port', type: { kind: 'integer', min: 1, max: 65535 }, default: 9001, description: 'Preferred port for the browser client (127.0.0.1); tries through 9100 if busy.' },
+	{
+		name: 'webPort',
+		label: 'Web port',
+		type: { kind: 'integer', min: 1, max: 65535 },
+		default: 9001,
+		description: 'Preferred port for the browser client (127.0.0.1); tries through 9100 if busy.',
+	},
 	{
 		name: 'webUrl',
 		label: 'Web address',
 		type: { kind: 'text', url: true },
 		default: '',
-		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
+		description:
+			'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
-	{ name: 'sessionRecap', label: 'Session recap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
-	{ name: 'push', label: 'Push notifications', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
+	{
+		name: 'sessionRecap',
+		label: 'Session recap',
+		type: { kind: 'boolean' },
+		default: false,
+		description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).',
+	},
+	{
+		name: 'push',
+		label: 'Push notifications',
+		type: { kind: 'boolean' },
+		default: true,
+		description: 'Send web push notifications to subscribed devices.',
+	},
 	{
 		name: 'webDiagnostics',
 		label: 'Web diagnostics',
@@ -75,7 +116,8 @@ const table: Setting[] = [
 		label: 'Composer debug',
 		type: { kind: 'boolean' },
 		default: false,
-		description: "Web pages record every message box event with its full state, draft text included, to this host's state/composer-debug.log, and show a debug badge.",
+		description:
+			"Web pages record every message box event with its full state, draft text included, to this host's state/composer-debug.log, and show a debug badge.",
 		browser: true,
 	},
 	...verbosityRows(),
@@ -121,13 +163,17 @@ function problem(type: SettingType, value: unknown): string | undefined {
 			// An empty address means the default (localhost).
 			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
 			if (value === '') return undefined
-			return !type.url || /^https?:\/\/[^\s\p{Cc}/?#]+(\/[^\s\p{Cc}?#]*)?$/u.test(value) ? undefined : 'expected an http(s) address without ? or #'
+			return !type.url || /^https?:\/\/[^\s\p{Cc}/?#]+(\/[^\s\p{Cc}?#]*)?$/u.test(value)
+				? undefined
+				: 'expected an http(s) address without ? or #'
 		case 'integer':
 			return Number.isInteger(value) && (value as number) >= type.min && (value as number) <= type.max
 				? undefined
 				: `expected an integer ${type.min}–${type.max}`
 		case 'choice':
-			return type.options.includes(value as string) ? undefined : `expected one of ${type.options.map((o) => `'${o}'`).join(', ')}`
+			return type.options.includes(value as string)
+				? undefined
+				: `expected one of ${type.options.map((o) => `'${o}'`).join(', ')}`
 		case 'boolean':
 			return typeof value === 'boolean' ? undefined : 'expected true or false'
 	}
@@ -156,7 +202,8 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 		else warnings.push(`${key}: ${why}, got ${JSON.stringify(raw[key]) ?? String(raw[key])}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
-		if (!settings.table.some((s) => s.name === key.replace(/^blockVerbosity/, 'cardVerbosity'))) warnings.push(`unknown setting '${key}', ignored`)
+		if (!settings.table.some((s) => s.name === key.replace(/^blockVerbosity/, 'cardVerbosity')))
+			warnings.push(`unknown setting '${key}', ignored`)
 	}
 	return { values, warnings }
 }
@@ -201,7 +248,10 @@ export const settings = {
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).
-	webUrl: (): string => ((settings.value('webUrl') as string) || `http://localhost:${settings.state.listeningPort ?? settings.webPort()}`).replace(/\/+$/, ''),
+	webUrl: (): string =>
+		(
+			(settings.value('webUrl') as string) || `http://localhost:${settings.state.listeningPort ?? settings.webPort()}`
+		).replace(/\/+$/, ''),
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,

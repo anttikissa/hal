@@ -30,7 +30,8 @@ function set(id: string, value: boolean, typed = false): void {
 // work gives the human ownership. Queued follow-ups never call this hook.
 function promote(id: string): void {
 	if (!sessions.open(id).autoclose) return
-	if (history.readSync(id).some((r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue')) autoclose.set(id, false)
+	if (history.readSync(id).some((r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue'))
+		autoclose.set(id, false)
 }
 
 // Called only after a completed turn. Idle plus empty work lists prevents

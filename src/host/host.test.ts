@@ -33,11 +33,16 @@ test('web snapshot load diagnostics are opt-in, numeric and content-free', async
 		let logged = readFileSync(file, 'utf8')
 		expect(logged).not.toContain(id)
 		expect(logged).not.toContain('private content')
-		let entries = logged.trim().split('\n').flatMap((line) => JSON.parse(line.slice(line.indexOf(' ') + 1)).entries)
+		let entries = logged
+			.trim()
+			.split('\n')
+			.flatMap((line) => JSON.parse(line.slice(line.indexOf(' ') + 1)).entries)
 		expect(entries.map((e) => e.detail)).toEqual(['requested', 'ready', 'tail', 'built', 'encoded'])
 		expect(entries.every((e) => Number.isFinite(e.ms) && e.ms >= 0)).toBe(true)
 		expect(entries.at(-1).bytes).toBeGreaterThan(0)
-	} finally { web.close() }
+	} finally {
+		web.close()
+	}
 })
 
 test('create makes a session and sends its snapshot', () => {
@@ -56,7 +61,8 @@ test('history sends distinct assistant model names before the page', async () =>
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'old' }, model: 'openai/gpt-6-luna' })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'again' }, model: 'openai/gpt-6-luna' })
 	let original = models.nameEvent
-	models.nameEvent = (ids) => ids.length ? { type: 'model-names', names: { 'openai/gpt-6-luna': 'GPT-6 Luna' } } : undefined
+	models.nameEvent = (ids) =>
+		ids.length ? { type: 'model-names', names: { 'openai/gpt-6-luna': 'GPT-6 Luna' } } : undefined
 	try {
 		a.events.length = 0
 		a.conn.send({ type: 'history', sessionId: id, before: statSync(history.file(id)).size })
@@ -69,7 +75,14 @@ test('history sends distinct assistant model names before the page', async () =>
 
 test('bad commands are rejected, not thrown', async () => {
 	let a = client()
-	for (let bad of [null, 'open', { type: 'explode' }, { type: 'submit', sessionId: 1, text: 'x' }, { type: 'create' }, { type: 'submit', sessionId: 's', text: 'x', queue: 'yes' }]) {
+	for (let bad of [
+		null,
+		'open',
+		{ type: 'explode' },
+		{ type: 'submit', sessionId: 1, text: 'x' },
+		{ type: 'create' },
+		{ type: 'submit', sessionId: 's', text: 'x', queue: 'yes' },
+	]) {
 		expect(() => a.conn.send(bad)).not.toThrow()
 	}
 	a.conn.send({ type: 'open', sessionId: '999-zzz' })
@@ -78,7 +91,9 @@ test('bad commands are rejected, not thrown', async () => {
 	a.conn.send({ type: 'submit', sessionId: id, text: 'not opened here' })
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('rejected').length === 10)
-	expect(a.events.every((e) => e.type === 'rejected' || e.type === 'tabs' || e.type === 'home' || e.type === 'host-mode')).toBe(true)
+	expect(
+		a.events.every((e) => e.type === 'rejected' || e.type === 'tabs' || e.type === 'home' || e.type === 'host-mode'),
+	).toBe(true)
 	expect(calls).toEqual([])
 })
 
@@ -138,8 +153,6 @@ test('config warnings reach every client: on connect and when announced', () => 
 		config.warnings = origWarnings
 	}
 })
-
-
 
 test('a refused command is rejected with its id, again when repeated', async () => {
 	let a = client()

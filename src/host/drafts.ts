@@ -51,7 +51,8 @@ function set(id: string, text: string, base?: number): Draft | undefined {
 // `base`, the rev the sender's draft was typed from: if nobody changed
 // the draft since, it clears even when the host missed the last edits.
 function sent(id: string, text: string, base?: number): Draft | undefined {
-	let d = drafts.get(id), current = d.text.trim()
+	let d = drafts.get(id),
+		current = d.text.trim()
 	return current && (base === d.rev || text.includes(current)) ? drafts.set(id, '') : undefined
 }
 

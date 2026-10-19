@@ -42,14 +42,16 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Index of the first shown row; set once per session, then moved
 	// only up.
 	let start = () => {
-		let rows = all(), key = starts().get(id())
+		let rows = all(),
+			key = starts().get(id())
 		let i = key === undefined ? -1 : rows.findIndex((r) => r.key === key)
 		return i >= 0 ? i : Math.max(0, rows.length - first)
 	}
-	let setStart = (i: number) => untrack(() => {
-		let key = all()[i]?.key
-		if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
-	})
+	let setStart = (i: number) =>
+		untrack(() => {
+			let key = all()[i]?.key
+			if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
+		})
 	// Nearing the top: rows already loaded first, then earlier history.
 	let more = () => {
 		if (start() === 0) return app.older()
@@ -72,13 +74,20 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
 	let rows = createMemo<Row[]>((before) => view.rows(items(), props.view.sent, before))
-	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), { equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true) })
-	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, tabIds(), props.view.transcript?.queueHold))
+	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), {
+		equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true),
+	})
+	let all = createMemo(() =>
+		view.withPending(rows(), props.pending, props.view.transcript?.inbox, tabIds(), props.view.transcript?.queueHold),
+	)
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
 	// The call the session runs now: its card ticks (task hyt).
-	let running = () => { let st = props.view.transcript?.state; return st?.type === 'running' && st.phase === 'tools' && st.call ? { call: st.call, since: st.since } : undefined }
+	let running = () => {
+		let st = props.view.transcript?.state
+		return st?.type === 'running' && st.phase === 'tools' && st.call ? { call: st.call, since: st.since } : undefined
+	}
 	// Otherwise its own line after the last row, before waiting and
 	// pending messages: the cursor is the work now, they the future.
 	let line = () => (
@@ -90,7 +99,12 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let jobs = createMemo(() => view.jobs(all()))
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
 	// One queued message is edited at a time, in one window.
-	let editableWaiting = (r: Row) => !props.view.transcript?.queueHold && r.note !== undefined && r.item.type === 'prompt' && r.item.from === undefined && r.item.origin !== 'model'
+	let editableWaiting = (r: Row) =>
+		!props.view.transcript?.queueHold &&
+		r.note !== undefined &&
+		r.item.type === 'prompt' &&
+		r.item.from === undefined &&
+		r.item.origin !== 'model'
 	let editable = createMemo(() => amend.editable(items()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	// The linked card is always among the rows shown.
@@ -100,7 +114,10 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		return rows.slice(Math.max(0, Math.min(start(), linked < 0 ? rows.length : linked)))
 	})
 	// Pin the first shown row once the tab has rows.
-	createEffect(() => (all().length && !starts().has(id()) ? start() : -1), (i) => void (i >= 0 && setStart(i)))
+	createEffect(
+		() => (all().length && !starts().has(id()) ? start() : -1),
+		(i) => void (i >= 0 && setStart(i)),
+	)
 	createEffect(shown, () => void requestAnimationFrame(check))
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
@@ -109,18 +126,44 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)} running={running()} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold} waiting={waiting} />}>
-						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
-					</Show>
-					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
+						<Show
+							when={open(row())}
+							fallback={
+								<Card
+									row={row()}
+									session={props.view.transcript?.meta.id ?? ''}
+									blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)}
+									running={running()}
+									cursor={cursorKey() === row().key}
+									target={hit() === row().key}
+									job={jobs().has(row().item.key) ? row().item.key : undefined}
+									edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
+									discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold}
+									waiting={waiting}
+								/>
+							}
+						>
+							{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
+						</Show>
+						<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
 					</>
 				)}
 			</For>
 			<Show when={!streaming() && !rows().length}>{line()}</Show>
 			<div class="to-bottom">
 				<Show when={away()}>
-					<button type="button" aria-label="Scroll to the bottom" title="Scroll to the bottom" onPointerDown={(e) => e.preventDefault()} onClick={() => scroll.follow(() => {}, true)}>
-						<span class="pill"><svg viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10L6 7zM1 8h10l-5 6z" /></svg></span>
+					<button
+						type="button"
+						aria-label="Scroll to the bottom"
+						title="Scroll to the bottom"
+						onPointerDown={(e) => e.preventDefault()}
+						onClick={() => scroll.follow(() => {}, true)}
+					>
+						<span class="pill">
+							<svg viewBox="0 0 12 16" aria-hidden="true">
+								<path d="M1 1h10L6 7zM1 8h10l-5 6z" />
+							</svg>
+						</span>
 					</button>
 				</Show>
 			</div>

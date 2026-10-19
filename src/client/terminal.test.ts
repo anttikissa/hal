@@ -96,7 +96,10 @@ describe('start', () => {
 			delete process.env.STY
 			process.env.TERM = 'xterm-256color'
 			expect(fixture().out).toContain('\x1b[>1u')
-			for (let [sty, term] of [['1.pts-0.host', 'xterm-256color'], [undefined, 'screen.xterm-256color']]) {
+			for (let [sty, term] of [
+				['1.pts-0.host', 'xterm-256color'],
+				[undefined, 'screen.xterm-256color'],
+			]) {
 				terminal.reset()
 				if (sty) process.env.STY = sty
 				else delete process.env.STY

@@ -13,17 +13,56 @@ export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit' |
 // replaces the whole title, as "Closed tab 5: name" (task 97r).
 // `color`: the sending tab's project color (colors.project p0..p7), set
 // when tabs have colors; the card takes it instead of the kind's.
-export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string; title?: string }
+export type NoticeEvent = {
+	type: 'notice'
+	session: string
+	tab?: number
+	color?: number
+	name: string
+	kind: NoticeKind
+	line: string
+	key?: string
+	what?: string
+	title?: string
+}
 // `href`: where a web card links when it names no session.
-export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; href?: string; at: number }
+export type Notice = {
+	key: string
+	kind: NoticeKind
+	title: string
+	line: string
+	session?: string
+	tab?: number
+	color?: number
+	stays?: true
+	href?: string
+	at: number
+}
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
 
 // A history entry (task py, host/notice-history.ts): `block` is the
 // triggering record's key; `awaiting` whether a question is still open.
-export type NoticeEntry = { id: string; at: string; session: string; name: string; kind: NoticeKind; line: string; what?: string; block?: string; awaiting?: boolean }
+export type NoticeEntry = {
+	id: string
+	at: string
+	session: string
+	name: string
+	kind: NoticeKind
+	line: string
+	what?: string
+	block?: string
+	awaiting?: boolean
+}
 
 // 'update': a mid-turn notify-tool line, which neither ends the turn nor asks.
-const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', update: 'update', commit: 'committed', warning: 'warning' }
+const WORDS: Record<NoticeKind, string> = {
+	done: 'done',
+	failed: 'failed',
+	attention: 'needs your attention',
+	update: 'update',
+	commit: 'committed',
+	warning: 'warning',
+}
 
 // Why a history entry was sent, in words that claim no more than
 // happened (both clients' notification history).
@@ -38,7 +77,13 @@ function stamp(at: string): string {
 }
 
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
-	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: e.title ?? `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
+	let n: Omit<Notice, 'at'> = {
+		key: e.key ?? `session:${e.session}`,
+		kind: e.kind,
+		title: e.title ?? `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(),
+		line: e.line,
+		session: e.session,
+	}
 	if (e.tab !== undefined) n.tab = e.tab
 	if (e.color !== undefined) n.color = e.color
 	return n
@@ -70,10 +115,13 @@ function schedule(now = Date.now()): void {
 	clearTimeout(notices.state.timer)
 	let ends = notices.state.entries.filter((e) => !e.stays).map((e) => e.at + notices.ttl)
 	if (!ends.length) return void (notices.state.timer = undefined)
-	notices.state.timer = setTimeout(() => {
-		if (notices.expire()) notices.onChange()
-		notices.schedule()
-	}, Math.max(0, Math.min(...ends) - now))
+	notices.state.timer = setTimeout(
+		() => {
+			if (notices.expire()) notices.onChange()
+			notices.schedule()
+		},
+		Math.max(0, Math.min(...ends) - now),
+	)
 }
 
 // What the stack shows: the newest max(), the rest counted with their tab numbers.

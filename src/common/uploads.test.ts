@@ -8,13 +8,32 @@ beforeEach(() => {
 	settings.state.raw = {}
 })
 
-const attached = (command: string, marker: string): Event => ({ type: 'attached', sessionId: 's', command, blob: 'b', marker })
-const rejected = (id: string, reason: string): Event => ({ type: 'rejected', sessionId: 's', command: 'attach', reason, id })
+const attached = (command: string, marker: string): Event => ({
+	type: 'attached',
+	sessionId: 's',
+	command,
+	blob: 'b',
+	marker,
+})
+const rejected = (id: string, reason: string): Event => ({
+	type: 'rejected',
+	sessionId: 's',
+	command: 'attach',
+	reason,
+	id,
+})
 
 test('an image is its final marker [image/<name>] from the start; the command carries the name', () => {
 	let marker = uploads.begin('s', 'c.1', 'image/png')
 	let name = /^\[image\/([0-9a-z]{6}\.png)\]$/.exec(marker)![1]
-	expect(uploads.command('s', 'c.1', 'image/png', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'image/png', data: 'AQI=', name })
+	expect(uploads.command('s', 'c.1', 'image/png', new Uint8Array([1, 2]))).toEqual({
+		type: 'attach',
+		id: 'c.1',
+		sessionId: 's',
+		mediaType: 'image/png',
+		data: 'AQI=',
+		name,
+	})
 	expect(uploads.begin('s', 'c.2', 'image/jpeg')).toMatch(/^\[image\/[0-9a-z]{6}\.jpg\]$/)
 	expect(uploads.pending('s')).toBe(true)
 	let done = uploads.settle(attached('c.1', marker))!
@@ -24,7 +43,14 @@ test('an image is its final marker [image/<name>] from the start; the command ca
 test('a long paste is its final marker [paste/<name>.txt] from the start, in flight until answered', () => {
 	let marker = uploads.begin('s', 'c.1', 'text/plain')
 	let name = /^\[paste\/([0-9a-z]{6}\.txt)\]$/.exec(marker)![1]
-	expect(uploads.command('s', 'c.1', 'text/plain', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'text/plain', data: 'AQI=', name })
+	expect(uploads.command('s', 'c.1', 'text/plain', new Uint8Array([1, 2]))).toEqual({
+		type: 'attach',
+		id: 'c.1',
+		sessionId: 's',
+		mediaType: 'text/plain',
+		data: 'AQI=',
+		name,
+	})
 	expect(uploads.inFlight(marker)).toBe(true)
 	let text = `look ${marker} here and more`
 	let p = { text, cursor: text.length, anchor: 2 }

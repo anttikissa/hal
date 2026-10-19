@@ -3,7 +3,14 @@ import type { SparseRebase } from './rebase-sparse.ts'
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
 
-export type ContextTransition = { id: string; kind: 'clear' | 'compact' | 'rebase'; rebase?: { sparse: SparseRebase; paused?: true; resume?: true; call?: string }; prompt?: string; sender: Sender; canceled?: true }
+export type ContextTransition = {
+	id: string
+	kind: 'clear' | 'compact' | 'rebase'
+	rebase?: { sparse: SparseRebase; paused?: true; resume?: true; call?: string }
+	prompt?: string
+	sender: Sender
+	canceled?: true
+}
 
 function pending(records: HistoryRecord[]): ContextTransition | undefined {
 	let intent: ContextTransition | undefined

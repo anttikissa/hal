@@ -19,24 +19,45 @@ const said = {
 
 export function Notifications(props: { open: boolean; onClose: () => void }) {
 	let dialog!: HTMLDialogElement
-	createEffect(() => props.open, (o) => {
-		// Moving focus runs focus handlers here; they read state untracked.
-		if (o && !dialog.open) { untrack(() => dialog.showModal()); connection.send({ type: 'push', action: 'list' }) }
-		if (!o && dialog.open) untrack(() => dialog.close())
-		push.watchHistory(o)
-	})
+	createEffect(
+		() => props.open,
+		(o) => {
+			// Moving focus runs focus handlers here; they read state untracked.
+			if (o && !dialog.open) {
+				untrack(() => dialog.showModal())
+				connection.send({ type: 'push', action: 'list' })
+			}
+			if (!o && dialog.open) untrack(() => dialog.close())
+			push.watchHistory(o)
+		},
+	)
 	let fail = (e: any) => alert(`Notifications: ${e?.message ?? e}`)
 	return (
-		<dialog ref={(e) => (dialog = e)} class="Notifications sheet" aria-label="Notifications" onClose={props.onClose} onClick={(e) => e.target === e.currentTarget && props.onClose()}>
+		<dialog
+			ref={(e) => (dialog = e)}
+			class="Notifications sheet"
+			aria-label="Notifications"
+			onClose={props.onClose}
+			onClick={(e) => e.target === e.currentTarget && props.onClose()}
+		>
 			<h2>Notifications</h2>
 			<p role="status">{said[push.status()]}</p>
 			<Show when={push.problem()}>{(p) => <p>Reason: {p()}.</p>}</Show>
 			<Show when={push.status() === 'off'}>
-				<button type="button" class="new" onClick={() => void push.enable().catch(fail)}><Icon name="bell" />Turn on</button>
+				<button type="button" class="new" onClick={() => void push.enable().catch(fail)}>
+					<Icon name="bell" />
+					Turn on
+				</button>
 			</Show>
 			<Show when={push.status() === 'on'}>
-				<button type="button" onClick={push.test}><Icon name="send" />Send test notification</button>
-				<button type="button" onClick={() => void push.disable().catch(fail)}><Icon name="close" />Turn off</button>
+				<button type="button" onClick={push.test}>
+					<Icon name="send" />
+					Send test notification
+				</button>
+				<button type="button" onClick={() => void push.disable().catch(fail)}>
+					<Icon name="close" />
+					Turn off
+				</button>
 			</Show>
 			<Show when={push.devices().result}>{(r) => <p role="status">{r()}</p>}</Show>
 			<h3>History</h3>
@@ -46,14 +67,19 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 						<For each={list()} fallback={<li>No notifications yet.</li>}>
 							{(e) => (
 								<li class={e.kind}>
-									<a href={(e.block && transcript.href(e.session, e.block)) || router.format(e.session)} onClick={(ev) => {
-										if (ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return
-										props.onClose()
-										if (e.block) return
-										ev.preventDefault()
-										tabs.show(e.session, false)
-									}}>
-										<span class="head"><time datetime={e.at}>{notices.stamp(e.at)}</time> {e.name} · {notices.reason(e)}</span>
+									<a
+										href={(e.block && transcript.href(e.session, e.block)) || router.format(e.session)}
+										onClick={(ev) => {
+											if (ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return
+											props.onClose()
+											if (e.block) return
+											ev.preventDefault()
+											tabs.show(e.session, false)
+										}}
+									>
+										<span class="head">
+											<time datetime={e.at}>{notices.stamp(e.at)}</time> {e.name} · {notices.reason(e)}
+										</span>
 										<span class="line">{e.line}</span>
 									</a>
 								</li>
@@ -73,12 +99,23 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 								{d.endpoint === push.mine() ? ' (this device)' : ''}
 								{d.added ? ` · added ${new Date(d.added!).toLocaleDateString()}` : ''}
 							</span>
-							<button type="button" class="close" aria-label={`Remove ${d.device ?? 'device'}`} onClick={() => push.remove(d.endpoint)}><Icon name="close" />Remove</button>
+							<button
+								type="button"
+								class="close"
+								aria-label={`Remove ${d.device ?? 'device'}`}
+								onClick={() => push.remove(d.endpoint)}
+							>
+								<Icon name="close" />
+								Remove
+							</button>
 						</li>
 					)}
 				</For>
 			</ul>
-			<button type="button" onClick={props.onClose}><Icon name="close" />Close</button>
+			<button type="button" onClick={props.onClose}>
+				<Icon name="close" />
+				Close
+			</button>
 		</dialog>
 	)
 }

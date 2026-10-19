@@ -5,7 +5,18 @@ import { paths } from './paths.ts'
 import { type ToolContext, type ToolOutput, tools } from './tools.ts'
 
 function entities(text: string): string {
-	const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', hellip: '…', copy: '©' }
+	const named: Record<string, string> = {
+		amp: '&',
+		lt: '<',
+		gt: '>',
+		quot: '"',
+		apos: "'",
+		nbsp: ' ',
+		mdash: '—',
+		ndash: '–',
+		hellip: '…',
+		copy: '©',
+	}
 	return text.replace(/&(#(?:x[0-9a-f]+|[0-9]+)|[a-z]+);/gi, (whole, key: string) => {
 		if (key[0] !== '#') return named[key.toLowerCase()] ?? whole
 		let point = key[1]?.toLowerCase() === 'x' ? parseInt(key.slice(2), 16) : parseInt(key.slice(1), 10)
@@ -34,9 +45,23 @@ async function body(res: Response, limit: number): Promise<{ bytes: Uint8Array; 
 
 function htmlText(html: string): string {
 	let title = entities((html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] ?? '').replace(/<[^>]*>/g, '').trim())
-	let body = html.replace(/<!--[^]*?-->/g, '').replace(/<template\b(?=[^>]*\bshadowrootmode\s*=)[^>]*>/gi, '').replace(/<(script|style|noscript|template|head)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
-	body = body.replace(/<br\b[^>]*\/?>/gi, '\n').replace(/<\/?(?:p|div|section|article|main|header|footer|nav|h[1-6]|li|ul|ol|blockquote|pre|table|tr|td|th|hr)\b[^>]*>/gi, '\n').replace(/<[^>]*>/g, '')
-	body = entities(body).replace(/\r\n?/g, '\n').replace(/[\t \f]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+	let body = html
+		.replace(/<!--[^]*?-->/g, '')
+		.replace(/<template\b(?=[^>]*\bshadowrootmode\s*=)[^>]*>/gi, '')
+		.replace(/<(script|style|noscript|template|head)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
+	body = body
+		.replace(/<br\b[^>]*\/?>/gi, '\n')
+		.replace(
+			/<\/?(?:p|div|section|article|main|header|footer|nav|h[1-6]|li|ul|ol|blockquote|pre|table|tr|td|th|hr)\b[^>]*>/gi,
+			'\n',
+		)
+		.replace(/<[^>]*>/g, '')
+	body = entities(body)
+		.replace(/\r\n?/g, '\n')
+		.replace(/[\t \f]+/g, ' ')
+		.replace(/ *\n */g, '\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim()
 	return [title, body].filter(Boolean).join('\n\n')
 }
 
@@ -47,7 +72,11 @@ export const webRead = {
 	async run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
 		if (typeof input.url !== 'string') throw new Error('url must be an http(s) URL')
 		let url: URL
-		try { url = new URL(input.url) } catch { throw new Error('invalid URL') }
+		try {
+			url = new URL(input.url)
+		} catch {
+			throw new Error('invalid URL')
+		}
 		if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('url must use http or https')
 		let signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(30_000)])
 		let res = await fetch(url, { signal })
@@ -58,16 +87,26 @@ export const webRead = {
 			if (size > attachments.maxBytes) throw new Error(`image larger than ${attachments.maxBytes} bytes`)
 			let { bytes, cut } = await body(res, attachments.maxBytes)
 			if (cut) throw new Error(`image larger than ${attachments.maxBytes} bytes`)
-			return { text: `Image from ${res.url} (${type}, ${bytes.length} bytes)`, image: { mediaType: type, data: Buffer.from(bytes).toString('base64') } }
+			return {
+				text: `Image from ${res.url} (${type}, ${bytes.length} bytes)`,
+				image: { mediaType: type, data: Buffer.from(bytes).toString('base64') },
+			}
 		}
-		if (type === 'text/html' || type === 'application/xhtml+xml' || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json')) {
+		if (
+			type === 'text/html' ||
+			type === 'application/xhtml+xml' ||
+			type.startsWith('text/') ||
+			type === 'application/json' ||
+			type.endsWith('+json')
+		) {
 			let { bytes, cut } = await body(res, webRead.maxTextBytes)
 			let text = new TextDecoder().decode(bytes)
 			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
 			if (!readable.trim()) return `No readable content found at ${res.url} (empty page or JavaScript-rendered page).`
 			let max = tools.maxChars - 100
 			let more = cut ? `more than ${webRead.maxTextBytes} bytes; ` : ''
-			if (readable.length > max) return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
+			if (readable.length > max)
+				return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
 			return cut ? `${readable}\n[output truncated: the page is ${more.slice(0, -2)}]` : readable
 		}
 		let dir = paths.fileDir()

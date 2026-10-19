@@ -20,7 +20,13 @@ import { sessions } from './host/sessions.ts'
 import { paths } from './host/paths.ts'
 
 const savedHome = paths.state.home
-const saved = { send: app.send, show: render.show, budget: pages.budget, draftSend: drafts.send, onError: liveFiles.onError }
+const saved = {
+	send: app.send,
+	show: render.show,
+	budget: pages.budget,
+	draftSend: drafts.send,
+	onError: liveFiles.onError,
+}
 let home = ''
 
 beforeEach(() => {
@@ -52,18 +58,29 @@ function longSession(): string {
 	let id = sessions.create({ cwd: '/', model: 'fake/m' }).id
 	for (let i = 0; i < 40; i++) {
 		history.submit(id, `prompt ${i}`)
-		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: `t${i}`, name: 'read', input: { path: `/f${i}` } } })
-		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: `t${i}`, output: `line\n`.repeat(50 + i) }] })
+		history.append(id, {
+			type: 'assistant',
+			block: { type: 'tool_call', id: `t${i}`, name: 'read', input: { path: `/f${i}` } },
+		})
+		history.append(id, {
+			type: 'user',
+			blocks: [{ type: 'tool_result', id: `t${i}`, output: `line\n`.repeat(50 + i) }],
+		})
 		history.append(id, { type: 'assistant', block: { type: 'text', text: `answer ${i} `.repeat(30) } })
 		history.append(id, { type: 'turn_end', status: 'completed', usage: { input: i, output: 1 } })
 		if (i === 10) {
 			history.append(id, { type: 'command', text: '/cd /tmp' })
 			history.append(id, { type: 'output', text: 'now in /tmp' })
 		}
-		if (i === 20) history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${i} edited` }], replaces: true })
+		if (i === 20)
+			history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${i} edited` }], replaces: true })
 	}
 	history.submit(id, 'the last prompt')
-	history.append(id, { type: 'question', id: 'q1', form: { text: 'Allow?', fields: [{ type: 'choice', name: 'ok', options: ['yes', 'no'] }] } })
+	history.append(id, {
+		type: 'question',
+		id: 'q1',
+		form: { text: 'Allow?', fields: [{ type: 'choice', name: 'ok', options: ['yes', 'no'] }] },
+	})
 	for (let i = 0; i < 30; i++) history.append(id, { type: 'output', text: `waiting ${i} `.repeat(100) })
 	return id
 }

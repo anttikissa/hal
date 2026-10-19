@@ -13,7 +13,16 @@ test('only the keys whose meaning differs from a textarea leave native editing',
 	expect(routed('backspace', { alt: true })).toBe(true)
 	expect(routed('left', { alt: true })).toBe(true)
 	// Native already matches: typing, arrows, word-right, deleting, undo.
-	for (let [k, mods] of [['a', {}], ['right', { alt: true }], ['right', { cmd: true }], ['backspace', {}], ['home', {}], ['z', { cmd: true }], ['a', { ctrl: true }]] as const) expect(routed(k, mods)).toBe(false)
+	for (let [k, mods] of [
+		['a', {}],
+		['right', { alt: true }],
+		['right', { cmd: true }],
+		['backspace', {}],
+		['home', {}],
+		['z', { cmd: true }],
+		['a', { ctrl: true }],
+	] as const)
+		expect(routed(k, mods)).toBe(false)
 })
 
 test('splice finds the smallest replacement between two texts, never splitting a surrogate pair', () => {
@@ -40,7 +49,16 @@ test('splice finds the smallest replacement between two texts, never splitting a
 
 test('writing back an unchanged text leaves the box alone', () => {
 	// A browser's execCommand('delete') on a caret deletes backwards.
-	let box = { value: 'see [image/abc123.png]', selectionStart: 22, selectionEnd: 22, focus() {}, setSelectionRange(a: number, b: number) { box.selectionStart = a; box.selectionEnd = b } }
+	let box = {
+		value: 'see [image/abc123.png]',
+		selectionStart: 22,
+		selectionEnd: 22,
+		focus() {},
+		setSelectionRange(a: number, b: number) {
+			box.selectionStart = a
+			box.selectionEnd = b
+		},
+	}
 	let doc = globalThis as any
 	let had = doc.document
 	doc.document = {

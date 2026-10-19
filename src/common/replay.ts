@@ -3,7 +3,17 @@
 // these records alone, never from display state.
 // Tasks: 7, nvm, svt, 6eq, rqq.
 
-import type { AssistantBlock, CommitBlock, Message, StopReason, ToolCallBlock, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import type {
+	AssistantBlock,
+	CommitBlock,
+	Message,
+	StopReason,
+	ToolCallBlock,
+	ToolResultBlock,
+	Usage,
+	UserBlock,
+	UserText,
+} from './blocks.ts'
 import { ason } from './ason.ts'
 import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
@@ -26,7 +36,14 @@ export type TurnStatus = 'completed' | 'paused' | 'error' | 'canceled' | 'interr
 export type FileSnapshot = string | { size: number; mtime: number } | null
 export type FileChange =
 	| { path: string; before: FileSnapshot; after: FileSnapshot; undeclared?: never }
-	| { path: string; undeclared: true; statusBefore: string | null; statusAfter: string | null; before?: never; after?: never }
+	| {
+			path: string
+			undeclared: true
+			statusBefore: string | null
+			statusAfter: string | null
+			before?: never
+			after?: never
+	  }
 
 // Every record has `n`, its number in the session (task w5): 1, 2, 3...,
 // given by the host, the one writer of a home's histories, so numbers
@@ -36,75 +53,143 @@ export type FileChange =
 // have no `n` on disk and get their byte offset + 1 when read (pages.ts),
 // which no later number reuses. Absent only in records built by hand.
 export type HistoryRecord = Numbered &
-	(
 	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; replaces?: true; amends?: number; ts: string }
-	// A message sent while the session was busy, waiting in the inbox
-	// (src/common/inbox.ts) until a prompt record delivers it. Not
-	// provider input by itself. `id`: the client's command id, if any.
-	// Sender fields (from, label, advisory): another session sent it
-	// (task rj); none, the human. A later
-	// record with the same id is an edit of the waiting message (task
-	// dg): its new text, in the same place; `withdrawn` takes it out
-	// (edited into a slash command). `command`: the edit's command id.
-	| { type: 'inbox'; id: string; text: string; interactive?: boolean; delivery?: 'now' | 'next-round' | 'after-turn'; from?: string; label?: string; advisory?: true; summary?: string; report?: 'question' | 'summary'; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
-	// One assistant block, appended as soon as it is complete.
-	// `ts`: when the block started streaming; `model`, `effort`: what
-	// wrote it (task hp; older records have neither).
-	| { type: 'assistant'; block: AssistantBlock; model?: string; effort?: string; interrupted?: true; ts: string }
-	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
-	// the user, paused it). `usage`: all its rounds'; `context`: the
-	// tokens its last round with usage took in (status row, task 1g).
-	// A turn with no end is unfinished: the host
-	// died or restarted mid-turn, and the next host continues it.
-	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; context?: number; ts: string }
-	// The turn goes on after a pause, a failure or a host that went away.
-	| { type: 'continue'; reason?: string; ts: string }
-	// A provider answered with a limit; waiting is progress, not a crash.
-	| { type: 'rate_limit'; provider: string; model: string; until: string; text: string; ts: string }
-	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
-	// with nothing in memory, until an answer re-runs whoever asked.
-	// `call`: the tool call it asks approval for (host/approval.ts).
-	// `usage`: the turn's usage so far, which the answered turn goes on
-	// from, as nothing of the turn stays in memory while it waits.
-	// `from`: the slash command that asked, re-run with the answer;
-	// without it, the turn asked.
-	| { type: 'question'; id: string; form: Form; call?: string; usage?: Usage; from?: { command: string; args: string }; ts: string }
-	// The first answer to question `question`. Secret fields are left
-	// out of `answers` and only named in `secrets`. `canceled`: Escape
-	// dismissed a command's question; nothing was answered.
-	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; canceled?: true; ts: string }
-	// A slash command (src/host/commands/), as typed. `from`: the session
-	// that sent it; `origin: model` identifies Hal's command tool. Without
-	// either, the human typed it (legacy provenance is unknown). `command`: the
-	// client's id for the submit, so a resend is recognized.
-	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
-	// What a command said; `error` if it failed.
-	// `change`: a system-prompt file changed (host/prompt-trail.ts); the
-	// model reads `text` as a notice on its next request.
-	// `commit`: a commit a Bash call made (task 179), its own card.
-	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; commit?: CommitBlock; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
-	// The session's cwd (/cd) or model changed. Not a turn; the model is
-	// told as a notice on its next request.
-	| { type: 'change'; cwd?: string; model?: string; autoclose?: boolean; previous?: { cwd?: string; model?: string; autoclose?: boolean }; ts: string }
-	// Host facts, delivered only at a frozen request boundary (nvm).
-	| { type: 'notice'; text: string; rendered?: true; source?: number; sectionUpdate?: true; ts: string }
-	// Observed changes during bash, not proof of authorship; not provider input.
-	| { type: 'file_changes'; toolId: string; call?: number; cwd: string; files: FileChange[]; ts: string }
-	// One provider round's own usage (task c4), after its blocks: the
-	// context graph's points. `block`: the number of the round's first
-	// assistant record. Not provider input, not shown in the transcript.
-	| { type: 'round'; usage: Usage; model?: string; account?: string; block?: number; ts: string }
-	// A context boundary: `keep` names this turn's prompts, replayed
-	// verbatim (including images) after the summary, not summarized into it.
-	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
-	// A fresh context (/clear, task vh): provider input is rebuilt from
-	// the records after it alone, with no summary.
-	| ({ type: 'rebase'; transition?: string; contextChanged?: true; quiet?: true; ts: string } & import('./rebase.ts').RebasePlan)
-	| { type: 'reset'; transition?: string; ts: string }
+	(
+		| {
+				type: 'user'
+				blocks: UserBlock[]
+				notices?: Notice[]
+				naming?: { turn: number; version: number; name: string; eligible: boolean }
+				command?: string
+				inbox?: string[]
+				replaces?: true
+				amends?: number
+				ts: string
+		  }
+		// A message sent while the session was busy, waiting in the inbox
+		// (src/common/inbox.ts) until a prompt record delivers it. Not
+		// provider input by itself. `id`: the client's command id, if any.
+		// Sender fields (from, label, advisory): another session sent it
+		// (task rj); none, the human. A later
+		// record with the same id is an edit of the waiting message (task
+		// dg): its new text, in the same place; `withdrawn` takes it out
+		// (edited into a slash command). `command`: the edit's command id.
+		| {
+				type: 'inbox'
+				id: string
+				text: string
+				interactive?: boolean
+				delivery?: 'now' | 'next-round' | 'after-turn'
+				from?: string
+				label?: string
+				advisory?: true
+				summary?: string
+				report?: 'question' | 'summary'
+				withdrawn?: true
+				command?: string
+				origin?: 'model'
+				generatingCommand?: 'clear'
+				ts: string
+		  }
+		// One assistant block, appended as soon as it is complete.
+		// `ts`: when the block started streaming; `model`, `effort`: what
+		// wrote it (task hp; older records have neither).
+		| { type: 'assistant'; block: AssistantBlock; model?: string; effort?: string; interrupted?: true; ts: string }
+		// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
+		// the user, paused it). `usage`: all its rounds'; `context`: the
+		// tokens its last round with usage took in (status row, task 1g).
+		// A turn with no end is unfinished: the host
+		// died or restarted mid-turn, and the next host continues it.
+		| {
+				type: 'turn_end'
+				status: TurnStatus
+				reason?: StopReason
+				error?: string
+				pauseReason?: string
+				usage: Usage
+				context?: number
+				ts: string
+		  }
+		// The turn goes on after a pause, a failure or a host that went away.
+		| { type: 'continue'; reason?: string; ts: string }
+		// A provider answered with a limit; waiting is progress, not a crash.
+		| { type: 'rate_limit'; provider: string; model: string; until: string; text: string; ts: string }
+		// A durable question (tasks/w4/forms.md): the turn waits, blocked,
+		// with nothing in memory, until an answer re-runs whoever asked.
+		// `call`: the tool call it asks approval for (host/approval.ts).
+		// `usage`: the turn's usage so far, which the answered turn goes on
+		// from, as nothing of the turn stays in memory while it waits.
+		// `from`: the slash command that asked, re-run with the answer;
+		// without it, the turn asked.
+		| {
+				type: 'question'
+				id: string
+				form: Form
+				call?: string
+				usage?: Usage
+				from?: { command: string; args: string }
+				ts: string
+		  }
+		// The first answer to question `question`. Secret fields are left
+		// out of `answers` and only named in `secrets`. `canceled`: Escape
+		// dismissed a command's question; nothing was answered.
+		| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; canceled?: true; ts: string }
+		// A slash command (src/host/commands/), as typed. `from`: the session
+		// that sent it; `origin: model` identifies Hal's command tool. Without
+		// either, the human typed it (legacy provenance is unknown). `command`: the
+		// client's id for the submit, so a resend is recognized.
+		| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
+		// What a command said; `error` if it failed.
+		// `change`: a system-prompt file changed (host/prompt-trail.ts); the
+		// model reads `text` as a notice on its next request.
+		// `commit`: a commit a Bash call made (task 179), its own card.
+		| {
+				type: 'output'
+				text: string
+				error?: true
+				origin?: 'model'
+				synthetic?: true
+				change?: PromptChange
+				commit?: CommitBlock
+				transition?: ContextTransition
+				transitionDone?: string
+				transitionCancel?: string
+				ts: string
+		  }
+		// The session's cwd (/cd) or model changed. Not a turn; the model is
+		// told as a notice on its next request.
+		| {
+				type: 'change'
+				cwd?: string
+				model?: string
+				autoclose?: boolean
+				previous?: { cwd?: string; model?: string; autoclose?: boolean }
+				ts: string
+		  }
+		// Host facts, delivered only at a frozen request boundary (nvm).
+		| { type: 'notice'; text: string; rendered?: true; source?: number; sectionUpdate?: true; ts: string }
+		// Observed changes during bash, not proof of authorship; not provider input.
+		| { type: 'file_changes'; toolId: string; call?: number; cwd: string; files: FileChange[]; ts: string }
+		// One provider round's own usage (task c4), after its blocks: the
+		// context graph's points. `block`: the number of the round's first
+		// assistant record. Not provider input, not shown in the transcript.
+		| { type: 'round'; usage: Usage; model?: string; account?: string; block?: number; ts: string }
+		// A context boundary: `keep` names this turn's prompts, replayed
+		// verbatim (including images) after the summary, not summarized into it.
+		| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
+		// A fresh context (/clear, task vh): provider input is rebuilt from
+		// the records after it alone, with no summary.
+		| ({
+				type: 'rebase'
+				transition?: string
+				contextChanged?: true
+				quiet?: true
+				ts: string
+		  } & import('./rebase.ts').RebasePlan)
+		| { type: 'reset'; transition?: string; ts: string }
 	)
 
 // Copied records retain their original session through repeated forks (v6).
@@ -124,24 +209,29 @@ type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
 // text the model wrote (an unresolved one as its cmd), and a call from
 // before the one native tool as the equivalent NAME { fields } text.
 function asNative(b: ToolCallBlock): ToolCallBlock {
-	let text = b.cmd ?? (b.name === 'tool' && typeof b.input.cmd === 'string' ? b.input.cmd : `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
+	let text =
+		b.cmd ??
+		(b.name === 'tool' && typeof b.input.cmd === 'string'
+			? b.input.cmd
+			: `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
 	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
 }
 
 function toMessages(records: HistoryRecord[]): Message[] {
-	let materialized = new Set(records.flatMap((r) => r.type === 'notice' && r.source !== undefined ? [r.source] : []))
+	let materialized = new Set(records.flatMap((r) => (r.type === 'notice' && r.source !== undefined ? [r.source] : [])))
 	records = replay.current(records)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let boundary = records[at]
 	let kept = boundary?.type === 'compact' ? new Set(boundary.keep ?? []) : new Set<number>()
 	let prompts = records.slice(0, at).filter((r) => r.type === 'user' && r.n !== undefined && kept.has(r.n))
 	if (at >= 0) records = [...prompts, ...records.slice(at + 1)]
-	let out: Message[] = boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []
+	let out: Message[] =
+		boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []
 	let pending: string[] = []
 	let status: TurnStatus | undefined
 	let facts: Notice[] = []
 	let known: Parameters<typeof modelNotices.text>[1] = {}
-	let delivered = new Set(records.flatMap((r) => r.type === 'user' ? r.notices?.map((n) => n.source) ?? [] : []))
+	let delivered = new Set(records.flatMap((r) => (r.type === 'user' ? (r.notices?.map((n) => n.source) ?? []) : [])))
 	let push = (msg: Message) => {
 		let last = out.at(-1)
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
@@ -167,11 +257,13 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	// Records built by hand (tests) have no number, so no id. No " in
 	// <origin>" suffix: a fork replays byte-identical to its parent, so
 	// the prompt cache still hits.
-	let ref = (r: HistoryRecord, letter: string, i = 0) => r.n === undefined ? '' : `${letter}${r.n}${i ? `.${i}` : ''}`
+	let ref = (r: HistoryRecord, letter: string, i = 0) => (r.n === undefined ? '' : `${letter}${r.n}${i ? `.${i}` : ''}`)
 	let result = (block: ToolResultBlock): ToolResultBlock => {
 		let { presentation: _presentation, presentationError, ...b } = block
 		let call = calls.get(b.id)
-		let error = presentationError ?? (call?.type === 'assistant' && call.block.type === 'tool_call' ? call.block.presentationError : undefined)
+		let error =
+			presentationError ??
+			(call?.type === 'assistant' && call.block.type === 'tool_call' ? call.block.presentationError : undefined)
 		if (error) b.output += `\nDisplay error (execution outcome unchanged): ${error}`
 		if (call?.n === undefined) return b
 		let time = b.ms !== undefined && b.ms >= 5000 ? bashResult.duration(b.ms) : undefined
@@ -184,8 +276,24 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		let text = modelNotices.text(r, known)
-		if (text && !materialized.has(r.n ?? i + 1) && !delivered.has(r.n ?? i + 1)) facts.push({ source: r.n ?? i + 1, text })
-		if (r.type === 'notice' || r.type === 'change' || r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (text && !materialized.has(r.n ?? i + 1) && !delivered.has(r.n ?? i + 1))
+			facts.push({ source: r.n ?? i + 1, text })
+		if (
+			r.type === 'notice' ||
+			r.type === 'change' ||
+			r.type === 'rate_limit' ||
+			r.type === 'rebase' ||
+			r.type === 'file_changes' ||
+			r.type === 'round' ||
+			r.type === 'inbox' ||
+			r.type === 'question' ||
+			r.type === 'answer' ||
+			r.type === 'command' ||
+			r.type === 'output' ||
+			r.type === 'compact' ||
+			r.type === 'reset'
+		)
+			continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) continue
 		let before = prev
@@ -194,7 +302,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			status = r.status
 		} else if (r.type === 'continue') {
 			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
-			let missing = pending.map((id): ToolResultBlock => result({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
+			let missing = pending.map((id): ToolResultBlock =>
+				result({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }),
+			)
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: missing })
@@ -202,20 +312,46 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		} else if (r.type === 'assistant') {
 			let b = r.block
 			if ((b.type === 'thinking' && !b.signature) || b.type === 'hosted_tool') continue
-			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
-			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
-			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : b.type === 'tool_call' ? replay.asNative({ type: 'tool_call', id: b.id, name: b.name, input: b.input, ...(b.cmd !== undefined && { cmd: b.cmd }) }) : { ...b }] })
+			if (b.type === 'tool_call') {
+				pending.push(b.id)
+				calls.set(b.id, r)
+			} else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
+			push({
+				role: 'assistant',
+				blocks: [
+					b.type === 'text'
+						? { type: 'text', text: b.text }
+						: b.type === 'tool_call'
+							? replay.asNative({
+									type: 'tool_call',
+									id: b.id,
+									name: b.name,
+									input: b.input,
+									...(b.cmd !== undefined && { cmd: b.cmd }),
+								})
+							: { ...b },
+				],
+			})
 		} else {
-			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
+			if (!r.blocks.length && r.notices) {
+				facts.push(...r.notices)
+				if (!pending.length) flush()
+				continue
+			}
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
 			let answered = new Set(results.map((b) => b.id))
 			let missing: ToolResultBlock[] = pending
 				.filter((id) => !answered.has(id))
-				.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(status), isError: true }))
+				.map((id): ToolResultBlock => ({
+					type: 'tool_result',
+					id,
+					output: replay.missingResult(status),
+					isError: true,
+				}))
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: [...results, ...missing].map(result) })
-			facts.push(...r.notices ?? [])
+			facts.push(...(r.notices ?? []))
 			flush()
 			let texts = r.blocks.filter((b): b is UserText => b.type === 'text')
 			if (!texts.length) continue
@@ -223,7 +359,11 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			// texts (several when it delivers the inbox) are one block, each
 			// under its own header. Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
-			let text = texts.map((b) => `${header(r.ts, ref(r, replay.letter(b), r.blocks.indexOf(b)), replay.tags(b))}\n${replay.framed(b)}`).join('\n\n')
+			let text = texts
+				.map(
+					(b) => `${header(r.ts, ref(r, replay.letter(b), r.blocks.indexOf(b)), replay.tags(b))}\n${replay.framed(b)}`,
+				)
+				.join('\n\n')
 			out.push({ role: 'user', blocks: [{ type: 'text', text }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
@@ -237,7 +377,10 @@ function toMessages(records: HistoryRecord[]): Message[] {
 // A prompt text as the model reads it, below its header: a next-round
 // message also says it needn't drop its work for it.
 function framed(b: UserText): string {
-	let text = b.queuedAt === undefined ? b.text : `<hal-note>Message was queued at ${b.queuedAt}, take that into account when reading it.</hal-note>\n${b.text}`
+	let text =
+		b.queuedAt === undefined
+			? b.text
+			: `<hal-note>Message was queued at ${b.queuedAt}, take that into account when reading it.</hal-note>\n${b.text}`
 	return b.advisory ? `${replay.nextRoundNotice}\n${text}` : text
 }
 
@@ -249,10 +392,14 @@ function letter(b: UserText): string {
 // The transcript header's tags for a prompt text (task c2t); none for a plain prompt.
 function tags(b: UserText): string[] {
 	return [
-		b.from !== undefined ? `message from ${titles.address(b.label ?? b.from)}` : b.origin === 'model' ? 'Hal' : undefined,
+		b.from !== undefined
+			? `message from ${titles.address(b.label ?? b.from)}`
+			: b.origin === 'model'
+				? 'Hal'
+				: undefined,
 		b.generatingCommand && `/${b.generatingCommand} continuation`,
-		(b.delivery === 'now') && 'steering',
-		(b.delivery === 'next-round') && !b.advisory && 'soft-steering',
+		b.delivery === 'now' && 'steering',
+		b.delivery === 'next-round' && !b.advisory && 'soft-steering',
 		b.queuedAt !== undefined && `queued at ${replay.clock(b.queuedAt).slice(-5)}`,
 		b.advisory && 'next round',
 	].filter((t): t is string => !!t)
@@ -276,13 +423,17 @@ function lastPrompt(records: HistoryRecord[]): number {
 // Inbox messages a dropped prompt delivered leave with it: the edit
 // replaced them, so they never wait again.
 function current(records: HistoryRecord[]): HistoryRecord[] {
-	let materialized = new Set(records.flatMap((r) => r.type === 'notice' && r.source !== undefined ? [r.source] : []))
-	if (materialized.size) records = records.map((r) => materialized.has(r.n!) && !r.noticeSuppressed ? { ...r, noticeSuppressed: true } : r)
+	let materialized = new Set(records.flatMap((r) => (r.type === 'notice' && r.source !== undefined ? [r.source] : [])))
+	if (materialized.size)
+		records = records.map((r) => (materialized.has(r.n!) && !r.noticeSuppressed ? { ...r, noticeSuppressed: true } : r))
 	records = rebase.latest(records)
 	if (!records.some((r) => r.type === 'rebase' || (r.type === 'user' && r.replaces))) return records
 	let out: HistoryRecord[] = []
 	for (let r of records) {
-		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
+		if (r.type === 'rebase') {
+			out = rebase.apply(out, r)
+			continue
+		}
 		if (r.type === 'user' && r.replaces) {
 			let target = r.amends
 			let at = target === undefined ? replay.lastPrompt(out) : out.findIndex((x) => x.n === target)
@@ -290,7 +441,19 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 			if (at >= 0) {
 				if (target === undefined && out[at]!.n !== undefined) projected.amends = out[at]!.n
 				let delivered = new Set(out.slice(at).flatMap((x) => (x.type === 'user' ? (x.inbox ?? []) : [])))
-				out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
+				out = [
+					...out.slice(0, at),
+					...out
+						.slice(at)
+						.filter(
+							(x) =>
+								x.type === 'inbox' ||
+								x.type === 'answer' ||
+								x.type === 'notice' ||
+								x.type === 'change' ||
+								(x.type === 'output' && x.change !== undefined),
+						),
+				]
 				if (delivered.size) out = out.filter((x) => x.type !== 'inbox' || !delivered.has(x.id))
 			}
 			r = projected
@@ -309,7 +472,17 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let questions = new Map(records.flatMap((r) => (r.type === 'question' ? [[r.id, r] as const] : [])))
 	return records.filter((r) => {
-		if ((r.type === 'user' && r.notices !== undefined && !r.blocks.length) || r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'notice' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
+		if (
+			(r.type === 'user' && r.notices !== undefined && !r.blocks.length) ||
+			r.type === 'rebase' ||
+			r.type === 'command' ||
+			r.type === 'output' ||
+			r.type === 'notice' ||
+			r.type === 'change' ||
+			r.type === 'compact' ||
+			r.type === 'reset'
+		)
+			return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || (questions.has(r.question) && !questions.get(r.question)!.from)
 	})
@@ -329,7 +502,8 @@ function clock(ts: string, prev?: string): string {
 // What the model is told about a call with no recorded result. A host
 // that went away, or a pause, may have cut it off mid-run.
 function missingResult(status: TurnStatus | undefined): string {
-	if (status === 'interrupted' || status === 'paused') return 'No result: the turn was interrupted, so this tool call may or may not have run.'
+	if (status === 'interrupted' || status === 'paused')
+		return 'No result: the turn was interrupted, so this tool call may or may not have run.'
 	return `Tool call did not run: the turn ${status ?? 'ended'}.`
 }
 
@@ -348,9 +522,14 @@ function markCache(records: HistoryRecord[], messages: Message[], model?: string
 	let mine = rounds.findLast((r) => r.model === model && r.block !== undefined)
 	let start = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	if (!mine || records.indexOf(mine) < start) return messages
-	let count = replay.toMessages(records.filter((r) => r.n === undefined || r.n < mine.block!)).reduce((sum, m) => sum + m.blocks.length, 0)
+	let count = replay
+		.toMessages(records.filter((r) => r.n === undefined || r.n < mine.block!))
+		.reduce((sum, m) => sum + m.blocks.length, 0)
 	for (let m of messages) {
-		if (count <= m.blocks.length) { if (count) m.cache = count; break }
+		if (count <= m.blocks.length) {
+			if (count) m.cache = count
+			break
+		}
 		count -= m.blocks.length
 	}
 	return messages
@@ -358,7 +537,8 @@ function markCache(records: HistoryRecord[], messages: Message[], model?: string
 
 export const replay = {
 	// Told with a next-round message delivered while the model works.
-	nextRoundNotice: '<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
+	nextRoundNotice:
+		'<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
 	toMessages,
 	markCache,
 	asNative,

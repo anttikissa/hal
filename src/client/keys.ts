@@ -55,14 +55,50 @@ function parseMods(raw: number): Pick<KeyEvent, 'shift' | 'alt' | 'ctrl' | 'cmd'
 }
 
 const FINAL_KEYS: Record<string, string> = { A: 'up', B: 'down', C: 'right', D: 'left', H: 'home', F: 'end', P: 'f1' }
-const TILDE_KEYS: Record<number, string> = { 1: 'home', 2: 'insert', 3: 'delete', 4: 'end', 5: 'pageup', 6: 'pagedown', 7: 'home', 8: 'end', 11: 'f1' }
+const TILDE_KEYS: Record<number, string> = {
+	1: 'home',
+	2: 'insert',
+	3: 'delete',
+	4: 'end',
+	5: 'pageup',
+	6: 'pagedown',
+	7: 'home',
+	8: 'end',
+	11: 'f1',
+}
 
 // Legacy control bytes. 0x0A is absent: raw-mode Enter sends CR, so a bare
 // LF is Ctrl-J or a terminal's shift+enter mapping; see controlKey().
 const CTRL_KEYS: Record<number, string> = {
-	0: 'space', 1: 'a', 2: 'b', 3: 'c', 4: 'd', 5: 'e', 6: 'f', 7: 'g', 8: 'backspace', 9: 'tab',
-	11: 'k', 12: 'l', 13: 'enter', 14: 'n', 15: 'o', 16: 'p', 17: 'q', 18: 'r', 19: 's', 20: 't',
-	21: 'u', 22: 'v', 23: 'w', 24: 'x', 25: 'y', 26: 'z', 27: 'escape', 31: '/', 127: 'backspace',
+	0: 'space',
+	1: 'a',
+	2: 'b',
+	3: 'c',
+	4: 'd',
+	5: 'e',
+	6: 'f',
+	7: 'g',
+	8: 'backspace',
+	9: 'tab',
+	11: 'k',
+	12: 'l',
+	13: 'enter',
+	14: 'n',
+	15: 'o',
+	16: 'p',
+	17: 'q',
+	18: 'r',
+	19: 's',
+	20: 't',
+	21: 'u',
+	22: 'v',
+	23: 'w',
+	24: 'x',
+	25: 'y',
+	26: 'z',
+	27: 'escape',
+	31: '/',
+	127: 'backspace',
 }
 const PLAIN = new Set(['tab', 'enter', 'backspace', 'escape'])
 
@@ -109,7 +145,8 @@ function parseCsiU(body: string): KeyEvent | null {
 	if (cp < 0x20) return null
 	let text: string | undefined
 	let cps = fields[2]?.split(':').map(Number)
-	if (cps?.length && cps.every((n) => Number.isInteger(n) && n > 0 && n <= 0x10ffff)) text = String.fromCodePoint(...cps)
+	if (cps?.length && cps.every((n) => Number.isInteger(n) && n > 0 && n <= 0x10ffff))
+		text = String.fromCodePoint(...cps)
 	let ch = text ?? String.fromCodePoint(cp)
 	let typed = !mods.ctrl && !mods.cmd && !mods.alt
 	return ke(ch.toLowerCase(), { ...mods, text: typed ? ch : undefined })
@@ -168,7 +205,14 @@ function scanEscape(s: string, i: number): Scan {
 	}
 	let cp = s.codePointAt(i + 1)!
 	let len = cp > 0xffff ? 2 : 1
-	let event = cp < 0x20 || cp === 0x7f ? controlKey(cp, true) : c === 'b' ? ke('left', { alt: true }) : c === 'f' ? ke('right', { alt: true }) : printable(String.fromCodePoint(cp), true)
+	let event =
+		cp < 0x20 || cp === 0x7f
+			? controlKey(cp, true)
+			: c === 'b'
+				? ke('left', { alt: true })
+				: c === 'f'
+					? ke('right', { alt: true })
+					: printable(String.fromCodePoint(cp), true)
 	return { end: i + 1 + len, event }
 }
 

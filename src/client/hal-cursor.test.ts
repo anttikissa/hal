@@ -32,7 +32,11 @@ afterEach(() => {
 
 const snapshot = (state: SessionState = { type: 'idle' }): Event => {
 	// Long thinking has the cursor; short, its spinner (task hyt).
-	let snap: Snapshot = { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '', blocks: { thinking: 'long' } }, history: [], state }
+	let snap: Snapshot = {
+		meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '', blocks: { thinking: 'long' } },
+		history: [],
+		state,
+	}
 	return { type: 'snapshot', sessionId: 's1', snapshot: snap }
 }
 const state = (s: SessionState) => app.onEvent({ type: 'state', sessionId: 's1', state: s })
@@ -47,9 +51,13 @@ const start = () => {
 function rows(cols = 40): string[] {
 	let hal = ansi.sgr({ fg: colors.assistant().cursor! })
 	let think = ansi.sgr({ fg: colors.thinking().fg! })
-	return frame
-		.build(appView.view(), cols)
-		.lines.map((l) => l.replaceAll(hal + '█', '{hal}').replaceAll(think + '█', '{think}').replace(new RegExp('\x1b\\[[0-9;]*m', 'g'), '').trimEnd())
+	return frame.build(appView.view(), cols).lines.map((l) =>
+		l
+			.replaceAll(hal + '█', '{hal}')
+			.replaceAll(think + '█', '{think}')
+			.replace(new RegExp('\x1b\\[[0-9;]*m', 'g'), '')
+			.trimEnd(),
+	)
 }
 // The rows after the last transcript row, `after`.
 const below = (after: string) => {
@@ -144,7 +152,6 @@ test('a blink phase rewrites the cursor row alone', () => {
 	app.beat()
 	expect(written).toBe('')
 })
-
 
 test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	let shown: string[] = []

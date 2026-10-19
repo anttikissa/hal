@@ -89,6 +89,9 @@ to operate a host is not permission to publish its configuration.
 
 Start each source file with a short comment explaining its purpose.
 
+Format code with `bunx oxfmt` (config: .oxfmtrc.json). Markdown and
+tasks/ stay hand-wrapped.
+
 Write code for humans to read. Use small, well-named abstractions that express
 intent rather than mixing all the mechanics together. For example, an argument
 parser might declare options with arg('--home <dir>', 'Set Hal home directory',

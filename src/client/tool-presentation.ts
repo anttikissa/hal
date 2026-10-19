@@ -15,7 +15,14 @@ function lines(presentation: ToolPresentation, output: string, width: number, st
 	return presentation.blocks.flatMap((b, i) => [
 		...(i ? [''] : []),
 		...(b.path ? ansi.wrap(ansi.clean(b.path), width) : []),
-		...toolPresentation.text(b, output).split('\n').flatMap((line) => ansi.wrap(ansi.clean(line), width).map((r) => b.kind === 'diff' ? diffView.paint(r, diff.tone(line), style) : r)),
+		...toolPresentation
+			.text(b, output)
+			.split('\n')
+			.flatMap((line) =>
+				ansi
+					.wrap(ansi.clean(line), width)
+					.map((r) => (b.kind === 'diff' ? diffView.paint(r, diff.tone(line), style) : r)),
+			),
 	])
 }
 
@@ -29,7 +36,14 @@ function cut(rows: string[], max: number, width: number, style: Style | undefine
 
 // A presented call before its result: its blocks, then live output.
 // With a result, the result draws them under the title.
-function call(item: Item & { type: 'tool' }, head: string, width: number, fold: Verbosity, result: Item | undefined, style: Style | undefined): string[] {
+function call(
+	item: Item & { type: 'tool' },
+	head: string,
+	width: number,
+	fold: Verbosity,
+	result: Item | undefined,
+	style: Style | undefined,
+): string[] {
 	let rows = [head, ...(item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : [])]
 	if (result) return rows
 	if (item.presentation) rows.push(...presentationView.lines(item.presentation, '', width, style))
@@ -38,13 +52,25 @@ function call(item: Item & { type: 'tool' }, head: string, width: number, fold: 
 }
 
 // A presented result shows complete failures followed by its blocks.
-function result(item: Item & { type: 'tool-result' }, out: string, width: number, max: number, style: Style | undefined, normal: Style | undefined, raw: string | undefined): string[] {
+function result(
+	item: Item & { type: 'tool-result' },
+	out: string,
+	width: number,
+	max: number,
+	style: Style | undefined,
+	normal: Style | undefined,
+	raw: string | undefined,
+): string[] {
 	let rows = item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []
-	if (item.isError || item.interrupted || !item.presentation) rows.push(...ansi.wrap(ansi.clean((item.isError ? '✗ ' : '') + out), width))
+	if (item.isError || item.interrupted || !item.presentation)
+		rows.push(...ansi.wrap(ansi.clean((item.isError ? '✗ ' : '') + out), width))
 	if (item.presentation) {
 		let blocks = presentationView.lines(item.presentation, item.output, width, style)
 		let back = style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m'
-		let color = item.isError && normal?.fg && !ansi.mono() ? (r: string) => ansi.sgr({ fg: normal.fg! }) + r + back : (r: string) => r
+		let color =
+			item.isError && normal?.fg && !ansi.mono()
+				? (r: string) => ansi.sgr({ fg: normal.fg! }) + r + back
+				: (r: string) => r
 		rows.push(...blocks.map(color))
 	}
 	return presentationView.cut(rows, max, width, style)

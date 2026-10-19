@@ -8,9 +8,12 @@ export type RebasePlan = { base: number; drop: number[]; edit: { n: number; text
 function invalid(value: unknown): string | undefined {
 	let p = value as RebasePlan
 	let number = (n: unknown) => Number.isSafeInteger(n) && (n as number) > 0
-	if (!p || !Number.isSafeInteger(p.base) || p.base < 0 || !Array.isArray(p.drop) || !Array.isArray(p.edit)) return 'invalid rebase plan'
-	if (p.drop.some((n) => !number(n)) || p.edit.some((e) => !e || !number(e.n) || typeof e.text !== 'string')) return 'invalid rebase target'
-	if (new Set(p.drop).size !== p.drop.length || new Set(p.edit.map((e) => e.n)).size !== p.edit.length) return 'duplicate rebase target'
+	if (!p || !Number.isSafeInteger(p.base) || p.base < 0 || !Array.isArray(p.drop) || !Array.isArray(p.edit))
+		return 'invalid rebase plan'
+	if (p.drop.some((n) => !number(n)) || p.edit.some((e) => !e || !number(e.n) || typeof e.text !== 'string'))
+		return 'invalid rebase target'
+	if (new Set(p.drop).size !== p.drop.length || new Set(p.edit.map((e) => e.n)).size !== p.edit.length)
+		return 'duplicate rebase target'
 	if (p.edit.some((e) => p.drop.includes(e.n))) return 'rebase target is both dropped and edited'
 }
 
@@ -24,16 +27,26 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 		for (let n of all) out.set(n, all)
 	}
 	let inboxRecords = new Map<string, number[]>()
-	for (let r of records) if (r.type === 'inbox' && r.n !== undefined) {
-		let ns = inboxRecords.get(r.id) ?? []
-		ns.push(r.n); inboxRecords.set(r.id, ns)
-	}
+	for (let r of records)
+		if (r.type === 'inbox' && r.n !== undefined) {
+			let ns = inboxRecords.get(r.id) ?? []
+			ns.push(r.n)
+			inboxRecords.set(r.id, ns)
+		}
 	for (let ns of inboxRecords.values()) join(ns)
-	for (let r of records) if (r.type === 'user' && r.n !== undefined) {
-		for (let id of r.inbox ?? []) join([r.n, ...(inboxRecords.get(id) ?? [])])
+	for (let r of records)
+		if (r.type === 'user' && r.n !== undefined) {
+			for (let id of r.inbox ?? []) join([r.n, ...(inboxRecords.get(id) ?? [])])
+		}
+	let calls = new Map<string, number>(),
+		round: number[] = [],
+		signed = false,
+		command: number | undefined
+	let flush = () => {
+		if (signed) join(round)
+		round = []
+		signed = false
 	}
-	let calls = new Map<string, number>(), round: number[] = [], signed = false, command: number | undefined
-	let flush = () => { if (signed) join(round); round = []; signed = false }
 	for (let r of records) {
 		if (r.type === 'assistant' && r.n !== undefined) {
 			round.push(r.n)
@@ -41,12 +54,16 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 			if (r.block.type === 'tool_call') calls.set(r.block.id, r.n)
 		} else if (r.type === 'user') {
 			flush()
-			for (let b of r.blocks) if (b.type === 'tool_result') {
-				let n = calls.get(b.id)
-				if (n !== undefined && r.n !== undefined) join([n, r.n])
-				calls.delete(b.id)
+			for (let b of r.blocks)
+				if (b.type === 'tool_result') {
+					let n = calls.get(b.id)
+					if (n !== undefined && r.n !== undefined) join([n, r.n])
+					calls.delete(b.id)
+				}
+			if (r.blocks.some((b) => b.type === 'text')) {
+				calls.clear()
+				command = undefined
 			}
-			if (r.blocks.some((b) => b.type === 'text')) { calls.clear(); command = undefined }
 		} else if (r.type === 'command') command = r.n
 		else if (r.type === 'output' && !r.change && command !== undefined && r.n !== undefined) join([command, r.n])
 		else if (r.type === 'round' || r.type === 'turn_end' || r.type === 'compact' || r.type === 'reset') flush()
@@ -57,7 +74,15 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 
 function text(r: HistoryRecord): string | undefined {
 	if (r.type === 'inbox' || r.type === 'notice' || (r.type === 'output' && r.change)) return r.text
-	if (r.type === 'change') return ason.stringify(Object.fromEntries(['cwd', 'model', 'autoclose'].filter((k) => Object.hasOwn(r, k)).map((k) => [k, r[k as 'cwd' | 'model' | 'autoclose']])), 'short')
+	if (r.type === 'change')
+		return ason.stringify(
+			Object.fromEntries(
+				['cwd', 'model', 'autoclose']
+					.filter((k) => Object.hasOwn(r, k))
+					.map((k) => [k, r[k as 'cwd' | 'model' | 'autoclose']]),
+			),
+			'short',
+		)
 	if (r.type === 'assistant' && r.block.type === 'text') return r.block.text
 	if (r.type !== 'user') return undefined
 	let texts = r.blocks.filter((b) => b.type === 'text')
@@ -69,7 +94,19 @@ function edited(r: HistoryRecord, text: string): HistoryRecord {
 	if (r.type === 'inbox' || r.type === 'notice' || (r.type === 'output' && r.change)) return { ...r, text }
 	if (r.type === 'change') {
 		let value = ason.parse(text) as Record<string, unknown>
-		if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.keys(value).length || Object.entries(value).some(([key, v]) => !['cwd', 'model', 'autoclose'].includes(key) || typeof v !== (key === 'autoclose' ? 'boolean' : 'string') || (typeof v === 'string' && !v.trim()))) throw new Error(`entry ${r.n}: invalid session setting change`)
+		if (
+			!value ||
+			typeof value !== 'object' ||
+			Array.isArray(value) ||
+			!Object.keys(value).length ||
+			Object.entries(value).some(
+				([key, v]) =>
+					!['cwd', 'model', 'autoclose'].includes(key) ||
+					typeof v !== (key === 'autoclose' ? 'boolean' : 'string') ||
+					(typeof v === 'string' && !v.trim()),
+			)
+		)
+			throw new Error(`entry ${r.n}: invalid session setting change`)
 		let { cwd: _cwd, model: _model, autoclose: _autoclose, ...rest } = r
 		return { ...rest, ...value } as HistoryRecord
 	}
@@ -95,7 +132,8 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 		if (!byNumber.has(n)) throw new Error(`entry ${n} not found`)
 		if (byNumber.get(n)!.type === 'rebase') throw new Error(`cannot rebase control entry ${n}`)
 	}
-	let groups = rebase.groups(records), dropped = new Set(plan.drop.flatMap((n) => [...(groups.get(n) ?? [n])]))
+	let groups = rebase.groups(records),
+		dropped = new Set(plan.drop.flatMap((n) => [...(groups.get(n) ?? [n])]))
 	let edits = new Map(plan.edit.map((e) => [e.n, e.text]))
 	for (let n of edits.keys()) if (dropped.has(n)) throw new Error(`entry ${n} is edited but its group is dropped`)
 	let results = new Map<number, Map<string, string>>()
@@ -105,24 +143,38 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 		let id = r.block.id
 		let target: number | undefined
 		for (let next of records.slice(records.indexOf(r) + 1)) {
-			if (next.type === 'user' && next.blocks.some((b) => b.type === 'tool_result' && b.id === id)) { target = next.n; break }
-			if ((next.type === 'user' && next.blocks.some((b) => b.type === 'text')) || (next.type === 'assistant' && next.block.type === 'tool_call' && next.block.id === id)) break
+			if (next.type === 'user' && next.blocks.some((b) => b.type === 'tool_result' && b.id === id)) {
+				target = next.n
+				break
+			}
+			if (
+				(next.type === 'user' && next.blocks.some((b) => b.type === 'text')) ||
+				(next.type === 'assistant' && next.block.type === 'tool_call' && next.block.id === id)
+			)
+				break
 		}
 		if (target === undefined) throw new Error(`t${n} is not editable: no tool result`)
 		if (edits.has(target)) throw new Error(`conflicting edits of t${n}'s tool result`)
 		let batch = results.get(target) ?? new Map<string, string>()
-		batch.set(id, text); results.set(target, batch); edits.delete(n)
+		batch.set(id, text)
+		results.set(target, batch)
+		edits.delete(n)
 	}
-	let projected = records.filter((r) => !dropped.has(r.n!)).map((r) => {
-		if (edits.has(r.n!)) return rebase.edited(r, edits.get(r.n!)!)
-		let batch = results.get(r.n!)
-		if (r.type !== 'user' || !batch) return r
-		return { ...r, blocks: r.blocks.map((b) => {
-			if (b.type !== 'tool_result' || !batch.has(b.id)) return b
-			let { image: _image, images: _images, outputBlob: _outputBlob, ...rest } = b
-			return { ...rest, output: batch.get(b.id)! }
-		}) }
-	})
+	let projected = records
+		.filter((r) => !dropped.has(r.n!))
+		.map((r) => {
+			if (edits.has(r.n!)) return rebase.edited(r, edits.get(r.n!)!)
+			let batch = results.get(r.n!)
+			if (r.type !== 'user' || !batch) return r
+			return {
+				...r,
+				blocks: r.blocks.map((b) => {
+					if (b.type !== 'tool_result' || !batch.has(b.id)) return b
+					let { image: _image, images: _images, outputBlob: _outputBlob, ...rest } = b
+					return { ...rest, output: batch.get(b.id)! }
+				}),
+			}
+		})
 	let sources = new Map(projected.map((r) => [r.n, r]))
 	return projected.map((r) => {
 		if (r.type !== 'user' || !r.notices) return r

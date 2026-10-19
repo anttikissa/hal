@@ -50,7 +50,10 @@ function entries(records: HistoryRecord[]): HistoryRecord[] {
 
 function promptText(r: HistoryRecord): string {
 	if (r.type !== 'user') return ''
-	return [...r.notices?.map((n) => n.text) ?? [], ...r.blocks.flatMap((b) => (b.type === 'text' ? [replay.framed(b)] : []))].join('\n\n')
+	return [
+		...(r.notices?.map((n) => n.text) ?? []),
+		...r.blocks.flatMap((b) => (b.type === 'text' ? [replay.framed(b)] : [])),
+	].join('\n\n')
 }
 
 const isText = (r: HistoryRecord) => r.type === 'assistant' && r.block.type === 'text'
@@ -75,7 +78,11 @@ function count(parts: string[], n: number, what: string): void {
 
 // One line for the omitted entries `run`: what they held, by kind.
 function omission(run: HistoryRecord[], label: (r: HistoryRecord, i: number) => string): string {
-	let calls = 0, results = 0, thinking = 0, text = 0, prompts = 0
+	let calls = 0,
+		results = 0,
+		thinking = 0,
+		text = 0,
+		prompts = 0
 	for (let r of run) {
 		if (r.type === 'assistant') {
 			if (r.block.type === 'tool_call') calls++
@@ -107,7 +114,12 @@ function summary(records: HistoryRecord[], historyPath: string): { summary: stri
 	if (!list.length) return undefined
 	// Each entry under its record number, the block id clients show.
 	let label = (r: HistoryRecord, i: number) => String(r.n ?? i + 1)
-	let lines = ['Context was compacted to avoid exceeding the token limit. Verify before assuming.', '', "Here's a summary of what happened (only user and assistant messages preserved):", '']
+	let lines = [
+		'Context was compacted to avoid exceeding the token limit. Verify before assuming.',
+		'',
+		"Here's a summary of what happened (only user and assistant messages preserved):",
+		'',
+	]
 	let run: HistoryRecord[] = []
 	let flush = () => {
 		let line = run.length ? compaction.omission(run, (r) => label(r, list.indexOf(r))) : ''
@@ -121,7 +133,8 @@ function summary(records: HistoryRecord[], historyPath: string): { summary: stri
 		}
 		flush()
 		if (r.type === 'user') lines.push(`[${label(r, i)}] user: ${promptText(r)}`)
-		else if (r.type === 'assistant' && r.block.type === 'text') lines.push(`[${label(r, i)}] assistant: ${compaction.trim(r.block.text)}`)
+		else if (r.type === 'assistant' && r.block.type === 'text')
+			lines.push(`[${label(r, i)}] assistant: ${compaction.trim(r.block.text)}`)
 	}
 	flush()
 	lines.push('', `Full history: ${historyPath} (read it with bash for anything left out)`)

@@ -76,9 +76,14 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 		case 'request':
 		case 'stream':
 		case 'tools': {
-			if (state.type !== 'running' && !(event.type === 'request' && (state.type === 'retrying' || state.type === 'blocked'))) return state
+			if (
+				state.type !== 'running' &&
+				!(event.type === 'request' && (state.type === 'retrying' || state.type === 'blocked'))
+			)
+				return state
 			let phase: Phase = event.type === 'request' ? 'requesting' : event.type === 'stream' ? 'streaming' : 'tools'
-			if (event.type === 'tools' && event.call !== undefined) return { type: 'running', phase, call: event.call, ...(event.at !== undefined ? { since: event.at } : {}) }
+			if (event.type === 'tools' && event.call !== undefined)
+				return { type: 'running', phase, call: event.call, ...(event.at !== undefined ? { since: event.at } : {}) }
 			return state.type === 'running' && state.phase === phase ? state : { type: 'running', phase }
 		}
 		case 'pause': {
@@ -92,7 +97,9 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 		case 'block':
 			return busy(state) ? { type: 'blocked', reason: event.reason } : state
 		case 'answer':
-			return state.type === 'blocked' && state.reason === 'question' ? { type: 'running', phase: 'requesting' } : 'no question is open'
+			return state.type === 'blocked' && state.reason === 'question'
+				? { type: 'running', phase: 'requesting' }
+				: 'no question is open'
 		case 'end':
 			if (!busy(state)) return state
 			return event.error !== undefined ? { type: 'error', message: event.error } : { type: 'idle' }
@@ -141,17 +148,41 @@ function recoveries(records: HistoryRecord[]): number {
 // rechecks limits and retries now), the oldest queued message sent early
 // (bare Enter or Ctrl-Enter on a busy turn with `queued` ones), nothing
 // (bare Enter otherwise), or why not (the text stays).
-function enter(sessionId: string, state: SessionState, text: string, delivery: Delivery = 'steer', queued = false): { command?: unknown; refused?: string } {
+function enter(
+	sessionId: string,
+	state: SessionState,
+	text: string,
+	delivery: Delivery = 'steer',
+	queued = false,
+): { command?: unknown; refused?: string } {
 	let busy = states.busy(state)
 	if (!text.trim()) {
-		if (busy && queued && delivery !== 'queue') return { command: { type: 'submit', sessionId, text: delivery === 'steer' ? '/queue now' : '/queue next' } }
-		return state.type === 'paused' || state.type === 'error' || state.type === 'retrying' ? { command: { type: 'continue', sessionId } } : {}
+		if (busy && queued && delivery !== 'queue')
+			return { command: { type: 'submit', sessionId, text: delivery === 'steer' ? '/queue now' : '/queue next' } }
+		return state.type === 'paused' || state.type === 'error' || state.type === 'retrying'
+			? { command: { type: 'continue', sessionId } }
+			: {}
 	}
-	return { command: delivery === 'queue' || (delivery === 'soft-steer' && busy) ? { type: 'submit', sessionId, text, delivery } : { type: 'submit', sessionId, text } }
+	return {
+		command:
+			delivery === 'queue' || (delivery === 'soft-steer' && busy)
+				? { type: 'submit', sessionId, text, delivery }
+				: { type: 'submit', sessionId, text },
+	}
 }
 
 // Shared idle nudges for web Continue and terminal Enter (task yhn).
-const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.', 'You can do it.', 'Onward!']
+const NUDGES = [
+	'Continue.',
+	'Proceed.',
+	'Go on.',
+	'Keep going.',
+	'Carry on.',
+	'Go ahead.',
+	'Finish it.',
+	'You can do it.',
+	'Onward!',
+]
 function nudge(state: SessionState, pick = Math.random()): string | undefined {
 	return state.type === 'idle' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
 }
@@ -159,7 +190,7 @@ function nudge(state: SessionState, pick = Math.random()): string | undefined {
 // Whether undo on an empty prompt may take back a message sent early
 // from the queue (task csn): one of the user's waits to interject.
 function promoted(items: InboxItem[]): boolean {
-	return items.some((m) => (m.delivery === 'next-round') && m.from === undefined && m.origin !== 'model')
+	return items.some((m) => m.delivery === 'next-round' && m.from === undefined && m.origin !== 'model')
 }
 
 // What a client sends for Escape: a pause, if anything is running.
@@ -220,4 +251,17 @@ function withJobs(text: string | undefined, jobs: number): string | undefined {
 	return text ? `${text} · ${jobs} ${jobs === 1 ? 'job' : 'jobs'}` : `${jobs} background ${jobs === 1 ? 'job' : 'jobs'}`
 }
 
-export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, nudge, promoted, escape, describe, doing, withJobs }
+export const states = {
+	maxRecoveries: () => MAX_RECOVERIES,
+	busy,
+	step,
+	fromHistory,
+	recoveries,
+	enter,
+	nudge,
+	promoted,
+	escape,
+	describe,
+	doing,
+	withJobs,
+}

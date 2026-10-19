@@ -2,13 +2,24 @@
 // y9) as host (cold, then warm), as a peer, switching tabs, over -r and
 // in the web client, and prints one table. Never run by ./test; no real
 // data. Exits 1 if a budget is missed.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'fs'
 import { tmpdir } from 'os'
 import { perfHome } from './home.ts'
 
 const repo = `${import.meta.dir}/../..`
 const run = `${repo}/run`
-const strip = (s: string) => s.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]/g, '')
+const strip = (s: string) =>
+	s.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]/g, '')
 const keys = '§¶ØÆ¤µ'
 
 // Temp dirs are named after this process (hp-<pid>-, hal-perf-chrome-<pid>-)
@@ -26,20 +37,35 @@ function drop(dir: string): void {
 }
 function sweep(): void {
 	let alive = (pid: number) => {
-		try { return process.kill(pid, 0) } catch (e) { return (e as { code?: string }).code === 'EPERM' }
+		try {
+			return process.kill(pid, 0)
+		} catch (e) {
+			return (e as { code?: string }).code === 'EPERM'
+		}
 	}
-	for (let [dir, prefix] of [['/tmp', 'hp-'], [tmpdir(), 'hal-perf-chrome-']] as const) {
+	for (let [dir, prefix] of [
+		['/tmp', 'hp-'],
+		[tmpdir(), 'hal-perf-chrome-'],
+	] as const) {
 		for (let name of existsSync(dir) ? readdirSync(dir) : []) {
 			if (!name.startsWith(prefix)) continue
 			let pid = Number(name.slice(prefix.length).split('-')[0])
 			// Older runs named dirs without a pid: gone after an hour.
-			let stale = Number.isInteger(pid) && pid > 0 ? !alive(pid) : Date.now() - statSync(`${dir}/${name}`).mtimeMs > 3600_000
+			let stale =
+				Number.isInteger(pid) && pid > 0 ? !alive(pid) : Date.now() - statSync(`${dir}/${name}`).mtimeMs > 3600_000
 			if (stale) rmSync(`${dir}/${name}`, { recursive: true, force: true })
 		}
 	}
 }
 
-type Term = { exited(): boolean; write(s: string): void; screen(): string; clear(): void; rss(): number; stop(): Promise<void> }
+type Term = {
+	exited(): boolean
+	write(s: string): void
+	screen(): string
+	clear(): void
+	rss(): number
+	stop(): Promise<void>
+}
 
 // ./run with `args` in a pseudo-terminal of its own; `screen` is the
 // plain text written since the last `clear`.
@@ -55,16 +81,31 @@ function launch(home: string, args: string[] = []): Term {
 		},
 	})
 	let root = realpathSync(`${home}/..`)
-	let proc = Bun.spawn([run, ...args, '--home', home], { cwd: root, env: { ...process.env, TMPDIR: home, HAL_STALLS: `${root}/stalls.log` }, terminal: term, detached: true })
+	let proc = Bun.spawn([run, ...args, '--home', home], {
+		cwd: root,
+		env: { ...process.env, TMPDIR: home, HAL_STALLS: `${root}/stalls.log` },
+		terminal: term,
+		detached: true,
+	})
 	return {
 		exited: () => proc.exitCode !== null,
 		write: (s) => term.write(s),
 		screen: () => strip(buf),
 		clear: () => (buf = ''),
 		rss() {
-			let pids = Bun.spawnSync(['pgrep', '-g', String(proc.pid)]).stdout.toString().trim().split('\n').filter(Boolean)
+			let pids = Bun.spawnSync(['pgrep', '-g', String(proc.pid)])
+				.stdout.toString()
+				.trim()
+				.split('\n')
+				.filter(Boolean)
 			if (!pids.length) return 0
-			return Bun.spawnSync(['ps', '-o', 'rss=', '-p', pids.join(',')]).stdout.toString().trim().split('\n').reduce((a, b) => a + Number(b), 0) * 1024
+			return (
+				Bun.spawnSync(['ps', '-o', 'rss=', '-p', pids.join(',')])
+					.stdout.toString()
+					.trim()
+					.split('\n')
+					.reduce((a, b) => a + Number(b), 0) * 1024
+			)
 		},
 		async stop() {
 			if (proc.exitCode !== null) return
@@ -87,28 +128,51 @@ async function until(test: () => boolean, ms: number): Promise<number | undefine
 }
 
 type Stalls = { n: number; max: number; total: number; worst: string }
-type Probe = { first?: number; interactive?: number; p50?: number; p99?: number; max?: number; lost: number; allMarks?: number; rssMB: number; stalls: Stalls }
+type Probe = {
+	first?: number
+	interactive?: number
+	p50?: number
+	p99?: number
+	max?: number
+	lost: number
+	allMarks?: number
+	rssMB: number
+	stalls: Stalls
+}
 
 // Event-loop blocks over 10 ms that any Hal process under `root`
 // reported (HAL_STALLS, task 7j) between wall-clock `from` and `to`;
 // `worst` lists the longest as length@seconds-since-from.
 function stalls(root: string, from: number, to: number): Stalls {
 	let file = `${root}/stalls.log`
-	let all = existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => l.split(' ').map(Number) as [number, number, number]) : []
+	let all = existsSync(file)
+		? readFileSync(file, 'utf8')
+				.trim()
+				.split('\n')
+				.filter(Boolean)
+				.map((l) => l.split(' ').map(Number) as [number, number, number])
+		: []
 	let got = all.filter(([, at]) => at >= from && at <= to).map(([, at, ms]) => ({ at: (at - from) / 1000, ms }))
-	let worst = got.toSorted((a, b) => b.ms - a.ms).slice(0, 4).map((s) => `${s.ms}@${s.at.toFixed(1)}s`).join(' ')
+	let worst = got
+		.toSorted((a, b) => b.ms - a.ms)
+		.slice(0, 4)
+		.map((s) => `${s.ms}@${s.at.toFixed(1)}s`)
+		.join(' ')
 	return { n: got.length, max: Math.max(0, ...got.map((s) => s.ms)), total: got.reduce((a, s) => a + s.ms, 0), worst }
 }
 
 // Launches ./run, types a key at once (time to interactive), then one key
 // at a time for `secs`, each erased once it shows.
 async function probe(home: string, args: string[], ready: RegExp, secs: number, open: string[]): Promise<Probe> {
-	let t0 = performance.now(), wall = Date.now()
+	let t0 = performance.now(),
+		wall = Date.now()
 	let term = launch(home, args)
 	term.write('Ω')
 	let first: number | undefined, interactive: number | undefined, allMarks: number | undefined
 	let lat: number[] = []
-	let lost = 0, rss = 0, i = 0
+	let lost = 0,
+		rss = 0,
+		i = 0
 	await until(() => {
 		let s = term.screen()
 		if (first === undefined && ready.test(s)) first = performance.now() - t0
@@ -129,14 +193,25 @@ async function probe(home: string, args: string[], ready: RegExp, secs: number, 
 		if (took === undefined) lost++
 		else lat.push(took)
 		term.write('\x7f')
-		if (allMarks === undefined && open.length && open.every((id) => existsSync(`${home}/sessions/${id}/marks.ason`))) allMarks = performance.now() - t0
+		if (allMarks === undefined && open.length && open.every((id) => existsSync(`${home}/sessions/${id}/marks.ason`)))
+			allMarks = performance.now() - t0
 		if (i % 10 === 0) rss = Math.max(rss, term.rss())
 		await Bun.sleep(Math.max(0, 100 - (performance.now() - at)))
 	}
 	let stalled = stalls(realpathSync(`${home}/..`), wall, Date.now())
 	await term.stop()
 	lat.sort((a, b) => a - b)
-	return { first, interactive, p50: lat[lat.length >> 1], p99: lat[Math.floor(lat.length * 0.99)], max: lat.at(-1), lost, allMarks, rssMB: Math.round(rss / 2 ** 20), stalls: stalled }
+	return {
+		first,
+		interactive,
+		p50: lat[lat.length >> 1],
+		p99: lat[Math.floor(lat.length * 0.99)],
+		max: lat.at(-1),
+		lost,
+		allMarks,
+		rssMB: Math.round(rss / 2 ** 20),
+		stalls: stalled,
+	}
 }
 
 // Ctrl-N through every tab on a running client; each switch's time until
@@ -172,17 +247,38 @@ function code(home: string): string {
 	return m[1]!
 }
 
-const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) => existsSync(p))
+const chrome = [
+	'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+	'/usr/bin/chromium',
+	'/usr/bin/chromium-browser',
+	'/usr/bin/google-chrome',
+].find((p) => existsSync(p))
 
 // Time from navigating to the page until the focused tab's history and
 // prompt show, in headless Chrome.
 async function webLoad(url: string): Promise<number | undefined> {
 	if (!chrome) return undefined
 	let dir = temp(`${tmpdir()}/hal-perf-chrome-`)
-	let proc = Bun.spawn([chrome, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdout: 'ignore', stderr: 'ignore' })
+	let proc = Bun.spawn(
+		[
+			chrome,
+			'--headless=new',
+			'--remote-debugging-port=0',
+			`--user-data-dir=${dir}`,
+			'--no-first-run',
+			...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+			'about:blank',
+		],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	)
 	try {
 		let port = ''
-		await until(() => existsSync(`${dir}/DevToolsActivePort`) && !!(port = readFileSync(`${dir}/DevToolsActivePort`, 'utf8').split('\n')[0]!), 10000)
+		await until(
+			() =>
+				existsSync(`${dir}/DevToolsActivePort`) &&
+				!!(port = readFileSync(`${dir}/DevToolsActivePort`, 'utf8').split('\n')[0]!),
+			10000,
+		)
 		let targets: { type: string; webSocketDebuggerUrl: string }[] = []
 		for (let i = 0; i < 100 && !targets.some((t) => t.type === 'page'); i++) {
 			targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
@@ -196,12 +292,20 @@ async function webLoad(url: string): Promise<number | undefined> {
 			let msg = JSON.parse(String(m.data))
 			waiting.get(msg.id)?.(msg)
 		}
-		let call = (method: string, params: object) => new Promise<{ result?: { result?: { value?: unknown } } }>((resolve) => (waiting.set(++next, resolve), ws.send(JSON.stringify({ id: next, method, params }))))
+		let call = (method: string, params: object) =>
+			new Promise<{ result?: { result?: { value?: unknown } } }>(
+				(resolve) => (waiting.set(++next, resolve), ws.send(JSON.stringify({ id: next, method, params }))),
+			)
 		let t = performance.now()
 		await call('Page.navigate', { url })
 		let ready = false
 		while (!ready && performance.now() - t < 20000) {
-			ready = !!(await call('Runtime.evaluate', { expression: `!!document.querySelector('.entry .hint')?.textContent && document.querySelectorAll('.Transcript *').length > 50`, returnByValue: true })).result?.result?.value
+			ready = !!(
+				await call('Runtime.evaluate', {
+					expression: `!!document.querySelector('.entry .hint')?.textContent && document.querySelectorAll('.Transcript *').length > 50`,
+					returnByValue: true,
+				})
+			).result?.result?.value
 			if (!ready) await Bun.sleep(5)
 		}
 		ws.close()
@@ -218,7 +322,11 @@ const ms = (x: number | undefined) => (x === undefined ? '—' : x === Infinity 
 async function main(): Promise<number> {
 	let scale = Number(process.argv[2] ?? 1)
 	// Under /tmp: the host's socket path must stay under 104 bytes.
-	for (let [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const) process.on(signal, () => process.exit(code))
+	for (let [signal, code] of [
+		['SIGINT', 130],
+		['SIGTERM', 143],
+	] as const)
+		process.on(signal, () => process.exit(code))
 	process.on('exit', () => [...temps].forEach(drop))
 	sweep()
 	let root = temp('/tmp/hp-')
@@ -232,7 +340,9 @@ async function main(): Promise<number> {
 		let { open, sessions } = perfHome.generate(home, { scale, cwd: realpathSync(root) })
 		let port = await freePort()
 		writeFileSync(`${home}/config.ason`, `{ webPort: ${port} }\n`)
-		console.log(`home: ${sessions} sessions, ${open.length} open tabs, generated in ${ms(performance.now() - t)} (scale ${scale})`)
+		console.log(
+			`home: ${sessions} sessions, ${open.length} open tabs, generated in ${ms(performance.now() - t)} (scale ${scale})`,
+		)
 		let rows: [string, Probe][] = []
 		let hostReady = /\bhost\b/
 
@@ -258,7 +368,8 @@ async function main(): Promise<number> {
 		await until(() => /code/i.test(login.screen()), 10000)
 		login.clear()
 		login.write(code(home) + '\r')
-		if ((await until(() => login.screen().includes(`localhost:${port}`), 10000)) === undefined) throw new Error(`-r login failed: ${login.screen().slice(-1000)}`)
+		if ((await until(() => login.screen().includes(`localhost:${port}`), 10000)) === undefined)
+			throw new Error(`-r login failed: ${login.screen().slice(-1000)}`)
 		await login.stop()
 		rows.push(['-r to this host', await probe(remote, ['-r'], new RegExp(`localhost:${port}`), 10, [])])
 
@@ -268,13 +379,23 @@ async function main(): Promise<number> {
 		await host.stop()
 
 		console.log('\nsetup             first screen  interactive  key p50  key p99  key max  lost  all indexed  memory')
-		for (let [name, p] of rows) console.log(`${name.padEnd(18)}${ms(p.first).padStart(12)}${ms(p.interactive).padStart(13)}${ms(p.p50).padStart(9)}${ms(p.p99).padStart(9)}${ms(p.max).padStart(9)}${String(p.lost).padStart(6)}${ms(p.allMarks).padStart(13)}${`${p.rssMB} MB`.padStart(8)}`)
+		for (let [name, p] of rows)
+			console.log(
+				`${name.padEnd(18)}${ms(p.first).padStart(12)}${ms(p.interactive).padStart(13)}${ms(p.p50).padStart(9)}${ms(p.p99).padStart(9)}${ms(p.max).padStart(9)}${String(p.lost).padStart(6)}${ms(p.allMarks).padStart(13)}${`${p.rssMB} MB`.padStart(8)}`,
+			)
 		let sorted = sw.toSorted((a, b) => a - b)
 		console.log(`\ntab switch (${sw.length}, peer): p50 ${ms(sorted[sorted.length >> 1])}, max ${ms(sorted.at(-1))}`)
 		console.log(`web page ready (focused tab shown): ${chrome ? ms(web) : 'no Chrome'}`)
-		let stallRows: [string, Stalls][] = [...rows.map(([n, p]): [string, Stalls] => [n, p.stalls]), ['tab switching', swStalls], ['web page load (host)', webStalls]]
+		let stallRows: [string, Stalls][] = [
+			...rows.map(([n, p]): [string, Stalls] => [n, p.stalls]),
+			['tab switching', swStalls],
+			['web page load (host)', webStalls],
+		]
 		console.log('\nevent-loop blocks over 10 ms (task 7j)\nsetup                 count  longest    total  worst (ms@s)')
-		for (let [name, st] of stallRows) console.log(`${name.padEnd(20)}${String(st.n).padStart(7)}${ms(st.max).padStart(9)}${ms(st.total).padStart(9)}  ${st.worst}`)
+		for (let [name, st] of stallRows)
+			console.log(
+				`${name.padEnd(20)}${String(st.n).padStart(7)}${ms(st.max).padStart(9)}${ms(st.total).padStart(9)}  ${st.worst}`,
+			)
 
 		for (let [name, p] of rows) {
 			if (name !== 'host, cold') {

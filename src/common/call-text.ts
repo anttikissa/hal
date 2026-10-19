@@ -36,12 +36,18 @@ function blank(text: string, i: number): number {
 function withoutLineComment(text: string): { text: string; purpose?: string } {
 	let end = lineEnd(text, 0)
 	for (let i = 0; i < end;) {
-		if (text.startsWith('//', i) && (i === 0 || /\s/.test(text[i - 1]!))) return { text: text.slice(0, i).trimEnd() + text.slice(end), purpose: text.slice(i + 2, end).trim() }
+		if (text.startsWith('//', i) && (i === 0 || /\s/.test(text[i - 1]!)))
+			return { text: text.slice(0, i).trimEnd() + text.slice(end), purpose: text.slice(i + 2, end).trim() }
 		if ('{["\'`'.includes(text[i]!) && (i === 0 || /\s/.test(text[i - 1]!))) {
-			try { i = ason.parseAt(text, i).end } catch { return { text } }
-		}
-		else if (text.startsWith('/*', i)) { let close = text.indexOf('*/', i + 2); i = close < 0 ? end : close + 2 }
-		else i++
+			try {
+				i = ason.parseAt(text, i).end
+			} catch {
+				return { text }
+			}
+		} else if (text.startsWith('/*', i)) {
+			let close = text.indexOf('*/', i + 2)
+			i = close < 0 ? end : close + 2
+		} else i++
 	}
 	return { text }
 }
@@ -55,9 +61,11 @@ function parse(input: unknown): Parsed {
 	if (i >= text.length) throw new Error('empty tool call; e.g. READ "src/main.ts" or BASH "ls -l"')
 	if (/^\/[A-Za-z]/.test(text.slice(i, i + 2))) return { name: 'command', raw: ' ' + text.slice(i) }
 	let name = /^[A-Za-z_]+/.exec(text.slice(i, i + 64))?.[0]
-	if (!name) throw new Error(`expected a tool name such as READ or BASH, found ${JSON.stringify(text.slice(i, i + 40))}`)
+	if (!name)
+		throw new Error(`expected a tool name such as READ or BASH, found ${JSON.stringify(text.slice(i, i + 40))}`)
 	let end = i + name.length
-	if (end < text.length && !/\s/.test(text[end]!) && !text.startsWith('/*', end)) throw new Error(`expected a space after ${name}, found ${JSON.stringify(text.slice(i, i + 40))}`)
+	if (end < text.length && !/\s/.test(text[end]!) && !text.startsWith('/*', end))
+		throw new Error(`expected a space after ${name}, found ${JSON.stringify(text.slice(i, i + 40))}`)
 	return { name: name.toLowerCase(), raw: text.slice(end), ...(purpose && { purpose }) }
 }
 
@@ -73,15 +81,17 @@ function values(raw: string): Values {
 	for (;;) {
 		while (i < raw.length) {
 			let c = raw[i]!
-			if (c === '\n') { firstLine = false; i++ }
-			else if (/\s/.test(c)) i++
+			if (c === '\n') {
+				firstLine = false
+				i++
+			} else if (/\s/.test(c)) i++
 			else if (raw.startsWith('/*', i)) {
 				let close = raw.indexOf('*/', i + 2)
 				let stop = close < 0 ? lineEnd(raw, i) : close
 				purposes.push(raw.slice(i + 2, stop).trim())
 				if (close < 0) unclosed = true
 				i = close < 0 ? stop : close + 2
-			} else if (c === '#' && !/^#t?\d+(?=\s|$)/.test(raw.slice(i)) || raw.startsWith('//', i)) i = lineEnd(raw, i)
+			} else if ((c === '#' && !/^#t?\d+(?=\s|$)/.test(raw.slice(i))) || raw.startsWith('//', i)) i = lineEnd(raw, i)
 			else break
 		}
 		if (i >= raw.length) break
@@ -106,7 +116,8 @@ function values(raw: string): Values {
 			let end = i
 			while (end < raw.length && !/\s/.test(raw[end]!)) end++
 			let word = raw.slice(i, end)
-			if (!firstLine) throw new Error(`unexpected ${JSON.stringify(word)} on a later line: quote multi-line arguments; ${one}`)
+			if (!firstLine)
+				throw new Error(`unexpected ${JSON.stringify(word)} on a later line: quote multi-line arguments; ${one}`)
 			out.push(word)
 			i = end
 		}
@@ -118,10 +129,15 @@ function values(raw: string): Values {
 function split(text: string): string[] {
 	callText.parse(text)
 	if (!text.includes('\n')) return [text]
-	let starts = [0], lineStart = true, first = true, edit = false, block = false
+	let starts = [0],
+		lineStart = true,
+		first = true,
+		edit = false,
+		block = false
 	for (let i = 0; i < text.length;) {
 		if (lineStart && edit && (block || text[i] === '!')) {
-			let end = lineEnd(text, i), line = text.slice(i, end).replace(/\r$/, '')
+			let end = lineEnd(text, i),
+				line = text.slice(i, end).replace(/\r$/, '')
 			if (block || /^!!(OLD|NEW)$/.test(line)) {
 				block = line !== '!!END'
 				i = end < text.length ? end + 1 : end
@@ -129,13 +145,20 @@ function split(text: string): string[] {
 			}
 		}
 		let c = text[i]!
-		if (/\s/.test(c)) { if (c === '\n') lineStart = true; i++; continue }
+		if (/\s/.test(c)) {
+			if (c === '\n') lineStart = true
+			i++
+			continue
+		}
 		if (text.startsWith('/*', i)) {
 			let close = text.indexOf('*/', i + 2)
 			i = close < 0 ? lineEnd(text, i) : close + 2
 			continue
 		}
-		if (c === '#' || text.startsWith('//', i)) { i = lineEnd(text, i); continue }
+		if (c === '#' || text.startsWith('//', i)) {
+			i = lineEnd(text, i)
+			continue
+		}
 		let name = lineStart ? /^[A-Za-z_]+(?=\s|$|\/\*)/.exec(text.slice(i))?.[0] : undefined
 		if (name) {
 			if (!first) starts.push(i)

@@ -115,7 +115,9 @@ test('a busy preferred web port falls back; the advertised URL and link codes fo
 	// web.start tries ports up to 9100, so take one below it.
 	let busy!: ReturnType<typeof Bun.serve>
 	for (let port = 9050; !busy && port < 9099; port++) {
-		try { busy = Bun.serve({ hostname: '127.0.0.1', port, fetch: () => new Response() }) } catch {}
+		try {
+			busy = Bun.serve({ hostname: '127.0.0.1', port, fetch: () => new Response() })
+		} catch {}
 	}
 	let port = busy.port
 	if (port === undefined) throw new Error('server did not report its bound port')

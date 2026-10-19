@@ -13,7 +13,11 @@ type Saved = { boundary: number; checkpoint: number; pressure: number; omitted: 
 type Budget = { overhead?: number; window?: number; model?: string }
 
 function saved(id: string): Saved {
-	return liveFiles.liveFile(`${paths.sessionDir(id)}/projection.ason`, { boundary: 0, checkpoint: 0, pressure: -1, omitted: [], consumed: [] } as Saved, { watch: false })
+	return liveFiles.liveFile(
+		`${paths.sessionDir(id)}/projection.ason`,
+		{ boundary: 0, checkpoint: 0, pressure: -1, omitted: [], consumed: [] } as Saved,
+		{ watch: false },
+	)
 }
 
 function marker(kind: string, ref: string): string {
@@ -23,10 +27,11 @@ function marker(kind: string, ref: string): string {
 // Match our reserved generated form (read_blob before READ_ENTRY), recursively, before any tool executes.
 function copied(value: unknown): string | undefined {
 	if (typeof value === 'string') return /\[pruned [^\]\n;]+; read_(?:blob|entry) id=[\w/#.-]+\]/.exec(value)?.[0]
-	if (value && typeof value === 'object') for (let child of Object.entries(value).flat()) {
-		let found = pruning.copied(child)
-		if (found) return found
-	}
+	if (value && typeof value === 'object')
+		for (let child of Object.entries(value).flat()) {
+			let found = pruning.copied(child)
+			if (found) return found
+		}
 }
 
 // A long argument keeps its first line (a call's purpose comment), so old
@@ -38,17 +43,27 @@ function argumentsOf(value: unknown, ref: string): unknown {
 	}
 	if (typeof value === 'string') return value
 	if (Array.isArray(value)) return value.map((v) => pruning.argumentsOf(v, ref))
-	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pruning.argumentsOf(v, ref)]))
+	if (value && typeof value === 'object')
+		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pruning.argumentsOf(v, ref)]))
 	return value
 }
 
 function omit(id: string, r: HistoryRecord): HistoryRecord {
 	let ref = `${id}/${r.n}`
-	if (r.type === 'assistant' && r.block.type === 'tool_call') return { ...r, block: { ...r.block, input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>, ...(r.block.cmd !== undefined && { cmd: pruning.argumentsOf(r.block.cmd, ref) as string }) } }
+	if (r.type === 'assistant' && r.block.type === 'tool_call')
+		return {
+			...r,
+			block: {
+				...r.block,
+				input: pruning.argumentsOf(r.block.input, ref) as Record<string, unknown>,
+				...(r.block.cmd !== undefined && { cmd: pruning.argumentsOf(r.block.cmd, ref) as string }),
+			},
+		}
 	if (r.type !== 'user') return r
 	let slot = 0
 	// A bare entry ID reads every part, so name the part when there are several.
-	let many = r.blocks.length > 1 || r.blocks.some((b) => b.type === 'tool_result' && conversationBlocks.resultImages(b).length)
+	let many =
+		r.blocks.length > 1 || r.blocks.some((b) => b.type === 'tool_result' && conversationBlocks.resultImages(b).length)
 	let itemRef = (at: number) => `${id}/${r.n}${many ? `.${at}` : ''}`
 	let blocks: UserBlock[] = r.blocks.map((b) => {
 		let at = slot++
@@ -65,8 +80,10 @@ function omit(id: string, r: HistoryRecord): HistoryRecord {
 }
 
 function heavy(r: HistoryRecord): boolean {
-	return (r.type === 'user' && r.blocks.some((b) => b.type === 'image' || b.type === 'tool_result')) ||
+	return (
+		(r.type === 'user' && r.blocks.some((b) => b.type === 'image' || b.type === 'tool_result')) ||
 		(r.type === 'assistant' && r.block.type === 'tool_call')
+	)
 }
 
 // Image tokens, measured from real usage. Opus 5.5 (count_tokens): downscale
@@ -77,10 +94,10 @@ function heavy(r: HistoryRecord): boolean {
 function imageTokens(width: number, height: number, model?: string): number {
 	if (model?.startsWith('openai/')) return Math.floor(Math.ceil(width / 32) * Math.ceil(height / 32) * 1.2) + 1
 	let scale = Math.min(1, 2576 / Math.max(width, height))
-	let patches = Math.ceil(width * scale / 28) * Math.ceil(height * scale / 28)
+	let patches = Math.ceil((width * scale) / 28) * Math.ceil((height * scale) / 28)
 	if (patches > 4761) {
 		scale *= Math.sqrt(4761 / patches)
-		patches = Math.ceil(width * scale / 28) * Math.ceil(height * scale / 28)
+		patches = Math.ceil((width * scale) / 28) * Math.ceil((height * scale) / 28)
 	}
 	return patches + 3
 }
@@ -104,14 +121,21 @@ function imageCost(id: string, blob: string, model?: string): number {
 // images by pixels, not file bytes.
 function estimate(id: string, messages: Message[], overhead = 0, model?: string): number {
 	let images = 0
-	for (let m of messages) for (let b of m.blocks) {
-		let imagesInBlock = b.type === 'image' ? [b] : b.type === 'tool_result' ? conversationBlocks.resultImages(b) : []
-		for (let image of imagesInBlock) images += pruning.imageCost(id, image.blob, model)
-	}
+	for (let m of messages)
+		for (let b of m.blocks) {
+			let imagesInBlock = b.type === 'image' ? [b] : b.type === 'tool_result' ? conversationBlocks.resultImages(b) : []
+			for (let image of imagesInBlock) images += pruning.imageCost(id, image.blob, model)
+		}
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }
 
-function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r, projectCurrent: (records: HistoryRecord[]) => HistoryRecord[] = (records) => records): HistoryRecord[] {
+function project(
+	id: string,
+	all: HistoryRecord[],
+	budget: Budget = {},
+	materialize: (r: HistoryRecord) => HistoryRecord = (r) => r,
+	projectCurrent: (records: HistoryRecord[]) => HistoryRecord[] = (records) => records,
+): HistoryRecord[] {
 	let original = new Map(all.map((r) => [r.n, r]))
 	let records = replay.current(all)
 	let edited = new Set(records.filter((r) => JSON.stringify(r) !== JSON.stringify(original.get(r.n))).map((r) => r.n))
@@ -135,8 +159,16 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}, material
 			if (r.type === 'turn_end' && r.status === 'completed') completed++
 		}
 		let checkpoint = Math.floor(completed / pruning.batchTurns) * pruning.batchTurns
-		let apply = (set: Set<number>) => all.map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
-		let candidates = (old: boolean) => active.filter((r) => r.n !== undefined && !omitted.has(r.n) && consumed.has(r.n) && pruning.heavy(r) && (!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns))
+		let apply = (set: Set<number>) => all.map((r) => (r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r))
+		let candidates = (old: boolean) =>
+			active.filter(
+				(r) =>
+					r.n !== undefined &&
+					!omitted.has(r.n) &&
+					consumed.has(r.n) &&
+					pruning.heavy(r) &&
+					(!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns),
+			)
 		let add = (eligible: HistoryRecord[]) => {
 			let next = new Set(omitted)
 			for (let r of eligible) if (JSON.stringify(pruning.omit(id, r)).length < JSON.stringify(r).length) next.add(r.n!)
@@ -150,8 +182,12 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}, material
 			state.pressure = -1
 		}
 		let projected = apply(omitted)
-		let limit = Math.min(pruning.pressureTokens, (budget.window ?? Infinity) * .75)
-		if (state.pressure !== checkpoint && pruning.estimate(id, replay.toMessages(projected), budget.overhead, budget.model) > limit && add(candidates(false))) {
+		let limit = Math.min(pruning.pressureTokens, (budget.window ?? Infinity) * 0.75)
+		if (
+			state.pressure !== checkpoint &&
+			pruning.estimate(id, replay.toMessages(projected), budget.overhead, budget.model) > limit &&
+			add(candidates(false))
+		) {
 			state.pressure = checkpoint
 			diag.log(`pruning ${id}: pressure boundary at checkpoint ${checkpoint}; omitted ${omitted.size} records`)
 			projected = apply(omitted)
@@ -159,7 +195,9 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}, material
 		state.omitted = [...omitted]
 		liveFiles.save(state)
 		return projected
-	} finally { liveFiles.close(state) }
+	} finally {
+		liveFiles.close(state)
+	}
 }
 
 // Only a successful provider round proves it read these payloads. Capture
@@ -167,13 +205,30 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}, material
 function consumed(id: string, records: HistoryRecord[]): void {
 	let state = pruning.saved(id)
 	try {
-		state.consumed = [...new Set([...state.consumed, ...records.filter(pruning.heavy).flatMap((r) => r.n === undefined ? [] : [r.n])])]
+		state.consumed = [
+			...new Set([
+				...state.consumed,
+				...records.filter(pruning.heavy).flatMap((r) => (r.n === undefined ? [] : [r.n])),
+			]),
+		]
 		liveFiles.save(state)
-	} finally { liveFiles.close(state) }
+	} finally {
+		liveFiles.close(state)
+	}
 }
 
 export const pruning = {
-	saved, marker, copied, argumentsOf, omit, heavy, imageTokens, imageCost, estimate, project, consumed,
+	saved,
+	marker,
+	copied,
+	argumentsOf,
+	omit,
+	heavy,
+	imageTokens,
+	imageCost,
+	estimate,
+	project,
+	consumed,
 	batchTurns: 8,
 	retainTurns: 4,
 	maxArgumentChars: 1000,

@@ -53,17 +53,23 @@ function paint(hints: Hint[]): string {
 function row(v: HelpInput, cols: number, resize = false): string {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let h = colors.help()
-	let line = (text: string, fg = h.description!) => ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
+	let line = (text: string, fg = h.description!) =>
+		ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
 	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
 	if (v.editing) {
 		let parts = /^(\[[^\]]+\]) (.*)$/.exec(v.editing)
-		return parts ? line(`${ansi.sgr({ fg: colors.warning().fg! })}${parts[1]} ${helpRow.paint(parts[2]!.split(', ').map((s) => s.split(': ') as Hint))}`) : line(v.editing, colors.warning().fg!)
+		return parts
+			? line(
+					`${ansi.sgr({ fg: colors.warning().fg! })}${parts[1]} ${helpRow.paint(parts[2]!.split(', ').map((s) => s.split(': ') as Hint))}`,
+				)
+			: line(v.editing, colors.warning().fg!)
 	}
-	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
+	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => (typeof c === 'string' ? c : c[0])).join('  ')))
 	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text, v.transcript?.items)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
-	if (v.noUser) left = `${ansi.sgr({ fg: colors.warning().fg! })}USER.md disabled${ansi.sgr({ fg: h.description! })}${left ? `; ${left}` : ''}`
+	if (v.noUser)
+		left = `${ansi.sgr({ fg: colors.warning().fg! })}USER.md disabled${ansi.sgr({ fg: h.description! })}${left ? `; ${left}` : ''}`
 	let right = helpRow.paint([['/keys', 'shortcuts']])
 	let rw = strings.visLen(right)
 	if (rw + 1 > width) return line(left)
@@ -80,8 +86,19 @@ function rows(v: HelpInput, cols: number, resize = false, max = 10): string[] {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let h = colors.help()
 	let pad = Math.max(...hints.slice(0, max).map(([c]) => strings.visLen(ansi.clean(c))))
-	let out = hints.slice(0, max).map(([c, d]) => ansi.PAD + strings.clipVisual(`${ansi.sgr({ fg: h.key! })}${ansi.clean(c).padEnd(pad)}  ${ansi.sgr({ fg: h.description! })}${ansi.clean(d)}`, width) + ansi.UNCOLOR)
-	if (hints.length > max) out.push(ansi.PAD + ansi.sgr({ fg: h.description! }) + `+${hints.length - max} more` + ansi.UNCOLOR)
+	let out = hints
+		.slice(0, max)
+		.map(
+			([c, d]) =>
+				ansi.PAD +
+				strings.clipVisual(
+					`${ansi.sgr({ fg: h.key! })}${ansi.clean(c).padEnd(pad)}  ${ansi.sgr({ fg: h.description! })}${ansi.clean(d)}`,
+					width,
+				) +
+				ansi.UNCOLOR,
+		)
+	if (hints.length > max)
+		out.push(ansi.PAD + ansi.sgr({ fg: h.description! }) + `+${hints.length - max} more` + ansi.UNCOLOR)
 	return out
 }
 

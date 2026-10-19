@@ -26,7 +26,21 @@ import { paths } from './paths.ts'
 import { pageSlices } from './page-slices.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { rebaseVersion?: 1; rebase?: number; transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; files?: number }
+type Marks = {
+	rebaseVersion?: 1
+	rebase?: number
+	transitions?: number[]
+	size: number
+	next?: number
+	question?: number
+	turnQuestion?: string
+	answer?: number
+	turn?: number
+	prompt?: number
+	inbox: Record<string, number | number[]>
+	changes?: number[]
+	files?: number
+}
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -37,7 +51,16 @@ export type Tail = { history: HistoryRecord[]; earlier: HistoryRecord[]; older?:
 type Steps<T> = Generator<number, T, void>
 // `scanned`: bytes whose line offsets are known; `size`: what `list` covers.
 // `display`: snapshots.build's rewrites and dropped, for the same size.
-type Rebased = { scanned: number; offsets: number[]; size: number; records: HistoryRecord[]; list: HistoryRecord[]; shown: Map<number | undefined, HistoryRecord>; current: Map<number | undefined, HistoryRecord>; display?: { rewrites: Snapshot['rewrites']; dropped: number[] } }
+type Rebased = {
+	scanned: number
+	offsets: number[]
+	size: number
+	records: HistoryRecord[]
+	list: HistoryRecord[]
+	shown: Map<number | undefined, HistoryRecord>
+	current: Map<number | undefined, HistoryRecord>
+	display?: { rewrites: Snapshot['rewrites']; dropped: number[] }
+}
 
 const NL = 10
 
@@ -47,7 +70,6 @@ function drive<T>(steps: Steps<T>): T {
 		if (r.done) return r.value
 	}
 }
-
 
 // Bytes [start, end) of a history file. Every lazy read goes through
 // here, so what opening a session costs can be counted.
@@ -79,7 +101,7 @@ function parse(path: string, text: string, offset: number): HistoryRecord {
 // The complete lines of `buf`, read from file offset `base`, from its
 // first byte on (the caller drops a leading fragment), not decoded yet.
 function* raw(buf: Buffer, base: number): Generator<Raw, void, void> {
-	for (let at = 0; ; ) {
+	for (let at = 0; ;) {
 		let nl = buf.indexOf(NL, at)
 		if (nl < 0) return
 		let text = buf.toString('utf8', at, nl)
@@ -88,7 +110,11 @@ function* raw(buf: Buffer, base: number): Generator<Raw, void, void> {
 	}
 }
 
-const decode = (path: string, r: Raw): Line => ({ offset: r.offset, bytes: r.bytes, record: pages.parse(path, r.text, r.offset) })
+const decode = (path: string, r: Raw): Line => ({
+	offset: r.offset,
+	bytes: r.bytes,
+	record: pages.parse(path, r.text, r.offset),
+})
 
 // The lines of `buf` (as raw()), decoded.
 function lines(path: string, buf: Buffer, base: number): Line[] {
@@ -126,7 +152,11 @@ function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
 	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
 	// Every record of a message: an edit keeps the place of the first.
 	else if (r.type === 'inbox') m.inbox[r.id] = [...[m.inbox[r.id] ?? []].flat(), offset]
-	else if ((r.type === 'user' && (r.notices === undefined || r.blocks.length)) || r.type === 'assistant' || r.type === 'continue') {
+	else if (
+		(r.type === 'user' && (r.notices === undefined || r.blocks.length)) ||
+		r.type === 'assistant' ||
+		r.type === 'continue'
+	) {
 		m.turn = offset
 		if (replay.isPrompt(r)) m.prompt = offset
 		if (r.type === 'user') for (let id of r.inbox ?? []) delete m.inbox[id]
@@ -169,7 +199,12 @@ function* catchUp(id: string): Steps<Marks> {
 		// Marks from before `next`, or with `close` (an answer or a turn
 		// end, before answers were kept apart), are rebuilt.
 		changedFiles.upgrade(m)
-		if (m.size < 0 || m.size > size || (m.size > 0 && (m.next === undefined || m.changes === undefined || !('rebaseVersion' in m))) || 'close' in m) {
+		if (
+			m.size < 0 ||
+			m.size > size ||
+			(m.size > 0 && (m.next === undefined || m.changes === undefined || !('rebaseVersion' in m))) ||
+			'close' in m
+		) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
 			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 1 })
 			changedFiles.reset(m)
@@ -177,7 +212,8 @@ function* catchUp(id: string): Steps<Marks> {
 		if (m.size >= size) return m
 		let base = m.size
 		let buf = pages.readBytes(path, base, Math.min(size, base + pages.chunk))
-		for (let n = pages.chunk * 2; buf.indexOf(NL) < 0 && base + buf.length < size; n *= 2) buf = pages.readBytes(path, base, Math.min(size, base + n))
+		for (let n = pages.chunk * 2; buf.indexOf(NL) < 0 && base + buf.length < size; n *= 2)
+			buf = pages.readBytes(path, base, Math.min(size, base + n))
 		// Only a torn last line is left.
 		if (buf.indexOf(NL) < 0) return m
 		let at = base
@@ -211,7 +247,11 @@ function marked(id: string): Line[] {
 
 function* markedSteps(id: string): Steps<Line[]> {
 	let m = yield* pages.catchUp(id)
-	let offsets = new Set([m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat(), ...(m.transitions ?? [])].filter((o) => o !== undefined))
+	let offsets = new Set(
+		[m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat(), ...(m.transitions ?? [])].filter(
+			(o) => o !== undefined,
+		),
+	)
 	let path = history.file(id)
 	let out: Line[] = []
 	for (let o of [...offsets].sort((a, b) => a - b)) {
@@ -238,9 +278,12 @@ function rebased(id: string): Rebased {
 	let records = history.readSync(id)
 	for (let key of pages.state.rebased.keys()) if (!history.state.cache.has(key)) pages.state.rebased.delete(key)
 	let c = pages.state.rebased.get(id)
-	if (!c || c.scanned > size) c = { scanned: 0, offsets: [], size: -1, records: [], list: [], shown: new Map(), current: new Map() }
-	let buf = pages.readBytes(path, c.scanned, size), at = 0
-	for (let nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1) if (buf.subarray(at, nl).some((b) => b > 32)) c.offsets.push(c.scanned + at)
+	if (!c || c.scanned > size)
+		c = { scanned: 0, offsets: [], size: -1, records: [], list: [], shown: new Map(), current: new Map() }
+	let buf = pages.readBytes(path, c.scanned, size),
+		at = 0
+	for (let nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1)
+		if (buf.subarray(at, nl).some((b) => b > 32)) c.offsets.push(c.scanned + at)
 	c.scanned += at
 	if (c.size !== c.scanned) {
 		c.records = records.slice(0, c.offsets.length)
@@ -269,11 +312,14 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
 	let end = before ?? size
-	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL)) throw new Error(`${path}: ${before} is not a record boundary`)
+	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL))
+		throw new Error(`${path}: ${before} is not a record boundary`)
 	// Rebase undo and cross-page groups need the audit trail.
 	if (pages.marks(id).rebase !== undefined) {
 		let { records, offsets, shown: current } = pages.rebased(id)
-		let found = records.map((record, i) => ({ offset: offsets[i]!, record })).filter((l) => l.offset < end && l.record.type !== 'rebase' && current.has(l.record.n))
+		let found = records
+			.map((record, i) => ({ offset: offsets[i]!, record }))
+			.filter((l) => l.offset < end && l.record.type !== 'rebase' && current.has(l.record.n))
 		let at = found.findIndex((l) => l.offset >= end - budget)
 		if (at < 0) at = Math.max(0, found.length - 1)
 		let turn = at > 0 ? found.findIndex((l, i) => i >= at && turnStart(l.record)) : -1
@@ -315,7 +361,11 @@ function* snapshotSteps(id: string, budget = pages.budget): Steps<Tail> {
 	}
 	let used = pages.state.bytesRead - read
 	let tail = yield* pages.pageSteps(id, undefined, Math.max(budget - used, 1))
-	let out: Tail = { history: tail.records, earlier: earlier.filter((l) => l.offset < tail.start).map((l) => l.record), end: tail.end }
+	let out: Tail = {
+		history: tail.records,
+		earlier: earlier.filter((l) => l.offset < tail.start).map((l) => l.record),
+		end: tail.end,
+	}
 	if (tail.start > 0 && !tail.records.some((r) => r.type === 'reset')) out.older = tail.start
 	return out
 }
@@ -329,8 +379,19 @@ function since(id: string, tail: Tail): Tail {
 	if (size <= tail.end) return tail
 	let more = pages.lines(path, pages.readBytes(path, tail.end, size), tail.end)
 	let start = tail.older ?? 0
-	let earlier = tail.older === undefined ? [] : pages.marked(id).filter((l) => l.offset < start).map((l) => l.record)
-	return { ...tail, history: [...tail.history, ...more.map((l) => l.record)], earlier, end: more.length ? more.at(-1)!.offset + more.at(-1)!.bytes : tail.end }
+	let earlier =
+		tail.older === undefined
+			? []
+			: pages
+					.marked(id)
+					.filter((l) => l.offset < start)
+					.map((l) => l.record)
+	return {
+		...tail,
+		history: [...tail.history, ...more.map((l) => l.record)],
+		earlier,
+		end: more.length ? more.at(-1)!.offset + more.at(-1)!.bytes : tail.end,
+	}
 }
 
 // Forgets (and writes) every session's marks (tests, a closing host).
@@ -347,7 +408,12 @@ function reset(): void {
 export const pages = {
 	// `bytesRead`: history bytes read lazily so far. `marks`: by path.
 	// `until`: when this turn's slice of sliced work ends.
-	state: { bytesRead: 0, marks: new Map<string, Marks>(), rebased: new Map<string, Rebased>(), until: undefined as number | undefined },
+	state: {
+		bytesRead: 0,
+		marks: new Map<string, Marks>(),
+		rebased: new Map<string, Rebased>(),
+		until: undefined as number | undefined,
+	},
 	// About how many bytes of history a snapshot or a page reads.
 	budget: 256 * 1024,
 	// The longest stretch sliced reading runs without yielding.

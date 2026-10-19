@@ -111,7 +111,10 @@ test('versioned GPT aliases complete and select their own generation', () => {
 	try {
 		process.env.OPENAI_API_KEY = 'test-key'
 		provider.state.providers = { openai: fake([]) }
-		models.state.lists.set('openai', { at: Date.now(), ids: ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-sol'] })
+		models.state.lists.set('openai', {
+			at: Date.now(),
+			ids: ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-sol'],
+		})
 		expect(models.resolve('gpt').id).toBe('openai/gpt-6.1-sol')
 		expect(models.resolve('gpt6.1').id).toBe('openai/gpt-6.1-sol')
 		expect(models.resolve('gpt6').id).toBe('openai/gpt-6-sol')
@@ -126,8 +129,12 @@ test('versioned GPT aliases complete and select their own generation', () => {
 		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
 		let reply = c.of('completions').at(-1)
 		expect(reply.items).toEqual(['/model gpt', '/model gpt-6.1', '/model gpt-6', '/model openai/gpt-6-astra'])
-		expect(reply.descriptions).toEqual(['openai/gpt-6.1-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol', 'openai/gpt-6-astra'])
-
+		expect(reply.descriptions).toEqual([
+			'openai/gpt-6.1-sol',
+			'openai/gpt-6.1-sol',
+			'openai/gpt-6-sol',
+			'openai/gpt-6-astra',
+		])
 	} finally {
 		if (saved === undefined) delete process.env.OPENAI_API_KEY
 		else process.env.OPENAI_API_KEY = saved
@@ -141,9 +148,18 @@ test('family aliases and picker defaults advance versions without changing prefe
 		process.env.OPENAI_API_KEY = 'test-key'
 		process.env.ANTHROPIC_API_KEY = 'test-key'
 		provider.state.providers = { openai: fake([]), anthropic: fake([]) }
-		let ids = ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-luna', 'anthropic/claude-opus-5-5', 'anthropic/claude-sonnet-5-5', 'anthropic/claude-fable-5-1', 'anthropic/claude-haiku-4-5']
+		let ids = [
+			'openai/gpt-6.1-sol',
+			'openai/gpt-6-astra',
+			'openai/gpt-6-luna',
+			'anthropic/claude-opus-5-5',
+			'anthropic/claude-sonnet-5-5',
+			'anthropic/claude-fable-5-1',
+			'anthropic/claude-haiku-4-5',
+		]
 		let cache = () => {
-			for (let name of ['openai', 'anthropic']) models.state.lists.set(name, { at: Date.now(), ids: ids.filter((id) => id.startsWith(`${name}/`)) })
+			for (let name of ['openai', 'anthropic'])
+				models.state.lists.set(name, { at: Date.now(), ids: ids.filter((id) => id.startsWith(`${name}/`)) })
 		}
 		let choices = (targets: Record<string, string>) => {
 			for (let [alias, id] of Object.entries(targets)) expect(models.resolve(alias).id).toBe(id)
@@ -154,13 +170,43 @@ test('family aliases and picker defaults advance versions without changing prefe
 			}
 		}
 		cache()
-		let targets = { gpt: ids[0]!, openai: ids[0]!, sol: ids[0]!, astra: ids[1]!, luna: ids[2]!, opus: ids[3]!, anthropic: ids[3]!, claude: ids[3]!, sonnet: ids[4]!, fable: ids[5]!, haiku: ids[6]! }
+		let targets = {
+			gpt: ids[0]!,
+			openai: ids[0]!,
+			sol: ids[0]!,
+			astra: ids[1]!,
+			luna: ids[2]!,
+			opus: ids[3]!,
+			anthropic: ids[3]!,
+			claude: ids[3]!,
+			sonnet: ids[4]!,
+			fable: ids[5]!,
+			haiku: ids[6]!,
+		}
 		choices(targets)
-		ids.push('openai/pollux-6.5', 'openai/gpt-6.2-terra', 'anthropic/claude-haiku-5-5', 'anthropic/claude-fable-5-2', 'openai/gpt-6.2-sol')
+		ids.push(
+			'openai/pollux-6.5',
+			'openai/gpt-6.2-terra',
+			'anthropic/claude-haiku-5-5',
+			'anthropic/claude-fable-5-2',
+			'openai/gpt-6.2-sol',
+		)
 		cache()
-		targets = { ...targets, gpt: ids.at(-1)!, openai: ids.at(-1)!, sol: ids.at(-1)!, haiku: 'anthropic/claude-haiku-5-5', fable: 'anthropic/claude-fable-5-2' }
+		targets = {
+			...targets,
+			gpt: ids.at(-1)!,
+			openai: ids.at(-1)!,
+			sol: ids.at(-1)!,
+			haiku: 'anthropic/claude-haiku-5-5',
+			fable: 'anthropic/claude-fable-5-2',
+		}
 		choices(targets)
-		ids.push('openai/gpt-6.10-sol', 'openai/gpt-7-sol-mini', 'anthropic/claude-haiku-5-5-20261013', 'anthropic/claude-fable-6-20261013')
+		ids.push(
+			'openai/gpt-6.10-sol',
+			'openai/gpt-7-sol-mini',
+			'anthropic/claude-haiku-5-5-20261013',
+			'anthropic/claude-fable-6-20261013',
+		)
 		cache()
 		choices({ ...targets, gpt: 'openai/gpt-6.10-sol', openai: 'openai/gpt-6.10-sol', sol: 'openai/gpt-6.10-sol' })
 		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
@@ -180,19 +226,30 @@ test('reseller aliases and picker defaults rank versions before general-purpose 
 		process.env.OPENROUTER_API_KEY = 'test-key'
 		let groups = {
 			glm: ['z-ai/glm-5.3', 'z-ai/glm-5.3-prime', 'z-ai/glm-5.3-flash'],
-			qwen: ['qwen/qwen3.8-max-0902', 'qwen/qwen3.8-max-prime', 'qwen/qwen3.8-flash', 'qwen/qwen3.8-omni-flash', 'qwen/qwen3.7-max'],
+			qwen: [
+				'qwen/qwen3.8-max-0902',
+				'qwen/qwen3.8-max-prime',
+				'qwen/qwen3.8-flash',
+				'qwen/qwen3.8-omni-flash',
+				'qwen/qwen3.7-max',
+			],
 			kimi: ['moonshotai/kimi-k3', 'moonshotai/kimi-k2.7-code', 'moonshotai/kimi-k2.6'],
 			deepseek: ['deepseek/deepseek-v4.1-flash', 'deepseek/deepseek-v4-pro'],
 			minimax: ['minimax/minimax-m3', 'minimax/minimax-m2.7'],
 		}
-		let ids = Object.values(groups).flat().map((id) => `openrouter/${id}`).reverse()
+		let ids = Object.values(groups)
+			.flat()
+			.map((id) => `openrouter/${id}`)
+			.reverse()
 		provider.state.providers = { openrouter: fake(ids) }
 		models.state.lists.set('openrouter', { at: Date.now(), ids })
 		for (let [alias, variants] of Object.entries(groups)) {
 			let expected = `openrouter/${variants[0]}`
 			expect(models.resolve(alias).id).toBe(expected)
 			let st = picker.step(picker.open('hal/intro', ids), { key: 'x', text: alias }, ids).state
-			expect(picker.command('s1', st, { type: 'submit', item: st.selected, answers: {} })?.text).toBe(`/model ${expected}`)
+			expect(picker.command('s1', st, { type: 'submit', item: st.selected, answers: {} })?.text).toBe(
+				`/model ${expected}`,
+			)
 		}
 	} finally {
 		if (key === undefined) delete process.env.OPENROUTER_API_KEY
@@ -202,7 +259,11 @@ test('reseller aliases and picker defaults rank versions before general-purpose 
 
 test('a provider that never answers does not hold up the list', async () => {
 	models.state.lists.clear()
-	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }
+	provider.state.providers.slow = {
+		...fake([]),
+		models: (signal) =>
+			new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))),
+	}
 	let saved = models.timeoutMs
 	models.timeoutMs = 5
 	try {
@@ -257,7 +318,11 @@ test('/model alone opens the picker on every client following the session', asyn
 	a.conn.send({ type: 'submit', sessionId: id, text: '/model', from: '9-xyz' })
 	await until(() => b.of('models').length)
 	await until(() => a.of('models').length)
-	expect(b.of('models')[0]).toMatchObject({ sessionId: id, current: 'hal/intro', items: expect.arrayContaining(['acme/big-1']) })
+	expect(b.of('models')[0]).toMatchObject({
+		sessionId: id,
+		current: 'hal/intro',
+		items: expect.arrayContaining(['acme/big-1']),
+	})
 	expect(other.of('models')).toEqual([])
 })
 
@@ -307,7 +372,10 @@ test('credential changes invalidate cached and in-flight model lists', async () 
 	key = 'second'
 	expect(models.known()).not.toContain('acme/big-1')
 	let resolve!: (ids: string[]) => void
-	provider.state.providers.acme!.models = () => new Promise((done) => { resolve = done })
+	provider.state.providers.acme!.models = () =>
+		new Promise((done) => {
+			resolve = done
+		})
 	let pending = models.fetchList('acme')
 	key = 'third'
 	resolve(['stale'])

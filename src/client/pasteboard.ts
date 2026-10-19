@@ -26,9 +26,12 @@ function load(): ObjC | null {
 			objc_getClass: { args: [cstring], returns: pointer },
 			sel_registerName: { args: [cstring], returns: pointer },
 		}).symbols
-		let msg = (args: FFIType[], returns: FFIType) => dlopen(libobjc, { objc_msgSend: { args, returns } }).symbols.objc_msgSend as any
+		let msg = (args: FFIType[], returns: FFIType) =>
+			dlopen(libobjc, { objc_msgSend: { args, returns } }).symbols.objc_msgSend as any
 		// Loading AppKit registers NSPasteboard with the runtime.
-		dlopen('/System/Library/Frameworks/AppKit.framework/AppKit', { NSApplicationLoad: { args: [], returns: FFIType.bool } })
+		dlopen('/System/Library/Frameworks/AppKit.framework/AppKit', {
+			NSApplicationLoad: { args: [], returns: FFIType.bool },
+		})
 		let c = (s: string) => Buffer.from(s + '\0')
 		let send1 = msg([pointer, pointer, pointer], pointer)
 		let cls = (name: string) => objc.objc_getClass(c(name)) as unknown as number
@@ -55,7 +58,9 @@ function png(name?: string): Uint8Array | null {
 	if (!m) return null
 	try {
 		let board = m.cls('NSPasteboard')
-		let pb = name ? m.send1(board, m.sel('pasteboardWithName:'), m.nsstring(name)) : m.send0(board, m.sel('generalPasteboard'))
+		let pb = name
+			? m.send1(board, m.sel('pasteboardWithName:'), m.nsstring(name))
+			: m.send0(board, m.sel('generalPasteboard'))
 		if (!pb) return null
 		let data = m.send1(pb, m.sel('dataForType:'), m.nsstring('public.png'))
 		if (!data) {

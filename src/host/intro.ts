@@ -107,7 +107,11 @@ const PLACEHOLDERS = [
 
 // A weighted shuffle: sorting by random × (rank + 5) keeps the
 // earlier entries early while any one can still come up.
-const ranked = (list: string[]): string[] => list.map((s, i) => ({ s, k: Math.random() * (i + 5) })).sort((a, b) => a.k - b.k).map((x) => x.s)
+const ranked = (list: string[]): string[] =>
+	list
+		.map((s, i) => ({ s, k: Math.random() * (i + 5) }))
+		.sort((a, b) => a.k - b.k)
+		.map((x) => x.s)
 
 // A fresh order for each run: the first example always first, a wink
 // about where the examples live fourth, the rest in a weighted shuffle.
@@ -120,7 +124,19 @@ function languages(): string[] {
 // Name examples: people who talked to a fictional AI, most iconic
 // first. Dave (2001) always comes first and Chell (Portal) last for
 // those who know; the rest get a fresh weighted shuffle each run.
-const NAMES = ['Dave', 'Professor Falken', 'Will Robinson', 'Tony', 'Michael', 'Theodore', 'Ripley', 'Cooper', 'Caleb', 'Lister', 'Chell']
+const NAMES = [
+	'Dave',
+	'Professor Falken',
+	'Will Robinson',
+	'Tony',
+	'Michael',
+	'Theodore',
+	'Ripley',
+	'Cooper',
+	'Caleb',
+	'Lister',
+	'Chell',
+]
 const names = (): string[] => [NAMES[0]!, ...ranked(NAMES.slice(1, -1)), NAMES.at(-1)!]
 
 type Entry = Record<string, any>
@@ -129,8 +145,12 @@ const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can 
 const saved = 'I saved your '
 const closing = "You're all set."
 const restart = 'Starting the intro.'
-const subscriptions = 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
-const yesNo = (name: string, text: string): Form => ({ text, fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }] })
+const subscriptions =
+	'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
+const yesNo = (name: string, text: string): Form => ({
+	text,
+	fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }],
+})
 const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six']
 // The sample thinking card the card question previews on (task 5zq).
 const sample = `Thinking cards hold the model's reasoning before it acts. Here it decides to list the files in this folder, so a tool card shows up below with the command and its output.
@@ -141,7 +161,17 @@ Short shows a card's title row and a few rows in the terminal, the title row alo
 // card question has something to preview on.
 async function* samples(sessionId: string): AsyncGenerator<StreamEvent> {
 	yield { type: 'thinking', text: sample }
-	yield* nativeTool.expand({ type: 'tool_call', id: `intro-${crypto.randomUUID()}`, name: 'tool', input: { cmd: 'BASH /* List files */ "ls -l"' } }, { sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/intro' }).map((c) => ({ ...c, type: 'tool_call' as const }))
+	yield* nativeTool
+		.expand(
+			{
+				type: 'tool_call',
+				id: `intro-${crypto.randomUUID()}`,
+				name: 'tool',
+				input: { cmd: 'BASH /* List files */ "ls -l"' },
+			},
+			{ sessionId, cwd: sessions.open(sessionId).cwd, model: 'hal/intro' },
+		)
+		.map((c) => ({ ...c, type: 'tool_call' as const }))
 	yield { type: 'done', reason: 'tool_use' }
 }
 
@@ -150,7 +180,14 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 		let record = records[i]!
 		if (record.type === 'answer' && Object.hasOwn(record.answers, field)) return record.answers[field]
 		// Escape skips an intro question: it reads as an empty answer.
-		if (record.type === 'answer' && record.canceled && records.some((q) => q.type === 'question' && q.id === record.question && q.form.fields.some((f) => f.name === field))) return ''
+		if (
+			record.type === 'answer' &&
+			record.canceled &&
+			records.some(
+				(q) => q.type === 'question' && q.id === record.question && q.form.fields.some((f) => f.name === field),
+			)
+		)
+			return ''
 	}
 	return undefined
 }
@@ -158,14 +195,26 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 // Whether the last reply to `field` was an emptied field and Enter,
 // not Escape: on a rerun that removes the saved value.
 function cleared(records: HistoryRecord[], field: string): boolean {
-	let last = records.findLast((r) => r.type === 'answer' && (Object.hasOwn(r.answers, field) || (r.canceled && records.some((q) => q.type === 'question' && q.id === r.question && q.form.fields.some((f) => f.name === field)))))
+	let last = records.findLast(
+		(r) =>
+			r.type === 'answer' &&
+			(Object.hasOwn(r.answers, field) ||
+				(r.canceled &&
+					records.some(
+						(q) => q.type === 'question' && q.id === r.question && q.form.fields.some((f) => f.name === field),
+					))),
+	)
 	return last?.type === 'answer' && !last.canceled && !last.answers[field]?.trim()
 }
 
 // Whether any question asking `field` got an answer, even a secret one
 // (kept out of history) or a skip.
 function replied(records: HistoryRecord[], field: string): boolean {
-	return records.some((a) => a.type === 'answer' && records.some((q) => q.type === 'question' && q.id === a.question && q.form.fields.some((f) => f.name === field)))
+	return records.some(
+		(a) =>
+			a.type === 'answer' &&
+			records.some((q) => q.type === 'question' && q.id === a.question && q.form.fields.some((f) => f.name === field)),
+	)
 }
 
 function said(records: HistoryRecord[], text: string): boolean {
@@ -177,18 +226,28 @@ function said(records: HistoryRecord[], text: string): boolean {
 // malformed credentials fail rather than disappear.
 function accounts(): { names: string[]; providers: string[]; stored: number } {
 	let data: Entry = existsSync(paths.authFile()) ? auth.store() : {}
-	let names: string[] = [], providers: string[] = [], stored = 0
+	let names: string[] = [],
+		providers: string[] = [],
+		stored = 0
 	for (let [kind, label, env] of [
-		['anthropic', 'Claude', 'ANTHROPIC_API_KEY'], ['openai', 'ChatGPT', 'OPENAI_API_KEY'],
+		['anthropic', 'Claude', 'ANTHROPIC_API_KEY'],
+		['openai', 'ChatGPT', 'OPENAI_API_KEY'],
 		['opencode-go', 'OpenCode Go', 'OPENCODE_API_KEY'],
 	] as const) {
 		let entries = data[kind] === undefined ? [] : Array.isArray(data[kind]) ? data[kind] : [data[kind]]
-		for (let entry of entries) if ((typeof entry?.accessToken === 'string' && entry.accessToken.length > 0) || (typeof entry?.apiKey === 'string' && entry.apiKey.length > 0)) {
-			names.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
+		for (let entry of entries)
+			if (
+				(typeof entry?.accessToken === 'string' && entry.accessToken.length > 0) ||
+				(typeof entry?.apiKey === 'string' && entry.apiKey.length > 0)
+			) {
+				names.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
+				providers.push(kind)
+				stored++
+			}
+		if (process.env[env]) {
+			names.push(`${label} (${env})`)
 			providers.push(kind)
-			stored++
 		}
-		if (process.env[env]) { names.push(`${label} (${env})`); providers.push(kind) }
 	}
 	return { names, providers, stored }
 }
@@ -198,11 +257,15 @@ function accounts(): { names: string[]; providers: string[]; stored: number } {
 // Then local Ollama models, if the greeting's warm-up found any.
 function choices(providers: string[]): Map<string, string> {
 	let out = new Map<string, string>()
-	for (let [alias, family] of [['claude', 'Claude'], ['gpt', 'GPT']] as const) {
+	for (let [alias, family] of [
+		['claude', 'Claude'],
+		['gpt', 'GPT'],
+	] as const) {
 		let id = models.resolve(alias).id
 		if (id && providers.includes(id.split('/')[0]!)) out.set(modelsDev.displayName(id) ?? family, id)
 	}
-	for (let id of models.cached('ollama')?.ids.slice(0, 4) ?? []) out.set(`${id.slice('ollama/'.length)} (Ollama, local)`, id)
+	for (let id of models.cached('ollama')?.ids.slice(0, 4) ?? [])
+		out.set(`${id.slice('ollama/'.length)} (Ollama, local)`, id)
 	return out
 }
 
@@ -216,22 +279,36 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 }
 
 function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
-	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
+	let start = records.findLastIndex(
+		(r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting),
+	)
 	// A rerun starts from the saved answers, like /config: Enter keeps
 	// one, an emptied field removes it, Escape leaves it alone.
 	let known = (label: 'Name' | 'Language and tone') => {
 		let v = profile.field(profile.text(), label)
 		return v === undefined ? {} : { initial: v }
 	}
-	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }] }
+	let ask: Form = {
+		text: 'What should I call you? (Optional)',
+		fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }],
+	}
 	// Local servers answer before the model question (task vc).
-	let hello = (): Reply => (void models.warm(), { say: `${greeting}
+	let hello = (): Reply => (
+		void models.warm(),
+		{
+			say: `${greeting}
 
-I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
+I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
+			ask,
+		}
+	)
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
-	let finished = run.findIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(closing))
-	if (finished >= 0) return (require('./intro-fun.ts') as typeof import('./intro-fun.ts')).introFun.run(run.slice(finished + 1))
+	let finished = run.findIndex(
+		(r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(closing),
+	)
+	if (finished >= 0)
+		return (require('./intro-fun.ts') as typeof import('./intro-fun.ts')).introFun.run(run.slice(finished + 1))
 	// Text typed while nothing was asked: the intro can't take it. Text
 	// sent while a question was open waited in the inbox; it is let be.
 	// A tool result is no typing: the sample tool card's output.
@@ -244,11 +321,19 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 		let go = answered(run.slice(typed), 'intro')
 		if (go === undefined) {
 			let user = run[typed] as HistoryRecord & { type: 'user' }
-			let text = user.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(' ').replace(/\s+/g, ' ').trim()
+			let text = user.blocks
+				.flatMap((b) => (b.type === 'text' ? [b.text] : []))
+				.join(' ')
+				.replace(/\s+/g, ' ')
+				.trim()
 			if (text.length > 80) text = `${text.slice(0, 79)}…`
-			return { say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`, ask: yesNo('intro', over ? 'Start from the beginning?' : 'Continue with the intro?') }
+			return {
+				say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`,
+				ask: yesNo('intro', over ? 'Start from the beginning?' : 'Continue with the intro?'),
+			}
 		}
-		if (go === 'No') return { say: `Okay, the intro stops here; what you answered stays saved. /model or Ctrl-M picks a model.` }
+		if (go === 'No')
+			return { say: `Okay, the intro stops here; what you answered stays saved. /model or Ctrl-M picks a model.` }
 		if (over) return hello()
 	}
 	let name = profile.value(answered(run, 'name'))
@@ -261,7 +346,9 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 		let value = profile.value(answered(run, field))
 		if (value) {
 			profile.save({ [label]: value })
-			say.push(`${saved}${what} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`)
+			say.push(
+				`${saved}${what} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`,
+			)
 		} else if (cleared(run, field) && profile.field(profile.text(), label) !== undefined) {
 			profile.save({ [label]: null })
 			say.push(`I removed your ${what} from ${resolve(profile.file())}.`)
@@ -273,36 +360,68 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	let login = answered(run, 'login')
 	// Environment keys alone still get the offer: a subscription may be
 	// what the user wants, and they may not know Hal found the key.
-	if (!loggedIn.stored && login === undefined) return reply({
-		say: `${subscriptions}${loggedIn.names.length ? ` Found: ${loggedIn.names.join(', ')}; Skip uses it.` : ''}`,
-		ask: { text: 'Sign in now?', fields: [{ type: 'choice', name: 'login', options: ['/login claude', '/login chatgpt', '/login opencode', 'Skip'], initial: 0 }] },
-	})
+	if (!loggedIn.stored && login === undefined)
+		return reply({
+			say: `${subscriptions}${loggedIn.names.length ? ` Found: ${loggedIn.names.join(', ')}; Skip uses it.` : ''}`,
+			ask: {
+				text: 'Sign in now?',
+				fields: [
+					{
+						type: 'choice',
+						name: 'login',
+						options: ['/login claude', '/login chatgpt', '/login opencode', 'Skip'],
+						initial: 0,
+					},
+				],
+			},
+		})
 	if (!loggedIn.stored && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
 		// The intro turn ends paused first; the command's records follow it.
-		let start = () => sessionId && slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) })
+		let start = () =>
+			sessionId && slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) })
 		return reply({ pause: 'waiting for /login', after: start })
 	}
 
 	let options = intro.choices(loggedIn.providers)
 	let chosen = answered(run, 'model')
-	if (options.size && chosen === undefined) return reply({
-		say: `${loggedIn.names.length ? `Available logins: ${loggedIn.names.join(', ')}.` : 'Ollama runs models on this computer.'}${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
-		ask: { text: 'Which model should Hal use?', fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }] },
-	})
-	let model = chosen === undefined ? undefined : options.get(chosen) ?? [...options.values()].find((id) => id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'))
+	if (options.size && chosen === undefined)
+		return reply({
+			say: `${loggedIn.names.length ? `Available logins: ${loggedIn.names.join(', ')}.` : 'Ollama runs models on this computer.'}${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
+			ask: {
+				text: 'Which model should Hal use?',
+				fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }],
+			},
+		})
+	let model =
+		chosen === undefined
+			? undefined
+			: (options.get(chosen) ??
+				[...options.values()].find((id) =>
+					id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'),
+				))
 
 	let search = answered(run, 'search')
 	let later = 'If you change your mind, run /intro again to set up Serper.'
-	if (!auth.serperKey() && search === undefined) return reply({
-		say: 'Recommended: [Serper](https://serper.dev/signup) adds uniform Google search results for all models. Its free tier goes a long way. OpenAI and Anthropic can use their native web search as a fallback.',
-		ask: { text: 'Set up a Serper web search key?', fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }] },
-	})
+	if (!auth.serperKey() && search === undefined)
+		return reply({
+			say: 'Recommended: [Serper](https://serper.dev/signup) adds uniform Google search results for all models. Its free tier goes a long way. OpenAI and Anthropic can use their native web search as a fallback.',
+			ask: {
+				text: 'Set up a Serper web search key?',
+				fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }],
+			},
+		})
 	if (search === 'Maybe later' && !auth.serperKey() && !said(run, later)) say.push(later)
 	// An empty key or Escape skips: the step must never trap the user.
 	if (search === 'Yes' && !auth.serperKey()) {
 		// Secrets stay out of history: only this turn's answers hold the key.
 		let key = answers?.key ?? (replied(run, 'key') ? '' : undefined)
-		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
+		if (key === undefined)
+			return reply({
+				ask: {
+					text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.',
+					fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }],
+				},
+			})
 		if (key.trim()) apiKeys.save('serper', key.trim())
 		else if ((answers?.key !== undefined || !replied(run, 'language')) && !said(run, later)) say.push(later)
 	}
@@ -310,12 +429,31 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	// whose rows preview on them while it is open (Field.cards).
 	let startsAs = (kind: Kind) => settings.value(card.setting(kind)) as string
 	let levels: string[] = card.levels
-	let row = (name: string, label: string, kind: Kind): Field => ({ type: 'choice', name, label, options: levels, initial: Math.max(0, levels.indexOf(startsAs(kind))), inline: true, cards: kind })
+	let row = (name: string, label: string, kind: Kind): Field => ({
+		type: 'choice',
+		name,
+		label,
+		options: levels,
+		initial: Math.max(0, levels.indexOf(startsAs(kind))),
+		inline: true,
+		cards: kind,
+	})
 	if (answered(run, 'toolCards') === undefined) {
-		if (sessionId && !run.some((r) => r.type === 'assistant' && r.block.type === 'thinking' && r.block.text === sample)) return { stream: samples(sessionId) }
-		return reply({ ask: { text: 'How verbose do you like your output? (/config changes it later)', fields: [row('toolCards', 'Tool', 'tool'), row('thinkingCards', 'Thinking', 'thinking')] } })
+		if (sessionId && !run.some((r) => r.type === 'assistant' && r.block.type === 'thinking' && r.block.text === sample))
+			return { stream: samples(sessionId) }
+		return reply({
+			ask: {
+				text: 'How verbose do you like your output? (/config changes it later)',
+				fields: [row('toolCards', 'Tool', 'tool'), row('thinkingCards', 'Thinking', 'thinking')],
+			},
+		})
 	}
-	let picked = ([['tool', answers?.toolCards], ['thinking', answers?.thinkingCards]] as const).filter(([kind, v]) => v && levels.includes(v) && v !== startsAs(kind))
+	let picked = (
+		[
+			['tool', answers?.toolCards],
+			['thinking', answers?.thinkingCards],
+		] as const
+	).filter(([kind, v]) => v && levels.includes(v) && v !== startsAs(kind))
 	if (picked.length) {
 		config.init()
 		for (let [kind, v] of picked) config.state.data![card.setting(kind)] = v
@@ -325,7 +463,21 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	// plugin loader applies at once; a rerun starts from the active one.
 	// Only the answer itself selects, so a later /theme is not undone.
 	let current = theme.active()
-	if (answered(run, 'theme') === undefined) return reply({ ask: { text: 'Which color theme? (/theme changes it later)', fields: [{ type: 'choice', name: 'theme', options: theme.names(), initial: Math.max(0, theme.names().indexOf(current.name ?? '')), preview: 'theme' }] } })
+	if (answered(run, 'theme') === undefined)
+		return reply({
+			ask: {
+				text: 'Which color theme? (/theme changes it later)',
+				fields: [
+					{
+						type: 'choice',
+						name: 'theme',
+						options: theme.names(),
+						initial: Math.max(0, theme.names().indexOf(current.name ?? '')),
+						preview: 'theme',
+					},
+				],
+			},
+		})
 	if (answers?.theme && answers.theme !== current.name) {
 		let refused = theme.select(answers.theme)
 		if (refused) say.push(refused)
@@ -333,7 +485,13 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	// Language comes last: the scripted intro can't switch language
 	// mid-way, so asking earlier would promise what it can't do.
 	let language = answered(run, 'language')
-	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.languages(), ...known('Language and tone') }] } })
+	if (language === undefined)
+		return reply({
+			ask: {
+				text: 'Any language or tone preferences?',
+				fields: [{ type: 'text', name: 'language', placeholder: intro.languages(), ...known('Language and tone') }],
+			},
+		})
 	store('Language and tone', 'language')
 	if (model) {
 		config.init()
@@ -341,13 +499,17 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 		liveFiles.save(config.state.data!)
 		if (sessionId) slash.change(sessionId, { model })
 	}
-	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.`
-		: !loggedIn.names.length ? 'No model can answer yet: after /login, /model or Ctrl-M picks one.'
-		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
+	let now = model
+		? `This tab now uses ${chosen}, also the default for new tabs.`
+		: !loggedIn.names.length
+			? 'No model can answer yet: after /login, /model or Ctrl-M picks one.'
+			: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	// Not signed in (environment keys aside): the close always says how.
-	if (!loggedIn.stored) now += "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
-	return reply({ say:
-		`${closing} A few tips:
+	if (!loggedIn.stored)
+		now +=
+			"\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
+	return reply({
+		say: `${closing} A few tips:
 
 Escape pauses a turn; ${sendKeys.name('queue')} queues a message for later.
 
@@ -357,7 +519,8 @@ The web client is at ${settings.webUrl()} — /auth gives the one-time login cod
 
 Ctrl-C to quit.
 
-${now}` })
+${now}`,
+	})
 }
 
 export const intro = { languages, restart, run, answered, accounts, choices }

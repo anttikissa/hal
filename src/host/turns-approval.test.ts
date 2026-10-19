@@ -95,11 +95,23 @@ async function opened(id: string) {
 	return c
 }
 
-const bash = (id: string, command: string): StreamEvent => ({ type: 'tool_call', id, name: 'bash', input: { command, description: 'Clean up' } })
+const bash = (id: string, command: string): StreamEvent => ({
+	type: 'tool_call',
+	id,
+	name: 'bash',
+	input: { command, description: 'Clean up' },
+})
 const read = (id: string): StreamEvent => ({ type: 'tool_call', id, name: 'read', input: { path: 'notes.txt' } })
-const round1 = (...events: StreamEvent[]) => calls[0]!.push(...events, { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
-const finish = (call: Call) => call.push({ type: 'text', text: 'done' }, { type: 'usage', usage: { input: 20, output: 1 } }, { type: 'done', reason: 'end' })
-const results = (call: Call) => call.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
+const round1 = (...events: StreamEvent[]) =>
+	calls[0]!.push(...events, { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
+const finish = (call: Call) =>
+	call.push(
+		{ type: 'text', text: 'done' },
+		{ type: 'usage', usage: { input: 20, output: 1 } },
+		{ type: 'done', reason: 'end' },
+	)
+const results = (call: Call) =>
+	call.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
 
 test('each dangerous call is asked once, harmless ones not at all; answers survive a restart and results keep call order', async () => {
 	let a = client()
@@ -140,10 +152,16 @@ test('each dangerous call is asked once, harmless ones not at all; answers survi
 })
 
 test('compound commands retain individual approvals and declined results', async () => {
-	let c = client(), id = session(c)
+	let c = client(),
+		id = session(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'tidy' })
 	await until(() => calls.length === 1)
-	round1({ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd: 'READ notes.txt\nBASH "rm -rf junk"\nREAD notes.txt' } })
+	round1({
+		type: 'tool_call',
+		id: 'compound',
+		name: 'tool',
+		input: { cmd: 'READ notes.txt\nBASH "rm -rf junk"\nREAD notes.txt' },
+	})
 	await until(() => transcript.question(c.views.get(id)))
 	let question = transcript.question(c.views.get(id))!
 	expect(question.form.quote!.text).toBe('rm -rf junk')
@@ -181,4 +199,3 @@ test("Escape at an approval pauses with the turn's usage; the call has not run a
 	expect(ran).toEqual(['b1'])
 	expect(results(calls[1]!)).toEqual([expect.objectContaining({ id: 'b1', output: expect.stringMatching(/exit 0/) })])
 })
-

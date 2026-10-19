@@ -4,8 +4,13 @@ import { app } from './app.ts'
 import { render } from './render.ts'
 
 test('Ctrl-F debounces transient queries, cancels on Escape and tells where the selected block is', async () => {
-	let saved = { send: app.send, show: render.show }, sent: any[] = []
-	app.reset(); app.send = (c) => { sent.push(c) }; render.show = () => {}
+	let saved = { send: app.send, show: render.show },
+		sent: any[] = []
+	app.reset()
+	app.send = (c) => {
+		sent.push(c)
+	}
+	render.show = () => {}
 	try {
 		app.state.prompt = { text: 'unsent draft', cursor: 12 }
 		app.onKeys([keyHelp.parse('ctrl-f')])
@@ -19,5 +24,9 @@ test('Ctrl-F debounces transient queries, cancels on Escape and tells where the 
 		app.onKeys([keyHelp.parse('escape')])
 		expect(app.state.modal).toBeUndefined()
 		expect(sent.at(-1).type).toBe('find-cancel')
-	} finally { app.reset(); app.send = saved.send; render.show = saved.show }
+	} finally {
+		app.reset()
+		app.send = saved.send
+		render.show = saved.show
+	}
 })

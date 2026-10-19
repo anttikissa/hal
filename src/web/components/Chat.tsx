@@ -28,7 +28,21 @@ import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 import { Icon } from './Icon.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
+const snap = () => ({
+	target: app.state.target?.found && app.state.target.key,
+	pages: app.state.pages,
+	tabs: app.state.tabs,
+	shown: app.state.shown,
+	view: app.state.view,
+	text: app.state.text,
+	menu: app.state.menu,
+	pending: app.pending(),
+	notice: app.notice(),
+	connected: connection.connected(),
+	pushReady: !!push.state.registration,
+	notices: notices.state.entries,
+	updateAvailable: app.state.updateAvailable,
+})
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -59,15 +73,17 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 		if (scroll.atTop()) app.older()
 		return
 	}
-	if (items(next) === items(before) && next.view.transcript?.inbox === before.view.transcript?.inbox && next.pending.length === before.pending.length) return set(next)
-	let sent = next.pending.length > before.pending.length
-	scroll.follow(
-		() => {
-			set(next)
-			flush()
-		},
-		sent,
+	if (
+		items(next) === items(before) &&
+		next.view.transcript?.inbox === before.view.transcript?.inbox &&
+		next.pending.length === before.pending.length
 	)
+		return set(next)
+	let sent = next.pending.length > before.pending.length
+	scroll.follow(() => {
+		set(next)
+		flush()
+	}, sent)
 }
 
 // The linked block's card came: scroll to it once (the redraw that
@@ -127,9 +143,18 @@ function target(e: Event): Target {
 		let [cursor, anchor] = back ? [t.selectionStart, t.selectionEnd] : [t.selectionEnd, t.selectionStart]
 		let coarse = matchMedia('(pointer: coarse)').matches
 		let arrow = e instanceof KeyboardEvent && (e.key === 'ArrowUp' || e.key === 'ArrowDown')
-		return { kind: 'message', text: t.value, cursor, anchor, coarse, ...(arrow ? rows(t, cursor) : {}), write: (edit, at, from) => editor.write(t, edit, at, from) }
+		return {
+			kind: 'message',
+			text: t.value,
+			cursor,
+			anchor,
+			coarse,
+			...(arrow ? rows(t, cursor) : {}),
+			write: (edit, at, from) => editor.write(t, edit, at, from),
+		}
 	}
-	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return { kind: 'field', cursor: t.selectionStart ?? undefined }
+	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)
+		return { kind: 'field', cursor: t.selectionStart ?? undefined }
 	// An open sheet keeps its keys (the box behind it is inert).
 	if (t instanceof Element && t.closest('dialog[open], [contenteditable]')) return { kind: 'field' }
 	if (t instanceof HTMLAnchorElement) return { kind: 'link' }
@@ -137,14 +162,25 @@ function target(e: Event): Target {
 	return { kind: 'other' }
 }
 
-const same = (a: Sending[], b: Sending[]) => a.length === b.length && a.every((s, i) => s.id === b[i]!.id && s.text === b[i]!.text)
+const same = (a: Sending[], b: Sending[]) =>
+	a.length === b.length && a.every((s, i) => s.id === b[i]!.id && s.text === b[i]!.text)
 
 export function Chat() {
 	let [state, setState] = createSignal(snap())
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, menu, notice, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('connected'), field('target'), field('pushReady')]
+	let [tabs, shown, view, text, menu, notice, connected, linked, pushReady] = [
+		field('tabs'),
+		field('shown'),
+		field('view'),
+		field('text'),
+		field('menu'),
+		field('notice'),
+		field('connected'),
+		field('target'),
+		field('pushReady'),
+	]
 	let stack = field('notices')
 	let updateAvailable = field('updateAvailable')
 	let pending = createMemo(() => state().pending, { equals: same })
@@ -181,13 +217,19 @@ export function Chat() {
 			keys.drop(e.dataTransfer!.files)
 			flush()
 		}
-		let drags = [['dragover', onDrag], ['dragleave', onLeave], ['drop', onDrop]] as const
+		let drags = [
+			['dragover', onDrag],
+			['dragleave', onLeave],
+			['drop', onDrop],
+		] as const
 		for (let [k, f] of drags) document.addEventListener(k, f)
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
 		let stop = viewport.page()
 		let stopFlash = flash.buttons()
-		let stopTap = viewport.statusTap(() => document.querySelector('.Transcript')?.scrollTo({ top: 0, behavior: 'smooth' }))
+		let stopTap = viewport.statusTap(() =>
+			document.querySelector('.Transcript')?.scrollTo({ top: 0, behavior: 'smooth' }),
+		)
 		app.start()
 		return () => {
 			document.removeEventListener('keydown', onKey)
@@ -202,13 +244,30 @@ export function Chat() {
 		<div class={['Chat', 'project', { offline: !connected() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Show when={updateAvailable()}>
-				<div class="source-update"><button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}><Icon name="reload" />reload</button></div>
+				<div class="source-update">
+					<button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}>
+						<Icon name="reload" />
+						reload
+					</button>
+				</div>
 			</Show>
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />
-			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} hal={!!tabs().find((t) => t.id === shown())?.hal} />
+			<StatusRow
+				view={view()}
+				connected={connected()}
+				color={tabs().find((t) => t.id === shown())?.color}
+				hal={!!tabs().find((t) => t.id === shown())?.hal}
+			/>
 			<EditBar view={view()} />
-			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} dropping={dropping()} />
+			<Composer
+				update={!!updateAvailable()}
+				view={view()}
+				text={text()}
+				menu={menu()}
+				notice={notice()}
+				dropping={dropping()}
+			/>
 			<Picker modal={view().modal} />
 			<Changes shown={shown()} />
 			<Rebase />

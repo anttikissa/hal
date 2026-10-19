@@ -79,7 +79,13 @@ function toCss(c: Oklch): string {
 }
 
 function toHex(c: Oklch): string {
-	return '#' + oklch.toRgb(c).map((x) => x.toString(16).padStart(2, '0')).join('')
+	return (
+		'#' +
+		oklch
+			.toRgb(c)
+			.map((x) => x.toString(16).padStart(2, '0'))
+			.join('')
+	)
 }
 
 // WCAG 2.2 contrast ratio of two colors as shown (after gamut
@@ -131,4 +137,14 @@ function faint(fg: Oklch, bg: Oklch): Oklch {
 	return [Math.min(1, Math.round((bg[0] + 0.3) * 10) / 10), Math.min(fg[1], chroma), fg[2]]
 }
 
-export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, fit, convert, toHex, toCss, contrast, quiet, faint }
+export const oklch = {
+	state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() },
+	toRgb,
+	fit,
+	convert,
+	toHex,
+	toCss,
+	contrast,
+	quiet,
+	faint,
+}

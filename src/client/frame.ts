@@ -65,7 +65,8 @@ export interface View {
 	/** The status row below the prompt box (task 1g); blank without. */
 	status?: StatusInfo
 	/** Help row: newCode offers ctrl-r; noUser (hal --no-user) says USER.md is off. */
-	newCode?: boolean; noUser?: boolean
+	newCode?: boolean
+	noUser?: boolean
 	/** The notice stack, over the rows just above the tab bar (task qm). */
 	notices?: Folded
 	/** Toggled blocks' states (task ghs); `sig` changes with them. */
@@ -110,18 +111,32 @@ function promptWidth(cols: number): number {
 // `status`: after the title: a call's (task wm0), a live block's
 // elapsed time and spinner cell (task hyt). `look`: its verbosity
 // (tasks ghs, hyt).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
+function itemRows(
+	item: Item,
+	cols: number,
+	session?: string,
+	hal?: HalCursor,
+	calls?: Map<string, string>,
+	tool?: string,
+	images: Item[] = [],
+	status = '',
+	look: Look = {},
+): string[] {
 	let style = look.style ?? itemView.itemStyle(item, tool)
-	if (item.type === 'prompt' && bashResult.background(item)) status = toolView.status(bashResult.exit(item.text), undefined, style)
+	if (item.type === 'prompt' && bashResult.background(item))
+		status = toolView.status(bashResult.exit(item.text), undefined, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
 	let scroll = frame.scrolls(item, look.now) ? look.now : ''
-	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}${look.call?.ts ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.background?.input.command ?? ''} ${look.wait?.map((p) => typeof p === 'string' ? p : p.text).join('') ?? ''} ${scroll}`
+	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}${look.call?.ts ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.background?.input.command ?? ''} ${look.wait?.map((p) => (typeof p === 'string' ? p : p.text)).join('') ?? ''} ${scroll}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
-	let lines = look.lines?.(inner) ?? itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: head })
-	if (look.streamRows !== undefined && lines.length > look.streamRows) lines = [lines[0]!, ...(look.streamRows > 1 ? lines.slice(-(look.streamRows - 1)) : [])]
+	let lines =
+		look.lines?.(inner) ??
+		itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: head })
+	if (look.streamRows !== undefined && lines.length > look.streamRows)
+		lines = [lines[0]!, ...(look.streamRows > 1 ? lines.slice(-(look.streamRows - 1)) : [])]
 	if (hal && (look.fold ?? card.initial(item)) === 'long') lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
@@ -144,8 +159,15 @@ function look(_item: Item, look: Look): Look {
 }
 
 // Queued cards share their sender's style, whether compact or expanded.
-function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number, session?: string, look: Look = {}): string[] {
-	if ((look.fold ?? card.initial(item)) !== 'short') return frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', { ...look, pad: false })
+function queuedRows(
+	item: Item & { type: 'prompt' },
+	note: string,
+	cols: number,
+	session?: string,
+	look: Look = {},
+): string[] {
+	if ((look.fold ?? card.initial(item)) !== 'short')
+		return frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', { ...look, pad: false })
 	let style = itemView.itemStyle(item)
 	let { inner, mark } = itemView.place(item, cols, session, style)
 	let lines = [strings.clipVisual(ansi.clean(`${note} ${card.text(item)}`.split('\n')[0]!).replace(/\s+/g, ' '), inner)]
@@ -155,7 +177,13 @@ function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number,
 
 // `items`/`ends`: the items laid out and the row each ends at, so a
 // row can be traced to its block (render.clear's reasons, task e4c).
-export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCursor?: Frame['cursor']; tick?: { row: number; labeled: string; plain: string } }
+export type Past = {
+	lines: string[]
+	items?: Item[]
+	ends?: number[]
+	formCursor?: Frame['cursor']
+	tick?: { row: number; labeled: string; plain: string }
+}
 
 // Lays out the transcript's items. The rows of items drawn last time
 // and unchanged since are reused as they are: a frame costs what
@@ -168,9 +196,12 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let session = view.transcript?.meta.id
 	// Ordered once per transcript (updates replace its items), in slices
 	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
-	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${session} ${src.length}`
+	let src = view.transcript?.items ?? [],
+		memo = frame.state.ordered,
+		how = `${session} ${src.length}`
 	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src)) } }
-	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
+	else if (memo?.src !== src || memo.how !== how)
+		memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
 	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, deadline, memo.at)
 	if (save) frame.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
@@ -195,13 +226,18 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	// (the blocked-state event follows the question). Never reuse its
 	// inactive rows while the form is taking keys.
 	// A call's title shows its result's status, or its running time.
-	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) {
-		let item = items[start]!
-		if (item.type === 'question' && item.id === view.form?.id) break
-		if (item.type === 'tool' && (item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1] || frame.scrolls(item, view.now))) break
-		if (item.type === 'tool-result' && items[start + 1] !== kept.items[start + 1]) break
-		start++
-	}
+	if (kept?.look === look)
+		while (start < kept.items.length && items[start] === kept.items[start]) {
+			let item = items[start]!
+			if (item.type === 'question' && item.id === view.form?.id) break
+			if (
+				item.type === 'tool' &&
+				(item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1] || frame.scrolls(item, view.now))
+			)
+				break
+			if (item.type === 'tool-result' && items[start + 1] !== kept.items[start + 1]) break
+			start++
+		}
 	// A call is laid out with all its results, so its card is measured whole.
 	while (start > 0 && items[start]?.type === 'tool-result') start--
 	let lines = start ? kept!.lines.slice(0, kept!.ends[start - 1]) : []
@@ -228,8 +264,16 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		if (item.type !== 'image') imagePrompt = item.type === 'prompt'
 		// Toggled here, or as the session starts its kind (task hyt); a
 		// call fails with its result.
-		let res = batchOrder.state.apart.has(item) ? undefined : items[i + 1], failed = item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id && card.failed(res, item.name === 'bash')
-		let fold = item.type === 'tool-result' ? callFolds.get(item.id) ?? 'short' : view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed)
+		let res = batchOrder.state.apart.has(item) ? undefined : items[i + 1],
+			failed =
+				item.type === 'tool' &&
+				res?.type === 'tool-result' &&
+				res.id === item.id &&
+				card.failed(res, item.name === 'bash')
+		let fold =
+			item.type === 'tool-result'
+				? (callFolds.get(item.id) ?? 'short')
+				: (view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed))
 		if (item.type === 'tool') callFolds.set(item.id, fold)
 		let look: Look = { fold }
 		if (item.type === 'tool') {
@@ -243,7 +287,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		}
 		let background = bashResult.background(item)
 		if (background) {
-			backgroundCalls ??= new Map(src.flatMap((i) => i.type === 'tool' && i.name === 'bash' ? [[i.key, i] as const] : []))
+			backgroundCalls ??= new Map(
+				src.flatMap((i) => (i.type === 'tool' && i.name === 'bash' ? [[i.key, i] as const] : [])),
+			)
 			look.background = backgroundCalls.get(background.replace(/^t/, ''))
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
@@ -259,12 +305,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			// Adjacent results continue their call's card without a reference or gap.
 			let tool: string | undefined
-			if (item.type === 'tool-result') for (let j = i - 1; j >= 0; j--) {
-				let prev = items[j]!
-				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
-				if (prev.type === 'tool' && batchOrder.state.apart.has(prev)) break
-				if (prev.type === 'tool') { tool = prev.name; look.head = toolView.heads.get(prev); if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true }
-			}
+			if (item.type === 'tool-result')
+				for (let j = i - 1; j >= 0; j--) {
+					let prev = items[j]!
+					if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
+					if (prev.type === 'tool' && batchOrder.state.apart.has(prev)) break
+					if (prev.type === 'tool') {
+						tool = prev.name
+						look.head = toolView.heads.get(prev)
+						if (toolDetails.fullCommand(prev.name, prev.input)) look.full = true
+					}
+				}
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
 			let merged = item.type === 'image' && imagePrompt
@@ -272,7 +323,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			// (task hyt); a call whose output is drawn below shows ↓ there.
 			let ticks = item.type === 'tool' && item.id === view.tick?.call
 			let live = ticks || (streams && !!view.tick && view.tick.call === undefined)
-			let cell = item.type === 'tool' || item.type === 'thinking' || item.type === 'text' ? (live ? view.tick!.spin : batchOrder.state.apart.has(item) ? ansi.quiet('↓', itemView.itemStyle(item)) : '') : ''
+			let cell =
+				item.type === 'tool' || item.type === 'thinking' || item.type === 'text'
+					? live
+						? view.tick!.spin
+						: batchOrder.state.apart.has(item)
+							? ansi.quiet('↓', itemView.itemStyle(item))
+							: ''
+					: ''
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
 			if (item.type === 'tool' && !item.presentation && !look.result?.presentation) {
 				let h = toolDetails.headline(item.name, item.input, look.result?.output)
@@ -280,13 +338,31 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			}
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)
-			else if (look.result && !(fold === 'long' && titles.resultTime(item.ts, look.result.ts) && bashResult.trim(look.result.output))) look.status = toolView.resultStatus(look.result, item.type === 'tool' && item.name === 'bash', itemView.itemStyle(item), limit, fold === 'short' && settings.shortRows() === 1)
+			else if (
+				look.result &&
+				!(fold === 'long' && titles.resultTime(item.ts, look.result.ts) && bashResult.trim(look.result.output))
+			)
+				look.status = toolView.resultStatus(
+					look.result,
+					item.type === 'tool' && item.name === 'bash',
+					itemView.itemStyle(item),
+					limit,
+					fold === 'short' && settings.shortRows() === 1,
+				)
 			if (item.type === 'tool' && item.name === 'bash' && view.now !== undefined) look.now = view.now
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
-			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true) look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
-			if (fold === 'long' && ((item.type === 'tool' && item.partial !== undefined && !look.result) || (item.type === 'tool-result' && (item as Item & { live?: boolean }).live))) look.streamRows = Math.max(1, Math.floor(screenRows / 2) - 10)
+			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true)
+				look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
+			if (
+				fold === 'long' &&
+				((item.type === 'tool' && item.partial !== undefined && !look.result) ||
+					(item.type === 'tool-result' && (item as Item & { live?: boolean }).live))
+			)
+				look.streamRows = Math.max(1, Math.floor(screenRows / 2) - 10)
 			look = frame.look(item, look)
-			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)
+			let rows = merged
+				? []
+				: frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, look.status, look)
 			let natural = rows.length
 			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
 			if (rows.length > natural) frame.state.padded = true
@@ -296,30 +372,50 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (tool && rows.length && lines.length && drawn?.pad !== false) {
 				lines.pop()
 				if (!Bun.stripANSI(rows[0]!).trim()) rows = rows.slice(1)
-			}
-			else if (rows.length && look.gap !== false && (lines.length || Bun.stripANSI(rows[0]!).trim())) lines.push('')
+			} else if (rows.length && look.gap !== false && (lines.length || Bun.stripANSI(rows[0]!).trim())) lines.push('')
 			if (rows.length) drawn = look
 			for (let r of rows) lines.push(r)
-			if (item.type === 'tool' && !batchOrder.state.apart.has(item)) callCard = { id: item.id, key: item.key, start: lines.length - rows.length }
+			if (item.type === 'tool' && !batchOrder.state.apart.has(item))
+				callCard = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
 			// A split batch's output region never shrinks either: its live
 			// rows give way to the results (task 5gn).
 			if (region && below && !(next && batchOrder.state.below.get(next) === region)) {
 				let natural = lines.length
-				water.card(frame.state.peaks, lines, below.start, `${cols} ${screenRows} ${session} below ${region} ${look.fold ?? ''}`, look.style, cols)
+				water.card(
+					frame.state.peaks,
+					lines,
+					below.start,
+					`${cols} ${screenRows} ${session} below ${region} ${look.fold ?? ''}`,
+					look.style,
+					cols,
+				)
 				if (lines.length > natural) frame.state.padded = true
 				below = undefined
 			}
-			if (callCard && (item.type === 'tool' || item.type === 'tool-result') && item.id === callCard.id && !(next?.type === 'tool-result' && next.id === callCard.id)) {
+			if (
+				callCard &&
+				(item.type === 'tool' || item.type === 'tool-result') &&
+				item.id === callCard.id &&
+				!(next?.type === 'tool-result' && next.id === callCard.id)
+			) {
 				let natural = lines.length
-				water.card(frame.state.peaks, lines, callCard.start, `${cols} ${screenRows} ${session} call ${callCard.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)
+				water.card(
+					frame.state.peaks,
+					lines,
+					callCard.start,
+					`${cols} ${screenRows} ${session} call ${callCard.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`,
+					itemView.itemStyle(item, tool),
+					cols,
+				)
 				if (lines.length > natural) frame.state.padded = true
 				callCard = undefined
 			}
 			if (ticks) {
 				let plain = frame.itemRows(item, cols, session, undefined, calls, tool, images, ' ', look)
 				let k = rows.findIndex((r, j) => r !== plain[j])
-				if (k >= 0 && rows.length === plain.length) tick = { row: lines.length - rows.length + k, labeled: rows[k]!, plain: plain[k]! }
+				if (k >= 0 && rows.length === plain.length)
+					tick = { row: lines.length - rows.length + k, labeled: rows[k]!, plain: plain[k]! }
 			}
 			// A streaming block, a ticking call or a question being
 			// answered is redrawn every frame; so is everything after it.
@@ -337,7 +433,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 // (tasks/cc/terminal.md, Height management). `past`: the items' rows
 // (layout), laid out already. `floor`: the least height in full mode,
 // padded the same way, so a shrink never clears scrollback.
-function build(view: View, cols: number, rows = 24, full = false, past: Past = frame.layout(view, cols, Infinity, true, rows)!, floor = 0): Frame {
+function build(
+	view: View,
+	cols: number,
+	rows = 24,
+	full = false,
+	past: Past = frame.layout(view, cols, Infinity, true, rows)!,
+	floor = 0,
+): Frame {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let lines: string[] = past.lines.slice()
 	let block = (rows: string[], style: Style | undefined) => {
@@ -367,8 +470,19 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
-		let look: Look = { fold: view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)) }
-		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session, look) : frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
+		let look: Look = {
+			fold:
+				view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)),
+		}
+		let rows = queued
+			? frame.queuedRows(
+					item as Item & { type: 'prompt' },
+					inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold),
+					cols,
+					session,
+					look,
+				)
+			: frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
 		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
 		let joined = edge !== undefined && stacked === edge
 		if (stacked && !joined) lines.push(stacked)
@@ -388,14 +502,16 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// prompt's rows, so nothing below the transcript jumps.
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let input = colors.input()
-	let rule = (left: string, center: string, right: string) => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center), ansi.clean(right)) + ansi.UNCOLOR
+	let rule = (left: string, center: string, right: string) =>
+		ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center), ansi.clean(right)) + ansi.UNCOLOR
 	let join = (...parts: string[]) => parts.filter(Boolean).join(' ')
 	let s = promptView.slots
 	let over = view.tabs?.list.length ? tabBar.overRow(view.tabs.list, view.tabs.focused, cols) : undefined
 	if (over !== undefined) lines.push(over)
 	else lines.push('')
 	let anchor = lines.length
-	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
+	if (view.tabs?.list.length)
+		lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
 	lines.push(rule(join(p.above ? `↑${p.above}` : '', s.topLeft()), s.topCenter(view.activity), s.topRight()))
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
@@ -414,16 +530,49 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	if (tick && lines.length - tick.row > rows && lines[tick.row] === tick.labeled) lines[tick.row] = tick.plain
 	top += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
-	let out = { lines, cursor, promptScroll: p.scroll, history: history.length + grown, items: past.items, ends: past.ends }
+	let out = {
+		lines,
+		cursor,
+		promptScroll: p.scroll,
+		history: history.length + grown,
+		items: past.items,
+		ends: past.ends,
+	}
 	if (!view.modal) return out
 	let m = modalView.withModal(lines, view.modal, rows, cols)
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
 // The unchanged transcript prefix, including originating tool identities.
-type History = { look: string; items: Item[]; ends: number[]; tools: (NonNullable<Look['call']> & { at: number; id: string; fold: Verbosity })[]; lines: string[] }
+type History = {
+	look: string
+	items: Item[]
+	ends: number[]
+	tools: (NonNullable<Look['call']> & { at: number; id: string; fold: Verbosity })[]
+	lines: string[]
+}
 
 // A Bash call whose command still scrolls at `now`: redrawn every frame.
-const scrolls = (item: Item, now: number | undefined): boolean => now !== undefined && item.type === 'tool' && item.name === 'bash' && bashCard.scrolling(item.input.command, now - Date.parse(item.ts ?? ''))
+const scrolls = (item: Item, now: number | undefined): boolean =>
+	now !== undefined &&
+	item.type === 'tool' &&
+	item.name === 'bash' &&
+	bashCard.scrolling(item.input.command, now - Date.parse(item.ts ?? ''))
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), padded: false, history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, look, queuedRows, order: batchOrder.order, promptWidth, scrolls }
+export const frame = {
+	state: {
+		rows: new WeakMap<Item, { key: string; rows: string[] }>(),
+		peaks: new Map<string, number>(),
+		padded: false,
+		history: undefined as History | undefined,
+		ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined,
+	},
+	layout,
+	build,
+	itemRows,
+	look,
+	queuedRows,
+	order: batchOrder.order,
+	promptWidth,
+	scrolls,
+}

@@ -27,7 +27,8 @@ const ids = (c: C) => tabsOf(c)?.map((t) => t.id)
 const ack = (c: C, id: string) => c.events.find((e: any) => e.type === 'ack' && e.id === id) as any
 const rejected = (c: C, id: string) => c.events.find((e: any) => e.type === 'rejected' && e.id === id) as any
 // Opens a new tab and returns its id, as named in the answer.
-const newTab = (c: C, cwd = '/tmp/w', after?: string) => ack(c, send(c, { type: 'tab-new', cwd, ...(after ? { after } : {}) })).tab as string
+const newTab = (c: C, cwd = '/tmp/w', after?: string) =>
+	ack(c, send(c, { type: 'tab-new', cwd, ...(after ? { after } : {}) })).tab as string
 
 test('without a default model, new tabs run the intro, which starts by itself; once one is set, tabs use it', async () => {
 	config.update({ model: 'hal/intro' })
@@ -43,7 +44,6 @@ test('without a default model, new tabs run the intro, which starts by itself; o
 	config.update({ model: 'anthropic/claude-opus-5-5' })
 	expect(sessions.open(newTab(c)).model).toBe('anthropic/claude-opus-5-5')
 })
-
 
 test('new tabs inherit the source tab model, effort and current cwd', () => {
 	let c = client()
@@ -117,7 +117,13 @@ test('closing a parent stops owned subagent turns, but leaves an interactive chi
 	let parent = newTab(a)
 	sessions.open(parent).model = 'fake/m1'
 	let owned = subagents.spawn(parent, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp/w', limit: 0 })
-	let interactive = subagents.spawn(parent, { kind: 'interactive', task: 'independent', fork: false, cwd: '/tmp/w', limit: 0 })
+	let interactive = subagents.spawn(parent, {
+		kind: 'interactive',
+		task: 'independent',
+		fork: false,
+		cwd: '/tmp/w',
+		limit: 0,
+	})
 	await until(() => calls.length === 2)
 	send(a, { type: 'tab-close', sessionId: parent })
 	await until(() => history.readSync(owned).some((r) => r.type === 'turn_end'))
@@ -131,7 +137,14 @@ test('a child stopped by closing an idle parent cannot restart its closed tab', 
 	let a = client()
 	newTab(a)
 	let parent = newTab(a)
-	let child = subagents.spawn(parent, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp/w', model: 'fake/m1', limit: 0 })
+	let child = subagents.spawn(parent, {
+		kind: 'subagent',
+		task: 'work',
+		fork: false,
+		cwd: '/tmp/w',
+		model: 'fake/m1',
+		limit: 0,
+	})
 	await until(() => calls.length === 1)
 	send(a, { type: 'tab-close', sessionId: parent })
 	await until(() => history.readSync(child).some((r) => r.type === 'turn_end'))
@@ -148,7 +161,10 @@ test('closing a tab blocked on a question cancels it instead of restarting the t
 	a.conn.send({ type: 'open', sessionId: id })
 	send(a, { type: 'submit', sessionId: id, text: 'ask' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'git reset --hard', description: 'Reset work' } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{ type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'git reset --hard', description: 'Reset work' } },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => a.of('question').length)
 	expect(tabsOf(a)!.find((t) => t.id === id)!.question).toBe('approval')
 	send(a, { type: 'tab-close', sessionId: id })
@@ -189,7 +205,10 @@ test('an unreadable session stays a tab, failed with the error, and opening it i
 	writeFileSync(`${paths.sessionDir(broken)}/history.asonl`, '{ type: @@ }\n')
 	send(a, { type: 'tab-new', cwd: '/tmp/p' })
 	let tab = tabsOf(a)?.find((t) => t.id === broken)
-	expect(tab?.state).toEqual({ type: 'error', message: expect.stringContaining(`${broken}/history.asonl: malformed history`) })
+	expect(tab?.state).toEqual({
+		type: 'error',
+		message: expect.stringContaining(`${broken}/history.asonl: malformed history`),
+	})
 	let open = send(a, { type: 'open', sessionId: broken })
 	await until(() => rejected(a, open))
 	expect(rejected(a, open).reason).toContain('malformed history')
@@ -200,10 +219,16 @@ test('a session with unreadable metadata fails its own tab, not the tab list', (
 	let good = newTab(a, '/tmp/p')
 	let broken = newTab(a, '/tmp/p')
 	sessions.close(broken)
-	writeFileSync(`${paths.sessionDir(broken)}/session.ason`, `{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: 'huge' }`)
+	writeFileSync(
+		`${paths.sessionDir(broken)}/session.ason`,
+		`{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: 'huge' }`,
+	)
 	send(a, { type: 'tab-new', cwd: '/tmp/p' })
 	expect(tabsOf(a)?.find((t) => t.id === good)?.state.type).not.toBe('error')
-	expect(tabsOf(a)?.find((t) => t.id === broken)?.state).toEqual({ type: 'error', message: expect.stringContaining('invalid blocks') })
+	expect(tabsOf(a)?.find((t) => t.id === broken)?.state).toEqual({
+		type: 'error',
+		message: expect.stringContaining('invalid blocks'),
+	})
 	expect(ack(a, send(a, { type: 'tab-start', cwd: '/tmp/p', last: broken })).tab).toBe(good)
 })
 
@@ -227,8 +252,10 @@ test('a tab wants attention when its turn ends until a client has seen it', asyn
 
 test('tab question metadata accepts known kinds and rejects other wire values', () => {
 	let tab = { id: 'x', name: 'x', cwd: '/' }
-	for (let question of [undefined, 'ordinary', 'approval']) expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBeUndefined()
-	for (let question of [true, 'danger', {}]) expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBe('tabs: invalid question kind')
+	for (let question of [undefined, 'ordinary', 'approval'])
+		expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBeUndefined()
+	for (let question of [true, 'danger', {}])
+		expect(eventCheck.invalidEvent({ type: 'tabs', tabs: [{ ...tab, question }] })).toBe('tabs: invalid question kind')
 })
 
 test('final questions stay distinct from unread completions through viewing and restart, until answered', async () => {
@@ -238,7 +265,10 @@ test('final questions stay distinct from unread completions through viewing and 
 	a.conn.send({ type: 'open', sessionId: id })
 	send(a, { type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: '<question>Proceed?</question>\n<summary>Waiting.</summary>' }, { type: 'done', reason: 'end' })
+	calls[0]!.push(
+		{ type: 'text', text: '<question>Proceed?</question>\n<summary>Waiting.</summary>' },
+		{ type: 'done', reason: 'end' },
+	)
 	await until(() => a.of('turn-end').length)
 	expect(tabsOf(a)!.find((t) => t.id === id)!.state.type).toBe('idle')
 	expect(tabsOf(a)!.find((t) => t.id === id)!.question).toBe('ordinary')

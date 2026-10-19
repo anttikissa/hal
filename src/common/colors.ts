@@ -21,7 +21,11 @@ type Colors = typeof colors
 // A theme (task d3): replacements for some fields, each given the field
 // it replaces, so it can change one part of a style and keep the rest.
 // A plain value (fgL, screen, mix) is replaced by a plain value (plugin.set).
-export type Look = { [K in keyof Colors]?: Colors[K] extends (...args: any[]) => unknown ? (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]> : Colors[K] }
+export type Look = {
+	[K in keyof Colors]?: Colors[K] extends (...args: any[]) => unknown
+		? (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]>
+		: Colors[K]
+}
 
 // Fields that derive a color from others, so take arguments; every
 // other field is a plain value (fgL, screen, mix) or a style, a function
@@ -86,19 +90,44 @@ export const colors = {
 	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215], title: [0.935, 0.06, 212] }),
 	// Messages and commands from another session (task 9p): hot pink,
 	// apart from bash's magenta and the error red.
-	message: (): Style => ({ fg: [0.62, 0.18, 350], bg: [colors.bgL, 0.08, 0], title: [0.82, 0.18, 350], output: [0.62, 0.18, 350] }),
+	message: (): Style => ({
+		fg: [0.62, 0.18, 350],
+		bg: [colors.bgL, 0.08, 0],
+		title: [0.82, 0.18, 350],
+		output: [0.62, 0.18, 350],
+	}),
 	// placeholder: the example request in an empty prompt, readable but
 	// quieter than typed text.
-	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg!, placeholder: oklch.faint(colors.user().fg!, colors.user().bg!) }),
+	input: (): Style => ({
+		...colors.user(),
+		cursor: colors.user().fg!,
+		placeholder: oklch.faint(colors.user().fg!, colors.user().bg!),
+	}),
 	// Log: neutral, moderately dim.
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
-	warning: (): Style => ({ fg: [0.9, 0.17, 100], bg: [0.21, 0.05, 100], code: [0.94, 0.12, 100], linkBg: [0.28, 0.06, 100] }),
+	warning: (): Style => ({
+		fg: [0.9, 0.17, 100],
+		bg: [0.21, 0.05, 100],
+		code: [0.94, 0.12, 100],
+		linkBg: [0.28, 0.06, 100],
+	}),
 	// Questions waiting on the user: neutral, like the user's own card.
 	question: (): Style => colors.plain(),
 	// Errors: the diff's removal red, under a clearly brighter title.
-	error: (): Style => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], title: [0.9, 0.08, 28], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
-	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
+	error: (): Style => ({
+		fg: colors.diff().removeFg!,
+		bg: [0.2, 0.08, 30],
+		title: [0.9, 0.08, 28],
+		code: colors.diff().removeFg!,
+		linkBg: [0.25, 0.07, 30],
+	}),
+	info: (): Style => ({
+		fg: [0.74, 0.06, 55],
+		bg: [0.22, 0.025, 55],
+		code: [0.86, 0.04, 55],
+		linkBg: [0.3, 0.025, 55],
+	}),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
 	// Status line: neutral, with a highlight for what matters.
@@ -120,10 +149,14 @@ export const colors = {
 	}),
 	// Project colors (task 22), CSS --p0..--p7: one L and C, hues spread
 	// with a single cyan; the display clips what is out of its gamut.
-	project: (): Style => Object.fromEntries([327.5, 7.5, 47.5, 87.5, 127.5, 195, 247.5, 287.5].map((h, i) => [`p${i}`, [0.778, 0.225, h] as Oklch])),
+	project: (): Style =>
+		Object.fromEntries(
+			[327.5, 7.5, 47.5, 87.5, 127.5, 195, 247.5, 287.5].map((h, i) => [`p${i}`, [0.778, 0.225, h] as Oklch]),
+		),
 	// Dim tints of the project colors for a notice's background (task
 	// qm): p0Bg..p7Bg, each the hue of its p0..p7.
-	projectTint: (): Style => Object.fromEntries(Object.entries(colors.project()).map(([k, c]) => [`${k}Bg`, [0.2, 0.05, c![2]] as Oklch])),
+	projectTint: (): Style =>
+		Object.fromEntries(Object.entries(colors.project()).map(([k, c]) => [`${k}Bg`, [0.2, 0.05, c![2]] as Oklch])),
 	// The notice stack (task qm): a bar in the event's color on a faint
 	// neutral gray, lighter than the screen so its shape shows; never slate.
 	notice: (): Style => ({
@@ -200,4 +233,3 @@ export const colors = {
 	// Inter-tab messages, both directions, in the message pink.
 	toolSend: (): Style => colors.message(),
 }
-

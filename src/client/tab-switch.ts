@@ -30,7 +30,8 @@ function hiddenEvent(event: Event): void {
 		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 		let kept = st.hidden.get(event.sessionId) ?? { prompt: prompt.empty() }
 		kept.transcript = transcript.fold(kept.transcript, event)
-		if (event.type === 'snapshot' && kept.transcript) kept.prompt = { text: drafts.text(event.sessionId), cursor: drafts.text(event.sessionId).length }
+		if (event.type === 'snapshot' && kept.transcript)
+			kept.prompt = { text: drafts.text(event.sessionId), cursor: drafts.text(event.sessionId).length }
 		queuedPrompt.sync(kept, event)
 		st.hidden.set(event.sessionId, kept)
 	}
@@ -45,7 +46,12 @@ function hiddenEvent(event: Event): void {
 function backgroundStep(): void {
 	let st = app.state
 	if (!st.painted || st.loading || st.timer || !connection.connected()) return
-	let id = backfill.nearby(st.tabs.map((tab) => tab.id), st.focus.tab ?? '').find((id) => !st.background.has(id))
+	let id = backfill
+		.nearby(
+			st.tabs.map((tab) => tab.id),
+			st.focus.tab ?? '',
+		)
+		.find((id) => !st.background.has(id))
 	if (!id) return
 	st.timer = setTimeout(() => {
 		delete st.timer
@@ -69,11 +75,12 @@ function onTabs(list: Tab[]): void {
 	for (let id of ids) markdown.state.sessions.add(id)
 	let asked = st.asked
 	if (asked !== undefined && ids.includes(asked)) delete st.asked
-	for (let id of st.hidden.keys()) if (!ids.includes(id)) {
-		st.hidden.delete(id)
-		st.background.delete(id)
-		app.send({ type: 'close', sessionId: id })
-	}
+	for (let id of st.hidden.keys())
+		if (!ids.includes(id)) {
+			st.hidden.delete(id)
+			st.background.delete(id)
+			app.send({ type: 'close', sessionId: id })
+		}
 	app.focusOn(tabs.focus(old, ids, st.focus, asked))
 	app.show()
 	app.backgroundStep()
@@ -108,7 +115,9 @@ function focusOn(focus: Focus): void {
 			st.hidden.delete(focus.tab)
 			if (!back) drafts.join(focus.tab, early)
 			// Cached editor text can lag draft events received while hidden (qhz).
-			app.setPrompt(queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : recall.shown(focus.tab) ?? drafts.text(focus.tab))
+			app.setPrompt(
+				queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : (recall.shown(focus.tab) ?? drafts.text(focus.tab)),
+			)
 			if (!st.background.has(focus.tab)) {
 				st.background.add(focus.tab)
 				app.send({ type: 'open', sessionId: focus.tab })
@@ -129,7 +138,8 @@ function focusOn(focus: Focus): void {
 // shown, unless the window reported losing focus; a terminal that never
 // reports focus watches whenever it shows a tab. Sent on change only.
 function watch(): void {
-	let st = app.state, tab = st.focus.tab
+	let st = app.state,
+		tab = st.focus.tab
 	let now = tab === undefined ? undefined : `${tab} ${!st.away}`
 	if (now === undefined || now === st.watching) return
 	st.watching = now
@@ -141,7 +151,13 @@ function watch(): void {
 // Tab keys: next, previous, go to 1-10. True if handled.
 function tabKey(k: KeyEvent): boolean {
 	let tab = app.focusedTab()
-	let r = tab && tabKeys.key(k, tab.id, app.state.tabs.map((t) => t.id))
+	let r =
+		tab &&
+		tabKeys.key(
+			k,
+			tab.id,
+			app.state.tabs.map((t) => t.id),
+		)
 	if (!r) return false
 	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
 	return true

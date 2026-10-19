@@ -73,15 +73,28 @@ function check(sample = resources.measure()): void {
 	let before = st.level
 	st.sample = sample
 	st.level = resources.grade(sample)
-	if (st.level === 'critical') for (let [id, running] of turns.state.running) {
-		if (running.controller.signal.aborted) continue
-		try { turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`) }
-		catch (e) { process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
-	}
+	if (st.level === 'critical')
+		for (let [id, running] of turns.state.running) {
+			if (running.controller.signal.aborted) continue
+			try {
+				turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`)
+			} catch (e) {
+				process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`)
+			}
+		}
 	if (st.level === before) return
-	serverLog.log(`resources ${st.level === 'ok' ? 'recovered' : st.level}`, { disk: gb(sample.disk), memory: gb(sample.memory), host: serverLog.mb(process.memoryUsage().rss) })
+	serverLog.log(`resources ${st.level === 'ok' ? 'recovered' : st.level}`, {
+		disk: gb(sample.disk),
+		memory: gb(sample.memory),
+		host: serverLog.mb(process.memoryUsage().rss),
+	})
 	warnings.set('resources', resources.warning())
-	if (st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available. Paused sessions remain paused; choose Continue or press Enter to resume.` })
+	if (st.level === 'ok')
+		for (let client of host.state.clients)
+			client.deliver({
+				type: 'warning',
+				text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available. Paused sessions remain paused; choose Continue or press Enter to resume.`,
+			})
 }
 
 // Checks now and every intervalMs; clients joining while short get the
@@ -93,7 +106,8 @@ function init(): void {
 		try {
 			resources.check()
 		} catch (e) {
-			for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resource check failed: ${e instanceof Error ? e.stack : e}` })
+			for (let client of host.state.clients)
+				client.deliver({ type: 'warning', text: `Resource check failed: ${e instanceof Error ? e.stack : e}` })
 		}
 	}
 	st.timer = setInterval(run, resources.intervalMs)
@@ -107,11 +121,22 @@ function stop(): void {
 }
 
 export const resources = {
-	state: { level: 'ok' as Level, timer: undefined as ReturnType<typeof setInterval> | undefined, sample: undefined as Sample | undefined },
+	state: {
+		level: 'ok' as Level,
+		timer: undefined as ReturnType<typeof setInterval> | undefined,
+		sample: undefined as Sample | undefined,
+	},
 	intervalMs: 30_000,
 	lowDiskBytes: 5e9,
 	criticalDiskBytes: 1e9,
 	lowMemoryBytes: 1.5e9,
 	criticalMemoryBytes: 0.5e9,
-	availableMemory, measure, grade, describe, warning, check, init, stop,
+	availableMemory,
+	measure,
+	grade,
+	describe,
+	warning,
+	check,
+	init,
+	stop,
 }

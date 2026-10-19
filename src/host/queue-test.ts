@@ -41,11 +41,16 @@ function arrived(records: HistoryRecord[]): string[] {
 		let texts = r.blocks.filter((b) => b.type === 'text')
 		for (let [i, b] of texts.entries()) {
 			let id = r.inbox?.[i]
-			let how = b.from !== undefined ? `from ${b.label ?? b.from}, ${b.advisory ? 'default delivery' : (b.delivery === 'now') ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
-				: b.origin === 'model' ? 'from Hal'
-				: (b.delivery === 'now') ? 'You, steering'
-				: b.queuedAt !== undefined || b.delivery === 'after-turn' ? 'You, queued'
-				: 'You, prompt'
+			let how =
+				b.from !== undefined
+					? `from ${b.label ?? b.from}, ${b.advisory ? 'default delivery' : b.delivery === 'now' ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
+					: b.origin === 'model'
+						? 'from Hal'
+						: b.delivery === 'now'
+							? 'You, steering'
+							: b.queuedAt !== undefined || b.delivery === 'after-turn'
+								? 'You, queued'
+								: 'You, prompt'
 			let at = b.queuedAt ?? (id && sent.get(id)) ?? r.ts
 			lines.push(`- sent ${clock(at)}, arrived ${clock(r.ts)} · ${how}: ${JSON.stringify(b.text)}`)
 		}
@@ -74,11 +79,14 @@ function planned(records: HistoryRecord[]): { total: number; stopped: boolean } 
 	return plan
 }
 
-const usage = "How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends. Ask another session to send messages to this session."
+const usage =
+	"How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends. Ask another session to send messages to this session."
 
 function report(n: number, lines: string[], total = rounds, note = ''): { head: string; body: string } {
 	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
-	let body = lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.`
+	let body = lines.length
+		? `Round ${n}. New messages since the last round:\n${lines.join('\n')}`
+		: `Round ${n}: no new messages.`
 	if (note) body += `\n\n${note}`
 	return { head: `Round ${n} of ${total}: ${count}.`, body: n === 1 ? `${body}\n\n${usage}` : body }
 }
@@ -95,7 +103,12 @@ async function* round(n: number, lines: string[], total: number, note: string): 
 	yield { type: 'signature', value: '' }
 	yield { type: 'text', text: body }
 	let command = `sleep 3; echo round ${n}`
-	yield { type: 'tool_call', id: `queue-test-${Date.now()}`, name: 'bash', input: { command, description: `Wait 3 seconds (round ${n})` } }
+	yield {
+		type: 'tool_call',
+		id: `queue-test-${Date.now()}`,
+		name: 'bash',
+		input: { command, description: `Wait 3 seconds (round ${n})` },
+	}
 	yield { type: 'done', reason: 'tool_use' }
 }
 
@@ -106,7 +119,10 @@ function run(records: HistoryRecord[]): Reply {
 	// Confirm a number that just arrived: compare with the plan before it.
 	let spoke = records.findLastIndex((r) => r.type === 'assistant')
 	let left = total - n
-	let note = planned(records.slice(0, spoke + 1)).total !== total && !stopped ? `OK: ${left} round${left === 1 ? '' : 's'} left, ending after round ${total}.` : ''
+	let note =
+		planned(records.slice(0, spoke + 1)).total !== total && !stopped
+			? `OK: ${left} round${left === 1 ? '' : 's'} left, ending after round ${total}.`
+			: ''
 	if (n < total && !stopped) return { stream: round(n + 1, lines, total, note) }
 	let say = lines.length ? `New messages since the last round:\n${lines.join('\n')}\n\n` : ''
 	let count = `${n} round${n === 1 ? '' : 's'}`

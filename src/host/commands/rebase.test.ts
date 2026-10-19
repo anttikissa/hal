@@ -8,7 +8,9 @@ import { replay } from '../../common/replay.ts'
 useHost()
 
 test('rebase plans are requester-local; changes, dividers and undo reach every follower and survive restart', async () => {
-	let a = client(), id = created(a), b = client()
+	let a = client(),
+		id = created(a),
+		b = client()
 	let prompt = history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'original prompt' }] })
 	let answer = history.append(id, { type: 'assistant', block: { type: 'text', text: 'large answer' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
@@ -17,17 +19,26 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	await until(() => a.of('rebase-plan').length)
 	expect(b.of('rebase-plan')).toHaveLength(0)
 	let start = a.of('rebase-plan')[0]
-	a.conn.send({ type: 'rebase-apply', paused: true, sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [{ n: prompt.n, text: 'fixed prompt' }] } })
+	a.conn.send({
+		type: 'rebase-apply',
+		paused: true,
+		sessionId: id,
+		base: start.snapshot.base,
+		plan: { base: start.snapshot.base, drop: [answer.n], edit: [{ n: prompt.n, text: 'fixed prompt' }] },
+	})
 	expect(a.of('history-rewritten')).toHaveLength(1)
 	expect(b.of('history-rewritten')).toHaveLength(1)
 	for (let c of [a, b]) {
 		expect(c.views.get(id)?.items.some((i) => i.type === 'text' && i.text === 'large answer')).toBe(false)
 		expect(c.views.get(id)?.items.some((i) => i.type === 'prompt' && i.text === 'fixed prompt')).toBe(true)
-		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({ text: 'History rewritten: 1 card hidden, 1 edited. `/rebase undo` to go back.' })
+		expect(c.views.get(id)?.items.find((i) => i.type === 'divider')).toMatchObject({
+			text: 'History rewritten: 1 card hidden, 1 edited. `/rebase undo` to go back.',
+		})
 	}
 	restartHost()
 	expect((await fresh(id)).items.some((i) => i.type === 'divider')).toBe(true)
-	let c = client(); c.conn.send({ type: 'open', sessionId: id })
+	let c = client()
+	c.conn.send({ type: 'open', sessionId: id })
 	await until(() => c.views.has(id))
 	c.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
 	await until(() => c.of('history-rewritten').length)
@@ -37,14 +48,28 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	c.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => c.of('rebase-plan').length)
 	let next = c.of('rebase-plan').at(-1)
-	let apply = { type: 'rebase-apply', paused: true, id: 'rebase-dedup', sessionId: id, base: next.snapshot.base, plan: { base: next.snapshot.base, drop: [answer.n], edit: [] } }
-	c.conn.send(apply); c.conn.send(apply)
+	let apply = {
+		type: 'rebase-apply',
+		paused: true,
+		id: 'rebase-dedup',
+		sessionId: id,
+		base: next.snapshot.base,
+		plan: { base: next.snapshot.base, drop: [answer.n], edit: [] },
+	}
+	c.conn.send(apply)
+	c.conn.send(apply)
 	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(3)
-	expect(c.of('rebase-result').slice(-2).map((r) => r.ok)).toEqual([true, true])
+	expect(
+		c
+			.of('rebase-result')
+			.slice(-2)
+			.map((r) => r.ok),
+	).toEqual([true, true])
 })
 
 test('append activity is allowed, context rewrites and malformed plans refuse; busy editors refuse and model uses sparse commands', async () => {
-	let a = client(), id = created(a)
+	let a = client(),
+		id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => a.of('rebase-plan').length)
 	let start = a.of('rebase-plan')[0]
@@ -59,7 +84,12 @@ test('append activity is allowed, context rewrites and malformed plans refuse; b
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: 'wrong', todo: start.todo })
 	expect(a.of('rejected').at(-1).reason).toContain('base')
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
-	await expect(tools.all().get('command')!.run({ command: '/rebase' }, { sessionId: id, signal: new AbortController().signal } as any)).rejects.toThrow('Use /rebase show')
+	await expect(
+		tools
+			.all()
+			.get('command')!
+			.run({ command: '/rebase' }, { sessionId: id, signal: new AbortController().signal } as any),
+	).rejects.toThrow('Use /rebase show')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'running' })
 	await until(() => calls.length)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
@@ -68,7 +98,8 @@ test('append activity is allowed, context rewrites and malformed plans refuse; b
 })
 
 test('todo replacement text is applied; queue prompts start in order; empty and unchanged plans do not rewrite', async () => {
-	let a = client(), id = created(a)
+	let a = client(),
+		id = created(a)
 	let user = history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'original' }] })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
@@ -78,23 +109,49 @@ test('todo replacement text is applied; queue prompts start in order; empty and 
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: '' })
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
 	let todo = start.todo.replace(`keep  u${user.n}`, `edit  u${user.n}`) + 'queue first\nqueue second\n'
-	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' }, paused: true })
-	expect(a.of('rebase-result').at(-1)).toMatchObject({ ok: false, text: expect.stringContaining('remove the queue lines or --paused') })
+	a.conn.send({
+		type: 'rebase-apply',
+		sessionId: id,
+		base: start.snapshot.base,
+		todo,
+		replacements: { [user.n!]: 'edited' },
+		paused: true,
+	})
+	expect(a.of('rebase-result').at(-1)).toMatchObject({
+		ok: false,
+		text: expect.stringContaining('remove the queue lines or --paused'),
+	})
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
-	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' } })
+	a.conn.send({
+		type: 'rebase-apply',
+		sessionId: id,
+		base: start.snapshot.base,
+		todo,
+		replacements: { [user.n!]: 'edited' },
+	})
 	await until(() => calls.length === 1)
 	expect(a.of('turn-start').at(-1).prompt).toBe('first')
-	expect(history.readSync(id).findLast((r) => r.type === 'rebase')).toMatchObject({ edit: [{ n: user.n, text: 'edited' }] })
+	expect(history.readSync(id).findLast((r) => r.type === 'rebase')).toMatchObject({
+		edit: [{ n: user.n, text: 'edited' }],
+	})
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
 	expect(a.of('turn-start').at(-1).prompt).toBe('second')
 })
 
 test('waiting cross-session messages can be dropped from the todo and stay gone after host restart', async () => {
-	let a = client(), id = created(a)
+	let a = client(),
+		id = created(a)
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'go' }] })
 	history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
-	let message = history.append(id, { type: 'inbox', id: 'cross-session-message', text: 'waiting message', from: 'other-session', label: 'Other session', delivery: 'next-round' })
+	let message = history.append(id, {
+		type: 'inbox',
+		id: 'cross-session-message',
+		text: 'waiting message',
+		from: 'other-session',
+		label: 'Other session',
+		delivery: 'next-round',
+	})
 	a.conn.send({ type: 'open', sessionId: id })
 	expect(a.views.get(id)?.inbox).toHaveLength(1)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
@@ -107,7 +164,8 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 	expect(a.views.get(id)?.inbox).toEqual([])
 	restartHost()
 	expect((await fresh(id)).inbox).toEqual([])
-	let b = client(); b.conn.send({ type: 'open', sessionId: id })
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
 	await until(() => b.views.has(id))
 	b.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
 	await until(() => b.of('history-rewritten').length)
@@ -115,7 +173,8 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 })
 
 test('paused rebase leaving an unanswered prompt clears cached idle state and Enter can resume after restart', async () => {
-	let a = client(), id = created(a)
+	let a = client(),
+		id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'Answer this.' })
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'Old answer.' }, { type: 'done', reason: 'end' })
@@ -125,14 +184,21 @@ test('paused rebase leaving an unanswered prompt clears cached idle state and En
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => a.of('rebase-plan').length)
 	let start = a.of('rebase-plan')[0]
-	a.conn.send({ type: 'rebase-apply', paused: true, sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [] } })
+	a.conn.send({
+		type: 'rebase-apply',
+		paused: true,
+		sessionId: id,
+		base: start.snapshot.base,
+		plan: { base: start.snapshot.base, drop: [answer.n], edit: [] },
+	})
 	expect(a.views.get(id)?.state.type).toBe('paused')
 	expect(calls).toHaveLength(1)
 	restartHost()
 	let snap = await fresh(id)
 	expect(snap.state.type).toBe('paused')
 	expect(calls).toHaveLength(1)
-	let b = client(); b.conn.send({ type: 'open', sessionId: id })
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
 	await until(() => b.views.has(id))
 	let enter = states.enter(id, snap.state, '')
 	expect(enter.command).toMatchObject({ type: 'continue', sessionId: id })
@@ -143,7 +209,8 @@ test('paused rebase leaving an unanswered prompt clears cached idle state and En
 })
 
 test('/clear undo restores hidden context, refuses the other kind, and /rebase undo reverses it', async () => {
-	let a = client(), id = created(a)
+	let a = client(),
+		id = created(a)
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'before' }] })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
@@ -155,11 +222,16 @@ test('/clear undo restores hidden context, refuses the other kind, and /rebase u
 	a.conn.send({ type: 'submit', sessionId: id, text: '/clear undo' })
 	await until(() => a.of('history-rewritten').length)
 	expect(context()).toContain('before')
-	let notices = () => history.readSync(id).flatMap((r) => r.type === 'notice' ? [r.text] : [])
+	let notices = () => history.readSync(id).flatMap((r) => (r.type === 'notice' ? [r.text] : []))
 	expect(notices()).toEqual(['Clear undone: the earlier context is back. `/rebase undo` to clear it again.'])
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
 	await until(() => a.of('history-rewritten').length === 2)
 	expect(context()).not.toContain('before')
 	expect(notices().at(-1)).toBe('Context cleared again. `/clear undo` to go back.')
-	expect(a.views.get(id)?.items.filter((i) => i.type === 'divider').map((i: any) => i.text)).toContain('Context cleared again. `/clear undo` to go back.')
+	expect(
+		a.views
+			.get(id)
+			?.items.filter((i) => i.type === 'divider')
+			.map((i: any) => i.text),
+	).toContain('Context cleared again. `/clear undo` to go back.')
 })

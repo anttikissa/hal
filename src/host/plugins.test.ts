@@ -39,7 +39,10 @@ afterEach(() => {
 // `plugin` in scope) and loads it.
 async function plugin(name: string, body: string, head = ''): Promise<string> {
 	let path = join(dir, name)
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n${head}\nexport default (plugin: any) => {\n${body}\n}\n`)
+	writeFileSync(
+		path,
+		`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n${head}\nexport default (plugin: any) => {\n${body}\n}\n`,
+	)
 	await plugins.load(path)
 	return path
 }
@@ -70,9 +73,15 @@ test('set: the last file wins, removing it reveals the earlier one, then the ori
 })
 
 test('a preview replaces one plugin until unpreview, which brings it back unless it reloaded meanwhile', async () => {
-	let theme = await plugin('theme.ts', `plugin.set(t, 'value', 4)\nplugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)`)
+	let theme = await plugin(
+		'theme.ts',
+		`plugin.set(t, 'value', 4)\nplugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)`,
+	)
 	let other = join(dir, 'other.ts')
-	writeFileSync(other, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.set(t, 'value', 7); return () => t.log.push('gone') }\n`)
+	writeFileSync(
+		other,
+		`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.set(t, 'value', 7); return () => t.log.push('gone') }\n`,
+	)
 	await plugins.preview(theme, other)
 	expect([t.value, t.f(1)]).toEqual([7, 2])
 	// None: the original look, then the next preview replaces the first.
@@ -88,16 +97,25 @@ test('a preview replaces one plugin until unpreview, which brings it back unless
 })
 
 test('befores, then arounds with the first registered outermost, then afters; file order survives a reload', async () => {
-	let a = await plugin('a.ts', `plugin.before(t, 'f', () => t.log.push('a-before'))
+	let a = await plugin(
+		'a.ts',
+		`plugin.before(t, 'f', () => t.log.push('a-before'))
 plugin.around(t, 'f', (fn: any, x: number) => { t.log.push('a-around'); return fn(x) })
-plugin.after(t, 'f', () => t.log.push('a-after'))`)
-	await plugin('b.ts', `plugin.before(t, 'f', () => t.log.push('b-before'))
+plugin.after(t, 'f', () => t.log.push('a-after'))`,
+	)
+	await plugin(
+		'b.ts',
+		`plugin.before(t, 'f', () => t.log.push('b-before'))
 plugin.around(t, 'f', (fn: any, x: number) => { t.log.push('b-around'); return fn(x) })
-plugin.after(t, 'f', () => t.log.push('b-after'))`)
+plugin.after(t, 'f', () => t.log.push('b-after'))`,
+	)
 	t.f(1)
 	expect(t.log).toEqual(['a-before', 'b-before', 'a-around', 'b-around', 'f', 'a-after', 'b-after'])
 	// Reloading a.ts (now last to load) must not move it behind b.ts.
-	writeFileSync(a, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => plugin.before(t, 'f', () => t.log.push('a2'))\n`)
+	writeFileSync(
+		a,
+		`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => plugin.before(t, 'f', () => t.log.push('a2'))\n`,
+	)
 	await plugins.load(a)
 	t.log.length = 0
 	t.f(1)
@@ -105,8 +123,11 @@ plugin.after(t, 'f', () => t.log.push('b-after'))`)
 })
 
 test('a hooked sync function stays sync and keeps this; errors pass through', async () => {
-	await plugin('a.ts', `plugin.before(t, 'f', () => {})
-plugin.after(t, 'boom', () => {})`)
+	await plugin(
+		'a.ts',
+		`plugin.before(t, 'f', () => {})
+plugin.after(t, 'boom', () => {})`,
+	)
 	let other = { n: 5, log: [], f: t.f }
 	expect(other.f(2)).toBe(10)
 	expect(t.f(2)).toBe(4)
@@ -114,8 +135,11 @@ plugin.after(t, 'boom', () => {})`)
 })
 
 test('async targets: an async around awaits fn, after sees the Promise as returned', async () => {
-	await plugin('a.ts', `plugin.around(t, 'g', async (fn: any, x: number) => (await fn(x)) * 100)
-plugin.after(t, 'g', (result: any) => { t.log.push(result instanceof Promise ? 'promise' : 'value') })`)
+	await plugin(
+		'a.ts',
+		`plugin.around(t, 'g', async (fn: any, x: number) => (await fn(x)) * 100)
+plugin.after(t, 'g', (result: any) => { t.log.push(result instanceof Promise ? 'promise' : 'value') })`,
+	)
 	expect(await t.g(1)).toBe(200)
 	expect(t.log).toEqual(['promise'])
 })
@@ -137,7 +161,11 @@ return () => t.log.push('cleanup sees ' + t.f(1) + ' ' + t.value)`,
 		'globalThis.pluginRuns++',
 	)
 	expect(t.log).toEqual(['setup sees v1 4'])
-	await plugin('a.ts', `t.log.push('v2 body sees ' + t.f(1) + ' ' + t.value)\nplugin.set(t, 'value', 5)`, 'globalThis.pluginRuns++')
+	await plugin(
+		'a.ts',
+		`t.log.push('v2 body sees ' + t.f(1) + ' ' + t.value)\nplugin.set(t, 'value', 5)`,
+		'globalThis.pluginRuns++',
+	)
 	expect(g.pluginRuns).toBe(2)
 	expect(t.log.filter((l: string) => l !== 'f')).toEqual(['setup sees v1 4', 'cleanup sees 2 3', 'v2 body sees 2 3'])
 	expect(t.value).toBe(5)
@@ -148,7 +176,10 @@ return () => t.log.push('cleanup sees ' + t.f(1) + ' ' + t.value)`,
 test('a file that throws in its body runs without its hooks and is renamed to .ts.broken', async () => {
 	let original = t.f
 	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\nreturn () => t.log.push('v1 cleanup')`)
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.around(t, 'f', () => 'v2'); throw new Error('bad v2') }\n`)
+	writeFileSync(
+		path,
+		`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.around(t, 'f', () => 'v2'); throw new Error('bad v2') }\n`,
+	)
 	await plugins.load(path)
 	expect(t.f).toBe(original)
 	expect(t.log).toEqual(['v1 cleanup'])
@@ -167,7 +198,10 @@ test('an async registration function is refused, and hooks registered after the 
 	let path = await plugin('a.ts', `globalThis.late = plugin`)
 	expect(() => g.late.around(t, 'f', () => 0)).toThrow('after the registration function returned')
 	expect(t.f).toBe(original)
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => { plugin.around(t, 'f', () => 0) }\n`)
+	writeFileSync(
+		path,
+		`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => { plugin.around(t, 'f', () => 0) }\n`,
+	)
 	await plugins.load(path)
 	expect(t.f).toBe(original)
 	expect(reports[0]).toContain('a Promise')
@@ -176,8 +210,11 @@ test('an async registration function is refused, and hooks registered after the 
 
 test('deleting a file removes its hooks and runs its cleanup', async () => {
 	let original = t.f
-	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)
-return () => t.log.push('cleaned')`)
+	let path = await plugin(
+		'a.ts',
+		`plugin.around(t, 'f', () => 0)
+return () => t.log.push('cleaned')`,
+	)
 	unlinkSync(path)
 	await plugins.sync(dir, 'a.ts')
 	expect(t.f).toBe(original)
@@ -190,7 +227,11 @@ test('an expired file never registers; a live one is unloaded when its expiry pa
 	expect(g.pluginRuns).toBe(0)
 	expect(t.f).toBe(original)
 	let soon = new Date(Date.now() + 150).toISOString()
-	await plugin('soon.ts', `plugin.around(t, 'f', () => 0)\nreturn () => t.log.push('expired')`, `export const expires = '${soon}'`)
+	await plugin(
+		'soon.ts',
+		`plugin.around(t, 'f', () => 0)\nreturn () => t.log.push('expired')`,
+		`export const expires = '${soon}'`,
+	)
 	expect(t.f(1)).toBe(0)
 	await Bun.sleep(300)
 	expect(t.f).toBe(original)
@@ -249,7 +290,10 @@ test('/plugins disable and enable toggle a watched plugin and restore its file e
 
 test('disable stops the body, removes what it registered, and is not a failure', async () => {
 	let original = t.f
-	let path = await plugin('a.ts', `plugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)\nplugin.disable()\nglobalThis.pluginRuns++\nreturn () => globalThis.pluginRuns++`)
+	let path = await plugin(
+		'a.ts',
+		`plugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)\nplugin.disable()\nglobalThis.pluginRuns++\nreturn () => globalThis.pluginRuns++`,
+	)
 	expect(t.f).toBe(original)
 	expect(g.pluginRuns).toBe(0)
 	expect(reports).toEqual([])

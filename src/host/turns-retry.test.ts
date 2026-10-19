@@ -19,7 +19,13 @@ import { slash } from './slash.ts'
 import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
-const orig = { stream: turns.stream, now: clock.now, sleep: clock.sleep, changed: auth.changed, onError: liveFiles.onError }
+const orig = {
+	stream: turns.stream,
+	now: clock.now,
+	sleep: clock.sleep,
+	changed: auth.changed,
+	onError: liveFiles.onError,
+}
 let home = ''
 let now = 0
 // Every wait the host asked the clock for, in ms.
@@ -93,7 +99,10 @@ function start(c: ReturnType<typeof client>): string {
 	return id
 }
 
-const done: StreamEvent[] = [{ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' }]
+const done: StreamEvent[] = [
+	{ type: 'text', text: 'ok' },
+	{ type: 'done', reason: 'end' },
+]
 
 test('a rate limit waits for the time the provider gave, visible in snapshots; Escape pauses it', async () => {
 	let a = client()
@@ -102,10 +111,17 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	hold = true
 	let id = start(a)
 	await until(() => status.stateOf(id).type === 'retrying')
-	expect(status.stateOf(id)).toEqual({ type: 'retrying', at: new Date(at).toISOString(), reason: 'HTTP 429 from fake: quota' })
+	expect(status.stateOf(id)).toEqual({
+		type: 'retrying',
+		at: new Date(at).toISOString(),
+		reason: 'HTTP 429 from fake: quota',
+	})
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	expect((b.events.find((e) => e.type === 'snapshot') as any).snapshot.state).toMatchObject({ type: 'retrying', at: new Date(at).toISOString() })
+	expect((b.events.find((e) => e.type === 'snapshot') as any).snapshot.state).toMatchObject({
+		type: 'retrying',
+		at: new Date(at).toISOString(),
+	})
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.ends().length)
 	expect(a.ends()[0]).toMatchObject({ status: 'paused' })
@@ -115,7 +131,9 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 
 test('repeated rate limits on one model record one wait', async () => {
 	let a = client()
-	let limited = (s: number): StreamEvent[] => [{ type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: now + s * 1000 }]
+	let limited = (s: number): StreamEvent[] => [
+		{ type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: now + s * 1000 },
+	]
 	script = [limited(60), limited(120), limited(180), done]
 	let id = start(a)
 	await until(() => a.ends().length)
@@ -128,9 +146,8 @@ test('a login in another tab resumes all quota waits without resuming paused or 
 	let at = now + 3 * 3600_000
 	let limited: StreamEvent = { type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: at }
 	// Keep wall time fixed: the deadline cannot be what resumes the turns.
-	clock.sleep = (ms, signal) => ms === auth.pollMs
-		? orig.sleep(1, signal)
-		: new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
+	clock.sleep = (ms, signal) =>
+		ms === auth.pollMs ? orig.sleep(1, signal) : new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
 	let ids: string[] = []
 	for (let i = 0; i < 3; i++) {
 		script = [[limited]]
@@ -164,7 +181,6 @@ test('a rotation to another account retries at once', async () => {
 	expect(calls).toHaveLength(2)
 	expect(slept).toEqual([])
 })
-
 
 test('switching model while blocked on a login tries the new model at once', async () => {
 	let a = client()

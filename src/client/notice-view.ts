@@ -18,13 +18,17 @@ function width(cols: number): number {
 
 function rows(stack: Folded, w: number): string[] {
 	let c = colors.notice()
-	let fill = (text: string, used: number) => text + ' '.repeat(Math.max(0, w - used - strings.visLen(text))) + ansi.UNCOLOR
+	let fill = (text: string, used: number) =>
+		text + ' '.repeat(Math.max(0, w - used - strings.visLen(text))) + ansi.UNCOLOR
 	let out: string[] = []
-	if (stack.more) out.push(ansi.sgr({ fg: c.fg!, bg: c.bg! }) + fill(strings.clipVisual('  ' + notices.moreText(stack.more), w), 0))
+	if (stack.more)
+		out.push(ansi.sgr({ fg: c.fg!, bg: c.bg! }) + fill(strings.clipVisual('  ' + notices.moreText(stack.more), w), 0))
 	for (let n of stack.shown) {
 		// A tab's project color: bright bar and title on a dim tint of it.
 		let hue = n.color === undefined ? undefined : colors.project()[`p${n.color}`]
-		let on = ansi.sgr(hue ? { fg: hue, bg: colors.projectTint()[`p${n.color}Bg`]! } : { fg: c[`${n.kind}Fg`]!, bg: c.bg! })
+		let on = ansi.sgr(
+			hue ? { fg: hue, bg: colors.projectTint()[`p${n.color}Bg`]! } : { fg: c[`${n.kind}Fg`]!, bg: c.bg! },
+		)
 		let title = strings.clipVisual(ansi.clean(n.title), w - 2)
 		out.push(on + '┃ ' + ansi.BOLD + title + ansi.UNBOLD + fill('', 2 + strings.visLen(title)))
 		let line = strings.clipVisual(ansi.clean(n.line), w - 4)
@@ -45,12 +49,19 @@ function overlay(lines: string[], stack: Folded, anchor: number, cols: number): 
 	return grow
 }
 
-function messages(why: string | undefined, notice: string | undefined, clearable: boolean | undefined, w: number): string[] {
+function messages(
+	why: string | undefined,
+	notice: string | undefined,
+	clearable: boolean | undefined,
+	w: number,
+): string[] {
 	let told = [why, notice].filter((t) => t).map((t) => ansi.wrap(t!, w))
 	if (notice && clearable) {
-		let rows = told[told.length - 1]!, hint = '(esc to clear)'
+		let rows = told[told.length - 1]!,
+			hint = '(esc to clear)'
 		let last = rows[rows.length - 1]!
-		if (strings.visLen(last) + hint.length + 1 > w) rows.push(...ansi.wrap(hint, w).map((r) => ' '.repeat(Math.max(0, w - strings.visLen(r))) + r))
+		if (strings.visLen(last) + hint.length + 1 > w)
+			rows.push(...ansi.wrap(hint, w).map((r) => ' '.repeat(Math.max(0, w - strings.visLen(r))) + r))
 		else rows[rows.length - 1] = last + ' '.repeat(w - strings.visLen(last) - hint.length) + hint
 	}
 	return told.flatMap((rows, i) => (i ? ['─'.repeat(w), ...rows] : rows))

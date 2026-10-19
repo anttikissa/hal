@@ -27,13 +27,23 @@ type Source = Box & Events
 // offsetTop is how far the browser has panned the visual viewport down
 // the layout viewport; translating the app there puts it back on screen.
 function css(box: Box): Record<string, string> {
-	return { '--app-width': `${box.width}px`, '--app-height': `${box.height}px`, '--app-left': `${box.offsetLeft}px`, '--app-top': `${box.offsetTop}px` }
+	return {
+		'--app-width': `${box.width}px`,
+		'--app-height': `${box.height}px`,
+		'--app-left': `${box.offsetLeft}px`,
+		'--app-top': `${box.offsetTop}px`,
+	}
 }
 
 // Mirrors `source` into `style` now and on every change, or `full()`
 // when it answers a box; `also` lists other targets and events that
 // call for a fresh look. Answers the function that stops.
-function sync(source: Source | undefined, style: Pick<CSSStyleDeclaration, 'setProperty'>, full: () => Box | undefined = () => undefined, also: [Events, string[]][] = []): () => void {
+function sync(
+	source: Source | undefined,
+	style: Pick<CSSStyleDeclaration, 'setProperty'>,
+	full: () => Box | undefined = () => undefined,
+	also: [Events, string[]][] = [],
+): () => void {
 	if (!source) return () => {}
 	let write = () => {
 		for (let [k, v] of Object.entries(css(full() ?? source))) style.setProperty(k, v)
@@ -55,7 +65,12 @@ function page(): () => void {
 	let vv = visualViewport ?? undefined
 	let typing = () => {
 		let e = document.activeElement
-		return e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'file', 'submit', 'reset', 'range', 'color'].includes(e.type)) || (e instanceof HTMLElement && e.isContentEditable)
+		return (
+			e instanceof HTMLTextAreaElement ||
+			(e instanceof HTMLInputElement &&
+				!['button', 'checkbox', 'radio', 'file', 'submit', 'reset', 'range', 'color'].includes(e.type)) ||
+			(e instanceof HTMLElement && e.isContentEditable)
+		)
 	}
 	let unzoomed: Box | undefined
 	let full = () => {
@@ -68,20 +83,26 @@ function page(): () => void {
 	// never hidden; when it closes, html.easing lets the composer glide
 	// down on an S curve (index.html) rather than drop with the
 	// keyboard, so the Send button's flash stays in sight.
-	let last = 0, timer: ReturnType<typeof setTimeout> | undefined
-	let style = { setProperty(k: string, v: string) {
-		if (k === '--app-height') {
-			let h = parseFloat(v)
-			if (last && h > last + 100 && matchMedia('(pointer: coarse)').matches) {
-				root.classList.add('easing')
-				clearTimeout(timer)
-				timer = setTimeout(() => root.classList.remove('easing'), 460)
+	let last = 0,
+		timer: ReturnType<typeof setTimeout> | undefined
+	let style = {
+		setProperty(k: string, v: string) {
+			if (k === '--app-height') {
+				let h = parseFloat(v)
+				if (last && h > last + 100 && matchMedia('(pointer: coarse)').matches) {
+					root.classList.add('easing')
+					clearTimeout(timer)
+					timer = setTimeout(() => root.classList.remove('easing'), 460)
+				}
+				last = h
 			}
-			last = h
-		}
-		root.style.setProperty(k, v)
-	} }
-	return sync(vv, style, full, [[window, ['resize', 'pageshow']], [document, ['focusin', 'focusout', 'visibilitychange']]])
+			root.style.setProperty(k, v)
+		},
+	}
+	return sync(vv, style, full, [
+		[window, ['resize', 'pageshow']],
+		[document, ['focusin', 'focusout', 'visibilitychange']],
+	])
 }
 
 // iOS scrolls the document to its top when the status bar is tapped,
@@ -91,8 +112,13 @@ function page(): () => void {
 // document, so 0 within 600 ms of one is ignored, then re-parked.
 function statusTap(top: () => void): () => void {
 	let quietUntil = 0
-	let park = () => { if (scrollY !== 1 && !document.activeElement?.matches('textarea, input')) scrollTo(0, 1) }
-	let settle = () => { quietUntil = performance.now() + 600; setTimeout(park, 300) }
+	let park = () => {
+		if (scrollY !== 1 && !document.activeElement?.matches('textarea, input')) scrollTo(0, 1)
+	}
+	let settle = () => {
+		quietUntil = performance.now() + 600
+		setTimeout(park, 300)
+	}
 	// Typing restores the locked layout (index.html, html.typing): the
 	// keyboard must not be able to pan a scrollable document.
 	let typing = () => {
@@ -102,17 +128,29 @@ function statusTap(top: () => void): () => void {
 		if (on) scrollTo(0, 0)
 		document.documentElement.classList.toggle('typing', on)
 	}
-	let focus = () => { typing(); settle() }
+	let focus = () => {
+		typing()
+		settle()
+	}
 	let onScroll = () => {
 		if (scrollY > 0) return
 		if (performance.now() > quietUntil) top()
 		requestAnimationFrame(park)
 	}
 	let vv = visualViewport
-	let on: [EventTarget | null, string, () => void][] = [[window, 'scroll', onScroll], [window, 'pageshow', settle], [document, 'focusin', focus], [document, 'focusout', () => setTimeout(focus)], [vv, 'resize', settle]]
+	let on: [EventTarget | null, string, () => void][] = [
+		[window, 'scroll', onScroll],
+		[window, 'pageshow', settle],
+		[document, 'focusin', focus],
+		[document, 'focusout', () => setTimeout(focus)],
+		[vv, 'resize', settle],
+	]
 	for (let [t, k, f] of on) t?.addEventListener(k, f, { passive: true })
 	focus()
-	return () => { for (let [t, k, f] of on) t?.removeEventListener(k, f); document.documentElement.classList.remove('typing') }
+	return () => {
+		for (let [t, k, f] of on) t?.removeEventListener(k, f)
+		document.documentElement.classList.remove('typing')
+	}
 }
 
 export const viewport = { css, sync, page, statusTap }

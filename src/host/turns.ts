@@ -4,7 +4,16 @@
 // process becomes host continues it (recover).
 // Tasks: yq, xz, svt, 6eq, rqq, 81y.
 
-import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock } from '../common/blocks.ts'
+import {
+	blocks,
+	type DoneEvent,
+	type ErrorEvent,
+	type ImageBlock,
+	type Sender,
+	type StreamEvent,
+	type ToolCallBlock,
+	type ToolResultBlock,
+} from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
@@ -42,7 +51,16 @@ import { bash } from './tools/bash.ts'
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
 // when), so a steer waits for them all to end (`steered`, prompts.submit)
 // and a restart asks first (commands/restart.ts; task ker).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: Map<string, { input: Record<string, unknown>; at: number }>; steered?: true }
+type Running = {
+	provider: string
+	model?: string
+	effort?: string
+	controller: AbortController
+	done?: Promise<void>
+	rewait?: AbortController
+	unsafe?: Map<string, { input: Record<string, unknown>; at: number }>
+	steered?: true
+}
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -70,7 +88,13 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { inbox?: string[]; n?: number; command?: string; sender?: Sender; ts?: string }): void {
+function start(
+	id: string,
+	prompt?: string,
+	answers?: Answers,
+	images?: ImageBlock[],
+	record?: { inbox?: string[]; n?: number; command?: string; sender?: Sender; ts?: string },
+): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
 	let effort = target(running, model, sessions.open(id).effort)
@@ -92,10 +116,14 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 // it paused; one not running here (unfinished on disk) is paused on disk.
 // A command's open question is dismissed instead: nothing ran.
 function stop(id: string, reason?: string, closing = false): string | undefined {
-	try { return pause(id, reason, closing) }
-	finally {
+	try {
+		return pause(id, reason, closing)
+	} finally {
 		let running = turns.state.running.get(id)
-		if (reason !== undefined && !closing && running) { delete running.steered; running.controller.abort() }
+		if (reason !== undefined && !closing && running) {
+			delete running.steered
+			running.controller.abort()
+		}
 	}
 }
 
@@ -125,10 +153,21 @@ function pause(id: string, reason?: string, closing = false): string | undefined
 	if (running) return void (delete running.steered, running.controller.abort())
 	if (transition?.kind === 'clear') contextTransitions.settle(id)
 	// A turn parked at a question has its usage so far there.
-	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
+	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = {
+		type: 'turn_end',
+		status: 'paused',
+		usage: forms.open(history.readSync(id))?.usage ?? {},
+	}
 	if (reason !== undefined) end.pauseReason = reason
 	let recorded = history.append(id, end) as HistoryRecord & { type: 'turn_end' }
-	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n: recorded.n, ts: recorded.ts, stats: stats.ended(id, recorded) }
+	let ended: Event = {
+		type: 'turn-end',
+		sessionId: id,
+		status: 'paused',
+		n: recorded.n,
+		ts: recorded.ts,
+		stats: stats.ended(id, recorded),
+	}
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
 	contextTransitions.apply(id)
@@ -182,15 +221,43 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
-			let { system, cacheId } = promptCache.prepare(id, { cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
+			let { system, cacheId } = promptCache.prepare(id, {
+				cwd: sessions.open(id).cwd,
+				model: models.qualified(model, running.effort),
+				now: clock.now(),
+				sessionId: id,
+			})
 			let defs = [nativeTool.def()]
-			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
+			let messages = await history.messages(id, {
+				overhead: system.length + JSON.stringify(defs).length,
+				window: models.contextWindow(model),
+				model,
+			})
 			if (signal.aborted) return
-			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id, cacheId }, signal)) {
+			for await (let event of turns.stream(
+				model,
+				{
+					system,
+					effort: running.effort,
+					messages,
+					tools: defs,
+					image: (blob) => blobs.base64(id, blob),
+					sessionId: id,
+					cacheId,
+				},
+				signal,
+			)) {
 				if (signal.aborted) return
-				if (event.type !== 'tool_call') { yield event; continue }
+				if (event.type !== 'tool_call') {
+					yield event
+					continue
+				}
 				for (let call of nativeTool.expand({ ...event }, { cwd: sessions.open(id).cwd, sessionId: id, model })) {
-					if (call.name === 'bash' && typeof call.input.command === 'string') call = { ...call, input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) } }
+					if (call.name === 'bash' && typeof call.input.command === 'string')
+						call = {
+							...call,
+							input: { ...call.input, command: bash.withoutCd(call.input.command, sessions.open(id).cwd) },
+						}
 					yield { ...call, type: 'tool_call' }
 				}
 			}
@@ -217,8 +284,14 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				break
 			}
 			if (transition?.kind === 'rebase') {
-				let stop = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.apply(id, transition)
-				if (stop) { last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined; break }
+				let stop = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.apply(
+					id,
+					transition,
+				)
+				if (stop) {
+					last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined
+					break
+				}
 			}
 			if (transition?.kind === 'compact') contextTransitions.apply(id)
 			// Aborted work has settled. A steer left a fresh controller
@@ -257,11 +330,20 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					status.transition(id, { type: 'stream' })
 					let n = history.streaming(id)
 					let ts = history.started(id)
-					host.broadcast(id, { type: 'stream', sessionId: id, event, model: running.model, effort: running.effort, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
+					host.broadcast(id, {
+						type: 'stream',
+						sessionId: id,
+						event,
+						model: running.model,
+						effort: running.effort,
+						...(n !== undefined && { n }),
+						...(ts !== undefined && { ts }),
+					})
 				}
 				let interrupted = history.interrupted(id)
 				if (interrupted) host.broadcast(id, { type: 'assistant-interrupted', sessionId: id, record: interrupted })
-				if (Object.keys(round.usage).length) host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
+				if (Object.keys(round.usage).length)
+					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
 				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {
 					shrunk = true
 					continue
@@ -275,8 +357,22 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (signal.aborted) {
 					let clear = contextTransitions.pending(id)?.kind === 'clear'
 					if (clear || signal.reason === jobs.steered) {
-						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => clear ? { type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true } : turnPolicy.canceled(b.id))
-						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts }) }
+						let results = round.blocks
+							.filter((b) => b.type === 'tool_call')
+							.map((b) =>
+								clear
+									? {
+											type: 'tool_result' as const,
+											id: b.id,
+											output: 'Tool call did not run: clear accepted before dispatch.',
+											isError: true,
+										}
+									: turnPolicy.canceled(b.id),
+							)
+						if (results.length) {
+							let r = history.results(id, results)
+							host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts })
+						}
 					}
 					continue
 				}
@@ -311,30 +407,54 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			// spawned in the same round.
 			let runOne = async (call: ToolCallBlock): Promise<ToolResultBlock> => {
 				if (signal.aborted && signal.reason === jobs.steered) return turnPolicy.canceled(call.id)
-				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') return { type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true }
+				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear')
+					return {
+						type: 'tool_result',
+						id: call.id,
+						output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`,
+						isError: true,
+					}
 				if (decided.get(call.id) === false) return approval.declined(call)
 				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
 				let stream = tools.streams(call) ? toolOutput.start(id, call.id) : undefined
 				if (tools.unsafe(call)) (running.unsafe ??= new Map()).set(call.id, { input: call.input, at: Date.now() })
-				try { return turnPolicy.stoppedBy(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx), signal) }
-				finally {
+				try {
+					return turnPolicy.stoppedBy(
+						await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx),
+						signal,
+					)
+				} finally {
 					stream?.stop()
 					running.unsafe?.delete(call.id)
 					if (!running.unsafe?.size) delete running.unsafe
 					// A steer that waited for the flagged calls interrupts once none runs.
-					if (running.steered && !running.unsafe) { delete running.steered; prompts.interrupt(running) }
+					if (running.steered && !running.unsafe) {
+						delete running.steered
+						prompts.interrupt(running)
+					}
 				}
 			}
 			let results = await tools.round(calls, ctx, runOne)
 			if (turns.state.running.get(id) !== running) return
 			let made = commits.take(results)
 			if (contextTransitions.pending(id)?.kind === 'rebase') {
-				let { stop } = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(id, results)
+				let { stop } = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent.results(
+					id,
+					results,
+				)
 				commits.cards(id, made)
-				if (stop) { last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined; break }
+				if (stop) {
+					last = stop === 'done' ? { type: 'done', reason: 'end' } : undefined
+					break
+				}
 			} else {
 				let r = history.results(id, results)
-				host.broadcast(id, r?.n === undefined ? { type: 'tool-results', sessionId: id, results, ts: r?.ts } : { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
+				host.broadcast(
+					id,
+					r?.n === undefined
+						? { type: 'tool-results', sessionId: id, results, ts: r?.ts }
+						: { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts },
+				)
 				commits.cards(id, made)
 			}
 			if (signal.aborted) continue
@@ -358,7 +478,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	} catch (e: any) {
 		failure ??= String(e?.message ?? e)
 	}
-	let end: Event & { type: 'turn-end' } = { type: 'turn-end', sessionId: id, status: 'error', error: failure ?? 'turn end was not recorded' }
+	let end: Event & { type: 'turn-end' } = {
+		type: 'turn-end',
+		sessionId: id,
+		status: 'error',
+		error: failure ?? 'turn end was not recorded',
+	}
 	if (recorded?.type === 'turn_end') {
 		end = { type: 'turn-end', sessionId: id, status: recorded.status, ts: recorded.ts }
 		if (recorded.n !== undefined) end.n = recorded.n
@@ -368,8 +493,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	}
 	host.broadcast(id, end)
 	// Paused already, unless something other than the user aborted it.
-	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
-	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
+	if (end.status === 'paused')
+		status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
+	else
+		status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	// After the turn's own records, so what it starts lands below them.
 	if (end.status === 'paused' && capped !== undefined) replied?.after?.()
 	if (contextTransitions.apply(id)) return

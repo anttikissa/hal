@@ -10,36 +10,43 @@ import { turns } from './turns.ts'
 
 useHost()
 
-for (let delivery of ['soft-steer', 'steer'] as const) test(`/cd interrupts with ${delivery}, refreshes instructions and leaves queued messages queued`, async () => {
-	let c = client(), home = testHome(), id = created(c, home)
-	mkdirSync(`${home}/sub`)
-	writeFileSync(`${home}/sub/AGENTS.md`, 'Respond in Finnish.')
-	c.conn.send({ type: 'submit', sessionId: id, text: 'Write a poem.' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'Summer light' })
-	await until(() => c.of('stream').length)
-	let signal = turns.state.running.get(id)!.controller.signal
-	c.conn.send({ type: 'submit', sessionId: id, text: 'Later task.', delivery: 'queue' })
-	c.conn.send({ type: 'submit', sessionId: id, text: '/cd sub', delivery })
-	expect(signal.aborted).toBe(true)
-	await until(() => calls.length === 2)
-	expect(calls[1]!.input.system).toBe(calls[0]!.input.system)
-	let input = JSON.stringify(calls[1]!.input.messages)
-	expect(input).toContain('Respond in Finnish.')
-	expect(input).toContain(`${home}/sub`)
-	expect(input).toContain('Summer light')
-	expect(input).toContain('Continue your unfinished response')
-	expect(input).not.toContain('Later task.')
-	expect(c.views.get(id)!.inbox.map((m) => m.text)).toEqual(['Later task.'])
-	let items = c.views.get(id)!.items
-	expect(items.findIndex((i) => i.type === 'text' && i.text === 'Summer light')).toBeLessThan(items.findIndex((i) => i.type === 'command' && i.text === '/cd sub'))
-	c.conn.send({ type: 'pause', sessionId: id })
-	await until(() => c.of('turn-end').length)
-	expect(await fresh(id)).toEqual(c.views.get(id)!)
-})
+for (let delivery of ['soft-steer', 'steer'] as const)
+	test(`/cd interrupts with ${delivery}, refreshes instructions and leaves queued messages queued`, async () => {
+		let c = client(),
+			home = testHome(),
+			id = created(c, home)
+		mkdirSync(`${home}/sub`)
+		writeFileSync(`${home}/sub/AGENTS.md`, 'Respond in Finnish.')
+		c.conn.send({ type: 'submit', sessionId: id, text: 'Write a poem.' })
+		await until(() => calls.length === 1)
+		calls[0]!.push({ type: 'text', text: 'Summer light' })
+		await until(() => c.of('stream').length)
+		let signal = turns.state.running.get(id)!.controller.signal
+		c.conn.send({ type: 'submit', sessionId: id, text: 'Later task.', delivery: 'queue' })
+		c.conn.send({ type: 'submit', sessionId: id, text: '/cd sub', delivery })
+		expect(signal.aborted).toBe(true)
+		await until(() => calls.length === 2)
+		expect(calls[1]!.input.system).toBe(calls[0]!.input.system)
+		let input = JSON.stringify(calls[1]!.input.messages)
+		expect(input).toContain('Respond in Finnish.')
+		expect(input).toContain(`${home}/sub`)
+		expect(input).toContain('Summer light')
+		expect(input).toContain('Continue your unfinished response')
+		expect(input).not.toContain('Later task.')
+		expect(c.views.get(id)!.inbox.map((m) => m.text)).toEqual(['Later task.'])
+		let items = c.views.get(id)!.items
+		expect(items.findIndex((i) => i.type === 'text' && i.text === 'Summer light')).toBeLessThan(
+			items.findIndex((i) => i.type === 'command' && i.text === '/cd sub'),
+		)
+		c.conn.send({ type: 'pause', sessionId: id })
+		await until(() => c.of('turn-end').length)
+		expect(await fresh(id)).toEqual(c.views.get(id)!)
+	})
 
 test('invalid and unchanged settings do not interrupt; changes do not override a pause during settlement', async () => {
-	let c = client(), home = testHome(), id = created(c, home)
+	let c = client(),
+		home = testHome(),
+		id = created(c, home)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
 	let signal = turns.state.running.get(id)!.controller.signal
@@ -56,13 +63,19 @@ test('invalid and unchanged settings do not interrupt; changes do not override a
 	await until(() => c.of('turn-end').length)
 	expect(calls).toHaveLength(1)
 	expect(c.views.get(id)!.state.type).toBe('paused')
-	expect(history.readSync(id).some((r) => r.type === 'notice' && r.text.includes('Continue your unfinished response'))).toBe(false)
+	expect(
+		history.readSync(id).some((r) => r.type === 'notice' && r.text.includes('Continue your unfinished response')),
+	).toBe(false)
 })
 
 test('model handoff lets the round, unsafe work included, settle once', async () => {
 	let finish!: () => void
-	let settled = new Promise<void>((resolve) => { finish = resolve })
-	let original = tools.run, signal: AbortSignal | undefined, dispatched: string[] = []
+	let settled = new Promise<void>((resolve) => {
+		finish = resolve
+	})
+	let original = tools.run,
+		signal: AbortSignal | undefined,
+		dispatched: string[] = []
 	tools.run = async (call, ctx) => {
 		dispatched.push(call.id)
 		signal = ctx.signal
@@ -70,7 +83,8 @@ test('model handoff lets the round, unsafe work included, settle once', async ()
 		return { type: 'tool_result', id: call.id, output: 'Migration finished.' }
 	}
 	try {
-		let c = client(), id = created(c)
+		let c = client(),
+			id = created(c)
 		c.conn.send({ type: 'submit', sessionId: id, text: 'Migrate.' })
 		await until(() => calls.length === 1)
 		calls[0]!.push(
@@ -91,5 +105,8 @@ test('model handoff lets the round, unsafe work included, settle once', async ()
 		expect(dispatched).toEqual(['migration', 'pending'])
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length)
-	} finally { finish(); tools.run = original }
+	} finally {
+		finish()
+		tools.run = original
+	}
 })

@@ -12,11 +12,28 @@ import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
 export type Cause = 'rebase' | 'compaction' | 'clear' | 'pruning checkpoint' | 'cache miss'
-export type Point = { n: number; ts: string; turn: number; round: number; input: number; cacheRead: number; cacheWrite: number; total: number; block?: number; model?: string; approx?: true; cause?: Cause; window?: number }
+export type Point = {
+	n: number
+	ts: string
+	turn: number
+	round: number
+	input: number
+	cacheRead: number
+	cacheWrite: number
+	total: number
+	block?: number
+	model?: string
+	approx?: true
+	cause?: Cause
+	window?: number
+}
 
 function points(records: HistoryRecord[], window: (model?: string) => number | undefined = () => undefined): Point[] {
 	let out: Point[] = []
-	let turn = 0, round = 0, completed = 0, roundsInTurn = 0
+	let turn = 0,
+		round = 0,
+		completed = 0,
+		roundsInTurn = 0
 	let boundary: Cause | undefined
 	let checkpoint = 0
 	for (let r of records) {
@@ -31,7 +48,16 @@ function points(records: HistoryRecord[], window: (model?: string) => number | u
 		} else if (r.type === 'turn_end' && r.status === 'completed') completed++
 		if (r.type !== 'round' && !(r.type === 'turn_end' && r.context && !roundsInTurn)) continue
 		let usage = r.type === 'round' ? r.usage : { input: r.context }
-		let p: Point = { n: r.n ?? out.length + 1, ts: r.ts, turn, round: ++round, input: usage.input ?? 0, cacheRead: usage.cacheRead ?? 0, cacheWrite: usage.cacheWrite ?? 0, total: 0 }
+		let p: Point = {
+			n: r.n ?? out.length + 1,
+			ts: r.ts,
+			turn,
+			round: ++round,
+			input: usage.input ?? 0,
+			cacheRead: usage.cacheRead ?? 0,
+			cacheWrite: usage.cacheWrite ?? 0,
+			total: 0,
+		}
 		p.total = p.input + p.cacheRead + p.cacheWrite
 		if (r.type === 'round') {
 			roundsInTurn++

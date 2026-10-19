@@ -52,16 +52,21 @@ describe('terminal markdown', () => {
 		// The link's address is its hidden target.
 		expect(rows.join('')).toContain('\x1b]8;;https://example.com/a\x07')
 		// A table too wide for even one letter a column is clipped, not wider.
-		for (let r of markdownView.lines('| a | b | c | d |\n|-|-|-|-|\n| 1 | 2 | 3 | 4 |', 10)) expect(strings.visLen(r)).toBeLessThanOrEqual(10)
+		for (let r of markdownView.lines('| a | b | c | d |\n|-|-|-|-|\n| 1 | 2 | 3 | 4 |', 10))
+			expect(strings.visLen(r)).toBeLessThanOrEqual(10)
 	})
 
 	test('a table keeps every word whole while columns can wrap', () => {
-		let rows = markdownView.lines('| key | description |\n|---|---|\n| identifier_name | one two three four five six |', 34).map(visible)
+		let rows = markdownView
+			.lines('| key | description |\n|---|---|\n| identifier_name | one two three four five six |', 34)
+			.map(visible)
 		expect(rows.some((r) => r.includes('identifier_name'))).toBe(true)
 		expect(rows.filter((r) => r.startsWith('│')).length).toBeGreaterThan(2)
 	})
 	test('a two-line cell puts the bar over the reset text in one row', () => {
-		let rows = markdownView.lines('| Account | 5h |\n|---|---|\n| alice | █████<br>95% used (resets 23:39) |', 64).map(visible)
+		let rows = markdownView
+			.lines('| Account | 5h |\n|---|---|\n| alice | █████<br>95% used (resets 23:39) |', 64)
+			.map(visible)
 		expect(rows.some((r) => r.includes('█████') && r.includes('alice'))).toBe(true)
 		expect(rows.some((r) => r.includes('95% used (resets 23:39)') && !r.includes('alice'))).toBe(true)
 		expect(rows.join('')).not.toContain('<br>')
@@ -72,7 +77,12 @@ describe('high-water mark', () => {
 	afterEach(() => frame.state.peaks.clear())
 	let hal = { at: 'stream' as const, lit: false, color: colors.assistant().fg! }
 	let view = (session: string, text: string, streaming: boolean): View => {
-		let transcript: Transcript = { meta: { id: session, cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: [{ type: 'text', text, key: '~1' }] }
+		let transcript: Transcript = {
+			meta: { id: session, cwd: '/', model: 'm', createdAt: '' },
+			state: { type: 'idle' },
+			inbox: [],
+			items: [{ type: 'text', text, key: '~1' }],
+		}
 		return { transcript, prompt: { text: '', cursor: 0 }, hal: streaming ? hal : undefined }
 	}
 	let height = (v: View) => frame.build(v, 40).history
@@ -93,13 +103,25 @@ describe('tool card high-water mark', () => {
 	afterEach(() => frame.state.peaks.clear())
 	let input = { command: 'seq 9', description: 'Count' }
 	// Tool cards short (task hyt): running output against the short result.
-	let view = (items: any[], folds?: View['folds']): View => ({ transcript: { meta: { id: 'c', cwd: '/', model: 'm', createdAt: '', blocks: { tool: 'short' } }, state: { type: 'idle' }, inbox: [], items }, prompt: { text: '', cursor: 0 }, folds })
+	let view = (items: any[], folds?: View['folds']): View => ({
+		transcript: {
+			meta: { id: 'c', cwd: '/', model: 'm', createdAt: '', blocks: { tool: 'short' } },
+			state: { type: 'idle' },
+			inbox: [],
+			items,
+		},
+		prompt: { text: '', cursor: 0 },
+		folds,
+	})
 	let height = (v: View) => frame.build(v, 40).history
 	let output = '1\n2\n3\n4\n5\n6\n7\n8\n9\n'
 
 	test('a finished call with its result is never shorter than while it ran', () => {
 		let running = height(view([{ type: 'tool', id: 'x', name: 'bash', input, partial: output, key: '3' }]))
-		let done = view([{ type: 'tool', id: 'x', name: 'bash', input, key: '3' }, { type: 'tool-result', id: 'x', output: `[exit 0]\n${output}`, key: '4' }])
+		let done = view([
+			{ type: 'tool', id: 'x', name: 'bash', input, key: '3' },
+			{ type: 'tool-result', id: 'x', output: `[exit 0]\n${output}`, key: '4' },
+		])
 		expect(height(done)).toBe(running)
 		// Not only through the mark: running output is laid out as the short result.
 		frame.state.peaks.clear()
@@ -109,7 +131,10 @@ describe('tool card high-water mark', () => {
 
 	test('a result shorter than its running output keeps the height until a full redraw', () => {
 		let running = height(view([{ type: 'tool', id: 'x', name: 'bash', input, partial: 'a\n\n\n', key: '3' }]))
-		let done = view([{ type: 'tool', id: 'x', name: 'bash', input, key: '3' }, { type: 'tool-result', id: 'x', output: '[exit 0]\na\n\n\n', key: '4' }])
+		let done = view([
+			{ type: 'tool', id: 'x', name: 'bash', input, key: '3' },
+			{ type: 'tool-result', id: 'x', output: '[exit 0]\na\n\n\n', key: '4' },
+		])
 		expect(height(done)).toBe(running)
 		frame.state.peaks.clear()
 		frame.state.history = undefined

@@ -15,5 +15,8 @@ test('/queue next runs a queued foreign message even when paused, retaining its 
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue next' })
 	await until(() => calls.length === 2)
 	expect(a.views.get(id)?.inbox).toEqual([])
-	expect(a.views.get(id)?.items.find((i) => i.type === 'prompt' && i.text === 'foreign message')).toMatchObject({ from: '9-abc', label: 'helper' })
+	expect(a.views.get(id)?.items.find((i) => i.type === 'prompt' && i.text === 'foreign message')).toMatchObject({
+		from: '9-abc',
+		label: 'helper',
+	})
 })

@@ -53,4 +53,11 @@ function watch(report: (ms: number, at: number) => void, limit = 10, tick = 5): 
 	return () => clearInterval(timer)
 }
 
-export const perf = { state: { epoch: performance.timeOrigin, marks: [] as Mark[] }, maxMarks: 500, now, mark, trace, watch }
+export const perf = {
+	state: { epoch: performance.timeOrigin, marks: [] as Mark[] },
+	maxMarks: 500,
+	now,
+	mark,
+	trace,
+	watch,
+}

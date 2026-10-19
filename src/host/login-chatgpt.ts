@@ -41,12 +41,21 @@ async function post(url: string, body: unknown): Promise<Response> {
 // Asks for a user code to show.
 async function start(): Promise<Device> {
 	let res = await post(`${chatgptLogin.deviceUrl}/usercode`, { client_id: OPENAI_CLIENT_ID })
-	if (res.status === 404) throw new Error('ChatGPT device-code login is unavailable: turn on Enable device code sign-in at https://chatgpt.com/#settings/Security (or ask your workspace admin)')
+	if (res.status === 404)
+		throw new Error(
+			'ChatGPT device-code login is unavailable: turn on Enable device code sign-in at https://chatgpt.com/#settings/Security (or ask your workspace admin)',
+		)
 	if (!res.ok) throw new Error(`ChatGPT device-code request failed: HTTP ${res.status}`)
 	let data: any = await res.json().catch(() => null)
-	if (typeof data?.device_auth_id !== 'string' || typeof data?.user_code !== 'string') throw new Error('ChatGPT device-code response is missing its code')
+	if (typeof data?.device_auth_id !== 'string' || typeof data?.user_code !== 'string')
+		throw new Error('ChatGPT device-code response is missing its code')
 	let interval = Number(data.interval)
-	return { id: data.device_auth_id, userCode: data.user_code, intervalMs: Math.max(0, Number.isFinite(interval) ? interval * 1000 : 5000), url: chatgptLogin.verifyUrl }
+	return {
+		id: data.device_auth_id,
+		userCode: data.user_code,
+		intervalMs: Math.max(0, Number.isFinite(interval) ? interval * 1000 : 5000),
+		url: chatgptLogin.verifyUrl,
+	}
 }
 
 // Polls until the user has entered the code; 403 and 404 mean not yet.
@@ -56,7 +65,8 @@ async function wait(device: Device): Promise<{ code: string; verifier: string }>
 		let res = await post(`${chatgptLogin.deviceUrl}/token`, { device_auth_id: device.id, user_code: device.userCode })
 		if (res.ok) {
 			let data: any = await res.json().catch(() => null)
-			if (typeof data?.authorization_code !== 'string' || typeof data?.code_verifier !== 'string') throw new Error('ChatGPT device-code response is missing its authorization code')
+			if (typeof data?.authorization_code !== 'string' || typeof data?.code_verifier !== 'string')
+				throw new Error('ChatGPT device-code response is missing its authorization code')
 			return { code: data.authorization_code, verifier: data.code_verifier }
 		}
 		if (res.status !== 403 && res.status !== 404) throw new Error(`ChatGPT login failed: HTTP ${res.status}`)
@@ -71,12 +81,19 @@ async function exchange(grant: { code: string; verifier: string }, redirect = CA
 	let res = await fetch(auth.tokenUrl('openai'), {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({ grant_type: 'authorization_code', client_id: OPENAI_CLIENT_ID, code: grant.code, code_verifier: grant.verifier, redirect_uri: redirect }),
+		body: new URLSearchParams({
+			grant_type: 'authorization_code',
+			client_id: OPENAI_CLIENT_ID,
+			code: grant.code,
+			code_verifier: grant.verifier,
+			redirect_uri: redirect,
+		}),
 		signal: AbortSignal.timeout(auth.refreshTimeoutMs()),
 	})
 	let body: any = await res.json().catch(() => null)
 	if (!res.ok) throw new Error(`ChatGPT login failed: HTTP ${res.status}${code(body)}`)
-	if (typeof body?.access_token !== 'string' || typeof body?.refresh_token !== 'string') throw new Error('ChatGPT login failed: no tokens in the response')
+	if (typeof body?.access_token !== 'string' || typeof body?.refresh_token !== 'string')
+		throw new Error('ChatGPT login failed: no tokens in the response')
 	let claims = jwtClaims(body.access_token)
 	let accountId = claims?.['https://api.openai.com/auth']?.chatgpt_account_id
 	let email = claims?.['https://api.openai.com/profile']?.email
@@ -94,11 +111,17 @@ async function exchange(grant: { code: string; verifier: string }, redirect = CA
 	return typeof email === 'string' && email ? email : undefined
 }
 
-const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const base64url = (bytes: Uint8Array) =>
+	btoa(String.fromCharCode(...bytes))
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '')
 
 // The browser flow's redirect listener and the URL to open; undefined
 // when the port is taken (another login, or a Codex CLI).
-async function browser(): Promise<{ url: string; grant: Promise<{ code: string; verifier: string }>; stop(): void } | undefined> {
+async function browser(): Promise<
+	{ url: string; grant: Promise<{ code: string; verifier: string }>; stop(): void } | undefined
+> {
 	let verifier = base64url(crypto.getRandomValues(new Uint8Array(32)))
 	let state = base64url(crypto.getRandomValues(new Uint8Array(32)))
 	let challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))))
@@ -113,7 +136,8 @@ async function browser(): Promise<{ url: string; grant: Promise<{ code: string; 
 				let u = new URL(req.url)
 				if (u.pathname !== '/auth/callback') return new Response('Not found', { status: 404 })
 				// The state ties the answer to this login; anything else is refused.
-				if (u.searchParams.get('state') !== state) return new Response('This login link is stale; run /login chatgpt again.', { status: 400 })
+				if (u.searchParams.get('state') !== state)
+					return new Response('This login link is stale; run /login chatgpt again.', { status: 400 })
 				let code = u.searchParams.get('code')
 				if (!code) {
 					let error = u.searchParams.get('error') ?? ''
@@ -128,10 +152,27 @@ async function browser(): Promise<{ url: string; grant: Promise<{ code: string; 
 		return undefined
 	}
 	let u = new URL(chatgptLogin.authorizeUrl)
-	let params = { response_type: 'code', client_id: OPENAI_CLIENT_ID, redirect_uri: chatgptLogin.redirect(), scope: 'openid profile email offline_access', code_challenge: challenge, code_challenge_method: 'S256', id_token_add_organizations: 'true', codex_cli_simplified_flow: 'true', state, originator: 'codex_cli_rs' }
+	let params = {
+		response_type: 'code',
+		client_id: OPENAI_CLIENT_ID,
+		redirect_uri: chatgptLogin.redirect(),
+		scope: 'openid profile email offline_access',
+		code_challenge: challenge,
+		code_challenge_method: 'S256',
+		id_token_add_organizations: 'true',
+		codex_cli_simplified_flow: 'true',
+		state,
+		originator: 'codex_cli_rs',
+	}
 	for (let [k, v] of Object.entries(params)) u.searchParams.set(k, v)
-	let timer = setTimeout(() => fail(new Error('ChatGPT login timed out after 15 minutes; run /login chatgpt again')), chatgptLogin.timeoutMs)
-	let stop = () => { clearTimeout(timer); server.stop(true) }
+	let timer = setTimeout(
+		() => fail(new Error('ChatGPT login timed out after 15 minutes; run /login chatgpt again')),
+		chatgptLogin.timeoutMs,
+	)
+	let stop = () => {
+		clearTimeout(timer)
+		server.stop(true)
+	}
 	return { url: u.toString(), grant: got.then((code) => ({ code, verifier })), stop }
 }
 
@@ -145,7 +186,9 @@ async function run(show: (text: string) => void): Promise<string | undefined> {
 		let flow = chatgptLogin.local() ? await chatgptLogin.browser() : undefined
 		if (flow) {
 			try {
-				show(`Open this URL in a browser on this computer to log in to ChatGPT (it waits up to 15 minutes):\n\n${flow.url}`)
+				show(
+					`Open this URL in a browser on this computer to log in to ChatGPT (it waits up to 15 minutes):\n\n${flow.url}`,
+				)
 				return await chatgptLogin.exchange(await flow.grant, chatgptLogin.redirect())
 			} finally {
 				flow.stop()
@@ -153,7 +196,9 @@ async function run(show: (text: string) => void): Promise<string | undefined> {
 		}
 		show('Before ChatGPT login, turn on Enable device code sign-in at https://chatgpt.com/#settings/Security')
 		let device = await chatgptLogin.start()
-		show(`Open this URL to log in to ChatGPT:\n\n${device.url}\n\nand enter this one-time code (expires in 15 minutes):\n\n${device.userCode}\n\nOnly continue if you started this login in Hal.`)
+		show(
+			`Open this URL to log in to ChatGPT:\n\n${device.url}\n\nand enter this one-time code (expires in 15 minutes):\n\n${device.userCode}\n\nOnly continue if you started this login in Hal.`,
+		)
 		return await chatgptLogin.exchange(await chatgptLogin.wait(device))
 	} finally {
 		// A session blocked on login tries again (auth.changed).

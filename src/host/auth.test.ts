@@ -9,7 +9,11 @@ import { paths } from './paths.ts'
 // ./auth.ason nor ~/.hal/auth.ason can be read or written here.
 
 const savedHome = paths.state.home
-const savedEnv = { HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+const savedEnv = {
+	HOME: process.env.HOME,
+	ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+}
 const origTokenUrl = auth.tokenUrl
 let home = ''
 let server: ReturnType<typeof Bun.serve> | null = null
@@ -69,7 +73,9 @@ async function failure(): Promise<Error> {
 }
 
 test('single-entry shape: a valid token is returned without refreshing or rewriting', async () => {
-	write({ anthropic: { accessToken: 'fake-access', refreshToken: 'fake-refresh', expires: later(), email: 'a@example.com' } })
+	write({
+		anthropic: { accessToken: 'fake-access', refreshToken: 'fake-refresh', expires: later(), email: 'a@example.com' },
+	})
 	let before = readFileSync(file(), 'utf8')
 	let cred = await auth.anthropic()
 	expect(cred).toMatchObject({ type: 'token', value: 'fake-access', email: 'a@example.com' })
@@ -79,7 +85,9 @@ test('single-entry shape: a valid token is returned without refreshing or rewrit
 })
 
 test('array shape: first entry holding a credential is used', async () => {
-	write({ anthropic: [{ email: 'metadata-only' }, { accessToken: 'second', expires: later() }, { accessToken: 'third' }] })
+	write({
+		anthropic: [{ email: 'metadata-only' }, { accessToken: 'second', expires: later() }, { accessToken: 'third' }],
+	})
 	expect((await auth.anthropic()).value).toBe('second')
 })
 
@@ -88,7 +96,10 @@ test('expired token is refreshed and only this copy is rewritten, 0600, others k
 	mkdirSync(`${home}/user/.hal`, { recursive: true })
 	writeFileSync(userAuth, 'untouched')
 	write({
-		anthropic: [{ accessToken: 'old-access', refreshToken: 'old-refresh', expires: earlier(), email: 'a@example.com' }, { accessToken: 'other' }],
+		anthropic: [
+			{ accessToken: 'old-access', refreshToken: 'old-refresh', expires: earlier(), email: 'a@example.com' },
+			{ accessToken: 'other' },
+		],
 		openai: { accessToken: 'openai-token' },
 	})
 	refreshed()
@@ -100,7 +111,11 @@ test('expired token is refreshed and only this copy is rewritten, 0600, others k
 	expect(typeof requests[0].client_id).toBe('string')
 
 	let saved = disk()
-	expect(saved.anthropic[0]).toMatchObject({ accessToken: 'new-access', refreshToken: 'new-refresh', email: 'a@example.com' })
+	expect(saved.anthropic[0]).toMatchObject({
+		accessToken: 'new-access',
+		refreshToken: 'new-refresh',
+		email: 'a@example.com',
+	})
 	expect(saved.anthropic[0].expires).toBeGreaterThanOrEqual(start + 7200_000)
 	expect(saved.anthropic[1]).toEqual({ accessToken: 'other' })
 	expect(saved.openai).toEqual({ accessToken: 'openai-token' })
@@ -157,7 +172,7 @@ test('failed refresh is a clear error without secrets, and the file is unchanged
 test('a refresh that fails on the server side or the network is temporary, and tried again', async () => {
 	write({ anthropic: { accessToken: 'old', refreshToken: 'r', expires: earlier() } })
 	reply = () => new Response('oops', { status: 503 })
-	expect((await failure() as any).failure).toBe('temporary')
+	expect(((await failure()) as any).failure).toBe('temporary')
 	refreshed()
 	expect((await auth.anthropic()).value).toBe('new-access')
 })
@@ -216,13 +231,21 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 			],
 		})
 		// The two-homes case: another copy already rotated a's refresh token.
-		reply = () => Response.json({ error: 'invalid_grant', error_description: 'Refresh token not found or invalid' }, { status: 400 })
+		reply = () =>
+			Response.json(
+				{ error: 'invalid_grant', error_description: 'Refresh token not found or invalid' },
+				{ status: 400 },
+			)
 		expect(await auth.anthropic('m', { session: 's' })).toMatchObject({ value: 'b-token', account: 'b@x' })
 		expect(requests).toHaveLength(1)
 		// Skipping a broken login is never silent: the session hears the
 		// provider's error, once.
 		expect(await auth.anthropic('m', { session: 's' })).toMatchObject({ value: 'b-token' })
-		expect(told).toEqual([expect.stringMatching(/^s anthropic login a@x is not working.*invalid_grant \(Refresh token not found or invalid\)/)])
+		expect(told).toEqual([
+			expect.stringMatching(
+				/^s anthropic login a@x is not working.*invalid_grant \(Refresh token not found or invalid\)/,
+			),
+		])
 		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
 		expect(await auth.anthropic('m')).toMatchObject({ value: 'c-key', account: 'account 3' })
 		// Another model is not limited on b.
@@ -240,7 +263,12 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 })
 
 test('every login broken is an auth failure naming the problem', async () => {
-	write({ anthropic: [{ accessToken: 'x', expires: earlier() }, { accessToken: 'y', refreshToken: 'secret-r', expires: earlier() }] })
+	write({
+		anthropic: [
+			{ accessToken: 'x', expires: earlier() },
+			{ accessToken: 'y', refreshToken: 'secret-r', expires: earlier() },
+		],
+	})
 	reply = () => Response.json({ error: 'invalid_grant' }, { status: 400 })
 	let e: any = await failure()
 	expect(e.failure).toBe('auth')
@@ -249,21 +277,34 @@ test('every login broken is an auth failure naming the problem', async () => {
 })
 
 test('pickAccount is the per-request override point; a key waits behind any usable subscription', async () => {
-	write({ anthropic: [
-		{ apiKey: 'key', email: 'key@x' },
-		{ accessToken: 'token', email: 'sub@x', expires: later() },
-	] })
+	write({
+		anthropic: [
+			{ apiKey: 'key', email: 'key@x' },
+			{ accessToken: 'token', email: 'sub@x', expires: later() },
+		],
+	})
 	let { usage } = await import('./usage.ts')
 	let { paths } = await import('./paths.ts')
 	paths.init()
 	let reset = String(Math.floor(later() / 1000))
 	// A key has no usage windows; a busy subscription still comes first.
-	usage.observe('anthropic', 'sub@x', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.95', 'anthropic-ratelimit-unified-5h-reset': reset }))
+	usage.observe(
+		'anthropic',
+		'sub@x',
+		new Headers({
+			'anthropic-ratelimit-unified-5h-utilization': '0.95',
+			'anthropic-ratelimit-unified-5h-reset': reset,
+		}),
+	)
 	expect((await auth.anthropic()).account).toBe('sub@x')
 	let original = auth.pickAccount
 	auth.pickAccount = (_kind, list) => [list.find((a) => a.name === 'key@x')!, ...list.filter((a) => a.name !== 'key@x')]
-	try { expect((await auth.anthropic()).account).toBe('key@x') }
-	finally { auth.pickAccount = original; usage.close() }
+	try {
+		expect((await auth.anthropic()).account).toBe('key@x')
+	} finally {
+		auth.pickAccount = original
+		usage.close()
+	}
 })
 
 test('a session falls back to a key only while every subscription is out, says so once, and comes back', async () => {
@@ -351,7 +392,14 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 	let { paths } = await import('./paths.ts')
 	paths.init()
 	let used = (account: string, fraction: number) =>
-		usage.observe('anthropic', account, new Headers({ 'anthropic-ratelimit-unified-5h-utilization': String(fraction), 'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)) }))
+		usage.observe(
+			'anthropic',
+			account,
+			new Headers({
+				'anthropic-ratelimit-unified-5h-utilization': String(fraction),
+				'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)),
+			}),
+		)
 	try {
 		write({
 			anthropic: [
@@ -397,9 +445,22 @@ test('an account picked with /account goes first until rotation leaves it', asyn
 	let { paths } = await import('./paths.ts')
 	paths.init()
 	let used = (account: string, fraction: number) =>
-		usage.observe('anthropic', account, new Headers({ 'anthropic-ratelimit-unified-5h-utilization': String(fraction), 'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)) }))
+		usage.observe(
+			'anthropic',
+			account,
+			new Headers({
+				'anthropic-ratelimit-unified-5h-utilization': String(fraction),
+				'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)),
+			}),
+		)
 	try {
-		write({ anthropic: [{ accessToken: 'a-token', expires: later(), email: 'a@x' }, { accessToken: 'b-token', expires: later(), email: 'b@x' }, { apiKey: 'k-key' }] })
+		write({
+			anthropic: [
+				{ accessToken: 'a-token', expires: later(), email: 'a@x' },
+				{ accessToken: 'b-token', expires: later(), email: 'b@x' },
+				{ apiKey: 'k-key' },
+			],
+		})
 		used('a@x', 0.9)
 		used('b@x', 0.1)
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('b@x')
@@ -425,9 +486,19 @@ test('a model counts as limited while every account has spent a window all model
 	let { usage } = await import('./usage.ts')
 	paths.init()
 	let secs = (ms: number) => String(Math.floor(ms / 1000))
-	let spent = (resets: number, used = '1') => new Headers({ 'x-codex-primary-used-percent': String(Number(used) * 100), 'x-codex-primary-window-minutes': '300', 'x-codex-primary-reset-at': secs(resets) })
+	let spent = (resets: number, used = '1') =>
+		new Headers({
+			'x-codex-primary-used-percent': String(Number(used) * 100),
+			'x-codex-primary-window-minutes': '300',
+			'x-codex-primary-reset-at': secs(resets),
+		})
 	try {
-		write({ openai: [{ accessToken: 'a', expires: later(), email: 'a@x' }, { accessToken: 'b', expires: later(), email: 'b@x' }] })
+		write({
+			openai: [
+				{ accessToken: 'a', expires: later(), email: 'a@x' },
+				{ accessToken: 'b', expires: later(), email: 'b@x' },
+			],
+		})
 		usage.observe('openai', 'a@x', spent(now() + 3_600_000))
 		usage.observe('openai', 'b@x', spent(now() + 7_200_000, '0.9'))
 		// One account still has room: any OpenAI model can run.
@@ -436,5 +507,7 @@ test('a model counts as limited while every account has spent a window all model
 		// Every account spent: limited until the first window resets, for every model.
 		let until = auth.limitedUntil('openai/gpt-y')
 		expect(Math.abs(until - (now() + 3_600_000))).toBeLessThan(2000)
-	} finally { usage.close() }
+	} finally {
+		usage.close()
+	}
 })

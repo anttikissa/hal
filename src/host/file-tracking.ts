@@ -12,7 +12,12 @@ function inside(path: string, root: string): boolean {
 }
 
 async function repo(cwd: string): Promise<string | undefined> {
-	try { await stat(cwd) } catch (e: any) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return; throw e }
+	try {
+		await stat(cwd)
+	} catch (e: any) {
+		if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return
+		throw e
+	}
 	let result = await fileChanges.git(cwd, ['rev-parse', '--show-toplevel'])
 	if (!result.code) return result.text.trimEnd()
 	if (result.error.includes('not a git repository')) return
@@ -23,7 +28,12 @@ async function gitPath(root: string, path: string): Promise<string> {
 	let at = root
 	for (let part of relative(root, path).split('/')) {
 		at = resolve(at, part)
-		try { if ((await lstat(at)).isSymbolicLink()) return at } catch (e: any) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return path; throw e }
+		try {
+			if ((await lstat(at)).isSymbolicLink()) return at
+		} catch (e: any) {
+			if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return path
+			throw e
+		}
 	}
 	return path
 }
@@ -42,13 +52,24 @@ async function filter(cwd: string, names: string[], patterns = false): Promise<s
 	let root = await fileTracking.repo(cwd)
 	if (!root) return candidates.map((c) => c.name)
 	for (let candidate of candidates) {
-		if (patterns && /[*?[\]{}]/.test(candidate.name)) { candidate.paths = []; continue }
-		candidate.paths = await Promise.all(candidate.paths.filter((p) => fileTracking.inside(p, root)).map((p) => candidate.paths.length > 1 ? fileTracking.gitPath(root, p) : p))
+		if (patterns && /[*?[\]{}]/.test(candidate.name)) {
+			candidate.paths = []
+			continue
+		}
+		candidate.paths = await Promise.all(
+			candidate.paths
+				.filter((p) => fileTracking.inside(p, root))
+				.map((p) => (candidate.paths.length > 1 ? fileTracking.gitPath(root, p) : p)),
+		)
 	}
 	let paths = [...new Set(candidates.flatMap((c) => c.paths))]
 	let ignored = new Set<string>()
 	for (let at = 0; at < paths.length; at += 1024) {
-		let result = await fileChanges.git(root, ['check-ignore', '-z', '--stdin'], paths.slice(at, at + 1024).join('\0') + '\0')
+		let result = await fileChanges.git(
+			root,
+			['check-ignore', '-z', '--stdin'],
+			paths.slice(at, at + 1024).join('\0') + '\0',
+		)
 		if (result.code > 1) throw new Error(result.error)
 		for (let path of result.text.split('\0')) if (path) ignored.add(path)
 	}
@@ -56,7 +77,12 @@ async function filter(cwd: string, names: string[], patterns = false): Promise<s
 }
 
 async function file(path: string): Promise<boolean> {
-	try { return (await stat(path)).isFile() } catch (e: any) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return false; throw e }
+	try {
+		return (await stat(path)).isFile()
+	} catch (e: any) {
+		if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return false
+		throw e
+	}
 }
 
 async function* walk(root: string): AsyncGenerator<string> {
@@ -64,7 +90,7 @@ async function* walk(root: string): AsyncGenerator<string> {
 		let path = resolve(root, entry.name)
 		if (fileTracking.excluded(path)) continue
 		if (entry.isDirectory()) yield* fileTracking.walk(path)
-		else if (entry.isFile() || entry.isSymbolicLink() && await fileTracking.file(path)) yield path
+		else if (entry.isFile() || (entry.isSymbolicLink() && (await fileTracking.file(path)))) yield path
 	}
 }
 
@@ -74,20 +100,45 @@ async function glob(cwd: string, pattern: string): Promise<string[]> {
 	let first = parts.findIndex((part) => /[*?[\]{}]/.test(part))
 	let root = first < 0 ? dirname(absolute) : parts.slice(0, first).join('/') || '/'
 	if (fileTracking.excluded(root)) return []
-	try { if (!(await stat(root)).isDirectory()) return [] } catch (e: any) { if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return []; throw e }
-	let matcher = new Bun.Glob(absolute), found: string[] = []
+	try {
+		if (!(await stat(root)).isDirectory()) return []
+	} catch (e: any) {
+		if (e.code === 'ENOENT' || e.code === 'ENOTDIR') return []
+		throw e
+	}
+	let matcher = new Bun.Glob(absolute),
+		found: string[] = []
 	if (await fileTracking.repo(root)) {
-		let result = await fileChanges.git(root, ['ls-files', '--cached', '--others', '--exclude-standard', ...fileTracking.generatedDirs.map((name) => `--exclude=${name}/`), '-z'])
+		let result = await fileChanges.git(root, [
+			'ls-files',
+			'--cached',
+			'--others',
+			'--exclude-standard',
+			...fileTracking.generatedDirs.map((name) => `--exclude=${name}/`),
+			'-z',
+		])
 		if (result.code) throw new Error(result.error)
 		for (let name of result.text.split('\0')) {
 			if (!name) continue
 			let path = resolve(root, name)
-			if (!fileTracking.excluded(path) && matcher.match(path) && await fileTracking.file(path)) found.push(isAbsolute(pattern) ? path : relative(cwd, path))
+			if (!fileTracking.excluded(path) && matcher.match(path) && (await fileTracking.file(path)))
+				found.push(isAbsolute(pattern) ? path : relative(cwd, path))
 		}
 	} else {
-		for await (let path of fileTracking.walk(root)) if (matcher.match(path)) found.push(isAbsolute(pattern) ? path : relative(cwd, path))
+		for await (let path of fileTracking.walk(root))
+			if (matcher.match(path)) found.push(isAbsolute(pattern) ? path : relative(cwd, path))
 	}
 	return found
 }
 
-export const fileTracking = { generatedDirs: ['node_modules'], excluded, inside, repo, gitPath, filter, file, walk, glob }
+export const fileTracking = {
+	generatedDirs: ['node_modules'],
+	excluded,
+	inside,
+	repo,
+	gitPath,
+	filter,
+	file,
+	walk,
+	glob,
+}

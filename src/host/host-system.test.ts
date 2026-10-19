@@ -69,7 +69,9 @@ function start() {
 }
 
 const lastPrompt = (messages: Message[]) => {
-	let m = messages.findLast((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.startsWith('[')))!
+	let m = messages.findLast(
+		(m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.startsWith('[')),
+	)!
 	return m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')
 }
 

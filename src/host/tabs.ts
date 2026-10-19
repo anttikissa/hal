@@ -59,7 +59,13 @@ function list(): Tab[] {
 		try {
 			meta = sessions.open(id)
 		} catch (e: any) {
-			return { id, name: id, cwd: '', model: '', state: { type: 'error', message: String(e?.message ?? e) } } satisfies Tab
+			return {
+				id,
+				name: id,
+				cwd: '',
+				model: '',
+				state: { type: 'error', message: String(e?.message ?? e) },
+			} satisfies Tab
 		}
 		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
 		if (tab.state.type !== 'error') {
@@ -86,7 +92,13 @@ function questionOf(id: string): Tab['question'] {
 	let cached = questions.get(id)
 	if (cached?.size === size) return cached.question
 	let open = forms.open(pages.essentials(id))
-	let question: Tab['question'] = open ? open.call ? 'approval' : 'ordinary' : notify.asked(id) ? 'ordinary' : undefined
+	let question: Tab['question'] = open
+		? open.call
+			? 'approval'
+			: 'ordinary'
+		: notify.asked(id)
+			? 'ordinary'
+			: undefined
 	questions.set(id, { size, question })
 	return question
 }
@@ -119,21 +131,25 @@ function indexed(): Promise<void> | undefined {
 	try {
 		open = tabs.file().open
 	} catch {}
-	let steps = (): void | Promise<void> => pages.slices(
-		(function* () {
-			let n = 0
-			for (let id of open) {
-				try {
-					// Its meta too, which the tabs event reads.
-					sessions.open(id)
-					status.derive(id, (yield* pages.markedSteps(id)).map((l) => l.record))
-				} catch {}
-				// Every 8th tab counts as a big read, so 60 small ones yield
-				// between slices (task 7j); a few still finish at once.
-				yield ++n % 8 ? 0 : pages.syncBytes
-			}
-		})(),
-	)
+	let steps = (): void | Promise<void> =>
+		pages.slices(
+			(function* () {
+				let n = 0
+				for (let id of open) {
+					try {
+						// Its meta too, which the tabs event reads.
+						sessions.open(id)
+						status.derive(
+							id,
+							(yield* pages.markedSteps(id)).map((l) => l.record),
+						)
+					} catch {}
+					// Every 8th tab counts as a big read, so 60 small ones yield
+					// between slices (task 7j); a few still finish at once.
+					yield ++n % 8 ? 0 : pages.syncBytes
+				}
+			})(),
+		)
 	// Old marks convert in a worker first (task 7j).
 	let upgraded = marksWorker.upgrade(open)
 	let done = upgraded ? upgraded.then(steps) : steps()
@@ -190,7 +206,8 @@ function create(cwd: string, after?: string, autoclose = false, interactive = tr
 function stopOwned(id: string): void {
 	for (let child of sessions.openIds()) {
 		let meta = sessions.open(child)
-		if (meta.owner === id && meta.spawn !== 'interactive' && subagents.owed(child, history.readSync(child))) tabs.stopOwned(child)
+		if (meta.owner === id && meta.spawn !== 'interactive' && subagents.owed(child, history.readSync(child)))
+			tabs.stopOwned(child)
 	}
 	jobs.kill(id)
 	if (states.busy(status.stateOf(id))) {
@@ -256,7 +273,8 @@ function act(c: TabCommand, timezone?: string): Outcome {
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last, timezone)
 	// A turn that asked keeps its mark until the user sends something (task nd6);
 	// a tab marked by /unread keeps it until its client shows another (task wr5).
-	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId) && !tabs.state.kept.has(c.sessionId)) f.attention = f.attention.filter((id) => id !== c.sessionId)
+	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId) && !tabs.state.kept.has(c.sessionId))
+		f.attention = f.attention.filter((id) => id !== c.sessionId)
 	else if (c.type === 'tab-move') {
 		let from = f.open.indexOf(c.sessionId)
 		if (from < 0) return { refused: 'not a tab' }
@@ -280,7 +298,9 @@ function observe(id: string, event: Event): void {
 		return
 	}
 	if (!f.open.includes(id)) return
-	let wants = event.type === 'question' || (event.type === 'turn-end' && (event.status === 'completed' || event.status === 'error'))
+	let wants =
+		event.type === 'question' ||
+		(event.type === 'turn-end' && (event.status === 'completed' || event.status === 'error'))
 	if (wants && !f.attention.includes(id)) f.attention.push(id)
 	// The user answered an asking turn: a new turn runs.
 	if (event.type === 'state' && states.busy(event.state)) {

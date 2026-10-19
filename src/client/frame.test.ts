@@ -14,11 +14,17 @@ import { ansi } from './ansi.ts'
 import { target } from '../web/target.ts'
 
 let originalNames: Record<string, string>
-beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
-afterEach(() => { titles.names = originalNames })
+beforeEach(() => {
+	originalNames = titles.names
+	titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' }
+})
+afterEach(() => {
+	titles.names = originalNames
+})
 
 // Where text in `style`'s quieter color starts (ansi.quiet).
-const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
+const quietOn = (style: { fg?: Oklch; bg?: Oklch }) =>
+	ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
 
 // Visible text only: escape sequences removed.
 function strip(s: string): string {
@@ -30,7 +36,12 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
+	let transcript: Transcript = {
+		meta: { id: 's', cwd: '/', model: 'm', createdAt: '' },
+		state: { type: 'idle' },
+		inbox: [],
+		items: items.map((item, i) => ({ ...item, key: `~${i}` })),
+	}
 	return { transcript, prompt: { text, cursor } }
 }
 
@@ -46,7 +57,10 @@ test('queued cards expand by inbox ID and their padding matches each sender', ()
 		{ id: 'b', n: 21, text: 'Human first\nHuman last', delivery: 'after-turn' },
 	]
 	let closed = frame.build(v, 100).lines
-	for (let [text, style] of [['Agent first', colors.message()], ['Human first', colors.user()]] as const) {
+	for (let [text, style] of [
+		['Agent first', colors.message()],
+		['Human first', colors.user()],
+	] as const) {
 		let at = closed.findIndex((line) => strip(line).includes(text))
 		expect(at).toBeGreaterThan(0)
 		expect(closed[at - 1]).toBe(ansi.paint('', style, 100))
@@ -72,19 +86,33 @@ function boxOf(f: Frame): { top: number; bottom: number; rows: string[] } {
 }
 
 test('every image returned by a tool remains linked, including consecutive images', () => {
-	let images = ['0123456789ab', '0123456789ac'].map((blob): Item => ({ type: 'image', blob, mediaType: 'image/png', bytes: 12 }))
+	let images = ['0123456789ab', '0123456789ac'].map((blob): Item => ({
+		type: 'image',
+		blob,
+		mediaType: 'image/png',
+		bytes: 12,
+	}))
 	for (let cols of [40, 100]) {
-		let output = frame.build(view([{ type: 'tool-result', id: 'r', output: 'images' }, ...images]), cols).lines.join('\n')
+		let output = frame
+			.build(view([{ type: 'tool-result', id: 'r', output: 'images' }, ...images]), cols)
+			.lines.join('\n')
 		for (let image of images) if (image.type === 'image') expect(output).toContain(`/s/${image.blob}`)
 	}
 })
 
 test('EDIT line lists cannot consume the title or block reference', () => {
-	let item = { type: 'tool', id: 'edit', name: 'edit', input: { path: 'src/host/file-changes.ts' }, key: '62', ts: new Date().toISOString() } as const
+	let item = {
+		type: 'tool',
+		id: 'edit',
+		name: 'edit',
+		input: { path: 'src/host/file-changes.ts' },
+		key: '62',
+		ts: new Date().toISOString(),
+	} as const
 	let status = '(+5 −6, lines 6, 25, 28, 31, 37, 42, 59, 71, 100, 120)'
 	for (let cols of [40, 60, 100]) {
 		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
-		let header = rows.find(r => r.includes('> '))!
+		let header = rows.find((r) => r.includes('> '))!
 		expect(header).toContain('> src/')
 		expect(header).toContain(' t62')
 		expect(header).toContain('…')
@@ -94,7 +122,8 @@ test('EDIT line lists cannot consume the title or block reference', () => {
 
 test('shows every item, however long the history', () => {
 	let items: Item[] = []
-	for (let i = 0; i < 300; i++) items.push({ type: 'prompt', text: `question ${i}` }, { type: 'text', text: `answer ${i}` })
+	for (let i = 0; i < 300; i++)
+		items.push({ type: 'prompt', text: `question ${i}` }, { type: 'text', text: `answer ${i}` })
 	let lines = plain(frame.build(view(items), 40).lines)
 	expect(lines).toContain('question 0')
 	expect(lines).toContain('answer 0')
@@ -152,14 +181,19 @@ test('no row is wider than the terminal, whatever the text', () => {
 test('a tool result of megabytes shows its first rows, each shown line wrapped, the rest counted', () => {
 	let long = 'w'.repeat(100)
 	let output = [long, ...Array.from({ length: 200_000 }, (_, i) => `row ${i}`)].join('\n')
-	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines).filter((l) => /w|row|more/.test(l))
+	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines).filter((l) =>
+		/w|row|more/.test(l),
+	)
 	// 100 w's on 34 columns wrap to three rows: the first three shown.
 	expect(lines.slice(0, 3).every((l) => /^w+$/.test(l))).toBe(true)
 	expect(lines.at(-1)).toBe('… 200000 more lines')
 })
 
 test('a frame reusing the last one equals a frame built from nothing, as items stream in and change', () => {
-	let items: Item[] = [{ type: 'prompt', text: 'hi' }, { type: 'text', text: 'one' }]
+	let items: Item[] = [
+		{ type: 'prompt', text: 'hi' },
+		{ type: 'text', text: 'one' },
+	]
 	let v = view(items)
 	let fresh = (w: View) => {
 		let kept = frame.state.history
@@ -170,12 +204,28 @@ test('a frame reusing the last one equals a frame built from nothing, as items s
 	}
 	let steps: View[] = [v]
 	let t = v.transcript!
-	steps.push({ ...v, transcript: { ...t, items: [...t.items, { type: 'tool', id: 'c', name: 'bash', input: {}, key: '7' }] } })
+	steps.push({
+		...v,
+		transcript: { ...t, items: [...t.items, { type: 'tool', id: 'c', name: 'bash', input: {}, key: '7' }] },
+	})
 	let t2 = steps[1]!.transcript!
-	steps.push({ ...v, transcript: { ...t2, items: [...t2.items, { type: 'tool-result', id: 'c', output: 'done', key: '~9' }] } })
+	steps.push({
+		...v,
+		transcript: { ...t2, items: [...t2.items, { type: 'tool-result', id: 'c', output: 'done', key: '~9' }] },
+	})
 	// A changed item (a new object) in the middle.
 	let t3 = steps[2]!.transcript!
-	steps.push({ ...v, transcript: { ...t3, items: [t3.items[0]!, { ...t3.items[1]!, text: 'one, edited' } as (typeof t3.items)[number], ...t3.items.slice(2)] } })
+	steps.push({
+		...v,
+		transcript: {
+			...t3,
+			items: [
+				t3.items[0]!,
+				{ ...t3.items[1]!, text: 'one, edited' } as (typeof t3.items)[number],
+				...t3.items.slice(2),
+			],
+		},
+	})
 	steps.push({ ...steps[3]!, prompt: { text: 'typing', cursor: 6 } })
 	for (let w of steps) expect(frame.build(w, 50, 20, true).lines).toEqual(fresh(w))
 	// Another width lays everything out again.
@@ -276,7 +326,8 @@ describe('prompt box', () => {
 	})
 
 	test('hints the resize keys once the text nears the box height', () => {
-		let help = (n: number, text = Array.from({ length: n }, (_, i) => `l${i}`).join('\n')) => plain(frame.build({ prompt: { text, cursor: 0 } }, 80).lines).at(-1)!
+		let help = (n: number, text = Array.from({ length: n }, (_, i) => `l${i}`).join('\n')) =>
+			plain(frame.build({ prompt: { text, cursor: 0 } }, 80).lines).at(-1)!
 		let near = settings.promptRows() - 2
 		expect(help(near)).toContain('ctrl-=/-')
 		expect(help(near - 1)).not.toContain('ctrl-=/-')
@@ -320,17 +371,24 @@ describe('prompt box', () => {
 	})
 
 	test('an empty prompt shows a readable example distinguishable from typed text', () => {
-		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: { cut: '', text: 'Try this', next: Infinity } }, 40)
+		let f = frame.build(
+			{ prompt: { text: '', cursor: 0 }, placeholder: { cut: '', text: 'Try this', next: Infinity } },
+			40,
+		)
 		expect(boxOf(f).rows).toEqual(['Try this'])
 		let rgb = /38;2;(\d+);(\d+);(\d+)mTry this/.exec(f.lines[2]!)!.slice(1).map(Number)
-		let fg = oklch.toRgb(colors.input().fg!), bg = oklch.toRgb(colors.input().bg!)
+		let fg = oklch.toRgb(colors.input().fg!),
+			bg = oklch.toRgb(colors.input().bg!)
 		// It stands out from the dark box, but recedes behind typed text.
 		let dist = (a: number[], b: number[]) => Math.hypot(...a.map((v, i) => v - b[i]!))
 		expect(dist(rgb, bg)).toBeGreaterThan(100)
 		expect(dist(rgb, bg)).toBeLessThan(dist(fg, bg) * 0.7)
 		expect(f.cursor).toEqual({ row: 2, col: 1 })
 		// Erasing from its left as typing starts: what is left keeps its columns.
-		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: { cut: 'Tr', text: 'y this', fade: 'left', next: 5 } }, 40)
+		let typed = frame.build(
+			{ prompt: { text: 'x', cursor: 1 }, placeholder: { cut: 'Tr', text: 'y this', fade: 'left', next: 5 } },
+			40,
+		)
 		expect(boxOf(typed).rows).toEqual(['x y this'])
 		expect(typed.cursor).toEqual({ row: 2, col: 2 })
 	})
@@ -345,7 +403,11 @@ describe('prompt box', () => {
 	test('the selection shows in reverse video, a selected tab as spaces to its stop', () => {
 		let row = (st: PromptState, cols = 40) => promptView.box(st, cols).rows
 		expect(row({ text: 'a\tb', cursor: 2, anchor: 1 })).toEqual(['a\x1b[7m   \x1b[27mb'])
-		expect(row({ text: '\tone\n\ttwo\nthree', cursor: 8, anchor: 0 })).toEqual(['\x1b[7m    one\x1b[27m', '\x1b[7m    tw\x1b[27mo', 'three'])
+		expect(row({ text: '\tone\n\ttwo\nthree', cursor: 8, anchor: 0 })).toEqual([
+			'\x1b[7m    one\x1b[27m',
+			'\x1b[7m    tw\x1b[27mo',
+			'three',
+		])
 		// Across a wrapped row, and ending inside the box's width.
 		let wrapped = row({ text: 'abcdef', cursor: 0, anchor: 6 }, 3)
 		expect(wrapped).toEqual(['\x1b[7mabc\x1b[27m', '\x1b[7mdef\x1b[27m'])
@@ -357,8 +419,19 @@ test('inside GNU screen the frame has no color, only reverse video for the selec
 	let env = process.env.STY
 	process.env.STY = '1.pts-0.host'
 	try {
-		let v = view([{ type: 'prompt', text: 'hi' }, { type: 'text', text: 'hello' }, { type: 'output', text: 'boom', error: true }, { type: 'tool', id: 't', name: 'bash', input: { command: 'ls' } }], 'draft')
-		v.tabs = { list: [{ id: 's', name: 's', cwd: '/', model: 'm', state: { type: 'running', phase: 'requesting' } }], focused: 's' }
+		let v = view(
+			[
+				{ type: 'prompt', text: 'hi' },
+				{ type: 'text', text: 'hello' },
+				{ type: 'output', text: 'boom', error: true },
+				{ type: 'tool', id: 't', name: 'bash', input: { command: 'ls' } },
+			],
+			'draft',
+		)
+		v.tabs = {
+			list: [{ id: 's', name: 's', cwd: '/', model: 'm', state: { type: 'running', phase: 'requesting' } }],
+			focused: 's',
+		}
 		v.notice = 'note'
 		let out = frame.build(v, 40).lines.join('\n')
 		expect(strip(out)).toContain('hello')
@@ -380,7 +453,9 @@ test('an [image/<name>] marker is a link to the image, in the transcript and the
 	for (let row of rows) expect(row).toContain(link)
 	expect(plain(rows)).toEqual(['see [image/abc123.png] ok', 'and [image/abc123.png]'])
 	// A forged name is not linked.
-	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toMatch(/\x1b\]8;;[^\x07]*x\.png/)
+	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toMatch(
+		/\x1b\]8;;[^\x07]*x\.png/,
+	)
 })
 
 // OSC 8 targets in `lines`, in order.
@@ -407,7 +482,8 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
 		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
-		for (let key of ['u4', 'a5', 't6', 'q7', 's8']) expect(plain(lines).some((l) => l.endsWith(` ${key}`) && l.length === 58)).toBe(true)
+		for (let key of ['u4', 'a5', 't6', 'q7', 's8'])
+			expect(plain(lines).some((l) => l.endsWith(` ${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
@@ -448,35 +524,47 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 	}
 })
 
-
 // Local h:m today: older headers carry a date (titles.time).
-let today = (h: number, m: number) => { let d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString() }
-
+let today = (h: number, m: number) => {
+	let d = new Date()
+	d.setHours(h, m, 0, 0)
+	return d.toISOString()
+}
 
 test('tool and command-output timestamps match prose while machine output stays compact', () => {
 	let ts = today(8, 50)
-	let f = frame.build(view([
-		{ type: 'text', text: 'Message body', ts },
-		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Inspect files', command: 'ls' }, ts },
-		{ type: 'tool', id: 'read', name: 'read', input: { path: 'example.txt' }, ts },
-		{ type: 'output', text: 'Command body', ts },
-	]), 80)
+	let f = frame.build(
+		view([
+			{ type: 'text', text: 'Message body', ts },
+			{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Inspect files', command: 'ls' }, ts },
+			{ type: 'tool', id: 'read', name: 'read', input: { path: 'example.txt' }, ts },
+			{ type: 'output', text: 'Command body', ts },
+		]),
+		80,
+	)
 	let lines = plain(f.lines)
-	let ordinary = lines.findIndex(line => line.startsWith('08:50 Hal'))
-	let output = lines.findIndex(line => line === '08:50')
+	let ordinary = lines.findIndex((line) => line.startsWith('08:50 Hal'))
+	let output = lines.findIndex((line) => line === '08:50')
 	expect(lines[ordinary + 1]).toBe('')
 	expect(lines[ordinary + 2]).toBe('Message body')
 	expect(lines[output + 1]).toBe('Command body')
-	expect(lines.some(line => line.startsWith('08:50 $ Inspect files'))).toBe(true)
-	expect(lines.some(line => line.startsWith('08:50 < example.txt'))).toBe(true)
+	expect(lines.some((line) => line.startsWith('08:50 $ Inspect files'))).toBe(true)
+	expect(lines.some((line) => line.startsWith('08:50 < example.txt'))).toBe(true)
 })
 
 test('finished thinking with no readable text draws nothing, not a bare header', () => {
-	let lines = plain(frame.build(view([{ type: 'thinking', text: '', model: 'anthropic/claude-opus-5-5' }, { type: 'text', text: 'hi' }]), 60).lines)
+	let lines = plain(
+		frame.build(
+			view([
+				{ type: 'thinking', text: '', model: 'anthropic/claude-opus-5-5' },
+				{ type: 'text', text: 'hi' },
+			]),
+			60,
+		).lines,
+	)
 	expect(lines.join('\n')).not.toContain('thinking')
 	expect(lines.join('\n')).toContain('hi')
 })
-
 
 test('Bash results link to the call; a failed status and the time go in the title, in the warning color (task wm0)', () => {
 	let v = view([
@@ -486,7 +574,10 @@ test('Bash results link to the call; a failed status and the time go in the titl
 		{ type: 'tool-result', id: 'bad', output: '[exit 123]\nerror: cannot access file\n', ms: 3270 },
 		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
 	])
-	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816', '1817'][i]! }))
+	v.transcript!.items = v.transcript!.items.map((item, i) => ({
+		...item,
+		key: ['1813', '1814', '1815', '1816', '1817'][i]!,
+	}))
 	v.transcript!.meta.blocks = { tool: 'short' }
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
@@ -505,18 +596,21 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
-	let detached = plain(frame.build(apart, 70).lines).find(line => line.includes('M notes.md'))!
+	let detached = plain(frame.build(apart, 70).lines).find((line) => line.includes('M notes.md'))!
 	expect(detached).toBe('M notes.md')
-	expect(plain(frame.build(apart, 70).lines).find(line => line.includes('Result of:'))).toMatch(/^Result of: \$ Check files +t1813/)
+	expect(plain(frame.build(apart, 70).lines).find((line) => line.includes('Result of:'))).toMatch(
+		/^Result of: \$ Check files +t1813/,
+	)
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	expect(printed).not.toContain('Background command finished')
-	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {
-		let job = view([{ type: 'prompt', text: '[exit 123]\nmissing file', from: 's', label }])
-		let rendered = frame.build(job, width).lines
-		let ref = label.slice(5).replace(/^#/, '')
-		expect(targets(rendered)).toContain(`${settings.webUrl()}/s#${ref}`)
-		expect(plain(rendered).join('\n')).toContain(ref)
-	}
+	for (let width of [40, 50, 70])
+		for (let label of ['bash #1813', 'bash #t1813', 'bash t1813']) {
+			let job = view([{ type: 'prompt', text: '[exit 123]\nmissing file', from: 's', label }])
+			let rendered = frame.build(job, width).lines
+			let ref = label.slice(5).replace(/^#/, '')
+			expect(targets(rendered)).toContain(`${settings.webUrl()}/s#${ref}`)
+			expect(plain(rendered).join('\n')).toContain(ref)
+		}
 })
 
 test('long streaming tool cards keep a bounded tail, then expand on completion', () => {
@@ -530,7 +624,10 @@ test('long streaming tool cards keep a bounded tail, then expand on completion',
 	expect(text).not.toContain('output 0\n')
 	let resized = frame.build(v, 80, 40)
 	expect(resized.history).toBeLessThanOrEqual(12)
-	v.transcript!.items = [{ ...v.transcript!.items[0]!, partial: undefined } as Transcript['items'][number], { type: 'tool-result', id: 'bounded', output, key: '~result' }]
+	v.transcript!.items = [
+		{ ...v.transcript!.items[0]!, partial: undefined } as Transcript['items'][number],
+		{ type: 'tool-result', id: 'bounded', output, key: '~result' },
+	]
 	let finished = frame.build(v, 80, 60)
 	expect(finished.history).toBeGreaterThan(100)
 	expect(plain(finished.lines).join('\n')).toContain('output 0\n')
@@ -547,24 +644,33 @@ test('long streaming tool cards keep a bounded tail, then expand on completion',
 })
 
 test('legacy rename controls never appear in terminal answers without a naming flag', () => {
-	let f = frame.build(view([{ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' }]), 80)
+	let f = frame.build(
+		view([{ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' }]),
+		80,
+	)
 	let text = plain(f.lines).join('\n')
 	expect(text).toContain('Done.')
 	expect(text).not.toContain('Fix replay persistence')
 	expect(text).not.toContain('<rename>')
 })
 
-
 test('a batch seen running keeps its output and results below its calls until a rebuild', () => {
 	type Row = Parameters<typeof frame.order>[0][number]
-	let call = (id: string, partial?: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}`, ...(partial && { partial }) }) as Row
+	let call = (id: string, partial?: string) =>
+		({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}`, ...(partial && { partial }) }) as Row
 	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Row
-	let keys = (items: Row[]) => frame.order(items).map((i) => i.key).join(' ')
+	let keys = (items: Row[]) =>
+		frame
+			.order(items)
+			.map((i) => i.key)
+			.join(' ')
 	let done = [call('a'), call('b'), result('b'), result('a')]
 	expect(keys(done)).toBe('ta ra tb rb')
 	let running = [call('c', 'out'), call('d')]
 	expect(keys(running)).toBe('tc td tc~live')
-	expect(keys([...running.map((c) => ({ ...c, partial: undefined }) as Row), result('d'), result('c')])).toBe('tc td rd rc')
+	expect(keys([...running.map((c) => ({ ...c, partial: undefined }) as Row), result('d'), result('c')])).toBe(
+		'tc td rd rc',
+	)
 })
 
 test('interruption markers remain whole and colored at a full terminal row', () => {
@@ -578,7 +684,10 @@ test('interruption markers remain whole and colored at a full terminal row', () 
 
 test('help and rebase command cards open directly to full input and output without changing other commands', () => {
 	for (let command of ['/help rebase', '/rebase show', '/rename Example']) {
-		let v = view([{ type: 'tool', id: 'c', name: 'command', input: { command } }, { type: 'tool-result', id: 'c', output: Array.from({ length: 240 }, (_, i) => `output ${i}`).join('\n') }])
+		let v = view([
+			{ type: 'tool', id: 'c', name: 'command', input: { command } },
+			{ type: 'tool-result', id: 'c', output: Array.from({ length: 240 }, (_, i) => `output ${i}`).join('\n') },
+		])
 		let closed = plain(frame.build(v, 70).lines).join('\n')
 		if (command !== '/rename Example') expect(closed).not.toContain('output 0')
 		v.folds = { states: new Map([['~0', 'long']]), sig: 'long' }
@@ -592,8 +701,12 @@ test('help and rebase command cards open directly to full input and output witho
 })
 
 test('rebase reports show colored edits immediately, separately from an earlier editor error', () => {
-	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 user:\n```diff\n-old\n+replacement\n```'
-	let v = view([{ type: 'output', text: 'Rebase failed: editor exited with code 1', error: true }, { type: 'output', text: report }])
+	let report =
+		'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 user:\n```diff\n-old\n+replacement\n```'
+	let v = view([
+		{ type: 'output', text: 'Rebase failed: editor exited with code 1', error: true },
+		{ type: 'output', text: report },
+	])
 	let rows = frame.build(v, 80).lines
 	let text = plain(rows).join('\n')
 	expect(text).toContain('Rebase failed: editor exited with code 1')
@@ -601,7 +714,10 @@ test('rebase reports show colored edits immediately, separately from an earlier 
 	expect(text).toContain('--paused')
 	expect(text).toContain('Edited #169')
 	expect(text).not.toContain('```')
-	for (let [line, fg] of [['-old', colors.diff().removeFg], ['+replacement', colors.diff().addFg]] as const) {
+	for (let [line, fg] of [
+		['-old', colors.diff().removeFg],
+		['+replacement', colors.diff().addFg],
+	] as const) {
 		expect(rows.find((r) => plain([r])[0]!.includes(line))).toContain(ansi.sgr({ fg: fg! }))
 	}
 })
@@ -620,12 +736,24 @@ test('idle cursor has one blank row after text, fences and whitespace tails', ()
 
 test('receipt ticks follow waiting messages into history and leave optimistic and immediate prompts unmarked', () => {
 	let v = view([])
-	v.transcript!.inbox = [{ id: 'soft', text: 'pending soft', delivery: 'next-round' }, { id: 'queue', text: 'pending queue', delivery: 'after-turn' }]
+	v.transcript!.inbox = [
+		{ id: 'soft', text: 'pending soft', delivery: 'next-round' },
+		{ id: 'queue', text: 'pending queue', delivery: 'after-turn' },
+	]
 	v.pending = ['optimistic prompt']
 	let waiting = plain(frame.build(v, 90).lines)
 	expect(waiting.filter((l) => l.includes('✓'))).toHaveLength(2)
 	expect(waiting.some((l) => l.includes('✓✓'))).toBe(false)
 	expect(waiting.find((l) => l.includes('optimistic prompt'))).not.toContain('✓')
-	let read = plain(frame.build(view([{ type: 'prompt', text: 'read soft', delivery: 'next-round' }, { type: 'prompt', text: 'read queue', delivery: 'after-turn' }, { type: 'prompt', text: 'immediate', delivery: 'now' }]), 90).lines)
+	let read = plain(
+		frame.build(
+			view([
+				{ type: 'prompt', text: 'read soft', delivery: 'next-round' },
+				{ type: 'prompt', text: 'read queue', delivery: 'after-turn' },
+				{ type: 'prompt', text: 'immediate', delivery: 'now' },
+			]),
+			90,
+		).lines,
+	)
 	expect(read.filter((l) => l.includes('✓✓'))).toHaveLength(2)
 })

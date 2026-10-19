@@ -49,7 +49,7 @@ function record(facts: Record<string, unknown>): void {
 	if (st.fd === undefined) return
 	try {
 		let bytes = Buffer.from(JSON.stringify({ time: new Date().toISOString(), pid: process.pid, ...facts }) + '\n')
-		for (let at = 0; at < bytes.length; ) {
+		for (let at = 0; at < bytes.length;) {
 			let n = writeSync(st.fd, bytes, at)
 			if (!n) throw new Error('trace write made no progress')
 			at += n
@@ -67,7 +67,11 @@ function stop(): void {
 	if (st.fd !== undefined) {
 		let fd = st.fd
 		st.fd = undefined
-		try { closeSync(fd) } catch (e) { st.error = String(e) }
+		try {
+			closeSync(fd)
+		} catch (e) {
+			st.error = String(e)
+		}
 	}
 	st.pending.clear()
 }
@@ -75,10 +79,15 @@ function stop(): void {
 function start(path: string | URL): void {
 	redrawTrace.stop()
 	// Do not truncate a previous capture or follow a substituted symlink.
-	let fd = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600)
+	let fd = openSync(
+		path,
+		constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+		0o600,
+	)
 	try {
 		let stat = fstatSync(fd)
-		if (!stat.isFile() || stat.nlink !== 1 || stat.uid !== process.getuid!()) throw new Error('trace requires a privately owned regular file with one link')
+		if (!stat.isFile() || stat.nlink !== 1 || stat.uid !== process.getuid!())
+			throw new Error('trace requires a privately owned regular file with one link')
 		fchmodSync(fd, 0o600)
 	} catch (e) {
 		closeSync(fd)
@@ -89,10 +98,37 @@ function start(path: string | URL): void {
 	// Event types are deliberately not copied from the payload: select the
 	// useful protocol categories, with a fixed fallback for everything else.
 	redrawTrace.hook(app, 'onEvent', (next, event) => {
-		let type = ['stream', 'tool-output', 'tool-results', 'turn-start', 'turn-end', 'turn-stats', 'snapshot', 'history', 'tabs', 'state', 'draft', 'inbox', 'notice', 'auth', 'output', 'prompt', 'meta', 'question', 'answer', 'warning'].includes(event.type) ? event.type : 'other'
+		let type = [
+			'stream',
+			'tool-output',
+			'tool-results',
+			'turn-start',
+			'turn-end',
+			'turn-stats',
+			'snapshot',
+			'history',
+			'tabs',
+			'state',
+			'draft',
+			'inbox',
+			'notice',
+			'auth',
+			'output',
+			'prompt',
+			'meta',
+			'question',
+			'answer',
+			'warning',
+		].includes(event.type)
+			? event.type
+			: 'other'
 		let st = redrawTrace.state
 		st.context.push(`event:${type}`)
-		try { return next(event) } finally { st.context.pop() }
+		try {
+			return next(event)
+		} finally {
+			st.context.pop()
+		}
 	})
 	for (let key of ['beat', 'onKeys', 'onState', 'onTabs'] as const) redrawTrace.cause(app, key, `app.${key}`)
 	redrawTrace.cause(terminal, 'resized', 'terminal.resized')
@@ -120,11 +156,16 @@ function start(path: string | URL): void {
 		st.painting = [...new Set([...st.pending, ...st.context])]
 		if (!st.painting.length) st.painting.push('render.draw')
 		st.pending.clear()
-		try { return next(force) } finally { st.painting = before }
+		try {
+			return next(force)
+		} finally {
+			st.painting = before
+		}
 	})
 	redrawTrace.hook(render, 'paintParts', (next, frame, rows, force = false) => {
 		let prev = render.state.prev
-		let oldRows = prev.length, newRows = frame.lines.length
+		let oldRows = prev.length,
+			newRows = frame.lines.length
 		let first = 0
 		while (first < oldRows && first < newRows && prev[first] === frame.lines[first]) first++
 		let same = first === oldRows && first === newRows
@@ -135,12 +176,35 @@ function start(path: string | URL): void {
 		let parts = next(frame, rows, force) as (string | (() => string))[]
 		let clear = parts.some((p) => typeof p === 'string' && p.includes('\x1b[3J'))
 		let home = parts.some((p) => typeof p === 'string' && p.includes('\x1b[H'))
-		let reason = clear ? force ? 'forced' : newRows < oldRows ? 'shrink' : first < writableTop ? 'immutable-row-changed' : 'rebuild' : same ? 'unchanged' : 'diff'
+		let reason = clear
+			? force
+				? 'forced'
+				: newRows < oldRows
+					? 'shrink'
+					: first < writableTop
+						? 'immutable-row-changed'
+						: 'rebuild'
+			: same
+				? 'unchanged'
+				: 'diff'
 		redrawTrace.record({
-			causes: redrawTrace.state.painting.length ? redrawTrace.state.painting : [...redrawTrace.state.context, 'render.paintParts'],
-			reason, force, wasFull, fullscreen: render.state.fullscreen, rows, oldRows, newRows,
-			firstChanged: same ? null : first, writableTop, oldCursorRow,
-			cursorRow: frame.cursor.row, cursorCol: frame.cursor.col, clear, home,
+			causes: redrawTrace.state.painting.length
+				? redrawTrace.state.painting
+				: [...redrawTrace.state.context, 'render.paintParts'],
+			reason,
+			force,
+			wasFull,
+			fullscreen: render.state.fullscreen,
+			rows,
+			oldRows,
+			newRows,
+			firstChanged: same ? null : first,
+			writableTop,
+			oldCursorRow,
+			cursorRow: frame.cursor.row,
+			cursorCol: frame.cursor.col,
+			clear,
+			home,
 			inlineBytes: parts.reduce((n, p) => n + (typeof p === 'string' ? Buffer.byteLength(p) : 0), 0),
 			deferredParts: parts.filter((p) => typeof p === 'function').length,
 		})
@@ -152,5 +216,9 @@ export const redrawTrace = {
 	state: createState(),
 	/** A bounded diagnostic run; start again explicitly for another capture. */
 	maxRecords: 20000,
-	start, stop, hook, cause, record,
+	start,
+	stop,
+	hook,
+	cause,
+	record,
 }

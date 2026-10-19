@@ -6,13 +6,23 @@ import type { Event, Tab } from '../common/protocol.ts'
 import type { NoticeEntry } from '../common/notices.ts'
 
 function supported(): boolean {
-	return typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:'
+	return (
+		typeof navigator !== 'undefined' &&
+		'serviceWorker' in navigator &&
+		'PushManager' in window &&
+		'Notification' in window &&
+		location.protocol === 'https:'
+	)
 }
 
 function key(): Uint8Array<ArrayBuffer> | undefined {
 	let text = document.getElementById('push-key')?.textContent
 	let encoded: unknown
-	try { encoded = JSON.parse(text ?? 'null') } catch { return undefined }
+	try {
+		encoded = JSON.parse(text ?? 'null')
+	} catch {
+		return undefined
+	}
 	if (typeof encoded !== 'string') return undefined
 	let raw = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'))
 	return Uint8Array.from(raw, (c) => c.charCodeAt(0))
@@ -26,14 +36,41 @@ function available(): boolean {
 // A readable name for this device, for the device list.
 function device(): string {
 	let ua = navigator.userAgent
-	let os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'Device'
-	let app = matchMedia('(display-mode: standalone)').matches ? 'Home Screen app' : /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'browser'
+	let os = /iPhone/.test(ua)
+		? 'iPhone'
+		: /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+			? 'iPad'
+			: /Android/.test(ua)
+				? 'Android'
+				: /Mac OS/.test(ua)
+					? 'Mac'
+					: /Windows/.test(ua)
+						? 'Windows'
+						: /Linux/.test(ua)
+							? 'Linux'
+							: 'Device'
+	let app = matchMedia('(display-mode: standalone)').matches
+		? 'Home Screen app'
+		: /Edg\//.test(ua)
+			? 'Edge'
+			: /Firefox\//.test(ua)
+				? 'Firefox'
+				: /Chrome\//.test(ua)
+					? 'Chrome'
+					: /Safari\//.test(ua)
+						? 'Safari'
+						: 'browser'
 	return `${os} · ${app}`
 }
 
 function send(subscription: PushSubscription): void {
 	let json = subscription.toJSON()
-	if (json.endpoint && json.keys?.p256dh && json.keys.auth) connection.send({ type: 'push-subscribe', subscription: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }, device: push.device() })
+	if (json.endpoint && json.keys?.p256dh && json.keys.auth)
+		connection.send({
+			type: 'push-subscribe',
+			subscription: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } },
+			device: push.device(),
+		})
 }
 
 type Devices = Extract<Event, { type: 'push-devices' }>
@@ -105,7 +142,9 @@ async function enable(): Promise<void> {
 	if (!push.supported() || !publicKey || !ready) throw new Error('push needs an HTTPS home-screen app')
 	// subscribe() is invoked synchronously by the tap, before any await:
 	// iOS requires the subscription prompt to be user-initiated.
-	let subscription = push.state.subscription ?? await ready.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: publicKey })
+	let subscription =
+		push.state.subscription ??
+		(await ready.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: publicKey }))
 	push.state.subscription = subscription
 	setMine(subscription.endpoint)
 	push.send(subscription)
@@ -114,7 +153,12 @@ async function enable(): Promise<void> {
 async function start(changed: () => void = () => {}): Promise<void> {
 	if (!push.supported()) return
 	let registration: ServiceWorkerRegistration
-	try { registration = await navigator.serviceWorker.register('/sw.js') } catch (e: any) { setFailed(`service worker failed: ${e?.message ?? e}`); return changed() }
+	try {
+		registration = await navigator.serviceWorker.register('/sw.js')
+	} catch (e: any) {
+		setFailed(`service worker failed: ${e?.message ?? e}`)
+		return changed()
+	}
 	push.state.registration = registration
 	setReady(true)
 	// A lost subscription must not hide the Turn on button.
@@ -127,7 +171,11 @@ async function start(changed: () => void = () => {}): Promise<void> {
 
 function visibility(id?: string): void {
 	if (typeof document === 'undefined' || !connection.connected() || !id) return
-	connection.send({ type: 'visibility', sessionId: id, visible: document.visibilityState === 'visible' && document.hasFocus() })
+	connection.send({
+		type: 'visibility',
+		sessionId: id,
+		visible: document.visibilityState === 'visible' && document.hasFocus(),
+	})
 }
 
 function badge(tabs: Tab[]): void {
@@ -136,4 +184,27 @@ function badge(tabs: Tab[]): void {
 	void (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {})
 }
 
-export const push = { onEvent, history, watchHistory, noticed, state, supported, key, available, device, send, devices, setDevices, mine, status, problem, enable, disable, remove, test, start, visibility, badge }
+export const push = {
+	onEvent,
+	history,
+	watchHistory,
+	noticed,
+	state,
+	supported,
+	key,
+	available,
+	device,
+	send,
+	devices,
+	setDevices,
+	mine,
+	status,
+	problem,
+	enable,
+	disable,
+	remove,
+	test,
+	start,
+	visibility,
+	badge,
+}

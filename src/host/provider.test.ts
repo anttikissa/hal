@@ -28,7 +28,11 @@ async function all<T>(it: AsyncIterable<T>): Promise<T[]> {
 
 // Echo provider: every SSE data line is one JSON event, passed through.
 const echo: Provider = {
-	request: (req) => ({ url: `https://example.test/${req.model}`, headers: { 'x-key': 'k' }, body: { model: req.model, n: req.messages.length } }),
+	request: (req) => ({
+		url: `https://example.test/${req.model}`,
+		headers: { 'x-key': 'k' },
+		body: { model: req.model, n: req.messages.length },
+	}),
 	async *parse(messages) {
 		for await (let m of messages) yield JSON.parse(m.data) as StreamEvent
 	},
@@ -74,7 +78,8 @@ afterEach(() => {
 })
 
 test('SSE framing survives arbitrary chunk boundaries', async () => {
-	let text = ': comment\r\nevent: a\r\ndata: {"x":1}\r\n\r\ndata: line1\ndata: line2\n\nevent: b\ndata:no-space\n\ndata: [DONE]\n\ndata: tail'
+	let text =
+		': comment\r\nevent: a\r\ndata: {"x":1}\r\n\r\ndata: line1\ndata: line2\n\nevent: b\ndata:no-space\n\ndata: [DONE]\n\ndata: tail'
 	let expected: SseMessage[] = [
 		{ event: 'a', data: '{"x":1}' },
 		{ event: undefined, data: 'line1\nline2' },
@@ -101,7 +106,10 @@ test('model id selects the registered provider and the request goes out as JSON'
 	provider.register('fake', echo)
 	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })])))
 	let events = await all(provider.stream('fake/m1', req))
-	expect(events).toEqual([{ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' }])
+	expect(events).toEqual([
+		{ type: 'text', text: 'ok' },
+		{ type: 'done', reason: 'end' },
+	])
 	expect(calls).toHaveLength(1)
 	expect(calls[0]!.url).toBe('https://example.test/m1')
 	expect(calls[0]!.init.method).toBe('POST')
@@ -130,7 +138,12 @@ test('HTTP error status becomes one error event carrying status and body', async
 
 test('nothing follows a terminal event', async () => {
 	provider.register('fake', echo)
-	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' }, { type: 'text', text: 'late' }, { type: 'error', message: 'x' })])))
+	fakeFetch(
+		() =>
+			new Response(
+				body([sse({ type: 'done', reason: 'end' }, { type: 'text', text: 'late' }, { type: 'error', message: 'x' })]),
+			),
+	)
 	expect(await all(provider.stream('fake/m1', req))).toEqual([{ type: 'done', reason: 'end' }])
 })
 
@@ -205,7 +218,9 @@ test('failures are classified by what fixes them, with the provider message', as
 		expect(e.message).toContain('prompt is too long')
 	}
 	fakeFetch(() => Promise.reject(new Error('ECONNRESET')))
-	expect(await all(provider.stream('fake/m1', req))).toEqual([expect.objectContaining({ type: 'error', failure: 'temporary', message: expect.stringContaining('ECONNRESET') })])
+	expect(await all(provider.stream('fake/m1', req))).toEqual([
+		expect.objectContaining({ type: 'error', failure: 'temporary', message: expect.stringContaining('ECONNRESET') }),
+	])
 	// Cut off mid-stream (no done), or an overloaded error inside the stream.
 	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'partial' })])))
 	let cut = await all(provider.stream('fake/m1', req))
@@ -252,7 +267,11 @@ test('the reset time can come from a date, a unix time header or the body', asyn
 	provider.register('fake', echo)
 	let cases: [ResponseInit, string, number][] = [
 		[{ status: 429, headers: { 'retry-after': new Date(now + 60_000).toUTCString() } }, '{}', now + 60_000],
-		[{ status: 429, headers: { 'anthropic-ratelimit-unified-reset': String((now + 3 * 3600_000) / 1000) } }, '{}', now + 3 * 3600_000],
+		[
+			{ status: 429, headers: { 'anthropic-ratelimit-unified-reset': String((now + 3 * 3600_000) / 1000) } },
+			'{}',
+			now + 3 * 3600_000,
+		],
 		[{ status: 429 }, '{"error":{"type":"usage_limit_reached","resets_in_seconds":7200}}', now + 7200_000],
 		[{ status: 429 }, `{"error":{"resets_at":${(now + 5000_000) / 1000}}}`, now + 5000_000],
 	]
@@ -274,7 +293,8 @@ test('a 429 limits the whole account, every model on it, and the host may rotate
 test("a model's own credits running out (credits_required) limits only that model", async () => {
 	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
 	// The body Anthropic sends when Fable's usage credits are spent (4 Oct).
-	let spent = '{"type":"error","error":{"type":"rate_limit_error","message":"Usage credits are required for this model.","details":{"error_code":"credits_required","disabled_reason":"out_of_credits","model":"claude-fable-5"}}}'
+	let spent =
+		'{"type":"error","error":{"type":"rate_limit_error","message":"Usage credits are required for this model.","details":{"error_code":"credits_required","disabled_reason":"out_of_credits","model":"claude-fable-5"}}}'
 	fakeFetch(() => new Response(spent, { status: 429, headers: { 'retry-after': '3600' } }))
 	await all(provider.stream('fake/fable', req))
 	expect(limits.on('fake/fable', 'a@x')).toBe(now + 3600_000)
@@ -283,10 +303,25 @@ test("a model's own credits running out (credits_required) limits only that mode
 
 test("every response's usage windows are kept for its account, a 429's too", async () => {
 	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
-	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' })]), { headers: { 'x-codex-primary-used-percent': '10', 'x-codex-primary-window-minutes': '300' } }))
+	fakeFetch(
+		() =>
+			new Response(body([sse({ type: 'done', reason: 'end' })]), {
+				headers: { 'x-codex-primary-used-percent': '10', 'x-codex-primary-window-minutes': '300' },
+			}),
+	)
 	await all(provider.stream('fake/m1', req))
 	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(10)
-	fakeFetch(() => new Response('{}', { status: 429, headers: { 'x-codex-primary-used-percent': '100', 'x-codex-primary-window-minutes': '300', 'x-codex-primary-reset-after-seconds': '7200' } }))
+	fakeFetch(
+		() =>
+			new Response('{}', {
+				status: 429,
+				headers: {
+					'x-codex-primary-used-percent': '100',
+					'x-codex-primary-window-minutes': '300',
+					'x-codex-primary-reset-after-seconds': '7200',
+				},
+			}),
+	)
 	await all(provider.stream('fake/m1', req))
 	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(100)
 	// No reset in the 429 itself: the spent window says when.
@@ -295,7 +330,11 @@ test("every response's usage windows are kept for its account, a 429's too", asy
 
 test('a 401 tells the provider which account was rejected', async () => {
 	let rejected: string[] = []
-	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }), rejected: (a) => void rejected.push(a) })
+	provider.register('fake', {
+		...echo,
+		request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }),
+		rejected: (a) => void rejected.push(a),
+	})
 	fakeFetch(() => new Response('{}', { status: 401 }))
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e.failure).toBe('auth')
@@ -304,13 +343,27 @@ test('a 401 tells the provider which account was rejected', async () => {
 
 test('an account out of credits is set aside and the host rotates at once, not after a rate limit', async () => {
 	let spent: string[] = []
-	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'k' }), spent: (a) => void spent.push(a) })
+	provider.register('fake', {
+		...echo,
+		request: (r) => ({ ...(echo.request(r) as any), account: 'k' }),
+		spent: (a) => void spent.push(a),
+	})
 	// OpenAI says it with a 429; Anthropic with a 400.
-	fakeFetch(() => Response.json({ error: { message: 'You exceeded your current quota', code: 'insufficient_quota' } }, { status: 429 }))
+	fakeFetch(() =>
+		Response.json(
+			{ error: { message: 'You exceeded your current quota', code: 'insufficient_quota' } },
+			{ status: 429 },
+		),
+	)
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e).toMatchObject({ failure: 'auth', retryAt: now })
 	expect(limits.until(limits.key('fake/m1', 'k'))).toBe(0)
-	fakeFetch(() => Response.json({ error: { message: 'Your credit balance is too low to access the Anthropic API.' } }, { status: 400 }))
+	fakeFetch(() =>
+		Response.json(
+			{ error: { message: 'Your credit balance is too low to access the Anthropic API.' } },
+			{ status: 400 },
+		),
+	)
 	await all(provider.stream('fake/m1', req))
 	// A plain 429 is only a rate limit.
 	fakeFetch(() => new Response('{}', { status: 429 }))
@@ -320,7 +373,12 @@ test('an account out of credits is set aside and the host rotates at once, not a
 
 test('a model refused for the account plan sets that account aside for the model and rotates at once', async () => {
 	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
-	fakeFetch(() => Response.json({ detail: "The 'm1' model is not supported when using Codex with a ChatGPT account." }, { status: 400 }))
+	fakeFetch(() =>
+		Response.json(
+			{ detail: "The 'm1' model is not supported when using Codex with a ChatGPT account." },
+			{ status: 400 },
+		),
+	)
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
 	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + provider.planLimitMs)
@@ -335,7 +393,9 @@ test('errors thrown while building the request keep their failure and reset time
 		},
 	})
 	fakeFetch(() => new Response(''))
-	expect(await all(provider.stream('fake/m1', req))).toEqual([expect.objectContaining({ failure: 'limited', retryAt: now + 1000 })])
+	expect(await all(provider.stream('fake/m1', req))).toEqual([
+		expect.objectContaining({ failure: 'limited', retryAt: now + 1000 }),
+	])
 	expect(calls).toHaveLength(0)
 })
 
@@ -343,7 +403,10 @@ test('errors thrown while building the request keep their failure and reset time
 test('a wake drops the open stream as a temporary failure, not a cancel', async () => {
 	provider.register('fake', echo)
 	let enc = new TextEncoder()
-	fakeFetch(() => new Response(new ReadableStream({ start: (c) => c.enqueue(enc.encode(sse({ type: 'text', text: 'first' }))) })))
+	fakeFetch(
+		() =>
+			new Response(new ReadableStream({ start: (c) => c.enqueue(enc.encode(sse({ type: 'text', text: 'first' }))) })),
+	)
 	let events: StreamEvent[] = []
 	for await (let e of provider.stream('fake/m1', req)) {
 		events.push(e)

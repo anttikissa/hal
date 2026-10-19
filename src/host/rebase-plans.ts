@@ -20,10 +20,18 @@ import { tokenCalibration } from './token-calibration.ts'
 
 function build(id: string): RebaseRows {
 	let raw = history.readSync(id)
-	if (states.busy(status.stateOf(id)) || history.state.running.has(id) || forms.open(raw)) throw new Error('Pause the session and answer or dismiss its question before rebasing.')
-	let blobSizes: Record<string, number> = {}, dir = blobs.dir(id)
-	if (existsSync(dir)) for (let name of readdirSync(dir)) blobSizes[name.split('.')[0]!] = statSync(`${dir}/${name}`).size
-	return rebaseRows.build(raw, { model: sessions.open(id).model, ratios: tokenCalibration.ratios(), blobSizes, pruned: pruning.saved(id).omitted })
+	if (states.busy(status.stateOf(id)) || history.state.running.has(id) || forms.open(raw))
+		throw new Error('Pause the session and answer or dismiss its question before rebasing.')
+	let blobSizes: Record<string, number> = {},
+		dir = blobs.dir(id)
+	if (existsSync(dir))
+		for (let name of readdirSync(dir)) blobSizes[name.split('.')[0]!] = statSync(`${dir}/${name}`).size
+	return rebaseRows.build(raw, {
+		model: sessions.open(id).model,
+		ratios: tokenCalibration.ratios(),
+		blobSizes,
+		pruned: pruning.saved(id).omitted,
+	})
 }
 
 function broadcast(id: string, from: number): void {
@@ -34,21 +42,35 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 	let current = rebasePlans.build(c.sessionId)
 	let agent = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent
 	agent.fresh(history.readSync(c.sessionId), c.base)
-	let snapshot = rebaseRows.build(history.readSync(c.sessionId).filter((r) => r.n! <= c.base), current.options)
+	let snapshot = rebaseRows.build(
+		history.readSync(c.sessionId).filter((r) => r.n! <= c.base),
+		current.options,
+	)
 	let parsed = c.todo === undefined ? undefined : rebaseRows.parse(c.todo, snapshot, c.replacements)
 	if (parsed?.aborted) return 'Rebase aborted.'
-	if (parsed?.edits.length) throw new Error(`Rebase edits missing full text: ${parsed.edits.map((n) => rebaseRows.cardOf(snapshot.rows, n)).join(', ')}`)
-	let plan = parsed?.plan ?? c.plan!, queue = parsed?.queue ?? []
-	if (c.paused && queue.length) throw new Error('--paused cannot be combined with queue lines; remove the queue lines or --paused before applying.')
+	if (parsed?.edits.length)
+		throw new Error(
+			`Rebase edits missing full text: ${parsed.edits.map((n) => rebaseRows.cardOf(snapshot.rows, n)).join(', ')}`,
+		)
+	let plan = parsed?.plan ?? c.plan!,
+		queue = parsed?.queue ?? []
+	if (c.paused && queue.length)
+		throw new Error('--paused cannot be combined with queue lines; remove the queue lines or --paused before applying.')
 	if (plan.base !== c.base) throw new Error('Rebase plan base does not match the requested base.')
 	// Queue entries must be prompts, not a second channel for slash commands.
-	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/i.test(text))) throw new Error('Rebase queue lines must be prompts, not slash commands.')
+	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/i.test(text)))
+		throw new Error('Rebase queue lines must be prompts, not slash commands.')
 	plan = { ...plan, edit: plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text) }
 	let sums = rebaseRows.totals(snapshot, plan)
 	let continuation = agent.continuation(history.readSync(c.sessionId), plan, c.paused)
 	if (plan.drop.length || plan.edit.length) {
 		// Generate before writing: a diff failure must not partially apply the rebase.
-		let report = (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan, c.paused, continuation)
+		let report = (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(
+			snapshot,
+			plan,
+			c.paused,
+			continuation,
+		)
 		rebases.apply(c.sessionId, { ...plan, base: current.base }, current.base)
 		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
 		slash.output(c.sessionId, report)
@@ -58,16 +80,24 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 		if (refused) throw new Error(refused)
 	}
 	if (!queue.length && (plan.drop.length || plan.edit.length)) agent.continuePrompt(c.sessionId, c.paused, continuation)
-	return plan.drop.length || plan.edit.length ? `History rewritten.${queue.length ? ` Queued ${queue.length} prompts.` : ''}` : queue.length ? `Queued ${queue.length} prompts.` : 'Rebase unchanged.'
+	return plan.drop.length || plan.edit.length
+		? `History rewritten.${queue.length ? ` Queued ${queue.length} prompts.` : ''}`
+		: queue.length
+			? `Queued ${queue.length} prompts.`
+			: 'Rebase unchanged.'
 }
 
 function undo(id: string): string {
-	let snapshot = rebasePlans.build(id), raw = history.readSync(id)
+	let snapshot = rebasePlans.build(id),
+		raw = history.readSync(id)
 	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase' && (r.drop.length || r.edit.length))
 	if (!last || last.type !== 'rebase') throw new Error('No rebase to undo.')
 	let plan: RebasePlan = { base: last.base, drop: [], edit: [] }
 	rebases.apply(id, plan, snapshot.base)
-	let before = raw.slice(0, raw.findIndex((r) => r.n === last.n))
+	let before = raw.slice(
+		0,
+		raw.findIndex((r) => r.n === last.n),
+	)
 	rebasePlans.broadcast(id, rebaseRows.totals(rebaseRows.build(before), last).cacheFrom ?? last.base)
 	return 'Rebase undone.'
 }
@@ -75,7 +105,8 @@ function undo(id: string): string {
 // Hides records ns and their linked records with one rebase, so
 // /rebase undo restores them. Throws when the session is busy or stale.
 function drop(id: string, ns: number[], options: { continuing?: boolean } = {}): void {
-	let raw = history.readSync(id), groups = rebase.groups(replay.current(raw))
+	let raw = history.readSync(id),
+		groups = rebase.groups(replay.current(raw))
 	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop: ns, edit: [] }, undefined, options)
 	rebasePlans.broadcast(id, Math.min(...ns.flatMap((n) => [...(groups.get(n) ?? [n])])))
 }
@@ -83,7 +114,13 @@ function drop(id: string, ns: number[], options: { continuing?: boolean } = {}):
 // What an amend leaves in place after its prompt: messages, answers,
 // notices and setting changes stay true whatever the prompt said.
 function survives(r: HistoryRecord): boolean {
-	return r.type === 'inbox' || r.type === 'answer' || r.type === 'notice' || r.type === 'change' || (r.type === 'output' && r.change !== undefined)
+	return (
+		r.type === 'inbox' ||
+		r.type === 'answer' ||
+		r.type === 'notice' ||
+		r.type === 'change' ||
+		(r.type === 'output' && r.change !== undefined)
+	)
 }
 
 // /edit undo (task hx8): one plan on the edit's base replaces the edit
@@ -95,11 +132,22 @@ function unamend(id: string): string {
 	let raw = history.readSync(id)
 	if (forms.open(raw)) throw new Error('Answer or dismiss the open question before undoing the edit.')
 	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase')
-	if (last?.type !== 'rebase' || !last.quiet) throw new Error('Nothing to undo: the latest history rewrite is not an edit.')
-	let current = replay.current(raw), at = current.findIndex((r) => r.n! > last.n!)
+	if (last?.type !== 'rebase' || !last.quiet)
+		throw new Error('Nothing to undo: the latest history rewrite is not an edit.')
+	let current = replay.current(raw),
+		at = current.findIndex((r) => r.n! > last.n!)
 	let edited = current.find((r) => r.type === 'user' && r.amends !== undefined && r.n! > last.n!)
 	if (edited?.type !== 'user') throw new Error('Nothing to undo: the edited prompt is gone.')
-	rebases.apply(id, { base: last.base, drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])), edit: [] }, raw.at(-1)?.n ?? 0, { quiet: true })
+	rebases.apply(
+		id,
+		{
+			base: last.base,
+			drop: current.slice(at).flatMap((r) => (r.n === undefined || survives(r) ? [] : [r.n])),
+			edit: [],
+		},
+		raw.at(-1)?.n ?? 0,
+		{ quiet: true },
+	)
 	rebasePlans.broadcast(id, edited.amends!)
 	return `Edit undone: prompt u${edited.amends} and its partial output are back.`
 }
@@ -109,20 +157,33 @@ function unamend(id: string): string {
 // then the edited text sent as a new prompt. Returns why it is refused,
 // if it is.
 function rewind(id: string, n: number, text: string, command?: string): string | undefined {
-	let raw = history.readSync(id), state = status.stateOf(id, raw).type
+	let raw = history.readSync(id),
+		state = status.stateOf(id, raw).type
 	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
-	let current = replay.current(raw), at = current.findIndex((r) => r.n === n), target = current[at]
-	let mine = target?.type === 'user' && target.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
+	let current = replay.current(raw),
+		at = current.findIndex((r) => r.n === n),
+		target = current[at]
+	let mine =
+		target?.type === 'user' &&
+		target.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
 	if (!mine) return `${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
 	let later = current.slice(at)
-	if (later.some((r) => r.type === 'compact' || r.type === 'reset')) return `u${n} is before the latest compaction or clear.`
+	if (later.some((r) => r.type === 'compact' || r.type === 'reset'))
+		return `u${n} is before the latest compaction or clear.`
 	return prompts.amend(id, text, command, n)
 }
 
 function answer(c: Command & { type: 'rebase-apply' }): Event {
-	let result: Event & { type: 'rebase-result' } = { type: 'rebase-result', sessionId: c.sessionId, command: c.id, ok: true, text: '' }
-	try { result.text = rebasePlans.apply(c) }
-	catch (error) {
+	let result: Event & { type: 'rebase-result' } = {
+		type: 'rebase-result',
+		sessionId: c.sessionId,
+		command: c.id,
+		ok: true,
+		text: '',
+	}
+	try {
+		result.text = rebasePlans.apply(c)
+	} catch (error) {
 		result.ok = false
 		result.text = `${error instanceof Error ? error.message : String(error)}${c.recoveryPath ? `\nRebase files kept at ${c.recoveryPath}` : ''}`
 		slash.output(c.sessionId, result.text, true)

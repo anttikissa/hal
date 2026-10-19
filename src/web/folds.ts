@@ -71,7 +71,8 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	if (typeof p === 'string') return p
 	scroll.follow(() => {
 		for (let item of p.items) {
-			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
+			let result =
+				item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
 			folds.set(`${t.meta.id}#${item.key}`, toggle.step(at(item), p.open), result ? [item.key, result] : [item.key])
 		}
 		flush()
@@ -91,7 +92,8 @@ function typed(text: string): boolean {
 // The model's command for the session shown: true if it was one.
 function onEvent(event: Event): boolean {
 	if (event.type === 'paste-text') {
-		if (draft?.accept(event) && app.state.view.modal?.blocks && app.sessionId() === draft.sessionId) app.setView({ ...app.state.view, modal: hinted(app.state.view.modal) })
+		if (draft?.accept(event) && app.state.view.modal?.blocks && app.sessionId() === draft.sessionId)
+			app.setView({ ...app.state.view, modal: hinted(app.state.view.modal) })
 		return true
 	}
 	if (event.type !== 'toggle') return false
@@ -122,13 +124,15 @@ function open(): void {
 // The dialog's field typed into: a new hint, Tab's list gone.
 function input(text: string): void {
 	let m = app.state.view.modal
-	if (m?.compact && m.form) app.setView({ ...app.state.view, modal: folds.hinted({ ...m, form: forms.set(m.form, 0, text) }) })
+	if (m?.compact && m.form)
+		app.setView({ ...app.state.view, modal: folds.hinted({ ...m, form: forms.set(m.form, 0, text) }) })
 }
 
 // A key on the dialog: Enter runs /toggle, Escape closes, Tab
 // completes the block id before `cursor`.
 function key(k: Key, cursor?: number): void {
-	let m = app.state.view.modal, t = app.state.view.transcript
+	let m = app.state.view.modal,
+		t = app.state.view.transcript
 	if (!m?.compact) return
 	if (k.key === 'tab') {
 		if (!t) return
@@ -136,7 +140,10 @@ function key(k: Key, cursor?: number): void {
 		app.setView({ ...app.state.view, modal: next })
 		// The caret stays after the completed id, not at the end.
 		let field = document.activeElement
-		if (field instanceof HTMLInputElement) { flush(); field.setSelectionRange(next.form!.cursor, next.form!.cursor) }
+		if (field instanceof HTMLInputElement) {
+			flush()
+			field.setSelectionRange(next.form!.cursor, next.form!.cursor)
+		}
 		return
 	}
 	if (k.key !== 'enter' && k.key !== 'escape') return
@@ -150,7 +157,10 @@ function key(k: Key, cursor?: number): void {
 		flush()
 		app.rewrite((p) => {
 			let result = draft!.expand(p)
-			if (typeof result === 'string') { app.setNotice(result); return p }
+			if (typeof result === 'string') {
+				app.setNotice(result)
+				return p
+			}
 			return result
 		})
 		draft = undefined

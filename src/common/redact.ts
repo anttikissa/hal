@@ -9,7 +9,10 @@ const secretKey = String.raw`[\w-]*(?:token(?!s)|secret|password|api[_-]?key|aut
 
 const patterns: [RegExp, string][] = [
 	// key: 'value', "key": "value", key=value, Authorization: Bearer x
-	[new RegExp(String.raw`(["']?${secretKey}["']?\s*[:=]\s*)(?:(?:Bearer|Basic)\s+)?(["']?)[^\s"',&}]+\2`, 'gi'), `$1$2${MASK}$2`],
+	[
+		new RegExp(String.raw`(["']?${secretKey}["']?\s*[:=]\s*)(?:(?:Bearer|Basic)\s+)?(["']?)[^\s"',&}]+\2`, 'gi'),
+		`$1$2${MASK}$2`,
+	],
 	[/\b(Bearer|Basic)\s+[\w.~+/=-]+/g, `$1 ${MASK}`],
 	// Provider key prefixes (Anthropic, OpenAI, GitHub, Slack) and JWTs.
 	[/\bsk-[\w-]{16,}/g, MASK],

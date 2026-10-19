@@ -50,7 +50,11 @@ export const handover = {
 		later()
 	},
 	pending(): boolean {
-		try { return Date.now() - statSync(handoverPath()).mtimeMs < 10_000 } catch { return false }
+		try {
+			return Date.now() - statSync(handoverPath()).mtimeMs < 10_000
+		} catch {
+			return false
+		}
 	},
 	done: () => rmSync(handoverPath(), { force: true }),
 }
@@ -66,15 +70,35 @@ function later(): void {
 // Ctrl-R in the host's terminal asks it too (main.ts).
 function flagged(): FlaggedCall[] {
 	let now = Date.now()
-	return [...turns.state.running].flatMap(([id, running]) => [...running.unsafe ?? []].map(([call, unsafe]) => {
-		let n = history.readSync(id).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
-		let key = n === undefined ? undefined : `t${n}`
-		return { block: key ?? tabs.label(id), ...(key && { href: transcript.href(id, key) }), title: toolDetails.headline('bash', unsafe.input).text, ms: now - unsafe.at }
-	})).concat([...jobs.state.running].flatMap(([id, job]) => {
-		if (!job.unsafe) return []
-		let key = `t${id.slice(job.sessionId.length + 1)}`
-		return [{ block: key, href: transcript.href(job.sessionId, key), title: toolDetails.headline('bash', job.unsafe.input).text, ms: now - job.unsafe.at }]
-	}))
+	return [...turns.state.running]
+		.flatMap(([id, running]) =>
+			[...(running.unsafe ?? [])].map(([call, unsafe]) => {
+				let n = history
+					.readSync(id)
+					.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
+				let key = n === undefined ? undefined : `t${n}`
+				return {
+					block: key ?? tabs.label(id),
+					...(key && { href: transcript.href(id, key) }),
+					title: toolDetails.headline('bash', unsafe.input).text,
+					ms: now - unsafe.at,
+				}
+			}),
+		)
+		.concat(
+			[...jobs.state.running].flatMap(([id, job]) => {
+				if (!job.unsafe) return []
+				let key = `t${id.slice(job.sessionId.length + 1)}`
+				return [
+					{
+						block: key,
+						href: transcript.href(job.sessionId, key),
+						title: toolDetails.headline('bash', job.unsafe.input).text,
+						ms: now - job.unsafe.at,
+					},
+				]
+			}),
+		)
 }
 
 export const command: SlashCommand = {
@@ -90,10 +114,19 @@ export const command: SlashCommand = {
 			'Agents: use only with user consent.',
 		].join('\n'),
 	complete: (args) => scopes.filter((s) => s.startsWith(args.trim())),
-	describeCompletion: (args) => ({ all: 'restart the host and every connected client (default)', host: 'restart the host', both: 'restart the host and this client', local: 'restart this client (ctrl-r)' } as Record<string, string>)[args]!,
+	describeCompletion: (args) =>
+		(
+			{
+				all: 'restart the host and every connected client (default)',
+				host: 'restart the host',
+				both: 'restart the host and this client',
+				local: 'restart this client (ctrl-r)',
+			} as Record<string, string>
+		)[args]!,
 	run: (args, _answers, ctx) => {
 		let [scope = 'all', anyway] = args.trim().split(/\s+/).filter(Boolean)
-		if (anyway !== undefined && anyway !== 'anyway') return { error: `unknown argument ${anyway}; use /restart [scope] anyway` }
+		if (anyway !== undefined && anyway !== 'anyway')
+			return { error: `unknown argument ${anyway}; use /restart [scope] anyway` }
 		let calls = restartGuard.flagged()
 		if (!calls.length) refused.clear()
 		let model = ctx.sender?.origin === 'model'
@@ -113,10 +146,18 @@ export const command: SlashCommand = {
 			}
 		}
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })
-		else if (scope !== 'host' && scope !== 'both') return { error: scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }
+		else if (scope !== 'host' && scope !== 'both')
+			return {
+				error:
+					scope === 'local'
+						? 'only a client can restart itself; use /restart host'
+						: `unknown scope ${scope}; use ${scopes.join(', ')}`,
+			}
 		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`)
 		let asker = clients.state.senders.get(ctx.sessionId)
-		serverLog.log(`restart ${scope} requested in ${ctx.sessionId} by ${model ? 'the model' : asker ? serverLog.client(asker) : 'a client'}`)
+		serverLog.log(
+			`restart ${scope} requested in ${ctx.sessionId} by ${model ? 'the model' : asker ? serverLog.client(asker) : 'a client'}`,
+		)
 		later()
 		return { say: scope === 'all' ? 'restarting the host and every client' : 'restarting the host' }
 	},

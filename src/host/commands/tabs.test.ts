@@ -14,7 +14,9 @@ test('/tabs includes all closed sessions beyond the resume cache and records clo
 	let a = sessions.create({ cwd: '/tmp', name: 'First' }).id
 	let b = sessions.create({ cwd: '/tmp', name: 'Second' }).id
 	let c = sessions.create({ cwd: '/tmp', name: 'Third' }).id
-	tabs.insert(a, 0); tabs.insert(b, 1); tabs.insert(c, 2)
+	tabs.insert(a, 0)
+	tabs.insert(b, 1)
+	tabs.insert(c, 2)
 	let ctx = { sessionId: a, cwd: '/tmp', model: 'hal/intro', setCwd() {}, setModel() {}, say() {} }
 	expect(tabs.close(b)).toBeUndefined()
 	sessions.open(b).closedAt = '2026-01-01T00:00:00.000Z'

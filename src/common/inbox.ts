@@ -32,8 +32,7 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 			if (n !== undefined) item.n = n
 			Object.assign(item, inbox.sender(r))
 			waiting.set(r.id, item)
-		}
-		else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
+		} else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
 	}
 	let all = [...waiting.values()]
 	return [...all.filter((m) => m.delivery !== 'after-turn'), ...all.filter((m) => m.delivery === 'after-turn')]
@@ -58,7 +57,11 @@ function sender(s: Sender): Sender {
 // Provenance a waiting message retains when delivered. Next-round and
 // after-this-turn messages do not interrupt; delivery belongs to each text.
 function provenance(item: InboxItem): Sender {
-	return { ...inbox.sender(item), delivery: item.delivery ?? 'now', ...((item.delivery === 'after-turn') && item.ts !== undefined ? { queuedAt: item.ts } : {}) }
+	return {
+		...inbox.sender(item),
+		delivery: item.delivery ?? 'now',
+		...(item.delivery === 'after-turn' && item.ts !== undefined ? { queuedAt: item.ts } : {}),
+	}
 }
 
 // What leads a waiting message's compact row (task 16):

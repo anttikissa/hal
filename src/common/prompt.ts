@@ -170,7 +170,8 @@ function vertical(st: PromptState, dir: -1 | 1, width: number): PromptState {
 	let { row, col } = promptLayout.position(st.text, rows, st.cursor)
 	let goal = st.goal ?? col
 	let target = row + dir
-	let cursor = target < 0 ? 0 : target >= rows.length ? st.text.length : promptLayout.offsetAt(st.text, rows, target, goal)
+	let cursor =
+		target < 0 ? 0 : target >= rows.length ? st.text.length : promptLayout.offsetAt(st.text, rows, target, goal)
 	return { ...st, cursor, goal }
 }
 
@@ -204,7 +205,11 @@ function indent(st: PromptState, out: boolean): PromptState {
 	let after = before.replace(pattern, put)
 	if (after === before) return st
 	let map = (o: number) =>
-		o < first ? o : o >= last ? o + after.length - before.length : first + before.slice(0, o - first).replace(pattern, put).length
+		o < first
+			? o
+			: o >= last
+				? o + after.length - before.length
+				: first + before.slice(0, o - first).replace(pattern, put).length
 	let next: PromptState = { ...st, text: text.slice(0, first) + after + text.slice(last), cursor: map(cursor) }
 	if (st.anchor !== undefined) next.anchor = map(st.anchor)
 	if (!out && sel) {
@@ -234,7 +239,8 @@ function withoutTyped(st: PromptState): PromptState {
 function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 	let mod = (k.ctrl ? 'C' : '') + (k.alt ? 'M' : '') + (k.cmd ? 's' : '')
 	let name = `${mod}-${k.key}`
-	if (name === 'C-/' || name === 's-z' || name === 's-u') return { state: prompt.withoutTyped(promptUndo.undo(st, !!k.shift)) }
+	if (name === 'C-/' || name === 's-z' || name === 's-u')
+		return { state: prompt.withoutTyped(promptUndo.undo(st, !!k.shift)) }
 	let r = prompt.apply(st, k, width)
 	if (r.action?.type === 'submit') return r
 	let typed = k.text !== undefined && mod === '' && k.key !== 'paste'

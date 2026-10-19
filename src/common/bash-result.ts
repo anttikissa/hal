@@ -27,7 +27,10 @@ function status(output: string): string | undefined {
 	return code === 'exit 0' ? undefined : code
 }
 
-function failure(result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' }, bash = false): string | undefined {
+function failure(
+	result: { output: string; isError?: boolean; interrupted?: 'canceled' | 'stopped' },
+	bash = false,
+): string | undefined {
 	if (result.interrupted) return undefined
 	return (bash ? bashResult.status(result.output) : undefined) ?? (result.isError ? 'failed' : undefined)
 }
@@ -49,4 +52,14 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 }
 
 // Stored job labels identify literal Bash output and its original call.
-export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, exit, status, failure, duration, interrupted }
+export const bashResult = {
+	background: (item: Shown) =>
+		item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined,
+	display,
+	trim,
+	exit,
+	status,
+	failure,
+	duration,
+	interrupted,
+}

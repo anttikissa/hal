@@ -19,24 +19,30 @@ import { titles } from '../../common/titles.ts'
 import { target } from '../target.ts'
 import { CardReference } from './CardReference.tsx'
 
-export function Question(props: { item: Item & { type: 'question' } & { key: string }; form: FormState; session: string }) {
+export function Question(props: {
+	item: Item & { type: 'question' } & { key: string }
+	form: FormState
+	session: string
+}) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
 	let parts = createMemo(() => hrefs.urlParts(form().text))
 	// The focused field takes the focus (its chosen option, for a group).
 	// The memo gates on equality: other updates re-run an effect's
 	// callback, and a focus() then would clear a reader's selection.
-	let at = createMemo(() => [props.form.focus, props.form.values[props.form.focus]] as const, { equals: (a, b) => a[0] === b[0] && a[1] === b[1] })
-	createEffect(
-		at,
-		([focus, value]) => {
-			let node = fields[focus]
-			let target = node instanceof HTMLInputElement ? node : [...(node?.querySelectorAll('button') ?? [])].find((b) => b.value === value)
-			// focus() runs the focus and blur handlers here, inside the
-			// effect; they read the state as of the event.
-			if (target && target !== document.activeElement) untrack(() => target.focus())
-		},
-	)
+	let at = createMemo(() => [props.form.focus, props.form.values[props.form.focus]] as const, {
+		equals: (a, b) => a[0] === b[0] && a[1] === b[1],
+	})
+	createEffect(at, ([focus, value]) => {
+		let node = fields[focus]
+		let target =
+			node instanceof HTMLInputElement
+				? node
+				: [...(node?.querySelectorAll('button') ?? [])].find((b) => b.value === value)
+		// focus() runs the focus and blur handlers here, inside the
+		// effect; they read the state as of the event.
+		if (target && target !== document.activeElement) untrack(() => target.focus())
+	})
 	// Rotating placeholders repaint when their text next changes; with
 	// reduced motion the first stays.
 	let [now, setNow] = createSignal(Date.now())
@@ -58,7 +64,39 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 	}
 	return (
 		<form class="Question question" onSubmit={submit}>
-			<CardHeader time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<CardReference href={target.href(props.session, titles.blockId(props.item))} id={titles.blockId(props.item)} />} actions={<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}><Icon name="close" /></button>} />
+			<CardHeader
+				time={titles.time(props.item.ts)}
+				label={
+					<For each={parts()}>
+						{(part) =>
+							typeof part === 'string' ? (
+								part
+							) : (
+								<a href={external(part.href)} target="_blank" rel="noopener noreferrer">
+									{part.text}
+								</a>
+							)
+						}
+					</For>
+				}
+				reference={
+					<CardReference
+						href={target.href(props.session, titles.blockId(props.item))}
+						id={titles.blockId(props.item)}
+					/>
+				}
+				actions={
+					<button
+						type="button"
+						class="dismiss"
+						aria-label="Dismiss"
+						title="Dismiss (Esc)"
+						onClick={() => app.sendForm({ type: 'cancel' })}
+					>
+						<Icon name="close" />
+					</button>
+				}
+			/>
 			<Show when={form().quote}>
 				{(quote) => (
 					<pre class="quote">
@@ -70,7 +108,19 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 				{(field, i) =>
 					field.type === 'choice' ? (
 						<div role="group" aria-label={field.label ?? form().text} ref={(el) => (fields[untrack(i)] = el)}>
-							{field.inline ? <span style={{ 'min-width': `${Math.max(...form().fields.map((f) => (f.type === 'choice' && f.inline ? (f.label?.length ?? 0) + 1 : 0)))}ch` }}>{field.label ? `${field.label}:` : ''}</span> : field.label ? `${field.label}: ` : ''}
+							{field.inline ? (
+								<span
+									style={{
+										'min-width': `${Math.max(...form().fields.map((f) => (f.type === 'choice' && f.inline ? (f.label?.length ?? 0) + 1 : 0)))}ch`,
+									}}
+								>
+									{field.label ? `${field.label}:` : ''}
+								</span>
+							) : field.label ? (
+								`${field.label}: `
+							) : (
+								''
+							)}
 							{field.help ? <div>{field.help}</div> : null}
 							<For each={field.options}>
 								{(option) => (
@@ -100,7 +150,9 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 								inputmode={field.type === 'integer' ? 'numeric' : undefined}
 								aria-label={field.label ?? form().text}
 								autocomplete="off"
-								placeholder={field.type === 'text' ? forms.example(props.form, i(), now()).text || undefined : undefined}
+								placeholder={
+									field.type === 'text' ? forms.example(props.form, i(), now()).text || undefined : undefined
+								}
 								value={props.form.values[i()] ?? ''}
 								onInput={(e) => app.formInput(i(), e.currentTarget.value)}
 								onFocus={() => app.formFocus(i())}
@@ -110,7 +162,10 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 				}
 			</For>
 			<Show when={form().fields.some((f) => f.type !== 'choice') || form().fields.length > 1}>
-				<button class="answer"><Icon name="check" />Answer</button>
+				<button class="answer">
+					<Icon name="check" />
+					Answer
+				</button>
 			</Show>
 		</form>
 	)

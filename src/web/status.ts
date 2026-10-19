@@ -19,12 +19,13 @@ export type UsageWindow = { name: string; used: number; resets?: string }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 // Model-specific windows (7d_sonnet) are left out, as in /status.
-const general = (plan: { windows: Record<string, number> }) => Object.keys(plan.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))
+const general = (plan: { windows: Record<string, number> }) =>
+	Object.keys(plan.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))
 
 function context(st: ViewState): StatusPart | undefined {
 	let stats = st.transcript?.stats
 	if (!stats?.window) return
-	let percent = Math.round((stats.context ?? 0) / stats.window * 100)
+	let percent = Math.round(((stats.context ?? 0) / stats.window) * 100)
 	return { text: `${percent}%`, heat: clamp(percent) }
 }
 
@@ -47,7 +48,13 @@ function windows(st: ViewState): UsageWindow[] {
 	if (!plan) return []
 	let data = subscriptions.plan(plan)
 	let length = (name: string) => usageWindows.minutes(name) ?? Infinity
-	let out: UsageWindow[] = general(data).sort((a, b) => length(a) - length(b)).map((name) => ({ name, used: clamp(data.windows[name]!), ...(data.resets[name] && { resets: data.resets[name] }) }))
+	let out: UsageWindow[] = general(data)
+		.sort((a, b) => length(a) - length(b))
+		.map((name) => ({
+			name,
+			used: clamp(data.windows[name]!),
+			...(data.resets[name] && { resets: data.resets[name] }),
+		}))
 	let moot = usageWindows.moot(out)
 	return out.filter((w) => !moot.has(w.name))
 }
@@ -57,20 +64,26 @@ function groups(st: ViewState): StatusGroup[] {
 	let t = st.transcript
 	if (!t) return []
 	let { meta, stats } = t
-	let kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 1000)}k`
+	let kilo = (n: number) => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
 	let out: StatusGroup[] = [
 		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
 		{ parts: [{ text: meta.cwd }], path: true },
 		{ parts: [{ text: titles.modelLabel(meta.model, stats?.effort, true) }] },
 	]
-	if (stats?.files) out.push({ parts: [{ text: `${stats.files} file${stats.files === 1 ? '' : 's'}` }], href: `/${meta.id}/changes` })
+	if (stats?.files)
+		out.push({ parts: [{ text: `${stats.files} file${stats.files === 1 ? '' : 's'}` }], href: `/${meta.id}/changes` })
 	let pct = status.context(st)
-	if (stats?.window) out.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, pct!, { text: ')' }], href: `/context/${meta.id}` })
+	if (stats?.window)
+		out.push({
+			parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, pct!, { text: ')' }],
+			href: `/context/${meta.id}`,
+		})
 	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
 	if (stats?.plan) {
 		let plan = stats.plan
 		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		for (let [name, percent] of Object.entries(subscriptions.plan(plan).windows)) parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: clamp(percent) })
+		for (let [name, percent] of Object.entries(subscriptions.plan(plan).windows))
+			parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: clamp(percent) })
 		out.push({ parts })
 	}
 	return out

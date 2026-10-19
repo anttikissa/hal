@@ -9,7 +9,14 @@ import { itemView } from './item-view.ts'
 // at, from its first render here, pads it with blank rows at its end,
 // also after it stops streaming, until the next full redraw (render.draw
 // forgets them all). In memory only, per block and width.
-function high(peaks: Map<string, number>, rows: string[], item: Item, cols: number, session: string | undefined, streams: boolean): string[] {
+function high(
+	peaks: Map<string, number>,
+	rows: string[],
+	item: Item,
+	cols: number,
+	session: string | undefined,
+	streams: boolean,
+): string[] {
 	let id = `${cols} ${session} ${item.key}`
 	let peak = peaks.get(id)
 	if (peak === undefined && !streams) return rows
@@ -26,8 +33,16 @@ function high(peaks: Map<string, number>, rows: string[], item: Item, cols: numb
 // bottom. Blank card rows at its end keep the tallest height drawn at
 // this width and fold state until the next full redraw; folding with
 // /collapse starts afresh.
-function card(peaks: Map<string, number>, lines: string[], start: number, id: string, style: Style | undefined, cols: number): void {
-	let height = lines.length - start, peak = peaks.get(id) ?? 0
+function card(
+	peaks: Map<string, number>,
+	lines: string[],
+	start: number,
+	id: string,
+	style: Style | undefined,
+	cols: number,
+): void {
+	let height = lines.length - start,
+		peak = peaks.get(id) ?? 0
 	if (height >= peak) peaks.set(id, height)
 	else for (let n = height; n < peak; n++) lines.push(ansi.paint('', style, cols))
 }

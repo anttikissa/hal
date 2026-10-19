@@ -44,7 +44,9 @@ test('/theme writes a portable selector the loader applies live; hal, the built-
 	expect(a.of('output').at(-1)!.error).toBeFalsy()
 	let text = readFileSync(file(), 'utf8')
 	expect(text).toContain('export const portable = true\n')
-	expect(text).toContain(`export { default } from '${relative(realpathSync(plugins.dir()), realpathSync(themes))}/classic.ts'\n`)
+	expect(text).toContain(
+		`export { default } from '${relative(realpathSync(plugins.dir()), realpathSync(themes))}/classic.ts'\n`,
+	)
 	field = await ask()
 	expect(field.options[field.initial]).toBe('classic')
 	await plugins.init()

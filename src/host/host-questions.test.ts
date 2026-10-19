@@ -137,7 +137,15 @@ test('a secret reaches whoever asked but history only records that it was given;
 	synthetic.models.login = (records, answers) => {
 		heard.push(answers)
 		if (!records.some((r) => r.type === 'answer'))
-			return { ask: { text: 'Log in', fields: [{ type: 'secret', name: 'key', label: 'API key' }, { type: 'choice', name: 'save', options: ['yes', 'no'] }] } }
+			return {
+				ask: {
+					text: 'Log in',
+					fields: [
+						{ type: 'secret', name: 'key', label: 'API key' },
+						{ type: 'choice', name: 'save', options: ['yes', 'no'] },
+					],
+				},
+			}
 		return { say: answers?.key ? 'logged in' : 'no key' }
 	}
 	let a = client()
@@ -145,7 +153,12 @@ test('a secret reaches whoever asked but history only records that it was given;
 	a.conn.send({ type: 'submit', sessionId: id, text: 'log me in' })
 	await until(() => transcript.question(a.views.get(id)))
 	let q = transcript.question(a.views.get(id))!
-	for (let answers of [{ key: 'k' }, { key: 'k', save: 'maybe' }, { key: 'k', save: 'yes', extra: 'x' }, { key: 1, save: 'yes' }]) {
+	for (let answers of [
+		{ key: 'k' },
+		{ key: 'k', save: 'maybe' },
+		{ key: 'k', save: 'yes', extra: 'x' },
+		{ key: 1, save: 'yes' },
+	]) {
 		a.conn.send({ type: 'answer', sessionId: id, question: q.id, answers })
 	}
 	expect(a.of('rejected')).toHaveLength(4)
@@ -162,16 +175,24 @@ const field = (c: ReturnType<typeof client>, id: string) => transcript.question(
 
 async function reply(c: ReturnType<typeof client>, id: string, name: string, value: string, next?: string) {
 	await until(() => field(c, id)?.name === name)
-	c.conn.send({ type: 'answer', sessionId: id, question: transcript.question(c.views.get(id))!.id, answers: name === 'toolCards' ? { toolCards: value, thinkingCards: value } : { [name]: value } })
+	c.conn.send({
+		type: 'answer',
+		sessionId: id,
+		question: transcript.question(c.views.get(id))!.id,
+		answers: name === 'toolCards' ? { toolCards: value, thinkingCards: value } : { [name]: value },
+	})
 	if (next) await until(() => field(c, id)?.name === next)
 }
 
 test('intro resumes through profile, save, model and secret search setup', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
 	await reply(c, id, 'name', 'Rowan', 'login')
-	expect(texts(c.views.get(id)!)[0]).toBe('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have six questions for you.')
+	expect(texts(c.views.get(id)!)[0]).toBe(
+		'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have six questions for you.',
+	)
 	// A restart between steps keeps answers in history.
 	host.reset()
 	sessions.closeAll()
@@ -180,7 +201,9 @@ test('intro resumes through profile, save, model and secret search setup', async
 	// An environment key alone still gets the sign-in offer.
 	expect(field(c, id)?.name).toBe('login')
 	await reply(c, id, 'login', 'Skip', 'model')
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(
+		'<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\n',
+	)
 	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your name to ${home}/USER.md.`)
 	let options = (field(c, id) as { options: string[] }).options
 	// Friendly names of the aliases a credential can use, never ids.
@@ -190,7 +213,9 @@ test('intro resumes through profile, save, model and secret search setup', async
 	await reply(c, id, 'search', 'Yes', 'key')
 	await reply(c, id, 'key', 'secret-SERPER-123', 'toolCards')
 	// Sample cards come first: a thinking card and a real ls -l.
-	expect(c.views.get(id)!.items.some((i) => i.type === 'thinking') && c.views.get(id)!.items.some((i) => i.type === 'tool')).toBe(true)
+	expect(
+		c.views.get(id)!.items.some((i) => i.type === 'thinking') && c.views.get(id)!.items.some((i) => i.type === 'tool'),
+	).toBe(true)
 	expect(field(c, id)).toMatchObject({ inline: true, cards: 'tool' })
 	await reply(c, id, 'toolCards', 'long', 'theme')
 	expect(readFileSync(paths.configFile(), 'utf8')).toContain('long')
@@ -202,7 +227,9 @@ test('intro resumes through profile, save, model and secret search setup', async
 	await until(() => c.of('turn-end').length > 0)
 	expect(apiKeys.get('serper')).toBe('secret-SERPER-123')
 	expect(statSync(paths.authFile()).mode & 0o777).toBe(0o600)
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\nLanguage and tone: US English\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(
+		'<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\nLanguage and tone: US English\n',
+	)
 	expect(readFileSync(history.file(id), 'utf8')).not.toContain('secret-SERPER-123')
 	expect(JSON.stringify(c.events)).not.toContain('secret-SERPER-123')
 	expect(sessions.open(id).model).toStartWith('anthropic/')
@@ -211,9 +238,17 @@ test('intro resumes through profile, save, model and secret search setup', async
 
 test('with no credential the intro offers /login, pauses for it and goes on once signed in', async () => {
 	apiKeys.save('serper', 'existing-key')
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-	expect(texts(await (async () => { await until(() => field(c, id)); return c.views.get(id)! })())[0]).toContain('five questions')
+	expect(
+		texts(
+			await (async () => {
+				await until(() => field(c, id))
+				return c.views.get(id)!
+			})(),
+		)[0],
+	).toContain('five questions')
 	await reply(c, id, 'name', '', 'login')
 	// Nothing answered, nothing saved.
 	expect(profile.text()).toBe('')
@@ -222,7 +257,9 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	expect(c.of('command').at(-1)?.text).toBe('/login opencode')
 	// The intro's paused turn end comes first, then the login it started.
 	let records = history.readSync(id)
-	expect(records.findLastIndex((r) => r.type === 'turn_end')).toBeLessThan(records.findLastIndex((r) => r.type === 'command'))
+	expect(records.findLastIndex((r) => r.type === 'turn_end')).toBeLessThan(
+		records.findLastIndex((r) => r.type === 'command'),
+	)
 	await reply(c, id, 'key', 'test-key', 'toolCards')
 	await reply(c, id, 'toolCards', 'short', 'theme')
 	await reply(c, id, 'theme', 'hal', 'language')
@@ -236,7 +273,8 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 
 test('the Serper step never traps: Maybe later, an empty key or Escape moves on and says how to set it up later', async () => {
 	for (let skip of ['later', 'empty', 'escape']) {
-		let c = client(), id = created(c)
+		let c = client(),
+			id = created(c)
 		c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
 		await reply(c, id, 'name', '', 'login')
 		await reply(c, id, 'login', 'Skip', 'search')
@@ -260,7 +298,8 @@ test('the Serper step never traps: Maybe later, an empty key or Escape moves on 
 test('/intro switches a tab back to hal/intro and greets again at once', async () => {
 	apiKeys.save('serper', 'existing-key')
 	synthetic.models.asker = () => ({ say: 'ok' })
-	let c = client(), id = created(c, 'hal/asker')
+	let c = client(),
+		id = created(c, 'hal/asker')
 	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 	await until(() => field(c, id)?.name === 'name')
 	expect(sessions.open(id).model).toBe('hal/intro')
@@ -274,7 +313,9 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	// A rerun offers the saved name.
 	profile.save({ Name: 'Rowan' })
 	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
-	await until(() => texts(c.views.get(id)!).filter((t) => t.includes('HAL 9001')).length === 2 && field(c, id)?.name === 'name')
+	await until(
+		() => texts(c.views.get(id)!).filter((t) => t.includes('HAL 9001')).length === 2 && field(c, id)?.name === 'name',
+	)
 	expect(field(c, id)).toMatchObject({ initial: 'Rowan' })
 	// An emptied field removes the saved value; Escape keeps it.
 	profile.save({ 'Language and tone': 'Terse' })
@@ -285,7 +326,9 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	expect(field(c, id)).toMatchObject({ initial: 'Terse' })
 	c.conn.send({ type: 'pause', sessionId: id })
 	await until(() => c.of('turn-end').filter((e) => e.status === 'completed').length === 2)
-	expect(profile.text()).toBe('<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nLanguage and tone: Terse\n')
+	expect(profile.text()).toBe(
+		'<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nLanguage and tone: Terse\n',
+	)
 	expect(texts(c.views.get(id)!).join('\n')).toContain('I removed your name from')
 })
 
@@ -293,21 +336,32 @@ test('text typed outside a question asks whether to go on; No ends the intro', (
 	let ts = new Date().toISOString()
 	let records: HistoryRecord[] = [
 		{ type: 'user', blocks: [{ type: 'text', text: 'hi' }], ts },
-		{ type: 'assistant', block: { type: 'text', text: 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.' }, ts },
+		{
+			type: 'assistant',
+			block: { type: 'text', text: 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.' },
+			ts,
+		},
 		{ type: 'user', blocks: [{ type: 'text', text: 'open the pod bay doors' }], ts },
 	]
 	let first = intro.run(records)
-	expect(first.say).toBe('I see you typed: "open the pod bay doors" — but I\'m not a language model, so I can\'t understand you.')
+	expect(first.say).toBe(
+		'I see you typed: "open the pod bay doors" — but I\'m not a language model, so I can\'t understand you.',
+	)
 	expect(first.ask).toMatchObject({ text: 'Continue with the intro?', fields: [{ name: 'intro' }] })
-	expect(intro.run([...records, { type: 'answer', question: 'q', answers: { intro: 'Yes' }, ts }]).ask?.fields[0]?.name).toBe('name')
+	expect(
+		intro.run([...records, { type: 'answer', question: 'q', answers: { intro: 'Yes' }, ts }]).ask?.fields[0]?.name,
+	).toBe('name')
 	let no = intro.run([...records, { type: 'answer', question: 'q', answers: { intro: 'No' }, ts }])
 	expect(no.ask).toBeUndefined()
 })
 
 test('saving the profile rewrites only its fields and keeps everything else byte for byte', () => {
-	let original = '# User\nFreeform notes, kept verbatim.\nName: <name>\n\n## Working preferences\n\nLikes quiet rooms.\nName: stale'
+	let original =
+		'# User\nFreeform notes, kept verbatim.\nName: <name>\n\n## Working preferences\n\nLikes quiet rooms.\nName: stale'
 	writeFileSync(`${home}/USER.md`, original)
 	profile.save({ Name: 'Rowan', 'Language and tone': 'Terse' })
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\nFreeform notes, kept verbatim.\nName: Rowan\nLanguage and tone: Terse\n\n## Working preferences\n\nLikes quiet rooms.')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(
+		'# User\nFreeform notes, kept verbatim.\nName: Rowan\nLanguage and tone: Terse\n\n## Working preferences\n\nLikes quiet rooms.',
+	)
 	expect(statSync(`${home}/USER.md`).mode & 0o777).toBe(0o600)
 })

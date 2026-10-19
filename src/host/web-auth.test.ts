@@ -103,7 +103,8 @@ test('codes are 6 Crockford characters, fresh each time, and a token is valid on
 	for (let code of codes) expect(code).toMatch(/^[0-9a-hjkmnp-tv-z]{6}$/)
 	let out = webAuth.redeem([...codes][0])
 	if (!('token' in out)) throw new Error('code refused')
-	for (let bad of [out.token.toUpperCase(), out.token.slice(1), `${out.token}0`, undefined, 42, ['x']]) expect(webAuth.valid(bad)).toBe(false)
+	for (let bad of [out.token.toUpperCase(), out.token.slice(1), `${out.token}0`, undefined, 42, ['x']])
+		expect(webAuth.valid(bad)).toBe(false)
 	for (let bad of [undefined, 42, {}, 'x'.repeat(10_000)]) expect(webAuth.redeem(bad)).toEqual({ refused: 'wrong' })
 })
 

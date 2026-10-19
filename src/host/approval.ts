@@ -35,7 +35,9 @@ const mktemp = '/tmp/mktemp'
 // is known safe. Any other assignment to the name forgets it.
 function tmpVars(command: string): Map<string, string> {
 	let vars = new Map<string, string>()
-	for (let m of command.matchAll(/(?:^|[\s;])([A-Za-z_]\w*)=(?:(\/tmp\/[^\s;&|]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g)) {
+	for (let m of command.matchAll(
+		/(?:^|[\s;])([A-Za-z_]\w*)=(?:(\/tmp\/[^\s;&|]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g,
+	)) {
 		if (m[2] || m[3]) vars.set(m[1]!, m[2] ?? mktemp)
 		else vars.delete(m[1]!)
 	}
@@ -122,11 +124,19 @@ function marks(command: string): Mark[] {
 			let recursive = flags.some((f) => f === '--recursive' || /^-[a-zA-Z]*[rR]/.test(f))
 			let force = flags.some((f) => f === '--force' || /^-[a-zA-Z]*f/.test(f))
 			let targets = tokens.filter((t) => !t.startsWith('-'))
-			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i])))) found = rm
+			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i]))))
+				found = rm
 		}
 		for (let re of git) found ??= seg.match(re)
 		let print = seg.match(/(?<!\S)(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
-		if (print && !seg.slice(0, print.index).trim() && (print[1]!.match(/"[^"]*"|'[^']*'|[^\s<>]+/g) ?? []).some((t) => approval.sensitive(t.replace(/^['"]|['"]$/g, '')))) found ??= print
+		if (
+			print &&
+			!seg.slice(0, print.index).trim() &&
+			(print[1]!.match(/"[^"]*"|'[^']*'|[^\s<>]+/g) ?? []).some((t) =>
+				approval.sensitive(t.replace(/^['"]|['"]$/g, '')),
+			)
+		)
+			found ??= print
 		if (!found) continue
 		let text = found[0].trimEnd()
 		out.push([from + found.index!, from + found.index! + text.length])
@@ -150,7 +160,12 @@ function form(call: ToolCallBlock): Form | undefined {
 
 // The result the model gets for a call the human said no to.
 function declined(call: ToolCallBlock) {
-	return { type: 'tool_result' as const, id: call.id, output: 'The user declined to run this; it did not run.', isError: true }
+	return {
+		type: 'tool_result' as const,
+		id: call.id,
+		output: 'The user declined to run this; it did not run.',
+		isError: true,
+	}
 }
 
 // The last round's calls, if they are held for approval and none has
@@ -161,7 +176,9 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 	let end = records.findLastIndex((r) => r.type === 'assistant')
 	let start = end
 	while (start > 0 && records[start - 1]!.type === 'assistant') start--
-	let calls = records.slice(start, end + 1).flatMap((r) => (r.type === 'assistant' && r.block.type === 'tool_call' ? [r.block] : []))
+	let calls = records
+		.slice(start, end + 1)
+		.flatMap((r) => (r.type === 'assistant' && r.block.type === 'tool_call' ? [r.block] : []))
 	if (!calls.length) return undefined
 	let ids = new Set(calls.map((c) => c.id))
 	let decided = new Map<string, boolean>()
@@ -182,11 +199,16 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 
 // Shared best-effort sensitive-path policy for READ, shell approval and snapshots.
 function sensitive(path: string): boolean {
-	const secretPaths = /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i
+	const secretPaths =
+		/(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i
 	const privateKeyFiles = /\.(?:pem|key|p12|pfx)$/i
-	const cryptoWalletFiles = /(?:^|\/)(?:wallet\.dat(?:-(?:journal|wal|shm))?|UTC--[^/]+|[^/]+\.keys|exodus\.wallet|nkbihfbeogaeaoehlefnkodbefgpgknn)(?:\/|$)/i
-	const cryptoWalletPaths = /(?:^|\/)(?:(?:\.?electrum|\.electron-cash|electron cash|\.?sparrow)\/(?:[^/]+\/)*wallets|\.?walletwasabi\/client\/wallets|\.config\/solana\/id\.json)(?:\/|$)/i
-	return secretPaths.test(path) || privateKeyFiles.test(path) || cryptoWalletFiles.test(path) || cryptoWalletPaths.test(path)
+	const cryptoWalletFiles =
+		/(?:^|\/)(?:wallet\.dat(?:-(?:journal|wal|shm))?|UTC--[^/]+|[^/]+\.keys|exodus\.wallet|nkbihfbeogaeaoehlefnkodbefgpgknn)(?:\/|$)/i
+	const cryptoWalletPaths =
+		/(?:^|\/)(?:(?:\.?electrum|\.electron-cash|electron cash|\.?sparrow)\/(?:[^/]+\/)*wallets|\.?walletwasabi\/client\/wallets|\.config\/solana\/id\.json)(?:\/|$)/i
+	return (
+		secretPaths.test(path) || privateKeyFiles.test(path) || cryptoWalletFiles.test(path) || cryptoWalletPaths.test(path)
+	)
 }
 
 export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held, sensitive }

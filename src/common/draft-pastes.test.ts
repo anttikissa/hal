@@ -12,7 +12,11 @@ test('expand all draft pastes once, preserving other attachments, caret and newe
 	expect(p.hint(text).hint).toBe('Replace 2 paste markers with their contents (4 lines).')
 	let draft = { text: `new ${text}`, cursor: text.length + 4, anchor: 0 }
 	let expanded = p.expand(draft)
-	expect(expanded).toEqual({ text: `new first\n${marker} [image/ghijkl.png] first\n${marker}`, cursor: 4 + 2 * (`first\n${marker}`).length + ' [image/ghijkl.png] '.length, anchor: 0 })
+	expect(expanded).toEqual({
+		text: `new first\n${marker} [image/ghijkl.png] first\n${marker}`,
+		cursor: 4 + 2 * `first\n${marker}`.length + ' [image/ghijkl.png] '.length,
+		anchor: 0,
+	})
 	expect(draft.text).toBe(`new ${text}`)
 })
 
@@ -33,5 +37,7 @@ test('a pending upload is not fetched or expanded', () => {
 		let p = draftPastes.create('pending-session', marker)
 		expect(p.names).toEqual([])
 		expect(p.expand({ text: marker, cursor: marker.length })).toBe(`Wait for paste upload: ${marker}`)
-	} finally { uploads.state.pending.delete('pending-paste') }
+	} finally {
+		uploads.state.pending.delete('pending-paste')
+	}
 })

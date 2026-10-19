@@ -9,19 +9,29 @@
 import type { HistoryRecord } from './replay.ts'
 import { placeholders, type Shown } from './placeholders.ts'
 
-export type Field = { help?: string } & (
+export type Field = { help?: string } &
 	// One line of text; may be left empty, or prefilled by the host.
 	// A placeholder list rotates (placeholders.rotate), first one first.
-	| { type: 'text'; name: string; label?: string; placeholder?: string | string[]; initial?: string }
-	| { type: 'integer'; name: string; label?: string; initial?: string }
-	// Never put a secret's current value in the form (it goes to history).
-	| { type: 'secret'; name: string; label?: string }
-	// `inline`: options in a row; left and right change it, up and down
-	// move between fields. `cards`: a card kind (card.kinds) whose cards
-	// start as the chosen option while the form is open: a live preview.
-	// `preview: 'theme'`: the terminal shows the chosen theme meanwhile.
-	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number; inline?: true; cards?: string; preview?: 'theme' }
-)
+	(
+		| { type: 'text'; name: string; label?: string; placeholder?: string | string[]; initial?: string }
+		| { type: 'integer'; name: string; label?: string; initial?: string }
+		// Never put a secret's current value in the form (it goes to history).
+		| { type: 'secret'; name: string; label?: string }
+		// `inline`: options in a row; left and right change it, up and down
+		// move between fields. `cards`: a card kind (card.kinds) whose cards
+		// start as the chosen option while the form is open: a live preview.
+		// `preview: 'theme'`: the terminal shows the chosen theme meanwhile.
+		| {
+				type: 'choice'
+				name: string
+				label?: string
+				options: string[]
+				initial?: number
+				inline?: true
+				cards?: string
+				preview?: 'theme'
+		  }
+	)
 
 // `quote`: text shown as it is below the question (a command to
 // approve), with `marks`, [start, end) offsets, highlighted.
@@ -51,12 +61,21 @@ type QuestionRecord = Extract<HistoryRecord, { type: 'question' }>
 // from trusted host code, but a bad one must fail where it is made.
 function invalid(value: unknown): string | undefined {
 	let f = value as Form
-	if (!f || typeof f.text !== 'string' || !Array.isArray(f.fields) || !f.fields.length) return 'a form needs text and fields'
+	if (!f || typeof f.text !== 'string' || !Array.isArray(f.fields) || !f.fields.length)
+		return 'a form needs text and fields'
 	if (f.quote !== undefined) {
 		let q = f.quote
 		if (!q || typeof q.text !== 'string') return 'a quote needs text'
-		let ok = (m: unknown) => Array.isArray(m) && m.length === 2 && Number.isInteger(m[0]) && Number.isInteger(m[1]) && 0 <= m[0] && m[0] <= m[1] && m[1] <= q.text.length
-		if (q.marks !== undefined && (!Array.isArray(q.marks) || !q.marks.every(ok))) return 'quote marks must be [start, end] offsets into its text'
+		let ok = (m: unknown) =>
+			Array.isArray(m) &&
+			m.length === 2 &&
+			Number.isInteger(m[0]) &&
+			Number.isInteger(m[1]) &&
+			0 <= m[0] &&
+			m[0] <= m[1] &&
+			m[1] <= q.text.length
+		if (q.marks !== undefined && (!Array.isArray(q.marks) || !q.marks.every(ok)))
+			return 'quote marks must be [start, end] offsets into its text'
 	}
 	if (f.skip !== undefined && f.skip !== true) return 'skip must be true'
 	let names = new Set<string>()
@@ -64,14 +83,28 @@ function invalid(value: unknown): string | undefined {
 		if (!field || typeof field.name !== 'string' || names.has(field.name)) return 'every field needs a unique name'
 		names.add(field.name)
 		if (field.type === 'choice') {
-			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string')) return `${field.name}: choices need options`
+			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string'))
+				return `${field.name}: choices need options`
 			if (field.inline !== undefined && field.inline !== true) return `${field.name}: inline must be true`
-			if (field.cards !== undefined && typeof field.cards !== 'string') return `${field.name}: cards must be a card kind`
+			if (field.cards !== undefined && typeof field.cards !== 'string')
+				return `${field.name}: cards must be a card kind`
 			if (field.preview !== undefined && field.preview !== 'theme') return `${field.name}: preview must be 'theme'`
-		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer') return `${(field as Field).name}: unknown field type`
-		if ((field.type === 'text' || field.type === 'integer') && field.initial !== undefined && typeof field.initial !== 'string') return `${field.name}: initial must be a string`
+		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer')
+			return `${(field as Field).name}: unknown field type`
+		if (
+			(field.type === 'text' || field.type === 'integer') &&
+			field.initial !== undefined &&
+			typeof field.initial !== 'string'
+		)
+			return `${field.name}: initial must be a string`
 		if (field.help !== undefined && typeof field.help !== 'string') return `${field.name}: help must be a string`
-		if (field.type === 'text' && field.placeholder !== undefined && typeof field.placeholder !== 'string' && !(Array.isArray(field.placeholder) && field.placeholder.every((p) => typeof p === 'string'))) return `${field.name}: placeholder must be a string or a list of strings`
+		if (
+			field.type === 'text' &&
+			field.placeholder !== undefined &&
+			typeof field.placeholder !== 'string' &&
+			!(Array.isArray(field.placeholder) && field.placeholder.every((p) => typeof p === 'string'))
+		)
+			return `${field.name}: placeholder must be a string or a list of strings`
 	}
 	return undefined
 }
@@ -142,7 +175,13 @@ function summary(form: Form, answers: Answers, secrets: string[] = []): string[]
 }
 
 function start(id: string, form: Form): FormState {
-	let values = form.fields.map((f) => (f.type === 'choice' ? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]! : f.type === 'secret' ? '' : f.initial ?? ''))
+	let values = form.fields.map((f) =>
+		f.type === 'choice'
+			? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]!
+			: f.type === 'secret'
+				? ''
+				: (f.initial ?? ''),
+	)
 	return { id, form, values, focus: 0, cursor: values[0]!.length, opened: Date.now() }
 }
 
@@ -151,7 +190,9 @@ function start(id: string, form: Form): FormState {
 function example(st: FormState, index: number, now: number): Shown {
 	let f = st.form.fields[index]
 	let p = f?.type === 'text' ? f.placeholder : undefined
-	return Array.isArray(p) ? placeholders.rotate(p, now - (st.opened ?? now)) : { cut: '', text: p ?? '', next: Infinity }
+	return Array.isArray(p)
+		? placeholders.rotate(p, now - (st.opened ?? now))
+		: { cut: '', text: p ?? '', next: Infinity }
 }
 
 // The form state for question `open` (the transcript's open one): the
@@ -200,7 +241,10 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 		let at = field.options.indexOf(value)
 		let move = key.key === 'up' || key.key === 'left' ? -1 : key.key === 'down' || key.key === 'right' ? 1 : 0
 		// In a row only left and right change it, stopping at the ends.
-		if (field.inline && (key.key === 'left' || key.key === 'right')) return { state: forms.set(st, st.focus, field.options[Math.max(0, Math.min(field.options.length - 1, at + move))]!) }
+		if (field.inline && (key.key === 'left' || key.key === 'right'))
+			return {
+				state: forms.set(st, st.focus, field.options[Math.max(0, Math.min(field.options.length - 1, at + move))]!),
+			}
 		if (field.inline) move = 0
 		let to = at + move
 		if (move && to >= 0 && to < field.options.length) return { state: forms.set(st, st.focus, field.options[to]!) }
@@ -213,7 +257,9 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 			return { state: st, action: { type: 'cancel' } }
 		case 'enter':
 			if (!plain) return { state: st }
-			return last ? { state: st, action: { type: 'submit', answers: forms.answers(st) } } : { state: forms.focusOn(st, st.focus + 1) }
+			return last
+				? { state: st, action: { type: 'submit', answers: forms.answers(st) } }
+				: { state: forms.focusOn(st, st.focus + 1) }
 		case 'tab':
 			return { state: forms.focusOn(st, st.focus + (key.shift ? -1 : 1)) }
 		case 'down':
@@ -226,7 +272,9 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 		let pick = typed ? field.options.find((o) => o.toLowerCase().startsWith(typed)) : undefined
 		if (!pick) return { state: st }
 		let state = forms.set(st, st.focus, pick)
-		return st.form.fields.length === 1 ? { state, action: { type: 'submit', answers: forms.answers(state) } } : { state }
+		return st.form.fields.length === 1
+			? { state, action: { type: 'submit', answers: forms.answers(state) } }
+			: { state }
 	}
 	let put = (text: string, cursor: number) => {
 		let state = forms.set(st, st.focus, text)
@@ -284,4 +332,20 @@ function cards<B extends Record<string, string>>(st: FormState | undefined, bloc
 	return shown?.length ? ({ ...blocks, ...Object.fromEntries(shown) } as B) : blocks
 }
 
-export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, example, set, answers, focusOn, step, command, cards }
+export const forms = {
+	invalid,
+	check,
+	redact,
+	open,
+	quoteParts,
+	summary,
+	start,
+	follow,
+	example,
+	set,
+	answers,
+	focusOn,
+	step,
+	command,
+	cards,
+}

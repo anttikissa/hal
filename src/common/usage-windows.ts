@@ -14,7 +14,10 @@ function minutes(name: string): number | undefined {
 function shortest(windows: Record<string, number>): string | undefined {
 	let names = Object.keys(windows)
 	let length = (name: string) => usageWindows.minutes(name) ?? Infinity
-	return names.reduce<string | undefined>((best, name) => (best === undefined || length(name) < length(best) ? name : best), undefined)
+	return names.reduce<string | undefined>(
+		(best, name) => (best === undefined || length(name) < length(best) ? name : best),
+		undefined,
+	)
 }
 
 // "23:39", or "07:59 on 3 Oct" when not today, in timeZone (default local).
@@ -29,7 +32,9 @@ function reset(at: string, now = Date.now(), timeZone?: string): string {
 // late (a full 7d makes the 5h moot). Status lines leave them out.
 function moot(windows: { name: string; used: number; resets?: string }[]): Set<string> {
 	let end = (w: { resets?: string }) => (w.resets ? Date.parse(w.resets) : Infinity)
-	return new Set(windows.filter((w) => windows.some((o) => o !== w && o.used >= 100 && end(o) >= end(w))).map((w) => w.name))
+	return new Set(
+		windows.filter((w) => windows.some((o) => o !== w && o.used >= 100 && end(o) >= end(w))).map((w) => w.name),
+	)
 }
 
 export const usageWindows = { minutes, shortest, reset, moot }

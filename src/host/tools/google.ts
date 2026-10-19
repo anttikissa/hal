@@ -5,7 +5,11 @@ import { auth } from '../auth.ts'
 import type { Tool } from '../tools.ts'
 
 type Hit = { title?: string; link?: string; snippet?: string }
-type Answer = { organic?: Hit[]; answerBox?: { answer?: string; snippet?: string }; knowledgeGraph?: { title?: string; description?: string } }
+type Answer = {
+	organic?: Hit[]
+	answerBox?: { answer?: string; snippet?: string }
+	knowledgeGraph?: { title?: string; description?: string }
+}
 
 // Serper's answer as plain text: answer box, knowledge graph, then hits.
 function format(data: Answer): string {
@@ -28,7 +32,13 @@ export const tool: Tool & { url: string; format: typeof format } = {
 		type: 'object',
 		properties: {
 			query: { type: 'string', description: 'Search query' },
-			num: { type: 'integer', minimum: 1, maximum: 10, default: defaultNum, description: 'Number of results, at most 10' },
+			num: {
+				type: 'integer',
+				minimum: 1,
+				maximum: 10,
+				default: defaultNum,
+				description: 'Number of results, at most 10',
+			},
 		},
 		required: ['query'],
 	},

@@ -5,10 +5,12 @@ import { status } from '../status.ts'
 import { turns } from '../turns.ts'
 
 export const command: SlashCommand = {
-	help: () => '/intro: rerun the first-run guide in this tab; it switches the tab to hal/intro. Answers already saved stay until you change them.',
+	help: () =>
+		'/intro: rerun the first-run guide in this tab; it switches the tab to hal/intro. Answers already saved stay until you change them.',
 	run(_args, _answers, ctx) {
 		let state = status.stateOf(ctx.sessionId).type
-		if (state !== 'idle' && state !== 'paused' && state !== 'error') return { error: 'finish or pause the current turn first' }
+		if (state !== 'idle' && state !== 'paused' && state !== 'error')
+			return { error: 'finish or pause the current turn first' }
 		let { intro } = require('../intro.ts') as typeof import('../intro.ts')
 		let result = ctx.setModel('hal/intro')
 		ctx.say(intro.restart)

@@ -25,10 +25,21 @@ const transport: Transport = {
 }
 
 function snapshot(id: string): Event {
-	return { type: 'snapshot', sessionId: id, snapshot: { meta: { id, cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' } } }
+	return {
+		type: 'snapshot',
+		sessionId: id,
+		snapshot: { meta: { id, cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' } },
+	}
 }
 
-const start = () => connection.start({ transport, onEvent: (e) => events.push(e), onState: (s) => states.push(s), baseMs: 100, maxMs: 1000 })
+const start = () =>
+	connection.start({
+		transport,
+		onEvent: (e) => events.push(e),
+		onState: (s) => states.push(s),
+		baseMs: 100,
+		maxMs: 1000,
+	})
 const tick = () => Bun.sleep(0)
 // The next retry, run now.
 async function fire(): Promise<number> {
@@ -136,7 +147,10 @@ test('what the client sends on hearing it is connected goes out once', async () 
 		connection.send({ type: 'open', sessionId: 's' })
 	}
 	await connection.start({ transport, onEvent: () => {}, onState, baseMs: 100, maxMs: 1000 })
-	expect(conns[0]!.sent.map(without)).toEqual([{ type: 'tab-start', cwd: '/' }, { type: 'open', sessionId: 's' }])
+	expect(conns[0]!.sent.map(without)).toEqual([
+		{ type: 'tab-start', cwd: '/' },
+		{ type: 'open', sessionId: 's' },
+	])
 })
 
 test('retries back off, capped, and a connection resets the backoff', async () => {
@@ -194,7 +208,13 @@ test('an event that fails its check is not applied: the client gets one plain wa
 	events = []
 	// A host on newer code: an ack without its id, a draft shaped differently,
 	// an event type this client doesn't know, and junk.
-	for (let bad of [{ type: 'ack', tab: 3 }, { type: 'draft', sessionId: 's', draft: { text: 1, rev: 0 } }, { type: 'explode', sessionId: 's' }, 'x']) conns[0]!.deliver(bad as any)
+	for (let bad of [
+		{ type: 'ack', tab: 3 },
+		{ type: 'draft', sessionId: 's', draft: { text: 1, rev: 0 } },
+		{ type: 'explode', sessionId: 's' },
+		'x',
+	])
+		conns[0]!.deliver(bad as any)
 	expect(events.map((e) => e.type)).toEqual(['warning', 'warning', 'warning', 'warning'])
 	let texts = events.map((e) => (e as any).text as string)
 	expect(texts[0]).toContain('ack')

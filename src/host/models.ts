@@ -74,10 +74,14 @@ async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]
 	let controller = new AbortController()
 	let timer = setTimeout(() => controller.abort(), models.timeoutMs)
 	try {
-		let ids = (await Promise.race([
-			list(controller.signal),
-			new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('timed out')))),
-		])).map((m) => `${name}/${m}`)
+		let ids = (
+			await Promise.race([
+				list(controller.signal),
+				new Promise<never>((_, reject) =>
+					controller.signal.addEventListener('abort', () => reject(new Error('timed out'))),
+				),
+			])
+		).map((m) => `${name}/${m}`)
 		if (key !== provider.state.providers[name]?.modelsKey?.()) return undefined
 		models.state.lists.set(name, { at: Date.now(), ids, key })
 		return ids
@@ -99,7 +103,15 @@ function list(current: string): string[] {
 // Asks every provider for its list; settles when all have answered,
 // failed or timed out. Calls while one runs share it.
 function warm(): Promise<void> {
-	return (models.state.warming ??= Promise.all(Object.keys(provider.state.providers).map((name) => models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`)))).then(() => {}).finally(() => { models.state.warming = undefined }))
+	return (models.state.warming ??= Promise.all(
+		Object.keys(provider.state.providers).map((name) =>
+			models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`)),
+		),
+	)
+		.then(() => {})
+		.finally(() => {
+			models.state.warming = undefined
+		}))
 }
 
 // The ids known without asking anyone: synthetic ones, and each
@@ -116,11 +128,18 @@ function known(): string[] {
 // Display names models.dev gives the ids it knows.
 // The model-names event for `ids`: display names, and each model's
 // default effort so clients can leave it unsaid (task r7r).
-function nameEvent(ids: string[]): { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> } | undefined {
+function nameEvent(
+	ids: string[],
+): { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> } | undefined {
 	let names = models.names(ids)
 	let defaults: Record<string, string> = {}
-	for (let id of ids) { let level = models.effort(id); if (level) defaults[id] = level }
-	return Object.keys(names).length || Object.keys(defaults).length ? { type: 'model-names', names, ...(Object.keys(defaults).length && { defaults }) } : undefined
+	for (let id of ids) {
+		let level = models.effort(id)
+		if (level) defaults[id] = level
+	}
+	return Object.keys(names).length || Object.keys(defaults).length
+		? { type: 'model-names', names, ...(Object.keys(defaults).length && { defaults }) }
+		: undefined
 }
 
 function names(ids: string[]): Record<string, string> {
@@ -156,23 +175,67 @@ function resolve(input: string): { id?: string; login?: string } {
 		return access.id ? { id } : access
 	}
 	let version = /^gpt-?(\d+(?:\.\d+)?)$/.exec(family)?.[1]
-	if (!version && !['sol', 'opus', 'astra', 'luna', 'terra', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
-	let own = version || ['sol', 'astra', 'luna', 'terra'].includes(family) ? 'openai' : ['opus', 'sonnet', 'fable', 'haiku'].includes(family) ? 'anthropic' : undefined
-	let candidates = models.known().filter((id) => own ? id.startsWith(`${own}/`) : id.split('/').slice(1).join('/').toLowerCase().includes(family))
+	if (
+		!version &&
+		![
+			'sol',
+			'opus',
+			'astra',
+			'luna',
+			'terra',
+			'sonnet',
+			'fable',
+			'haiku',
+			'kimi',
+			'qwen',
+			'deepseek',
+			'glm',
+			'minimax',
+		].includes(family)
+	)
+		return { id: input }
+	let own =
+		version || ['sol', 'astra', 'luna', 'terra'].includes(family)
+			? 'openai'
+			: ['opus', 'sonnet', 'fable', 'haiku'].includes(family)
+				? 'anthropic'
+				: undefined
+	let candidates = models
+		.known()
+		.filter((id) => (own ? id.startsWith(`${own}/`) : id.split('/').slice(1).join('/').toLowerCase().includes(family)))
 	if (own) {
 		let preferred = version ? `openai/gpt-${version}-sol` : modelAliases.select(family, candidates)
 		candidates = preferred ? [preferred] : []
 	}
 	let providers = own ? [own] : ['opencode-go', 'openrouter']
 	for (let name of providers) {
-		let available = name === 'openai' || name === 'anthropic'
-			? !!(auth.envKey(name as Kind) || (existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length))
-			: !!(apiKeys.get(name === 'opencode-go' ? 'opencode' : name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
+		let available =
+			name === 'openai' || name === 'anthropic'
+				? !!(
+						auth.envKey(name as Kind) ||
+						(existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length)
+					)
+				: !!(
+						apiKeys.get(name === 'opencode-go' ? 'opencode' : name) ||
+						process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY']
+					)
 		if (!available) continue
-		let found = version ? candidates.find((id) => id.startsWith(`${name}/`)) : modelAliases.select(family, candidates.filter((id) => id.startsWith(`${name}/`)))
+		let found = version
+			? candidates.find((id) => id.startsWith(`${name}/`))
+			: modelAliases.select(
+					family,
+					candidates.filter((id) => id.startsWith(`${name}/`)),
+				)
 		if (found) return { id: found }
 	}
-	return { login: own === 'openai' ? '/login chatgpt' : own === 'anthropic' ? '/login claude' : '/login opencode or /login openrouter' }
+	return {
+		login:
+			own === 'openai'
+				? '/login chatgpt'
+				: own === 'anthropic'
+					? '/login claude'
+					: '/login opencode or /login openrouter',
+	}
 }
 
 export const models = {
@@ -198,7 +261,10 @@ export const models = {
 	resolve,
 	// List prices, not subscription charges. Unknown prices stay unknown.
 	pricing(id: string): Pricing | undefined {
-		return modelsDev.info(id)?.pricing ?? (id === 'anthropic/claude-opus-5-5' ? { input: 4, output: 20, cacheRead: .2, cacheWrite: 5 } : undefined)
+		return (
+			modelsDev.info(id)?.pricing ??
+			(id === 'anthropic/claude-opus-5-5' ? { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 } : undefined)
+		)
 	},
 	// Tokens `id` can take in, if known: for the context meter.
 	contextWindow(id: string): number | undefined {
@@ -209,7 +275,11 @@ export const models = {
 	// The reasoning effort requests for `id` set, if any (task hp).
 	effort(id: string, selected?: string): string | undefined {
 		let parsed = blocks.parseModelId(id)
-		return selected ?? effort.describe(id)?.policy ?? (parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
+		return (
+			selected ??
+			effort.describe(id)?.policy ??
+			(parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
+		)
 	},
 	// `carry` is the effort kept when input names none (task 7vt).
 	selection(input: string, carry?: string): { id: string; effort?: string; note?: string } {
@@ -221,8 +291,13 @@ export const models = {
 				let suffix = input.slice(colon + 1)
 				let candidate = input.slice(0, colon)
 				let alias = models.resolve(candidate)
-				if (suffix === 'default' || suffix === 'ultra' || vocabulary.levels.includes(suffix as any)) { base = candidate; level = suffix }
-				else if (models.known().includes(candidate) || alias.id !== candidate || alias.login) throw new Error(`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`)
+				if (suffix === 'default' || suffix === 'ultra' || vocabulary.levels.includes(suffix as any)) {
+					base = candidate
+					level = suffix
+				} else if (models.known().includes(candidate) || alias.id !== candidate || alias.login)
+					throw new Error(
+						`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`,
+					)
 			}
 		}
 		let choice = models.resolve(base)
@@ -230,9 +305,15 @@ export const models = {
 		level ??= carry
 		if (!level || level === 'default') return { id: choice.id }
 		let snapped = effort.nearest(choice.id, level)
-		return { id: choice.id, ...(snapped.level && { effort: snapped.level }), ...(snapped.note && { note: snapped.note }) }
+		return {
+			id: choice.id,
+			...(snapped.level && { effort: snapped.level }),
+			...(snapped.note && { note: snapped.note }),
+		}
 	},
-	qualified(model: string, selected?: string): string { return selected === undefined ? model : `${model}:${selected}` },
+	qualified(model: string, selected?: string): string {
+		return selected === undefined ? model : `${model}:${selected}`
+	},
 	fallback,
 	known,
 	valid,

@@ -7,7 +7,8 @@ afterEach(() => {
 	notices.reset()
 })
 
-const done = (session: string, tab: number) => notices.fromEvent({ type: 'notice', session, tab, name: `S${tab}`, kind: 'done', line: 'ok' })
+const done = (session: string, tab: number) =>
+	notices.fromEvent({ type: 'notice', session, tab, name: `S${tab}`, kind: 'done', line: 'ok' })
 
 test('beyond three, the oldest fold into one line naming their tabs; newest stays last', () => {
 	for (let tab = 1; tab <= 5; tab++) notices.add(done(`s${tab}`, tab))
@@ -21,7 +22,10 @@ test('a newer notice from the same session replaces the old one and moves to the
 	notices.add(done('a', 1))
 	notices.add(done('b', 2))
 	notices.add({ ...done('a', 1), kind: 'failed', line: 'boom' })
-	expect(notices.state.entries.map((n) => [n.session, n.kind])).toEqual([['b', 'done'], ['a', 'failed']])
+	expect(notices.state.entries.map((n) => [n.session, n.kind])).toEqual([
+		['b', 'done'],
+		['a', 'failed'],
+	])
 })
 
 test('each notice goes after its time, one that stays only when its source removes it', async () => {

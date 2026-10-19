@@ -15,13 +15,23 @@ import { transcript, type Transcript } from './transcript.ts'
 // `before` of the page asked for and not answered yet; `earlier`, the
 // snapshot's records from further back (as JSON), shown on top until a
 // page holds them.
-export type Backfill = { loaded: HistoryRecord[]; pages: HistoryRecord[]; earlier: string[]; older?: number; asked?: number }
+export type Backfill = {
+	loaded: HistoryRecord[]
+	pages: HistoryRecord[]
+	earlier: string[]
+	older?: number
+	asked?: number
+}
 
 type Sessions = Map<string, Backfill>
 
 // A snapshot starts over: what was fetched before may be stale.
 function onSnapshot(all: Sessions, event: Event & { type: 'snapshot' }): void {
-	let b: Backfill = { loaded: event.snapshot.history, pages: [], earlier: (event.snapshot.earlier ?? []).map((r) => JSON.stringify(r)) }
+	let b: Backfill = {
+		loaded: event.snapshot.history,
+		pages: [],
+		earlier: (event.snapshot.earlier ?? []).map((r) => JSON.stringify(r)),
+	}
 	if (event.snapshot.older !== undefined) b.older = event.snapshot.older
 	all.set(event.sessionId, b)
 }
@@ -76,7 +86,11 @@ function nearby(ids: string[], shown: string): string[] {
 // The terminal's way: after a snapshot or a page, the command asking
 // for the next page, and once the last is in, the transcript with all
 // of them in front.
-function fetchAll<V extends { transcript?: Transcript }>(all: Sessions, view: V, event: Event & { type: 'snapshot' | 'history' }): { command?: ReturnType<typeof next>; view?: Partial<V> } {
+function fetchAll<V extends { transcript?: Transcript }>(
+	all: Sessions,
+	view: V,
+	event: Event & { type: 'snapshot' | 'history' },
+): { command?: ReturnType<typeof next>; view?: Partial<V> } {
 	if (event.type === 'snapshot') backfill.onSnapshot(all, event)
 	else if (!backfill.onPage(all, event)) return {}
 	let command = backfill.next(all, event.sessionId)

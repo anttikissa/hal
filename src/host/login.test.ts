@@ -21,7 +21,13 @@ import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
 const saved = { HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY }
-const orig = { tokenUrl: auth.tokenUrl, profileUrl: login.profileUrl, pollMs: auth.pollMs, stream: turns.stream, onError: liveFiles.onError }
+const orig = {
+	tokenUrl: auth.tokenUrl,
+	profileUrl: login.profileUrl,
+	pollMs: auth.pollMs,
+	stream: turns.stream,
+	onError: liveFiles.onError,
+}
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let tokenRequests: any[] = []
@@ -98,9 +104,15 @@ test('/login claude asks for the code, exchanges it and writes this home a worki
 	let verifier = code.split('#')[1]
 	let reply = await command.run('claude', { code }, ctx)
 	expect(reply.say).toContain('a@example.com')
-	expect(tokenRequests).toEqual([expect.objectContaining({ grant_type: 'authorization_code', code: 'the-code', code_verifier: verifier })])
+	expect(tokenRequests).toEqual([
+		expect.objectContaining({ grant_type: 'authorization_code', code: 'the-code', code_verifier: verifier }),
+	])
 	expect(statSync(file()).mode & 0o777).toBe(0o600)
-	expect(disk().anthropic).toMatchObject({ accessToken: 'new-access', refreshToken: 'new-refresh', email: 'a@example.com' })
+	expect(disk().anthropic).toMatchObject({
+		accessToken: 'new-access',
+		refreshToken: 'new-refresh',
+		email: 'a@example.com',
+	})
 	expect(await auth.anthropic()).toMatchObject({ type: 'token', value: 'new-access', account: 'a@example.com' })
 })
 
@@ -109,7 +121,10 @@ test('the challenge in the URL is the hash of the verifier the code brings back'
 	let url = new URL(/https:\S+/.exec(reply.ask!.text)![0])
 	let verifier = url.searchParams.get('state')!
 	let hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
-	let expected = btoa(String.fromCharCode(...hash)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+	let expected = btoa(String.fromCharCode(...hash))
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '')
 	expect(url.searchParams.get('code_challenge')).toBe(expected)
 	expect(url.searchParams.get('code_challenge_method')).toBe('S256')
 	// A fresh verifier each time.
@@ -118,7 +133,16 @@ test('the challenge in the URL is the hash of the verifier the code brings back'
 })
 
 test('a login replaces the account with the same email and adds any other, keeping copied ones', async () => {
-	writeFileSync(file(), ason.stringify({ anthropic: [{ accessToken: 'copied', refreshToken: 'r', email: 'b@example.com' }, { accessToken: 'old', refreshToken: 'r', email: 'a@example.com', plan: 'max' }] }), { mode: 0o600 })
+	writeFileSync(
+		file(),
+		ason.stringify({
+			anthropic: [
+				{ accessToken: 'copied', refreshToken: 'r', email: 'b@example.com' },
+				{ accessToken: 'old', refreshToken: 'r', email: 'a@example.com', plan: 'max' },
+			],
+		}),
+		{ mode: 0o600 },
+	)
 	await command.run('claude', { code: await pastedCode() }, ctx)
 	expect(disk().anthropic).toEqual([
 		{ accessToken: 'copied', refreshToken: 'r', email: 'b@example.com' },
@@ -144,16 +168,37 @@ test('a bad code or a refused exchange is an error that never echoes the code, a
 
 test('/login asks for a method; choosing one continues to a secret form without losing other accounts', async () => {
 	let first = await command.run('', undefined, ctx)
-	expect(first.ask?.fields[0]).toMatchObject({ type: 'choice', name: 'method', options: expect.arrayContaining(['Claude subscription', 'ChatGPT subscription', 'Claude API key', 'ChatGPT API key', 'OpenCode API key', 'OpenRouter API key']) })
-	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'subscription', refreshToken: 'refresh', email: 'a@example.com' } }), { mode: 0o600 })
+	expect(first.ask?.fields[0]).toMatchObject({
+		type: 'choice',
+		name: 'method',
+		options: expect.arrayContaining([
+			'Claude subscription',
+			'ChatGPT subscription',
+			'Claude API key',
+			'ChatGPT API key',
+			'OpenCode API key',
+			'OpenRouter API key',
+		]),
+	})
+	writeFileSync(
+		file(),
+		ason.stringify({ anthropic: { accessToken: 'subscription', refreshToken: 'refresh', email: 'a@example.com' } }),
+		{ mode: 0o600 },
+	)
 	let picked = await command.run('', { method: 'Claude API key' }, ctx)
 	expect(picked.ask?.fields[0]).toMatchObject({ type: 'secret', name: 'key' })
 	expect(picked.askArgs).toBe('anthropic-key')
 	await command.run(picked.askArgs!, { key: 'my-key' }, ctx)
-	expect(disk().anthropic).toEqual([expect.objectContaining({ accessToken: 'subscription', refreshToken: 'refresh' }), { apiKey: 'my-key' }])
+	expect(disk().anthropic).toEqual([
+		expect.objectContaining({ accessToken: 'subscription', refreshToken: 'refresh' }),
+		{ apiKey: 'my-key' },
+	])
 	await command.run(picked.askArgs!, { key: 'new-key' }, ctx)
 	expect(disk().anthropic).toHaveLength(2)
-	expect(auth.all('anthropic').list.map((a) => a.entry)).toEqual([expect.objectContaining({ accessToken: 'subscription' }), expect.objectContaining({ apiKey: 'new-key' })])
+	expect(auth.all('anthropic').list.map((a) => a.entry)).toEqual([
+		expect.objectContaining({ accessToken: 'subscription' }),
+		expect.objectContaining({ apiKey: 'new-key' }),
+	])
 	let subscription = await command.run('', { method: 'Claude subscription' }, ctx)
 	expect(subscription.askArgs).toBe('claude')
 	expect(subscription.ask?.fields[0]?.type).toBe('secret')
@@ -193,20 +238,35 @@ test('ANTHROPIC_API_KEY alone needs no file; a login in the file comes first and
 	process.env.ANTHROPIC_API_KEY = 'env-key'
 	expect(await auth.anthropic()).toMatchObject({ type: 'api-key', value: 'env-key' })
 	expect(existsSync(file())).toBe(false)
-	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'file-token', refreshToken: 'r', expires: Date.now() - 1 } }), { mode: 0o600 })
+	writeFileSync(
+		file(),
+		ason.stringify({ anthropic: { accessToken: 'file-token', refreshToken: 'r', expires: Date.now() - 1 } }),
+		{ mode: 0o600 },
+	)
 	auth.close()
 	tokenReply = () => Response.json({ error: 'invalid_grant' }, { status: 400 })
 	// The file's login is broken: the key takes over.
 	expect(await auth.anthropic()).toMatchObject({ type: 'api-key', value: 'env-key' })
-	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'file-token', expires: Date.now() + 3_600_000 } }), { mode: 0o600 })
+	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'file-token', expires: Date.now() + 3_600_000 } }), {
+		mode: 0o600,
+	})
 	auth.close()
 	expect(await auth.anthropic()).toMatchObject({ type: 'token', value: 'file-token' })
 })
 
 // 2 Oct 2026: a plan refusal set an account aside for an hour; logging
 // in again after upgrading the plan left it skipped.
-test('a login makes its account usable again at once, leaving other accounts\' limits', async () => {
-	writeFileSync(file(), ason.stringify({ anthropic: [{ accessToken: 'old', refreshToken: 'r', email: 'a@example.com' }, { accessToken: 'b', refreshToken: 'r', email: 'b@example.com' }] }), { mode: 0o600 })
+test("a login makes its account usable again at once, leaving other accounts' limits", async () => {
+	writeFileSync(
+		file(),
+		ason.stringify({
+			anthropic: [
+				{ accessToken: 'old', refreshToken: 'r', email: 'a@example.com' },
+				{ accessToken: 'b', refreshToken: 'r', email: 'b@example.com' },
+			],
+		}),
+		{ mode: 0o600 },
+	)
 	let later = Date.now() + 3600_000
 	mkdirSync(`${home}/state`)
 	try {
@@ -215,7 +275,9 @@ test('a login makes its account usable again at once, leaving other accounts\' l
 		await command.run('claude', { code: await pastedCode() }, ctx)
 		expect(await auth.anthropic('m')).toMatchObject({ value: 'new-access', account: 'a@example.com' })
 		expect(limits.until(limits.key('anthropic/m', 'b@example.com'))).toBe(later)
-	} finally { limits.close() }
+	} finally {
+		limits.close()
+	}
 })
 
 test('a blocked turn accepts bare /login and /login claude, then resumes after success', async () => {
@@ -244,7 +306,10 @@ test('a blocked turn accepts bare /login and /login claude, then resumes after s
 	await until(() => status.stateOf(id).type === 'blocked')
 	expect((status.stateOf(id) as any).reason).toContain('/login claude')
 
-	let open = () => events.some((e) => e.type === 'question' && !events.some((a) => a.type === 'answer' && (a as any).question === (e as any).id))
+	let open = () =>
+		events.some(
+			(e) => e.type === 'question' && !events.some((a) => a.type === 'answer' && (a as any).question === (e as any).id),
+		)
 	// A failed login blocks again; the question stays answerable. Bare
 	// /login asks twice (method, then code), and the command's questions
 	// never change the turn's state.
@@ -260,9 +325,15 @@ test('a blocked turn accepts bare /login and /login claude, then resumes after s
 		expect((status.stateOf(id) as any).reason).toContain('/login claude')
 		let q = events.findLast((e) => e.type === 'question') as any
 		let state = new URL(/https:\S+/.exec(q.form.text)![0]).searchParams.get('state')
-		conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { code: code === 'right' ? `c#${state}` : 'wrong' } })
+		conn.send({
+			type: 'answer',
+			sessionId: id,
+			question: q.id,
+			answers: { code: code === 'right' ? `c#${state}` : 'wrong' },
+		})
 		await until(() => events.some((e) => e.type === 'answer' && (e as any).question === q.id))
-		if (code === 'wrong') await until(() => status.stateOf(id).type === 'blocked' && (status.stateOf(id) as any).reason !== 'question')
+		if (code === 'wrong')
+			await until(() => status.stateOf(id).type === 'blocked' && (status.stateOf(id) as any).reason !== 'question')
 	}
 	await until(() => events.some((e) => e.type === 'turn-end'))
 	expect(events.find((e) => e.type === 'turn-end')).toMatchObject({ status: 'completed' })

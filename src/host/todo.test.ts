@@ -57,7 +57,8 @@ test('without TODO.md an idle session files the item itself, and bare todo never
 })
 
 test('without TODO.md a busy session delegates to a subagent for one slot, and refuses with none', async () => {
-	let c = client(), parent = toolSession(c)
+	let c = client(),
+		parent = toolSession(c)
 	tabs.insert(parent, 0)
 	sessions.open(parent).slots = 1
 	c.conn.send({ type: 'submit', sessionId: parent, text: 'keep working' })

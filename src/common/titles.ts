@@ -51,7 +51,9 @@ function time(ts: string | undefined): string {
 	let hit = times.get(key)
 	if (hit !== undefined) return hit
 	let d = new Date(ts)
-	let t = Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+	let t = Number.isNaN(d.getTime())
+		? ''
+		: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 	if (t && d.toDateString() !== today) t = `${d.getDate()} ${months[d.getMonth()]} ${t}`
 	times.set(key, t)
 	return t
@@ -101,13 +103,22 @@ function sender(label: string): [string, string | undefined] {
 
 // Receipts describe model delivery, not transport acknowledgement of normal prompts.
 function receipt(item: Shown): 0 | 1 | 2 {
-	return item.type === 'prompt' && !bashResult.background(item) && ((item.delivery === 'next-round') || (item.delivery === 'after-turn') || item.queuedAt) ? item.waiting ? 1 : 2 : 0
+	return item.type === 'prompt' &&
+		!bashResult.background(item) &&
+		(item.delivery === 'next-round' || item.delivery === 'after-turn' || item.queuedAt)
+		? item.waiting
+			? 1
+			: 2
+		: 0
 }
 
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
-	let notes = [item.originSession !== undefined && `in ${item.originSession}`, ...(item.type === 'output' && item.commit?.tags || [])].filter(Boolean)
+	let notes = [
+		item.originSession !== undefined && `in ${item.originSession}`,
+		...((item.type === 'output' && item.commit?.tags) || []),
+	].filter(Boolean)
 	return label !== undefined && notes.length ? `${label} (${notes.join('; ')})` : label
 }
 
@@ -115,28 +126,52 @@ function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt': {
 			let call = bashResult.background(item)
-			let delivery = [item.edited && 'edited; /edit undo to go back', item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && 'next round', item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : (item.delivery === 'after-turn') && 'queued']
+			let delivery = [
+				item.edited && 'edited; /edit undo to go back',
+				item.generatingCommand && `/${item.generatingCommand} continuation`,
+				item.delivery === 'now' && 'steering',
+				item.delivery === 'next-round' && 'next round',
+				item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : item.delivery === 'after-turn' && 'queued',
+			]
 			if (call) return `Output of ${/^\d+$/.test(call) ? `t${call}` : call}`
 			if (item.from === undefined) return tagged(item.origin === 'model' ? 'Hal' : 'You', delivery)
 			let [id, tab] = sender(item.label ?? item.from)
-			return tagged(`From ${item.from || id}`, [tab, item.report === 'question' ? 'question' : item.report === 'summary' ? 'done' : undefined, ...delivery])
+			return tagged(`From ${item.from || id}`, [
+				tab,
+				item.report === 'question' ? 'question' : item.report === 'summary' ? 'done' : undefined,
+				...delivery,
+			])
 		}
 		// Another session's command is headed as the prompt it was sent
 		// as; the human's by itself, over what it said (none alone).
 		case 'command':
-			return item.from !== undefined ? `Command from ${item.label ?? item.from}` : item.output === undefined ? undefined : item.text
+			return item.from !== undefined
+				? `Command from ${item.label ?? item.from}`
+				: item.output === undefined
+					? undefined
+					: item.text
 		// The reply's header names model and effort (task r7r).
 		case 'thinking':
 			return 'Thinking'
 		case 'text':
-			return tagged('Hal', [item.synthetic ? 'synthetic' : item.model && titles.modelLabel(item.model, item.effort), !item.interrupted && !item.naming && (summary.asks(item.text) ? 'question' : summary.extract(item.text) ? 'done' : undefined)])
+			return tagged('Hal', [
+				item.synthetic ? 'synthetic' : item.model && titles.modelLabel(item.model, item.effort),
+				!item.interrupted &&
+					!item.naming &&
+					(summary.asks(item.text) ? 'question' : summary.extract(item.text) ? 'done' : undefined),
+			])
 		case 'output':
 			return item.commit ? (item.commit.amend ? 'Amended' : 'Committed') : item.error ? 'Error' : undefined
 	}
 }
 
 function preview(text: string): string {
-	return text.match(/\S[^\r\n]*/)?.[0]?.replace(/\s+/g, ' ').trim() ?? ''
+	return (
+		text
+			.match(/\S[^\r\n]*/)?.[0]
+			?.replace(/\s+/g, ' ')
+			.trim() ?? ''
+	)
 }
 
 function compact(item: Shown): string | undefined {
@@ -173,7 +208,13 @@ function title(item: Shown): string | undefined {
 function letter(item: Shown): string {
 	switch (item.type) {
 		case 'prompt':
-			return item.from === undefined ? (item.origin === 'model' ? 's' : 'u') : item.label?.startsWith('bash ') ? 's' : 'm'
+			return item.from === undefined
+				? item.origin === 'model'
+					? 's'
+					: 'u'
+				: item.label?.startsWith('bash ')
+					? 's'
+					: 'm'
 		case 'image':
 			return 'u'
 		case 'command':
@@ -198,4 +239,27 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, budget, learn, time, resultTime, stamp, ended, address, receipt, messageHead, preview, compact, hidden, author, who, title, letter, blockId }
+export const titles = {
+	names: {} as Record<string, string>,
+	defaults: {} as Record<string, string>,
+	modelName,
+	shortName,
+	modelLabel,
+	budget,
+	learn,
+	time,
+	resultTime,
+	stamp,
+	ended,
+	address,
+	receipt,
+	messageHead,
+	preview,
+	compact,
+	hidden,
+	author,
+	who,
+	title,
+	letter,
+	blockId,
+}

@@ -70,7 +70,13 @@ function stop(): void {
 }
 
 function createState() {
-	return { started: false, loaded: undefined as string | undefined, head: undefined as string | undefined, newCode: false, timer: undefined as Timer | undefined }
+	return {
+		started: false,
+		loaded: undefined as string | undefined,
+		head: undefined as string | undefined,
+		newCode: false,
+		timer: undefined as Timer | undefined,
+	}
 }
 
 export const version = {

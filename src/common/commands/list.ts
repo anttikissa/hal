@@ -12,7 +12,17 @@ import { keyHelp, type Binding } from '../key-help.ts'
 // `keyArgs`: the arguments the key runs the command with, as /keys shows.
 // `defaultArgs`: Tab fills these for an exact command without arguments.
 export type CommandBinding = { key: string; args?: string }
-export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; bindings?: CommandBinding[]; defaultArgs?: string; clientOnly?: true; hidden?: true }
+export type CommandInfo = {
+	name: string
+	description: string
+	category: string
+	key?: string
+	keyArgs?: string
+	bindings?: CommandBinding[]
+	defaultArgs?: string
+	clientOnly?: true
+	hidden?: true
+}
 
 // Sorted by name.
 const list: CommandInfo[] = [
@@ -31,8 +41,12 @@ const list: CommandInfo[] = [
 	{ name: 'collapse', description: 'collapse cards (t*, 10-24)', category: 'session' },
 	{ name: 'compact', description: 'summarize the context so far', category: 'session' },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
-	{ name: 'edit', description: 'edit a prompt and run it again (up arrow), or undo the last edit', category: 'session' },
-	{ name: 'effort', description: 'set the model\'s effort', category: 'session' },
+	{
+		name: 'edit',
+		description: 'edit a prompt and run it again (up arrow), or undo the last edit',
+		category: 'session',
+	},
+	{ name: 'effort', description: "set the model's effort", category: 'session' },
 	{ name: 'expand', description: 'expand cards (t*, 10-24)', category: 'session' },
 	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f' },
 	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
@@ -65,7 +79,15 @@ const list: CommandInfo[] = [
 	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart local (Ctrl-R) runs in the client; bare (all), host and both
 	// on the host (src/host/commands/restart.ts).
-	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', bindings: [{ key: 'shift-ctrl-r', args: 'all' }], defaultArgs: 'all' },
+	{
+		name: 'restart',
+		description: 'restart everything (all), the host, both, or this client (local)',
+		category: 'app',
+		key: 'ctrl-r',
+		keyArgs: 'local',
+		bindings: [{ key: 'shift-ctrl-r', args: 'all' }],
+		defaultArgs: 'all',
+	},
 	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t', keyArgs: 'last' },
 	{ name: 'send', description: 'send a message or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
@@ -97,7 +119,8 @@ function bindings(c: CommandInfo): CommandBinding[] {
 
 // The command pressing `k` runs, if any.
 function byKey(k: Binding): CommandInfo | undefined {
-	let same = (b: Binding) => b.key === k.key && b.shift === k.shift && b.alt === k.alt && b.ctrl === k.ctrl && b.cmd === k.cmd
+	let same = (b: Binding) =>
+		b.key === k.key && b.shift === k.shift && b.alt === k.alt && b.ctrl === k.ctrl && b.cmd === k.cmd
 	for (let c of commandList.all()) {
 		if (c.key && same(keyHelp.parse(c.key))) return c
 		let b = c.bindings?.find((b) => same(keyHelp.parse(b.key)))

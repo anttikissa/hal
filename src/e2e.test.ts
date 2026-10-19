@@ -20,11 +20,13 @@ let holds: (() => void)[] = []
 // Real streams recorded by scripts/record-anthropic.ts; the fake swaps
 // in only the reply text and the tool command.
 const enc = new TextEncoder()
-const recorded = (name: string) => readFileSync(`${import.meta.dir}/fixtures/anthropic-${name}.sse`, 'utf8').split(/(?<=\n\n)/)
+const recorded = (name: string) =>
+	readFileSync(`${import.meta.dir}/fixtures/anthropic-${name}.sse`, 'utf8').split(/(?<=\n\n)/)
 const textEvents = recorded('text')
 const toolEvents = recorded('tool')
 const data = (raw: string) => JSON.parse(raw.slice(raw.indexOf('data: ') + 6))
-const isDelta = (raw: string, kind: string) => raw.startsWith('event: content_block_delta') && data(raw).delta.type === kind
+const isDelta = (raw: string, kind: string) =>
+	raw.startsWith('event: content_block_delta') && data(raw).delta.type === kind
 const withDelta = (raw: string, delta: object) => {
 	let e = data(raw)
 	return `event: ${e.type}\ndata: ${JSON.stringify({ ...e, delta: { ...e.delta, ...delta } })}\n\n`
@@ -54,7 +56,11 @@ function bashUse(command: string): string[] {
 	let n = toolEvents.filter((e) => isDelta(e, 'input_json_delta') && data(e).delta.partial_json).length
 	let size = Math.ceil(json.length / n)
 	let k = 0
-	return toolEvents.map((e) => (isDelta(e, 'input_json_delta') && data(e).delta.partial_json ? withDelta(e, { partial_json: json.slice(size * k, size * ++k) }) : e))
+	return toolEvents.map((e) =>
+		isDelta(e, 'input_json_delta') && data(e).delta.partial_json
+			? withDelta(e, { partial_json: json.slice(size * k, size * ++k) })
+			: e,
+	)
 }
 
 // A prompt's own text, without the [HH:MM] line and host notes that
@@ -67,10 +73,16 @@ const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d[^\]\n]*\]\n/, '')
 function reply(req: Request, body: any): Response {
 	let messages = body.messages
 	requests.push(messages)
-	let lastBlock = messages.flatMap((m: any) => m.role === 'user' ? m.content : []).findLast((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>'))
+	let lastBlock = messages
+		.flatMap((m: any) => (m.role === 'user' ? m.content : []))
+		.findLast((b: any) => b.type !== 'text' || !b.text.startsWith('<hal-note>'))
 	if (lastBlock.type === 'tool_result') return textReply(`SAW(${String(lastBlock.content).split('\n')[0]})`)
 	let assistant = messages.findLastIndex((m: any) => m.role === 'assistant')
-	if (assistant > messages.findLastIndex((m: any) => m.content.includes(lastBlock)) && messages[assistant].content.some((b: any) => b.type === 'text' && b.text === 'PART1')) return textReply(continued)
+	if (
+		assistant > messages.findLastIndex((m: any) => m.content.includes(lastBlock)) &&
+		messages[assistant].content.some((b: any) => b.type === 'text' && b.text === 'PART1')
+	)
+		return textReply(continued)
 	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
 	if (!prompt.startsWith('hold')) return textReply(`ECHO(${prompt})`)
@@ -93,15 +105,34 @@ beforeEach(() => {
 	holds = []
 	home = mkdtempSync(`${tmpdir()}/hal-e2e-`)
 	mkdirSync(`${home}/secrets`)
-	server = Bun.serve({ port: 0, idleTimeout: 0, fetch: async (req) => {
-		let bytes = new Uint8Array(await req.arrayBuffer())
-		return reply(req, JSON.parse(new TextDecoder().decode(req.headers.get('content-encoding') === 'gzip' ? Bun.gunzipSync(bytes) : bytes)))
-	} })
-	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'fake-key' } }) + '\n', { mode: 0o600 })
+	server = Bun.serve({
+		port: 0,
+		idleTimeout: 0,
+		fetch: async (req) => {
+			let bytes = new Uint8Array(await req.arrayBuffer())
+			return reply(
+				req,
+				JSON.parse(
+					new TextDecoder().decode(req.headers.get('content-encoding') === 'gzip' ? Bun.gunzipSync(bytes) : bytes),
+				),
+			)
+		},
+	})
+	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'fake-key' } }) + '\n', {
+		mode: 0o600,
+	})
 	// Provider tests exercise an already-set-up home; a fresh first tab is hal/intro.
 	mkdirSync(`${home}/sessions/1-ready`, { recursive: true })
 	mkdirSync(`${home}/state`)
-	writeFileSync(`${home}/sessions/1-ready/session.ason`, ason.stringify({ id: '1-ready', cwd: `${import.meta.dir}/..`, model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
+	writeFileSync(
+		`${home}/sessions/1-ready/session.ason`,
+		ason.stringify({
+			id: '1-ready',
+			cwd: `${import.meta.dir}/..`,
+			model: 'anthropic/claude-opus-5-5',
+			createdAt: new Date().toISOString(),
+		}) + '\n',
+	)
 	writeFileSync(`${home}/state/tabs.ason`, ason.stringify({ open: ['1-ready'], closed: [], attention: [] }) + '\n')
 	writeFileSync(
 		`${home}/local.ts`,
@@ -169,7 +200,9 @@ async function until(what: string, check: () => boolean): Promise<void> {
 	while (!check()) {
 		if (Date.now() > deadline) {
 			let err = await Promise.all(procs.map((p) => (p.exit !== undefined ? new Response(p.sub.stderr).text() : '')))
-			throw new Error(`timed out waiting for ${what}\n${procs.map((p) => JSON.stringify(p.out.slice(-500))).join('\n')}\n${err.join('\n')}`)
+			throw new Error(
+				`timed out waiting for ${what}\n${procs.map((p) => JSON.stringify(p.out.slice(-500))).join('\n')}\n${err.join('\n')}`,
+			)
 		}
 		await Bun.sleep(10)
 	}
@@ -178,7 +211,9 @@ async function until(what: string, check: () => boolean): Promise<void> {
 // Output after `from`: what the process has shown since then.
 const seen = (p: Proc, text: string, from = 0) => p.out.indexOf(text, from) >= 0
 const sessionCount = () =>
-	existsSync(`${home}/sessions`) ? readdirSync(`${home}/sessions`).filter((id) => existsSync(`${home}/sessions/${id}/session.ason`)).length : 0
+	existsSync(`${home}/sessions`)
+		? readdirSync(`${home}/sessions`).filter((id) => existsSync(`${home}/sessions/${id}/session.ason`)).length
+		: 0
 const hostReady = () => existsSync(`${home}/state/host.sock`)
 
 // Every turn end in the one session's history: its status.
@@ -209,7 +244,10 @@ test('Escape pauses a turn; it stays paused over a restart and Enter continues i
 
 	let mark = p.out.length
 	type(p, '\x12') // Ctrl-R
-	await until('the conversation after restart', () => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark) && seen(p, ': continue', mark))
+	await until(
+		'the conversation after restart',
+		() => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark) && seen(p, ': continue', mark),
+	)
 	expect(p.exit).toBeUndefined()
 	await Bun.sleep(200)
 	expect(requests).toHaveLength(2)
@@ -254,7 +292,10 @@ test('a second ./run follows the same stream and carries the turn on when the ho
 // deleted temp homes (task ah).
 test('Ctrl-C of the last Hal process kills its command and pauses the turn; the next start leaves it paused', async () => {
 	let marker = `32.${process.pid}3`
-	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let alive = () =>
+		Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`])
+			.stdout.toString()
+			.trim() !== ''
 	let a = run()
 	await until('the seeded tab to be shown', () => seen(a, '1-ready'))
 	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
@@ -275,7 +316,10 @@ test('Ctrl-C of the last Hal process kills its command and pauses the turn; the 
 
 test('a restarted host kills its running command; the next host continues the turn', async () => {
 	let marker = `34.${process.pid}5`
-	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let alive = () =>
+		Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`])
+			.stdout.toString()
+			.trim() !== ''
 	let a = run()
 	await until('the first host', hostReady)
 	let peer = run() // a second Hal process, so the restart pauses nothing
@@ -311,7 +355,14 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	// The model got the cut-off text back, was told, and nothing was sent twice.
 	expect(requests).toHaveLength(4)
 	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text && bare(b.text)))
-	expect(texts.filter((t: string) => !t.startsWith('<hal-note>') && !t.startsWith('ECHO(<hal-note>'))).toEqual(['hold it', 'PART1', continued, 'from b', 'ECHO(from b)', 'from a'])
+	expect(texts.filter((t: string) => !t.startsWith('<hal-note>') && !t.startsWith('ECHO(<hal-note>'))).toEqual([
+		'hold it',
+		'PART1',
+		continued,
+		'from b',
+		'ECHO(from b)',
+		'from a',
+	])
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)

@@ -10,10 +10,17 @@ const srcDir = import.meta.dir
 // Runs a script in a fresh process whose home is `home`, so the real
 // repo-root local.ts (if the user has one) is never involved.
 function run(home: string, script: string) {
-	let out = Bun.spawnSync(['bun', '-e', `(await import(${JSON.stringify(`${srcDir}/host/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}
-${script}`], {
-		timeout: 5000,
-	})
+	let out = Bun.spawnSync(
+		[
+			'bun',
+			'-e',
+			`(await import(${JSON.stringify(`${srcDir}/host/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}
+${script}`,
+		],
+		{
+			timeout: 5000,
+		},
+	)
 	return { stdout: out.stdout.toString(), stderr: out.stderr.toString(), exitCode: out.exitCode }
 }
 

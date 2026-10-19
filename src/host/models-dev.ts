@@ -72,7 +72,9 @@ function lazy(text: string, path: string): Catalog {
 
 // The catalog as cached: JSON, one provider per line.
 function serialize(catalog: Catalog): string {
-	return `{\n${Object.entries(catalog).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`).join(',\n')}\n}`
+	return `{\n${Object.entries(catalog)
+		.map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`)
+		.join(',\n')}\n}`
 }
 
 // Keeps name and context of every model in the api.json answer.
@@ -92,7 +94,8 @@ function parse(data: unknown): Catalog {
 				let prices: Pricing = { input: cost.input, output: cost.output }
 				if (typeof cost.cache_read === 'number') prices.cacheRead = cost.cache_read
 				if (typeof cost.cache_write === 'number') prices.cacheWrite = cost.cache_write
-				if (Object.values(prices).some((n) => !Number.isFinite(n) || n < 0)) throw new Error(`models.dev: invalid cost for ${name}/${id}`)
+				if (Object.values(prices).some((n) => !Number.isFinite(n) || n < 0))
+					throw new Error(`models.dev: invalid cost for ${name}/${id}`)
 				info.pricing = prices
 			}
 			list[id] = info
@@ -112,7 +115,11 @@ async function refresh(picked: string[] = []): Promise<string[]> {
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
 		let body = await res.arrayBuffer()
 		let before = picked.filter((id) => modelsDev.info(id))
-		let reply = await modelsDevWorker.run({ body, file: modelsDev.file(), tmp: `${modelsDev.file()}.${process.pid}.tmp` })
+		let reply = await modelsDevWorker.run({
+			body,
+			file: modelsDev.file(),
+			tmp: `${modelsDev.file()}.${process.pid}.tmp`,
+		})
 		if ('error' in reply) throw new Error(reply.error)
 		modelsDev.state.catalog = modelsDev.lazy(reply.json, modelsDev.file())
 		modelsDev.state.path = modelsDev.file()

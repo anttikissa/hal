@@ -79,7 +79,10 @@ function observe(provider: string, account: string | undefined, headers: Headers
 	let data = usage.store()
 	data[provider] ??= {}
 	let observed = new Date(clock.now()).toISOString()
-	data[provider]![account] = { ...data[provider]![account], ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	data[provider]![account] = {
+		...data[provider]![account],
+		...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])),
+	}
 	usage.publish(provider, account)
 }
 
@@ -146,14 +149,18 @@ function keeps(provider: string, mine: string, best: string): boolean {
 
 // Send account changes once, not a quota copy per session.
 function publish(provider: string, account: string): void {
-	let event = { type: 'subscription-usage' as const, accounts: { [subscriptions.key(provider, account)]: usage.windows(provider, account) } }
+	let event = {
+		type: 'subscription-usage' as const,
+		accounts: { [subscriptions.key(provider, account)]: usage.windows(provider, account) },
+	}
 	for (let client of usage.clients()) client.deliver(event)
 }
 
 function snapshot(): SubscriptionData {
 	let out: SubscriptionData = {}
 	for (let [provider, accounts] of Object.entries(usage.store())) {
-		for (let account of Object.keys(accounts)) out[subscriptions.key(provider, account)] = usage.windows(provider, account)
+		for (let account of Object.keys(accounts))
+			out[subscriptions.key(provider, account)] = usage.windows(provider, account)
 	}
 	return out
 }

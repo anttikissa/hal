@@ -24,14 +24,23 @@ import { busy } from './busy.ts'
 
 export type Run = { done: Promise<string>; stop: (why?: string) => void; output: () => string }
 // `unsafe`: the call was flagged unsafeToStop, so a restart asks first.
-type Job = { sessionId: string; stop: () => void; output?: () => string; unsafe?: { input: Record<string, unknown>; at: number } }
+type Job = {
+	sessionId: string
+	stop: () => void
+	output?: () => string
+	unsafe?: { input: Record<string, unknown>; at: number }
+}
 
 // Starts `command` with bash -c in `cwd`, stdout and stderr merged.
 // `done` is the status line (`[exit N]`, `[timed out after Ns]`, …)
 // then the output, cut past tools.maxChars; it waits for stdout to
 // close. `ms`: kill the group after that long.
 function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: string) => void): Run {
-	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], { cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
+	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], {
+		cwd,
+		detached: true,
+		stdio: ['ignore', 'pipe', 'ignore'],
+	})
 	let kill = () => child.pid !== undefined && tools.killGroup(child.pid)
 	let timer = ms === undefined ? undefined : setTimeout(() => end(`timed out after ${ms / 1000}s`), ms)
 	// Keep the whole result so the cap can retain it in a blob, up to
@@ -76,18 +85,39 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	}
 	child.on('error', (e) => (clearTimeout(timer), (settled = true), reject(e)))
 	child.on('close', (code, sig) => end(sig ? `killed by ${sig}` : `exit ${code}`, false))
-	return { done, stop: (why = 'stopped by the user') => end(why), output: () => `${head}${dropped ? `\n[${dropped} characters dropped]\n` : ''}${tail}` }
+	return {
+		done,
+		stop: (why = 'stopped by the user') => end(why),
+		output: () => `${head}${dropped ? `\n[${dropped} characters dropped]\n` : ''}${tail}`,
+	}
 }
 
 // Runs `command` for session `sessionId` in the background. One that
 // ends within jobs.graceMs (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
-async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run, unsafe?: Record<string, unknown>): Promise<string> {
-	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
+async function start(
+	sessionId: string,
+	command: string,
+	cwd: string,
+	ms?: number,
+	callId?: string,
+	prepared?: () => Run,
+	unsafe?: Record<string, unknown>,
+): Promise<string> {
+	let call = callId
+		? history
+				.readSync(sessionId)
+				.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId)
+		: undefined
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded card id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
-	jobs.state.running.set(id, { sessionId, stop: run.stop, output: run.output, ...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }) })
+	jobs.state.running.set(id, {
+		sessionId,
+		stop: run.stop,
+		output: run.output,
+		...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }),
+	})
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
 	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
@@ -137,16 +167,28 @@ function finish(id: string, out: string): void {
 // Sends `text` to the session as an advisory message from 'bash <id>'.
 function tell(sessionId: string, id: string, text: string): void {
 	jobs.state.delivering.set(id, text)
-	let settled = () => { jobs.state.delivering.delete(id); work.wake(sessionId) }
+	let settled = () => {
+		jobs.state.delivering.delete(id)
+		work.wake(sessionId)
+	}
 	let deliver = () => {
 		try {
-			let refused = prompts.submit(sessionId, text, undefined, 'steer', { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
+			let refused = prompts.submit(sessionId, text, undefined, 'steer', {
+				from: sessionId,
+				label: `bash ${jobs.label(sessionId, id)}`,
+				advisory: true,
+			})
 			if (refused) diag.log(`bash ${id} to ${sessionId}: ${refused}`)
-		} finally { settled() }
+		} finally {
+			settled()
+		}
 	}
 	let ready = host.ready(sessionId)
 	if (!ready) return deliver()
-	ready.then(deliver, (e) => { diag.log(`bash ${id} to ${sessionId}: ${e?.message ?? e}`); settled() })
+	ready.then(deliver, (e) => {
+		diag.log(`bash ${id} to ${sessionId}: ${e?.message ?? e}`)
+		settled()
+	})
 }
 
 // The session's background commands still running here.
@@ -177,11 +219,13 @@ function stop(sessionId: string, ref: string): { refused?: string; stopped?: str
 		return { stopped: list }
 	}
 	if (!ref.trim()) {
-		if (ids.length !== 1) return { refused: ids.length ? `several background jobs run (${list}); name one` : 'no background jobs running' }
+		if (ids.length !== 1)
+			return { refused: ids.length ? `several background jobs run (${list}); name one` : 'no background jobs running' }
 	} else if (n === undefined) return { refused: `not a job number: ${ref.trim()}` }
 	let id = n === undefined ? ids[0]! : `${sessionId}:${n}`
 	let job = jobs.state.running.get(id)
-	if (!job || job.sessionId !== sessionId) return { refused: `t${n} is not running${ids.length ? ` (running: ${list})` : ''}` }
+	if (!job || job.sessionId !== sessionId)
+		return { refused: `t${n} is not running${ids.length ? ` (running: ${list})` : ''}` }
 	job.stop()
 	return { stopped: jobs.label(sessionId, id) }
 }

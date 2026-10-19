@@ -17,13 +17,21 @@ const STATUS = 16
 // The narrowest room worth a command after the title.
 const MIN = 12
 
-const commandLines = (command: string): string[] => command.replace(/\s+$/, '').split('\n').map((l) => strings.expandTabs(ansi.clean(l)))
+const commandLines = (command: string): string[] =>
+	command
+		.replace(/\s+$/, '')
+		.split('\n')
+		.map((l) => strings.expandTabs(ansi.clean(l)))
 
 // `text` in the output color of a card in `style`; ↵ keeps the card's.
 function paint(text: string, style: Style | undefined): string {
 	if (ansi.mono() || !style?.fg) return text
-	let on = ansi.sgr({ fg: colors.toolOutput(style.fg) }), off = ansi.sgr({ fg: style.fg })
-	return text.split(/(↵)/).map((p) => (p === '↵' || !p ? p : on + p + off)).join('')
+	let on = ansi.sgr({ fg: colors.toolOutput(style.fg) }),
+		off = ansi.sgr({ fg: style.fg })
+	return text
+		.split(/(↵)/)
+		.map((p) => (p === '↵' || !p ? p : on + p + off))
+		.join('')
 }
 
 // `line`'s visible columns [at, at + room), with … where it goes on.
@@ -31,7 +39,8 @@ function window(line: string, room: number, at: number): string {
 	let len = strings.visLen(line)
 	if (len <= room) return line
 	if (room < 3) return strings.clipVisual(line, room)
-	let start = at > 0 ? '…' : '', end = at + room < len ? '…' : ''
+	let start = at > 0 ? '…' : '',
+		end = at + room < len ? '…' : ''
 	return start + strings.sliceVisual(line, at + start.length, at + room - end.length) + end
 }
 
@@ -54,7 +63,8 @@ function scrolled(line: string, room: number, ms: number): string {
 // A multi-line command on one row: first ↵ … ↵ last, the first line cut
 // in its middle before the last is cut.
 function joined(lines: string[], room: number): string {
-	let first = lines[0]!, last = lines.at(-1)!.trim()
+	let first = lines[0]!,
+		last = lines.at(-1)!.trim()
 	let sep = lines.length > 2 ? ' ↵ … ↵ ' : ' ↵ '
 	let rest = room - sep.length
 	if (rest < 4) return strings.clipVisual(first, room)
@@ -66,7 +76,15 @@ function joined(lines: string[], room: number): string {
 // the title row `head` (with the command after it when it fits) and the
 // command's own rows. `width`: the card's; `hw`: what the title row
 // leaves after its status; `ms`: since the call appeared.
-function head(head: string, command: unknown, width: number, hw: number, rows: number, ms: number, style: Style | undefined): string[] {
+function head(
+	head: string,
+	command: unknown,
+	width: number,
+	hw: number,
+	rows: number,
+	ms: number,
+	style: Style | undefined,
+): string[] {
 	if (typeof command !== 'string' || !command.trim()) return [head]
 	let lines = commandLines(command)
 	let fits = lines.length === 1 && strings.visLen(lines[0]!) <= width - strings.visLen(head) - GAP.length - STATUS
@@ -79,10 +97,18 @@ function head(head: string, command: unknown, width: number, hw: number, rows: n
 	if (lines.length === 1) return [head, paint(scrolled(lines[0]!, width, ms), style)]
 	if (rows < 6) return [head, paint(joined(lines, width), style)]
 	let last = lines.at(-1)!
-	return [head, paint(middle(lines[0]!, width - 2) + ' ↵', style), paint(lines.length > 2 ? middle(`… ↵ ${last}`, width) : middle(last, width), style)]
+	return [
+		head,
+		paint(middle(lines[0]!, width - 2) + ' ↵', style),
+		paint(lines.length > 2 ? middle(`… ↵ ${last}`, width) : middle(last, width), style),
+	]
 }
 
 // Whether `command` may still be scrolling `ms` after its call appeared.
-const scrolling = (command: unknown, ms: number): boolean => typeof command === 'string' && ms >= 0 && ms < (strings.visLen(command) * 1000) / SPEED && !command.trim().includes('\n')
+const scrolling = (command: unknown, ms: number): boolean =>
+	typeof command === 'string' &&
+	ms >= 0 &&
+	ms < (strings.visLen(command) * 1000) / SPEED &&
+	!command.trim().includes('\n')
 
 export const bashCard = { head, scrolling, paint }

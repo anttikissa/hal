@@ -47,12 +47,19 @@ function killQuietly(pid: number): void {
 }
 
 function spawn(): Proc {
-	let sub = Bun.spawn(['bun', '-e', `(await import(${JSON.stringify(`${import.meta.dir}/host/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}
-${script}`], {
-		stdin: 'ignore',
-		stdout: 'pipe',
-		stderr: 'pipe',
-	})
+	let sub = Bun.spawn(
+		[
+			'bun',
+			'-e',
+			`(await import(${JSON.stringify(`${import.meta.dir}/host/paths.ts`)})).paths.state.home = ${JSON.stringify(home)}
+${script}`,
+		],
+		{
+			stdin: 'ignore',
+			stdout: 'pipe',
+			stderr: 'pipe',
+		},
+	)
 	let p: Proc = { sub, reports: [], dead: false, read: Promise.resolve() }
 	p.read = (async () => {
 		let buf = ''
@@ -80,7 +87,9 @@ async function until(what: string, check: () => boolean): Promise<void> {
 	while (!check()) {
 		if (Date.now() > deadline) {
 			let stderr = await Promise.all(procs.map(async (p) => (p.dead ? await new Response(p.sub.stderr).text() : '')))
-			throw new Error(`timed out waiting for ${what}\n${JSON.stringify(procs.map((p) => p.reports))}\n${stderr.join('\n')}`)
+			throw new Error(
+				`timed out waiting for ${what}\n${JSON.stringify(procs.map((p) => p.reports))}\n${stderr.join('\n')}`,
+			)
 		}
 		await Bun.sleep(10)
 	}
@@ -88,9 +97,7 @@ async function until(what: string, check: () => boolean): Promise<void> {
 
 // Every live process has a role, and has seen a snapshot since `since`.
 async function settled(since: Map<Proc, number>): Promise<void> {
-	await until('every process to (re)connect', () =>
-		alive().every((p) => role(p) && snapshots(p) > (since.get(p) ?? 0)),
-	)
+	await until('every process to (re)connect', () => alive().every((p) => role(p) && snapshots(p) > (since.get(p) ?? 0)))
 	// Let any late second claim show up before counting hosts.
 	await Bun.sleep(100)
 	expect(hosts().length).toBe(1)

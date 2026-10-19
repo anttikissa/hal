@@ -25,7 +25,8 @@ afterEach(() => {
 	router.store.load = orig.load
 })
 
-const tabs = (...ids: string[]): Tab[] => ids.map((id) => ({ id, name: id, cwd: '/w', model: 'm', state: { type: 'idle' } }))
+const tabs = (...ids: string[]): Tab[] =>
+	ids.map((id) => ({ id, name: id, cwd: '/w', model: 'm', state: { type: 'idle' } }))
 
 test('the address names a tab only when shaped like a session id', () => {
 	expect(router.parse('http://h/12-abc')).toBe('12-abc')

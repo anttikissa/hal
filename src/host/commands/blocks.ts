@@ -16,11 +16,14 @@ function describe(blocks: SessionMeta['blocks']): string {
 }
 
 export const command: SlashCommand = {
-	help: () => `${usage}: show or set how cards of a kind start in this session. short is the title row and a few rows in the terminal, the title row alone on the web; long is everything; default follows config.ason (cardVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O toggles one card.`,
+	help: () =>
+		`${usage}: show or set how cards of a kind start in this session. short is the title row and a few rows in the terminal, the title row alone on the web; long is everything; default follows config.ason (cardVerbosity* in /config), reset drops every override. Kinds: ${card.kinds.join(', ')}. Ctrl-O toggles one card.`,
 	complete(args) {
 		let [kind = '', value] = args.split(/\s+/)
 		if (value === undefined) return [...card.kinds, 'reset'].filter((k) => k.startsWith(kind))
-		return card.kinds.includes(kind as Kind) ? [...card.levels, 'default'].filter((v) => v.startsWith(value)).map((v) => `${kind} ${v}`) : []
+		return card.kinds.includes(kind as Kind)
+			? [...card.levels, 'default'].filter((v) => v.startsWith(value)).map((v) => `${kind} ${v}`)
+			: []
 	},
 	run(args, _answers, ctx) {
 		let meta = sessions.open(ctx.sessionId)
@@ -28,7 +31,13 @@ export const command: SlashCommand = {
 		if (!kind) return { say: describe(meta.blocks) }
 		let next: NonNullable<SessionMeta['blocks']> = { ...meta.blocks }
 		if (kind === 'reset' && !value) next = {}
-		else if (!card.kinds.includes(kind as Kind) || rest.length || !value || ![...card.levels, 'default'].includes(value)) return { error: `usage: ${usage}` }
+		else if (
+			!card.kinds.includes(kind as Kind) ||
+			rest.length ||
+			!value ||
+			![...card.levels, 'default'].includes(value)
+		)
+			return { error: `usage: ${usage}` }
 		else if (value === 'default') delete next[kind as Kind]
 		else next[kind as Kind] = value as Verbosity
 		if (Object.keys(next).length) meta.blocks = next

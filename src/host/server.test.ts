@@ -39,7 +39,13 @@ async function dial() {
 	sockets.push(socket)
 	let events: any[] = []
 	let closed = false
-	socket.on('data', lines.decoder((e) => events.push(e), () => {}))
+	socket.on(
+		'data',
+		lines.decoder(
+			(e) => events.push(e),
+			() => {},
+		),
+	)
 	socket.on('close', () => (closed = true))
 	await new Promise((resolve, reject) => socket.once('connect', resolve).once('error', reject))
 	return { socket, events, closed: () => closed }

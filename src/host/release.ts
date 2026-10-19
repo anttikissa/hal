@@ -17,7 +17,9 @@ async function packageVersion(commit: string | undefined): Promise<string> {
 
 // The newest v* tag at or before `commit`, and how many commits follow it.
 async function tagged(commit: string): Promise<{ tag: string; n: number } | undefined> {
-	let m = /^v(.+)-(\d+)-g[0-9a-f]+$/.exec((await version.git('describe', '--tags', '--long', '--match', 'v*', commit)) ?? '')
+	let m = /^v(.+)-(\d+)-g[0-9a-f]+$/.exec(
+		(await version.git('describe', '--tags', '--long', '--match', 'v*', commit)) ?? '',
+	)
 	return m ? { tag: m[1]!, n: Number(m[2]) } : undefined
 }
 

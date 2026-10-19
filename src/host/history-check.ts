@@ -8,47 +8,158 @@ import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'notice', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase', 'rate_limit'])
+const recordTypes = new Set([
+	'user',
+	'assistant',
+	'turn_end',
+	'continue',
+	'inbox',
+	'question',
+	'answer',
+	'command',
+	'output',
+	'notice',
+	'change',
+	'compact',
+	'reset',
+	'file_changes',
+	'round',
+	'rebase',
+	'rate_limit',
+])
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
-	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
-	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
-	if ((r.type === 'command' || r.type === 'output') && r.origin !== undefined && r.origin !== 'model') throw new Error(`invalid ${r.type} origin`)
-	if (r.type === 'assistant' && r.interrupted !== undefined && (r.interrupted !== true || r.block?.type !== 'text')) throw new Error('invalid assistant interruption')
-	let senders = r.type === 'user' ? r.blocks.filter((b) => b.type === 'text') : r.type === 'inbox' || r.type === 'command' ? [r] : []
-	for (let s of senders) { let problem = sender.invalid(s); if (problem) throw new Error(problem) }
+	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n)))
+		throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	if (
+		r.originSession !== undefined &&
+		(typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))
+	)
+		throw new Error('invalid origin session')
+	if ((r.type === 'command' || r.type === 'output') && r.origin !== undefined && r.origin !== 'model')
+		throw new Error(`invalid ${r.type} origin`)
+	if (r.type === 'assistant' && r.interrupted !== undefined && (r.interrupted !== true || r.block?.type !== 'text'))
+		throw new Error('invalid assistant interruption')
+	let senders =
+		r.type === 'user'
+			? r.blocks.filter((b) => b.type === 'text')
+			: r.type === 'inbox' || r.type === 'command'
+				? [r]
+				: []
+	for (let s of senders) {
+		let problem = sender.invalid(s)
+		if (problem) throw new Error(problem)
+	}
 	if (r.type === 'output' && r.transition !== undefined) {
 		let t = r.transition
-		if (!t || typeof t.id !== 'string' || !['clear', 'compact', 'rebase'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.canceled !== undefined && t.canceled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
+		if (
+			!t ||
+			typeof t.id !== 'string' ||
+			!['clear', 'compact', 'rebase'].includes(t.kind) ||
+			(t.prompt !== undefined && typeof t.prompt !== 'string') ||
+			(t.canceled !== undefined && t.canceled !== true) ||
+			sender.invalid(t.sender)
+		)
+			throw new Error('invalid context transition')
 	}
 	if (r.type === 'output' && r.transition?.kind === 'rebase') {
 		let p = r.transition.rebase
-		if (!p || rebase.invalid(p.sparse?.plan) || !Array.isArray(p.sparse?.tails) || p.sparse.tails.some((t) => !t || typeof t.kinds !== 'string' || /[^traumsq]/.test(t.kinds) || !Number.isSafeInteger(t.from) || t.from < 0 || (t.to !== undefined && (!Number.isSafeInteger(t.to) || t.to < t.from))) || (p.paused !== undefined && p.paused !== true) || (p.resume !== undefined && p.resume !== true) || (p.call !== undefined && typeof p.call !== 'string')) throw new Error('invalid rebase transition')
+		if (
+			!p ||
+			rebase.invalid(p.sparse?.plan) ||
+			!Array.isArray(p.sparse?.tails) ||
+			p.sparse.tails.some(
+				(t) =>
+					!t ||
+					typeof t.kinds !== 'string' ||
+					/[^traumsq]/.test(t.kinds) ||
+					!Number.isSafeInteger(t.from) ||
+					t.from < 0 ||
+					(t.to !== undefined && (!Number.isSafeInteger(t.to) || t.to < t.from)),
+			) ||
+			(p.paused !== undefined && p.paused !== true) ||
+			(p.resume !== undefined && p.resume !== true) ||
+			(p.call !== undefined && typeof p.call !== 'string')
+		)
+			throw new Error('invalid rebase transition')
 	}
-	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
-	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
-	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string') throw new Error('invalid boundary transition')
+	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true)
+		throw new Error('invalid synthetic output')
+	if (r.type === 'output')
+		for (let k of ['transitionDone', 'transitionCancel'] as const)
+			if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
+	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string')
+		throw new Error('invalid boundary transition')
 	if (r.type === 'change') {
-		for (let value of [r, r.previous]) if (value) for (let key of ['cwd', 'model', 'autoclose'] as const) if (value[key] !== undefined && typeof value[key] !== (key === 'autoclose' ? 'boolean' : 'string')) throw new Error(`invalid ${key} setting`)
-		if (r.previous !== undefined && (!r.previous || typeof r.previous !== 'object')) throw new Error('invalid previous setting')
+		for (let value of [r, r.previous])
+			if (value)
+				for (let key of ['cwd', 'model', 'autoclose'] as const)
+					if (value[key] !== undefined && typeof value[key] !== (key === 'autoclose' ? 'boolean' : 'string'))
+						throw new Error(`invalid ${key} setting`)
+		if (r.previous !== undefined && (!r.previous || typeof r.previous !== 'object'))
+			throw new Error('invalid previous setting')
 	}
-	if (r.type === 'notice' && ((r.rendered !== undefined && r.rendered !== true) || (r.sectionUpdate !== undefined && r.sectionUpdate !== true) || (r.source !== undefined && (!Number.isSafeInteger(r.source) || r.source < 1)))) throw new Error('invalid notice metadata')
-	if (r.type === 'notice' && (typeof r.text !== 'string' || !r.text.trim() || typeof r.ts !== 'string' || !Number.isFinite(Date.parse(r.ts)))) throw new Error('invalid host notice')
-	if (r.type === 'continue' && r.reason !== undefined && typeof r.reason !== 'string') throw new Error('invalid continuation reason')
-	if (r.type === 'user' && r.notices !== undefined && (!Array.isArray(r.notices) || r.notices.some((n) => !n || !Number.isSafeInteger(n.source) || n.source < 1 || typeof n.text !== 'string'))) throw new Error('invalid notices')
+	if (
+		r.type === 'notice' &&
+		((r.rendered !== undefined && r.rendered !== true) ||
+			(r.sectionUpdate !== undefined && r.sectionUpdate !== true) ||
+			(r.source !== undefined && (!Number.isSafeInteger(r.source) || r.source < 1)))
+	)
+		throw new Error('invalid notice metadata')
+	if (
+		r.type === 'notice' &&
+		(typeof r.text !== 'string' || !r.text.trim() || typeof r.ts !== 'string' || !Number.isFinite(Date.parse(r.ts)))
+	)
+		throw new Error('invalid host notice')
+	if (r.type === 'continue' && r.reason !== undefined && typeof r.reason !== 'string')
+		throw new Error('invalid continuation reason')
+	if (
+		r.type === 'user' &&
+		r.notices !== undefined &&
+		(!Array.isArray(r.notices) ||
+			r.notices.some((n) => !n || !Number.isSafeInteger(n.source) || n.source < 1 || typeof n.text !== 'string'))
+	)
+		throw new Error('invalid notices')
 	if (r.type === 'user' && r.naming !== undefined) {
 		let n = r.naming
-		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
+		if (
+			!n ||
+			!Number.isSafeInteger(n.turn) ||
+			n.turn < 1 ||
+			!Number.isSafeInteger(n.version) ||
+			n.version < 0 ||
+			typeof n.name !== 'string' ||
+			typeof n.eligible !== 'boolean'
+		)
+			throw new Error('invalid naming context')
 	}
-	if (r.type === 'rate_limit' && (typeof r.provider !== 'string' || typeof r.model !== 'string' || typeof r.text !== 'string' || typeof r.until !== 'string' || !Number.isFinite(Date.parse(r.until)))) throw new Error('invalid rate limit wait')
-	if (r.type === 'rebase' && r.contextChanged !== undefined && r.contextChanged !== true) throw new Error('invalid rebase setting flag')
-	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
+	if (
+		r.type === 'rate_limit' &&
+		(typeof r.provider !== 'string' ||
+			typeof r.model !== 'string' ||
+			typeof r.text !== 'string' ||
+			typeof r.until !== 'string' ||
+			!Number.isFinite(Date.parse(r.until)))
+	)
+		throw new Error('invalid rate limit wait')
+	if (r.type === 'rebase' && r.contextChanged !== undefined && r.contextChanged !== true)
+		throw new Error('invalid rebase setting flag')
+	if (r.type === 'rebase') {
+		let problem = rebase.invalid(r)
+		if (problem) throw new Error(problem)
+	}
 	for (let b of r.type === 'assistant' ? [r.block] : r.type === 'user' ? r.blocks : []) {
-		if (b.type === 'tool_result' && b.outputBlob !== undefined && (typeof b.outputBlob !== 'string' || !attachments.blobId.test(b.outputBlob))) throw new Error('invalid tool output blob')
+		if (
+			b.type === 'tool_result' &&
+			b.outputBlob !== undefined &&
+			(typeof b.outputBlob !== 'string' || !attachments.blobId.test(b.outputBlob))
+		)
+			throw new Error('invalid tool output blob')
 		if (b.type !== 'tool_call' && b.type !== 'tool_result') continue
 		if (b.presentation !== undefined) toolPresentation.check(b.presentation, b.type === 'tool_result' ? b.output : '')
-		if (b.presentationError !== undefined && typeof b.presentationError !== 'string') throw new Error('invalid tool presentation error')
+		if (b.presentationError !== undefined && typeof b.presentationError !== 'string')
+			throw new Error('invalid tool presentation error')
 	}
 	return r
 }

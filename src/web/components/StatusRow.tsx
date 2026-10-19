@@ -18,7 +18,8 @@ const heat = (n: number | undefined) => (n === undefined ? '' : `heat-${n}`)
 // on the text baseline in whatever font renders it (task r92).
 function lift(e: HTMLElement) {
 	requestAnimationFrame(() => {
-		let cs = getComputedStyle(e), ctx = document.createElement('canvas').getContext('2d')
+		let cs = getComputedStyle(e),
+			ctx = document.createElement('canvas').getContext('2d')
 		if (!ctx) return
 		ctx.font = `${cs.fontSize} ${cs.fontFamily}`
 		e.style.setProperty('--lift', `${-ctx.measureText('⣀').actualBoundingBoxDescent}px`)
@@ -26,7 +27,13 @@ function lift(e: HTMLElement) {
 }
 
 function Parts(props: { group: StatusGroup }) {
-	return <span dir="ltr"><For each={props.group.parts} keyed={false}>{(part) => <span class={heat(part().heat)}>{part().text}</span>}</For></span>
+	return (
+		<span dir="ltr">
+			<For each={props.group.parts} keyed={false}>
+				{(part) => <span class={heat(part().heat)}>{part().text}</span>}
+			</For>
+		</span>
+	)
 }
 
 export function StatusRow(props: { view: ViewState; connected: boolean; color?: number; hal?: boolean }) {
@@ -41,43 +48,135 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 	let names_ = () => windows().map((w) => w.name)
 	let win = (name: string) => windows().find((w) => w.name === name)
 	// Which subscription the windows belong to, as /status numbers its slots.
-	let slot = () => { let p = props.view.transcript?.stats?.plan; return p && p.accounts > 1 ? `${p.account}/${p.accounts} ` : '' }
+	let slot = () => {
+		let p = props.view.transcript?.stats?.plan
+		return p && p.accounts > 1 ? `${p.account}/${p.accounts} ` : ''
+	}
 	let cwd = () => home.short(meta()?.cwd.replace(/(.)\/+$/, '$1') ?? '')
 	let outside = (e: MouseEvent) => {
 		let r = details.getBoundingClientRect()
-		if (e.target === details && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) details.close()
+		if (
+			e.target === details &&
+			(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+		)
+			details.close()
 	}
 	return (
 		<div class="StatusRow status" aria-label="Session status">
 			<div class="overview">
-				<button type="button" class="details-target" aria-label="Session details" aria-describedby="status-quota" aria-haspopup="dialog" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }} onClick={() => details.showModal()} />
+				<button
+					type="button"
+					class="details-target"
+					aria-label="Session details"
+					aria-describedby="status-quota"
+					aria-haspopup="dialog"
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+					}}
+					onClick={() => details.showModal()}
+				/>
 				<span class="primary">
-					<span class="name"><span class="id">{meta() ? `${meta()!.id}: ` : ''}</span>{meta()?.name ?? (meta() ? names.fallback(meta()!.id) : 'Connecting')}{meta()?.autoclose && <span title="Autoclose on" aria-label="Autoclose on"> ↧</span>}</span>
-					<span class={['activity', tone()]} aria-live="polite"><span class={['dot', tone()]} aria-hidden="true">●</span> {line().text}</span>
+					<span class="name">
+						<span class="id">{meta() ? `${meta()!.id}: ` : ''}</span>
+						{meta()?.name ?? (meta() ? names.fallback(meta()!.id) : 'Connecting')}
+						{meta()?.autoclose && (
+							<span title="Autoclose on" aria-label="Autoclose on">
+								{' '}
+								↧
+							</span>
+						)}
+					</span>
+					<span class={['activity', tone()]} aria-live="polite">
+						<span class={['dot', tone()]} aria-hidden="true">
+							●
+						</span>{' '}
+						{line().text}
+					</span>
 					<span class={heat(context()?.heat)}>{context()?.text}</span>
 					<span aria-hidden="true">▾</span>
 				</span>
 				<span class="secondary">
-					<span class={['cwd', props.hal && 'assistant']} style={props.hal || props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}><bdi>{cwd()}</bdi></span>
-					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? <><span class="full">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort, true)}</span><span class="short">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort)}</span></> : ''}</span>
-					<span class={['budget', (meta()?.slots ?? settings.subagentSlots()) <= 8 && 'pile']} ref={lift} aria-label={`Spawn budget: ${meta()?.slots ?? settings.subagentSlots()} slots left`}>{titles.budget(meta()?.slots ?? settings.subagentSlots())}</span>
-					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
-						<span class={['window', heat(win(name)?.used)]}>
-							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
-						</span>
-					)}</For></span>
+					<span
+						class={['cwd', props.hal && 'assistant']}
+						style={props.hal || props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}
+					>
+						<bdi>{cwd()}</bdi>
+					</span>
+					<span
+						class={['model', quota() && 'quota', heat(quota()?.used)]}
+						style={{ '--fill': `${quota()?.remaining ?? 0}%` }}
+					>
+						{meta() ? (
+							<>
+								<span class="full">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort, true)}</span>
+								<span class="short">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort)}</span>
+							</>
+						) : (
+							''
+						)}
+					</span>
+					<span
+						class={['budget', (meta()?.slots ?? settings.subagentSlots()) <= 8 && 'pile']}
+						ref={lift}
+						aria-label={`Spawn budget: ${meta()?.slots ?? settings.subagentSlots()} slots left`}
+					>
+						{titles.budget(meta()?.slots ?? settings.subagentSlots())}
+					</span>
+					<span class="windows" aria-hidden="true">
+						{slot()}
+						<For each={names_()}>
+							{(name) => (
+								<span class={['window', heat(win(name)?.used)]}>
+									{name}{' '}
+									<span class="bar">
+										<span style={{ width: `${win(name)?.used ?? 0}%` }} />
+									</span>{' '}
+									{win(name)?.used}% used
+									<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
+								</span>
+							)}
+						</For>
+					</span>
 				</span>
-				<span id="status-quota" class="hidden-text">{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}</span>
+				<span id="status-quota" class="hidden-text">
+					{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}
+				</span>
 			</div>
-			<dialog ref={(e) => (details = e)} class="StatusDetails plain" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
-				<div class="top"><strong class="title">Session details</strong><button type="button" class="close" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
+			<dialog
+				ref={(e) => (details = e)}
+				class="StatusDetails plain"
+				aria-label="Session details"
+				onClick={outside}
+				onKeyDown={(e) => e.stopPropagation()}
+			>
+				<div class="top">
+					<strong class="title">Session details</strong>
+					<button type="button" class="close" aria-label="Close session details" onClick={() => details.close()}>
+						<Icon name="close" />
+					</button>
+				</div>
 				<div class="body">
 					<p class={['fact', tone()]}>{line().text}</p>
-					<For each={status.groups(props.view)} keyed={false}>{(group) => <div class="fact">
-						{group().href ? <a href={group().href}><Parts group={group()} /></a> : <Parts group={group()} />}
-					</div>}</For>
+					<For each={status.groups(props.view)} keyed={false}>
+						{(group) => (
+							<div class="fact">
+								{group().href ? (
+									<a href={group().href}>
+										<Parts group={group()} />
+									</a>
+								) : (
+									<Parts group={group()} />
+								)}
+							</div>
+						)}
+					</For>
 				</div>
-				<form method="post" action="/logout" class="footer"><button type="submit"><Icon name="logout" />Log out this browser</button></form>
+				<form method="post" action="/logout" class="footer">
+					<button type="submit">
+						<Icon name="logout" />
+						Log out this browser
+					</button>
+				</form>
 			</dialog>
 		</div>
 	)

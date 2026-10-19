@@ -17,7 +17,9 @@ function get(name: string): string | undefined {
 	let entry = auth.store()[name]
 	if (entry === undefined) return undefined
 	if (typeof entry?.apiKey !== 'string' || !entry.apiKey) {
-		throw Object.assign(new Error(`${paths.display(paths.authFile())}: ${name} entry has no apiKey`), { failure: 'auth' })
+		throw Object.assign(new Error(`${paths.display(paths.authFile())}: ${name} entry has no apiKey`), {
+			failure: 'auth',
+		})
 	}
 	return entry.apiKey
 }

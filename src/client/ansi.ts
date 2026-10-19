@@ -91,7 +91,9 @@ function quiet(text: string, style: Style | undefined): string {
 }
 
 function heading(text: string, style: Style | undefined): string {
-	return !style?.fg || ansi.mono() ? text : ansi.sgr({ fg: style.title ?? colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
+	return !style?.fg || ansi.mono()
+		? text
+		: ansi.sgr({ fg: style.title ?? colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
 }
 
 export const ansi = {
@@ -118,7 +120,10 @@ export const ansi = {
 	// truecolor is known to work (COLORTERM), or a TERM only such
 	// terminals set (it passes over SSH; COLORTERM often does not).
 	// Elsewhere (xterm, screen) examples just erase.
-	fades: (): boolean => !ansi.mono() && (/^(truecolor|24bit)$/.test(process.env.COLORTERM ?? '') || /^(xterm-ghostty|xterm-kitty|wezterm)$/.test(process.env.TERM ?? '')),
+	fades: (): boolean =>
+		!ansi.mono() &&
+		(/^(truecolor|24bit)$/.test(process.env.COLORTERM ?? '') ||
+			/^(xterm-ghostty|xterm-kitty|wezterm)$/.test(process.env.TERM ?? '')),
 	sgr,
 	quiet,
 	heading,

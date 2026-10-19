@@ -19,7 +19,14 @@ export function Login(props: { onDone: () => void }) {
 	return (
 		<form class="Login" onSubmit={submit}>
 			<label for="code">Enter a one-time code: type /auth in Hal, or hal auth in a shell.</label>
-			<input ref={(e) => (input = e)} id="code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck={false} />
+			<input
+				ref={(e) => (input = e)}
+				id="code"
+				name="code"
+				autocomplete="one-time-code"
+				autocapitalize="none"
+				spellcheck={false}
+			/>
 			<button>Log in</button>
 			<div id="notice" class="log">
 				{notice()}

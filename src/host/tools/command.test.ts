@@ -6,10 +6,11 @@ import { sessions } from '../sessions.ts'
 
 useHost()
 
-const run = (sessionId: string, command: unknown, signal = new AbortController().signal) => tools.run(
-	{ type: 'tool_call', id: crypto.randomUUID(), name: 'command', input: { command } },
-	{ cwd: testHome(), signal, sessionId },
-)
+const run = (sessionId: string, command: unknown, signal = new AbortController().signal) =>
+	tools.run(
+		{ type: 'tool_call', id: crypto.randomUUID(), name: 'command', input: { command } },
+		{ cwd: testHome(), signal, sessionId },
+	)
 
 test('model commands use the same slash path as typed commands, including state, output and errors', async () => {
 	let a = client()
@@ -28,7 +29,11 @@ test('model commands use the same slash path as typed commands, including state,
 	expect(cwd.output).toContain(testHome())
 	expect((await run(id, '/cd /dev/null')).isError).toBe(true)
 	expect(sessions.open(id).cwd).toBe(testHome())
-	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual(['/rename Work in progress', '/cd .', '/cd /dev/null'])
+	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual([
+		'/rename Work in progress',
+		'/cd .',
+		'/cd /dev/null',
+	])
 	expect(a.of('output').at(-1).error).toBe(true)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rename Human title' })
 	await until(() => sessions.open(id).name === 'Human title')
@@ -48,12 +53,19 @@ test('a model tool call can /go and /rename while its turn runs; results reach t
 	tabs.file().open.push(id)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'Switch our tab' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 't1', name: 'command', input: { command: `/go ${target}` } }, { type: 'tool_call', id: 't2', name: 'command', input: { command: '/rename New name' } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{ type: 'tool_call', id: 't1', name: 'command', input: { command: `/go ${target}` } },
+		{ type: 'tool_call', id: 't2', name: 'command', input: { command: '/rename New name' } },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => calls.length === 2)
 	expect(a.of('go').at(-1).tab).toBe(target)
 	expect(sessions.open(id).name).toBe('New name')
 	let results = calls[1]!.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
-	expect(results).toEqual([{ type: 'tool_result', id: 't1', output: '/go done' }, { type: 'tool_result', id: 't2', output: `Session ${id} → New name` }])
+	expect(results).toEqual([
+		{ type: 'tool_result', id: 't1', output: '/go done' },
+		{ type: 'tool_result', id: 't2', output: `Session ${id} → New name` },
+	])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 })

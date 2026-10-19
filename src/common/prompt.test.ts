@@ -31,7 +31,11 @@ function key(name: string): Key {
 	for (;;) {
 		let m = /^([CMsS])-(.+)$/.exec(k.key)
 		if (!m) break
-		k = { ...k, key: m[2]!, ...({ C: { ctrl: true }, M: { alt: true }, s: { cmd: true }, S: { shift: true } } as const)[m[1] as 'C'] }
+		k = {
+			...k,
+			key: m[2]!,
+			...({ C: { ctrl: true }, M: { alt: true }, s: { cmd: true }, S: { shift: true } } as const)[m[1] as 'C'],
+		}
 	}
 	return [...k.key].length === 1 && !k.ctrl && !k.alt && !k.cmd ? { ...k, text: k.key } : k
 }
@@ -142,7 +146,11 @@ describe('actions', () => {
 	})
 	test('Enter, Shift-Enter, Alt-Enter and Escape', () => {
 		expect(prompt.step(at('h|i'), key('enter')).action).toEqual({ type: 'submit', text: 'hi', delivery: 'steer' })
-		expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', delivery: 'queue' })
+		expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({
+			type: 'submit',
+			text: 'hi',
+			delivery: 'queue',
+		})
 		expect(show(prompt.step(at('h|i'), { key: 'enter', shift: true }).state)).toBe('h\n|i')
 		expect(prompt.step(at('h|i'), key('escape'))).toEqual({ state: at('h|i'), action: { type: 'cancel' } })
 	})
@@ -152,7 +160,11 @@ describe('actions', () => {
 			sendKeys.load('{"enter":"steer","cmd-enter":null,"alt-enter":"bogus"}')
 			expect(prompt.step(at('h|i'), key('enter')).action).toEqual({ type: 'submit', text: 'hi', delivery: 'steer' })
 			expect(prompt.step(at('h|i'), { key: 'enter', cmd: true }).action).toBeUndefined()
-			expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', delivery: 'queue' })
+			expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({
+				type: 'submit',
+				text: 'hi',
+				delivery: 'queue',
+			})
 		} finally {
 			Object.assign(sendKeys, saved)
 		}

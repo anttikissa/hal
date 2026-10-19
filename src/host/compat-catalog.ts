@@ -16,7 +16,8 @@ export type Endpoint = {
 function cachedCapability(name: string, model: string): Capability | undefined {
 	if (name === 'openrouter' && compatCatalog.state.catalog !== effortCatalog.file()) {
 		compatCatalog.state.capabilities.clear()
-		for (let [id, cap] of Object.entries(effortCatalog.read())) compatCatalog.state.capabilities.set(id, { ...cap, wire: (level) => ({ reasoning: { effort: level } }) })
+		for (let [id, cap] of Object.entries(effortCatalog.read()))
+			compatCatalog.state.capabilities.set(id, { ...cap, wire: (level) => ({ reasoning: { effort: level } }) })
 		compatCatalog.state.catalog = effortCatalog.file()
 	}
 	return compatCatalog.state.capabilities.get(`${name}/${model}`)
@@ -24,7 +25,10 @@ function cachedCapability(name: string, model: string): Capability | undefined {
 
 function create(name: string): Provider {
 	let implementation: Provider | undefined
-	let load = () => (implementation ??= (require('./openai-compat.ts') as typeof import('./openai-compat.ts')).openaiCompat.create(name))
+	let load = () =>
+		(implementation ??= (require('./openai-compat.ts') as typeof import('./openai-compat.ts')).openaiCompat.create(
+			name,
+		))
 	let p: Provider = {
 		request: (req) => load().request(req),
 		parse: (messages) => load().parse(messages),
@@ -32,7 +36,8 @@ function create(name: string): Provider {
 			let env = compatCatalog.endpoints()[name]?.keyEnv
 			return !env || !!(apiKeys.get(name) ?? process.env[env])
 		},
-		capability: (model) => compatCatalog.endpoints()[name]?.capability?.(model) ?? compatCatalog.cachedCapability(name, model),
+		capability: (model) =>
+			compatCatalog.endpoints()[name]?.capability?.(model) ?? compatCatalog.cachedCapability(name, model),
 	}
 	if (compatCatalog.endpoints()[name]?.models !== false) p.models = (signal) => load().models!(signal)
 	return p
@@ -40,12 +45,16 @@ function create(name: string): Provider {
 
 export const compatCatalog = {
 	state: { capabilities: new Map<string, Capability>(), catalog: '' },
-	cachedCapability, create,
+	cachedCapability,
+	create,
 	endpoints(): Record<string, Endpoint> {
 		return {
 			openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
 			'opencode-go': {
-				baseUrl: 'https://opencode.ai/zen/go/v1', keyEnv: 'OPENCODE_API_KEY', login: 'opencode', models: false,
+				baseUrl: 'https://opencode.ai/zen/go/v1',
+				keyEnv: 'OPENCODE_API_KEY',
+				login: 'opencode',
+				models: false,
 				headers: (req) => ({ 'user-agent': 'hal', ...(req.sessionId && { 'x-opencode-session': req.sessionId }) }),
 			},
 			ollama: { baseUrl: 'http://localhost:11434/v1' },

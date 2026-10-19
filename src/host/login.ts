@@ -22,7 +22,10 @@ const SCOPE = 'org:create_api_key user:profile user:inference'
 const BAD_CODE = 'not a Claude login code; paste the whole code#state value from the page'
 
 function base64url(bytes: Uint8Array): string {
-	return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+	return btoa(String.fromCharCode(...bytes))
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '')
 }
 
 // The URL to open. Anthropic's server wants its own verifier shape: 43
@@ -49,7 +52,14 @@ async function finish(pasted: string): Promise<string | undefined> {
 		let res = await fetch(auth.tokenUrl(), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code, state: verifier, grant_type: 'authorization_code', client_id: CLIENT_ID, redirect_uri: REDIRECT, code_verifier: verifier }),
+			body: JSON.stringify({
+				code,
+				state: verifier,
+				grant_type: 'authorization_code',
+				client_id: CLIENT_ID,
+				redirect_uri: REDIRECT,
+				code_verifier: verifier,
+			}),
 			signal: AbortSignal.timeout(auth.refreshTimeoutMs()),
 		})
 		let body: any = await res.json().catch(() => null)
@@ -57,10 +67,16 @@ async function finish(pasted: string): Promise<string | undefined> {
 			let error = typeof body?.error === 'string' && /^[\w.-]{1,64}$/.test(body.error) ? ` ${body.error}` : ''
 			throw new Error(`Claude login failed: HTTP ${res.status}${error}`)
 		}
-		if (typeof body?.access_token !== 'string' || typeof body?.refresh_token !== 'string') throw new Error('Claude login failed: no tokens in the response')
+		if (typeof body?.access_token !== 'string' || typeof body?.refresh_token !== 'string')
+			throw new Error('Claude login failed: no tokens in the response')
 		let email = await login.email(body.access_token)
 		let expiresIn = typeof body.expires_in === 'number' ? body.expires_in : 3600
-		login.save({ accessToken: body.access_token, refreshToken: body.refresh_token, expires: Date.now() + expiresIn * 1000, ...(email && { email }) })
+		login.save({
+			accessToken: body.access_token,
+			refreshToken: body.refresh_token,
+			expires: Date.now() + expiresIn * 1000,
+			...(email && { email }),
+		})
 		return email
 	} finally {
 		// A session blocked on login tries again: it works now, or blocks
@@ -72,7 +88,10 @@ async function finish(pasted: string): Promise<string | undefined> {
 // The account's email, which names it in the file and in messages.
 async function email(token: string): Promise<string | undefined> {
 	try {
-		let res = await fetch(login.profileUrl, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) })
+		let res = await fetch(login.profileUrl, {
+			headers: { authorization: `Bearer ${token}` },
+			signal: AbortSignal.timeout(5000),
+		})
 		if (!res.ok) return undefined
 		let data: any = await res.json()
 		let found = data?.account?.email

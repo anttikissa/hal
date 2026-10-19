@@ -8,7 +8,12 @@ export type Route = { id: string; path?: string }
 export type Call = { block: string; href: string }
 export type FileRow = { path: string; shown: string; counts: string; time: string; calls: Call[] }
 export type List = { id: string; name?: string; files: FileRow[] }
-export type FileDetail = FileRow & { diff: string; commit?: string; others: { id: string; name?: string }[]; steps: { block?: string; time: string; diff: string }[] }
+export type FileDetail = FileRow & {
+	diff: string
+	commit?: string
+	others: { id: string; name?: string }[]
+	steps: { block?: string; time: string; diff: string }[]
+}
 export type Loaded<T> = { data?: T; error?: string }
 export type DiffLine = { kind: 'hunk' | 'add' | 'del' | 'same' | 'note'; text: string; old?: number; new?: number }
 
@@ -77,11 +82,16 @@ function lines(diff: string): DiffLine[] {
 	if (rows.at(-1) === '') rows.pop()
 	let start = rows.findIndex((l) => l.startsWith('@@'))
 	if (start < 0) return rows.map((text) => ({ kind: 'note', text }))
-	let out: DiffLine[] = [], a = 0, b = 0
+	let out: DiffLine[] = [],
+		a = 0,
+		b = 0
 	for (let text of rows.slice(start)) {
 		let hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(text)
-		if (hunk) { a = +hunk[1]!; b = +hunk[2]!; out.push({ kind: 'hunk', text }) }
-		else if (text.startsWith('+')) out.push({ kind: 'add', text: text.slice(1), new: b++ })
+		if (hunk) {
+			a = +hunk[1]!
+			b = +hunk[2]!
+			out.push({ kind: 'hunk', text })
+		} else if (text.startsWith('+')) out.push({ kind: 'add', text: text.slice(1), new: b++ })
 		else if (text.startsWith('-')) out.push({ kind: 'del', text: text.slice(1), old: a++ })
 		else if (text.startsWith('\\')) out.push({ kind: 'note', text })
 		else out.push({ kind: 'same', text: text.slice(1), old: a++, new: b++ })

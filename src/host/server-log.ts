@@ -92,7 +92,12 @@ function client(rec: ClientRecord): string {
 }
 
 function joined(rec: ClientRecord): void {
-	serverLog.log(`client connected ${client(rec)}`, rec.address || rec.userAgent ? { ...(rec.address && { ip: rec.address }), ...(rec.userAgent && { agent: rec.userAgent }) } : undefined)
+	serverLog.log(
+		`client connected ${client(rec)}`,
+		rec.address || rec.userAgent
+			? { ...(rec.address && { ip: rec.address }), ...(rec.userAgent && { agent: rec.userAgent }) }
+			: undefined,
+	)
 }
 
 function hello(rec: ClientRecord): void {
@@ -117,8 +122,27 @@ function start(stats: () => object): void {
 }
 
 export const serverLog = {
-	state: { on: false, timer: undefined as ReturnType<typeof setInterval> | undefined, text: new Map<string, string>(), started: new Map<string, number>(), numbers: new WeakMap<ClientRecord, number>(), next: 0 },
+	state: {
+		on: false,
+		timer: undefined as ReturnType<typeof setInterval> | undefined,
+		text: new Map<string, string>(),
+		started: new Map<string, number>(),
+		numbers: new WeakMap<ClientRecord, number>(),
+		next: 0,
+	},
 	hourMs,
 	write: (line: string): void => void process.stdout.write(line),
-	stamp, log, ms, cut, event, number, client, joined, hello, left, gb, mb, start,
+	stamp,
+	log,
+	ms,
+	cut,
+	event,
+	number,
+	client,
+	joined,
+	hello,
+	left,
+	gb,
+	mb,
+	start,
 }

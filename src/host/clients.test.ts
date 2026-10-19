@@ -39,7 +39,8 @@ test('the diagram lists live peers beside the host and others below, gone ones m
 })
 
 test('a reported timezone is kept only when valid, and a session hears its latest sender, else a follower', () => {
-	let a = clients.join(new Set(['s1'])), b = clients.join(new Set(['s1']))
+	let a = clients.join(new Set(['s1'])),
+		b = clients.join(new Set(['s1']))
 	clients.input(a, { type: 'tab-start', timezone: 'Europe/Helsinki' })
 	for (let bad of ['+05:30', 'UTC+02:00', 'Mars/Olympus', 'x'.repeat(100), 7]) {
 		clients.input(b, { type: 'tab-resume', timezone: bad })

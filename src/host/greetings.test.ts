@@ -14,26 +14,40 @@ import { tabs } from './tabs.ts'
 
 useHost(false, true)
 const random = greetings.random
-afterEach(() => { greetings.random = random })
+afterEach(() => {
+	greetings.random = random
+})
 
 test('arrival periods use only valid user-local time, including boundaries and daylight saving', () => {
 	for (let [time, expected] of [
-		['00:00', 'neutral'], ['06:59', 'neutral'], ['07:00', 'morning'], ['11:59', 'morning'],
-		['12:00', 'afternoon'], ['17:59', 'afternoon'], ['18:00', 'evening'], ['22:59', 'evening'], ['23:00', 'neutral'],
-	] as const) expect(greetings.period('Etc/UTC', Date.parse(`2026-06-01T${time}:00Z`))).toBe(expected)
+		['00:00', 'neutral'],
+		['06:59', 'neutral'],
+		['07:00', 'morning'],
+		['11:59', 'morning'],
+		['12:00', 'afternoon'],
+		['17:59', 'afternoon'],
+		['18:00', 'evening'],
+		['22:59', 'evening'],
+		['23:00', 'neutral'],
+	] as const)
+		expect(greetings.period('Etc/UTC', Date.parse(`2026-06-01T${time}:00Z`))).toBe(expected)
 	let summer = Date.parse('2026-06-01T05:00:00Z')
 	expect(greetings.period('Europe/Paris', summer)).toBe('morning')
 	expect(greetings.period('Europe/Paris', Date.parse('2026-01-01T05:00:00Z'))).toBe('neutral')
-	for (let zone of ['', 'Not specified', 'invalid/zone', '+03:00']) expect(greetings.period(zone, summer)).toBe('neutral')
-	expect(greetings.period(undefined, summer)).toBe(greetings.period(Intl.DateTimeFormat().resolvedOptions().timeZone, summer))
+	for (let zone of ['', 'Not specified', 'invalid/zone', '+03:00'])
+		expect(greetings.period(zone, summer)).toBe('neutral')
+	expect(greetings.period(undefined, summer)).toBe(
+		greetings.period(Intl.DateTimeFormat().resolvedOptions().timeZone, summer),
+	)
 })
 
 test('authored choices vary and names are optional data', () => {
 	let original = greetings.random
-	let samples = (profile: string) => Array.from({ length: 100 }, (_, i) => {
-		greetings.random = () => i / 100
-		return greetings.choose(profile, undefined, 'invalid/zone')
-	})
+	let samples = (profile: string) =>
+		Array.from({ length: 100 }, (_, i) => {
+			greetings.random = () => i / 100
+			return greetings.choose(profile, undefined, 'invalid/zone')
+		})
 	try {
 		let named = samples('Name: Sample Person')
 		expect(named.some((s) => s.includes('Sample Person'))).toBe(true)
@@ -50,7 +64,9 @@ test('authored choices vary and names are optional data', () => {
 		greetings.random = () => 0
 		let first = greetings.choose('')
 		expect(greetings.choose('', first)).not.toBe(first)
-	} finally { greetings.random = original }
+	} finally {
+		greetings.random = original
+	}
 })
 
 test('new tabs greet in the creator client zone and ignore profile timezone', () => {
@@ -64,7 +80,9 @@ test('new tabs greet in the creator client zone and ignore profile timezone', ()
 		c.conn.send({ type: 'tab-new', cwd: '/tmp' })
 		let id = tabs.file().open.at(-1)!
 		expect(history.readSync(id)[0]).toMatchObject({ type: 'output', text: expect.stringMatching(/evening/i) })
-	} finally { clock.now = now }
+	} finally {
+		clock.now = now
+	}
 })
 
 test('new interactive tabs have one shared durable output, no provider turn, and no immediate repeat after restart', async () => {
@@ -108,7 +126,11 @@ test('restored empty sessions and task-bearing, forked or subagent sessions rece
 	sessions.open(restored).slots = 10
 	let blank = subagents.spawn(restored, base)
 	expect(history.readSync(blank).map((r) => r.type)).toEqual(['output'])
-	for (let extra of [{ task: 'A supplied task' }, { kind: 'subagent' as const, task: 'Work' }, { kind: 'subagent-leave-open' as const, task: 'Work' }]) {
+	for (let extra of [
+		{ task: 'A supplied task' },
+		{ kind: 'subagent' as const, task: 'Work' },
+		{ kind: 'subagent-leave-open' as const, task: 'Work' },
+	]) {
 		let id = subagents.spawn(restored, { ...base, ...extra })
 		expect(history.readSync(id).some((r) => r.type === 'output')).toBe(false)
 	}

@@ -10,7 +10,16 @@ export type Args = (
 	| { kind: 'auth' }
 	| { kind: 'serve'; noUser?: true; port?: number }
 	| { kind: 'remote'; host?: string }
-	| { kind: 'print'; prompt: string; dir?: string; model?: string; session?: string; keep?: true; noUser?: true; delivery?: Delivery }
+	| {
+			kind: 'print'
+			prompt: string
+			dir?: string
+			model?: string
+			session?: string
+			keep?: true
+			noUser?: true
+			delivery?: Delivery
+	  }
 	| { kind: 'error'; message: string }
 ) & { home?: string }
 
@@ -37,11 +46,25 @@ Options:
 `
 
 type Kind = Exclude<Args['kind'], 'error'>
-type Out = { kind: Kind; home?: string; noUser?: true; port?: number; prompt?: string; host?: string; dir?: string; model?: string; session?: string; keep?: true; delivery?: Delivery }
+type Out = {
+	kind: Kind
+	home?: string
+	noUser?: true
+	port?: number
+	prompt?: string
+	host?: string
+	dir?: string
+	model?: string
+	session?: string
+	keep?: true
+	delivery?: Delivery
+}
 type Entry = { names: string[]; value?: string; kind?: Kind; within?: Entry; set?: (out: Out, value: string) => void }
 
 class UsageError extends Error {}
-const fail = (message: string): never => { throw new UsageError(message) }
+const fail = (message: string): never => {
+	throw new UsageError(message)
+}
 
 const commands: Entry[] = []
 const options: Entry[] = []
@@ -64,16 +87,26 @@ function arg(syntax: string, set: (out: Out, value: string) => void): void {
 	options.push({ ...entry(syntax), within, set })
 }
 
-const deliver = (delivery: Delivery) => (out: Out) => { out.delivery = out.delivery ? fail('choose one delivery flag') : delivery }
+const deliver = (delivery: Delivery) => (out: Out) => {
+	out.delivery = out.delivery ? fail('choose one delivery flag') : delivery
+}
 
 command('-p, --print <prompt>', 'print', () => {
-	arg('-d, --dir <dir>', (out, dir) => { out.dir = dir })
-	arg('-m, --model <model>', (out, model) => { out.model = model })
-	arg('-s, --session <id|tab>', (out, session) => { out.session = session })
+	arg('-d, --dir <dir>', (out, dir) => {
+		out.dir = dir
+	})
+	arg('-m, --model <model>', (out, model) => {
+		out.model = model
+	})
+	arg('-s, --session <id|tab>', (out, session) => {
+		out.session = session
+	})
 	arg('--steer', deliver('steer'))
 	arg('--soft-steer', deliver('soft-steer'))
 	arg('--queue', deliver('queue'))
-	arg('--keep', out => { out.keep = true })
+	arg('--keep', (out) => {
+		out.keep = true
+	})
 })
 command('-r [host]', 'remote')
 command('serve', 'serve', () => {
@@ -84,10 +117,14 @@ command('serve', 'serve', () => {
 command('auth', 'auth')
 command('-v, --version', 'version')
 command('-h, --help, help', 'help')
-arg('--home <dir>', (out, dir) => { out.home = dir })
-arg('--no-user', out => { out.noUser = true })
+arg('--home <dir>', (out, dir) => {
+	out.home = dir
+})
+arg('--no-user', (out) => {
+	out.noUser = true
+})
 
-const find = (list: Entry[], token: string) => list.find(e => e.names.includes(token))
+const find = (list: Entry[], token: string) => list.find((e) => e.names.includes(token))
 
 function parse(argv: string[]): Args {
 	try {
@@ -99,10 +136,16 @@ function parse(argv: string[]): Args {
 			let token = argv[i]!
 			let found = find(options, token) ?? (token.startsWith('-') ? find(commands, token) : undefined)
 			if (!found && token.startsWith('-')) fail(`unknown option ${token}`)
-			if (!found) { words.push(token); continue }
+			if (!found) {
+				words.push(token)
+				continue
+			}
 			if (used.has(found)) fail(`${token} given twice`)
 			used.add(found)
-			if (found.kind) { selected = selected ? fail(`${token} conflicts with ${selected.names[0]}`) : found; continue }
+			if (found.kind) {
+				selected = selected ? fail(`${token} conflicts with ${selected.names[0]}`) : found
+				continue
+			}
 			let value = found.value ? argv[++i] : ''
 			if (found.value && (!value || value.startsWith('-'))) fail(`${token} needs ${found.value}`)
 			found.set!(out, value!)
@@ -115,8 +158,10 @@ function parse(argv: string[]): Args {
 		if (selected?.value?.startsWith('<') && !operand?.trim()) fail(`${selected.names[0]} needs ${selected.value}`)
 		if (selected) out.kind = selected.kind!
 		if (operand) out[selected!.value!.slice(1, -1) as 'prompt' | 'host'] = operand
-		for (let e of used) if (e.within && e.within !== selected) fail(`${e.names[0]} applies only to hal ${e.within.names[0]}`)
-		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind)) fail('--no-user applies only to hal, hal serve and hal -p')
+		for (let e of used)
+			if (e.within && e.within !== selected) fail(`${e.names[0]} applies only to hal ${e.within.names[0]}`)
+		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind))
+			fail('--no-user applies only to hal, hal serve and hal -p')
 		if (out.session && out.keep) fail('--keep cannot be used with --session')
 		if (out.session && out.dir) fail('--dir cannot be used with --session; use /cd to change its directory')
 		return out as Args

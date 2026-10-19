@@ -18,11 +18,13 @@ function invoke(self: string, cmd: string) {
 	let resolved = nativeTool.resolve(cmd, { sessionId: self, cwd: testHome() })
 	let call = { type: 'tool_call' as const, id: crypto.randomUUID(), ...resolved }
 	let record = history.append(self, { type: 'assistant', block: call })
-	let promise = tools.run(call, { sessionId: self, cwd: testHome(), signal: new AbortController().signal }).then((result) => {
-		history.results(self, [result])
-		host.broadcast(self, { type: 'tool-results', sessionId: self, results: [result] })
-		return result
-	})
+	let promise = tools
+		.run(call, { sessionId: self, cwd: testHome(), signal: new AbortController().signal })
+		.then((result) => {
+			history.results(self, [result])
+			host.broadcast(self, { type: 'tool-results', sessionId: self, results: [result] })
+			return result
+		})
 	return { promise, ref: `t${record.n}` }
 }
 
@@ -34,7 +36,15 @@ async function background(self: string, gate: string, unsafe = false) {
 }
 
 function owned(owner: string, name: string, limit = 0, callId?: string) {
-	return subagents.spawn(owner, { kind: 'subagent-leave-open', task: name, name, cwd: testHome(), limit, fork: false, callId })
+	return subagents.spawn(owner, {
+		kind: 'subagent-leave-open',
+		task: name,
+		name,
+		cwd: testHome(),
+		limit,
+		fork: false,
+		callId,
+	})
 }
 
 test('shared numeric targets inspect and stop a background call with its partial output retained', async () => {
@@ -61,7 +71,10 @@ test('WAIT selects a command, ignores unrelated completion and streaming, and ca
 	let first = await background(self, 'first')
 	let second = await background(self, 'second')
 	let finished = false
-	let waiting = invoke(self, `WAIT ${second}`).promise.then((r) => { finished = true; return r })
+	let waiting = invoke(self, `WAIT ${second}`).promise.then((r) => {
+		finished = true
+		return r
+	})
 	await until(() => work.listeners.size === 1)
 	host.broadcast(self, { type: 'tool-output', sessionId: self, id: 'other', at: 0, chunk: 'progress' })
 	expect(finished).toBe(false)
@@ -110,7 +123,9 @@ test('STOP walks owned descendants, leaves unrelated sessions and tabs intact, a
 	await until(() => jobs.running(child).length === 0)
 	expect(work.inspect(work.target(child, job))).toContain('[stopped by the user]')
 	expect((await invoke(root, `COMMAND "/resume ${child}"`).promise).isError).toBeUndefined()
-	expect((await invoke(root, `SEND "${child}" "continue child" { delivery: "emergency" }`).promise).isError).toBeUndefined()
+	expect(
+		(await invoke(root, `SEND "${child}" "continue child" { delivery: "emergency" }`).promise).isError,
+	).toBeUndefined()
 	await until(() => calls.length === 5)
 	expect(status.stateOf(grandchild).type).toBe('paused')
 })
@@ -165,9 +180,19 @@ test('/stop can interrupt one foreground command without pausing its session', a
 	let self = toolSession(c)
 	c.conn.send({ type: 'submit', sessionId: self, text: 'work' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'foreground', name: 'bash', input: { command: 'echo ready; sleep 30', description: 'Foreground work' } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{
+			type: 'tool_call',
+			id: 'foreground',
+			name: 'bash',
+			input: { command: 'echo ready; sleep 30', description: 'Foreground work' },
+		},
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => c.of('tool-output').some((e) => e.chunk.includes('ready')))
-	let record = history.readSync(self).find((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === 'foreground')!
+	let record = history
+		.readSync(self)
+		.find((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === 'foreground')!
 	let ref = `t${record.n}`
 	expect(work.inspect(work.target(self, ref))).toContain('ready')
 	c.conn.send({ type: 'submit', sessionId: self, text: `/stop ${ref}` })
@@ -182,7 +207,11 @@ test('Escape exposes surviving subagents without stopping them or leaving a WAIT
 	let self = toolSession(c)
 	c.conn.send({ type: 'submit', sessionId: self, text: 'delegate' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'spawn', name: 'spawn', input: { task: 'child work', name: 'Child work' } }, { type: 'tool_call', id: 'wait', name: 'wait', input: {} }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{ type: 'tool_call', id: 'spawn', name: 'spawn', input: { task: 'child work', name: 'Child work' } },
+		{ type: 'tool_call', id: 'wait', name: 'wait', input: {} },
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => work.listeners.size === 1)
 	let child = sessions.openIds().find((id) => sessions.open(id).owner === self)!
 	c.conn.send({ type: 'pause', sessionId: self })
@@ -196,14 +225,18 @@ test('Escape exposes surviving subagents without stopping them or leaving a WAIT
 })
 
 test('WAIT does not outrun a subagent report held for the owner’s snapshot', async () => {
-	let c = client(), self = toolSession(c), child = owned(self, 'delayed report')
+	let c = client(),
+		self = toolSession(c),
+		child = owned(self, 'delayed report')
 	await until(() => calls.length === 1)
 	await host.ready(self)
 	let held = Promise.withResolvers<void>()
 	host.state.opening.set(self, held.promise)
 	let waiting = invoke(self, `WAIT ${child}`)
 	let finished = false
-	waiting.promise.then(() => { finished = true })
+	waiting.promise.then(() => {
+		finished = true
+	})
 	calls[0]!.push({ type: 'text', text: '<summary>ready after snapshot</summary>' }, { type: 'done', reason: 'end' })
 	await until(() => subagents.delivering.has(child))
 	expect(finished).toBe(false)

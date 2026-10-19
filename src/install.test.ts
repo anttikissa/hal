@@ -11,7 +11,10 @@ let home = ''
 afterEach(() => rmSync(home, { recursive: true, force: true }))
 
 function install(env: Record<string, string>, ...args: string[]): { code: number; out: string } {
-	let p = Bun.spawnSync([`${repo}/install`, ...args], { env: { HOME: home, SHELL: '/bin/zsh', ...env }, stdin: 'ignore' })
+	let p = Bun.spawnSync([`${repo}/install`, ...args], {
+		env: { HOME: home, SHELL: '/bin/zsh', ...env },
+		stdin: 'ignore',
+	})
 	return { code: p.exitCode, out: p.stdout.toString() + p.stderr.toString() }
 }
 

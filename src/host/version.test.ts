@@ -17,7 +17,9 @@ afterEach(() => {
 })
 
 function git(...args: string[]): string {
-	let out = Bun.spawnSync(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd: repo })
+	let out = Bun.spawnSync(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
+		cwd: repo,
+	})
 	if (out.exitCode !== 0) throw new Error(out.stderr.toString())
 	return out.stdout.toString().trim()
 }

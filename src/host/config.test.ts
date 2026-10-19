@@ -128,7 +128,6 @@ test('hand-written comments on keys and array items survive a save', () => {
 	expect(text).toContain('/* second */\n\t\t2')
 })
 
-
 test('qualified config defaults create the same validated pair and reject bad effort before saving', () => {
 	start()
 	config.update({ model: 'openai/gpt-6-sol:high' })

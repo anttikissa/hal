@@ -18,9 +18,21 @@ test('sparse selectors keep omitted rows, bare ranges include all kinds, prefixe
 test('quoted full replacements preserve semicolons, whitespace and literal interpolation, decode only explicit escapes', () => {
 	for (let quote of ['"', "'", '`']) {
 		let text = `edit 1 ${quote}  x; $\{literal}\\nline\\t\\\\\\${quote}${quote}; drop 2`
-		expect(rebaseSparse.parse(text, snapshot).plan).toMatchObject({ drop: [2], edit: [{ n: 1, text: `  x; $\{literal}\nline\t\\${quote}` }] })
+		expect(rebaseSparse.parse(text, snapshot).plan).toMatchObject({
+			drop: [2],
+			edit: [{ n: 1, text: `  x; $\{literal}\nline\t\\${quote}` }],
+		})
 	}
-	for (let text of ['edit 1 "\\u1234"', 'edit 1 "\\r"', 'edit 1 "unfinished', 'edit 1 "x" trailing', 'edit 1 "x";', 'insert 1 "x"', 'edit 1 "x"; drop 1']) expect(() => rebaseSparse.parse(text, snapshot)).toThrow()
+	for (let text of [
+		'edit 1 "\\u1234"',
+		'edit 1 "\\r"',
+		'edit 1 "unfinished',
+		'edit 1 "x" trailing',
+		'edit 1 "x";',
+		'insert 1 "x"',
+		'edit 1 "x"; drop 1',
+	])
+		expect(() => rebaseSparse.parse(text, snapshot)).toThrow()
 })
 test('open tails resolve against application rows, including later linked call results', () => {
 	let sparse = rebaseSparse.parse('drop 3-', rebaseRows.build(records.slice(0, 2)))
@@ -31,7 +43,12 @@ test('open tails resolve against application rows, including later linked call r
 
 test('tool names do not turn command-tool entries into system commands', () => {
 	let snapshot = rebaseRows.build([
-		{ n: 1, ts: '', type: 'assistant', block: { type: 'tool_call', name: 'command', id: 'cmd', input: { command: '/rebase show' } } },
+		{
+			n: 1,
+			ts: '',
+			type: 'assistant',
+			block: { type: 'tool_call', name: 'command', id: 'cmd', input: { command: '/rebase show' } },
+		},
 		{ n: 2, ts: '', type: 'command', text: '/rebase show', origin: 'model' },
 	])
 	expect(rebaseSparse.parse('drop t*', snapshot).plan.drop).toEqual([1])

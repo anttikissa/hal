@@ -12,10 +12,16 @@ import { tabs } from './tabs.ts'
 import { prompts } from './prompts.ts'
 
 useHost()
-const commandCall = (command: string, id = 'reset') => ({ type: 'tool_call' as const, id, name: 'command', input: { command } })
+const commandCall = (command: string, id = 'reset') => ({
+	type: 'tool_call' as const,
+	id,
+	name: 'command',
+	input: { command },
+})
 
 test('clear resets synthetic-only and already-cleared history without a provider turn', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	let { slash } = await import('./slash.ts')
 	slash.output(id, 'synthetic greeting', false, undefined, true)
 	for (let count of [1, 2]) {
@@ -30,15 +36,25 @@ test('clear resets synthetic-only and already-cleared history without a provider
 })
 
 test('self-issued clear records results for later undispatched calls, ends old turn and starts attributed literal multiline continuation', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'old prompt' })
 	await until(() => calls.length === 1)
 	let tail = '/rename literal, not a command\n  "quoted" @file\n'
-	calls[0]!.push(commandCall(`/clear ${tail}`), commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(commandCall(`/clear ${tail}`), commandCall('/rename concurrent', 'later'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	await until(() => calls.length === 2)
 	let all = await records(id)
 	let boundary = all.findIndex((r) => r.type === 'reset')
-	expect(all.slice(0, boundary).find((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result' && b.id === 'later' && b.isError))).toBeDefined()
+	expect(
+		all
+			.slice(0, boundary)
+			.find(
+				(r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result' && b.id === 'later' && b.isError),
+			),
+	).toBeDefined()
 	expect(all.slice(0, boundary).at(-1)?.type).toBe('turn_end')
 	let prompt = c.views.get(id)!.items.find((i) => i.type === 'prompt')!
 	expect(prompt).toMatchObject({ text: tail, origin: 'model', generatingCommand: 'clear' })
@@ -52,13 +68,24 @@ test('self-issued clear records results for later undispatched calls, ends old t
 })
 
 test('self-issued compact waits for every tool result, preserves prompt and continues same turn', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'active prompt' })
 	await until(() => calls.length === 1)
-	calls[0]!.push(commandCall('/compact'), commandCall('/rename Later tool', 'later'), { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(commandCall('/compact'), commandCall('/rename Later tool', 'later'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	await until(() => calls.length === 2)
-	let all = await records(id), boundary = all.findIndex((r) => r.type === 'compact')
-	expect(all[boundary - 1]).toMatchObject({ type: 'user', blocks: [{ type: 'tool_result', id: 'reset' }, { type: 'tool_result', id: 'later' }] })
+	let all = await records(id),
+		boundary = all.findIndex((r) => r.type === 'compact')
+	expect(all[boundary - 1]).toMatchObject({
+		type: 'user',
+		blocks: [
+			{ type: 'tool_result', id: 'reset' },
+			{ type: 'tool_result', id: 'later' },
+		],
+	})
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('active prompt')
 	expect(c.of('turn-end').length).toBe(0)
 	calls[1]!.push({ type: 'done', reason: 'end' })
@@ -66,10 +93,14 @@ test('self-issued compact waits for every tool result, preserves prompt and cont
 })
 
 test('human clear cancels streaming, ends before the boundary, and an empty context still starts a supplied prompt', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear fresh' })
 	await until(() => calls.length === 1)
-	expect(c.views.get(id)!.items.find((i) => i.type === 'prompt')).toMatchObject({ text: 'fresh', generatingCommand: 'clear' })
+	expect(c.views.get(id)!.items.find((i) => i.type === 'prompt')).toMatchObject({
+		text: 'fresh',
+		generatingCommand: 'clear',
+	})
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
 	await until(() => c.of('turn-end').length === 1)
 	expect(calls.length).toBe(1)
@@ -78,13 +109,22 @@ test('human clear cancels streaming, ends before the boundary, and an empty cont
 })
 
 test('human clear lets foreground work settle; Escape cancels continuation and conflicts cannot overwrite it', async () => {
-	let c = client(), id = created(c), resolve!: () => void
+	let c = client(),
+		id = created(c),
+		resolve!: () => void
 	let original = tools.run
-	tools.run = async (call, ctx) => call.name === 'held' ? (await new Promise<void>((r) => resolve = r), { type: 'tool_result', id: call.id, output: 'settled' }) : original(call, ctx)
+	tools.run = async (call, ctx) =>
+		call.name === 'held'
+			? (await new Promise<void>((r) => (resolve = r)), { type: 'tool_result', id: call.id, output: 'settled' })
+			: original(call, ctx)
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
+		calls[0]!.push(
+			{ type: 'tool_call', id: 'held', name: 'held', input: {} },
+			commandCall('/rename concurrent', 'later'),
+			{ type: 'done', reason: 'tool_use' },
+		)
 		await until(() => !!resolve)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/clear automatic' })
 		expect(turns.state.running.get(id)!.controller.signal.aborted).toBe(false)
@@ -97,17 +137,35 @@ test('human clear lets foreground work settle; Escape cancels continuation and c
 		expect(calls.length).toBe(1)
 		expect(c.views.get(id)!.state.type).toBe('paused')
 		expect(contextTransitions.pending(id)).toBeUndefined()
-		expect((await records(id)).findLast((r) => r.type === 'user')).toMatchObject({ blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') }] })
-	} finally { tools.run = original }
+		expect((await records(id)).findLast((r) => r.type === 'user')).toMatchObject({
+			blocks: [
+				{ type: 'tool_result', id: 'held', output: 'settled' },
+				{ type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') },
+			],
+		})
+	} finally {
+		tools.run = original
+	}
 })
 
 test('closed-tab recovery retains accepted intent across boundary and prompt crash gaps without duplicate injection', async () => {
 	for (let gap of ['intent', 'boundary', 'prompt', 'done'] as const) {
-		let c = client(), id = created(c)
-		let intent = { id: `intent-${gap}`, kind: 'clear' as const, prompt: 'durable continuation', sender: { origin: 'model' as const } }
+		let c = client(),
+			id = created(c)
+		let intent = {
+			id: `intent-${gap}`,
+			kind: 'clear' as const,
+			prompt: 'durable continuation',
+			sender: { origin: 'model' as const },
+		}
 		history.append(id, { type: 'output', text: 'accepted', transition: intent })
 		if (gap !== 'intent') history.append(id, { type: 'reset', transition: intent.id })
-		if (gap === 'prompt' || gap === 'done') history.submit(id, [{ type: 'text', text: intent.prompt, origin: 'model', generatingCommand: 'clear' }], intent.id)
+		if (gap === 'prompt' || gap === 'done')
+			history.submit(
+				id,
+				[{ type: 'text', text: intent.prompt, origin: 'model', generatingCommand: 'clear' }],
+				intent.id,
+			)
 		if (gap === 'done') history.append(id, { type: 'output', text: 'applied', transitionDone: intent.id })
 		expect(busy.list()).toContain(id)
 		if (gap !== 'done') expect(pages.essentials(id).some((r) => r.type === 'output' && r.transition)).toBe(true)
@@ -124,10 +182,13 @@ test('closed-tab recovery retains accepted intent across boundary and prompt cra
 })
 
 test('cross-session clear inherits host sender through execution and fresh prompt framing', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	prompts.submit(id, '/clear forwarded', undefined, 'steer', { from: '02-abc', label: 'tab 2 · Other session' })
 	await until(() => calls.length === 1)
-	expect(JSON.stringify(calls[0]!.input.messages)).toContain('; message from tab 2 (Other session); /clear continuation]')
+	expect(JSON.stringify(calls[0]!.input.messages)).toContain(
+		'; message from tab 2 (Other session); /clear continuation]',
+	)
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
 	expect(shown((await fresh(id)).items)).toEqual(shown(c.views.get(id)!.items))
@@ -135,7 +196,9 @@ test('cross-session clear inherits host sender through execution and fresh promp
 
 test('bare clear ends paused and failed contexts idle, both live and after reload', async () => {
 	for (let failure of [false, true]) {
-		let c = client(), id = created(c), before = calls.length
+		let c = client(),
+			id = created(c),
+			before = calls.length
 		c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 		await until(() => calls.length === before + 1)
 		if (failure) calls.at(-1)!.push({ type: 'error', message: 'failure' })
@@ -150,15 +213,23 @@ test('bare clear ends paused and failed contexts idle, both live and after reloa
 })
 
 test('recovery settles orphaned calls before clear turn end and keeps canceled continuation paused', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	history.submit(id, 'unfinished')
 	history.append(id, { type: 'assistant', block: commandCall('/clear followup') })
-	let intent = { id: 'canceled-intent', kind: 'clear' as const, prompt: 'must not start', sender: { origin: 'model' as const } }
+	let intent = {
+		id: 'canceled-intent',
+		kind: 'clear' as const,
+		prompt: 'must not start',
+		sender: { origin: 'model' as const },
+	}
 	history.append(id, { type: 'output', text: 'accepted', transition: intent })
 	history.append(id, { type: 'output', text: 'canceled', transitionCancel: intent.id })
 	restartHost()
 	await turns.recover()
-	let all = await records(id), end = all.findIndex((r) => r.type === 'turn_end'), results = all.findIndex((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))
+	let all = await records(id),
+		end = all.findIndex((r) => r.type === 'turn_end'),
+		results = all.findIndex((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))
 	expect(results).toBeLessThan(end)
 	expect((await fresh(id)).state.type).toBe('paused')
 	expect(calls.length).toBe(0)
@@ -167,10 +238,19 @@ test('recovery settles orphaned calls before clear turn end and keeps canceled c
 })
 
 test('clear at a parked approval closes the old turn and held calls never resume', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'dangerous work' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'danger', name: 'bash', input: { command: 'rm -rf /reserved-example', description: 'Requires approval', modifies: [] } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push(
+		{
+			type: 'tool_call',
+			id: 'danger',
+			name: 'bash',
+			input: { command: 'rm -rf /reserved-example', description: 'Requires approval', modifies: [] },
+		},
+		{ type: 'done', reason: 'tool_use' },
+	)
 	await until(() => c.of('question').length === 1)
 	let question = c.of('question')[0]!.id
 	c.conn.send({ type: 'submit', sessionId: id, text: '/clear' })
@@ -182,18 +262,29 @@ test('clear at a parked approval closes the old turn and held calls never resume
 	restartHost()
 	await turns.recover()
 	expect(calls.length).toBe(1)
-	let all = await records(id), end = all.findIndex((r) => r.type === 'turn_end'), results = all.findIndex((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))
+	let all = await records(id),
+		end = all.findIndex((r) => r.type === 'turn_end'),
+		results = all.findIndex((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))
 	expect(results).toBeLessThan(end)
 })
 
-test('human clear starts its continuation only after the round\'s calls settle', async () => {
-	let c = client(), id = created(c), resolve!: () => void
+test("human clear starts its continuation only after the round's calls settle", async () => {
+	let c = client(),
+		id = created(c),
+		resolve!: () => void
 	let original = tools.run
-	tools.run = async (call, ctx) => call.name === 'held' ? (await new Promise<void>((r) => resolve = r), { type: 'tool_result', id: call.id, output: 'settled' }) : original(call, ctx)
+	tools.run = async (call, ctx) =>
+		call.name === 'held'
+			? (await new Promise<void>((r) => (resolve = r)), { type: 'tool_result', id: call.id, output: 'settled' })
+			: original(call, ctx)
 	try {
 		c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 		await until(() => calls.length === 1)
-		calls[0]!.push({ type: 'tool_call', id: 'held', name: 'held', input: {} }, commandCall('/rename concurrent', 'later'), { type: 'done', reason: 'tool_use' })
+		calls[0]!.push(
+			{ type: 'tool_call', id: 'held', name: 'held', input: {} },
+			commandCall('/rename concurrent', 'later'),
+			{ type: 'done', reason: 'tool_use' },
+		)
 		await until(() => !!resolve)
 		c.conn.send({ type: 'submit', sessionId: id, text: '/clear next' })
 		expect(c.of('divider').length).toBe(0)
@@ -201,16 +292,29 @@ test('human clear starts its continuation only after the round\'s calls settle',
 		resolve()
 		await until(() => calls.length === 2)
 		expect(c.of('turn-end').length).toBe(1)
-		expect(c.views.get(id)!.items.find((i) => i.type === 'prompt')).toMatchObject({ text: 'next', generatingCommand: 'clear' })
-		let all = await records(id), end = all.findIndex((r) => r.type === 'turn_end')
-		expect(all[end - 1]).toMatchObject({ type: 'user', blocks: [{ type: 'tool_result', id: 'held', output: 'settled' }, { type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') }] })
+		expect(c.views.get(id)!.items.find((i) => i.type === 'prompt')).toMatchObject({
+			text: 'next',
+			generatingCommand: 'clear',
+		})
+		let all = await records(id),
+			end = all.findIndex((r) => r.type === 'turn_end')
+		expect(all[end - 1]).toMatchObject({
+			type: 'user',
+			blocks: [
+				{ type: 'tool_result', id: 'held', output: 'settled' },
+				{ type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') },
+			],
+		})
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length === 2)
-	} finally { tools.run = original }
+	} finally {
+		tools.run = original
+	}
 })
 
 test('Escape cancels pending compact without restarting its paused turn after recovery', async () => {
-	let c = client(), id = created(c)
+	let c = client(),
+		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'work' })
 	await until(() => calls.length === 1)
 	c.conn.send({ type: 'submit', sessionId: id, text: '/compact' })

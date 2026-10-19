@@ -208,7 +208,9 @@ test('client crash before the host had the prompt: sent after restart', async ()
 	events = []
 	await client()
 	await until(() => drafts.pending(id).length === 0)
-	expect(userRecords().map((r) => (r.type === 'user' && r.blocks[0]?.type === 'text' ? r.blocks[0].text : ''))).toEqual(['never arrived'])
+	expect(userRecords().map((r) => (r.type === 'user' && r.blocks[0]?.type === 'text' ? r.blocks[0].text : ''))).toEqual(
+		['never arrived'],
+	)
 })
 
 test('a prompt sent after offline edits clears the older host draft it replaced', async () => {
@@ -251,11 +253,15 @@ test('a refused prompt goes back into the editor, before text typed since', asyn
 
 test('a prompt sent while a turn runs steers it, and is pending until the host has it', async () => {
 	await client()
-	turns.stream = () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<StreamEvent>>(() => {}) }) })
+	turns.stream = () => ({
+		[Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<StreamEvent>>(() => {}) }),
+	})
 	drafts.submit(id, 'first')
 	drafts.submit(id, 'later', { delivery: 'queue' })
 	await until(() => drafts.pending(id).length === 0)
-	expect(history.readSync(id).filter((r) => r.type === 'inbox')).toMatchObject([{ text: 'later', delivery: 'after-turn' }])
+	expect(history.readSync(id).filter((r) => r.type === 'inbox')).toMatchObject([
+		{ text: 'later', delivery: 'after-turn' },
+	])
 	host.reset()
 })
 

@@ -5,7 +5,17 @@
 // watches plugins/. An older plugins/color-theme.ts symlink into themes/
 // is converted to theme.ts with the same theme.
 
-import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from 'fs'
+import {
+	lstatSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	readlinkSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'fs'
 import { basename, dirname, join, relative, resolve } from 'path'
 import type { SlashCommand } from '../commands.ts'
 import { plugins } from '../plugins.ts'
@@ -14,10 +24,19 @@ const themesDir = () => join(import.meta.dir, '../../../themes')
 const file = () => join(plugins.dir(), 'theme.ts')
 const oldLink = () => join(plugins.dir(), 'color-theme.ts')
 const header = '// The color theme, chosen with /theme (task 4c1).\n'
-const selector = /^(?:\/\/ The color theme, chosen with \/theme \(task 4c1\)\.\n)?export const portable = true\nexport \{ default \} from '[^'\n]*themes\/([\w.-]+)\.ts'\n$/
+const selector =
+	/^(?:\/\/ The color theme, chosen with \/theme \(task 4c1\)\.\n)?export const portable = true\nexport \{ default \} from '[^'\n]*themes\/([\w.-]+)\.ts'\n$/
 
 function names(): string[] {
-	return [...new Set(['hal', ...readdirSync(themesDir()).filter((f) => f.endsWith('.ts')).map((f) => f.slice(0, -3)).sort()])]
+	return [
+		...new Set([
+			'hal',
+			...readdirSync(themesDir())
+				.filter((f) => f.endsWith('.ts'))
+				.map((f) => f.slice(0, -3))
+				.sort(),
+		]),
+	]
 }
 
 // The theme a color-theme.ts symlink into themes/ selects; undefined for
@@ -81,17 +100,33 @@ async function preview(name?: string): Promise<void> {
 export const theme = { names, active, select, migrate, file, preview }
 
 export const command: SlashCommand = {
-	help: () => '/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
+	help: () =>
+		'/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
 	complete: (args) => names().filter((n) => n.startsWith(args)),
 	run(args, answers) {
 		let now = active()
 		let all = names()
 		// With no name, a question to pick from, the active one chosen.
 		if (!args && !answers) {
-			let text = now.own ? `${now.own}; /theme will not replace it.`
-				: all.includes(now.name ?? '') ? 'Pick the color theme.'
-				: `${file()} selects ${now.name}, which is not in ${themesDir()}. Pick the color theme.`
-			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now.name ?? '')), preview: 'theme' }] } }
+			let text = now.own
+				? `${now.own}; /theme will not replace it.`
+				: all.includes(now.name ?? '')
+					? 'Pick the color theme.'
+					: `${file()} selects ${now.name}, which is not in ${themesDir()}. Pick the color theme.`
+			return {
+				ask: {
+					text,
+					fields: [
+						{
+							type: 'choice',
+							name: 'theme',
+							options: all,
+							initial: Math.max(0, all.indexOf(now.name ?? '')),
+							preview: 'theme',
+						},
+					],
+				},
+			}
 		}
 		args ||= answers?.theme ?? ''
 		if (!all.includes(args)) return { error: `unknown theme ${args}: choose ${all.join(', ')}` }

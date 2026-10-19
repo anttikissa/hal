@@ -23,7 +23,14 @@ export function EditBar(props: { view: ViewState }) {
 			{(e) => (
 				<div class="EditBar notice" role="status">
 					<span class="text">{amend.bar(e())}</span>
-					<button type="button" disabled={!!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving} onClick={cancel}><Icon name="close" />Cancel</button>
+					<button
+						type="button"
+						disabled={!!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving}
+						onClick={cancel}
+					>
+						<Icon name="close" />
+						Cancel
+					</button>
 				</div>
 			)}
 		</Show>

@@ -21,7 +21,9 @@ const plain = (k: KeyEvent): boolean => !k.shift && !k.ctrl && !k.alt && !k.cmd
 // works starts it, Down unchanged or Escape leaves it. The draft is set
 // aside meanwhile and comes back after. `send` takes the pause or continue.
 function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void, width: number): boolean {
-	let top = k.key === 'up' && promptLayout.position(st.prompt.text, promptLayout.rows(st.prompt.text, width), st.prompt.cursor).row === 0
+	let top =
+		k.key === 'up' &&
+		promptLayout.position(st.prompt.text, promptLayout.rows(st.prompt.text, width), st.prompt.cursor).row === 0
 	if (queuedPrompt.key(st, k, top)) return true
 	if (!plain(k) || !st.transcript) return false
 	let id = st.transcript.meta.id
@@ -38,7 +40,11 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 		return true
 	}
 	let editing = st.editing
-	if (!editing || !(k.key === 'escape' || (k.key === 'down' && editing.rewind === undefined && st.prompt.text === editing.original))) return false
+	if (
+		!editing ||
+		!(k.key === 'escape' || (k.key === 'down' && editing.rewind === undefined && st.prompt.text === editing.original))
+	)
+		return false
 	st.editing = undefined
 	let draft = drafts.text(id)
 	st.prompt = { ...prompt.cleared(st.prompt), text: draft, cursor: draft.length }
@@ -59,7 +65,11 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 		let next = amend.step(st.editing, t, k.key === 'up' ? -1 : 1)
 		if (next) {
 			st.editing = next
-			st.prompt = { ...prompt.cleared(st.prompt), text: next.original, cursor: k.key === 'up' ? recall.topEnd(next.original, width) : next.original.length }
+			st.prompt = {
+				...prompt.cleared(st.prompt),
+				text: next.original,
+				cursor: k.key === 'up' ? recall.topEnd(next.original, width) : next.original.length,
+			}
 		}
 		return true
 	}
@@ -88,10 +98,13 @@ function clip(st: PromptKeysState, k: KeyEvent, done: (r: Clip) => void): boolea
 		return k.key === 'c'
 	}
 	if (k.key !== 'v' || !(only('ctrl') || only('cmd'))) return false
-	void clipboard.read().then(async (r): Promise<Clip> => {
-		let image = 'text' in r && r.text ? null : await clipboard.image()
-		return image ? { image } : r
-	}).then(done)
+	void clipboard
+		.read()
+		.then(async (r): Promise<Clip> => {
+			let image = 'text' in r && r.text ? null : await clipboard.image()
+			return image ? { image } : r
+		})
+		.then(done)
 	return true
 }
 

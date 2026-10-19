@@ -32,13 +32,18 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	let item = status.inboxOf(id).findLast((m) => m.from === from && m.text === text)
 	if (!item) return `Sent to ${to}: it started a turn`
 	let state = status.stateOf(id)
-	if ((item.delivery === 'after-turn') && notify.asked(id)) return `Queued in ${to}: it waits for the user's answer, then reads this`
+	if (item.delivery === 'after-turn' && notify.asked(id))
+		return `Queued in ${to}: it waits for the user's answer, then reads this`
 	let held = { paused: 'paused', error: 'failed' }[state.type as string]
-	if (held) return `Waiting in ${to}: it is ${held}; this message stays pending. To resume it, SEND "${id}" "Continue your work and read pending messages" { delivery: "steer" }`
+	if (held)
+		return `Waiting in ${to}: it is ${held}; this message stays pending. To resume it, SEND "${id}" "Continue your work and read pending messages" { delivery: "steer" }`
 	if (state.type === 'blocked') return `Waiting in ${to}: it waits for the user (${state.reason}); it reads this after`
-	if (notify.asked(id) && state.type === 'idle') return `Waiting in ${to}: it waits for the user's answer, then reads this with that answer`
-	if ((item.delivery === 'after-turn')) return `Queued in ${to}: it reads this after its current turn`
-	return delivery === 'steer' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
+	if (notify.asked(id) && state.type === 'idle')
+		return `Waiting in ${to}: it waits for the user's answer, then reads this with that answer`
+	if (item.delivery === 'after-turn') return `Queued in ${to}: it reads this after its current turn`
+	return delivery === 'steer'
+		? `Interrupted ${to}: it reads this now`
+		: `Sent to ${to}: it reads this before its next request`
 }
 
 export const tool: Tool = {
@@ -54,9 +59,14 @@ export const tool: Tool = {
 			text: { type: 'string', description: 'The message' },
 			description: {
 				type: 'string',
-				description: 'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
+				description:
+					'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
 			},
-			delivery: { type: 'string', enum: ['soft-steer', 'queue', 'steer', 'emergency'], description: 'Default soft-steer; emergency aliases steer' },
+			delivery: {
+				type: 'string',
+				enum: ['soft-steer', 'queue', 'steer', 'emergency'],
+				description: 'Default soft-steer; emergency aliases steer',
+			},
 		},
 		required: ['to', 'text'],
 	},
@@ -64,14 +74,20 @@ export const tool: Tool = {
 		let { to, text, description, delivery = 'soft-steer' } = input
 		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
 		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
-		if (description !== undefined && (typeof description !== 'string' || !description.trim())) throw new Error('description must be a non-empty sentence; the message was not sent')
+		if (description !== undefined && (typeof description !== 'string' || !description.trim()))
+			throw new Error('description must be a non-empty sentence; the message was not sent')
 		if (delivery === 'emergency') delivery = 'steer'
-		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'steer') throw new Error('delivery must be soft-steer, queue or steer (emergency aliases steer)')
+		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'steer')
+			throw new Error('delivery must be soft-steer, queue or steer (emergency aliases steer)')
 		let id = target(to.trim())
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
-		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), ...(description && { summary: description.replace(/\s+/g, ' ').trim() }) }
+		let sender: Sender = {
+			from: ctx.sessionId,
+			label: tabs.label(ctx.sessionId),
+			...(description && { summary: description.replace(/\s+/g, ' ').trim() }),
+		}
 		if (delivery === 'soft-steer') sender.advisory = true
 		let refused = prompts.submit(id, text, undefined, delivery, sender)
 		if (refused) throw new Error(refused)

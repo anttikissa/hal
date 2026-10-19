@@ -19,7 +19,8 @@ import type { Item } from '../common/transcript.ts'
 function order(items: Item[]): Item[]
 function order(items: Item[], deadline: number, at?: Ordering): Ordering
 function order(items: Item[], deadline?: number, at: Ordering = { i: 0, out: [] }): Item[] | Ordering {
-	let { out } = at, i = at.i
+	let { out } = at,
+		i = at.i
 	let { split, joined, apart } = batchOrder.state
 	for (let first = true; i < items.length; first = false) {
 		if (!first && deadline !== undefined && performance.now() > deadline) break
@@ -50,7 +51,10 @@ function order(items: Item[], deadline?: number, at: Ordering = { i: 0, out: [] 
 				let short = { ...c, partial: undefined }
 				apart.add(short)
 				out.push(short)
-				if (c.partial && !own(c).length) live = [{ type: 'tool-result', id: c.id, output: c.partial, key: `${c.key}~live`, ts: c.ts, live: true } as Item]
+				if (c.partial && !own(c).length)
+					live = [
+						{ type: 'tool-result', id: c.id, output: c.partial, key: `${c.key}~live`, ts: c.ts, live: true } as Item,
+					]
 			}
 			let below = [...results.filter((r) => !calls.some((c) => c.id === r.id && together(c))), ...live]
 			for (let r of below) batchOrder.state.below.set(r, calls[0]!.key)
@@ -65,4 +69,12 @@ export type Ordering = { i: number; out: Item[] }
 
 // `below`: the blocks after a split batch's calls, by the batch's first
 // call; together they never shrink (frame.layout).
-export const batchOrder = { state: { split: new Set<string>(), joined: new WeakSet<Item>(), apart: new WeakSet<Item>(), below: new WeakMap<Item, string>() }, order }
+export const batchOrder = {
+	state: {
+		split: new Set<string>(),
+		joined: new WeakSet<Item>(),
+		apart: new WeakSet<Item>(),
+		below: new WeakMap<Item, string>(),
+	},
+	order,
+}

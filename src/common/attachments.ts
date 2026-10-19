@@ -18,7 +18,9 @@ const types: Record<string, string> = {
 // all (macOS Chrome calls .ts video/mp2t, most give .md and .toml ''),
 // and a terminal drop gives only the path.
 const textExts = new Set(
-	'txt md markdown json jsonc json5 ason asonl ndjson csv tsv log xml svg html htm css scss less js mjs cjs jsx ts mts cts tsx py rb go rs c h cc cpp hpp java kt swift sh bash zsh fish yaml yml toml ini cfg conf env sql graphql lua pl php r diff patch tex rst org'.split(' '),
+	'txt md markdown json jsonc json5 ason asonl ndjson csv tsv log xml svg html htm css scss less js mjs cjs jsx ts mts cts tsx py rb go rs c h cc cpp hpp java kt swift sh bash zsh fish yaml yml toml ini cfg conf env sql graphql lua pl php r diff patch tex rst org'.split(
+		' ',
+	),
 )
 const textTypes = /^(?:text\/|application\/(?:json|xml|javascript|x-sh|x-yaml|yaml|toml|sql|x-httpd-php)\b)/
 
@@ -27,7 +29,9 @@ const textTypes = /^(?:text\/|application\/(?:json|xml|javascript|x-sh|x-yaml|ya
 function fileKind(name: string, type = ''): string | undefined {
 	let ext = /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase()
 	if (types[type] && type.startsWith('image/')) return type
-	let image = Object.keys(types).find((t) => t.startsWith('image/') && (types[t] === ext || (ext === 'jpeg' && t === 'image/jpeg')))
+	let image = Object.keys(types).find(
+		(t) => t.startsWith('image/') && (types[t] === ext || (ext === 'jpeg' && t === 'image/jpeg')),
+	)
 	if (!type && image) return image
 	if ((ext && textExts.has(ext)) || textTypes.test(type)) return 'text/plain'
 	if (!ext && !type) return 'text/plain'
@@ -47,8 +51,14 @@ const safeExt = '[a-z0-9]{1,8}'
 const fileName = new RegExp(`^[0-9a-z]{6}\\.${safeExt}$`)
 
 // Marker addresses are links in both clients.
-const fileMarker = new RegExp(`\\[((?:image\\/[0-9a-z]{6}\\.(?:png|jpg|gif|webp)|paste\\/[0-9a-z]{6}\\.(?:${[...textExts].join('|')})|file\\/[0-9a-z]{6}\\.${safeExt}))\\]`, 'g')
-const markerPattern = new RegExp(`\\[(?:(image|paste|file)\\/([0-9a-z]{6}\\.${safeExt})|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \\d+ lines?)\\]`, 'g')
+const fileMarker = new RegExp(
+	`\\[((?:image\\/[0-9a-z]{6}\\.(?:png|jpg|gif|webp)|paste\\/[0-9a-z]{6}\\.(?:${[...textExts].join('|')})|file\\/[0-9a-z]{6}\\.${safeExt}))\\]`,
+	'g',
+)
+const markerPattern = new RegExp(
+	`\\[(?:(image|paste|file)\\/([0-9a-z]{6}\\.${safeExt})|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \\d+ lines?)\\]`,
+	'g',
+)
 
 // `file`: the name of an [image/<name>] or [paste/<name>] marker, whose
 // blob is the name without its extension.
@@ -67,7 +77,14 @@ function markers(text: string): Marker[] {
 function newName(mediaType: string, from = ''): string {
 	let chars = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => (b % 36).toString(36)).join('')
 	let own = /\.([^./]+)$/.exec(from)?.[1]?.toLowerCase()
-	let ext = mediaType === 'application/octet-stream' ? own && /^[a-z0-9]{1,8}$/.test(own) && !textExts.has(own) && !Object.values(types).includes(own) ? own : 'bin' : mediaType === 'text/plain' && own && textExts.has(own) ? own : types[mediaType]
+	let ext =
+		mediaType === 'application/octet-stream'
+			? own && /^[a-z0-9]{1,8}$/.test(own) && !textExts.has(own) && !Object.values(types).includes(own)
+				? own
+				: 'bin'
+			: mediaType === 'text/plain' && own && textExts.has(own)
+				? own
+				: types[mediaType]
 	return `${chars}.${ext}`
 }
 
@@ -75,7 +92,9 @@ function newName(mediaType: string, from = ''): string {
 function nameType(name: string): string | undefined {
 	if (!fileName.test(name)) return undefined
 	let ext = name.slice(7)
-	return textExts.has(ext) ? 'text/plain' : Object.keys(types).find((t) => types[t] === ext) ?? 'application/octet-stream'
+	return textExts.has(ext)
+		? 'text/plain'
+		: (Object.keys(types).find((t) => types[t] === ext) ?? 'application/octet-stream')
 }
 
 // The marker of pasted file `name`: [image/<name>] or [paste/<name>].
@@ -92,7 +111,12 @@ function marker(blob: string, mediaType: string, lines = 0): string {
 function label(b: Pick<ImageBlock, 'mediaType' | 'bytes'>): string {
 	let ext = types[b.mediaType] ?? b.mediaType
 	if (b.bytes === undefined) return `[image ${ext}]`
-	let size = b.bytes < 1000 ? `${b.bytes} B` : b.bytes < 1e6 ? `${Math.round(b.bytes / 1000)} kB` : `${(b.bytes / 1e6).toFixed(1)} MB`
+	let size =
+		b.bytes < 1000
+			? `${b.bytes} B`
+			: b.bytes < 1e6
+				? `${Math.round(b.bytes / 1000)} kB`
+				: `${(b.bytes / 1e6).toFixed(1)} MB`
 	return `[image ${size} ${ext}]`
 }
 

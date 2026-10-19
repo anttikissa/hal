@@ -57,7 +57,15 @@ const clip = (items: any[], text = '') => ({ items, getData: (t: string) => (t =
 test('a pasted image shows its final marker at the caret at once and uploads under that name', async () => {
 	type('ab')
 	caret = 1
-	expect(attach.paste(clip([{ kind: 'string', type: 'text/html', getAsFile: () => null }, item(new Blob([png], { type: 'image/png' }))]), insert)).toBe(true)
+	expect(
+		attach.paste(
+			clip([
+				{ kind: 'string', type: 'text/html', getAsFile: () => null },
+				item(new Blob([png], { type: 'image/png' })),
+			]),
+			insert,
+		),
+	).toBe(true)
 	let name = /^a \[image\/([0-9a-z]{6}\.png)\] b$/.exec(app.state.text)![1]
 	await tick()
 	let [c] = attaches()
@@ -71,7 +79,13 @@ test('a refused upload leaves an error text', async () => {
 	attach.files([new File([png], 'a.png', { type: 'image/png' })], insert)
 	await tick()
 	expect(attaches()).toHaveLength(1)
-	app.onEvent({ type: 'rejected', sessionId, command: 'attach', reason: 'attachment is not image/png', id: attaches()[0].id })
+	app.onEvent({
+		type: 'rejected',
+		sessionId,
+		command: 'attach',
+		reason: 'attachment is not image/png',
+		id: attaches()[0].id,
+	})
 	expect(app.state.text).not.toContain('[image/')
 	expect(app.state.text).toContain('attachment is not image/png')
 })
@@ -105,15 +119,25 @@ test('pasted PDF file uploads rather than pasting clipboard text', async () => {
 	expect(attach.paste(clip([item(file)], 'ordinary text'), insert)).toBe(true)
 	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.pdf\] $/)
 	await tick()
-	expect(attaches()[0]).toMatchObject({ mediaType: 'application/octet-stream', name: app.state.text.trimEnd().slice(6, -1) })
+	expect(attaches()[0]).toMatchObject({
+		mediaType: 'application/octet-stream',
+		name: app.state.text.trimEnd().slice(6, -1),
+	})
 })
 
 test('dropped binary, image and text files become markers at the caret in order', async () => {
 	type('ab')
 	caret = 1
-	let files = [new File([png], 'shot.png', { type: 'image/png' }), new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }), new File(['# hi\n'], 'notes.md', { type: '' })]
+	let files = [
+		new File([png], 'shot.png', { type: 'image/png' }),
+		new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }),
+		new File(['# hi\n'], 'notes.md', { type: '' }),
+	]
 	attach.files(files, insert)
-	let [, image, file, paste] = /^a \[image\/([0-9a-z]{6}\.png)\] \[file\/([0-9a-z]{6}\.pdf)\] \[paste\/([0-9a-z]{6}\.md)\] b$/.exec(app.state.text)!
+	let [, image, file, paste] =
+		/^a \[image\/([0-9a-z]{6}\.png)\] \[file\/([0-9a-z]{6}\.pdf)\] \[paste\/([0-9a-z]{6}\.md)\] b$/.exec(
+			app.state.text,
+		)!
 	await tick()
 	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
 		[image, 'image/png', Buffer.from(png).toString()],
@@ -131,7 +155,14 @@ test('a file is an image, text by extension or type, or opaque binary', () => {
 	expect(kind('weird', 'text/x-custom')).toBe('text/plain')
 	expect(kind('Makefile')).toBe('text/plain')
 	expect(kind('logo.svg', 'image/svg+xml')).toBe('text/plain')
-	for (let [name, type] of [['paper.pdf', 'application/pdf'], ['photo.heic', 'image/heic'], ['a.zip', 'application/zip'], ['blob.bin', ''], ['movie.mp4', 'video/mp4']]) expect(kind(name!, type)).toBe('application/octet-stream')
+	for (let [name, type] of [
+		['paper.pdf', 'application/pdf'],
+		['photo.heic', 'image/heic'],
+		['a.zip', 'application/zip'],
+		['blob.bin', ''],
+		['movie.mp4', 'video/mp4'],
+	])
+		expect(kind(name!, type)).toBe('application/octet-stream')
 })
 
 test('an image too large to send is refused before reading it', () => {

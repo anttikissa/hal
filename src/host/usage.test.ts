@@ -54,7 +54,10 @@ test("Codex's primary and secondary windows are named by their span", () => {
 			'x-codex-secondary-reset-at': secs(now + 86400_000),
 		}),
 	)
-	expect(w).toEqual({ '5h': { used: 12, resets: new Date(now + 600_000).toISOString() }, '7d': { used: 100, resets: at(now + 86400_000) } })
+	expect(w).toEqual({
+		'5h': { used: 12, resets: new Date(now + 600_000).toISOString() },
+		'7d': { used: 100, resets: at(now + 86400_000) },
+	})
 	expect(usage.parse(new Headers({ 'content-type': 'text/event-stream' }))).toEqual({})
 })
 
@@ -104,12 +107,16 @@ test('rotation spends first the week needing the fastest pace; spent accounts co
 })
 
 test('a Sonnet-only week does not steer another Claude model to a busier account', () => {
-	usage.observe('anthropic', 'a', new Headers({
-		'anthropic-ratelimit-unified-7d_sonnet-utilization': '0.99',
-		'anthropic-ratelimit-unified-7d_sonnet-reset': secs(now + 86400_000),
-		'anthropic-ratelimit-unified-5h-utilization': '0.1',
-		'anthropic-ratelimit-unified-5h-reset': secs(now + 3600_000),
-	}))
+	usage.observe(
+		'anthropic',
+		'a',
+		new Headers({
+			'anthropic-ratelimit-unified-7d_sonnet-utilization': '0.99',
+			'anthropic-ratelimit-unified-7d_sonnet-reset': secs(now + 86400_000),
+			'anthropic-ratelimit-unified-5h-utilization': '0.1',
+			'anthropic-ratelimit-unified-5h-reset': secs(now + 3600_000),
+		}),
+	)
 	usage.observe('anthropic', 'b', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.4' }))
 	expect(usage.order('anthropic', ['a', 'b'], (x) => x)).toEqual(['a', 'b'])
 })

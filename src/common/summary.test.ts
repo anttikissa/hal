@@ -15,7 +15,8 @@ test('a tag quoted in code is text, not the summary', () => {
 	let full = 'Reports use their `<summary>` line.\n\n<summary>Done.</summary>'
 	expect(summary.strip(full)).toBe('Reports use their `<summary>` line.')
 	expect(summary.extract(full)).toBe('Done.')
-	for (let n = 'Reports use their `<summary>` line.'.length; n <= full.length; n++) expect(summary.strip(full.slice(0, n))).toBe('Reports use their `<summary>` line.')
+	for (let n = 'Reports use their `<summary>` line.'.length; n <= full.length; n++)
+		expect(summary.strip(full.slice(0, n))).toBe('Reports use their `<summary>` line.')
 })
 
 test('fenced and inline examples survive stripping and do not supply notifications', () => {
@@ -60,7 +61,8 @@ test('a question tag is hidden and extracted like a summary, and marks the reply
 	expect(summary.strip(full)).toBe('Two options.')
 	expect(summary.extract(full)).toBe('Use the new API or keep the old one?')
 	expect(summary.asks(full)).toBe(true)
-	for (let n = 'Two options.'.length; n <= full.length; n++) expect(summary.strip(full.slice(0, n))).toBe('Two options.')
+	for (let n = 'Two options.'.length; n <= full.length; n++)
+		expect(summary.strip(full.slice(0, n))).toBe('Two options.')
 	expect(summary.asks('Done.\n<summary>Done.</summary>')).toBe(false)
 	expect(summary.asks('Asking `<question>x</question>` in code.')).toBe(false)
 	expect(summary.asks(`${full}\n<summary>Waiting for a decision.</summary>`)).toBe(true)
@@ -72,7 +74,9 @@ test('notification-only answers stay visible without duplicating normal answers'
 		let text = `<${tag}>Stopped.</${tag}>`
 		expect(summary.answer(text)).toBe('Stopped.')
 		expect(summary.answer(` \n${text}\n`).trim()).toBe('Stopped.')
-		expect(summary.answer(`Visible answer.\n${text}`)).toBe(tag === 'question' ? 'Visible answer.\nStopped.' : 'Visible answer.')
+		expect(summary.answer(`Visible answer.\n${text}`)).toBe(
+			tag === 'question' ? 'Visible answer.\nStopped.' : 'Visible answer.',
+		)
 		expect(summary.answer(`${text}\n<rename>New name</rename>`)).toBe('Stopped.')
 		for (let n = 1; n < text.length; n++) expect(summary.answer(text.slice(0, n))).toBe('')
 	}

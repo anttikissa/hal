@@ -19,17 +19,32 @@ function pending(id: string): ContextTransition | undefined {
 	return contextTransition.pending(history.readSync(id))
 }
 
-function output(id: string, text: string, fields: { transition?: ContextTransition; transitionDone?: string; transitionCancel?: string }): void {
+function output(
+	id: string,
+	text: string,
+	fields: { transition?: ContextTransition; transitionDone?: string; transitionCancel?: string },
+): void {
 	let r = history.append(id, { type: 'output', text, ...fields })
 	if (!fields.transitionDone) host.broadcast(id, { type: 'output', sessionId: id, text, n: r.n, ts: r.ts })
 }
 
 function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): Reply {
 	if (contextTransitions.pending(id)) return { error: 'a context transition is already pending; wait or press Escape' }
-	if (kind === 'compact' && !turns.state.running.has(id) && !prompt.length && !compact.anything(history.readSync(id)) && history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact') {
+	if (
+		kind === 'compact' &&
+		!turns.state.running.has(id) &&
+		!prompt.length &&
+		!compact.anything(history.readSync(id)) &&
+		history.readSync(id).findLast((r) => r.type === 'compact' || r.type === 'reset')?.type !== 'compact'
+	) {
 		return { say: 'nothing to compact' }
 	}
-	let intent: ContextTransition = { id: crypto.randomUUID(), kind, sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }), ...(kind === 'clear' && prompt.length && { prompt }) }
+	let intent: ContextTransition = {
+		id: crypto.randomUUID(),
+		kind,
+		sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }),
+		...(kind === 'clear' && prompt.length && { prompt }),
+	}
 	contextTransitions.output(id, `/${kind} accepted; applying after active work settles.`, { transition: intent })
 	let running = turns.state.running.get(id)
 	let state = status.stateOf(id)
@@ -41,14 +56,14 @@ function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: 
 			host.broadcast(id, { type: 'state', sessionId: id, state: status.derive(id, history.readSync(id)) })
 		}
 		contextTransitions.apply(id)
-	}
-	else if (kind === 'clear' && (state.type !== 'running' || state.phase !== 'tools')) running.controller.abort()
+	} else if (kind === 'clear' && (state.type !== 'running' || state.phase !== 'tools')) running.controller.abort()
 	return { result: `/${kind} accepted; the host applies it after this exchange settles.` }
 }
 
 function cancel(id: string): void {
 	let intent = contextTransitions.pending(id)
-	if (intent && !intent.canceled) contextTransitions.output(id, 'Automatic context continuation canceled.', { transitionCancel: intent.id })
+	if (intent && !intent.canceled)
+		contextTransitions.output(id, 'Automatic context continuation canceled.', { transitionCancel: intent.id })
 }
 
 function settle(id: string): void {
@@ -59,7 +74,12 @@ function settle(id: string): void {
 		if (r.type === 'user') for (let b of r.blocks) if (b.type === 'tool_result') unanswered.delete(b.id)
 	}
 	if (unanswered.size) {
-		let results = [...unanswered].map((id) => ({ type: 'tool_result' as const, id, output: 'No result: the host stopped before settlement; this call may or may not have run.', isError: true }))
+		let results = [...unanswered].map((id) => ({
+			type: 'tool_result' as const,
+			id,
+			output: 'No result: the host stopped before settlement; this call may or may not have run.',
+			isError: true,
+		}))
 		let r = history.append(id, { type: 'user', blocks: results })
 		host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
 	}

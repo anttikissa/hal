@@ -34,7 +34,16 @@ import { promptChanges } from '../common/prompt-changes.ts'
 // sent, by its item's key, so its row keeps the key it had while pending
 // (and its card moves, not remounts, to where the host put it, task rk)
 // (showing another tab starts a new view state, and a new map).
-export type ViewState = { transcript?: Transcript; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; names?: Record<string, string>; sent?: Record<string, string> }
+export type ViewState = {
+	transcript?: Transcript
+	notice?: string
+	form?: FormState
+	editing?: Editing
+	modal?: ModalState
+	models?: string[]
+	names?: Record<string, string>
+	sent?: Record<string, string>
+}
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -51,7 +60,9 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	}
 	if (event.type === 'models') {
 		if (event.sessionId !== st.transcript?.meta.id || (event.refresh && !st.modal?.tree)) return st
-		let modal = event.refresh ? picker.refresh(st.modal!, event.items, event.names, event.capabilities) : picker.open(event.current, event.items, event.names, event.capabilities, event.effort)
+		let modal = event.refresh
+			? picker.refresh(st.modal!, event.items, event.names, event.capabilities)
+			: picker.open(event.current, event.items, event.names, event.capabilities, event.effort)
 		return { ...st, modal, models: event.items, names: event.names ?? {} }
 	}
 	if (event.type === 'restart-ask') return { ...st, modal: modals.restart(event.scope, event.calls) }
@@ -62,7 +73,11 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
-	if ((event.type === 'turn-start' || event.type === 'prompt' || event.type === 'command') && event.command && event.n !== undefined) {
+	if (
+		(event.type === 'turn-start' || event.type === 'prompt' || event.type === 'command') &&
+		event.command &&
+		event.n !== undefined
+	) {
 		let at = event.type === 'prompt' ? event.texts.length - 1 : 0
 		next.sent = { ...st.sent, [transcript.key(event.n, at, 0)]: event.command }
 	}
@@ -75,8 +90,28 @@ function onEvent(st: ViewState, event: Event): ViewState {
 // A browser key as a form key, or undefined for keys forms ignore.
 // With Alt, macOS types a symbol (Option-D is ∂): the physical key's
 // letter names it then.
-function key(e: { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): Key | undefined {
-	let names: Record<string, string> = { F1: 'f1', Enter: 'enter', Escape: 'escape', Tab: 'tab', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end' }
+function key(e: {
+	key: string
+	code?: string
+	shiftKey: boolean
+	ctrlKey: boolean
+	altKey: boolean
+	metaKey: boolean
+}): Key | undefined {
+	let names: Record<string, string> = {
+		F1: 'f1',
+		Enter: 'enter',
+		Escape: 'escape',
+		Tab: 'tab',
+		ArrowUp: 'up',
+		ArrowDown: 'down',
+		ArrowLeft: 'left',
+		ArrowRight: 'right',
+		Backspace: 'backspace',
+		Delete: 'delete',
+		Home: 'home',
+		End: 'end',
+	}
 	let mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey }
 	if (names[e.key]) return { key: names[e.key]!, ...mods }
 	let letter = e.altKey && !/^[a-z]$/i.test(e.key) && /^Key([A-Z])$/.exec(e.code ?? '')?.[1]
@@ -103,7 +138,16 @@ const tabKeys = new Set(['new', 'close', 'resume'])
 
 function commandKey(st: ViewState, k: Key, mac: boolean): unknown {
 	let c = commandList.byKey({ key: k.key, shift: !!k.shift, alt: !!k.alt, ctrl: !!k.ctrl, cmd: !!k.cmd })
-	if (!c || c.clientOnly || tabKeys.has(c.name) || c.name === 'restart' || c.name === 'redraw' || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
+	if (
+		!c ||
+		c.clientOnly ||
+		tabKeys.has(c.name) ||
+		c.name === 'restart' ||
+		c.name === 'redraw' ||
+		!commandList.onWeb(c.key!, mac) ||
+		!st.transcript
+	)
+		return undefined
 	let sessionId = st.transcript.meta.id
 	return c.name === 'model' ? { type: 'models', sessionId } : { type: 'submit', sessionId, text: `/${c.name}` }
 }
@@ -116,10 +160,18 @@ function closed(st: ViewState): ViewState {
 // A key on the open modal: the view after and the command Enter sends.
 function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
 	if (!st.modal || !st.transcript) return { state: st }
-	let { state, action } = st.modal.settings ? settingsModal.step(st.modal, k, st.transcript.meta.id) : st.modal.restart ? modals.step(st.modal, k) : picker.step(st.modal, k, st.models ?? [], st.names)
+	let { state, action } = st.modal.settings
+		? settingsModal.step(st.modal, k, st.transcript.meta.id)
+		: st.modal.restart
+			? modals.step(st.modal, k)
+			: picker.step(st.modal, k, st.models ?? [], st.names)
 	if (!action) return { state: { ...st, modal: state } }
 	if (action.type === 'send') return { state: { ...st, modal: state }, command: action.command }
-	let command = state.restart ? modals.restartCommand(state, action, st.transcript.meta.id) : action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
+	let command = state.restart
+		? modals.restartCommand(state, action, st.transcript.meta.id)
+		: action.type === 'submit'
+			? picker.command(st.transcript.meta.id, state, action)
+			: undefined
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }
 
@@ -127,7 +179,8 @@ function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown 
 // (typed natively in its input).
 function search(st: ViewState, text: string, edit = false): ViewState {
 	if (!st.modal?.form) return st
-	if (st.modal.settings) return { ...st, modal: edit ? settingsModal.edited(st.modal, text) : settingsModal.search(st.modal, text) }
+	if (st.modal.settings)
+		return { ...st, modal: edit ? settingsModal.edited(st.modal, text) : settingsModal.search(st.modal, text) }
 	let modal = { ...st.modal, form: forms.set(st.modal.form, 0, text), selected: 0, scroll: 0 }
 	return { ...st, modal: picker.refilter(modal, st.models ?? [], st.names) }
 }
@@ -137,14 +190,27 @@ function search(st: ViewState, text: string, edit = false): ViewState {
 // failed turn), or show why not (the typed text stays).
 // While editing a prompt, Enter sends the edit; emptied, an edit from
 // an Edit button cancels (task 26q).
-function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { command?: unknown; notice?: string; keep: boolean } {
+function submit(
+	st: ViewState,
+	text: string,
+	delivery: Delivery = 'steer',
+): { command?: unknown; notice?: string; keep: boolean } {
 	if (st.editing) {
-		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, delivery === 'queue')
+		let command =
+			st.editing.aside && !text.trim()
+				? amend.resume(st.editing, st.transcript)
+				: amend.enter(st.editing, st.transcript, text, delivery === 'queue')
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
 	if (!text.trim() && delivery === 'steer') text = states.nudge(st.transcript.state) ?? text
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.delivery === 'after-turn'))
+	let { command, refused } = states.enter(
+		st.transcript.meta.id,
+		st.transcript.state,
+		text,
+		delivery,
+		st.transcript.inbox.some((m) => m.delivery === 'after-turn'),
+	)
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
 }
@@ -152,7 +218,11 @@ function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { co
 // Up, Down or Escape with `text` in the input, for editing the last
 // prompt: the view after, the command to send and the input's new text;
 // undefined if the key means nothing here.
-function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { view: ViewState; command?: unknown; text: string } | undefined {
+function editKey(
+	st: ViewState,
+	key: 'up' | 'down' | 'escape',
+	text: string,
+): { view: ViewState; command?: unknown; text: string } | undefined {
 	let editing = st.editing
 	if (editing && key !== 'escape' && st.transcript) {
 		let next = amend.step(editing, st.transcript, key === 'up' ? -1 : 1)
@@ -161,7 +231,9 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 	}
 	if (key === 'up') {
 		let begun = !editing && amend.begin(st.transcript)
-		return begun ? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original } : undefined
+		return begun
+			? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original }
+			: undefined
 	}
 	if (!editing || editing.aside || (key === 'down' && text !== editing.original)) return undefined
 	let command = amend.resume(editing, st.transcript)
@@ -183,7 +255,11 @@ function complete(st: ViewState, text: string): unknown {
 
 // The host's completions, if the box still holds `input`, what was
 // sent: its new text and what to tell (the choices, or none found).
-function completed(st: ViewState, event: Event & { type: 'completions' }, input: string): { text: string; notice?: string } | undefined {
+function completed(
+	st: ViewState,
+	event: Event & { type: 'completions' },
+	input: string,
+): { text: string; notice?: string } | undefined {
 	if (st.transcript?.meta.id !== event.sessionId || input !== event.text) return undefined
 	let { text, choices } = completion.apply(event.text, event.items)
 	let notice = choices ? choices.join('  ') : event.items.length ? undefined : 'no completions'
@@ -221,7 +297,8 @@ function line(st: ViewState, connected: boolean): Line {
 	let s = t.state
 	if (queueEdit.waiting(t)) return { text: 'waiting for queue edit', tone: 'warn' }
 	let jobs = t.meta.background?.length ?? 0
-	if (s.type === 'idle') return jobs ? { text: states.withJobs(undefined, jobs)!, tone: 'busy' } : { text: 'idle', tone: 'idle' }
+	if (s.type === 'idle')
+		return jobs ? { text: states.withJobs(undefined, jobs)!, tone: 'busy' } : { text: 'idle', tone: 'idle' }
 	let text = states.withJobs(states.describe(s, undefined, t.items), s.type === 'running' ? jobs : 0) ?? ''
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
@@ -231,14 +308,24 @@ function line(st: ViewState, connected: boolean): Line {
 function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 	if (st.editing) {
 		let hint = amend.hint(st.editing, text)
-		return hint.slice(hint.indexOf(']') + 2).split(', ').map((s) => s.split(': ') as [string, string])
+		return hint
+			.slice(hint.indexOf(']') + 2)
+			.split(', ')
+			.map((s) => s.split(': ') as [string, string])
 	}
 	if (!menu) return sendKeys.hints(st.transcript?.state, text, st.transcript?.items)
 	let busy = !!st.transcript && states.busy(st.transcript.state)
 	let command = sendKeys.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
 	let queue: [string, string][] = busy && !command && sendKeys.key('queue') ? [[sendKeys.key('queue')!, 'queue']] : []
-	return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift-enter', 'newline'], ...queue, ['esc', 'dismiss']]
+	return [
+		['enter', enter],
+		['↑/↓', 'select'],
+		['tab', 'complete'],
+		['shift-enter', 'newline'],
+		...queue,
+		['esc', 'dismiss'],
+	]
 }
 
 // A transcript row: an item, and for a tool call its result once it
@@ -248,7 +335,16 @@ function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 // prompt or command this client sent, the command id it had while pending.
 // `pending`: sent, not yet acknowledged. `waiting`: in the inbox;
 // `note`: a queued message's compact row starts with it (task 16).
-export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; call?: Item & { type: 'tool' }; pending?: true; waiting?: true; note?: string }
+export type Row = {
+	item: Item
+	at: number
+	key: string
+	result?: Item & { type: 'tool-result' }
+	call?: Item & { type: 'tool' }
+	pending?: true
+	waiting?: true
+	note?: string
+}
 
 function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = []): Row[] {
 	let out: Row[] = []
@@ -268,14 +364,19 @@ function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = 
 		let row: Row = { item, at, key: sent[item.key] ?? item.key }
 		let background = bashResult.background(item)
 		if (background) row.call = keyedCalls.get(background.replace(/^t/, ''))
-		if (item.type === 'tool') { calls.set(item.id, row); keyedCalls.set(item.key, item) }
+		if (item.type === 'tool') {
+			calls.set(item.id, row)
+			keyedCalls.set(item.key, item)
+		}
 		out.push(row)
 	}
 	if (!before.length) return out
 	let previous = new Map(before.map((row) => [row.key, row]))
 	let next = out.map((row) => {
 		let old = previous.get(row.key)
-		return old && old.item === row.item && old.result === row.result && old.call === row.call && old.at === row.at ? old : row
+		return old && old.item === row.item && old.result === row.result && old.call === row.call && old.at === row.at
+			? old
+			: row
 	})
 	return next.length === before.length && next.every((row, i) => row === before[i]) ? before : next
 }
@@ -284,17 +385,26 @@ function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = 
 // command id), but for one the host already put in the transcript: it
 // is a row already, under the same key, so its card stays. `tabs`: the
 // host's tab ids in order, numbering a queued message's sender.
-function withPending(rows: Row[], pending: { id: string; text: string; ts?: string }[], waiting: InboxItem[] = [], tabs: string[] = [], held?: string): Row[] {
+function withPending(
+	rows: Row[],
+	pending: { id: string; text: string; ts?: string }[],
+	waiting: InboxItem[] = [],
+	tabs: string[] = [],
+	held?: string,
+): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
 	let row = (m: InboxItem): Row => {
 		let r: Row = { item: transcript.waitingItem(m), at, key: m.id, waiting: true }
-		if ((m.delivery === 'after-turn')) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
+		if (m.delivery === 'after-turn')
+			r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
 		return r
 	}
 	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)
 	for (let row of queued) keys.add(row.key)
-	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, ts: s.ts, key: s.id }, at, key: s.id, pending: true }))
+	let more = pending
+		.filter((s) => !keys.has(s.id))
+		.map((s): Row => ({ item: { type: 'prompt', text: s.text, ts: s.ts, key: s.id }, at, key: s.id, pending: true }))
 	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
 }
 
@@ -302,7 +412,13 @@ function withPending(rows: Row[], pending: { id: string; text: string; ts?: stri
 // result says so) and no 'bash t<key>' message has come back. The host
 // refuses /kill for one that has just ended.
 function jobs(rows: Row[]): ReadonlySet<string> {
-	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && /^bash #?t?\d+$/.test(r.item.label ?? '') ? [r.item.label!.replace(/^bash #?t?/, '')] : [])))
+	let done = new Set(
+		rows.flatMap((r) =>
+			r.item.type === 'prompt' && /^bash #?t?\d+$/.test(r.item.label ?? '')
+				? [r.item.label!.replace(/^bash #?t?/, '')]
+				: [],
+		),
+	)
 	let out = new Set<string>()
 	for (let r of rows) {
 		let n = r.result?.output.match(/^started in background as #t?(\d+)/)?.[1]
@@ -333,7 +449,16 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'tool-result': {
 			// Short rows, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
-			let rows = (item.diff ?? (item.interrupted ? bashResult.display(item.output, true) : bash ? bashResult.display(item.output) : item.output)).replace(/\n$/, '').split('\n')
+			let rows = (
+				item.diff ??
+				(item.interrupted
+					? bashResult.display(item.output, true)
+					: bash
+						? bashResult.display(item.output)
+						: item.output)
+			)
+				.replace(/\n$/, '')
+				.split('\n')
 			let shown = full ? rows : rows.slice(0, settings.shortRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			// An EDIT's diff: its rows as they are; Card colors each.
@@ -341,11 +466,16 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '') + shown.join('\n') }
 		}
 		case 'turn-end':
-			if (item.status === 'error') return { kind: 'end error', text: titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`) }
+			if (item.status === 'error')
+				return { kind: 'end error', text: titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`) }
 			if (item.status === 'completed') return null
 			return { kind: 'end log', text: titles.ended(item.ts, item.status) }
 		case 'question': {
-			let said = item.canceled ? ['(canceled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			let said = item.canceled
+				? ['(canceled)']
+				: item.answers
+					? forms.summary(item.form, item.answers, item.secrets)
+					: ['(not answered)']
 			let quote = item.form.quote ? [...item.form.quote.text.split('\n').map((l) => `    ${l}`), ''] : []
 			return { kind: 'question warning', text: [...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
@@ -358,7 +488,10 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'output':
 			// A prompt-file change or commit: its first line heads the card,
 			// so the body is the rest (tasks ar, 179).
-			return { kind: item.commit ? 'output commit-card' : item.error ? 'output error' : 'output plain', text: item.change || item.commit ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
+			return {
+				kind: item.commit ? 'output commit-card' : item.error ? 'output error' : 'output plain',
+				text: item.change || item.commit ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text,
+			}
 		case 'divider':
 			return { kind: 'divider log', text: titles.stamp(item.ts, item.text) }
 	}

@@ -35,7 +35,10 @@ function files(text: string): string[] | undefined {
 	let token = /'[^']*'|"[^"]*"|(?:\\.|[^\s\\'"])+/g
 	let tokens = text.match(token)
 	if (!tokens || tokens.length < 2 || text.replace(token, '').trim()) return undefined
-	let exists = (t: string) => { let p = paste.path(t); return p.startsWith('/') && !!statSync(p, { throwIfNoEntry: false })?.isFile() }
+	let exists = (t: string) => {
+		let p = paste.path(t)
+		return p.startsWith('/') && !!statSync(p, { throwIfNoEntry: false })?.isFile()
+	}
 	return tokens.every(exists) ? tokens : undefined
 }
 
@@ -70,7 +73,13 @@ function file(text: string): { mediaType: string; bytes: Uint8Array; name: strin
 
 // Sends `bytes` for session `sessionId`; the placeholder to insert.
 // `from`: the file's own name (uploads.begin).
-function upload(sessionId: string, mediaType: string, bytes: Uint8Array, send: (command: unknown) => void, from = ''): string {
+function upload(
+	sessionId: string,
+	mediaType: string,
+	bytes: Uint8Array,
+	send: (command: unknown) => void,
+	from = '',
+): string {
 	let big = uploads.tooBig(bytes.length)
 	if (big) return big
 	let id = connection.nextId()
@@ -97,11 +106,16 @@ function key(sessionId: string, k: KeyEvent, send: (command: unknown) => void): 
 	if (many) return { ...k, text: many.map((t) => attach(t) ?? t).join(' ') }
 	let one = attach(text)
 	if (one !== undefined) return { ...k, text: one }
-	if (uploads.long(text)) return { ...k, text: paste.upload(sessionId, 'text/plain', new TextEncoder().encode(text), send) }
+	if (uploads.long(text))
+		return { ...k, text: paste.upload(sessionId, 'text/plain', new TextEncoder().encode(text), send) }
 	return k
 }
 
-type Prompts = { transcript?: { meta: { id: string } }; prompt: PromptState; hidden: Map<string, { prompt?: PromptState }> }
+type Prompts = {
+	transcript?: { meta: { id: string } }
+	prompt: PromptState
+	hidden: Map<string, { prompt?: PromptState }>
+}
 
 // Puts the host's answer to an upload in place of its placeholder: in
 // the prompt shown or kept for a hidden tab, and in the draft.
@@ -113,7 +127,11 @@ function settled(st: Prompts, event: Event): Settled | undefined {
 	let kept = st.hidden.get(id)
 	if (kept?.prompt) kept.prompt = uploads.swap(kept.prompt, placeholder, text)
 	let draft = drafts.text(id)
-	if (draft.includes(placeholder)) drafts.edit(id, draft.replace(placeholder, () => text))
+	if (draft.includes(placeholder))
+		drafts.edit(
+			id,
+			draft.replace(placeholder, () => text),
+		)
 	return done
 }
 

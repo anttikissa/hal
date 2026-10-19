@@ -29,7 +29,16 @@ import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { auth } from './auth.ts'
 
-export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string; model?: string; name?: string; limit: number; callId?: string }
+export type Spawn = {
+	kind: SpawnKind
+	task: string
+	fork: boolean
+	cwd: string
+	model?: string
+	name?: string
+	limit: number
+	callId?: string
+}
 
 // Opens the child and starts its first turn; returns its id. Throws,
 // spending nothing, when an owner ancestor has too few slots left or the
@@ -38,22 +47,37 @@ function spawn(owner: string, s: Spawn): string {
 	let meta = sessions.open(owner)
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
 	let limited = auth.limitedUntil(selected.id)
-	if (limited) throw new Error(`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC on every ${selected.id.split('/')[0]} account`)
+	if (limited)
+		throw new Error(
+			`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC on every ${selected.id.split('/')[0]} account`,
+		)
 	if (!Number.isSafeInteger(s.limit) || s.limit < 0) throw new Error('limit must be a non-negative integer')
 	let charged: SessionMeta[] = []
 	if (s.kind !== 'interactive') {
 		let left = meta.slots ?? settings.subagentSlots()
-		if (s.limit > left - 1) throw new Error(`limit ${s.limit} needs at least ${s.limit + 1} spawn slots, but this session has ${left} left`)
+		if (s.limit > left - 1)
+			throw new Error(`limit ${s.limit} needs at least ${s.limit + 1} spawn slots, but this session has ${left} left`)
 		for (let at: SessionMeta | undefined = meta; at; at = at.owner ? sessions.open(at.owner) : undefined) {
 			if (charged.includes(at)) throw new Error(`owner cycle at ${at.id}`)
 			if ((at.slots ?? settings.subagentSlots()) === 0) throw new Error(`session ${at.id} has 0 spawn slots left`)
 			charged.push(at)
 		}
 	}
-	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name, autoclose: s.kind === 'subagent', interactive: promptCache.interactive(owner) })
-	Object.assign(child, { ...(s.kind !== 'interactive' && { owner, slots: s.limit }), spawn: s.kind } satisfies Partial<SessionMeta>)
+	let child = sessions.create({
+		cwd: s.cwd,
+		model: models.qualified(selected.id, selected.effort),
+		name: s.name,
+		autoclose: s.kind === 'subagent',
+		interactive: promptCache.interactive(owner),
+	})
+	Object.assign(child, {
+		...(s.kind !== 'interactive' && { owner, slots: s.limit }),
+		spawn: s.kind,
+	} satisfies Partial<SessionMeta>)
 	if (child.owner && s.callId) {
-		let call = history.readSync(owner).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === s.callId)
+		let call = history
+			.readSync(owner)
+			.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === s.callId)
 		if (call?.n !== undefined) child.ownerCall = call.n
 	}
 	if (s.fork) subagents.fork(owner, child.id)
@@ -79,9 +103,13 @@ function spawn(owner: string, s: Spawn): string {
 // are, without the parent's waiting inbox. The parent's turn is still
 // running this round's calls, so the copy answers them and ends it.
 function fork(parent: string, child: string): void {
-	let records = replay.current(history.readSync(parent)).filter((r) => r.type !== 'inbox').map((r) => ({ ...r, originSession: r.originSession ?? parent }))
+	let records = replay
+		.current(history.readSync(parent))
+		.filter((r) => r.type !== 'inbox')
+		.map((r) => ({ ...r, originSession: r.originSession ?? parent }))
 	writeFileSync(history.file(child), records.map((r) => lines.encode(r)).join(''))
-	let source = sessions.open(parent), target = sessions.open(child)
+	let source = sessions.open(parent),
+		target = sessions.open(child)
 	target.parent = parent
 	target.interactive = promptCache.interactive(parent)
 	if (source.startingState) target.startingState = { ...source.startingState }
@@ -97,13 +125,29 @@ function fork(parent: string, child: string): void {
 		if (r.type === 'assistant' && r.block.type === 'tool_call') pending.push(r.block.id)
 	}
 	let output = `Not run here: copied from ${parent} while it was still running there.`
-	if (pending.length) history.append(child, { type: 'user', blocks: pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output })) })
+	if (pending.length)
+		history.append(child, {
+			type: 'user',
+			blocks: pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output })),
+		})
 	history.append(child, { type: 'output', text: `Forked from ${parent}. Everything above happened there.` })
-	let last = records.findLast((r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue' || r.type === 'turn_end')
+	let last = records.findLast(
+		(r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue' || r.type === 'turn_end',
+	)
 	if (last && last.type !== 'turn_end') history.append(child, { type: 'turn_end', status: 'completed', usage: {} })
-	let previous = { cwd: source.cwd, model: models.qualified(source.model, source.effort), autoclose: source.autoclose ?? false }
-	let next = { cwd: target.cwd, model: models.qualified(target.model, target.effort), autoclose: target.autoclose ?? false }
-	let changed = Object.fromEntries(Object.entries(next).filter(([key, value]) => value !== previous[key as keyof typeof previous]))
+	let previous = {
+		cwd: source.cwd,
+		model: models.qualified(source.model, source.effort),
+		autoclose: source.autoclose ?? false,
+	}
+	let next = {
+		cwd: target.cwd,
+		model: models.qualified(target.model, target.effort),
+		autoclose: target.autoclose ?? false,
+	}
+	let changed = Object.fromEntries(
+		Object.entries(next).filter(([key, value]) => value !== previous[key as keyof typeof previous]),
+	)
 	if (Object.keys(changed).length) history.append(child, { type: 'change', ...changed, previous })
 }
 
@@ -127,10 +171,14 @@ function owed(id: string, records: HistoryRecord[]): boolean {
 	let reports = false
 	let starts = true
 	for (let r of records) {
-		if (r.type === 'inbox' && r.delivery !== 'after-turn' && r.from === undefined && r.origin !== 'model') owned = reports = false
+		if (r.type === 'inbox' && r.delivery !== 'after-turn' && r.from === undefined && r.origin !== 'model')
+			owned = reports = false
 		else if (r.type === 'turn_end') starts = true
 		else if (r.type === 'continue' || r.type === 'assistant') starts = false
-		else if (r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')) {
+		else if (
+			r.type === 'user' &&
+			r.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
+		) {
 			owned = reports = false
 			starts = false
 		} else if (r.type === 'user' && starts) {
@@ -163,22 +211,41 @@ function report(id: string): void {
 	else {
 		let turn = records.slice(records.findLastIndex((r, i) => r.type === 'turn_end' && i < records.length - 1) + 1)
 		let last = turn.findLast((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.trim())
-		text = last?.type === 'assistant' && last.block.type === 'text' ? last.block.text : `Session ${label} finished without a message`
+		text =
+			last?.type === 'assistant' && last.block.type === 'text'
+				? last.block.text
+				: `Session ${label} finished without a message`
 	}
 	let owner = meta.owner
 	subagents.delivering.add(id)
-	let settled = () => { subagents.delivering.delete(id); work.wake(id) }
+	let settled = () => {
+		subagents.delivering.delete(id)
+		work.wake(id)
+	}
 	let deliver = () => {
 		try {
 			// A child stopped by tab close must not wake an idle, now unseen owner.
 			if (tabs.file().closed.some((tab) => tab.id === owner) && !tabs.file().open.includes(owner)) return
-			let refused = prompts.submit(owner, text, undefined, 'steer', { from: id, label, advisory: true, summary: summary.extract(text), ...(summary.extract(text) && end.status === 'completed' ? { report: summary.asks(text) ? 'question' as const : 'summary' as const } : {}) })
+			let refused = prompts.submit(owner, text, undefined, 'steer', {
+				from: id,
+				label,
+				advisory: true,
+				summary: summary.extract(text),
+				...(summary.extract(text) && end.status === 'completed'
+					? { report: summary.asks(text) ? ('question' as const) : ('summary' as const) }
+					: {}),
+			})
 			if (refused) diag.log(`report ${id} to ${owner}: ${refused}`)
-		} finally { settled() }
+		} finally {
+			settled()
+		}
 	}
 	let ready = host.ready(owner)
 	if (!ready) return deliver()
-	ready.then(deliver, (e) => { diag.log(`report ${id} to ${owner}: ${e?.message ?? e}`); settled() })
+	ready.then(deliver, (e) => {
+		diag.log(`report ${id} to ${owner}: ${e?.message ?? e}`)
+		settled()
+	})
 }
 
 export const subagents = {

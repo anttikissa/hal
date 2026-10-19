@@ -9,7 +9,9 @@ import { app } from './app.ts'
 import { strings } from '../common/strings.ts'
 
 type Row = Record<string, unknown>
-let rows: Row[] = [], timer: ReturnType<typeof setTimeout> | undefined, serial = 0
+let rows: Row[] = [],
+	timer: ReturnType<typeof setTimeout> | undefined,
+	serial = 0
 const page = crypto.randomUUID().slice(0, 8)
 let badge: HTMLElement | undefined
 const fail = (text: string) => {
@@ -30,13 +32,21 @@ const rect = (el: Element | null | undefined) => {
 const font = (el: Element | null | undefined) => {
 	if (!el) return null
 	let s = getComputedStyle(el)
-	return { family: s.fontFamily, size: s.fontSize, letter: s.letterSpacing, pad: s.paddingLeft, opacity: s.opacity, visibility: s.visibility }
+	return {
+		family: s.fontFamily,
+		size: s.fontSize,
+		letter: s.letterSpacing,
+		pad: s.paddingLeft,
+		opacity: s.opacity,
+		visibility: s.visibility,
+	}
 }
 // One character's width in an element's font, so hint and box columns can be compared.
 let widths = new WeakMap<Element, { key: string; width: number }>()
 const chWidth = (el: Element | null | undefined) => {
 	if (!el) return null
-	let style = getComputedStyle(el), key = `${style.font}|${style.letterSpacing}`
+	let style = getComputedStyle(el),
+		key = `${style.font}|${style.letterSpacing}`
 	let cached = widths.get(el)
 	if (cached?.key === key) return cached.width
 	let probe = document.createElement('span')
@@ -53,36 +63,97 @@ const chWidth = (el: Element | null | undefined) => {
 function snapshot(): Row {
 	let box = document.querySelector<HTMLTextAreaElement>('.Composer .field textarea:not(.measure)')
 	let hint = document.querySelector<HTMLElement>('.Composer .entry .hint')
-	let st = app.state, t = st.view.transcript, vv = visualViewport
+	let st = app.state,
+		t = st.view.transcript,
+		vv = visualViewport
 	return {
-		tab: st.shown, session: t?.meta.id, state: t?.state.type,
-		stateText: st.text, value: box?.value, sel: box ? [box.selectionStart, box.selectionEnd, box.selectionDirection] : null,
-		focused: document.activeElement === box, active: document.activeElement?.tagName, disabled: box?.disabled,
-		hint: hint && { class: hint.className, cut: hint.querySelector('.cut')?.textContent, text: hint.querySelector('.text')?.textContent, rect: rect(hint), textRect: rect(hint.querySelector('.text')), font: font(hint), ch: chWidth(hint) },
-		box: box && { rect: rect(box), client: [box.clientWidth, box.clientHeight], scroll: [box.scrollWidth, box.scrollHeight, box.scrollLeft, box.scrollTop], styleHeight: box.style.height, font: font(box), ch: chWidth(box) },
-		field: rect(document.querySelector('.Composer .field')), entry: rect(document.querySelector('.Composer .entry')),
+		tab: st.shown,
+		session: t?.meta.id,
+		state: t?.state.type,
+		stateText: st.text,
+		value: box?.value,
+		sel: box ? [box.selectionStart, box.selectionEnd, box.selectionDirection] : null,
+		focused: document.activeElement === box,
+		active: document.activeElement?.tagName,
+		disabled: box?.disabled,
+		hint: hint && {
+			class: hint.className,
+			cut: hint.querySelector('.cut')?.textContent,
+			text: hint.querySelector('.text')?.textContent,
+			rect: rect(hint),
+			textRect: rect(hint.querySelector('.text')),
+			font: font(hint),
+			ch: chWidth(hint),
+		},
+		box: box && {
+			rect: rect(box),
+			client: [box.clientWidth, box.clientHeight],
+			scroll: [box.scrollWidth, box.scrollHeight, box.scrollLeft, box.scrollTop],
+			styleHeight: box.style.height,
+			font: font(box),
+			ch: chWidth(box),
+		},
+		field: rect(document.querySelector('.Composer .field')),
+		entry: rect(document.querySelector('.Composer .entry')),
 		attach: rect(document.querySelector('.Composer .attach')),
-		actions: [...document.querySelectorAll<HTMLButtonElement>('.Composer .actions button')].map((b) => ({ label: b.getAttribute('aria-label'), rect: rect(b), disabled: b.disabled })),
+		actions: [...document.querySelectorAll<HTMLButtonElement>('.Composer .actions button')].map((b) => ({
+			label: b.getAttribute('aria-label'),
+			rect: rect(b),
+			disabled: b.disabled,
+		})),
 		actionsClass: document.querySelector('.Composer .actions')?.className,
-		vv: vv && [vv.width, vv.height, vv.offsetTop, vv.scale].map((n) => Math.round(n * 10) / 10), inner: [innerWidth, innerHeight], dpr: devicePixelRatio,
+		vv: vv && [vv.width, vv.height, vv.offsetTop, vv.scale].map((n) => Math.round(n * 10) / 10),
+		inner: [innerWidth, innerHeight],
+		dpr: devicePixelRatio,
 	}
 }
 
 // What the screenshot shows: the example drawn over typed text, or the box and state disagreeing.
 function anomaly(s: Row): string[] {
 	let out: string[] = []
-	let value = (s.value as string | undefined) ?? '', hint = s.hint as { class: string; cut?: string; text?: string; font: { size: string; family: string; letter: string; pad: string } | null; ch: number | null } | null
-	let box = s.box as { font: { size: string; family: string; letter: string; pad: string } | null; ch: number | null } | null
+	let value = (s.value as string | undefined) ?? '',
+		hint = s.hint as {
+			class: string
+			cut?: string
+			text?: string
+			font: { size: string; family: string; letter: string; pad: string } | null
+			ch: number | null
+		} | null
+	let box = s.box as {
+		font: { size: string; family: string; letter: string; pad: string } | null
+		ch: number | null
+	} | null
 	// Capture-phase input and beforeinput run before the box's own handler.
-	if (s.value !== undefined && s.value !== s.stateText && s.event !== 'input' && s.event !== 'beforeinput') out.push('box value differs from app.state.text')
-	if (hint && value && !hint.class.split(' ').includes('gone') && hint.text && !value.includes('\n') && strings.visLen(hint.cut ?? '') < strings.visLen(value)) out.push('example drawn under typed text')
-	if (hint?.font && box?.font && (hint.font.size !== box.font.size || hint.font.family !== box.font.family || hint.font.letter !== box.font.letter)) out.push('example and box fonts differ')
+	if (s.value !== undefined && s.value !== s.stateText && s.event !== 'input' && s.event !== 'beforeinput')
+		out.push('box value differs from app.state.text')
+	if (
+		hint &&
+		value &&
+		!hint.class.split(' ').includes('gone') &&
+		hint.text &&
+		!value.includes('\n') &&
+		strings.visLen(hint.cut ?? '') < strings.visLen(value)
+	)
+		out.push('example drawn under typed text')
+	if (
+		hint?.font &&
+		box?.font &&
+		(hint.font.size !== box.font.size || hint.font.family !== box.font.family || hint.font.letter !== box.font.letter)
+	)
+		out.push('example and box fonts differ')
 	if (hint?.ch && box?.ch && Math.abs(hint.ch - box.ch) > 0.01) out.push('example and box column widths differ')
 	return out
 }
 
 function record(event: string, detail: Row = {}): void {
-	let s = { n: ++serial, at: new Date().toISOString(), ms: Math.round(performance.now()), event, ...detail, ...snapshot() }
+	let s = {
+		n: ++serial,
+		at: new Date().toISOString(),
+		ms: Math.round(performance.now()),
+		event,
+		...detail,
+		...snapshot(),
+	}
 	let found = anomaly(s)
 	if (found.length) (s as Row).anomaly = found
 	rows.push(s)
@@ -95,9 +166,16 @@ async function flush(): Promise<void> {
 	if (!rows.length) return
 	let batch = rows.splice(0, 100)
 	try {
-		let res = await fetch('/composer-debug', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', keepalive: batch.length < 20, body: JSON.stringify({ page, ua: navigator.userAgent, rows: batch }) })
+		let res = await fetch('/composer-debug', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			credentials: 'same-origin',
+			keepalive: batch.length < 20,
+			body: JSON.stringify({ page, ua: navigator.userAgent, rows: batch }),
+		})
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
-		badge?.remove(); badge = undefined
+		badge?.remove()
+		badge = undefined
 	} catch (error) {
 		rows = [...batch, ...rows].slice(-400)
 		fail(`composer debug: upload failed: ${String(error)}`)
@@ -106,31 +184,95 @@ async function flush(): Promise<void> {
 }
 
 function init(): void {
-	let inBox = (e: Event) => e.target instanceof HTMLTextAreaElement && !!e.target.closest('.Composer .field') && !e.target.classList.contains('measure')
-	let later = (name: string) => { setTimeout(() => record(`${name}+task`), 0); requestAnimationFrame(() => requestAnimationFrame(() => record(`${name}+frame`))) }
-	for (let name of ['beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'keydown', 'keyup', 'focus', 'blur', 'paste', 'cut', 'select']) {
-		document.addEventListener(name, (e) => {
-			if (!inBox(e)) return
-			let d: Row = {}
-			if (e instanceof InputEvent) Object.assign(d, { inputType: e.inputType, data: e.data, composing: e.isComposing })
-			if (e instanceof CompositionEvent) d.data = e.data
-			if (e instanceof KeyboardEvent) Object.assign(d, { key: e.key, code: e.code, keyCode: e.keyCode, composing: e.isComposing })
-			record(name, d)
-			if (name === 'input' || name === 'compositionend' || name === 'keyup') later(name)
-		}, { capture: true, passive: true })
+	let inBox = (e: Event) =>
+		e.target instanceof HTMLTextAreaElement &&
+		!!e.target.closest('.Composer .field') &&
+		!e.target.classList.contains('measure')
+	let later = (name: string) => {
+		setTimeout(() => record(`${name}+task`), 0)
+		requestAnimationFrame(() => requestAnimationFrame(() => record(`${name}+frame`)))
+	}
+	for (let name of [
+		'beforeinput',
+		'input',
+		'compositionstart',
+		'compositionupdate',
+		'compositionend',
+		'keydown',
+		'keyup',
+		'focus',
+		'blur',
+		'paste',
+		'cut',
+		'select',
+	]) {
+		document.addEventListener(
+			name,
+			(e) => {
+				if (!inBox(e)) return
+				let d: Row = {}
+				if (e instanceof InputEvent)
+					Object.assign(d, { inputType: e.inputType, data: e.data, composing: e.isComposing })
+				if (e instanceof CompositionEvent) d.data = e.data
+				if (e instanceof KeyboardEvent)
+					Object.assign(d, { key: e.key, code: e.code, keyCode: e.keyCode, composing: e.isComposing })
+				record(name, d)
+				if (name === 'input' || name === 'compositionend' || name === 'keyup') later(name)
+			},
+			{ capture: true, passive: true },
+		)
 	}
 	// Every touch, pointer, click and focus change on the page, with its target.
-	let label = (t: EventTarget | null) => t instanceof Element ? `${t.tagName.toLowerCase()}${t.className && typeof t.className === 'string' ? `.${t.className.trim().split(/\s+/).join('.')}` : ''}${t.getAttribute('aria-label') ? `[${t.getAttribute('aria-label')}]` : ''}${(t as HTMLButtonElement).disabled ? ':disabled' : ''}` : String(t)
-	for (let name of ['touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel', 'click', 'focusin', 'focusout', 'contextmenu']) {
-		document.addEventListener(name, (e) => {
-			let p = e instanceof PointerEvent || e instanceof MouseEvent ? e : typeof TouchEvent !== 'undefined' && e instanceof TouchEvent ? e.changedTouches[0] : undefined
-			record(name, { target: label(e.target), path: e.composedPath().slice(0, 4).map(label), xy: p && [Math.round(p.clientX), Math.round(p.clientY)], pointerType: e instanceof PointerEvent ? e.pointerType : undefined, prevented: e.defaultPrevented })
-			setTimeout(() => record(`${name}+task`, { prevented: e.defaultPrevented }), 0)
-		}, { capture: true, passive: true })
+	let label = (t: EventTarget | null) =>
+		t instanceof Element
+			? `${t.tagName.toLowerCase()}${t.className && typeof t.className === 'string' ? `.${t.className.trim().split(/\s+/).join('.')}` : ''}${t.getAttribute('aria-label') ? `[${t.getAttribute('aria-label')}]` : ''}${(t as HTMLButtonElement).disabled ? ':disabled' : ''}`
+			: String(t)
+	for (let name of [
+		'touchstart',
+		'touchend',
+		'touchcancel',
+		'pointerdown',
+		'pointerup',
+		'pointercancel',
+		'click',
+		'focusin',
+		'focusout',
+		'contextmenu',
+	]) {
+		document.addEventListener(
+			name,
+			(e) => {
+				let p =
+					e instanceof PointerEvent || e instanceof MouseEvent
+						? e
+						: typeof TouchEvent !== 'undefined' && e instanceof TouchEvent
+							? e.changedTouches[0]
+							: undefined
+				record(name, {
+					target: label(e.target),
+					path: e.composedPath().slice(0, 4).map(label),
+					xy: p && [Math.round(p.clientX), Math.round(p.clientY)],
+					pointerType: e instanceof PointerEvent ? e.pointerType : undefined,
+					prevented: e.defaultPrevented,
+				})
+				setTimeout(() => record(`${name}+task`, { prevented: e.defaultPrevented }), 0)
+			},
+			{ capture: true, passive: true },
+		)
 	}
-	addEventListener('error', (e: ErrorEvent) => record('error', { message: e.message, file: e.filename, line: e.lineno, col: e.colno, stack: e.error?.stack }))
-	addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => record('rejection', { reason: String(e.reason), stack: e.reason?.stack }))
-	document.addEventListener('selectionchange', () => { if (document.activeElement?.closest('.Composer .field')) record('selectionchange') }, { passive: true })
+	addEventListener('error', (e: ErrorEvent) =>
+		record('error', { message: e.message, file: e.filename, line: e.lineno, col: e.colno, stack: e.error?.stack }),
+	)
+	addEventListener('unhandledrejection', (e: PromiseRejectionEvent) =>
+		record('rejection', { reason: String(e.reason), stack: e.reason?.stack }),
+	)
+	document.addEventListener(
+		'selectionchange',
+		() => {
+			if (document.activeElement?.closest('.Composer .field')) record('selectionchange')
+		},
+		{ passive: true },
+	)
 	// Example and layout changes the events above don't cause (timers, host events, resizes).
 	let watched = new WeakSet<Element>()
 	let hintAt = 0
@@ -140,27 +282,55 @@ function init(): void {
 		hintAt = now
 		record('hint-mutation')
 	})
-	let sizes = new ResizeObserver((entries) => record('resize', { targets: entries.map((e) => (e.target as HTMLElement).className) }))
+	let sizes = new ResizeObserver((entries) =>
+		record('resize', { targets: entries.map((e) => (e.target as HTMLElement).className) }),
+	)
 	let attach = () => {
-		for (let el of document.querySelectorAll('.Composer .entry, .Composer .field, .Composer .actions, .Composer .entry .hint')) {
+		for (let el of document.querySelectorAll(
+			'.Composer .entry, .Composer .field, .Composer .actions, .Composer .entry .hint',
+		)) {
 			if (watched.has(el)) continue
 			watched.add(el)
-			if (el.classList.contains('hint')) hintChanges.observe(el, { attributes: true, characterData: true, childList: true, subtree: true })
+			if (el.classList.contains('hint'))
+				hintChanges.observe(el, { attributes: true, characterData: true, childList: true, subtree: true })
 			else sizes.observe(el)
 		}
 	}
 	let queued = false
 	new MutationObserver((records) => {
-		if (queued || !records.some((r) => [...r.addedNodes].some((n) => n instanceof Element && (n.matches('.Composer, .entry, .field, .actions, .hint') || n.querySelector('.Composer, .entry, .field, .actions, .hint'))))) return
+		if (
+			queued ||
+			!records.some((r) =>
+				[...r.addedNodes].some(
+					(n) =>
+						n instanceof Element &&
+						(n.matches('.Composer, .entry, .field, .actions, .hint') ||
+							n.querySelector('.Composer, .entry, .field, .actions, .hint')),
+				),
+			)
+		)
+			return
 		queued = true
-		queueMicrotask(() => { queued = false; attach() })
+		queueMicrotask(() => {
+			queued = false
+			attach()
+		})
 	}).observe(document.body, { childList: true, subtree: true })
 	attach()
-	document.fonts.addEventListener('loadingdone', () => { widths = new WeakMap(); record('fonts-loaded') })
+	document.fonts.addEventListener('loadingdone', () => {
+		widths = new WeakMap()
+		record('fonts-loaded')
+	})
 	visualViewport?.addEventListener('resize', () => record('vv-resize'))
-	document.addEventListener('visibilitychange', () => { record(`visibility-${document.visibilityState}`); if (document.visibilityState === 'hidden') void flush() })
+	document.addEventListener('visibilitychange', () => {
+		record(`visibility-${document.visibilityState}`)
+		if (document.visibilityState === 'hidden') void flush()
+	})
 	// A disagreement can appear without any composer event (a host event resets the text).
-	setInterval(() => { let s = snapshot(); if (anomaly(s).length) record('poll') }, 1000)
+	setInterval(() => {
+		let s = snapshot()
+		if (anomaly(s).length) record('poll')
+	}, 1000)
 	record('start', { ua: navigator.userAgent })
 }
 

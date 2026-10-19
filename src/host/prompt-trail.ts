@@ -21,7 +21,11 @@ type Seen = { cwd: string; files: Record<string, string>; outside?: string }
 const maxLines = 40
 
 function read(path: string): string | undefined {
-	try { return readFileSync(path, 'utf8') } catch { return undefined }
+	try {
+		return readFileSync(path, 'utf8')
+	} catch {
+		return undefined
+	}
 }
 
 // Keep the generator off the startup import graph.
@@ -33,17 +37,23 @@ function diff(before: string, after: string, limit = maxLines): string {
 // plugins/<file>. The prompt is built with the innermost plugin's
 // hooks, then the next ones out: each step's change is that plugin's.
 function pluginTexts(input: Parameters<typeof systemPrompt.inspect>[0]): Record<string, string> {
-	let patch = plugins.state.patches.get(systemPrompt)?.get('assemble'), out: Record<string, string> = {}
+	let patch = plugins.state.patches.get(systemPrompt)?.get('assemble'),
+		out: Record<string, string> = {}
 	if (!patch) return out
 	let hooks = patch.hooks.filter((h) => h.kind === 'around')
 	let build = (hs: typeof hooks): string => {
-		let call = (i: number, a: unknown[]): string => (i < hs.length ? hs[i]!.fn((...x: unknown[]) => call(i + 1, x), ...a) : patch.original.apply(systemPrompt, a))
+		let call = (i: number, a: unknown[]): string =>
+			i < hs.length ? hs[i]!.fn((...x: unknown[]) => call(i + 1, x), ...a) : patch.original.apply(systemPrompt, a)
 		return call(0, [input, []])
 	}
-	let files = [...new Set(hooks.map((h) => h.file))].reverse(), prev = build([])
+	let files = [...new Set(hooks.map((h) => h.file))].reverse(),
+		prev = build([])
 	for (let k = 1; k <= files.length; k++) {
 		let text = build(hooks.filter((h) => files.slice(0, k).includes(h.file)))
-		let base = prev.split('\n'), mine = text.split('\n'), had = new Set(base), has = new Set(mine)
+		let base = prev.split('\n'),
+			mine = text.split('\n'),
+			had = new Set(base),
+			has = new Set(mine)
 		let lines = [...mine.filter((l) => !had.has(l)), ...base.filter((l) => !has.has(l)).map((l) => `removed: ${l}`)]
 		if (lines.length) out[`plugins/${files[k - 1]}`] = `${lines.join('\n')}\n`
 		prev = text
@@ -60,7 +70,11 @@ function check(id: string): void {
 		let file = `${paths.sessionDir(id)}/prompt-files.json`
 		let input = promptCache.input(id)
 		let prompt = systemPrompt.inspect(input)
-		let now: Seen = { cwd: meta.cwd, files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])), outside: promptCache.outside(prompt) }
+		let now: Seen = {
+			cwd: meta.cwd,
+			files: Object.fromEntries(prompt.sources.map((s) => [s.path, read(s.path) ?? ''])),
+			outside: promptCache.outside(prompt),
+		}
 		Object.assign(now.files, pluginTexts(input))
 		let seen: Seen | undefined = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined
 		if (seen && JSON.stringify(seen) === JSON.stringify(now)) return
@@ -68,11 +82,20 @@ function check(id: string): void {
 		if (seen) {
 			let sameCwd = seen.cwd === now.cwd
 			for (let path of new Set([...Object.keys(seen.files), ...Object.keys(now.files)])) {
-				let a = seen.files[path], b = now.files[path]
+				let a = seen.files[path],
+					b = now.files[path]
 				if (a === b || ((a === undefined || b === undefined) && !sameCwd)) continue
 				let rel = path.startsWith('plugins/') ? path : relative(meta.cwd, path)
-				let change: PromptChange = { name: rel.startsWith('..') ? paths.display(path) : rel, what: a === undefined ? 'added' : b === undefined ? 'removed' : 'changed', diff: diff(a ?? '', b ?? ''), ...(seen.outside === now.outside && { sectionOnly: true as const }) }
-				notes.push({ change, text: `${paths.display(path)} ${change.what === 'changed' ? 'changed' : change.what === 'added' ? 'is now part of the system prompt' : 'is no longer part of the system prompt'}:\n${change.diff}` })
+				let change: PromptChange = {
+					name: rel.startsWith('..') ? paths.display(path) : rel,
+					what: a === undefined ? 'added' : b === undefined ? 'removed' : 'changed',
+					diff: diff(a ?? '', b ?? ''),
+					...(seen.outside === now.outside && { sectionOnly: true as const }),
+				}
+				notes.push({
+					change,
+					text: `${paths.display(path)} ${change.what === 'changed' ? 'changed' : change.what === 'added' ? 'is now part of the system prompt' : 'is no longer part of the system prompt'}:\n${change.diff}`,
+				})
 			}
 		}
 		writeFileSync(file, JSON.stringify(now))

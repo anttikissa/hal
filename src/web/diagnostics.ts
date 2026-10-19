@@ -2,11 +2,22 @@
 // Best-effort HTTP diagnostics still work when the WebSocket does not.
 // Only fixed labels and numeric/boolean state; no text or persistent storage.
 import type { Event as HostEvent } from '../common/protocol.ts'
-import { diagnosticDetails, type DiagnosticDetail, type Breadcrumb, type DiagnosticContext, type DiagnosticKind } from '../common/web-diagnostics.ts'
+import {
+	diagnosticDetails,
+	type DiagnosticDetail,
+	type Breadcrumb,
+	type DiagnosticContext,
+	type DiagnosticKind,
+} from '../common/web-diagnostics.ts'
 
-let entries: Breadcrumb[] = [], read: (() => DiagnosticContext) | undefined
-let lag = 0, dropped = 0
-let page = '', timer: ReturnType<typeof setTimeout> | undefined, busy = false, last = 0
+let entries: Breadcrumb[] = [],
+	read: (() => DiagnosticContext) | undefined
+let lag = 0,
+	dropped = 0
+let page = '',
+	timer: ReturnType<typeof setTimeout> | undefined,
+	busy = false,
+	last = 0
 // Pin changes are never evicted (but by each other): they are the
 // cause. The newest 12 other scroll entries outlast generic events.
 const pinEntry = (e: Breadcrumb) => e.kind === 'pin'
@@ -14,41 +25,86 @@ const scrollEntry = (e: Breadcrumb) => e.kind === 'scroll' || e.kind === 'pulled
 export function retain(entries: Breadcrumb[]): number {
 	let before = entries.length
 	while (entries.length > 32) {
-		let i = entries.filter(scrollEntry).length > 12 ? entries.findIndex(scrollEntry) : entries.findIndex((e) => !scrollEntry(e) && !pinEntry(e))
-		entries.splice(i >= 0 ? i : Math.max(0, entries.findIndex((e) => !pinEntry(e))), 1)
+		let i =
+			entries.filter(scrollEntry).length > 12
+				? entries.findIndex(scrollEntry)
+				: entries.findIndex((e) => !scrollEntry(e) && !pinEntry(e))
+		entries.splice(
+			i >= 0
+				? i
+				: Math.max(
+						0,
+						entries.findIndex((e) => !pinEntry(e)),
+					),
+			1,
+		)
 	}
 	return before - entries.length
 }
-function record(kind: DiagnosticKind, detail: string = 'other', line?: number, column?: number): Breadcrumb | undefined {
+function record(
+	kind: DiagnosticKind,
+	detail: string = 'other',
+	line?: number,
+	column?: number,
+): Breadcrumb | undefined {
 	if (!read) return
-	let e: Breadcrumb = { at: Date.now(), kind, detail: diagnosticDetails.includes(detail as any) ? detail as Breadcrumb['detail'] : 'other', tab: kind === 'event' ? undefined : read().tab }
+	let e: Breadcrumb = {
+		at: Date.now(),
+		kind,
+		detail: diagnosticDetails.includes(detail as any) ? (detail as Breadcrumb['detail']) : 'other',
+		tab: kind === 'event' ? undefined : read().tab,
+	}
 	if (Number.isFinite(line) && line! >= 0) e.line = line
 	if (Number.isFinite(column) && column! >= 0) e.column = column
 	let prev = entries.at(-1)
 	if (kind === 'event' && prev?.kind === kind && prev.detail === e.detail) entries[entries.length - 1] = e
-	else { entries.push(e); dropped += retain(entries) }
+	else {
+		entries.push(e)
+		dropped += retain(entries)
+	}
 	return e
 }
 
 function report(): void {
 	if (!read || timer || busy || !entries.length) return
-	timer = setTimeout(() => {
-		timer = undefined
-		void send()
-	}, Math.max(250, last + 5000 - Date.now()))
+	timer = setTimeout(
+		() => {
+			timer = undefined
+			void send()
+		},
+		Math.max(250, last + 5000 - Date.now()),
+	)
 }
 
 async function send(): Promise<void> {
 	if (!read || busy || !entries.length) return
-	busy = true; last = Date.now()
+	busy = true
+	last = Date.now()
 	let batch = entries.splice(0)
 	try {
-		let body = JSON.stringify({ page, version: document.documentElement.dataset.version ?? 'unknown', at: Date.now(), context: { ...read(), lag, dropped }, entries: batch })
-		let res = await fetch('/web-diagnostics', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body, keepalive: true, signal: AbortSignal.timeout(10_000) })
+		let body = JSON.stringify({
+			page,
+			version: document.documentElement.dataset.version ?? 'unknown',
+			at: Date.now(),
+			context: { ...read(), lag, dropped },
+			entries: batch,
+		})
+		let res = await fetch('/web-diagnostics', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			credentials: 'same-origin',
+			body,
+			keepalive: true,
+			signal: AbortSignal.timeout(10_000),
+		})
 		// A rejected report would be rejected again: drop it.
 		if (!res.ok && res.status !== 400) throw new Error('not accepted')
-	} catch { entries = [...batch, ...entries]; dropped += retain(entries) }
-	finally { busy = false }
+	} catch {
+		entries = [...batch, ...entries]
+		dropped += retain(entries)
+	} finally {
+		busy = false
+	}
 }
 
 function init(context: () => DiagnosticContext): void {
@@ -58,52 +114,112 @@ function init(context: () => DiagnosticContext): void {
 	let failure = (kind: 'error' | 'rejection', error: unknown, line?: number, column?: number) => {
 		// Never stringify the error/rejection: messages can contain user data.
 		let name = error instanceof Error ? error.name : 'other'
-		record(kind, name, line, column); report()
+		record(kind, name, line, column)
+		report()
 	}
 	window.addEventListener('error', (e) => failure('error', e.error, e.lineno, e.colno))
 	window.addEventListener('unhandledrejection', (e) => failure('rejection', e.reason))
 	let area = (e: Event): string => {
 		let el = e.target instanceof Element ? e.target : undefined
 		let action = el?.closest<HTMLButtonElement>('.Composer button[data-diagnostic-action]')?.dataset.diagnosticAction
-		return action && diagnosticDetails.includes(action as DiagnosticDetail) ? action : el?.closest('.Tabs') ? 'tabs' : el?.closest('.Composer') ? 'composer' : el?.closest('.Card') ? 'card' : 'other'
+		return action && diagnosticDetails.includes(action as DiagnosticDetail)
+			? action
+			: el?.closest('.Tabs')
+				? 'tabs'
+				: el?.closest('.Composer')
+					? 'composer'
+					: el?.closest('.Card')
+						? 'card'
+						: 'other'
 	}
-	for (let name of ['pointerdown', 'pointerup', 'pointercancel', 'click'] as const) document.addEventListener(name, (e) => {
-		let detail = area(e)
-		if (detail === 'other') return
-		if (e.target instanceof Element && e.target.closest('button:disabled')) record('disabled', detail)
-		record(name === 'pointerdown' ? 'pointer' : name, detail)
-		if (name === 'click') { let start = performance.now(); setTimeout(() => { lag = Math.max(0, Math.round(performance.now() - start)); record('settled', detail); report() }, 0) }
-		else report()
-	}, { capture: true, passive: true })
+	for (let name of ['pointerdown', 'pointerup', 'pointercancel', 'click'] as const)
+		document.addEventListener(
+			name,
+			(e) => {
+				let detail = area(e)
+				if (detail === 'other') return
+				if (e.target instanceof Element && e.target.closest('button:disabled')) record('disabled', detail)
+				record(name === 'pointerdown' ? 'pointer' : name, detail)
+				if (name === 'click') {
+					let start = performance.now()
+					setTimeout(() => {
+						lag = Math.max(0, Math.round(performance.now() - start))
+						record('settled', detail)
+						report()
+					}, 0)
+				} else report()
+			},
+			{ capture: true, passive: true },
+		)
 	// A character typed while focus is anywhere but the message box:
 	// where focus was, then whether the key reached the box. Capture on
 	// window sees it even if a handler stops it. Never which key.
 	let box = (el: Element | null) => el instanceof HTMLTextAreaElement && !!el.closest('.Composer')
 	let focusArea = (el: Element | null): string =>
-		!el || el === document.body ? 'body' : el.closest('dialog[open]') ? 'dialog' : el.matches('input, textarea, select, [contenteditable]') ? 'field'
-			: el.closest('.Tabs') ? 'tabs' : el.closest('.Card') ? 'card' : el instanceof HTMLButtonElement ? 'button' : el instanceof HTMLAnchorElement ? 'link' : 'other'
-	addEventListener('keydown', (e: KeyboardEvent) => {
-		if ([...e.key].length !== 1 || e.ctrlKey || e.altKey || e.metaKey || e.isComposing || box(document.activeElement)) return
-		record('key', focusArea(document.activeElement))
-		setTimeout(() => { record('settled', box(document.activeElement) ? 'composer' : 'other'); report() }, 0)
-	}, { capture: true, passive: true })
-	document.addEventListener('visibilitychange', () => { record('visibility', document.visibilityState); report() })
-	addEventListener('pageshow', () => { record('pageshow'); report() })
-	addEventListener('focus', () => { record('focus'); report() })
+		!el || el === document.body
+			? 'body'
+			: el.closest('dialog[open]')
+				? 'dialog'
+				: el.matches('input, textarea, select, [contenteditable]')
+					? 'field'
+					: el.closest('.Tabs')
+						? 'tabs'
+						: el.closest('.Card')
+							? 'card'
+							: el instanceof HTMLButtonElement
+								? 'button'
+								: el instanceof HTMLAnchorElement
+									? 'link'
+									: 'other'
+	addEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
+			if ([...e.key].length !== 1 || e.ctrlKey || e.altKey || e.metaKey || e.isComposing || box(document.activeElement))
+				return
+			record('key', focusArea(document.activeElement))
+			setTimeout(() => {
+				record('settled', box(document.activeElement) ? 'composer' : 'other')
+				report()
+			}, 0)
+		},
+		{ capture: true, passive: true },
+	)
+	document.addEventListener('visibilitychange', () => {
+		record('visibility', document.visibilityState)
+		report()
+	})
+	addEventListener('pageshow', () => {
+		record('pageshow')
+		report()
+	})
+	addEventListener('focus', () => {
+		record('focus')
+		report()
+	})
 	// The main thread blocked for 200 ms or more (Chromium only): a
 	// 'longtask' breadcrumb, ms its length. Read state/web-diag.log on the
 	// host serving the page; context.heap gives the heap at report time.
-	if (PerformanceObserver.supportedEntryTypes?.includes('longtask')) new PerformanceObserver((list) => {
-		for (let e of list.getEntries()) if (e.duration >= 200) { record('longtask'); entries.at(-1)!.ms = Math.round(e.duration) }
-		report()
-	}).observe({ type: 'longtask', buffered: true })
-	record('start'); report()
+	if (PerformanceObserver.supportedEntryTypes?.includes('longtask'))
+		new PerformanceObserver((list) => {
+			for (let e of list.getEntries())
+				if (e.duration >= 200) {
+					record('longtask')
+					entries.at(-1)!.ms = Math.round(e.duration)
+				}
+			report()
+		}).observe({ type: 'longtask', buffered: true })
+	record('start')
+	report()
 }
 
 function load(detail: DiagnosticDetail, start = performance.now(), tab = read?.().tab ?? 0, bytes?: number): void {
 	if (!read) return
 	record('load', detail)
-	Object.assign(entries.at(-1)!, { tab, ms: Math.max(0, performance.now() - start), ...(bytes !== undefined && { bytes }) })
+	Object.assign(entries.at(-1)!, {
+		tab,
+		ms: Math.max(0, performance.now() - start),
+		...(bytes !== undefined && { bytes }),
+	})
 	report()
 }
 
@@ -116,4 +232,17 @@ function apply(event: HostEvent, update: () => void, tab: number, shown: boolean
 	if (shown) requestAnimationFrame(() => diagnostics.load('frame', start, tab))
 }
 
-export const diagnostics = { enabled: () => !!read, apply, load, init: (context: () => DiagnosticContext) => { try { init(context) } catch { read = undefined } }, record, report }
+export const diagnostics = {
+	enabled: () => !!read,
+	apply,
+	load,
+	init: (context: () => DiagnosticContext) => {
+		try {
+			init(context)
+		} catch {
+			read = undefined
+		}
+	},
+	record,
+	report,
+}

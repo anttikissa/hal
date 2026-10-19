@@ -15,7 +15,9 @@ const modelText = 'Hal restarted.'
 function write(text: string): void {
 	if (written) return
 	written = true
-	try { writeFileSync(`${paths.stateDir()}/restart.ason`, ason.stringify({ text, at: Date.now() }) + '\n') } catch {}
+	try {
+		writeFileSync(`${paths.stateDir()}/restart.ason`, ason.stringify({ text, at: Date.now() }) + '\n')
+	} catch {}
 }
 
 function announce(): void {
@@ -24,7 +26,8 @@ function announce(): void {
 		let file = `${paths.stateDir()}/restart.ason`
 		let note = ason.parse(readFileSync(file, 'utf8')) as { text?: unknown; at?: unknown }
 		unlinkSync(file)
-		if (typeof note.text === 'string' && typeof note.at === 'number' && Date.now() - note.at <= 60_000) text = `Hal restarted by ${note.text}`
+		if (typeof note.text === 'string' && typeof note.at === 'number' && Date.now() - note.at <= 60_000)
+			text = `Hal restarted by ${note.text}`
 	} catch {}
 	if (text) {
 		warnings.set('restart', text)
@@ -36,9 +39,12 @@ function announce(): void {
 		try {
 			sessions.open(id)
 			let last = pages.page(id, undefined, 1).records.at(-1)
-			if ((history.unfinished(id) && last?.type !== 'question') || (last?.type === 'notice' && last.text === modelText)) continue
+			if ((history.unfinished(id) && last?.type !== 'question') || (last?.type === 'notice' && last.text === modelText))
+				continue
 			history.append(id, { type: 'notice', text: modelText })
-		} catch (e) { process.stderr.write(`restart notice for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
+		} catch (e) {
+			process.stderr.write(`restart notice for ${id}: ${e instanceof Error ? e.stack : e}\n`)
+		}
 	}
 }
 

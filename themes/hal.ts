@@ -71,7 +71,12 @@ export const look: Look = {
 	question: () => colors.plain(),
 	commitCard: () => colors.plain(),
 	// Errors and exit statuses: the diff's removal red.
-	error: () => ({ fg: colors.diff().removeFg!, bg: [0.2, 0.08, 30], code: colors.diff().removeFg!, linkBg: [0.25, 0.07, 30] }),
+	error: () => ({
+		fg: colors.diff().removeFg!,
+		bg: [0.2, 0.08, 30],
+		code: colors.diff().removeFg!,
+		linkBg: [0.25, 0.07, 30],
+	}),
 	exit: () => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
 	info: () => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.

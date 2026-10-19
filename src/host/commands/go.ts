@@ -22,18 +22,34 @@ function session(text: string, ctx: Context): { id: string; closed?: true } | un
 	let list = tabs.list()
 	let byNumber = /^[1-9]\d*$/.test(text) && Number.isSafeInteger(Number(text)) ? list[Number(text) - 1] : undefined
 	let path = commands.expand(text, ctx.cwd)
-	let open = byNumber ?? list.find((t) => t.id === text) ?? list.find((t) => t.name === text) ?? list.find((t) => resolve(t.cwd) === path)
+	let open =
+		byNumber ??
+		list.find((t) => t.id === text) ??
+		list.find((t) => t.name === text) ??
+		list.find((t) => resolve(t.cwd) === path)
 	if (open) return { id: open.id }
 	if (/^\d+$/.test(text)) return undefined
 	let shut = closed()
-	let s = shut.find((s) => s.id === text) ?? shut.find((s) => s.meta!.name === text) ?? shut.find((s) => resolve(s.meta!.cwd) === path)
+	let s =
+		shut.find((s) => s.id === text) ??
+		shut.find((s) => s.meta!.name === text) ??
+		shut.find((s) => resolve(s.meta!.cwd) === path)
 	return s && { id: s.id, closed: true }
 }
 
 // What a closed block shows: a tool's description, else its first line.
 function headline(item: Item): string {
 	if (item.type === 'tool') return toolDetails.headline(item.name, item.input).text
-	let text = item.type === 'prompt' && item.summary ? item.summary : item.type === 'question' ? item.form.text : item.type === 'image' ? 'image' : 'text' in item ? item.text : ''
+	let text =
+		item.type === 'prompt' && item.summary
+			? item.summary
+			: item.type === 'question'
+				? item.form.text
+				: item.type === 'image'
+					? 'image'
+					: 'text' in item
+						? item.text
+						: ''
 	return text.trim().split('\n')[0]!.trim()
 }
 
@@ -51,17 +67,39 @@ function when(ts: string | undefined, ctx: Context, time = true): string {
 function blockRows(id: string, rest: string, prefix: string, ctx: Context): Candidate[] {
 	let m = /^([a-z]?)(\d*(?:\.\d*)?)$/.exec(rest)
 	if (!m) return []
-	let rows = sessionBlocks.of(id).filter((i) => i.type !== 'tool-result' && i.type !== 'turn-end' && (!m[1] || titles.letter(i) === m[1]) && i.key.startsWith(m[2]!))
-	return rows.slice(-maxBlocks).reverse().map((i) => ({ value: `${prefix}${titles.blockId(i)}`, description: [when((i as { ts?: string }).ts, ctx), headline(i)].filter(Boolean).join('  ') }))
+	let rows = sessionBlocks
+		.of(id)
+		.filter(
+			(i) =>
+				i.type !== 'tool-result' &&
+				i.type !== 'turn-end' &&
+				(!m[1] || titles.letter(i) === m[1]) &&
+				i.key.startsWith(m[2]!),
+		)
+	return rows
+		.slice(-maxBlocks)
+		.reverse()
+		.map((i) => ({
+			value: `${prefix}${titles.blockId(i)}`,
+			description: [when((i as { ts?: string }).ts, ctx), headline(i)].filter(Boolean).join('  '),
+		}))
 }
 
 // Open and closed sessions whose id or name starts with `text`.
 function sessionRows(text: string, ctx: Context): Candidate[] {
 	let low = text.toLowerCase()
 	let hit = (id: string, name?: string) => id.startsWith(text) || !!name?.toLowerCase().startsWith(low)
-	let open = tabs.list().map((t, i) => ({ id: t.id, name: t.name === t.id ? undefined : t.name, where: `tab ${i + 1}` }))
-	let shut = closed().map((s) => ({ id: s.id, name: s.meta!.name, where: ['closed', when(s.meta!.closedAt, ctx, false)].filter(Boolean).join(', ') }))
-	return [...open, ...shut].filter((s) => hit(s.id, s.name)).map((s) => ({ value: s.id, description: `${s.name ? `${s.name} ` : ''}(${s.where})` }))
+	let open = tabs
+		.list()
+		.map((t, i) => ({ id: t.id, name: t.name === t.id ? undefined : t.name, where: `tab ${i + 1}` }))
+	let shut = closed().map((s) => ({
+		id: s.id,
+		name: s.meta!.name,
+		where: ['closed', when(s.meta!.closedAt, ctx, false)].filter(Boolean).join(', '),
+	}))
+	return [...open, ...shut]
+		.filter((s) => hit(s.id, s.name))
+		.map((s) => ({ value: s.id, description: `${s.name ? `${s.name} ` : ''}(${s.where})` }))
 }
 
 // Session directories, written the way `text` starts (~/, /, .).
@@ -74,15 +112,22 @@ function dirRows(text: string, ctx: Context): Candidate[] {
 		return !r ? '.' : r.startsWith('..') ? r : `./${r}`
 	}
 	let dirs = [...new Set([...tabs.list().map((t) => t.cwd), ...closed().map((s) => s.meta!.cwd)])]
-	return [...new Set(dirs.map(show))].filter((d) => d.startsWith(text)).map((value) => ({ value, description: 'directory' }))
+	return [...new Set(dirs.map(show))]
+		.filter((d) => d.startsWith(text))
+		.map((value) => ({ value, description: 'directory' }))
 }
 
 export const command: SlashCommand = {
 	quiet: true,
-	help: () => '/go <tab|session|directory>[#card]: go to a session, reopening it if closed, or to a card in it (t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.',
+	help: () =>
+		'/go <tab|session|directory>[#card]: go to a session, reopening it if closed, or to a card in it (t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.',
 	complete(args, ctx) {
 		if (/^[~/.]/.test(args)) return dirRows(args, ctx)
-		if (/^\d*$/.test(args)) return tabs.list().map((t, i) => ({ value: String(i + 1), description: t.name === t.id ? t.id : `${t.name}  ${t.id}` })).filter((c) => c.value.startsWith(args))
+		if (/^\d*$/.test(args))
+			return tabs
+				.list()
+				.map((t, i) => ({ value: String(i + 1), description: t.name === t.id ? t.id : `${t.name}  ${t.id}` }))
+				.filter((c) => c.value.startsWith(args))
 		let split = /^([^#/]+)[#/]#?(.*)$/.exec(args)
 		if (split) {
 			let s = session(split[1]!, ctx)

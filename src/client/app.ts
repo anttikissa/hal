@@ -74,13 +74,28 @@ export type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState, key: KeyEvent) => ReturnType<typeof modals.step>
-	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; typing?: ReturnType<typeof setTimeout>; choices?: string[] | Hint[]
+	older: Map<string, Backfill>
+	background: Set<string>
+	painted: boolean
+	loading?: string
+	timer?: ReturnType<typeof setTimeout>
+	typing?: ReturnType<typeof setTimeout>
+	choices?: string[] | Hint[]
 	// The theme an open form previews (previewTheme).
 	previewed?: string
 }
 
 function createState(): AppState {
-	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map(), background: new Set(), painted: false }
+	return {
+		tabs: [],
+		focus: {},
+		hidden: new Map(),
+		start: { cwd: '/' },
+		prompt: prompt.empty(),
+		older: new Map(),
+		background: new Set(),
+		painted: false,
+	}
 }
 
 // Paints the view; the pulse beats while something in it blinks.
@@ -96,7 +111,11 @@ function show(): void {
 	let f = st.form ?? st.modal?.form
 	let now = pulse.now()
 	// A returning example fades in on every frame.
-	let next = Math.min(v.placeholder?.back !== undefined ? 1 : Infinity, v.placeholder?.next ?? Infinity, ...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
+	let next = Math.min(
+		v.placeholder?.back !== undefined ? 1 : Infinity,
+		v.placeholder?.next ?? Infinity,
+		...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []),
+	)
 	if (next === Infinity) return
 	st.typing = setTimeout(app.show, pulse.until(next))
 	;(st.typing as { unref?: () => void }).unref?.()
@@ -116,7 +135,10 @@ function previewTheme(): void {
 // The pulse beats while something in `v` blinks: every frame while a
 // Bash command scrolls, every other while a call's spinner turns.
 function keepPulse(v: ReturnType<typeof appView.view>): void {
-	pulse.keep(appView.blinks(v) ? app.beat : null, v.now !== undefined ? pulse.frame : v.tick?.call ? pulse.frame * 2 : pulse.ms)
+	pulse.keep(
+		appView.blinks(v) ? app.beat : null,
+		v.now !== undefined ? pulse.frame : v.tick?.call ? pulse.frame * 2 : pulse.ms,
+	)
 }
 
 // A beat of the pulse: a repaint, if a blink changed.
@@ -129,17 +151,35 @@ function beat(): void {
 function onEvent(event: Event): void {
 	let st = app.state
 	let queueChanged = queueEdit.onEvent(event)
-	if (event.type === 'rebase-result') return rebaseEditor.result(event, (text) => { st.notice = text; app.show() })
-	if (event.type === 'rebase-plan') return void rebaseEditor.open(event, app.send, (text) => { st.notice = text; app.show() })
+	if (event.type === 'rebase-result')
+		return rebaseEditor.result(event, (text) => {
+			st.notice = text
+			app.show()
+		})
+	if (event.type === 'rebase-plan')
+		return void rebaseEditor.open(event, app.send, (text) => {
+			st.notice = text
+			app.show()
+		})
 	if (event.type === 'find-results') return find.event(event)
 	// A recalled entry stays on screen; the draft changes underneath.
-	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
+	let mine =
+		st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
 	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing) app.setPrompt(drafts.text(mine))
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
 	// Replayed as the chord bound to its delivery, so remapped keys hold (task 8kx).
 	let chord = resume && sendKeys.key(resume.delivery)
-	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: chord === 'alt-enter', ctrl: chord === 'ctrl-enter', cmd: chord === 'cmd-enter' }])
+	if (resume && mine)
+		app.onKeys([
+			{
+				key: 'enter',
+				shift: false,
+				alt: chord === 'alt-enter',
+				ctrl: chord === 'ctrl-enter',
+				cmd: chord === 'cmd-enter',
+			},
+		])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') {
@@ -150,7 +190,8 @@ function onEvent(event: Event): void {
 	if (event.type === 'host-mode') return void ((appView.state.noUser = event.noUser), app.show())
 	if (event.type === 'restart') return restart.withHost()
 	if (event.type === 'restart-ask') return restart.ask(event, app.open)
-	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text') return clientCommands.event(event)
+	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text')
+		return clientCommands.event(event)
 	if (event.type === 'go') {
 		if (st.focus.tab !== event.sessionId || !st.tabs.some((tab) => tab.id === event.tab)) return
 		find.go({ sessionId: event.tab, blockId: event.block?.replace(/^[a-z]/, '') })
@@ -161,7 +202,8 @@ function onEvent(event: Event): void {
 		return app.onTabs(st.tabs)
 	}
 	let shown = st.focus.tab
-	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown) return tabSwitch.hiddenEvent(event)
+	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown)
+		return tabSwitch.hiddenEvent(event)
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
@@ -171,7 +213,10 @@ function onEvent(event: Event): void {
 		let t = transcript.fold(st.transcript, event)
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
-		if (event.type === 'snapshot' && t) app.setPrompt(queueEdit.editing(t.meta.id) ? queueEdit.text(t.meta.id) : recall.shown(t.meta.id) ?? drafts.text(t.meta.id))
+		if (event.type === 'snapshot' && t)
+			app.setPrompt(
+				queueEdit.editing(t.meta.id) ? queueEdit.text(t.meta.id) : (recall.shown(t.meta.id) ?? drafts.text(t.meta.id)),
+			)
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	queuedPrompt.sync(st, event)
@@ -218,7 +263,13 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
 		? { command: amend.enter(st.editing, st.transcript, text, delivery === 'queue'), refused: undefined }
-		: states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.delivery === 'after-turn'))
+		: states.enter(
+				st.transcript.meta.id,
+				st.transcript.state,
+				text,
+				delivery,
+				st.transcript.inbox.some((m) => m.delivery === 'after-turn'),
+			)
 	if (refused) {
 		st.notice = refused
 		return false
@@ -240,7 +291,8 @@ function completed(event: Event & { type: 'completions' }): void {
 	let { text, choices } = completion.apply(event.text, event.items)
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
-	if (!event.items.length || st.notice === 'no completions') st.notice = event.items.length ? undefined : 'no completions'
+	if (!event.items.length || st.notice === 'no completions')
+		st.notice = event.items.length ? undefined : 'no completions'
 	// Described candidates (task 4qh) list one per row.
 	st.choices = choices && event.descriptions ? choices.map((c, i): Hint => [c, event.descriptions![i]!]) : choices
 }
@@ -277,7 +329,10 @@ function onKeys(events: KeyEvent[]): void {
 			st.modal = state
 			if (!action) continue
 			// A /config change: sent, the modal stays open.
-			if (action.type === 'send') { app.send(action.command); continue }
+			if (action.type === 'send') {
+				app.send(action.command)
+				continue
+			}
 			let submit = st.onModal
 			app.close()
 			let command = action.type === 'submit' ? submit?.(action, state) : undefined
@@ -299,7 +354,12 @@ function onKeys(events: KeyEvent[]): void {
 		let shown = st.transcript?.meta.id
 		if (promptKeys.clip(st, k, (r) => app.pasted(shown, r))) continue
 		// Tab at the end of a slash command: the host completes it.
-		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length && !prompt.selection(st.prompt)
+		let tab =
+			k.key === 'tab' &&
+			!k.shift &&
+			st.transcript &&
+			st.prompt.cursor === st.prompt.text.length &&
+			!prompt.selection(st.prompt)
 		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
 		if (complete) {
 			app.send(complete)
@@ -326,9 +386,11 @@ function onKeys(events: KeyEvent[]): void {
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
 		let id = st.transcript?.meta.id
-		if (edited && id && !queueEdit.input(id, state.text) && !st.editing && recall.typed(id, state.text)) drafts.edit(id, state.text)
+		if (edited && id && !queueEdit.input(id, state.text) && !st.editing && recall.typed(id, state.text))
+			drafts.edit(id, state.text)
 		// A recalled entry or an edit was sent: the user's own text comes back.
-		if (action?.type === 'submit' && id && (recall.stop(id) || (editing && !editing.queueEdit))) app.setPrompt(drafts.text(id))
+		if (action?.type === 'submit' && id && (recall.stop(id) || (editing && !editing.queueEdit)))
+			app.setPrompt(drafts.text(id))
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
@@ -358,7 +420,10 @@ function sendScreen(): void {
 	let size = terminal.state.io?.size()
 	if (!size) return
 	let env = process.env
-	let term = [env.TERM, [env.TERM_PROGRAM, env.TERM_PROGRAM_VERSION].filter(Boolean).join(' '), env.COLORTERM].filter(Boolean).join(', ').slice(0, 200)
+	let term = [env.TERM, [env.TERM_PROGRAM, env.TERM_PROGRAM_VERSION].filter(Boolean).join(' '), env.COLORTERM]
+		.filter(Boolean)
+		.join(', ')
+		.slice(0, 200)
 	app.send({ type: 'screen', cols: size.cols, rows: size.rows, ...(term ? { term } : {}) })
 }
 
