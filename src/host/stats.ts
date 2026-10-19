@@ -5,7 +5,7 @@
 // turn ends and model changes; nothing polls.
 
 import { blocks } from '../common/blocks.ts'
-import type { Plan, Stats } from '../common/protocol.ts'
+import type { Plan, Stats } from '../common/snapshot.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'

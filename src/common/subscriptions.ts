@@ -1,6 +1,6 @@
 // One client-wide account store; plans only identify an account (task w0d).
 // The browser installs a Solid 2 store; terminal clients use plain data.
-import type { Plan } from './protocol.ts'
+import type { Plan } from './snapshot.ts'
 
 export type SubscriptionWindows = Record<string, { used: number; resets?: string; observed?: string }>
 export type SubscriptionData = Record<string, SubscriptionWindows>

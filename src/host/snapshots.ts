@@ -5,7 +5,7 @@
 import { settings } from '../common/settings.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
 import { replay } from '../common/replay.ts'
-import type { Snapshot } from '../common/protocol.ts'
+import type { Snapshot } from '../common/snapshot.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'

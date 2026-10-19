@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
-import type { Event, Snapshot } from '../common/protocol.ts'
+import type { Event } from '../common/protocol.ts'
+import type { Snapshot } from '../common/snapshot.ts'
 import type { SessionState } from '../common/states.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'

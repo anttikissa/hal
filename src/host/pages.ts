@@ -16,7 +16,7 @@
 
 import { closeSync, existsSync, openSync, readSync as readFd, statSync } from 'fs'
 import { ason } from '../common/ason.ts'
-import type { Snapshot } from '../common/protocol.ts'
+import type { Snapshot } from '../common/snapshot.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { changedFiles } from './changed-files.ts'

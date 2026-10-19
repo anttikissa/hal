@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { amend } from './amend.ts'
 import { drafts } from './drafts.ts'
-import type { Snapshot } from './protocol.ts'
+import type { Snapshot } from './snapshot.ts'
 import type { SessionState } from './states.ts'
 import { transcript, type Transcript } from './transcript.ts'
 

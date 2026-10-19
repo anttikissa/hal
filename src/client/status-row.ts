@@ -12,7 +12,7 @@ import { subscriptions } from '../common/subscriptions.ts'
 import { usageWindows } from '../common/usage-windows.ts'
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
-import type { Stats } from '../common/protocol.ts'
+import type { Stats } from '../common/snapshot.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 

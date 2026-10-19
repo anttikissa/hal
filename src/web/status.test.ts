@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { titles } from '../common/titles.ts'
-import type { Event, Stats } from '../common/protocol.ts'
+import type { Event } from '../common/protocol.ts'
+import type { Stats } from '../common/snapshot.ts'
 import { subscriptions } from '../common/subscriptions.ts'
 import { status } from './status.ts'
 import { view, type ViewState } from './view.ts'

@@ -4,7 +4,7 @@
 // counts changes, and an edit based on an older rev than the current
 // one keeps both texts, so two clients typing apart never lose either.
 
-import type { Draft } from '../common/protocol.ts'
+import type { Draft } from '../common/snapshot.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 

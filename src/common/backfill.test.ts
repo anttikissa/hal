@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { backfill, type Backfill } from './backfill.ts'
-import type { Event, Snapshot } from './protocol.ts'
+import type { Event } from './protocol.ts'
+import type { Snapshot } from './snapshot.ts'
 import type { HistoryRecord } from './replay.ts'
 import { transcript, type Transcript } from './transcript.ts'
 
