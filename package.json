@@ -3,6 +3,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"private": true,
+	"scripts": {
+		"prepare": "git config core.hooksPath scripts/hooks 2>/dev/null || true"
+	},
 	"devDependencies": {
 		"@types/bun": "latest",
 		"oxfmt": "0.73.0",

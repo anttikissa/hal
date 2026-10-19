@@ -16,7 +16,7 @@ const general = [
 const hal = [
 	'Add one second precision to message timestamps',
 	"Make the tab bar show each session's model",
-	'Which module is closest to the 400-line limit?',
+	'Which module is closest to the size limit?',
 	'Add a /uptime command that shows when the host process started',
 	'Implement a plugin that uses Jev to decide the best model for subagent based on its initial prompt',
 	'What tools do you have available?',

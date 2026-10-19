@@ -187,11 +187,13 @@ minimize those exceptions and report the reason through render.clear.
 - `src/conventions.test.ts` enforces the import rules and that
   importing every module (main.ts included) prints nothing, registers
   no signal handlers and leaves no timers or watchers running.
-- Non-test modules under src/ stay at or under 450 lines (`wc -l`), so
-  each fits one read and has one job. conventions.test.ts enforces it;
-  its short exception list gives each entry a reason (ason.ts is one
-  cohesive format; others name the task that splits them) and fails
-  when a listed file shrinks or disappears. Tests have no limit.
+- Modules under src/, tests included, stay at or under 20,000 bytes
+  (about 5,000 tokens), so each fits one read and has one job.
+  scripts/size-limit.ts holds the limit, its exceptions with reasons
+  (ason.ts is one self-contained format) and the splitting advice.
+  conventions.test.ts checks all of src/ and fails when a listed file
+  shrinks or disappears. The pre-commit hook (scripts/hooks, installed
+  by `bun install`) rejects oversized staged files.
 - `./test` runs bun test, tsc and oxlint, and fails on any lint
   warning (.oxlintrc.json turns off only no-control-regex: a terminal
   program matches control bytes on purpose). No tautological tests:

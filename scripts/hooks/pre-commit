@@ -1,0 +1,3 @@
+#!/bin/sh
+# Rejects staged source files over the size limit (scripts/size-limit.ts).
+exec bun "$(git rev-parse --show-toplevel)/scripts/size-limit.ts" --staged

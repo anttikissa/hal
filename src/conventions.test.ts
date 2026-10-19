@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import { Glob } from 'bun'
 import { readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
+import { sizeLimit } from '../scripts/size-limit.ts'
 
 const srcDir = import.meta.dir
 
@@ -132,36 +133,12 @@ test('importing every module has no side effects', () => {
 	expect(out.exitCode).toBe(0)
 })
 
-// Modules stay under maxLines so each fits one read and has one job.
-// Exceptions carry a reason; a planned split names its task.
-const maxLines = 450
-const sizeExceptions: Record<string, string> = {
-	'common/ason.ts': 'one cohesive format: parser and stringifier belong together',
-}
-
-// Line count as wc -l reports it: the number of newlines.
-function lineCount(text: string): number {
-	let n = 0
-	for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) n++
-	return n
-}
-
-// sizes maps src-relative paths to line counts. Returns one message per
-// oversized unlisted file and per listed file that is small or missing.
-function sizeProblems(sizes: Record<string, number>, exceptions: Record<string, string>): string[] {
-	let problems: string[] = []
-	for (let [rel, n] of Object.entries(sizes)) {
-		if (n > maxLines && !(rel in exceptions)) problems.push(`${rel} has ${n} lines (max ${maxLines})`)
-	}
-	for (let rel of Object.keys(exceptions)) {
-		if (!(rel in sizes)) problems.push(`${rel} is listed as an exception but does not exist`)
-		else if (sizes[rel]! <= maxLines) problems.push(`${rel} is listed as an exception but has only ${sizes[rel]} lines`)
-	}
-	return problems
-}
-
-test('source modules stay under the line limit', () => {
+test('source modules stay under the size limit', () => {
 	let sizes: Record<string, number> = {}
-	for (let file of sourceFiles()) sizes[file.slice(srcDir.length + 1)] = lineCount(readFileSync(file, 'utf8'))
-	expect(sizeProblems(sizes, sizeExceptions)).toEqual([])
+	for (let rel of new Glob('**/*').scanSync(srcDir)) {
+		if (sizeLimit.covers(rel)) sizes[rel] = Bun.file(`${srcDir}/${rel}`).size
+	}
+	let found = sizeLimit.problems(sizes)
+	if (found.length) console.error(sizeLimit.advice)
+	expect(found).toEqual([])
 })
