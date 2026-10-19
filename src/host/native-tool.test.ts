@@ -6,7 +6,7 @@ import { readFileSync, statSync, writeFileSync, chmodSync, mkdtempSync, rmSync }
 import { relative } from 'path'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
-import { replay } from '../common/replay.ts'
+import { replayText } from '../common/replay-text.ts'
 import type { ToolResultBlock } from '../common/blocks.ts'
 import { nativeTool } from './native-tool.ts'
 import { toolPresentations } from './tool-presentation.ts'
@@ -148,9 +148,9 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 
 test('replay sends calls back as their cmd text, old calls as their equivalent', () => {
 	expect(
-		replay.asNative({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' }).input,
+		replayText.asNative({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' }).input,
 	).toEqual({ cmd: 'BASH "ls"' })
-	expect(replay.asNative({ type: 'tool_call', id: 'a', name: 'read', input: { path: 'x' } }).input).toEqual({
+	expect(replayText.asNative({ type: 'tool_call', id: 'a', name: 'read', input: { path: 'x' } }).input).toEqual({
 		cmd: "READ { path: 'x' }",
 	})
 })

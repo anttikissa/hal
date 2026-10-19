@@ -16,7 +16,7 @@ import { provider } from './provider.ts'
 import { usage } from './usage.ts'
 import { tools } from './tools.ts'
 import { nativeTool } from './native-tool.ts'
-import { replay } from '../common/replay.ts'
+import { replayText } from '../common/replay-text.ts'
 import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
@@ -494,7 +494,7 @@ test.each([false, true])('WebSocket replay pairs results with backend calls when
 	let call = turn.blocks.find((b) => b.type === 'tool_call')!
 	expect(call.type).toBe('tool_call')
 	if (call.type !== 'tool_call') throw new Error('recording has no tool call')
-	let calls = expanded ? nativeTool.expand(call).map(replay.asNative) : [call]
+	let calls = expanded ? nativeTool.expand(call).map(replayText.asNative) : [call]
 	messages.push(
 		{ role: 'assistant', blocks: calls },
 		{

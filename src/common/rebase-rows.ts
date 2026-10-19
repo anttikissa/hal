@@ -6,6 +6,7 @@ import { blocks as conversationBlocks, type UserBlock } from './blocks.ts'
 import { rebase, type RebasePlan } from './rebase.ts'
 import { rebaseSparse } from './rebase-sparse.ts'
 import { replay, type HistoryRecord } from './replay.ts'
+import { replayText } from './replay-text.ts'
 import { tokenEstimates } from './token-estimates.ts'
 
 export type RebaseRow = {
@@ -241,7 +242,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 	}
 	let previous: string | undefined
 	for (let row of rows) {
-		row.time = replay.clock(row.ts, previous)
+		row.time = replayText.clock(row.ts, previous)
 		previous = row.ts
 		row.group = [...new Set(row.ns.flatMap((n) => [...(groups.get(n) ?? [n])]))]
 		if (row.group.some((n) => !row.ns.includes(n) && byNumber.has(n)))

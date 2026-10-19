@@ -89,7 +89,7 @@ function toMessages(req: ProviderRequest): any[] {
 	}
 	// Cache the whole prefix: the next turn starts with it. A second marker
 	// at an earlier request's input end reaches its cache when it lies past
-	// the API's 20-position lookback (replay.markCache, task g5j).
+	// the API's 20-position lookback (cacheMarker.markCache, task g5j).
 	let last = out.at(-1)?.content.at(-1)
 	if (last) last.cache_control = ephemeral
 	if (earlier) earlier.cache_control = ephemeral

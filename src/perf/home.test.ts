@@ -3,6 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { replayText } from '../common/replay-text.ts'
 import { perfHome } from './home.ts'
 
 // Each generated home is megabytes: removed after every test.
@@ -65,8 +66,8 @@ test('generated histories are valid, idle and sized as the shape says', () => {
 		let outputs = replay
 			.toMessages(recs)
 			.flatMap((m) => m.blocks.flatMap((b) => (b.type === 'tool_result' ? [b.output] : [])))
-		expect(outputs.some((o) => o === replay.missingResult('completed') || o === replay.missingResult('paused'))).toBe(
-			false,
-		)
+		expect(
+			outputs.some((o) => o === replayText.missingResult('completed') || o === replayText.missingResult('paused')),
+		).toBe(false)
 	}
 })

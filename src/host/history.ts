@@ -23,6 +23,7 @@ import {
 } from '../common/blocks.ts'
 import { modelNotices } from '../common/model-notices.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { cacheMarker } from '../common/cache-marker.ts'
 import { blobs } from './blobs.ts'
 import { busy } from './busy.ts'
 import { diag } from './diag.ts'
@@ -308,7 +309,7 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 			records.push(history.append(id, { type: 'notice', text: notice.text, rendered: true, source: notice.source }))
 	due = modelNotices.pending(replay.current(records))
 	if (due.length) records.push(history.append(id, { type: 'user', blocks: [], notices: due }))
-	return replay.markCache(records, replay.toMessages(records), budget.model)
+	return cacheMarker.markCache(records, replay.toMessages(records), budget.model)
 }
 
 // One provider round of a turn. Passes stream events through,

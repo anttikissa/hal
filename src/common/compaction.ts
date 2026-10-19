@@ -7,6 +7,7 @@
 // record, so provider input stays byte-stable afterwards.
 
 import { replay, type HistoryRecord } from './replay.ts'
+import { replayText } from './replay-text.ts'
 
 const HEAD_BYTES = 1024
 const TAIL_BYTES = 2048
@@ -52,7 +53,7 @@ function promptText(r: HistoryRecord): string {
 	if (r.type !== 'user') return ''
 	return [
 		...(r.notices?.map((n) => n.text) ?? []),
-		...r.blocks.flatMap((b) => (b.type === 'text' ? [replay.framed(b)] : [])),
+		...r.blocks.flatMap((b) => (b.type === 'text' ? [replayText.framed(b)] : [])),
 	].join('\n\n')
 }
 

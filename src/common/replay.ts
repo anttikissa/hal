@@ -8,16 +8,14 @@ import type {
 	CommitBlock,
 	Message,
 	StopReason,
-	ToolCallBlock,
 	ToolResultBlock,
 	Usage,
 	UserBlock,
 	UserText,
 } from './blocks.ts'
-import { ason } from './ason.ts'
 import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
-import { titles } from './titles.ts'
+import { replayText } from './replay-text.ts'
 import { modelNotices, type Notice } from './model-notices.ts'
 import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
@@ -205,18 +203,6 @@ type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
 //
 // Only the records after the latest compact or reset count; a compact's
 // summary is the first user message.
-// Providers see one tool, `tool` (task 3fv): a call goes back as the
-// text the model wrote (an unresolved one as its cmd), and a call from
-// before the one native tool as the equivalent NAME { fields } text.
-function asNative(b: ToolCallBlock): ToolCallBlock {
-	let text =
-		b.cmd ??
-		(b.name === 'tool' && typeof b.input.cmd === 'string'
-			? b.input.cmd
-			: `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
-	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
-}
-
 function toMessages(records: HistoryRecord[]): Message[] {
 	let materialized = new Set(records.flatMap((r) => (r.type === 'notice' && r.source !== undefined ? [r.source] : [])))
 	records = replay.current(records)
@@ -250,7 +236,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	let header = (ts: string, id: string, tags: (string | undefined)[] = []) => {
 		let list = [...tags.filter((t): t is string => !!t), ...(wrote.length ? [`you wrote ${wrote.join(' ')}`] : [])]
 		wrote = []
-		let head = `[${replay.clock(ts, stamped)}${id ? ` ${id}` : ''}${list.map((t) => `; ${t}`).join('')}]`
+		let head = `[${replayText.clock(ts, stamped)}${id ? ` ${id}` : ''}${list.map((t) => `; ${t}`).join('')}]`
 		stamped = ts
 		return head
 	}
@@ -303,7 +289,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		} else if (r.type === 'continue') {
 			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
 			let missing = pending.map((id): ToolResultBlock =>
-				result({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }),
+				result({ type: 'tool_result', id, output: replayText.missingResult(why), isError: true }),
 			)
 			pending = []
 			waiting = undefined
@@ -322,7 +308,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 					b.type === 'text'
 						? { type: 'text', text: b.text }
 						: b.type === 'tool_call'
-							? replay.asNative({
+							? replayText.asNative({
 									type: 'tool_call',
 									id: b.id,
 									name: b.name,
@@ -345,7 +331,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 				.map((id): ToolResultBlock => ({
 					type: 'tool_result',
 					id,
-					output: replay.missingResult(status),
+					output: replayText.missingResult(status),
 					isError: true,
 				}))
 			pending = []
@@ -361,7 +347,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			let images = r.blocks.filter((b) => b.type === 'image')
 			let text = texts
 				.map(
-					(b) => `${header(r.ts, ref(r, replay.letter(b), r.blocks.indexOf(b)), replay.tags(b))}\n${replay.framed(b)}`,
+					(b) =>
+						`${header(r.ts, ref(r, replayText.letter(b), r.blocks.indexOf(b)), replayText.tags(b))}\n${replayText.framed(b)}`,
 				)
 				.join('\n\n')
 			out.push({ role: 'user', blocks: [{ type: 'text', text }, ...images.map((b) => ({ ...b }))] })
@@ -373,38 +360,6 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	while (out[0]?.role === 'assistant') out.shift()
 	return out
 }
-
-// A prompt text as the model reads it, below its header: a next-round
-// message also says it needn't drop its work for it.
-function framed(b: UserText): string {
-	let text =
-		b.queuedAt === undefined
-			? b.text
-			: `<hal-note>Message was queued at ${b.queuedAt}, take that into account when reading it.</hal-note>\n${b.text}`
-	return b.advisory ? `${replay.nextRoundNotice}\n${text}` : text
-}
-
-// A prompt text's kind letter, as the transcript shows it (task 9p).
-function letter(b: UserText): string {
-	return b.from === undefined ? (b.origin === 'model' ? 's' : 'u') : b.label?.startsWith('bash ') ? 's' : 'm'
-}
-
-// The transcript header's tags for a prompt text (task c2t); none for a plain prompt.
-function tags(b: UserText): string[] {
-	return [
-		b.from !== undefined
-			? `message from ${titles.address(b.label ?? b.from)}`
-			: b.origin === 'model'
-				? 'Hal'
-				: undefined,
-		b.generatingCommand && `/${b.generatingCommand} continuation`,
-		b.delivery === 'now' && 'steering',
-		b.delivery === 'next-round' && !b.advisory && 'soft-steering',
-		b.queuedAt !== undefined && `queued at ${replay.clock(b.queuedAt).slice(-5)}`,
-		b.advisory && 'next round',
-	].filter((t): t is string => !!t)
-}
-
 // Whether the record is a prompt: a user record with text.
 function isPrompt(r: HistoryRecord): r is Extract<HistoryRecord, { type: 'user' }> {
 	return r.type === 'user' && r.blocks.some((b) => b.type === 'text')
@@ -488,67 +443,10 @@ function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	})
 }
 
-// Local wall-clock HH:MM of an ISO timestamp, as YYYY-MM-DD HH:MM if
-// its date differs from that of `prev`, the last stamped prompt's (or
-// there is none), so a stamp past midnight isn't read as a stale date.
-function clock(ts: string, prev?: string): string {
-	let two = (n: number) => String(n).padStart(2, '0')
-	let day = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`
-	let d = new Date(ts)
-	let time = `${two(d.getHours())}:${two(d.getMinutes())}`
-	return prev !== undefined && day(new Date(prev)) === day(d) ? time : `${day(d)} ${time}`
-}
-
-// What the model is told about a call with no recorded result. A host
-// that went away, or a pause, may have cut it off mid-run.
-function missingResult(status: TurnStatus | undefined): string {
-	if (status === 'interrupted' || status === 'paused')
-		return 'No result: the turn was interrupted, so this tool call may or may not have run.'
-	return `Tool call did not run: the turn ${status ?? 'ended'}.`
-}
-
-// Back on a model after another one ran (task g5j). Anthropic finds a
-// cached prefix only within 20 positions back from a cache marker. With
-// one model that is enough: each round caches its own input, a few
-// blocks behind the next. Another model's tool exchange can add more, so
-// the newest marker no longer reaches the old cache and it is written
-// again in full (session 08-nah: ~13k tokens). Marking where this
-// model's last input ended finds it; Anthropic checks the prefix still
-// matches (pruning or an edit can change it), so nothing is stored.
-// Returns `messages`.
-function markCache(records: HistoryRecord[], messages: Message[], model?: string): Message[] {
-	let rounds = records.filter((r) => r.type === 'round')
-	if (!model || !rounds.length || rounds.at(-1)!.model === model) return messages
-	let mine = rounds.findLast((r) => r.model === model && r.block !== undefined)
-	let start = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
-	if (!mine || records.indexOf(mine) < start) return messages
-	let count = replay
-		.toMessages(records.filter((r) => r.n === undefined || r.n < mine.block!))
-		.reduce((sum, m) => sum + m.blocks.length, 0)
-	for (let m of messages) {
-		if (count <= m.blocks.length) {
-			if (count) m.cache = count
-			break
-		}
-		count -= m.blocks.length
-	}
-	return messages
-}
-
 export const replay = {
-	// Told with a next-round message delivered while the model works.
-	nextRoundNotice:
-		'<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
 	toMessages,
-	markCache,
-	asNative,
-	framed,
-	letter,
-	tags,
 	isPrompt,
 	lastPrompt,
 	current,
 	withoutCommands,
-	clock,
-	missingResult,
 }
