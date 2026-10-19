@@ -1,0 +1,10 @@
+{
+	title: 'Navigable module calls and deferred imported values',
+	spec: 'AGENTS.md explicitly allows cyclic imports within the existing layer boundaries when imported values are accessed after initialization. Module-level derived values and snapshots of another module are forbidden: read through the module object inside a function instead of const x = other.value, const x = f(other.value), destructuring, or captured method aliases in an exported object. Prefer function x() { return f(other.value) }. Core functions have navigable implementations, not empty placeholders overwritten by another module during startup. This does not prohibit local snapshots inside a function or literal constants. tasks/README.md points to this guidance. Existing violations are recorded as audit findings, not claimed fixed.',
+	status: 'done',
+	notes: [
+		'A source inventory found import-time snapshots in src/client/form-view.ts:13, item-view.ts:33, modal-view.ts:14 (ansi destructuring), src/common/protocol.ts:364 (commandCheck and eventCheck members), and src/host/effort.ts:84 (vocabulary.levels). Imported calls also occur in src/host/plugin-sync-client.ts:42, commands/expand.ts and collapse.ts, and providers/ollama.ts, opencode-go.ts and openrouter.ts. These are existing findings, not fixed by this guidance task. The line-based inventory is not an exhaustive AST or transitive initializer audit. Existing conventions.test.ts checks observable import side effects, not absence of calls or value captures.'
+	],
+	needs: ['9'],
+	foldInto: ['9']
+}

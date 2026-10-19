@@ -162,6 +162,19 @@ dependencies, especially on the host path. Never cut trust-boundary
 validation, data-loss handling, security, accessibility or explicit
 requirements.
 
+## Module initialization and navigation
+
+Cyclic imports are allowed within the layer boundaries. Read imported
+values inside functions, after module initialization, through the module
+object. Keep derived values callable: prefer
+`function x() { return f(other.value) }` to module-level
+`const x = f(other.value)` or `const x = other.value`. This also applies
+to destructuring and method aliases captured in exported objects.
+Literal constants and local snapshots inside functions are fine.
+
+Core functions have concrete, navigable implementations. Do not use empty
+placeholder functions that another module overwrites at startup.
+
 ## Plugins
 
 Hal hot-reloads plugins/*.ts when they change; no restart is needed.

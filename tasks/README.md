@@ -200,6 +200,8 @@ minimize those exceptions and report the reason through render.clear.
   keep it. A test run leaves nothing in the temp dir: tests delete the
   homes they make, and a test that spawns ./run passes --home and
   sets TMPDIR to such a home (SIGKILL skips ./run's cleanup trap).
+- Cyclic imports and deferred reads follow AGENTS.md's "Module
+  initialization and navigation" rules. Layer boundaries still apply.
 - Importing a module does no I/O, timers, watchers or signal setup.
   Startup work lives in an idempotent `init()`; `main.start()` calls
   them in order, and runs only when main.ts is the entry point.
