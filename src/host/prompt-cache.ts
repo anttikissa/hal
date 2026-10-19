@@ -15,9 +15,9 @@
 //   # T [section changed; new contents follow]   full body; the default
 //   # T [section changed; diff follows]          update="diff" sections
 //   # T [section changed; diff and new contents follow]
-//                                                 diff, then "New contents:"
-//                                                 and the full body; only
-//                                                 after a rebase, see below
+//                                                diff, then "New contents:"
+//                                                and the full body; only
+//                                                after a rebase, see below
 //   # T [new section]                            full body
 //   # T [section removed; its instructions no longer apply]
 //
