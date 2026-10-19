@@ -1,5 +1,5 @@
 // Ghost Shell: jade interfaces, city darkness and pale violet signals.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.12, 0.012, 160],
 	user: [

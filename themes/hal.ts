@@ -6,7 +6,7 @@
 // replace first; every color Hal draws comes from a field here.
 // It starts equal to src/common/colors.ts; nothing keeps them in step.
 
-import { rendering } from '../src/common/rendering.ts'
+import { render } from '../src/client/render.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import { oklch } from '../src/common/oklch.ts'
 import type { Plugin } from '../src/host/plugins.ts'
@@ -144,6 +144,6 @@ export default (plugin: Plugin) => {
 		else plugin.set(colors, key as never, v as never)
 	}
 	// Repaint in these colors now, and in the remaining ones once removed.
-	rendering.requestRedraw('theme applied')
-	return () => rendering.requestRedraw('theme removed')
+	render.request('theme applied')
+	return () => render.request('theme removed')
 }

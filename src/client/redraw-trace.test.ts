@@ -13,17 +13,14 @@ let file = join(dir, 'trace.jsonl')
 const originals = {
 	event: app.onEvent,
 	keys: app.onKeys,
-	redraw: terminal.redraw,
-	resize: terminal.onResize,
 	max: redrawTrace.maxRecords,
 }
 afterEach(() => {
 	redrawTrace.stop()
 	render.reset()
+	terminal.reset()
 	app.onEvent = originals.event
 	app.onKeys = originals.keys
-	terminal.redraw = originals.redraw
-	terminal.onResize = originals.resize
 	redrawTrace.maxRecords = originals.max
 	rmSync(dir, { recursive: true, force: true })
 	dir = mkdtempSync(join(tmpdir(), 'hal-redraw-'))
@@ -102,16 +99,20 @@ test('attributes throttle-coalesced paints to event and keyboard sources, not th
 	expect(writes.length).toBeGreaterThan(0)
 })
 
-test('hooks redraw callbacks installed after local configuration and restores them on stop', () => {
-	redrawTrace.start(file)
+test('attributes a resize to its source and restores the hooks on stop', async () => {
 	render.init({ size: () => ({ rows: 10, cols: 40 }), write: () => {} })
-	terminal.redraw()
-	terminal.onResize()
-	expect(capture().map((r) => r.causes)).toEqual([['terminal.redraw'], ['terminal.onResize']])
+	terminal.state.entered = true
+	redrawTrace.start(file)
+	terminal.resized()
+	await Promise.resolve()
+	expect(capture().map((r) => [r.causes, r.force])).toEqual([[['terminal.resized'], true]])
 	redrawTrace.stop()
 	expect(redrawTrace.state.fd).toBeUndefined()
-	terminal.redraw()
-	expect(capture()).toHaveLength(2)
+	render.reset()
+	render.init({ size: () => ({ rows: 10, cols: 40 }), write: () => {} })
+	terminal.resized()
+	await Promise.resolve()
+	expect(capture()).toHaveLength(1)
 })
 
 test('stops at its bound and does not overwrite a subsequent override', () => {

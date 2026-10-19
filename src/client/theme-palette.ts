@@ -1,7 +1,7 @@
 // Complete experimental palettes shared by the cinematic theme plugins.
-import { colors, type Look, type Style } from './colors.ts'
-import type { Oklch } from './oklch.ts'
-import { rendering } from './rendering.ts'
+import { colors, type Look, type Style } from '../common/colors.ts'
+import type { Oklch } from '../common/oklch.ts'
+import { render } from './render.ts'
 import type { Plugin } from '../host/plugins.ts'
 
 type Palette = {
@@ -79,7 +79,7 @@ export function themePlugin(look: Look) {
 			if (typeof value === 'function') plugin.around(colors, key as never, value as never)
 			else plugin.set(colors, key as never, value as never)
 		}
-		rendering.requestRedraw('theme applied')
-		return () => rendering.requestRedraw('theme removed')
+		render.request('theme applied')
+		return () => render.request('theme removed')
 	}
 }

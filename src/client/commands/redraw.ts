@@ -1,5 +1,5 @@
 // /redraw: repaints everything, whatever has the keys.
 
-import { terminal } from '../terminal.ts'
+import { render } from '../render.ts'
 
-export const command = { run: (): void => terminal.redraw('Ctrl-L or /redraw') }
+export const command = { run: (): void => render.request('Ctrl-L or /redraw') }

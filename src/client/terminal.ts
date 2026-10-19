@@ -9,6 +9,7 @@
 import { emergency, type EmergencyAction, type EmergencyState } from '../common/emergency.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
+import { render } from './render.ts'
 import fs from 'fs'
 
 /** The process and tty operations the terminal needs; faked in tests. */
@@ -204,14 +205,14 @@ function resumed(): void {
 	if (!terminal.state.suspended) return
 	terminal.state.suspended = false
 	terminal.enter()
-	terminal.redraw('a resume after suspend')
+	render.request('a resume after suspend')
 }
 
 // Only while we own the terminal; a resize during a suspend is answered
 // by the redraw on resume.
 function resized(): void {
 	terminal.onScreen()
-	if (terminal.state.entered) terminal.onResize()
+	if (terminal.state.entered) render.request('a terminal resize')
 }
 
 const ACTIONS: Record<EmergencyAction, () => void> = {
@@ -284,12 +285,6 @@ export const terminal = {
 	/** Runs as the user quits, before the exit; set by main. Must be
 	 * synchronous, quick and never throw or wait on the host. */
 	onQuit: (): void => {},
-	/** Repaints everything in the current colors (resume, Ctrl-L, a
-	 * plugin's theme); replaced by the renderer, a no-op until then. */
-	/** Repaint everything; `trigger` says why (task e4c). */
-	redraw: (_trigger?: string): void => {},
-	/** Repaints after a terminal resize; replaced by the renderer. */
-	onResize: (): void => {},
 	/** Tells the host the new size; replaced by the app. */
 	onScreen: (): void => {},
 	/** Moves the cursor below the frame before the terminal is given

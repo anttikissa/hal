@@ -132,37 +132,24 @@ function start(path: string | URL): void {
 	})
 	for (let key of ['beat', 'onKeys', 'onState', 'onTabs'] as const) redrawTrace.cause(app, key, `app.${key}`)
 	redrawTrace.cause(terminal, 'resized', 'terminal.resized')
-	// Plugins activate before render.init(), which installs these callbacks.
-	let terminalHooked = false
-	let hookTerminal = () => {
-		if (terminalHooked || !render.state.out) return
-		terminalHooked = true
-		for (let key of ['redraw', 'onResize'] as const) redrawTrace.cause(terminal, key, `terminal.${key}`)
-	}
-	redrawTrace.hook(render, 'init', (next, ...args) => {
-		let result = next(...args)
-		hookTerminal()
-		return result
-	})
-	hookTerminal()
-	redrawTrace.hook(render, 'request', (next) => {
+	redrawTrace.hook(render, 'request', (next, ...args) => {
 		let st = redrawTrace.state
 		for (let label of st.context.length ? st.context : ['render.request']) st.pending.add(label)
-		return next()
+		return next(...args)
 	})
-	redrawTrace.hook(render, 'draw', (next, force = false) => {
+	redrawTrace.hook(render, 'draw', (next, ...args) => {
 		let st = redrawTrace.state
 		let before = st.painting
 		st.painting = [...new Set([...st.pending, ...st.context])]
 		if (!st.painting.length) st.painting.push('render.draw')
 		st.pending.clear()
 		try {
-			return next(force)
+			return next(...args)
 		} finally {
 			st.painting = before
 		}
 	})
-	redrawTrace.hook(render, 'paintParts', (next, frame, rows, force = false) => {
+	redrawTrace.hook(render, 'paintParts', (next, frame, rows, force = false, ...rest) => {
 		let prev = render.state.prev
 		let oldRows = prev.length,
 			newRows = frame.lines.length
@@ -173,7 +160,7 @@ function start(path: string | URL): void {
 		let writableTop = Math.max(0, oldRows - rows)
 		let wasFull = render.state.fullscreen
 		let oldCursorRow = render.state.cursorRow
-		let parts = next(frame, rows, force) as (string | (() => string))[]
+		let parts = next(frame, rows, force, ...rest) as (string | (() => string))[]
 		let clear = parts.some((p) => typeof p === 'string' && p.includes('\x1b[3J'))
 		let home = parts.some((p) => typeof p === 'string' && p.includes('\x1b[H'))
 		let reason = clear

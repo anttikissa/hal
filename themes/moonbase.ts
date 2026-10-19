@@ -1,5 +1,5 @@
 // Moonbase: frost-blue readouts on the dark side of the moon.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.12, 0.014, 265],
 	user: [

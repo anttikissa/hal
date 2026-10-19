@@ -313,7 +313,8 @@ move the caret. A newline-free text is not one row.
   Restart exits with `terminal.restartCode` (100), which ./run answers
   by starting again.
 - Suspend restores the terminal and SIGSTOPs the process group; on
-  SIGCONT it re-enters raw mode and calls `terminal.redraw()`.
+  SIGCONT it re-enters raw mode and requests a full repaint
+  (`render.request`).
 
 ## Motion (web)
 

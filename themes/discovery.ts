@@ -1,5 +1,5 @@
 // Discovery: porcelain consoles and restrained spacecraft blue.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.13, 0.008, 255],
 	user: [

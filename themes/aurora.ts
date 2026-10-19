@@ -1,5 +1,5 @@
 // Aurora: arctic rose, green curtains and midnight violet.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.13, 0.015, 300],
 	user: [

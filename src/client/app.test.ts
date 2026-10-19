@@ -12,7 +12,6 @@ import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import { keys } from './keys.ts'
 import { render } from './render.ts'
-import { terminal } from './terminal.ts'
 import {
 	useApp,
 	sent,
@@ -316,14 +315,14 @@ test('Escape closes a modal and nothing else: the running turn goes on', () => {
 })
 
 test('Ctrl-L repaints everything', () => {
-	let saved = terminal.redraw
+	let saved = render.request
 	let redraws = 0
-	terminal.redraw = () => void redraws++
+	render.request = (full) => void (full && redraws++)
 	try {
 		app.onKeys([ctrl('l')])
 		expect(redraws).toBe(1)
 	} finally {
-		terminal.redraw = saved
+		render.request = saved
 	}
 })
 

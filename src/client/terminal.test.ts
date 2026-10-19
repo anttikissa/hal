@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { terminal, type TerminalIO } from './terminal.ts'
+import { render } from './render.ts'
 import type { KeyEvent } from './keys.ts'
 
 // A fake terminal: records raw mode, output, exits and stops, and lets
@@ -45,9 +46,8 @@ function fixture() {
 	let keys: KeyEvent[] = []
 	let redraws = 0
 	terminal.onKeys = (events) => keys.push(...events)
-	terminal.redraw = () => redraws++
+	render.request = (full) => void (full === 'a terminal resize' ? log.push('resize') : redraws++)
 	terminal.park = () => log.push('park')
-	terminal.onResize = () => log.push('resize')
 	terminal.init(io)
 	return {
 		log,
@@ -72,10 +72,11 @@ function fixture() {
 	}
 }
 
-const defaults = { onKeys: terminal.onKeys, redraw: terminal.redraw, park: terminal.park, onResize: terminal.onResize }
+const defaults = { onKeys: terminal.onKeys, park: terminal.park, request: render.request }
 afterEach(() => {
 	terminal.reset()
-	Object.assign(terminal, defaults)
+	Object.assign(terminal, { onKeys: defaults.onKeys, park: defaults.park })
+	render.request = defaults.request
 })
 
 const BRACKETED_PASTE_ON = '\x1b[?2004h'

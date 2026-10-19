@@ -5,6 +5,7 @@ import { join } from 'path'
 import type { Command, Event } from '../common/protocol.ts'
 import { rebaseRows } from '../common/rebase-rows.ts'
 import { keys } from './keys.ts'
+import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 
 async function edit(path: string): Promise<void> {
@@ -27,7 +28,7 @@ async function edit(path: string): Promise<void> {
 		terminal.state.external = false
 		if (terminal.state.io) terminal.enter()
 		process.stdin.resume()
-		terminal.redraw('the rebase editor closing')
+		render.request('the rebase editor closing')
 	}
 }
 

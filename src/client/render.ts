@@ -26,7 +26,6 @@
 //   a plugin observes each one, with why, by hooking it.
 
 import { titles } from '../common/titles.ts'
-import { rendering } from '../common/rendering.ts'
 import { ansi } from './ansi.ts'
 import { frame, type Frame, type View } from './frame.ts'
 import { frameLayout, type Past } from './frame-layout.ts'
@@ -81,6 +80,8 @@ interface RenderState {
 	parked: boolean
 	timer: ReturnType<typeof setTimeout> | null
 	dirty: boolean
+	/** Why the queued paint repaints every row (task e4c), if it does. */
+	full: string | undefined
 	/** The items' rows painted last and whose tab they are: shown again
 	 * while a long history is laid out in slices. */
 	past: { session: string | undefined; past: Past } | undefined
@@ -107,6 +108,7 @@ function createState(): RenderState {
 		parked: false,
 		timer: null,
 		dirty: false,
+		full: undefined,
 		past: undefined,
 		slicing: null,
 	}
@@ -402,11 +404,34 @@ function park(): void {
 function init(out: Output | null = terminal.state.io): void {
 	if (render.state.out || !out) return
 	render.state.out = out
-	// Never while suspended: the shell has the terminal.
-	terminal.redraw = (trigger = 'a redraw request') => void (terminal.state.suspended || render.draw(true, trigger))
-	rendering.requestRedraw = (reason) => terminal.redraw(reason)
-	terminal.onResize = () => render.draw(true, 'a terminal resize')
 	terminal.park = () => render.park()
+}
+
+/**
+ * Paint soon: requests in one task paint once at its end, then at most
+ * once per frameMs. `full` says why every row must be repainted (task
+ * e4c); one such request makes the batched paint full. Does nothing
+ * before init.
+ */
+function request(full?: string): void {
+	let st = render.state
+	if (!st.out) return
+	st.full ??= full
+	if (st.timer) {
+		st.dirty = true
+		return
+	}
+	queueMicrotask(() => {
+		if (render.state !== st) return
+		let trigger = st.full
+		st.full = undefined
+		st.dirty = false
+		render.draw(trigger !== undefined, trigger)
+	})
+	st.timer = setTimeout(() => {
+		st.timer = null
+		if (st.dirty) render.request()
+	}, render.frameMs)
 }
 
 /** Forget everything (tests). */
@@ -437,7 +462,7 @@ export const render = {
 	draw: (force = false, trigger?: string): void => renderView.draw(force, trigger),
 	tail: (view: View, cols: number, rows: number): View => renderView.tail(view, cols, rows),
 	later: (): void => renderView.later(),
-	request: (): void => renderView.request(),
+	request,
 	show: (view: View): void => renderView.show(view),
 	park,
 	init,

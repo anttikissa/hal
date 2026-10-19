@@ -1,5 +1,5 @@
 // Replicant: rain-lit lavender and rose neon on ink.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.12, 0.018, 285],
 	user: [

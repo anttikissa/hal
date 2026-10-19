@@ -16,7 +16,7 @@ function rebuild(view: View): void {
 
 function draw(force = false, trigger?: string): void {
 	let st = render.state
-	if (terminal.state.external || !st.out || (st.parked && !force)) return
+	if (terminal.state.external || terminal.state.suspended || !st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
 	if (!st.fullscreen && (st.view.tabs?.list.length ?? render.startTabs) > 1) {
@@ -89,24 +89,9 @@ function later(): void {
 	}, 0)
 }
 
-function request(): void {
-	let st = render.state
-	if (st.timer) {
-		st.dirty = true
-		return
-	}
-	queueMicrotask(() => ((st.dirty = false), render.draw()))
-	st.timer = setTimeout(() => {
-		st.timer = null
-		if (!st.dirty) return
-		st.dirty = false
-		render.request()
-	}, render.frameMs)
-}
-
 function show(view: View): void {
 	render.state.view = view
 	render.request()
 }
 
-export const renderView = { draw, tail, later, request, show }
+export const renderView = { draw, tail, later, show }

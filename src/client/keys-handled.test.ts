@@ -21,7 +21,7 @@ const saved = {
 	send: app.send,
 	show: render.show,
 	quit: terminal.quit,
-	redraw: terminal.redraw,
+	request: render.request,
 	draftSend: drafts.send,
 	clipboard: { ...clipboard },
 }
@@ -34,7 +34,7 @@ beforeEach(() => {
 	drafts.send = (c: any) => effects.push(c.type)
 	render.show = () => {}
 	terminal.quit = () => effects.push('quit')
-	terminal.redraw = () => effects.push('redraw')
+	render.request = (full) => void (full && effects.push('redraw'))
 	clipboard.write = async (text) => (effects.push(`copy ${text}`), undefined)
 	clipboard.read = async () => (effects.push('read'), clip)
 	// Never the real pasteboard: an image the user copied would win.
@@ -46,7 +46,7 @@ afterEach(() => {
 	drafts.send = saved.draftSend
 	render.show = saved.show
 	terminal.quit = saved.quit
-	terminal.redraw = saved.redraw
+	render.request = saved.request
 	Object.assign(clipboard, saved.clipboard)
 	app.reset()
 })

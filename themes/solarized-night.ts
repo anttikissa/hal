@@ -1,5 +1,5 @@
 // Solarized Night: blue-black ink, muted cyan and warm paper light.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.16, 0.025, 220],
 	user: [

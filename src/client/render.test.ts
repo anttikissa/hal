@@ -190,7 +190,7 @@ describe('leaving and coming back', () => {
 		expect(term.content()).toEqual(trimmed(frameRows.slice(0, -1)))
 		expect(term.row).toBe(height - 1)
 		terminal.reset()
-		Object.assign(terminal, { redraw: () => {}, onResize: () => {}, park: () => {} })
+		terminal.park = () => {}
 	})
 })
 
@@ -346,19 +346,27 @@ describe('long words', () => {
 	})
 })
 
-describe('terminal.redraw', () => {
-	test('is a no-op before the UI is ready and while suspended', () => {
-		expect(() => terminal.redraw()).not.toThrow()
+describe('render.request', () => {
+	test('is a no-op before the UI is ready, while suspended and after a reset', async () => {
+		render.request('x')
 		setup()
 		show(items(1))
 		term.written = ''
 		terminal.state.suspended = true
-		terminal.redraw()
+		render.request('x')
+		await Promise.resolve()
 		terminal.state.suspended = false
+		expect(term.written).toBe('')
+		render.reset()
+		setup()
+		render.request('x')
+		render.reset()
+		setup()
+		await Bun.sleep(20)
 		expect(term.written).toBe('')
 	})
 
-	test('repaints every row in the current colors, cached rows too', () => {
+	test('one full request makes the batched paint repaint every row in the current colors', async () => {
 		let exit = colors.exit,
 			mono = ansi.mono
 		// Color escapes exist only outside GNU screen (ansi.mono): a run
@@ -374,7 +382,14 @@ describe('terminal.redraw', () => {
 			expect(term.written).toContain(coral)
 			colors.exit = () => ({ ...exit(), fg: [0.8, 0.15, 145] })
 			term.written = ''
-			terminal.redraw()
+			let writes = 0
+			let write = term.write.bind(term)
+			term.write = (s) => void (writes++, write(s))
+			render.request()
+			render.request('a theme')
+			render.request()
+			await Promise.resolve()
+			expect(writes).toBe(1)
 			expect(term.written).toContain(green)
 			expect(term.written).not.toContain(coral)
 		} finally {
@@ -443,7 +458,7 @@ describe('clear reasons (task e4c)', () => {
 		expect(reasons.every((r) => r.text.length > 0)).toBe(true)
 	})
 
-	test('a full-mode shrink pads above the chrome instead of clearing scrollback; a forced repaint names its trigger', () => {
+	test('a full-mode shrink pads above the chrome instead of clearing scrollback; a forced repaint names its trigger', async () => {
 		setup(20, 30)
 		let list = items(10)
 		list.push({ type: 'output', text: 'one\ntwo\nthree\nfour' })
@@ -455,7 +470,8 @@ describe('clear reasons (task e4c)', () => {
 		expect(reasons).toEqual([])
 		expect(frameText().length).toBe(height)
 		expect(term.content()).toEqual(frameText())
-		terminal.redraw('Ctrl-L or /redraw')
+		render.request('Ctrl-L or /redraw')
+		await Promise.resolve()
 		expect(reasons[0]).toMatchObject({ kind: 'all', cause: 'forced', trigger: 'Ctrl-L or /redraw' })
 	})
 })

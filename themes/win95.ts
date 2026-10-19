@@ -1,5 +1,5 @@
 // Windows 95 after dark: cobalt selection, silver chrome, teal desktop.
-import { palette, themePlugin } from '../src/common/theme-palette.ts'
+import { palette, themePlugin } from '../src/client/theme-palette.ts'
 export const look = palette({
 	screen: [0.16, 0.02, 195],
 	user: [

@@ -131,7 +131,7 @@ function previewTheme(): void {
 	let name = i >= 0 ? st.form!.values[i] : undefined
 	if (name === st.previewed) return
 	st.previewed = name
-	void app.preview(name).then(() => terminal.redraw('theme preview'))
+	void app.preview(name).then(() => render.request('theme preview'))
 }
 
 // The pulse beats while something in `v` blinks: every frame while a
