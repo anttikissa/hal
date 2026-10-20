@@ -1,5 +1,7 @@
-// Host protocol: durable history before live events, shared by all transports.
-// Sliced snapshots hold commands until sent, then run them in order (task 7j).
+// The host protocol, which every transport shares: clients send commands
+// and get events. Durable history is written before live events go out.
+// While a snapshot is sent in slices, the connection's commands wait,
+// then run in order (task 7j).
 
 import { type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'

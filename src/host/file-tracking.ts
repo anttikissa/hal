@@ -1,3 +1,6 @@
+// Turns the paths and globs a call declares into the files Hal snapshots
+// (file-changes.ts). In a Git repo, files Git ignores are left out;
+// elsewhere the tree is walked. .git and node_modules are always skipped.
 import { lstat, readdir, stat } from 'fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'path'
 import { fileChanges } from './file-changes.ts'

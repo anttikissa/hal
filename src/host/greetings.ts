@@ -1,5 +1,7 @@
-// Display-only arrivals. Call only at creation, never while reopening:
-// the ordinary output record is the durable choice shared by both clients.
+// Greets the user in a new session, by time of day and by the name in
+// USER.md. Greetings are display only. Call only at creation, never while
+// reopening: the ordinary output record is the durable choice both
+// clients share.
 import { mkdirSync } from 'fs'
 import { clock } from './clock.ts'
 import { clients } from './clients.ts'

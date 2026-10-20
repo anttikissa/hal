@@ -1,4 +1,5 @@
-// Host initialization, role policy and supervised lifetime (task fd1).
+// Brings up a process that may host Hal: initialization, the rules for
+// which process becomes host, and its supervised lifetime (task fd1).
 import { config } from './config.ts'
 import { handover, restartProcess } from './commands/restart.ts'
 import type { Conn } from '../common/connection.ts'

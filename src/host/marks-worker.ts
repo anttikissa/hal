@@ -1,5 +1,6 @@
-// Off the host's thread (task 7j): work on one session's marks whose
-// cost grows with data the host cannot slice, a single ASON value.
+// Keeps slow work on one session's marks off the host's thread (task
+// 7j): its cost grows with a single ASON value, which the host cannot
+// split into slices.
 // `upgrade`: marks.ason from before `files` kept every changed path (up
 // to 15 MB, ~800 ms to load); it is converted and replaced atomically.
 // `paths`: the distinct paths of the file_changes records at `offsets`

@@ -1,5 +1,6 @@
-// /status: one table shape for the terminal and web (both render Markdown).
-// Every read refreshes subscriptions into master data without a model turn.
+// /status: how much of each account's usage windows is spent, as one
+// Markdown table that the terminal and the web both render. Every read
+// refreshes the stored subscription data without a model turn.
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'

@@ -1,5 +1,7 @@
-// Context boundaries wait for the active exchange, not for their own tool.
-// Intent and completion are ordinary output records, durable in history.
+// Lets /clear and /compact be asked for while work runs: the request is
+// recorded and applied once the active exchange settles, not when the
+// command's own tool call ends. The request and its completion are
+// ordinary output records, durable in history.
 // Tasks: jf, svt, rqq.
 import { contextTransition, type ContextTransition } from '../common/context-transition.ts'
 import { inbox } from '../common/inbox.ts'

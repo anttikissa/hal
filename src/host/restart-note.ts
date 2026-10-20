@@ -1,4 +1,6 @@
-// Deliberate restart attribution (2e) and model notices (nvm).
+// Tells users why Hal restarted and models that it did: a deliberate
+// restart is attributed to its cause (task 2e), and sessions get a notice
+// (task nvm).
 import { readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { history } from './history.ts'

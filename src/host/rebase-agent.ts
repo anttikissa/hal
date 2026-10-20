@@ -1,5 +1,7 @@
-// Sparse plans and durable round-boundary execution. Validation and reporting
-// finish before any drop; open tails include the settled executing exchange.
+// Applies /rebase without breaking a running exchange: sparse plans run
+// durably at a round boundary. Validation and the report finish before
+// anything is dropped. An open range at the end includes the exchange that
+// runs the rebase, once it settles.
 // Tasks: svt.
 import type { Sender, ToolResultBlock } from '../common/blocks.ts'
 import type { ContextTransition } from '../common/context-transition.ts'

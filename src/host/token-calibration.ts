@@ -1,5 +1,7 @@
-// Real successful rounds teach a per-model ratio; images do not teach a
-// character ratio because their input tokens are not proportional to bytes.
+// Learns how many characters make one token for each model, so token
+// estimates match the provider's counts. Only real, successful rounds
+// teach the ratio. Images teach no character ratio, because their input
+// tokens are not proportional to their bytes.
 import { mkdirSync } from 'fs'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { liveFiles } from './live-file.ts'

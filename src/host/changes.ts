@@ -1,4 +1,5 @@
-// Durable per-session file observations, independent of Git's working tree.
+// Lists the files a session changed, for /changes and its page. It reads
+// the session's own durable file observations, never Git's working tree.
 import { resolve, relative } from 'path'
 import type { FileChange, FileSnapshot, HistoryRecord } from '../common/replay.ts'
 import { fileChanges } from './file-changes.ts'

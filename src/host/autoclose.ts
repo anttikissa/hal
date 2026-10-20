@@ -1,5 +1,7 @@
-// Automatic tab closure is a session property, independent of spawn kind.
-// Changes are durable transcript output; metadata pushes update both titles.
+// Decides whether a session's tab closes by itself when its work ends.
+// Autoclose is a session property, independent of how the session was
+// spawned. Each change is durable transcript output, and a metadata push
+// updates both titles.
 // Tasks: p87.
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'

@@ -1,3 +1,6 @@
+// Runs history-reading steps (pages.ts) in time slices, so decoding a big
+// history never blocks the event loop (task 7j). Small reads finish
+// synchronously.
 import { pages } from './pages.ts'
 
 type Steps<T> = Generator<number, T, void>

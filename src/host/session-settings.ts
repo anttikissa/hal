@@ -1,3 +1,7 @@
+// A session's settings (cwd, model, autoclose) as its history says, so a
+// rebase that drops or edits a setting change also changes the setting.
+// project() replays changes over the starting state; recover() fixes the
+// metadata after such a rebase.
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import type { SessionMeta } from '../common/session.ts'
 import { models } from './models.ts'

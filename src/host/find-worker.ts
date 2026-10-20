@@ -1,4 +1,5 @@
-// Worker entry. Importing this module in the host does no work.
+// Entry point of the find worker, which keeps search off the host's
+// thread. Importing this module in the host does no work.
 import { isMainThread } from 'worker_threads'
 import { statSync } from 'fs'
 import {

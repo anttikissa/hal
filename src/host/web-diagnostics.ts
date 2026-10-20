@@ -1,5 +1,7 @@
-// Cookie/origin checks are web.ts's job. Bound and project untrusted reports
-// before logging; arbitrary fields, error messages and URL strings never land.
+// Logs diagnostic reports from browsers. Reports are untrusted, so they
+// are bounded and reduced to known fields before logging; arbitrary
+// fields, error messages and URL strings never land. Cookie and origin
+// checks are web.ts's job.
 import { appendFileSync, chmodSync, existsSync, renameSync, statSync } from 'fs'
 import {
 	diagnosticBooleans,

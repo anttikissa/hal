@@ -1,7 +1,8 @@
-// Task ar: a change to a system-prompt file leaves a trail in the
-// session: an output record with a short diff, shown in the transcript
-// and handed to the model as a notice on its next request. Without it the model sees new rules and its
-// own earlier replies that ignored them, and blames itself.
+// Without a trail, the model sees new rules beside its own earlier
+// replies that ignored them, and blames itself. So a change to a
+// system-prompt file leaves a trail in the session (task ar): an output
+// record with a short diff, shown in the transcript and handed to the
+// model as a notice on its next request.
 // The last seen texts live in the session's prompt-files.json.
 
 import { existsSync, readFileSync, writeFileSync } from 'fs'

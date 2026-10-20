@@ -1,4 +1,6 @@
-// Session names use the ordinary command path; reminders are context only.
+// Names sessions so the user can tell tabs apart. Names change through
+// the ordinary command path; naming reminders reach the model as context
+// only.
 import type { HistoryRecord } from '../common/replay.ts'
 import { names } from '../common/names.ts'
 import { sessions } from './sessions.ts'

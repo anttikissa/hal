@@ -1,5 +1,6 @@
-// Short session recall (task 3sf). Visibility is already
-// reported by both clients; no extra client lifecycle or polling needed.
+// /recap: a short recall of a session's goal, progress and blockers
+// (task 3sf). Both clients already report which tab is visible, so no
+// extra client lifecycle or polling is needed.
 import { ason } from '../common/ason.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'

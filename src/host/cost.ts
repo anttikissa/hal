@@ -1,4 +1,5 @@
-// Cost reads this home's durable usage, never the running host (task asa).
+// Works out what sessions cost from this home's durable usage records,
+// never from the running host (task asa).
 import { readdirSync } from 'fs'
 import type { Usage } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'

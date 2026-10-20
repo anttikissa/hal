@@ -1,3 +1,6 @@
+// The work a session owns, as a tree: tool calls, background jobs and
+// spawned subagents. Lets /stop, STOP and WAIT name a target by session
+// id or tool call (t123) and act on all of it.
 import type { ToolCallBlock } from '../common/blocks.ts'
 import { forms } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'

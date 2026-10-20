@@ -1,3 +1,6 @@
+// The OpenAI-compatible providers (OpenRouter, OpenCode Go, Ollama) in
+// one table: base URL, key, login and capabilities. create() makes a
+// provider that loads openai-compat.ts only when first used.
 import { apiKeys } from './api-keys.ts'
 import type { Capability } from './effort.ts'
 import { effortCatalog } from './effort-catalog.ts'

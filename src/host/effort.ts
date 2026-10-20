@@ -1,4 +1,6 @@
-// One overridable provider AND model capability/wire hook (task w7).
+// Says which reasoning-effort levels a model accepts and how a request
+// asks for one. One hook covers provider and model together, so a plugin
+// can override both in one place (task w7).
 import { effort as vocabulary, type EffortCapability, type EffortLevel } from '../common/effort.ts'
 import { blocks } from '../common/blocks.ts'
 import { provider as registry } from './provider.ts'

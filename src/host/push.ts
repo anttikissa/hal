@@ -1,4 +1,6 @@
-// Persistent web push identity/subscriptions and delivery. Nothing starts at import.
+// Web push, so the user hears about a session while no client watches
+// (notify.ts). Keeps the host's push identity and the browsers'
+// subscriptions on disk, and delivers messages. Nothing starts at import.
 import type { Command, Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'

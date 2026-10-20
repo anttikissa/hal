@@ -1,4 +1,5 @@
-// Hookable prompt assembly from one input snapshot (tasks ar, q5g, ftg).
+// Builds the system prompt from one snapshot of its inputs, so its parts
+// agree. Plugins can hook the assembly (tasks ar, q5g, ftg).
 
 import { existsSync, readdirSync, realpathSync } from 'fs'
 import { dirname, resolve } from 'path'

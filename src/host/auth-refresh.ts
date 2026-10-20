@@ -1,3 +1,7 @@
+// Keeps OAuth logins working: trades a refresh token for a new access
+// token (Anthropic or OpenAI) and saves it in the credentials file.
+// Errors redact tokens and say whether only a human can fix it ('auth')
+// or a retry may work ('temporary').
 import { auth, CLIENT_ID, OPENAI_CLIENT_ID, jwtClaims, type Kind } from './auth.ts'
 import { clock } from './clock.ts'
 import { liveFiles } from './live-file.ts'

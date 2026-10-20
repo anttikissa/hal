@@ -1,5 +1,6 @@
-// Host-facing transient search. Disk, ASON parsing and SQLite all live in
-// a worker; even a single enormous history record cannot stall typing.
+// Searches every session (/find) without stalling the host. Disk reads,
+// ASON parsing and SQLite all run in a worker, so even one enormous
+// history record cannot stall typing. Results are not stored.
 import type { FindBatch, FindFilter, FindResult } from '../common/find.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'

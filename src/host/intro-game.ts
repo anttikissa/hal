@@ -1,3 +1,5 @@
+// Tic-tac-toe for the intro (intro-fun.ts): results and the scripted
+// player's moves.
 import type { Reply } from './synthetic.ts'
 
 const squares = ['A1', 'B1', 'C1', 'A2', 'B2', 'C2', 'A3', 'B3', 'C3']

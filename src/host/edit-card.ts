@@ -1,4 +1,6 @@
-// EDIT cards retain their description and show the versioned result once.
+// Shows EDIT calls as readable cards: the title keeps the call's
+// description (or else its files and line counts), and the versioned
+// result shows once.
 import { diff } from '../common/diff.ts'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { ToolPresentation } from '../common/tool-presentation.ts'

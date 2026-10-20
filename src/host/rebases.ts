@@ -1,4 +1,5 @@
-// The synchronous host boundary: refuse stale plans and busy sessions before writing.
+// Writes a rebase into history. It is the synchronous host boundary: it
+// refuses stale plans and busy sessions before writing anything.
 // Tasks: 3zz, z71, svt.
 import { forms } from '../common/forms.ts'
 import { rebase, type RebasePlan } from '../common/rebase.ts'

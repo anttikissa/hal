@@ -1,4 +1,6 @@
-// Ordinary interactive forks (task px), independent of spawn ownership.
+// /fork copies a session into a new interactive tab (task px). An
+// ordinary fork, independent of spawn ownership: it does not stop the
+// parent's turn or spend a spawn slot.
 import { settings } from '../common/settings.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'

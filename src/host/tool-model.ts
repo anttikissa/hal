@@ -1,3 +1,6 @@
+// hal/tool: a scripted model that runs the tool calls the user types, so
+// a human can try Hal's tools and see results as a model would. The
+// commands run on the real machine.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { Reply } from './synthetic.ts'

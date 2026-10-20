@@ -1,5 +1,7 @@
-// Rebuildable SQLite projection. Used only in the find worker: parsing a
-// giant ASON line or SQLite call must never hold up the host event loop.
+// The /find search index: a SQLite copy of session histories that can
+// always be rebuilt. Used only in the find worker, because parsing a
+// giant ASON line or a SQLite call must never hold up the host's event
+// loop.
 import { Database } from 'bun:sqlite'
 import { createReadStream, existsSync, statSync } from 'fs'
 import { ason } from '../common/ason.ts'

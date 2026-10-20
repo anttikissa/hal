@@ -1,3 +1,5 @@
+// Keeps the intro (hal/intro) entertaining after its guide ends, with no
+// API key: tips, an ELIZA imitation, tic-tac-toe and a few film references.
 import type { StreamEvent } from '../common/blocks.ts'
 import { forms } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'

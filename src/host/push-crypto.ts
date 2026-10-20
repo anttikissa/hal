@@ -1,4 +1,5 @@
-// RFC 8291 aes128gcm single-record web push and RFC 8292 VAPID.
+// Encrypts and signs web push messages as push services require: RFC 8291
+// aes128gcm single-record encryption and RFC 8292 VAPID.
 // Signing and ephemeral ECDH MUST use different P-256 keys.
 export type VapidKeys = { publicKey: string; privateKey: JsonWebKey }
 export type PushKeys = { p256dh: string; auth: string }

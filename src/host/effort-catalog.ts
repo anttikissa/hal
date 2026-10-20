@@ -1,4 +1,6 @@
-// Verified gateway metadata survives restart, without serializing wire functions.
+// Remembers the effort levels verified for gateway models in
+// state/effort-catalog.ason, so they survive a restart. Only the levels
+// are stored; the functions that shape requests (wire) are not.
 import { mkdirSync } from 'fs'
 import { effort, type EffortCapability } from '../common/effort.ts'
 import { liveFiles } from './live-file.ts'

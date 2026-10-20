@@ -1,4 +1,6 @@
-// Client-local plans; only the host validates and writes history (tasks z71, svt).
+// Builds what the /rebase editor shows and applies its plans. The client
+// edits a plan locally; only the host validates it and writes history
+// (tasks z71, svt).
 import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
 import type { Command, Event } from '../common/protocol.ts'

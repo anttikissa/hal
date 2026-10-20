@@ -1,5 +1,8 @@
-// Provider-only projection. Omission decisions are saved before a request:
-// reopening cannot resurrect payloads or slide the cache frontier each round.
+// Keeps long sessions in the model's context: old tool output, images
+// and long arguments become markers the model can read back with
+// READ_ENTRY. Only what the provider gets changes; history keeps it all.
+// What is omitted is saved before each request, so reopening a session
+// never brings pruned payloads back or moves the cached prefix each round.
 import { blocks as conversationBlocks, type Message, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { liveFiles } from './live-file.ts'
