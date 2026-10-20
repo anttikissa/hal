@@ -136,13 +136,14 @@ export function client() {
 }
 
 export async function until(check: () => unknown): Promise<void> {
-	// Readiness is not a performance assertion; allow loaded CI hosts to settle.
-	let deadline = performance.now() + 10_000
+	// Readiness is not a performance assertion; allow loaded CI hosts to
+	// settle, but fail inside bun's 5 s test timeout, not in the next test.
+	let deadline = performance.now() + 4_000
 	while (performance.now() < deadline) {
 		if (check()) return
 		await new Promise((r) => setTimeout(r, 1))
 	}
-	throw new Error('timed out')
+	throw new Error(`timed out waiting for ${check}`)
 }
 
 export function created(c: ReturnType<typeof client>, cwd = '/tmp/w'): string {

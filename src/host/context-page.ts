@@ -175,18 +175,29 @@ function page(id: string, css: string): Response {
 	})
 }
 
-// One event stream per open page; each push is the whole graph.
+// One event stream per open page; each push is the whole graph. A
+// stream the page canceled or that fails to push is dropped, so a turn
+// that notifies it still ends.
 function stream(id: string, signal: AbortSignal): Response {
-	let send: (() => void) | undefined
+	let end = () => {}
 	let body = new ReadableStream({
 		start(controller) {
 			let enc = new TextEncoder()
-			send = () => controller.enqueue(enc.encode(`data: ${JSON.stringify(graph(id))}\n\n`))
+			let send = () => {
+				try {
+					controller.enqueue(enc.encode(`data: ${JSON.stringify(graph(id))}\n\n`))
+				} catch (e) {
+					end()
+					try {
+						controller.error(e)
+					} catch {}
+				}
+			}
 			let subs = contextPage.state.subs.get(id) ?? new Set()
 			contextPage.state.subs.set(id, subs)
 			subs.add(send)
-			let end = () => {
-				subs.delete(send!)
+			end = () => {
+				subs.delete(send)
 				if (!subs.size) contextPage.state.subs.delete(id)
 				contextPage.state.ends.delete(close)
 			}
@@ -201,6 +212,7 @@ function stream(id: string, signal: AbortSignal): Response {
 			signal.addEventListener('abort', end)
 			send()
 		},
+		cancel: () => end(),
 	})
 	return new Response(body, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' } })
 }

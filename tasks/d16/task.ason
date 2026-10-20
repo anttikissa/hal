@@ -1,0 +1,10 @@
+{
+	title: 'Context page streams never stop a turn from ending',
+	spec: 'A context-page event stream drops its subscriber when the page cancels it or a push fails, so contextPage.notify from stats.round or stats.ended never throws into runTurn and every turn still broadcasts turn-end. The host test helper until() fails inside the 5 s bun test timeout, naming the condition, so a timeout fails its own test rather than the next one.',
+	status: 'done',
+	notes: [
+		'Random 5 s host test timeouts (1-5 per 130-file run, different tests each time) came from context-page.test.ts: it canceled its /events reader, but the stream had no cancel handler and the test request never aborts, so the subscriber outlived host.reset. Session ids come from a small hourly word pool, so later tests reused the id; stats.ended then called the dead controller.enqueue (throws: Controller is already closed) after runTurn deleted its running entry and before turn-end was broadcast, so the turn vanished silently. Found by tracing turns.state.running deletions and scanning module Maps for a new id. Invariant restored: a context-page subscriber never stops a turn from ending. Other id-keyed state also survives host.reset (changes.state.cache, queueNext.promoted, toolOutput.state, drafts.state.sessions, connection.state.followed) but caused no observed failure. Verified: 5 consecutive clean 130-file host runs and 2 clean full ./test runs.'
+	],
+	needs: ['c4', '79g'],
+	foldInto: ['79g']
+}
