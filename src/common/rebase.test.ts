@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { rebase } from './rebase.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import { compaction } from './compaction.ts'
+import { rebaseDisplay } from './rebase-display.ts'
 import { transcript } from './transcript.ts'
 
 const ts = '2026-10-04T08:00:00Z'
@@ -179,4 +180,15 @@ test('tool-output edits do not cross prompts when providers reuse a call id', ()
 			],
 		}),
 	).toThrow('conflicting edits')
+})
+
+test('a rebase never drops records written after it; a later rebase can drop them', () => {
+	let raw: HistoryRecord[] = [
+		prompt(1, 'go'),
+		{ type: 'command', n: 2, text: '/rebase', ts },
+		plan(3, 2, [2]),
+		{ type: 'output', n: 4, text: 'Rebase applied', ts },
+		plan(5, 4, [4]),
+	]
+	expect(rebaseDisplay.current(raw).map((r) => r.n)).toEqual([1, 3, 5])
 })

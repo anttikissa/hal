@@ -9,8 +9,11 @@ function current(raw: HistoryRecord[]): HistoryRecord[] {
 	let projected = replay.current(raw),
 		active = new Set(projected),
 		byNumber = new Map(projected.filter((r) => r.n !== undefined).map((r) => [r.n, r]))
-	let candidates: HistoryRecord[] = raw.filter((r) => r.type !== 'rebase')
-	for (let r of rebase.latest(raw)) if (r.type === 'rebase') candidates = rebase.apply(candidates, r)
+	let candidates: HistoryRecord[] = []
+	for (let r of rebase.latest(raw)) {
+		if (r.type === 'rebase') candidates = rebase.apply(candidates, r)
+		else candidates.push(r)
+	}
 	return [
 		...candidates.flatMap((r) => (active.has(r) ? [r] : byNumber.has(r.n) ? [byNumber.get(r.n)!] : [])),
 		...rebase.latest(raw).filter((r) => r.type === 'rebase'),
