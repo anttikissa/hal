@@ -1,3 +1,5 @@
+// /changes lists the files this session declared and changed, with diffs
+// and the calls that changed them; /changes clear starts a fresh list.
 import { settings } from '../../common/settings.ts'
 import { changes } from '../changes.ts'
 import type { SlashCommand } from '../commands.ts'

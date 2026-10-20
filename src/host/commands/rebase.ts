@@ -1,4 +1,5 @@
-// /rebase editor and sparse command plans, applied between settled rounds.
+// /rebase rewrites this session's context: it opens the editor, or
+// applies a sparse plan typed as a command, between settled rounds.
 // Tasks: z71, svt.
 import type { SlashCommand } from '../commands.ts'
 import { rebasePlans } from '../rebase-plans.ts'

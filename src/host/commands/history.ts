@@ -1,3 +1,4 @@
+// /history prints the path of this session's history file.
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 

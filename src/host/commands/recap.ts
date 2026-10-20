@@ -1,3 +1,4 @@
+// /recap recalls a session's goal, progress and blockers (recap.ts).
 import type { SlashCommand } from '../commands.ts'
 import { recap } from '../recap.ts'
 import { tabs } from '../tabs.ts'

@@ -1,4 +1,5 @@
-// Human and model renames share the same command and history path.
+// /rename sets the session's title. Humans and models rename through this
+// same command, so both take the same history path.
 import type { SlashCommand } from '../commands.ts'
 import { names } from '../../common/names.ts'
 import { sessions } from '../sessions.ts'

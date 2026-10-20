@@ -1,3 +1,6 @@
+// The OpenAI provider: its known models, the claims in a ChatGPT token and
+// the smaller context window of a subscription, with openai.ts loaded on
+// first use.
 import { auth, jwtClaims } from '../auth.ts'
 import { modelsDev } from '../models-dev.ts'
 import type { Provider } from '../provider.ts'

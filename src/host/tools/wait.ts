@@ -1,3 +1,5 @@
+// WAIT lets the model wait until one of its sessions or tool calls
+// finishes, fails or asks (work.ts).
 import { callText } from '../../common/call-text.ts'
 import { nativeTool } from '../native-tool.ts'
 import type { Tool } from '../tools.ts'

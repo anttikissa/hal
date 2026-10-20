@@ -1,3 +1,5 @@
+// The Anthropic provider: its known models and web search models, with
+// anthropic.ts loaded on first use.
 import { auth } from '../auth.ts'
 import type { Provider } from '../provider.ts'
 import { providers } from '../providers.ts'

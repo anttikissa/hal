@@ -1,4 +1,5 @@
-// Open tabs and, on request, every saved session (task 1tk).
+// /tabs lists the open tabs and, on request, every saved session (task
+// 1tk).
 import { settings } from '../../common/settings.ts'
 import type { SlashCommand } from '../commands.ts'
 import { sessions, type SessionListing } from '../sessions.ts'

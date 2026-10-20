@@ -1,3 +1,5 @@
+// STOP lets the model stop a session or tool call and the work it owns
+// (work.ts).
 import type { Tool } from '../tools.ts'
 import { work } from '../work.ts'
 

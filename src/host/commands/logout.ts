@@ -1,3 +1,5 @@
+// /logout revokes one web login, or all, and closes their open
+// connections at once.
 import type { SlashCommand } from '../commands.ts'
 import { webAuth } from '../web-auth.ts'
 import { web } from '../web.ts'

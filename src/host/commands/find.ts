@@ -1,3 +1,4 @@
+// /find searches every session's history (find.ts).
 import type { SlashCommand } from '../commands.ts'
 import { find } from '../find.ts'
 

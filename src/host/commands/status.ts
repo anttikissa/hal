@@ -1,3 +1,4 @@
+// /status shows every account's usage windows (status-usage.ts).
 import type { SlashCommand } from '../commands.ts'
 import { statusUsage } from '../status-usage.ts'
 

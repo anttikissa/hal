@@ -1,3 +1,6 @@
+// Finds the providers: each file in providers/ is one, loaded on first
+// use, plus the OpenAI-compatible endpoints of compat-catalog.ts.
+// available() says whether Anthropic or OpenAI has credentials.
 import { readdirSync, existsSync } from 'fs'
 import { auth, type Kind } from './auth.ts'
 import { paths } from './paths.ts'

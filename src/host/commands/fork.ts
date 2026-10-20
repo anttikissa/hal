@@ -1,3 +1,4 @@
+// /fork (Ctrl-B) copies this session into a new interactive tab (forks.ts).
 import type { SlashCommand } from '../commands.ts'
 import { forks } from '../forks.ts'
 

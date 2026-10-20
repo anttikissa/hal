@@ -1,4 +1,5 @@
-// /budget: models may only read it (bare /budget, tools/command.ts); only a human changes it.
+// /budget shows or sets this session's spawn slots. Models may only read
+// it (bare /budget, tools/command.ts); only a human changes it.
 import type { SlashCommand } from '../commands.ts'
 import { sessions } from '../sessions.ts'
 import { settings } from '../../common/settings.ts'

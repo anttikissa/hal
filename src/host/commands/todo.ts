@@ -1,4 +1,5 @@
-// Project TODOs (task 8q): disk is authoritative when TODO.md exists.
+// /todo adds to or lists the project's TODO.md (task 8q). When TODO.md
+// exists, the file on disk is the authority.
 import { appendFileSync, existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import { states } from '../../common/states.ts'

@@ -1,3 +1,5 @@
+// /stop stops a session or tool call and all work it owns, keeping
+// sessions and output (work.ts). Unlike Escape, it stops subagents too.
 import type { SlashCommand } from '../commands.ts'
 import { work } from '../work.ts'
 
