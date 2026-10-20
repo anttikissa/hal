@@ -1,8 +1,7 @@
 // Catches performance regressions. scripts/perf (task te) measures Hal
-// on a generated heavy home (task
-// y9) as host (cold, then warm), as a peer, switching tabs, over -r and
-// in the web client, and prints one table. Never run by ./test; no real
-// data. Exits 1 if a budget is missed.
+// on a generated heavy home (task y9) as host (cold, then warm), as a
+// peer, switching tabs, over -r and in the web client, and prints one
+// table. Never run by ./test; no real data. Exits 1 if a budget is missed.
 import {
 	existsSync,
 	mkdirSync,
