@@ -7,6 +7,7 @@
 // screen but its last row, which the shell prompt takes; restart exits with restartCode, which ./run answers by starting
 // again. See the invariants in tasks/README.md.
 import { emergency, type EmergencyAction, type EmergencyState } from '../common/emergency.ts'
+import { userQuit } from '../common/user-quit.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
 import { render } from './render.ts'
@@ -184,9 +185,7 @@ function leave(): void {
 }
 
 function quit(code = 0): void {
-	try {
-		terminal.onQuit()
-	} catch {}
+	userQuit.state.requested = true
 	terminal.leave()
 	terminal.state.io!.exit(code)
 }
@@ -281,9 +280,6 @@ export const terminal = {
 	escapeMs: 50,
 	/** Whether there is a terminal to take over; tests replace it. */
 	available: (): boolean => !!process.stdin.isTTY,
-	/** Runs as the user quits, before the exit; set by main. Must be
-	 * synchronous, quick and never throw or wait on the host. */
-	onQuit: (): void => {},
 	writer,
 	realIO,
 	init,

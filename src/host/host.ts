@@ -39,6 +39,8 @@ import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { usage } from './usage.ts'
 import { commandCheck } from '../common/command-check.ts'
+import { userQuit } from '../common/user-quit.ts'
+import { server } from './server.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -335,24 +337,19 @@ function broadcast(id: string, event: Event): void {
 // SIGHUP), writes the output of running turns so far and aborts them,
 // which kills their bash process groups, and kills background commands
 // (jobs.ts): no command outlives the Hal that ran it. The turns stay unfinished for the next host to continue
-// as interrupted; or, if the user quit the last Hal process
-// (quitting()), they are recorded paused. Idempotent.
+// as interrupted; or, if the user quit (userQuit) and no other Hal
+// process (a peer on the host socket) can carry them on, they are
+// recorded paused: a runaway must stop and stay stopped until the user
+// has looked at it. Idempotent.
 function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
 	process.on('exit', () => {
-		history.stop(host.state.pauseOnExit)
+		history.stop(userQuit.state.requested && server.state.sockets.size === 0)
 		for (let r of turns.state.running.values()) r.controller.abort()
 		jobs.killAll()
 	})
 	clock.init()
-}
-
-// The user is quitting this process. If no other Hal process can carry
-// on (`last`), running turns are recorded paused as it exits: a runaway
-// must stop and stay stopped until the user has looked at it.
-function quitting(last: boolean): void {
-	host.state.pauseOnExit = last
 }
 // Forgets every client and turn (tests).
 function reset(): void {
@@ -380,7 +377,6 @@ function reset(): void {
 	drafts.reset()
 	webLinks.reset()
 	clients.reset()
-	host.state.pauseOnExit = false
 }
 usage.clients = () => host.state.clients
 
@@ -391,7 +387,6 @@ export const host = {
 		opening: new Map<string, Promise<void>>(),
 		// What each recent command id did, oldest first.
 		done: new Map<string, Outcome>(),
-		pauseOnExit: false,
 		inited: false,
 	},
 	// Working directory for a session created without one.
@@ -412,6 +407,5 @@ export const host = {
 	release,
 	broadcast,
 	init,
-	quitting,
 	reset,
 }

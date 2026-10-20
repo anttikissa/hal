@@ -107,9 +107,6 @@ function init(): void {
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
 	if (!terminal.available()) return
 	main.initTerminal()
-	// Ctrl-C pauses running turns only if no other Hal process (a peer
-	// on the host socket) can carry them on (tasks/j1/states.md).
-	terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
 	let exit = terminal.restart
 	let restartNow = (): void => {
 		if (server.state.listener) {
