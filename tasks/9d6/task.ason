@@ -1,0 +1,7 @@
+{
+	title: 'Approval dialog ignores keys typed just before it opens',
+	spec: 'Keystrokes the user was already typing when an approval dialog opens never answer, dismiss or decline it. While the user keeps typing, the keys go to the prompt and the dialog shows an indicator that it is not yet accepting keys; it starts accepting keys after a short pause in typing, and the indicator changes to show that. A dialog is answered only by keys pressed while it accepts them. Invariant restored: an approval is never declined by keys meant for the prompt. Terminal and web follow the same rule.',
+	status: 'planned',
+	needs: ['6f'],
+	foldInto: ['6f']
+}
