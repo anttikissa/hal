@@ -3,7 +3,8 @@
 	spec: 'On hover, a toggleable web card header shows a faint (50% opacity) hint after its title: open on a closed card, close on an open one. A closed folding card also shows a faint right-aligned (+N lines) before its reference: the rows opening adds, wrapped like a terminal by columns measured from the header width and the monospace character width: a tool command, one gap row and its whole output, or body lines, minus the first line a closed thinking title already shows. Presented tool results show no count rather than a wrong one. Hints take no layout width, never wrap or shorten the title, fade in over 100ms and out over 250ms, and show only with a fine hovering pointer. Terminal is unchanged.',
 	status: 'done',
 	notes: [
-		'The count follows the title, not the reference: placed before the reference it covered header status such as (1.8s). Its zero-width column cancels the grid gap with margin-left: -1ch. This fix landed inside 886b18f1 (176-spy) through the shared index.'
+		'The count follows the title, not the reference: placed before the reference it covered header status such as (1.8s). Its zero-width column cancels the grid gap with margin-left: -1ch. This fix landed inside 886b18f1 (176-spy) through the shared index.',
+		'Tall blocks are decided in one place for every kind: Transcript.tsx measures each block (ResizeObserver) and sets data-tall when it is over 10 lines tall. Headers of other blocks are static. Questions follow the same rule.'
 	],
 	needs: ['gwr']
 }

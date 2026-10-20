@@ -298,8 +298,6 @@ export function Card(props: {
 				: text().trim()
 		return body ? cardRows.rows(body, cols()) - (item.type === 'thinking' ? 1 : 0) : 0
 	})
-	// Headers stick only on cards over 10 rows.
-	let tall = createMemo(() => cardRows.rows(`${text()}\n${result()?.text ?? ''}`, cols()) > 10)
 	let prose = () =>
 		props.row.item.type === 'prompt' &&
 		!md() &&
@@ -464,7 +462,6 @@ export function Card(props: {
 						props.row.note !== undefined ? 'queued' : '',
 						folding() ? 'folds' : '',
 						expanded() ? 'open' : '',
-						tall() ? 'tall' : '',
 						props.cursor ? 'streaming' : '',
 						props.target ? 'target' : '',
 					]}

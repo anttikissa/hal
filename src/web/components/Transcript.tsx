@@ -67,6 +67,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// content growing below a still reader moves the bottom away.
 	let [away, setAway] = createSignal(false)
 	let check = () => el && setAway(scroll.gap(el) > scroll.awayPx)
+	// Headers stick only on blocks over 10 lines tall, of every kind.
+	let tall = new ResizeObserver((entries) => {
+		for (let { target } of entries) {
+			let block = target as HTMLElement
+			block.toggleAttribute('data-tall', block.offsetHeight > 10 * parseFloat(getComputedStyle(block).lineHeight))
+		}
+	})
 	onSettled(() => {
 		el.addEventListener('scroll', check, { passive: true })
 		return () => el.removeEventListener('scroll', check)
@@ -134,7 +141,12 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		() => (all().length && !starts().has(id()) ? start() : -1),
 		(i) => void (i >= 0 && setStart(i)),
 	)
-	createEffect(shown, () => void requestAnimationFrame(check))
+	createEffect(shown, () => {
+		requestAnimationFrame(() => {
+			check()
+			for (let block of el.querySelectorAll(':scope > :is(.Card, .Question)')) tall.observe(block)
+		})
+	})
 	let open = (row: Row) => (row.item.type === 'question' && formId() === row.item.id ? row.item : undefined)
 	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
 	return (
