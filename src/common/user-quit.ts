@@ -1,8 +1,4 @@
-// Tells the host that the user quit Hal.
-//
-// The host must know this when the process exits. If the user quit and no
-// other Hal process is running, the host pauses running turns, so nothing
-// keeps working without the user. The terminal sees the quit, but client
-// code cannot import host code. So the terminal sets this flag, and the
-// host reads it.
+// Lets the terminal tell the host that the user quit, without client code
+// importing host code. On exit, the host pauses running turns if the user
+// quit and no other Hal process is running.
 export const userQuit = { state: { requested: false } }

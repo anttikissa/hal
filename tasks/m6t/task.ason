@@ -1,0 +1,6 @@
+{
+	title: 'File comments say why the module exists',
+	spec: 'AGENTS.md: start each source file with a short comment that first says, in plain words, why the module exists. Every source file under src/ (and themes/, extras/, scripts/) follows it: the opening comment leads with the reason, such as the problem the module solves or the boundary it keeps, before what it holds. Dense, jargon-heavy comments are rewritten plainly without losing facts. Code is unchanged.',
+	status: 'planned',
+	needs: ['cej']
+}

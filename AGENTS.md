@@ -87,7 +87,8 @@ to operate a host is not permission to publish its configuration.
 
 # Code guidelines
 
-Start each source file with a short comment explaining its purpose.
+Start each source file with a short comment that first says, in plain
+words, why the module exists.
 
 Format code with `bunx oxfmt` (config: .oxfmtrc.json). Markdown and
 tasks/ stay hand-wrapped.
