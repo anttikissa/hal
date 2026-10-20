@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		"systemPrompt.file() is the checkout's SYSTEM.md (resolved from import.meta.dir, not HAL_HOME, so test homes still get it); build reads it per call, trimmed, as the first part before <date>/<cwd>/<model>. A missing file throws with its path (a broken checkout), no fallback text. Tests swap systemPrompt.file to a temp file.",
-		"The initial SYSTEM.md keeps only old rules true for Hal when written: git checkout/restore/stash, paths, /cd is the user's command (the model has no eval to run it), 25 lines, the lazy ladder, `read` over bash, <meta> markup. Dropped: eval, spawn, IPC, teleport, grep/glob/edit, <synthetic>, the self-improvement rule and template variables/conditionals. Add rules back as those tools land (task gr adds tools), only on the user's say."
+		"The initial SYSTEM.md keeps only old rules true for Hal when written: git checkout/restore/stash, paths, /cd is the user's command (the model has no eval to run it), 25 lines, the lazy ladder, `read` over bash, <meta> markup. Dropped: eval, spawn, IPC, teleport, grep/glob/edit, <synthetic>, the self-improvement rule and template variables/conditionals. Add rules back as those tools land (task gr adds tools), only on the user's say.",
+		'SYSTEM.md rule (user, 20 Oct): never make the user do work you can avoid; when alternatives exist, choose one that needs no approval, confirmation or manual step. Added after an agent ran git checkout, which needs approval, where writing the file had the same effect.'
 	],
 	needs: ['29'],
 	foldInto: ['29']
