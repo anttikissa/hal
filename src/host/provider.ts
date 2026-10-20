@@ -24,8 +24,9 @@ export type ProviderRequest = {
 	tools?: ToolDef[]
 	maxTokens?: number
 	// An image block's bytes as base64 (the session's blob, task 2a),
-	// read as the request is built; undefined if they are gone.
-	image?: (blob: string) => string | undefined
+	// read as the request is built; undefined if they are gone. With
+	// `maxEdge`, a larger image is shrunk to fit where possible.
+	image?: (blob: string, maxEdge?: number) => string | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
 	cacheId?: string

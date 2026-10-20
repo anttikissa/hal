@@ -38,7 +38,7 @@ async function* stream(
 			effort: running.effort,
 			messages,
 			tools: defs,
-			image: (blob) => blobs.base64(id, blob),
+			image: (blob, maxEdge) => blobs.base64(id, blob, maxEdge),
 			sessionId: id,
 			cacheId,
 		},

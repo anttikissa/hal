@@ -42,10 +42,12 @@ function redactedData(signature: string): string | undefined {
 }
 
 // An image goes as a base64 source, read now from the session's blob.
+// Shrunk to Opus 5.5's own 2576 px long edge, so nothing is lost: a
+// request with many images rejects sides over 3000 px.
 function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
 	if (b.type === 'image') {
-		let data = req.image?.(b.blob)
+		let data = req.image?.(b.blob, 2576)
 		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
 		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
 	}

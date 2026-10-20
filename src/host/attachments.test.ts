@@ -54,6 +54,36 @@ test('an attached png reaches both providers as an image; history keeps only its
 	expect(file).toContain(attached.blob)
 })
 
+test.if(process.platform === 'darwin')('a png wider than 2576 px reaches Anthropic shrunk; the blob stays', async () => {
+	let { crc32, deflateSync } = await import('zlib')
+	let chunk = (type: string, data: Buffer) => {
+		let body = Buffer.concat([Buffer.from(type, 'latin1'), data])
+		let n = (v: number) => Buffer.from([v >>> 24, (v >>> 16) & 255, (v >>> 8) & 255, v & 255])
+		return Buffer.concat([n(data.length), body, n(crc32(body))])
+	}
+	let ihdr = Buffer.alloc(13)
+	ihdr.writeUInt32BE(3104, 0)
+	ihdr.writeUInt32BE(4, 4)
+	ihdr.set([8, 0, 0, 0, 0], 8)
+	let wide = Buffer.concat([
+		png.subarray(0, 8),
+		chunk('IHDR', ihdr),
+		chunk('IDAT', deflateSync(Buffer.alloc(4 * 3105))),
+		chunk('IEND', Buffer.alloc(0)),
+	])
+	let c = client()
+	let id = created(c)
+	let stored = blobs.store(id, 'image/png', wide.toString('base64'))
+	let req = {
+		model: 'm',
+		messages: [{ role: 'user' as const, blocks: [{ type: 'image' as const, blob: stored.blob, mediaType: 'image/png' }] }],
+		image: (blob: string, maxEdge?: number) => blobs.base64(id, blob, maxEdge),
+	}
+	let sent = Buffer.from(anthropic.toMessages(req).at(-1).content[0].source.data, 'base64')
+	expect(sent.readUInt32BE(16)).toBe(2576)
+	expect(blobs.read(id, stored.blob)!.bytes).toEqual(wide)
+})
+
 test('a paste becomes its text for the model', async () => {
 	let c = client()
 	let id = created(c)
