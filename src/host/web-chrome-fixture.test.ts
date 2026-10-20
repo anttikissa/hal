@@ -5,7 +5,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir, totalmem } from 'os'
-import { until } from './web-fixture.test.ts'
 
 const chrome = [
 	'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -92,11 +91,17 @@ async function launch() {
 	)
 	writeFileSync(`${dir}/watchdog.pid`, String(proc.pid))
 	let port = ''
-	await until(
-		() =>
+	// Chrome's first start after an update can take seconds; the beforeAll
+	// timeout bounds this wait.
+	while (
+		!(
 			existsSync(`${profile}/DevToolsActivePort`) &&
-			(port = readFileSync(`${profile}/DevToolsActivePort`, 'utf8').split('\n')[0]!),
-	)
+			(port = readFileSync(`${profile}/DevToolsActivePort`, 'utf8').split('\n')[0]!)
+		)
+	) {
+		if (proc.exitCode !== null) throw new Error(`Chrome exited before it was ready (watchdog exit ${proc.exitCode})`)
+		await Bun.sleep(20)
+	}
 	let targets: any[] = []
 	for (let i = 0; i < 100 && !targets.some((t) => t.type === 'page'); i++) {
 		targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
