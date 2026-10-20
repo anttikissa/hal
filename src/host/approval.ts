@@ -1,13 +1,13 @@
 // Approval for dangerous tool calls (tasks/w4/forms.md, Approval).
 // Before a round's tool calls run, each bash command is checked against
 // patterns for commands that destroy work or print secrets: rm -rf,
-// git reset --hard, cat sensitive paths and friends. Plain rm -f is
-// rarely dangerous. A match asks the human y/N (default No), durably, showing
-// the command with the offending parts marked; No gives the model an
-// error result instead of running it.
+// git reset --hard, cat sensitive paths, ps -E and friends. Plain rm -f
+// is rarely dangerous. A match asks the human y/N (default No), durably,
+// with each match's reason and the command with the offending parts
+// marked; No gives the model an error result instead of running it.
 //
 // Best effort by name (setting `security`): there is no sandbox, and a
-// determined model gets around patterns. It catches mistakes.
+// determined attacker gets around patterns. It catches mistakes.
 
 import { resolve } from 'path'
 import type { ToolCallBlock } from '../common/blocks.ts'
@@ -100,23 +100,49 @@ function dirs(command: string, segs: Mark[], vars: Map<string, string>): (string
 	return out
 }
 
-const git: RegExp[] = [
-	/\bgit\s+reset\s+--hard\b.*/,
-	/\bgit\s+clean\b.*\s-[a-z]*[fxd].*/,
-	/\bgit\s+stash\s+(drop|clear)\b.*/,
-	/\bgit\s+push\b.*\s(--force(-with-lease)?|-f)\b.*/,
-	/\bgit\s+(checkout|restore)\b(?=.*\s--\s+\S|.*\s(\.|(?!v\d)\S+\.[A-Za-z0-9]+)(\s|$)).*/,
+const reasons = {
+	rm: 'May wipe out important files by accident.',
+	print: 'Will likely leak your secrets.',
+	env: 'Reveals env variables. If you have secrets like OPENAI_API_KEY in env, this will leak them.',
+}
+
+const git: [RegExp, string][] = [
+	[/\bgit\s+reset\s+--hard\b.*/, 'Throws away uncommitted changes.'],
+	[/\bgit\s+clean\b.*\s-[a-z]*[fxd].*/, 'Wipes out untracked files for good.'],
+	[/\bgit\s+stash\s+(drop|clear)\b.*/, 'Throws away stashed changes.'],
+	[/\bgit\s+push\b.*\s(--force(-with-lease)?|-f)\b.*/, "May clobber others' commits on the remote."],
+	[
+		/\bgit\s+(checkout|restore)\b(?=.*\s--\s+\S|.*\s(\.|(?!v\d)\S+\.[A-Za-z0-9]+)(\s|$)).*/,
+		'Throws away uncommitted changes in these files.',
+	],
 ]
 
-// The offending parts of a shell command, as [start, end) offsets.
-function marks(command: string): Mark[] {
-	let out: Mark[] = []
+// A command that starts the segment, like `cat x` but not `echo "cat x"`.
+function leading(seg: string, re: RegExp): RegExpMatchArray | null {
+	let m = seg.match(re)
+	return m && !seg.slice(0, m.index).trim() ? m : null
+}
+
+// ps -E (macOS) or ps e (BSD-style options, first argument) prints
+// every process's environment; so does /proc/<pid>/environ.
+function envDump(seg: string): RegExpMatchArray | null {
+	let ps = leading(seg, /(?<!\S)(?:\/bin\/)?ps(?:\s+(.*)|$)/)
+	let args = ps?.[1]?.trim().split(/\s+/) ?? []
+	if (ps && (args.some((a) => /^-[a-zA-Z]*E/.test(a)) || /^[a-zA-Z]*e[a-zA-Z]*$/.test(args[0] ?? ''))) return ps
+	return seg.match(/\S*\/proc\/[^\s/]+\/environ\S*/)
+}
+
+// The offending parts of a shell command, as [start, end) offsets, each
+// with why it is dangerous.
+function findings(command: string): { at: Mark; reason: string }[] {
+	let out: { at: Mark; reason: string }[] = []
 	let vars = approval.tmpVars(command)
 	let segs = approval.segments(command)
 	let where = approval.dirs(command, segs, vars)
 	for (let [i, [from, to]] of segs.entries()) {
 		let seg = command.slice(from, to)
 		let found: RegExpMatchArray | null = null
+		let reason = ''
 		let rm = seg.match(/\brm\s+(.*)/)
 		if (rm) {
 			let tokens = rm[1]!.trim().split(/\s+/)
@@ -124,22 +150,27 @@ function marks(command: string): Mark[] {
 			let recursive = flags.some((f) => f === '--recursive' || /^-[a-zA-Z]*[rR]/.test(f))
 			let force = flags.some((f) => f === '--force' || /^-[a-zA-Z]*f/.test(f))
 			let targets = tokens.filter((t) => !t.startsWith('-'))
-			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i]))))
+			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i])))) {
 				found = rm
+				reason = reasons.rm
+			}
 		}
-		for (let re of git) found ??= seg.match(re)
-		let print = seg.match(/(?<!\S)(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
+		for (let [re, why] of git) if (!found && (found = seg.match(re))) reason = why
+		if (!found && (found = envDump(seg))) reason = reasons.env
+		let print = leading(seg, /(?<!\S)(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
 		if (
+			!found &&
 			print &&
-			!seg.slice(0, print.index).trim() &&
 			(print[1]!.match(/"[^"]*"|'[^']*'|[^\s<>]+/g) ?? []).some((t) =>
 				approval.sensitive(t.replace(/^['"]|['"]$/g, '')),
 			)
-		)
-			found ??= print
+		) {
+			found = print
+			reason = reasons.print
+		}
 		if (!found) continue
 		let text = found[0].trimEnd()
-		out.push([from + found.index!, from + found.index! + text.length])
+		out.push({ at: [from + found.index!, from + found.index! + text.length], reason })
 	}
 	return out
 }
@@ -149,11 +180,11 @@ function marks(command: string): Mark[] {
 function form(call: ToolCallBlock): Form | undefined {
 	if (settings.security() === 'none' || call.name !== 'bash' || typeof call.input.command !== 'string') return undefined
 	let command = call.input.command
-	let found = approval.marks(command)
+	let found = approval.findings(command)
 	if (!found.length) return undefined
 	return {
-		text: 'Run this command? It matches a dangerous pattern.',
-		quote: { text: command, marks: found },
+		text: [...new Set(found.map((f) => f.reason)), '/help security to learn more.'].join('\n'),
+		quote: { text: command, marks: found.map((f) => f.at) },
 		fields: [{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }],
 	}
 }
@@ -197,18 +228,25 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 	return asked ? { calls, decided } : undefined
 }
 
-// Shared best-effort sensitive-path policy for READ, shell approval and snapshots.
+// Shared best-effort sensitive-path policy for READ, shell approval and
+// snapshots. Public keys (*.pub) are meant to be shared, even in .ssh/.
 function sensitive(path: string): boolean {
+	if (/\.pub$/i.test(path)) return false
 	const secretPaths =
-		/(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i
+		/(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519))(?:\/|$)/i
+	const processEnv = /(?:^|\/)proc\/[^/]+\/environ$/
 	const privateKeyFiles = /\.(?:pem|key|p12|pfx)$/i
 	const cryptoWalletFiles =
 		/(?:^|\/)(?:wallet\.dat(?:-(?:journal|wal|shm))?|UTC--[^/]+|[^/]+\.keys|exodus\.wallet|nkbihfbeogaeaoehlefnkodbefgpgknn)(?:\/|$)/i
 	const cryptoWalletPaths =
 		/(?:^|\/)(?:(?:\.?electrum|\.electron-cash|electron cash|\.?sparrow)\/(?:[^/]+\/)*wallets|\.?walletwasabi\/client\/wallets|\.config\/solana\/id\.json)(?:\/|$)/i
 	return (
-		secretPaths.test(path) || privateKeyFiles.test(path) || cryptoWalletFiles.test(path) || cryptoWalletPaths.test(path)
+		secretPaths.test(path) ||
+		processEnv.test(path) ||
+		privateKeyFiles.test(path) ||
+		cryptoWalletFiles.test(path) ||
+		cryptoWalletPaths.test(path)
 	)
 }
 
-export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held, sensitive }
+export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, findings, form, declined, held, sensitive }

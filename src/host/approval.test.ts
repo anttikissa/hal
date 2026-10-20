@@ -57,11 +57,33 @@ test('dangerous commands are caught and their offending part marked; harmless on
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
 })
 
-test('only bash is checked, and the form asks y/N with No as default', () => {
+test('only bash is checked, and the form asks y/N with No as default, giving each reason once', () => {
 	expect(approval.form({ type: 'tool_call', id: 'r', name: 'read', input: { path: 'rm -rf x' } })).toBeUndefined()
-	let form = approval.form(bash('rm -rf build'))!
+	let form = approval.form(bash('rm -rf build; rm -rf dist; git reset --hard'))!
 	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }])
-	expect(form.quote!.text).toBe('rm -rf build')
+	expect(form.quote!.text).toBe('rm -rf build; rm -rf dist; git reset --hard')
+	expect(form.text).toBe(
+		'May wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',
+	)
+})
+
+test('env dumps are caught; ps without env options is not', () => {
+	let table: [string, string[]][] = [
+		['ps -E', ['ps -E']],
+		['ps -ax -o pid,command -E | grep x', ['ps -ax -o pid,command -E']],
+		['ps -wwE -p 1', ['ps -wwE -p 1']],
+		['ps e', ['ps e']],
+		['ps auxe', ['ps auxe']],
+		['cat /proc/self/environ', ['/proc/self/environ']],
+		['tr "\\0" "\\n" < /proc/123/environ', ['/proc/123/environ']],
+		['ps aux', []],
+		['ps -e', []],
+		['ps -o user,pid', []],
+		['echo ps -E', []],
+	]
+	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
+	expect(approval.form(bash('ps -E'))!.text).toStartWith('Reveals env variables.')
+	expect(approval.sensitive('/proc/1/environ')).toBe(true)
 })
 
 test('secret-printing approvals are narrow, use the shared path policy and honor security none', () => {
@@ -78,6 +100,8 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 		['cat AGENTS.md', []],
 		['head src/host/secrets.ts', []],
 		['ssh -i ~/.ssh/id_rsa example.invalid', []],
+		// Public keys are meant to be shared.
+		['cat ~/.ssh/id_ed25519.pub', []],
 		['echo "cat ~/.ssh/id_rsa"', []],
 	]
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])

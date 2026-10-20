@@ -1,23 +1,42 @@
-// /help: every command by category with its key, or one command in
-// detail. Client-only commands are listed too (common/commands/list.ts).
+// /help: every command by category with its key, one command in detail,
+// or a topic. Client-only commands are listed too (common/commands/list.ts).
 // Tasks: et, x0, 18n.
 
 import { commandList } from '../../common/commands/list.ts'
 import { commands, type SlashCommand } from '../commands.ts'
 
+const topics: Record<string, string> = {
+	security: `Hal asks before it runs a command that may destroy work or leak
+secrets. A leaked secret is sent to the model provider and stored
+in plaintext in session files.
+
+Hal asks about:
+  rm -rf outside /tmp
+  git reset --hard, clean, stash drop/clear, push --force,
+    checkout/restore of files
+  Reading secret files (READ refuses them)
+  ps -E, ps e, /proc/*/environ (env variables)
+
+Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*,
+auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets.
+Public keys (*.pub) are not secret.
+
+This is best effort: it catches mistakes, not a determined attacker,
+such as a man-in-the-middle at the provider.
+
+To change it: /config security`,
+}
+
 export const command: SlashCommand = {
-	help: () => '/help lists every command by category.\n/help <name> shows one in detail.',
+	help: () => '/help lists every command by category.\n/help <name> shows one command or topic in detail.',
 	complete: (args) =>
-		commandList
-			.all()
-			.map((c) => c.name)
-			.filter((n) => n.startsWith(args)),
+		[...commandList.all().map((c) => c.name), ...Object.keys(topics)].filter((n) => n.startsWith(args)),
 	run(args) {
 		let all = commandList.all().filter((c) => !c.hidden)
 		if (args) {
 			let [name = '', ...rest] = args.replace(/^\//, '').split(/\s+/)
 			let info = commandList.byName(name)
-			if (!info) return { error: `no command /${name}` }
+			if (!info) return topics[name] ? { say: topics[name] } : { error: `no command or topic ${name}` }
 			let text = commands.all().get(name)?.help?.(rest.join(' ')) ?? info.description
 			if (['login', 'quit', 'suspend', 'budget'].includes(name))
 				text += '\n\nAgents: unavailable through the command tool.'
@@ -38,6 +57,6 @@ export const command: SlashCommand = {
 				.filter((c) => c.category === category)
 				.map((c) => `  ${`/${c.name}`.padEnd(width + 2)}${labels(c).padEnd(keys + 2)}${c.description}`),
 		])
-		return { say: lines.join('\n') }
+		return { say: [...lines, '', `Topics: ${Object.keys(topics).join(', ')} (/help <topic>)`].join('\n') }
 	},
 }
