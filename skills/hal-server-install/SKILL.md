@@ -44,3 +44,6 @@ the browser, the second for `hal -r`, the third for the phone. Add its
     Codes work one time each and are valid for 10 minutes.
     Use `/auth` or `hal auth` to get more, and `/clients` to see connected
     clients; `/logout <id>` revokes a login.
+
+    Provider logins are not copied. On the server, use `/login` for each
+    provider, including subscriptions you use here.

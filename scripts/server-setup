@@ -27,7 +27,7 @@ run_local() {
 	name="$(printf '%s' "${2:-${1#*@}}" | tr '[:upper:]' '[:lower:]')"
 	valid_name "$name" || die "$name is not a public DNS name; give one: scripts/server-setup $ssh_host <public-name>"
 	# accept-new trusts a server's key on first contact, refuses a changed one.
-	local home ssh_opts=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+	local home ssh_opts=(-T -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
 	home="$(cd "$(dirname "$0")/.." && pwd -P)"
 
 	# Without user@, try the SSH default, then the usual cloud image logins,
@@ -371,7 +371,7 @@ run_remote() {
 	if [ "$can_push" = yes ] && [ -n "$origin" ] &&
 		! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' \
 			git push -q --dry-run origin HEAD:refs/heads/hal-push-check >/dev/null 2>&1; then
-		echo "Hint: git on the server cannot push to $origin. To make git work there, ssh to the server and set up gh (gh auth login, then gh auth setup-git)."
+		echo "Hint: Git on the server cannot push to $origin. To push from there, connect with hal -r $name and ask Hal to set up push access."
 	fi
 }
 
