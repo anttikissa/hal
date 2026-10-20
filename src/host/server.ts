@@ -20,6 +20,7 @@ import { createServer, type Server, type Socket } from 'net'
 import { lines } from '../common/lines.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { promptFiles } from './prompt-files.ts'
 import { secrets } from './secrets.ts'
 import { web } from './web.ts'
 
@@ -66,8 +67,10 @@ async function serve(): Promise<boolean> {
 	// auth.ason would leave a stale copy that wins.
 	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	try {
+		promptFiles.start(host.state.clients)
 		server.state.listener = await server.listen(server.socketPath())
 	} catch (e) {
+		promptFiles.stop()
 		closeSync(server.state.lockFd!)
 		server.state.lockFd = null
 		throw e
@@ -127,6 +130,7 @@ function accept(socket: Socket): void {
 // Stops serving and releases the lock, so another process can take over.
 async function stop(): Promise<void> {
 	let { listener, lockFd } = server.state
+	promptFiles.stop()
 	server.state.listener = null
 	server.state.lockFd = null
 	await web.stop()

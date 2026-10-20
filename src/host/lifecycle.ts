@@ -7,7 +7,6 @@ import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { providers } from './providers.ts'
 import { paths } from './paths.ts'
-import { promptFiles } from './prompt-files.ts'
 import { server } from './server.ts'
 import { serverLog } from './server-log.ts'
 import { version } from './version.ts'
@@ -17,8 +16,6 @@ function initHost(): void {
 	paths.init()
 	host.init()
 	providers.init()
-	// Checks only while this process hosts: a peer has no clients.
-	promptFiles.start(host.state.clients)
 }
 
 // Checked on every join/retry, including print clients: a broken

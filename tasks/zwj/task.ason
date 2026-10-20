@@ -1,0 +1,10 @@
+{
+	title: 'Keep peer startup from caching host session state',
+	spec: 'Only the lock-owning host starts prompt-file watchers and catch-up checks; peers do not preload authoritative tabs or session metadata. Server shutdown stops those checks before releasing ownership. Headless startup logs read tab state only after acquiring ownership. Host takeover preserves the latest open and closed tab membership, order, names, and client focus, without flushing stale peer caches over current disk state. Retain a multiprocess regression covering peer startup followed by host state changes and takeover.',
+	status: 'planned',
+	notes: [
+		'Initial fix moves promptFiles.start from lifecycle.initHost into server.serve after lock acquisition and before listening, stops checks on listen failure and shutdown, and delays hal serve tab-count logging until ownership. Avoid tabs.reset for stale-cache disposal: liveFiles.close flushes pending changes. Initial focused verification: ./test main.test server.test passes 7 tests. Multiprocess regression and manual restart verification remain pending.'
+	],
+	needs: ['fd1', 'ar'],
+	foldInto: ['fd1', 'ar']
+}

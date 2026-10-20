@@ -468,10 +468,10 @@ export const main = {
 			.then(async ({ loaded }) =>
 				serverLog.log(`version ${await (await import('./host/release.ts')).release.line(loaded)}`),
 			)
-		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
-		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)
 		web.state.fixedPort = port
 		await lifecycle.serve(main.becomeHost, link.dial)
+		let sessions = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()).length : 0
+		serverLog.log(`${sessions} sessions, ${tabs.file().open.length} open tabs ${serverLog.ms()}`)
 		main.shown()
 		// After becomeHost's web.start: --port allows no other port.
 		if (port)
