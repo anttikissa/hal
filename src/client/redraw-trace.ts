@@ -4,6 +4,7 @@
 import { closeSync, constants, fchmodSync, fstatSync, openSync, writeSync } from 'fs'
 import { app } from './app.ts'
 import { ansi } from './ansi.ts'
+import { ason } from '../common/ason.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 
@@ -48,7 +49,9 @@ function record(facts: Record<string, unknown>): void {
 	let st = redrawTrace.state
 	if (st.fd === undefined) return
 	try {
-		let bytes = Buffer.from(JSON.stringify({ time: new Date().toISOString(), pid: process.pid, ...facts }) + '\n')
+		let bytes = Buffer.from(
+			ason.stringify({ time: new Date().toISOString(), pid: process.pid, ...facts }, 'short') + '\n',
+		)
 		for (let at = 0; at < bytes.length;) {
 			let n = writeSync(st.fd, bytes, at)
 			if (!n) throw new Error('trace write made no progress')

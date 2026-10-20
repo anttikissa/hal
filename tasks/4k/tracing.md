@@ -15,7 +15,7 @@ export default (plugin: Plugin) => {
   plugin.onChange(({ phase }) => {
     if (phase === 'activate') {
       mkdirSync(new URL('../state/', import.meta.url), { recursive: true, mode: 0o700 })
-      redrawTrace.start(new URL('../state/redraw-trace.jsonl', import.meta.url))
+      redrawTrace.start(new URL('../state/redraw-trace.asonl', import.meta.url))
     } else {
       redrawTrace.stop()
     }

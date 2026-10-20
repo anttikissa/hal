@@ -4,12 +4,13 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { app } from './app.ts'
 import { redrawTrace } from './redraw-trace.ts'
+import { ason } from '../common/ason.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import type { Frame } from './frame.ts'
 
 let dir = mkdtempSync(join(tmpdir(), 'hal-redraw-'))
-let file = join(dir, 'trace.jsonl')
+let file = join(dir, 'trace.asonl')
 const originals = {
 	event: app.onEvent,
 	keys: app.onKeys,
@@ -24,7 +25,7 @@ afterEach(() => {
 	redrawTrace.maxRecords = originals.max
 	rmSync(dir, { recursive: true, force: true })
 	dir = mkdtempSync(join(tmpdir(), 'hal-redraw-'))
-	file = join(dir, 'trace.jsonl')
+	file = join(dir, 'trace.asonl')
 })
 // Avoid creating one final temp dir after the last test.
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -35,11 +36,7 @@ const frame = (lines: string[]): Frame => ({
 	promptScroll: 0,
 	history: lines.length,
 })
-const capture = () =>
-	readFileSync(file, 'utf8')
-		.trim()
-		.split('\n')
-		.map((s) => JSON.parse(s))
+const capture = () => ason.parseAll(readFileSync(file, 'utf8')) as any[]
 
 test('inert until opted in; traces geometry and clears without altering output or leaking contents', () => {
 	expect(redrawTrace.state.fd).toBeUndefined()
