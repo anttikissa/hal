@@ -157,7 +157,7 @@ function key(e: KeyInput, target: Target): boolean {
 		if (st.view.modal.settings && (k.key === 'left' || k.key === 'right')) {
 			let modal = st.view.modal
 			let kind = settings.table.find((s) => s.name === modal.settings!.names[modal.selected])?.type.kind
-			if (modal.edit || (kind !== 'integer' && kind !== 'boolean')) return false
+			if (modal.edit || (kind !== 'integer' && kind !== 'boolean' && kind !== 'choice')) return false
 		}
 		app.modalKey(k)
 		return true

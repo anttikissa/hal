@@ -2,8 +2,9 @@
 // its label and value in two columns. The selected row also shows,
 // faint, what config.ason holds for it (`push: false`, or the name and
 // "(default)"), and its description below the list. Typing filters by
-// name and label. Enter or Space cycles a boolean or choice, or edits a
-// value in place: Enter saves, Escape restores. Every change is sent at
+// name and label. Left/Right step an integer, boolean or choice. Enter
+// or Space cycles a boolean or choice, or edits a value in place: Enter
+// saves, Escape restores. Every change is sent at
 // once as /config <name> <value> and the modal stays open; the host's
 // `settings` refresh then shows the result. Shared by terminal and web.
 
@@ -110,6 +111,11 @@ function step(st: ModalState, key: Key, sessionId: string): Step {
 		if (s.type.kind === 'boolean') text = String(key.key === 'right')
 		if (s.type.kind === 'integer')
 			text = String(Math.max(s.type.min, Math.min(s.type.max, Number(now) + (key.key === 'right' ? 1 : -1))))
+		if (s.type.kind === 'choice') {
+			let options = s.type.options
+			let at = options.indexOf(now) + (key.key === 'right' ? 1 : -1)
+			text = options[Math.max(0, Math.min(options.length - 1, at))]!
+		}
 		if (text !== undefined) return { state: st, ...(text !== now && { action: send(sessionId, s, text) }) }
 	}
 	if (s && plain && (key.key === 'enter' || key.text === ' ')) {

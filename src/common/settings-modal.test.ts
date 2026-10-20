@@ -35,13 +35,15 @@ test('an edit sends only a valid value; Escape restores without sending', () => 
 	expect(settingsModal.step(st, key('enter'), 's').action).toMatchObject({ command: { text: '/config webPort 9002' } })
 })
 
-test('Left and Right adjust integers and booleans without crossing bounds', () => {
+test('Left and Right adjust integers, booleans and choices without crossing bounds', () => {
 	for (let [name, now, left, right] of [
 		['webPort', '9001', '9000', '9002'],
 		['webPort', '1', undefined, '2'],
 		['webPort', '65535', '65534', undefined],
 		['push', 'true', 'false', undefined],
 		['push', 'false', undefined, 'true'],
+		['security', 'best-effort', undefined, 'none'],
+		['security', 'none', 'best-effort', undefined],
 	] as const) {
 		let st = at(name)
 		st.settings!.values = { ...data.values, [name]: now }
@@ -55,8 +57,12 @@ test('Left and Right adjust integers and booleans without crossing bounds', () =
 			else expect(result.action).toMatchObject({ command: { text: `/config ${name} ${value}` } })
 		}
 	}
-	for (let st of [at('model'), at('security'), settingsModal.step(at('webPort'), key('enter'), 's').state]) {
+	for (let st of [at('model'), settingsModal.step(at('webPort'), key('enter'), 's').state]) {
 		expect(settingsModal.step(st, key('right'), 's').action).toBeUndefined()
 	}
+	let searched = settingsModal.search(settingsModal.open(data), 'secu')
+	expect(settingsModal.step(searched, key('right'), 's').action).toMatchObject({
+		command: { text: '/config security none' },
+	})
 	expect(settingsModal.step(at('webPort'), { key: 'right', ctrl: true }, 's').action).toBeUndefined()
 })

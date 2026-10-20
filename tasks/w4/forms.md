@@ -240,10 +240,12 @@ row adds what config.ason holds for it, faint (`name (default)` when
 absent; on the web also on hover and focus). Its description wraps at
 the bottom. Outside inline editing, Left decreases an integer by one
 and Right increases it by one, within its bounds; Left sets a boolean
-off and Right sets it on. Enter or Space cycles a boolean or choice, or
-edits the value in place (Enter saves, Escape restores; a refused value
-shows its reason and stays). Every change is sent at once as `/config <name>
-<value>`; the modal stays open and the host's `settings` refresh,
+off and Right sets it on; Left and Right pick a choice's previous and
+next option, stopping at the ends. Enter or Space cycles a boolean or
+choice, or edits the value in place (Enter saves, Escape restores; a
+refused value shows its reason and stays). Every change is sent at once
+as `/config <name> <value>`; the modal stays open and the host's
+`settings` refresh,
 after any edit of the file, updates it. The generic parts (`values`,
 `notes`, `details`, `edit`, `error`, the `send` action) live in
 common/modals.ts for later row-based modals.
