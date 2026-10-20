@@ -1,0 +1,7 @@
+{
+	title: '/config guides values on the command line',
+	spec: '/config <name> <value> is usable without the modal. Tab after /config <name> completes the setting values: a choice setting its options, a boolean true and false; integer and text settings have none. /config <name> shows the value and below it how to set one: "Set it with /config <name> <values>", where <values> is the options joined by |, <min-max> for an integer, <text> or <http(s) address> for text.',
+	status: 'done',
+	needs: ['c0h'],
+	foldInto: ['c0h']
+}

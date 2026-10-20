@@ -20,10 +20,30 @@ function change(args: string): { s: Setting; next: unknown; why?: string } | und
 	return { s, next, why: settings.problem(s.type, next) }
 }
 
+// The values a setting's type takes, for completion.
+function values(type: Setting['type']): string[] {
+	return type.kind === 'choice' ? type.options : type.kind === 'boolean' ? ['true', 'false'] : []
+}
+
+// What /config <name> <value> accepts, as a usage placeholder.
+function accepts(type: Setting['type']): string {
+	if (type.kind === 'integer') return `<${type.min}–${type.max}>`
+	if (type.kind === 'text') return type.url ? '<http(s) address>' : '<text>'
+	return values(type).join('|')
+}
+
 export const command: SlashCommand = {
 	help: () =>
 		'/config lists all settings to change.\n/config <name> shows one.\n/config <name> <value> sets one.\n\nDefaults are not stored.',
-	complete: (args) => settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name),
+	complete(args) {
+		let { name, value } = parsed(args)
+		let s = settings.table.find((s) => s.name === name)
+		if (s && /\s/.test(args))
+			return values(s.type)
+				.filter((v) => v.startsWith(value ?? ''))
+				.map((v) => `${name} ${v}`)
+		return settings.table.filter((s) => s.name.startsWith(args)).map((s) => s.name)
+	},
 	// Setting a stored key to its default removes it; the command line
 	// says so: one row, no echo.
 	// Bare /config only opens the modal: nothing to keep in history.
@@ -41,7 +61,8 @@ export const command: SlashCommand = {
 		if (!name) return { open: 'settings' }
 		let s = settings.table.find((s) => s.name === name)
 		if (!s) return { error: `unknown setting '${name}'` }
-		if (value === undefined) return { say: `${name}: ${String(settings.value(name))}` }
+		if (value === undefined)
+			return { say: `${name}: ${String(settings.value(name))}\nSet it with /config ${name} ${accepts(s.type)}` }
 		let c = change(args)!
 		if (c.why) return { error: `${name}: ${c.why}` }
 		let keys = config.update({ [name]: c.next })
