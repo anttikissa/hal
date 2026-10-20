@@ -30,9 +30,24 @@ run_local() {
 	local home ssh_opts=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
 	home="$(cd "$(dirname "$0")/.." && pwd -P)"
 
-	step "Checking ssh $ssh_host"
-	ssh "${ssh_opts[@]}" "$ssh_host" true || die "ssh $ssh_host must work without prompts (key login, known host key)."
-	echo OK
+	# Without user@, try the SSH default, then the usual cloud image logins,
+	# until one works. Anything but a refused login stops the search.
+	step "Finding a login for $ssh_host"
+	local login out="" users=("" root ec2-user ubuntu admin debian centos rocky almalinux fedora opc azureuser)
+	[[ "$ssh_host" == *@* ]] && users=("")
+	for login in "${users[@]}"; do
+		login="${login:+$login@}$ssh_host"
+		if out="$(ssh "${ssh_opts[@]}" "$login" true 2>&1)"; then
+			ssh_host="$login"
+			break
+		fi
+		# Cloud images let root in only to print "Please login as the user ...".
+		[[ "$out" == *'Permission denied'* || "$out" == *'Please login as'* ]] || die "ssh $login fails: $out"
+		echo "ssh $login: ${out##*$'\n'}"
+		login=""
+	done
+	[ -n "$login" ] || die "no login works on $ssh_host (tried ${users[*]:1} and the SSH default). Add a key login, or name the user: user@$ssh_host."
+	echo "Using ssh $ssh_host."
 
 	step "Checking that $name points at the server"
 	local want have real a b match=""

@@ -9,10 +9,11 @@ Run in the foreground, from Hal's home, with no questions first:
 
     scripts/server-setup <ssh-host> [public-name]
 
-`<ssh-host>` is what `ssh` takes (`user@host` for another account). The
-public name defaults to the host. The script needs nothing else: it
-checks SSH, DNS and root, sends the committed checkout and the user's
-files, and is safe to rerun.
+`<ssh-host>` is what `ssh` takes. Without `user@`, the script tries the
+SSH default, root and the usual cloud logins (ec2-user, ubuntu, admin,
+debian, ...). The public name defaults to the host. The script needs
+nothing else: it checks SSH, DNS and root, sends the committed checkout
+and the user's files, and is safe to rerun.
 
 If it fails, show its reason and ask the user for what it needs (SSH
 access, passwordless sudo, DNS, open ports), then rerun.
