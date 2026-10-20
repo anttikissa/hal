@@ -333,14 +333,13 @@ function broadcast(id: string, event: Event): void {
 	serverLog.event(id, event)
 }
 
-// Whenever this process exits while it is host (quit, restart, SIGTERM,
-// SIGHUP), writes the output of running turns so far and aborts them,
-// which kills their bash process groups, and kills background commands
-// (jobs.ts): no command outlives the Hal that ran it. The turns stay unfinished for the next host to continue
-// as interrupted; or, if the user quit (userQuit) and no other Hal
-// process (a peer on the host socket) can carry them on, they are
-// recorded paused: a runaway must stop and stay stopped until the user
-// has looked at it. Idempotent.
+// When this process exits, stop all its work: save the output of running
+// turns, stop them, and kill their commands. No command outlives the Hal
+// that ran it.
+//
+// The turns stay unfinished, so the next Hal continues them. But if the
+// user quit and no other Hal process is running, they are saved as paused
+// instead: work the user stopped stays stopped until the user looks at it.
 function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
