@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
-// One pinned bottom: changes keep it at the bottom without animation.
-// Navigation away releases following; layout clamps do not. History,
-// viewport and tab changes preserve reading anchors. Tasks: 4s, 981.
+// Keeps a reader who is at the bottom there while content changes,
+// without animation: one pinned bottom. Navigating away releases following;
+// layout clamps do not. History, viewport and tab changes keep reading
+// anchors. Tasks: 4s, 981.
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }

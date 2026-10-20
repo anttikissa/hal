@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// One permalink presentation for transcript cards and active questions.
+// Links a transcript card or an active question to its address, so
+// every permalink looks and works the same.
 import { Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 

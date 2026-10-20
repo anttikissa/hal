@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
-// Temporary opt-in scroll probe (tasks s0, 981). Structural transition
-// snapshots survive event traffic; unpinned gaps are evidence, not failures.
+// A temporary opt-in probe that records why the view scrolls away from
+// where it should be (tasks s0, 981). Snapshots of structural
+// transitions survive event traffic; unpinned gaps are evidence, not
+// failures.
 import { scrollCauses, type Breadcrumb } from '../common/web-diagnostics.ts'
 import { notices } from '../common/notices.ts'
 import { diagnostics } from './diagnostics.ts'

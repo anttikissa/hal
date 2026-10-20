@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
-// Best-effort HTTP diagnostics still work when the WebSocket does not.
-// Only fixed labels and numeric/boolean state; no text or persistent storage.
+// Sends browser diagnostics over HTTP, best effort, so they still arrive
+// when the WebSocket does not work. Only fixed labels and numeric or
+// boolean state; no text and no persistent storage.
 import type { Event as HostEvent } from '../common/protocol.ts'
 import {
 	diagnosticDetails,

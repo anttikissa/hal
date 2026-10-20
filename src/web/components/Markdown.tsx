@@ -1,12 +1,13 @@
 /// <reference lib="dom" />
-// Model text as elements (tasks fn, 6eq), from the blocks of common/markdown.ts:
-// runs are text nodes in styled spans and links only http(s) <a>s, so
-// model text never reaches the page as HTML. Lists are non-keyed, so a
-// streamed delta updates the blocks it touched in place.
-// While `streaming`, the root keeps the tallest height it was drawn at
-// as its min-height within one layout: streamed reparsing never
-// shrinks it, but width/font reflow clears that obsolete height floor. On the root, not the card, so a folded thinking card still
-// folds. `children` (Hal's cursor) follows the last line.
+// Draws model text as elements (tasks fn, 6eq) from the blocks of
+// common/markdown.ts. Runs are text nodes in styled spans and links are
+// only http(s) <a>s, so model text never reaches the page as HTML. Lists
+// are non-keyed, so a streamed delta updates the blocks it touched in
+// place. While `streaming`, the root keeps the tallest height it was
+// drawn at as its min-height within one layout: streamed reparsing never
+// shrinks it, but width or font reflow clears that obsolete height
+// floor. It is on the root, not the card, so a folded thinking card
+// still folds. `children` (Hal's cursor) follows the last line.
 
 import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, For, Match, onSettled, Show, Switch } from 'solid-js'

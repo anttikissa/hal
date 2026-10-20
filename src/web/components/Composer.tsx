@@ -1,12 +1,13 @@
 /// <reference lib="dom" />
 // The bottom panel under the transcript: the messages waiting for the
 // turn (the inbox), the passing notice, the message box with its Send
-// button, and the key hints. Session activity lives in StatusRow. The box grows with its text up to 40% of
-// the window. Its height is set by script from a hidden copy with the
-// same width and text, so the visible box never collapses to measure
-// and changes height only when its row count does (task 4s). An open question or the model picker owns the keys
-// meanwhile; the box keeps its text and takes the focus back when they
-// close. Enter is handled by keys.key (none during IME composition).
+// button, and the key hints. Session activity lives in StatusRow. The
+// box grows with its text up to 40% of the window. Its height is set by
+// script from a hidden copy with the same width and text, so the visible
+// box never collapses to measure and changes height only when its row
+// count does (task 4s). An open question or the model picker owns the
+// keys meanwhile; the box keeps its text and takes the focus back when
+// they close. Enter is handled by keys.key (none during IME composition).
 // Images pasted, image and text files dropped on the page (Chat.tsx)
 // or picked with the attach button, and long pasted text, become
 // attachments (attach.ts): a placeholder at the caret, then the marker.

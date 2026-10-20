@@ -1,7 +1,7 @@
-import type { Local } from '../common/drafts.ts'
-
 // The browser's local copy of drafts, for typing while disconnected
 // and prompts not yet acknowledged when the tab closes.
+import type { Local } from '../common/drafts.ts'
+
 export const store = {
 	state: { window: undefined as string | undefined },
 	// One window per browser tab, kept across reloads.

@@ -1,5 +1,6 @@
-// Browser completion menu decisions. Candidate strings come from the host's
-// shared completion source; the shared formatter supplies their short labels.
+// Decides what the browser's completion menu shows. Candidate strings
+// come from the host's shared completion source; the shared formatter
+// supplies their short labels.
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 

@@ -1,13 +1,14 @@
 /// <reference lib="dom" />
-// Tasks: w5, 6eq, 18n, kx0, hyt, bp1. One transcript row as a card in its theme colors (view.show). A
+// Draws one transcript row as a card in its theme colors (view.show). A
 // card starts short (its title row) or long, as the session starts its
-// kind (task hyt); the header switches the two.
-// Only header taps collapse an open card. Hidden contents are inert. The height
-// animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
-// the card streams, so Hal's cursor follows its last character (in the
-// header while a folding card is closed). Whether a card is open is
-// kept by its session and row key (task w5), not by its DOM, so no other
-// item's card ever shows open in its place.
+// kind (task hyt); the header switches the two. Only header taps
+// collapse an open card. Hidden contents are inert. The height animates
+// in CSS; scroll.ts tracks the bottom meanwhile. `cursor`: the card
+// streams, so Hal's cursor follows its last character (in the header
+// while a folding card is closed). Whether a card is open is kept by its
+// session and row key (task w5), not by its DOM, so no other item's card
+// ever shows open in its place.
+// Tasks: w5, 6eq, 18n, kx0, hyt, bp1.
 // Every card links to itself (target.ts, task 0z); `target`: the
 // address links here, so the card is marked and opens. An open tool
 // card shows all of its result; the transcript holds all of it (host

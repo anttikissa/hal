@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// The native triangle-free control for card and nested disclosures.
+// The show/hide control for cards and nested disclosures: a native
+// button, without a triangle.
 import type { JSX } from '@solidjs/web'
 
 export function Disclosure(props: {

@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// Page-local, explicit touch probe. No telemetry or user text.
+// A touch probe for debugging touch input, turned on explicitly. It
+// stays in this page: no telemetry and no user text.
 import { app } from './app.ts'
 import { router } from './router.ts'
 

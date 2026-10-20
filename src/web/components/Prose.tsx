@@ -1,4 +1,5 @@
-// Literal human text with half-line paragraph gaps; code keeps its spacing.
+// Shows literal human text readably: paragraphs get half-line gaps, and
+// code keeps its spacing.
 import { createMemo, For } from 'solid-js'
 import { hrefs } from '../hrefs.ts'
 import { external } from './Markdown.tsx'

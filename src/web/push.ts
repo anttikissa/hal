@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// Web push stays on a real tap: never request permission on page load.
+// Web push notifications for this device. Permission is requested only
+// on a real tap, never on page load.
 import { createSignal } from 'solid-js'
 import { connection } from '../common/connection.ts'
 import type { Event, Tab } from '../common/protocol.ts'

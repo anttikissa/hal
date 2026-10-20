@@ -1,4 +1,4 @@
-// Web adapter for the shared protected queue editor (task jsg).
+// Connects the page to the shared editor for queued prompts (task jsg).
 import { queueEdit } from '../common/queue-edit.ts'
 import { drafts } from '../common/drafts.ts'
 import { app } from './app.ts'

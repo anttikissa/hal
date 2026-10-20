@@ -1,4 +1,6 @@
 /// <reference lib="dom" />
+// Draws a tool's presentation (common/tool-presentation.ts): each block
+// under its path, as code or as a diff with toned lines.
 import { For, Show } from 'solid-js'
 import { toolPresentation, type ToolPresentation as Presentation } from '../../common/tool-presentation.ts'
 import { diff } from '../../common/diff.ts'

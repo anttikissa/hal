@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
-// Web controller: host events and input update plain view state; changed
-// feeds Solid. Keys live in keys.ts, drafts in common/drafts.ts, tabs in
-// tabs.ts and router.ts. Queue edits persist separately from the draft.
+// Ties the browser client together: host events and user input update
+// plain view state, and each change feeds Solid. Keys live in keys.ts,
+// drafts in common/drafts.ts, tabs in tabs.ts and router.ts. Queue edits
+// persist separately from the draft.
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { restart } from './restart.ts'

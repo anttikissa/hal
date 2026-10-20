@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// Two stable overview lines; native modal details retain every pushed fact.
+// The status row: two overview lines with a stable layout, and a native
+// modal with details that keep every fact the host pushed.
 // The full cwd truncates from the start; wide layouts also show the session
 // id and usage windows. The model name doubles as quota left (task 5f).
 import { For } from 'solid-js'

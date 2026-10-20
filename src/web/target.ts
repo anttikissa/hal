@@ -1,8 +1,9 @@
 // Links to blocks (task 0z): every card has the address
 // /<session id>#<block id>, the block id being its item's key (task
 // w5), the same in every client, after a reload and in a page of
-// earlier history; a kind letter may lead it (#t19, task 9p). Opening such an address scrolls to that card, marks
-// it and opens it (a tool card with its whole output), loading earlier
+// earlier history; a kind letter may lead it (#t19, task 9p). Opening
+// such an address scrolls to that card, marks it and opens it (a tool
+// card with its whole output), loading earlier
 // pages until the block shows. Addresses are relative to the page until
 // the host's webUrl reaches the browser (task e3).
 

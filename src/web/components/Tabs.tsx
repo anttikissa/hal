@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
-// The host's tabs above the conversation. Web overflow scrolls independently
-// of selection (task ce); terminal paging stays in common/tab-pages.ts.
+// The host's tabs above the conversation. When they overflow, the strip
+// scrolls independently of selection (task ce); terminal paging stays in
+// common/tab-pages.ts.
 // Native horizontal momentum scrolling; edge buttons provide secondary paging.
 // Tab links retain native Cmd- and middle-click behavior.
 

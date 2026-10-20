@@ -1,4 +1,6 @@
 /// <reference lib="dom" />
+// A tool card's command. A compact card clips it to one line and adds
+// a control to show it whole.
 import { createEffect, createSignal, flush, onSettled, Show, untrack } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { Disclosure } from './Disclosure.tsx'

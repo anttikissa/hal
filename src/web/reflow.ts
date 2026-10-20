@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
-// Keep a pre-layout reading anchor: an exclusive nearby edge, otherwise
-// the text at the visible center. Resize events arrive after layout, so
-// scroll/content observers refresh it only while the box size is unchanged.
+// Keeps the reader's place when the layout changes, with a reading
+// anchor taken before layout: an exclusive nearby edge, otherwise the
+// text at the visible center. Resize events arrive after layout, so
+// scroll and content observers refresh it only while the box size is
+// unchanged.
 
 type Anchor = {
 	width: number

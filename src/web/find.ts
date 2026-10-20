@@ -1,4 +1,5 @@
-// Browser adapter: use the same modal, search box and stable block URLs.
+// Find in the browser, with the same modal and search box as the
+// terminal and stable block URLs.
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
