@@ -1,68 +1,44 @@
 ---
 name: hal-server-install
-description: Set up Hal as a supervised server on another Linux machine over SSH — checkout, systemd, what to carry over from this Hal, login and a TLS proxy.
+description: Set up or update Hal on a Linux server over SSH, with HTTPS through Caddy and a systemd user service. Use when the user asks to set up, install or update Hal on a server.
 ---
 
 # Install Hal on a server
 
-The target's own checkout holds the details: read its
-`skills/hal-server-install/SERVER.md` and follow it. This skill adds
-what a remote setup must decide.
+Run in the foreground, from Hal's home, with no questions first:
 
-## Ask first
+    scripts/server-setup <ssh-host> [public-name]
 
-- Host, SSH user and the account Hal runs as (prefer an unprivileged one).
-- Public name (e.g. `hal.example.com`) or SSH-tunnel only.
-- Whether a Hal host already runs there: never start a second host for
-  the same checkout; stopping one interrupts its work.
+`<ssh-host>` is what `ssh` takes (`user@host` for another account). The
+public name defaults to the host. The script needs nothing else: it
+checks SSH, DNS and root, sends the committed checkout and the user's
+files, and is safe to rerun.
 
-## Steps
+If it fails, show its reason and ask the user for what it needs (SSH
+access, passwordless sudo, DNS, open ports), then rerun.
 
-1. Check SSH, `systemctl --user` (or NixOS), free disk and Bun.
-2. Clone this checkout's origin (`git -C <hal home> remote get-url origin`)
-   as the service account; run `./install -y`.
-3. Carry over files (table below), then set a fixed `webPort`, and
-   `webUrl` when public.
-4. `./scripts/install-service --print`, then install; enable with
-   `systemctl --user enable --now hal.service`; `loginctl enable-linger`.
-   On NixOS give the user the snippet from `SERVER.md`; never hand-edit
-   `/etc`.
-5. Check `journalctl --user -u hal.service` for the actual port.
-6. Proxy (below), then `./run auth 3` on the server. Give the user one
-   login URL for their browser, a different code with `hal -r <host>`,
-   and the third login URL for mobile. Each code works once for ten minutes;
-   do not reuse a code across devices.
-7. The user runs `/login` there for providers.
+If the user wants something other than Caddy and systemd, discuss it
+with them before changing or replacing the script; `SERVER.md` beside
+this file covers manual and NixOS setups.
 
-## What to carry over
+## When it succeeds
 
-| File | Do |
-|---|---|
-| `USER.md` | Copy: the user's preferences apply everywhere. |
-| `config.ason` | Copy, then adjust `webPort`, `webUrl`. |
-| `plugins/`, `local.ts` | Ask per item; they may assume this machine. |
-| `secrets/` | **Never copy.** OAuth refresh on one host invalidates the other's token; each host logs in itself. |
-| `sessions/`, `state/` | Never: per-machine history, locks, sockets, web tokens. |
+Reply with this, filled from the script's last lines: the first code for
+the browser, the second for `hal -r`, the third for the phone. Add its
+`Hint:` line, if any, at the end.
 
-Copy with `scp`/`rsync` over SSH, keeping files private (`chmod 600`).
+    Hal is running at <public-name>
+    Use the following URL to log in with your browser:
 
-## TLS proxy (Caddy)
+    	https://<public-name>/?auth=<code 1>
 
-Caddy gets and renews certificates itself once DNS points at the server
-and ports 80/443 are open; `reverse_proxy` passes WebSockets through.
+    Use the `hal -r` remote client with:
 
-```
-hal.example.com {
-	reverse_proxy 127.0.0.1:9001
-}
-```
+    	hal -r <public-name>
+    	# When connected, use code: <code 2>
 
-Use the port from the journal: Hal moves past a busy `webPort`. Append to
-an existing Caddyfile, never replace it; `caddy validate` before
-`systemctl reload caddy`. Keep Hal's port on loopback.
+    Here's one more authentication code for your phone: <code 3>
 
-## Done means
-
-`systemctl --user status hal.service` is active, the public URL shows
-the login page, a code from `./run auth` logs in, and `/restart host`
-brings the service back.
+    Codes work one time each and are valid for 10 minutes.
+    Use `/auth` or `hal auth` to get more, and `/clients` to see connected
+    clients; `/logout <id>` revokes a login.

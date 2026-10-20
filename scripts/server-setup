@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# Sets up or updates Hal on a Linux server over SSH without questions:
+# the committed checkout and user files, a systemd user service, and
+# HTTPS through Caddy. Safe to run again. Task: np2.
+#
+#   scripts/server-setup <ssh-host> [public-name]
+#
+# The same file runs on the server as `server-setup --remote ...`.
+set -euo pipefail
+
+step() { printf '\n== %s\n' "$*"; }
+die() { printf '\nserver-setup: %s\n' "$*" >&2; exit 1; }
+warn() { printf 'Warning: %s\n' "$*"; }
+valid_name() { [[ "$1" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$ ]]; }
+is_hal() { curl -fsS --max-time 5 "$1/manifest.webmanifest" 2>/dev/null | grep -q '"name":"Hal"'; }
+
+# ---------------------------------------------------------------- local
+
+# The addresses a name resolves to, space-separated; empty if none.
+resolve() {
+	NAME="$1" bun -e 'let r = await require("dns").promises.lookup(process.env.NAME, { all: true }).catch(() => []); console.log(r.map((a) => a.address).join(" "))'
+}
+
+run_local() {
+	[ $# -ge 1 ] && [ $# -le 2 ] || die 'usage: scripts/server-setup <ssh-host> [public-name]'
+	local ssh_host="$1" name
+	name="$(printf '%s' "${2:-${1#*@}}" | tr '[:upper:]' '[:lower:]')"
+	valid_name "$name" || die "$name is not a public DNS name; give one: scripts/server-setup $ssh_host <public-name>"
+	# accept-new trusts a server's key on first contact, refuses a changed one.
+	local home ssh_opts=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+	home="$(cd "$(dirname "$0")/.." && pwd -P)"
+
+	step "Checking ssh $ssh_host"
+	ssh "${ssh_opts[@]}" "$ssh_host" true || die "ssh $ssh_host must work without prompts (key login, known host key)."
+	echo OK
+
+	step "Checking that $name points at the server"
+	local want have real a b match=""
+	want="$(resolve "$name")"
+	[ -n "$want" ] || die "$name does not resolve. Point its DNS A (or AAAA) record at the server."
+	real="$(ssh -G "$ssh_host" | awk '$1 == "hostname" { print $2 }')"
+	have="$(resolve "$real") $(ssh "${ssh_opts[@]}" "$ssh_host" 'ip -o addr show 2>/dev/null || hostname -I' |
+		grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-f]*:[0-9a-f:]+' | tr '\n' ' ')"
+	for a in $want; do for b in $have; do [ "$a" = "$b" ] && match="$a"; done; done
+	[ -n "$match" ] || die "$name resolves to $want, but ssh $ssh_host reaches $have. Point $name at the server, or pass the right public name."
+	echo "$name -> $match"
+
+	step 'Packing this Hal'
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hal-server.XXXXXX")"
+	trap 'rm -rf "$tmp"' EXIT
+	"$home/scripts/server-pack" "$tmp/pack"
+	cp "$home/scripts/server-setup" "$tmp/pack/server-setup"
+	# Whether this checkout may push to origin: the server then gets a hint
+	# when it cannot. A dry run to a new branch writes nothing.
+	local can_push=no
+	GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' \
+		git -C "$home" push -q --dry-run origin HEAD:refs/heads/hal-push-check >/dev/null 2>&1 && can_push=yes
+
+	step "Sending it to $ssh_host"
+	local dir
+	dir="$(COPYFILE_DISABLE=1 tar --format=ustar -C "$tmp/pack" -cf - . |
+		ssh "${ssh_opts[@]}" "$ssh_host" 'd="$(mktemp -d)" && tar -xf - -C "$d" && echo "$d"')"
+	echo "Sent to $dir"
+	ssh "${ssh_opts[@]}" "$ssh_host" bash "$dir/server-setup" --remote "$dir" "$name" "$can_push" | tee "$tmp/remote.log"
+
+	step "Checking https://$name"
+	local ok=""
+	for _ in $(seq 60); do is_hal "https://$name" && ok=1 && break; sleep 2; done
+	if [ -z "$ok" ]; then
+		curl -sS -o /dev/null --max-time 10 -w "HTTP %{http_code}\n" "https://$name/manifest.webmanifest" || true
+		ssh "${ssh_opts[@]}" "$ssh_host" 'journalctl -u caddy -n 30 --no-pager 2>/dev/null || sudo -n journalctl -u caddy -n 30 --no-pager' || true
+		die "https://$name does not answer as Hal. Check that the provider's firewall (security group) lets ports 80 and 443 in."
+	fi
+	echo OK
+
+	step 'Done'
+	echo "Hal is running at https://$name"
+	grep -E '^(Login code|Hint): ' "$tmp/remote.log" || true
+}
+
+# --------------------------------------------------------------- remote
+
+# Installs packages with whichever package manager the server has.
+pkg() {
+	case "$pm" in
+		apt)
+			[ -n "${apt_updated:-}" ] || { as_root apt-get update -q; apt_updated=1; }
+			as_root env DEBIAN_FRONTEND=noninteractive apt-get install -yq "$@" ;;
+		dnf|yum) as_root "$pm" install -y "$@" ;;
+		zypper) as_root zypper -n install "$@" ;;
+		pacman) as_root pacman -S --noconfirm --needed "$@" ;;
+	esac
+}
+
+as_root() { ${sudo[@]+"${sudo[@]}"} "$@"; }
+
+# Caddy from the distribution or Caddy's own repository; fails quietly so
+# the caller can fall back to the official binary.
+caddy_package() {
+	case "$pm" in
+		apt)
+			if ! apt-cache policy caddy 2>/dev/null | grep -q 'Candidate: [0-9]'; then
+				pkg gnupg &&
+					curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key |
+					as_root gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg &&
+					curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt |
+					as_root tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null &&
+					as_root apt-get update -q || return 1
+			fi
+			pkg caddy ;;
+		dnf)
+			pkg caddy || { pkg 'dnf-command(copr)' && as_root dnf copr enable -y @caddy/caddy && pkg caddy; } ;;
+		*) pkg caddy ;;
+	esac
+}
+
+# The official static binary and the official unit, for systems without a
+# package.
+caddy_binary() {
+	local arch
+	case "$(uname -m)" in
+		x86_64) arch=amd64 ;;
+		aarch64|arm64) arch=arm64 ;;
+		armv7l) arch=armv7 ;;
+		*) die "no Caddy package or binary for $(uname -m)" ;;
+	esac
+	curl -fsSL "https://caddyserver.com/api/download?os=linux&arch=$arch" -o "$dir/caddy"
+	as_root install -m 755 "$dir/caddy" /usr/bin/caddy
+	id caddy >/dev/null 2>&1 ||
+		as_root useradd --system --user-group --home-dir /var/lib/caddy --create-home \
+			--shell "$(command -v nologin || echo /bin/false)" caddy
+	as_root mkdir -p /etc/caddy
+	[ -f /etc/caddy/Caddyfile ] || as_root touch /etc/caddy/Caddyfile
+	as_root tee /etc/systemd/system/caddy.service >/dev/null <<-'UNIT'
+		[Unit]
+		Description=Caddy
+		After=network.target network-online.target
+		Requires=network-online.target
+
+		[Service]
+		Type=notify
+		User=caddy
+		Group=caddy
+		ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+		ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
+		TimeoutStopSec=5s
+		LimitNOFILE=1048576
+		PrivateTmp=true
+		ProtectSystem=full
+		AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+
+		[Install]
+		WantedBy=multi-user.target
+	UNIT
+	as_root systemctl daemon-reload
+}
+
+# The site: HTTPS to Hal's loopback port, and a page saying so when Hal
+# does not answer.
+site() {
+	cat <<-SITE
+		# Written by Hal's scripts/server-setup; rerunning it rewrites this file.
+		$name {
+		    reverse_proxy 127.0.0.1:$port
+		    handle_errors {
+		        @down expression \`{err.status_code} in [502, 503, 504]\`
+		        header @down Content-Type "text/html; charset=utf-8"
+		        respond @down \`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Hal is not answering</title><body style="font: 16px/1.5 system-ui, sans-serif; max-width: 36em; margin: 3em auto; padding: 0 1em"><h1>Hal is not answering</h1><p>This server is up, but Hal on its port $port is not. It may be restarting: reload in a few seconds.</p><p>If it stays down, ssh to the server and run:</p><pre>systemctl --user status hal.service
+		journalctl --user -u hal.service -n 50</pre>\` 502
+		    }
+		}
+	SITE
+}
+
+run_remote() {
+	dir="$1" name="$2"
+	local can_push="$3"
+	[ -f "$dir/branch" ] || die "$dir is not a server-setup pack"
+	trap 'rm -rf "$dir"' EXIT
+	valid_name "$name" || die "$name is not a public DNS name"
+	local hal="$HOME/hal" branch origin
+	branch="$(cat "$dir/branch")"
+	origin="$(cat "$dir/origin")"
+	case ":$PATH:" in *":$HOME/.bun/bin:"*) ;; *) PATH="$HOME/.bun/bin:$PATH" ;; esac
+	case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
+	export PATH
+
+	step "Checking the server ($(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr))"
+	[ "$(uname -s)" = Linux ] || die 'the server must run Linux'
+	command -v systemctl >/dev/null || die 'the server must use systemd (no systemctl found)'
+	if [ "$(id -u)" = 0 ]; then
+		sudo=()
+	elif sudo -n true 2>/dev/null; then
+		sudo=(sudo -n)
+	else
+		die "$(id -un) is not root and sudo asks for a password. Root is needed for packages, Caddy, the firewall and linger."
+	fi
+	pm=""
+	for p in apt-get dnf yum zypper pacman; do command -v "$p" >/dev/null && { pm="${p%-get}"; break; }; done
+	[ -n "$pm" ] || die 'no supported package manager (apt, dnf, yum, zypper, pacman)'
+	local web
+	web="$(as_root ss -ltnp '( sport = :80 or sport = :443 )' 2>/dev/null | tail -n +2 || true)"
+	if [ -n "$web" ] && ! grep -q '"caddy"' <<<"$web"; then
+		die "ports 80/443 belong to something other than Caddy; this script supports only Caddy:
+$web"
+	fi
+	echo "User $(id -un), ${sudo[*]:-root}, $pm"
+
+	step 'Installing prerequisites'
+	local need=()
+	for c in git curl unzip tar; do command -v "$c" >/dev/null || need+=("$c"); done
+	if [ ${#need[@]} -gt 0 ]; then pkg "${need[@]}"; else echo 'Already there.'; fi
+
+	step "Hal checkout in $hal"
+	local changed=no old=""
+	if [ -d "$hal/.git" ]; then
+		cd "$hal"
+		old="$(git rev-parse HEAD)"
+		if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+			warn "$hal has uncommitted changes; its code stays as is."
+		elif [ "$(git symbolic-ref --short -q HEAD)" != "$branch" ]; then
+			warn "$hal is not on $branch; its code stays as is."
+		elif ! { git fetch -q "$dir/hal.bundle" "$branch" && git merge -q --ff-only FETCH_HEAD; }; then
+			warn "$hal has commits the local checkout lacks; its code stays as is."
+		fi
+		[ "$(git rev-parse HEAD)" = "$old" ] || changed=yes
+	elif [ -e "$hal" ]; then
+		die "$hal exists but is not a Git checkout. Move it away first."
+	else
+		git clone -q -b "$branch" "$dir/hal.bundle" "$hal"
+		cd "$hal"
+		changed=yes
+	fi
+	if [ -n "$origin" ]; then git remote set-url origin "$origin"; else git remote remove origin 2>/dev/null || true; fi
+	echo "$(git log -1 --format='%h %s'), origin ${origin:-none}"
+	./install -y
+	bun install
+
+	step 'Copying USER.md, config.ason and portable plugins'
+	for f in "$dir"/USER.md "$dir"/config.ason "$dir"/plugins/*.ts; do
+		if [ -f "$f" ]; then
+			install -m 600 "$f" "$hal/${f#"$dir"/}"
+			echo "${f#"$dir"/}"
+		fi
+	done
+
+	step 'Systemd user service'
+	as_root loginctl enable-linger "$(id -un)"
+	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+	for _ in $(seq 50); do [ -S "$XDG_RUNTIME_DIR/bus" ] && break; sleep 0.2; done
+	[ -S "$XDG_RUNTIME_DIR/bus" ] || die "the systemd user manager did not start ($XDG_RUNTIME_DIR/bus is missing)"
+	export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+	# The running service keeps its port; otherwise the first free one.
+	local running="" p
+	port=""
+	if systemctl --user -q is-active hal.service; then
+		for p in $(seq 9001 9100); do is_hal "http://127.0.0.1:$p" && { running="$p"; break; }; done
+	fi
+	port="$running"
+	if [ -z "$port" ]; then
+		for p in $(seq 9001 9100); do (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null || { port="$p"; break; }; done
+	fi
+	[ -n "$port" ] || die 'no free port in 9001-9100'
+	bun -e "import { config } from './src/host/config.ts'; config.update({ webPort: $port, webUrl: 'https://$name' }); process.exit(0)"
+	echo "config.ason: webPort $port, webUrl https://$name"
+	local unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hal.service" before=""
+	[ -f "$unit" ] && before="$(cat "$unit")"
+	# Replace a unit this installer wrote earlier (another checkout path or
+	# PATH); refuse anything else, as install-service does.
+	if [ -n "$before" ] && [ "$before" != "$(scripts/install-service --print)" ] &&
+		grep -qx 'Description=Hal live-checkout host' "$unit"; then
+		rm -f "$unit"
+	fi
+	scripts/install-service >/dev/null
+	systemctl --user daemon-reload
+	systemctl --user enable -q hal.service
+	if [ -z "$running" ]; then
+		systemctl --user restart hal.service
+	elif [ "$changed" = yes ] || [ "$before" != "$(cat "$unit")" ]; then
+		echo 'Restarting Hal for the new code.'
+		systemctl --user restart hal.service
+	fi
+	local ok=""
+	for _ in $(seq 60); do is_hal "http://127.0.0.1:$port" && ok=1 && break; sleep 1; done
+	if [ -z "$ok" ]; then
+		journalctl --user -u hal.service -n 40 --no-pager || true
+		die "Hal does not answer on 127.0.0.1:$port"
+	fi
+	echo "Hal answers on 127.0.0.1:$port."
+
+	step 'Firewall'
+	if command -v firewall-cmd >/dev/null && as_root firewall-cmd --state >/dev/null 2>&1; then
+		as_root firewall-cmd -q --permanent --add-service=http --add-service=https
+		as_root firewall-cmd -q --reload
+		echo 'firewalld: http and https open.'
+	elif command -v ufw >/dev/null && as_root ufw status | grep -q 'Status: active'; then
+		as_root ufw allow 80/tcp
+		as_root ufw allow 443/tcp
+	else
+		echo 'No active firewalld or ufw.'
+	fi
+
+	step 'Caddy'
+	if ! command -v caddy >/dev/null; then
+		caddy_package || { warn 'no Caddy package; installing the official binary'; caddy_binary; }
+	fi
+	caddy version
+	# SELinux may confine a packaged Caddy as httpd_t, which may not
+	# connect to Hal's port without this boolean.
+	if command -v getenforce >/dev/null && [ "$(getenforce)" = Enforcing ]; then
+		as_root setsebool -P httpd_can_network_connect 1
+	fi
+	local conf=/etc/caddy/Caddyfile
+	if systemctl cat caddy.service >/dev/null 2>&1 && ! systemctl cat caddy.service | grep -q "$conf"; then
+		die "this Caddy does not use $conf; this script edits only that file"
+	fi
+	as_root mkdir -p /etc/caddy/hal.d
+	[ -f "$conf" ] || as_root touch "$conf"
+	as_root cat "$conf" > "$dir/Caddyfile.before"
+	site | as_root tee "/etc/caddy/hal.d/$name.caddy" >/dev/null
+	as_root grep -qxF 'import /etc/caddy/hal.d/*.caddy' "$conf" ||
+		printf '\n# Hal sites (scripts/server-setup)\nimport /etc/caddy/hal.d/*.caddy\n' | as_root tee -a "$conf" >/dev/null
+	if ! as_root caddy validate --config "$conf" --adapter caddyfile; then
+		as_root cp "$dir/Caddyfile.before" "$conf"
+		as_root rm -f "/etc/caddy/hal.d/$name.caddy"
+		die "Caddy rejected the configuration; $conf is restored"
+	fi
+	if systemctl -q is-active caddy.service; then
+		as_root systemctl reload caddy.service
+	else
+		as_root systemctl enable --now caddy.service
+	fi
+	systemctl -q is-active caddy.service || { as_root journalctl -u caddy -n 30 --no-pager; die 'Caddy is not running'; }
+	echo "Caddy serves $name from /etc/caddy/hal.d/$name.caddy."
+
+	step 'Login codes'
+	bun src/main.ts auth 3 | sed -n 's/^Login code ([^)]*): /Login code: /p'
+	if [ "$can_push" = yes ] && [ -n "$origin" ] &&
+		! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' \
+			git push -q --dry-run origin HEAD:refs/heads/hal-push-check >/dev/null 2>&1; then
+		echo "Hint: git on the server cannot push to $origin. To make git work there, ssh to the server and set up gh (gh auth login, then gh auth setup-git)."
+	fi
+}
+
+if [ "${1:-}" = --remote ]; then
+	shift
+	run_remote "$@"
+else
+	run_local "$@"
+fi

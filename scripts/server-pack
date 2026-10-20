@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Packs what a new server needs from this Hal: the committed checkout as a
+# Git bundle, its origin, USER.md, config.ason and portable plugins.
+# scripts/server-setup sends the result over SSH. Task: np2.
+set -euo pipefail
+
+case "${1:-}" in
+	''|-h|--help)
+		printf 'Usage: scripts/server-pack <empty-dir>\nWrites hal.bundle, branch, origin, USER.md, config.ason and portable plugins/ into <empty-dir>.\n'
+		[ -n "${1:-}" ]; exit ;;
+esac
+out="$1"
+mkdir -p "$out"
+[ -z "$(ls -A "$out")" ] || { echo "server-pack: $out is not empty" >&2; exit 1; }
+home="$(cd "$(dirname "$0")/.." && pwd -P)"
+cd "$home"
+
+branch="$(git symbolic-ref --short -q HEAD)" || { echo 'server-pack: HEAD is detached; check out a branch first' >&2; exit 1; }
+printf '%s\n' "$branch" > "$out/branch"
+git remote get-url origin > "$out/origin" 2>/dev/null || : > "$out/origin"
+git bundle create -q "$out/hal.bundle" "$branch"
+echo "Packed $branch at $(git rev-parse --short HEAD) ($(du -h "$out/hal.bundle" | cut -f1))."
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo 'Uncommitted changes stay here; only commits are sent:'
+	git status --short --untracked-files=no | sed 's/^/  /'
+fi
+
+for f in USER.md config.ason; do
+	if [ -f "$f" ]; then cp -p "$f" "$out/" && echo "Packed $f."; fi
+done
+
+# Plugins sync shares only `export const portable = true` files that
+# plugins/.syncignore does not list (tasks gev, zh7); the same go here.
+mkdir -p "$out/plugins"
+ignored="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' plugins/.syncignore 2>/dev/null | grep -v '^#' || true)"
+for f in plugins/*.ts; do
+	[ -f "$f" ] || continue
+	grep -Eq '^export (const|let|var) portable *= *true *(;|$)' "$f" || continue
+	if printf '%s\n' "$ignored" | grep -qxF "$(basename "$f")"; then continue; fi
+	cp -p "$f" "$out/plugins/" && echo "Packed $f."
+done
