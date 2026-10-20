@@ -50,3 +50,37 @@ test('/resume lists the 20 most recently closed sessions; all lifts the cap', ()
 	expect(rows.join('\n')).not.toContain(`[${ids[0]}]`)
 	expect((resumeCommand.run('all', undefined, ctx) as { say: string }).say).toContain(`[${ids[0]}]`)
 })
+
+test('/resume --bg publishes reopened tabs without navigating clients', () => {
+	let a = client()
+	let b = client()
+	let keep = sessions.create({ cwd: '/tmp' }).id
+	let closed = sessions.create({ cwd: '/tmp' }).id
+	tabs.insert(keep, 0)
+	tabs.insert(closed, 1)
+	tabs.close(closed)
+	a.conn.send({ type: 'open', sessionId: keep })
+	b.conn.send({ type: 'open', sessionId: keep })
+	let ctx = { sessionId: keep, cwd: '/tmp', model: 'hal/intro', setCwd() {}, setModel() {}, say() {} }
+	for (let target of [closed, 'last']) {
+		a.events.length = b.events.length = 0
+		expect(resumeCommand.run(`--bg ${target}`, undefined, ctx)).toEqual({ result: `reopened ${closed}` })
+		for (let c of [a, b]) {
+			expect(
+				c
+					.of('tabs')
+					.at(-1)
+					.tabs.map((t: { id: string }) => t.id),
+			).toContain(closed)
+			expect(c.of('go')).toHaveLength(0)
+		}
+		tabs.close(closed)
+	}
+	for (let args of ['--bg', '--bg all']) {
+		expect(resumeCommand.run(args, undefined, ctx)).toHaveProperty('error')
+		expect(tabs.file().open).not.toContain(closed)
+	}
+	expect(resumeCommand.complete!('--bg ', ctx)).toContain(`--bg ${closed}`)
+	expect(resumeCommand.run(closed, undefined, ctx)).toEqual({ result: `reopened ${closed}` })
+	for (let c of [a, b]) expect(c.of('go').at(-1)).toMatchObject({ tab: closed })
+})

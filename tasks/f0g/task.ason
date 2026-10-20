@@ -1,0 +1,7 @@
+{
+	title: 'Resume sessions without changing client focus',
+	spec: 'The canonical reopen example in /resume help, COMMAND guidance and SYSTEM.md is /resume --bg <session id>. This reopens a session without sending navigation to any terminal or web client; --bg last reopens the most recently closed session the same way. Plain /resume listing, all, last, explicit-id navigation and Shift-Ctrl-T remain unchanged; /go remains navigation. Completion supports --bg and its last/session targets. Bare --bg or --bg all reports usage without mutation. Restored invariant: background recovery changes the open tab set, never user focus. Keep a host-client contract test for reopening publication without go events and unchanged foreground navigation.',
+	status: 'done',
+	needs: ['18c'],
+	foldInto: ['18c']
+}
