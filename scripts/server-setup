@@ -3,7 +3,7 @@
 # the committed checkout and user files, a systemd user service, and
 # HTTPS through Caddy. Safe to run again. Task: np2.
 #
-#   scripts/server-setup <ssh-host> [public-name]
+#   scripts/server-setup [--copy-api-keys] <ssh-host> [public-name]
 #
 # The same file runs on the server as `server-setup --remote ...`.
 set -euo pipefail
@@ -22,7 +22,9 @@ resolve() {
 }
 
 run_local() {
-	[ $# -ge 1 ] && [ $# -le 2 ] || die 'usage: scripts/server-setup <ssh-host> [public-name]'
+	local copy_keys=()
+	[ "${1:-}" = --copy-api-keys ] && { copy_keys=(--api-keys); shift; }
+	[ $# -ge 1 ] && [ $# -le 2 ] || die 'usage: scripts/server-setup [--copy-api-keys] <ssh-host> [public-name]'
 	local ssh_host="$1" name
 	name="$(printf '%s' "${2:-${1#*@}}" | tr '[:upper:]' '[:lower:]')"
 	valid_name "$name" || die "$name is not a public DNS name; give one: scripts/server-setup $ssh_host <public-name>"
@@ -63,7 +65,7 @@ run_local() {
 	step 'Packing this Hal'
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hal-server.XXXXXX")"
 	trap 'rm -rf "$tmp"' EXIT
-	"$home/scripts/server-pack" "$tmp/pack"
+	"$home/scripts/server-pack" ${copy_keys[@]+"${copy_keys[@]}"} "$tmp/pack"
 	cp "$home/scripts/server-setup" "$tmp/pack/server-setup"
 	# Whether this checkout may push to origin: the server then gets a hint
 	# when it cannot. A dry run to a new branch writes nothing.
@@ -276,6 +278,16 @@ run_remote() {
 			echo "${f#"$dir"/}"
 		fi
 	done
+	if [ -f "$dir/api-keys.json" ]; then
+		step 'Storing API keys'
+		KEYS="$dir/api-keys.json" bun -e '
+			import { apiKeys } from "./src/host/api-keys.ts"
+			let keys = await Bun.file(process.env.KEYS).json()
+			for (let [name, key] of Object.entries(keys)) apiKeys.save(name, key)
+			console.log(Object.keys(keys).join(", ") || "None.")
+			process.exit(0)
+		'
+	fi
 
 	step 'Systemd user service'
 	as_root loginctl enable-linger "$(id -un)"

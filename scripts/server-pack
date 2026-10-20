@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Packs what a new server needs from this Hal: the committed checkout as a
-# Git bundle, its origin, USER.md, config.ason and portable plugins.
-# scripts/server-setup sends the result over SSH. Task: np2.
+# Git bundle, its origin, USER.md, config.ason and portable plugins, and
+# with --api-keys the API keys stored by /login. scripts/server-setup
+# sends the result over SSH. Task: np2.
 set -euo pipefail
 
+keys=no
+[ "${1:-}" = --api-keys ] && { keys=yes; shift; }
 case "${1:-}" in
 	''|-h|--help)
-		printf 'Usage: scripts/server-pack <empty-dir>\nWrites hal.bundle, branch, origin, USER.md, config.ason and portable plugins/ into <empty-dir>.\n'
+		printf 'Usage: scripts/server-pack [--api-keys] <empty-dir>\nWrites hal.bundle, branch, origin, USER.md, config.ason and portable plugins/ into <empty-dir>;\nwith --api-keys also api-keys.json (stored API keys; never OAuth logins).\n'
 		[ -n "${1:-}" ]; exit ;;
 esac
 out="$1"
@@ -39,3 +42,20 @@ for f in plugins/*.ts; do
 	if printf '%s\n' "$ignored" | grep -qxF "$(basename "$f")"; then continue; fi
 	cp -p "$f" "$out/plugins/" && echo "Packed $f."
 done
+
+# OAuth entries stay behind: two hosts refreshing one token break each
+# other's logins. Prints provider names, never keys.
+if [ "$keys" = yes ]; then
+	AUTH="$home/secrets/auth.ason" OUT="$out/api-keys.json" bun -e '
+		import { ason } from "./src/common/ason.ts"
+		import { existsSync, writeFileSync } from "fs"
+		let store = existsSync(process.env.AUTH) ? ason.parse(await Bun.file(process.env.AUTH).text()) : {}
+		let keys = {}
+		for (let [name, value] of Object.entries(store ?? {})) {
+			let entry = [value].flat().find((e) => typeof e?.apiKey === "string" && e.apiKey && !e.accessToken)
+			if (entry) keys[name] = entry.apiKey
+		}
+		writeFileSync(process.env.OUT, JSON.stringify(keys), { mode: 0o600 })
+		console.log(Object.keys(keys).length ? `Packed API keys: ${Object.keys(keys).join(", ")}.` : "No stored API keys to pack.")
+	'
+fi

@@ -2,6 +2,7 @@
 // without session histories or client addresses/credentials. A bare
 // call describes only the caller; scope and fields widen or narrow it.
 // INSPECT "tabs" lists every tab: models sent it by mistake (task qzh).
+import { existsSync } from 'fs'
 import { callText } from '../../common/call-text.ts'
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'
@@ -12,6 +13,7 @@ import { fileEditors } from '../file-editors.ts'
 import { host } from '../host.ts'
 import { limits } from '../limits.ts'
 import { models } from '../models.ts'
+import { paths } from '../paths.ts'
 import { provider } from '../provider.ts'
 import { stats } from '../stats.ts'
 import { statusUsage, type UsageRow } from '../status-usage.ts'
@@ -26,7 +28,7 @@ function withLimit(id: string): string {
 	return until ? `${id} (rate limited until ${new Date(until).toISOString().slice(0, 16).replace('T', ' ')} UTC)` : id
 }
 
-const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions', 'files']
+const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions', 'logins', 'files']
 const SCOPES = ['self', 'project', 'all']
 
 // Compact token counts as on the status row: 950, 87k, 1000k.
@@ -116,6 +118,21 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 	error: (r) => r.refreshError ?? 'none',
 }
 
+// Stored logins straight from the credentials file: no refresh, no network.
+function logins(): string {
+	if (!existsSync(paths.authFile())) return 'No stored logins.'
+	let rows = Object.entries(auth.store()).flatMap(([provider, value]) =>
+		[value]
+			.flat()
+			.map((e: any, i: number) => [
+				provider,
+				e?.apiKey && !e?.accessToken ? 'API key' : 'subscription',
+				typeof e?.email === 'string' ? e.email : `account ${i + 1}`,
+			]),
+	)
+	return rows.length ? table(['provider', 'type', 'account'], rows) : 'No stored logins.'
+}
+
 const usage = () =>
 	`\n\nUsage:\n${nativeTool
 		.usage(tool)
@@ -161,6 +178,7 @@ export const tool: Tool<ToolOutput> = {
 		usage: [
 			'INSPECT "<session id> | <tool call id>"    // e.g. INSPECT 12-xyz, INSPECT t150',
 			'INSPECT "subscriptions"',
+			'INSPECT "logins"',
 			'INSPECT [ { what, scope, fields } ]',
 		],
 		resolve: (raw) => {
@@ -178,7 +196,7 @@ export const tool: Tool<ToolOutput> = {
 		},
 	},
 	description:
-		'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. what "files": uncommitted files of the caller\'s Git root, each with every session and call that declared and changed it since its last commit, newest first, and whether the file still matches the newest; scope "all" adds files Hal changed outside the root. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
+		'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. what "logins": stored logins (provider, type API key or subscription, account) read from the credentials file, instantly and without network. what "files": uncommitted files of the caller\'s Git root, each with every session and call that declared and changed it since its last commit, newest first, and whether the file still matches the newest; scope "all" adds files Hal changed outside the root. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -190,7 +208,7 @@ export const tool: Tool<ToolOutput> = {
 			what: {
 				type: 'string',
 				enum: WHATS,
-				description: 'sessions (default), host, models, clients, subscriptions or files',
+				description: 'sessions (default), host, models, clients, subscriptions, logins or files',
 			},
 			scope: { type: 'string', enum: SCOPES, description: 'self (default; files: project), project or all' },
 			fields: { type: 'string', description: 'Comma-separated fields, e.g. "name,cwd,context"' },
@@ -211,6 +229,7 @@ export const tool: Tool<ToolOutput> = {
 				)
 			return fileEditors.report(ctx.cwd, scope as 'project' | 'all', clients.timezone(ctx.sessionId))
 		}
+		if (what === 'logins') return logins()
 		if (what === 'subscriptions') {
 			let fields = pick(input.fields, Object.keys(SUBSCRIPTION))
 			let rows = await statusUsage.rows(
