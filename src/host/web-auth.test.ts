@@ -12,6 +12,7 @@ import { sessions } from './sessions.ts'
 import { webAuth } from './web-auth.ts'
 import { web } from './web.ts'
 
+import { command as authCommand } from './commands/auth.ts'
 const savedHome = paths.state.home
 const origPort = web.port
 let home = ''
@@ -53,7 +54,10 @@ function client() {
 	return { conn, views }
 }
 
-const outputs = (t: Transcript | undefined) => (t?.items ?? []).flatMap((i) => (i.type === 'output' ? [i.text] : []))
+const outputs = (t: Transcript | undefined) =>
+	(t?.items ?? []).flatMap((i) =>
+		i.type === 'output' ? [i.text] : i.type === 'command' && i.output !== undefined ? [i.output] : [],
+	)
 
 // Every file under `dir`, read as text.
 function everyFile(dir: string): string {
@@ -63,27 +67,29 @@ function everyFile(dir: string): string {
 		.join('\n')
 }
 
-test('/auth shows every follower a working code that no file and no later snapshot holds', async () => {
+test('/auth batch shows followers independent working codes that no file or later snapshot holds', async () => {
 	let a = client()
 	a.conn.send({ type: 'create', cwd: home, model: 'hal/intro' })
 	let id = [...a.views.keys()][0]!
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
 	await until(() => b.views.get(id))
-	a.conn.send({ type: 'submit', sessionId: id, text: '/auth' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '/auth 3' })
 	await until(() => outputs(b.views.get(id)).length)
-	let code = /\b([0-9a-hjkmnp-tv-z]{6})\b/.exec(outputs(a.views.get(id))[0]!)![1]!
+	let codes = [...outputs(a.views.get(id))[0]!.matchAll(/minutes\): ([0-9a-hjkmnp-tv-z]{6})/g)].map((m) => m[1]!)
+	expect(new Set(codes).size).toBe(3)
 	expect(outputs(b.views.get(id))).toEqual(outputs(a.views.get(id)))
-	expect(everyFile(home)).not.toContain(code)
+	for (let code of codes) expect(everyFile(home)).not.toContain(code)
 	// Gone from what a client opening the session now sees.
 	let c = client()
 	c.conn.send({ type: 'open', sessionId: id })
 	await until(() => c.views.get(id))
 	expect(outputs(c.views.get(id))).toEqual([])
-	expect(c.views.get(id)!.items.some((i) => i.type === 'command' && i.text === '/auth')).toBe(true)
-	expect('token' in webAuth.redeem(code)).toBe(true)
-	// Single use.
-	expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
+	expect(c.views.get(id)!.items.some((i) => i.type === 'command' && i.text === '/auth 3')).toBe(true)
+	for (let code of codes) {
+		expect('token' in webAuth.redeem(code)).toBe(true)
+		expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
+	}
 })
 
 test('/auth revoke ends every web session', async () => {
@@ -110,17 +116,33 @@ test('codes are 6 Crockford characters, fresh each time, and a token is valid on
 })
 
 const main = `${import.meta.dir}/../main.ts`
-const runAuth = () => Bun.spawn(['bun', main, 'auth', '--home', home], { stdout: 'pipe', stderr: 'pipe' })
+const runAuth = (...args: string[]) =>
+	Bun.spawn(['bun', main, 'auth', ...args, '--home', home], { stdout: 'pipe', stderr: 'pipe' })
 
 test('./run auth prints a code from the running host, or says none is running', async () => {
 	let none = runAuth()
 	expect(await none.exited).toBe(1)
 	expect(await new Response(none.stderr).text()).toContain('no Hal is running')
 	expect(await server.serve()).toBe(true)
-	let asked = runAuth()
+	let asked = runAuth('3')
 	expect(await asked.exited).toBe(0)
-	let code = /\b([0-9a-hjkmnp-tv-z]{6})\b/.exec(await new Response(asked.stdout).text())![1]!
-	expect('token' in webAuth.redeem(code)).toBe(true)
+	let output = await new Response(asked.stdout).text()
+	let codes = [...output.matchAll(/minutes\): ([0-9a-hjkmnp-tv-z]{6})/g)].map((m) => m[1]!)
+	expect(new Set(codes).size).toBe(3)
+	for (let code of codes) {
+		expect(output).toContain(`/?auth=${code}`)
+		expect('token' in webAuth.redeem(code)).toBe(true)
+		expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
+		expect(everyFile(home)).not.toContain(code)
+	}
+})
+
+test('/auth rejects invalid counts without issuing codes', async () => {
+	for (let count of ['0', '-1', '1.5', '101', 'Infinity', '3 extra']) {
+		let result = await authCommand.run(count, undefined, {} as never)
+		expect(result).toEqual({ error: 'usage: /auth [count: 1-100] or /auth revoke' })
+	}
+	expect(webAuth.state.codes.size).toBe(0)
 })
 
 test('legacy login hashes retain their tokens and stable public ids across restart without inventing first seen', () => {

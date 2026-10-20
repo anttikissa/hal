@@ -28,7 +28,10 @@ what a remote setup must decide.
    On NixOS give the user the snippet from `SERVER.md`; never hand-edit
    `/etc`.
 5. Check `journalctl --user -u hal.service` for the actual port.
-6. Proxy (below), then `./run auth` on the server for a login code.
+6. Proxy (below), then `./run auth 3` on the server. Give the user one
+   login URL for their browser, a different code with `hal -r <host>`,
+   and the third login URL for mobile. Each code works once for ten minutes;
+   do not reuse a code across devices.
 7. The user runs `/login` there for providers.
 
 ## What to carry over

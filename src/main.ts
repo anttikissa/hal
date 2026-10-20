@@ -251,10 +251,11 @@ function shown(): void {
 // `./run auth`: asks this home's running host for a one-time web login
 // code (host/web-auth.ts) and prints it. It never becomes host itself:
 // a code from a process about to exit would log nobody in.
-async function auth(): Promise<number> {
-	let answer = await new Promise<{ code?: string; error?: string }>((resolve) => {
+async function auth(count = 1): Promise<number> {
+	let codes: string[] = []
+	let answer = await new Promise<{ codes?: string[]; error?: string }>((resolve) => {
 		let timer = setTimeout(() => resolve({ error: 'the host did not answer' }), main.authWaitMs)
-		let done = (out: { code?: string; error?: string }) => {
+		let done = (out: { codes?: string[]; error?: string }) => {
 			clearTimeout(timer)
 			resolve(out)
 		}
@@ -262,21 +263,23 @@ async function auth(): Promise<number> {
 			.dial(server.socketPath(), {
 				event: (e) => {
 					if (eventCheck.invalidEvent(e)) return
-					if (e.type === 'auth') done({ code: e.code })
-					else if (e.type === 'rejected' && e.command === 'auth') done({ error: `the host refused: ${e.reason}` })
+					if (e.type === 'auth') {
+						codes.push(e.code)
+						if (codes.length === count) done({ codes })
+					} else if (e.type === 'rejected' && e.command === 'auth') done({ error: `the host refused: ${e.reason}` })
 				},
 				dropped: () => done({ error: 'the host went away' }),
 			})
 			.then((conn) => {
 				if (!conn) return done({ error: `no Hal is running in ${paths.display(paths.home())}; start it with ./run` })
-				conn.send({ type: 'auth' })
+				for (let i = 0; i < count; i++) conn.send({ type: 'auth' })
 			})
 	})
-	if (answer.code === undefined) {
+	if (answer.codes === undefined) {
 		process.stderr.write(`hal: ${answer.error}\n`)
 		return 1
 	}
-	process.stdout.write(`${webAuth.message(answer.code)}\n`)
+	process.stdout.write(`${webAuth.message(answer.codes)}\n`)
 	return 0
 }
 
@@ -391,7 +394,7 @@ async function start(): Promise<void> {
 		process.stderr.write(`hal: ${problem}\n`)
 		process.exit(1)
 	}
-	if (parsed.kind === 'auth') process.exit(await main.auth())
+	if (parsed.kind === 'auth') process.exit(await main.auth(parsed.count))
 	// config.ason first, so local.ts sees it and may override settings.*.
 	config.init(() => warnings.all())
 	await main.loadLocal()

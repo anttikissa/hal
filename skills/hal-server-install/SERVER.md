@@ -93,8 +93,11 @@ the home. Logs go to the journal; private state stays in the checkout.
 
 ## Connect securely
 
-On the server, `./run` attaches a local terminal; `./run auth` prints a
-one-time web login code. Do not put login codes or provider credentials
+On the server, `./run` attaches a local terminal; `./run auth 3` prints
+three independent one-time login codes with browser URLs. Give one URL
+for the browser, a different code for `hal -r <host>`, and the third URL
+for mobile. Each code works once for ten minutes. Omit the count for one
+code, or request 1–100. Do not put login codes or provider credentials
 in the unit or publish them. Use `/login` from a connected client to set
 up provider accounts.
 

@@ -73,6 +73,7 @@ function store(): Store {
 
 // A fresh one-time code.
 function issue(): string {
+	webAuth.store()
 	let now = clock.now()
 	let codes = webAuth.state.codes
 	for (let [c, until] of codes) if (until <= now) codes.delete(c)
@@ -170,9 +171,15 @@ function close(): void {
 
 // The /auth and `hal auth` text: the code, a link carrying it, and how
 // to connect a terminal. Shown, never saved, so the visible code is fine.
-function message(code: string): string {
+function message(codes: string | string[]): string {
 	let url = settings.webUrl().replace(/\/$/, '')
-	return `Login code (works once, for ${Math.round(webAuth.codeMs / 60_000)} minutes): ${code}\n\nOpen: ${url}/?auth=${code}\nOr connect a terminal: hal -r ${url.replace(/^https?:\/\//, '')}`
+	let logins = (typeof codes === 'string' ? [codes] : codes)
+		.map(
+			(code) =>
+				`Login code (works once, for ${Math.round(webAuth.codeMs / 60_000)} minutes): ${code}\n\nOpen: ${url}/?auth=${code}`,
+		)
+		.join('\n\n')
+	return `${logins}\nOr connect a terminal: hal -r ${url.replace(/^https?:\/\//, '')}`
 }
 
 export const webAuth = {

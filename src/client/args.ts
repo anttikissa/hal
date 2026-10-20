@@ -8,7 +8,7 @@ export type Args = (
 	| { kind: 'terminal'; noUser?: true }
 	| { kind: 'help' }
 	| { kind: 'version' }
-	| { kind: 'auth' }
+	| { kind: 'auth'; count?: number }
 	| { kind: 'serve'; noUser?: true; port?: number }
 	| { kind: 'remote'; host?: string }
 	| {
@@ -36,7 +36,7 @@ const help = `Usage:
   hal -r [host]               connect to a remote Hal (default: the last one)
   hal serve [--port <n>]      run the foreground headless host;
                               --port: web only on port n, else exit
-  hal auth                    print a one-time web login code
+  hal auth [count]            print one-time login codes (default: 1, max: 100)
   hal -v, --version           show the version, commit and checkout
   hal -h, --help              show this help
 
@@ -52,6 +52,7 @@ type Out = {
 	home?: string
 	noUser?: true
 	port?: number
+	count?: number
 	prompt?: string
 	host?: string
 	dir?: string
@@ -115,7 +116,7 @@ command('serve', 'serve', () => {
 		out.port = /^\d+$/.test(port) && +port >= 1 && +port <= 65535 ? +port : fail(`--port needs 1-65535, got ${port}`)
 	})
 })
-command('auth', 'auth')
+command('auth [count]', 'auth')
 command('-v, --version', 'version')
 command('-h, --help, help', 'help')
 arg('--home <dir>', (out, dir) => {
@@ -158,7 +159,10 @@ function parse(argv: string[]): Args {
 		if (words.length) fail(`unexpected argument ${words[0]}`)
 		if (selected?.value?.startsWith('<') && !operand?.trim()) fail(`${selected.names[0]} needs ${selected.value}`)
 		if (selected) out.kind = selected.kind!
-		if (operand) out[selected!.value!.slice(1, -1) as 'prompt' | 'host'] = operand
+		if (operand !== undefined && out.kind === 'auth')
+			out.count =
+				/^\d+$/.test(operand) && +operand >= 1 && +operand <= 100 ? +operand : fail('auth count must be 1-100')
+		else if (operand) out[selected!.value!.slice(1, -1) as 'prompt' | 'host'] = operand
 		for (let e of used)
 			if (e.within && e.within !== selected) fail(`${e.names[0]} applies only to hal ${e.within.names[0]}`)
 		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind))

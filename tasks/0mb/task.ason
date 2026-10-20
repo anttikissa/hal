@@ -1,0 +1,11 @@
+{
+	title: 'Request multiple one-time login codes',
+	spec: 'hal auth [count] and /auth [count] issue the requested number of independent one-time login codes; the default remains one. Count is a decimal integer from 1 through 100, a bounded batch to avoid accidental unbounded generation. Reject invalid counts before issuing codes. Every code works once for ten minutes, and redeeming one leaves the others valid. Each code is shown with its own browser login URL; the terminal connection command is shown once. Preserve ephemeral output: codes never enter saved history or later snapshots. CLI help and slash help document the count. Server-install guidance requests three codes: browser, hal -r, and mobile, explaining that each device uses a different code. Retain focused security coverage for batch single-use and non-persistence.',
+	status: 'done',
+	notes: [
+		'Invariant: redeeming one code must not invalidate other outstanding codes. Lazy token-store initialization called close(), clearing all pending codes on first redemption; initialize the store before issuing codes. The existing web-auth tests also needed to read output joined into command cards, not only standalone output items.',
+		'CLI sends the existing single-code auth request count times on one socket and collects the replies; no wire-schema change is needed. Focused args, web-auth, and web-links tests pass.'
+	],
+	needs: ['8a'],
+	foldInto: ['8a']
+}
