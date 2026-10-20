@@ -5,7 +5,8 @@ description: Set up or update Hal on a Linux server over SSH, with HTTPS through
 
 # Install Hal on a server
 
-Run in the foreground, from Hal's home, with no questions first:
+Run in the foreground and unsafe to stop (a stop can leave the server
+half set up), from Hal's home, with no questions first:
 
     scripts/server-setup <ssh-host> [public-name]
 
