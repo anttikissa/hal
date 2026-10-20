@@ -71,11 +71,15 @@ run_local() {
 	GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' \
 		git -C "$home" push -q --dry-run origin HEAD:refs/heads/hal-push-check >/dev/null 2>&1 && can_push=yes
 
-	step "Sending it to $ssh_host"
+	# The script goes first, as plain text: it installs what the server
+	# lacks (tar included) before the rest arrives as a tar stream.
+	step "Preparing $ssh_host"
 	local dir
-	dir="$(COPYFILE_DISABLE=1 tar --format=ustar -C "$tmp/pack" -cf - . |
-		ssh "${ssh_opts[@]}" "$ssh_host" 'd="$(mktemp -d)" && tar -xf - -C "$d" && echo "$d"')"
-	echo "Sent to $dir"
+	dir="$(ssh "${ssh_opts[@]}" "$ssh_host" 'd="$(mktemp -d)" && cat > "$d/server-setup" && echo "$d"' < "$tmp/pack/server-setup")"
+	ssh "${ssh_opts[@]}" "$ssh_host" bash "$dir/server-setup" --prepare
+
+	step "Sending this Hal to $ssh_host:$dir"
+	COPYFILE_DISABLE=1 tar --format=ustar -C "$tmp/pack" -cf - . | ssh "${ssh_opts[@]}" "$ssh_host" tar -xf - -C "$dir"
 	ssh "${ssh_opts[@]}" "$ssh_host" bash "$dir/server-setup" --remote "$dir" "$name" "$can_push" | tee "$tmp/remote.log"
 
 	step "Checking https://$name"
@@ -187,22 +191,12 @@ site() {
 	SITE
 }
 
-run_remote() {
-	dir="$1" name="$2"
-	local can_push="$3"
-	[ -f "$dir/branch" ] || die "$dir is not a server-setup pack"
-	trap 'rm -rf "$dir"' EXIT
-	valid_name "$name" || die "$name is not a public DNS name"
-	local hal="$HOME/hal" branch origin
-	branch="$(cat "$dir/branch")"
-	origin="$(cat "$dir/origin")"
+# Root (directly or through sudo -n), the package manager and PATH; dies
+# when root is out of reach.
+detect() {
 	case ":$PATH:" in *":$HOME/.bun/bin:"*) ;; *) PATH="$HOME/.bun/bin:$PATH" ;; esac
 	case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
 	export PATH
-
-	step "Checking the server ($(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr))"
-	[ "$(uname -s)" = Linux ] || die 'the server must run Linux'
-	command -v systemctl >/dev/null || die 'the server must use systemd (no systemctl found)'
 	if [ "$(id -u)" = 0 ]; then
 		sudo=()
 	elif sudo -n true 2>/dev/null; then
@@ -213,6 +207,14 @@ run_remote() {
 	pm=""
 	for p in apt-get dnf yum zypper pacman; do command -v "$p" >/dev/null && { pm="${p%-get}"; break; }; done
 	[ -n "$pm" ] || die 'no supported package manager (apt, dnf, yum, zypper, pacman)'
+}
+
+# Checks the server and installs what this script and ./install use.
+run_prepare() {
+	echo "$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr)"
+	[ "$(uname -s)" = Linux ] || die 'the server must run Linux'
+	command -v systemctl >/dev/null || die 'the server must use systemd (no systemctl found)'
+	detect
 	local web
 	web="$(as_root ss -ltnp '( sport = :80 or sport = :443 )' 2>/dev/null | tail -n +2 || true)"
 	if [ -n "$web" ] && ! grep -q '"caddy"' <<<"$web"; then
@@ -220,12 +222,28 @@ run_remote() {
 $web"
 	fi
 	echo "User $(id -un), ${sudo[*]:-root}, $pm"
+	# tar and git for the checkout; curl, unzip and gzip for ./install's
+	# Bun installer.
+	local need=() c
+	for c in tar gzip git curl unzip; do command -v "$c" >/dev/null || need+=("$c"); done
+	if [ ${#need[@]} -gt 0 ]; then
+		echo "Installing ${need[*]}"
+		pkg "${need[@]}"
+	else
+		echo 'Prerequisites are there.'
+	fi
+}
 
-	step 'Installing prerequisites'
-	local need=()
-	for c in git curl unzip tar; do command -v "$c" >/dev/null || need+=("$c"); done
-	if [ ${#need[@]} -gt 0 ]; then pkg "${need[@]}"; else echo 'Already there.'; fi
-
+run_remote() {
+	dir="$1" name="$2"
+	local can_push="$3"
+	[ -f "$dir/branch" ] || die "$dir is not a server-setup pack"
+	trap 'rm -rf "$dir"' EXIT
+	valid_name "$name" || die "$name is not a public DNS name"
+	local hal="$HOME/hal" branch origin
+	branch="$(cat "$dir/branch")"
+	origin="$(cat "$dir/origin")"
+	detect
 	step "Hal checkout in $hal"
 	local changed=no old=""
 	if [ -d "$hal/.git" ]; then
@@ -357,9 +375,8 @@ $web"
 	fi
 }
 
-if [ "${1:-}" = --remote ]; then
-	shift
-	run_remote "$@"
-else
-	run_local "$@"
-fi
+case "${1:-}" in
+	--prepare) run_prepare ;;
+	--remote) shift; run_remote "$@" ;;
+	*) run_local "$@" ;;
+esac
