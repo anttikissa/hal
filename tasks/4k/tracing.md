@@ -10,8 +10,6 @@ import type { Plugin } from '../src/host/plugins.ts'
 import { redrawTrace } from '../src/client/redraw-trace.ts'
 
 export default (plugin: Plugin) => {
-  // This machine's remote terminal client only, not its host.
-  if (process.argv[2] !== '-r') return
   plugin.onChange(({ phase }) => {
     if (phase === 'activate') {
       mkdirSync(new URL('../state/', import.meta.url), { recursive: true, mode: 0o700 })
