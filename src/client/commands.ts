@@ -1,10 +1,10 @@
-// The terminal's side of the command list (common/commands/list.ts):
-// client-only commands run here from src/client/commands/<name>.ts,
+// Runs the terminal's side of the command list (common/commands/list.ts).
+// Client-only commands run here from src/client/commands/<name>.ts,
 // typed or by key, and never reach the host. The tab keys (new, close,
-// resume) also run here, sending the tab command unrecorded; typed,
+// resume) also run here and send the tab command unrecorded; typed,
 // those are host commands. Any other host command's key sends
-// `/<name>` as if typed. The emergency keys never get here
-// (client/terminal.ts takes them from raw stdin).
+// `/<name>` as if typed. The emergency keys never get here:
+// client/terminal.ts takes them from raw stdin.
 
 import { commandList } from '../common/commands/list.ts'
 import { drafts } from '../common/drafts.ts'

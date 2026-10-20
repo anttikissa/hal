@@ -1,4 +1,5 @@
-// Terminal rendering of shared semantic diff tones (task k8y).
+// Draws the shared semantic diff tones (common/diff.ts) in the terminal
+// (task k8y).
 import { colors, type Style } from '../common/colors.ts'
 import { diff, type DiffTone } from '../common/diff.ts'
 import { ansi } from './ansi.ts'

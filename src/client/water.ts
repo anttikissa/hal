@@ -1,5 +1,5 @@
-// High-water marks: streaming blocks and call cards never shrink until
-// the next full redraw. The marks live in frame.state.peaks. Tasks: fn.
+// Keeps streaming blocks and call cards from shrinking until the next
+// full redraw, with high-water marks in frame.state.peaks. Tasks: fn.
 import type { Item } from '../common/transcript.ts'
 import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'

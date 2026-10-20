@@ -1,6 +1,6 @@
-// Tool calls and their results as the terminal draws them (tasks wm0,
-// ghs, 4y4, hyt): short is settings.shortRows() rows, title included
-// (bash-card.ts for Bash's), long all of them. Pure.
+// Draws tool calls and their results in the terminal (tasks wm0, ghs,
+// 4y4, hyt). A short view is settings.shortRows() rows, title included
+// (bash-card.ts draws Bash's); a long view shows all rows. Pure.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'

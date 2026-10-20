@@ -1,11 +1,12 @@
 // The client's terminal: raw mode, input, and the emergency keys.
 //
 // Every stdin chunk is scanned for Ctrl-C (quit), Ctrl-Z (suspend) and
-// Ctrl-R (restart) before it reaches the key decoder, and they are handled
+// Ctrl-R (restart) before it reaches the key decoder. They are handled
 // right there, synchronously, without asking the host. Quit and restart
 // restore the terminal but never clear it, so the last frame stays on
-// screen but its last row, which the shell prompt takes; restart exits with restartCode, which ./run answers by starting
-// again. See the invariants in tasks/README.md.
+// screen except its last row, which the shell prompt takes. Restart
+// exits with restartCode, which ./run answers by starting again. See the
+// invariants in tasks/README.md.
 import { emergency, type EmergencyAction, type EmergencyState } from '../common/emergency.ts'
 import { userQuit } from '../common/user-quit.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'

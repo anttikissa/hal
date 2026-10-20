@@ -1,10 +1,11 @@
-// The help row, the chrome's last row (task p0): always exactly one
-// row, so the prompt never jumps when what it says changes. In
-// priority order: the keys of an open question, the hint while editing
-// the last prompt, tab completion's choices, else the key hints for
-// the session's state (sendKeys.hints, shared with the web; then 'ctrl-r: reload' when a new commit
-// is checked out) with '/keys: shortcuts' at the right. Keys in
-// the help key color, descriptions in its description color, as in
+// The help row tells the user which keys work now. It is the chrome's
+// last row (task p0) and always exactly one row, so the prompt never
+// jumps when its text changes. In priority order it shows: the keys of
+// an open question, the hint while editing the last prompt, tab
+// completion's choices, else the key hints for the session's state
+// (sendKeys.hints, shared with the web; then 'ctrl-r: reload' when a new
+// commit is checked out) with '/keys: shortcuts' at the right. Keys are
+// in the help key color, descriptions in its description color, as in
 // the old Hal. Pure.
 
 import { colors } from '../common/colors.ts'

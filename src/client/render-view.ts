@@ -1,4 +1,5 @@
-// Builds terminal frames and schedules incremental paints and canonical rebuilds.
+// Builds terminal frames and schedules incremental paints and canonical
+// rebuilds.
 import { frame, type View } from './frame.ts'
 import { frameLayout } from './frame-layout.ts'
 import { render } from './render.ts'

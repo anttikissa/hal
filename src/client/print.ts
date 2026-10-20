@@ -1,6 +1,7 @@
-// `hal -p`: one user prompt in a new or existing session, then its
-// turn's final answer on stdout. Inbox receipt identifies the owning
-// turn, so queued prompts do not return an unrelated running reply.
+// `hal -p`: runs one user prompt in a new or existing session, then
+// prints its turn's final answer on stdout. The inbox receipt names the
+// turn that owns the prompt, so a queued prompt never returns the reply
+// of another running turn.
 // Tasks: gw, 81y.
 
 import { connection } from '../common/connection.ts'

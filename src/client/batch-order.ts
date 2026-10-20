@@ -1,5 +1,5 @@
-// The order the terminal draws a transcript's tool batches in
-// (frameLayout.layout).
+// Decides the order in which the terminal draws a transcript's tool
+// batches (frameLayout.layout).
 
 import type { Item } from '../common/transcript.ts'
 

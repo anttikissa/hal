@@ -1,10 +1,10 @@
-// The system clipboard's text, for Cmd-C, Cmd-X and Ctrl-V, and its
-// image for Ctrl-V (task zc). Writes go
-// to pbcopy on macOS and wl-copy or xclip on Linux; over SSH (SSH_TTY
-// set) they go as OSC 52 to the terminal instead, which puts them on
-// the user's own machine. Reads use pbpaste, wl-paste or xclip, and
-// spawn only when asked (never at startup). Neither ever throws: a
-// missing tool or a failure comes back as a notice for the prompt.
+// Connects the terminal to the system clipboard: its text for Cmd-C,
+// Cmd-X and Ctrl-V, and its image for Ctrl-V (task zc). Writes go to
+// pbcopy on macOS and wl-copy or xclip on Linux. Over SSH (SSH_TTY set)
+// they go as OSC 52 to the terminal instead, which puts them on the
+// user's own machine. Reads use pbpaste, wl-paste or xclip, and spawn
+// only when asked (never at startup). Neither ever throws: a missing
+// tool or a failure comes back as a notice for the prompt.
 
 import { terminal } from './terminal.ts'
 

@@ -1,8 +1,8 @@
-// The one pulse every blink in the terminal follows (the Hal cursor,
-// later the tab indicators). Blink beats stay on wall-clock quarter
-// seconds; a live tool can also request finer frame boundaries. The
-// timer runs only while someone keeps it and the renderer writes only
-// rows that changed.
+// Keeps every blink in the terminal in step: all follow this one pulse
+// (the Hal cursor, later the tab indicators). Blink beats stay on
+// wall-clock quarter seconds; a live tool can also request finer frame
+// boundaries. The timer runs only while someone keeps it and the
+// renderer writes only rows that changed.
 
 // The beat now: a count of `ms()` periods since the epoch.
 function beat(): number {

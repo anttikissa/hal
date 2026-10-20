@@ -1,6 +1,6 @@
-// What the terminal client shows: the frame's View derived from the
-// app state (client/app.ts), the status row's facts and the words for
-// a session's state. Reads only; app.show() paints it.
+// Derives what the terminal client shows from the app state
+// (client/app.ts): the frame's View, the status row's facts and the
+// words for a session's state. Reads only; app.show() paints it.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors } from '../common/colors.ts'

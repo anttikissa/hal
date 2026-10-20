@@ -1,10 +1,10 @@
 // The status row between the prompt box and the help row (task 1g),
 // after the old Hal's renderStatusLine. Left, joined with ' · ': the
-// session id (and its name), the cwd, the model and the context used;
-// right-aligned: this process's role (or the remote host) and the
-// subscription account's usage windows, after any differing
-// portable plugins (task b81). When the row is too narrow
-// the right parts go from the end, then cwd and model share the space. Pure.
+// session id (and its name), the cwd, the model and the context used.
+// Right-aligned: this process's role (or the remote host) and the
+// subscription account's usage windows, after any differing portable
+// plugins (task b81). When the row is too narrow, the right parts go
+// from the end, then cwd and model share the space. Pure.
 
 import { settings } from '../common/settings.ts'
 import { titles } from '../common/titles.ts'

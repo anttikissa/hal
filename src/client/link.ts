@@ -1,5 +1,5 @@
-// The terminal's (and a peer's) transport to its home's host, whoever
-// that is, for the common connection (src/common/connection.ts). Each
+// Connects the terminal (or a peer) to its home's host, whoever that
+// is, for the common connection (src/common/connection.ts). Each
 // attempt becomes host if nobody is, and then talks to the host in this
 // process through the same protocol (in-process); else it connects to
 // the host socket (Unix socket, line-delimited ASON).

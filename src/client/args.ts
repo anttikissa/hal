@@ -1,5 +1,6 @@
-// Command-line arguments: declared once and parsed purely before Hal
-// starts; help is a handwritten string. Tasks: cb, 81y, 100.
+// Parses command-line arguments in one place, before Hal starts. Each
+// is declared once and parsed purely; help is a handwritten string.
+// Tasks: cb, 81y, 100.
 
 import type { Delivery } from '../common/protocol.ts'
 

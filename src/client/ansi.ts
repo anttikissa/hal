@@ -1,5 +1,6 @@
-// Escape codes and row primitives the frame is built from: styles to
-// SGR, padded and painted rows, links, and text made safe to show.
+// Keeps terminal escape codes in one place, so the frame is built from
+// named row primitives: styles to SGR, padded and painted rows, links,
+// and text made safe to show.
 
 import { attachments } from '../common/attachments.ts'
 import { colors, type Style } from '../common/colors.ts'

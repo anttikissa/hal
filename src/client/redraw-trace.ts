@@ -1,6 +1,7 @@
-// Opt-in client diagnostics (task 4k). A local plugin calls start(path); nothing
-// imports or enables this on the normal path. Only geometry and fixed
-// cause labels are recorded, never frame strings or host/client identity.
+// Records why the terminal redraws, as opt-in client diagnostics (task
+// 4k). A local plugin calls start(path); nothing imports or enables this
+// on the normal path. Only geometry and fixed cause labels are recorded,
+// never frame strings or host/client identity.
 import { closeSync, constants, fchmodSync, fstatSync, openSync, writeSync } from 'fs'
 import { app } from './app.ts'
 import { ansi } from './ansi.ts'

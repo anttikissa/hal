@@ -1,7 +1,8 @@
-// The terminal prompt's Up, Down and Escape before the editor's own:
-// editing the last prompt (common/amend.ts), then input history
-// (common/recall.ts); and the system clipboard's keys (clipboard.ts). Each takes the app's state and changes it in
-// place; true if the key was handled.
+// Handles the terminal prompt's Up, Down and Escape before the editor
+// does: editing the last prompt (common/amend.ts), then input history
+// (common/recall.ts). Also handles the system clipboard's keys
+// (clipboard.ts). Each handler takes the app's state and changes it in
+// place; it returns true if it handled the key.
 
 import { amend, type Editing } from '../common/amend.ts'
 import { drafts } from '../common/drafts.ts'

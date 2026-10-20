@@ -4,10 +4,10 @@
 // marks this client to restart as soon as its host goes: the next link
 // change after the mark is the host leaving.
 //
-// The restart dialog (task ker), opened with `open` (app.open): the host
-// held /restart <scope> for flagged calls (restart-ask), or (`now`)
-// Ctrl-R in the host's terminal found some. A `both` this client typed
-// follows the host only on Restart anyway.
+// The restart dialog (task ker) opens with `open` (app.open) when the
+// host held /restart <scope> because of flagged calls (restart-ask), or,
+// with `now`, when Ctrl-R in the host's terminal found flagged calls. A
+// `both` this client typed follows the host only on Restart anyway.
 
 import { modals, type FlaggedCall, type ModalAction, type ModalState } from '../../common/modals.ts'
 import { terminal } from '../terminal.ts'

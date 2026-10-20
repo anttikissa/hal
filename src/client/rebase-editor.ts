@@ -1,4 +1,6 @@
-// The files and editor belong to this client, including remote terminals (tasks 7ke, svt).
+// Lets the user edit a rebase plan in their own editor ($VISUAL, $EDITOR
+// or vi). The files and editor belong to this client, including remote
+// terminals (tasks 7ke, svt).
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'

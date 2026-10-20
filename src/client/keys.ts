@@ -1,9 +1,10 @@
-// Terminal key decoding: raw stdin bytes in, KeyEvents out.
+// Turns raw stdin bytes into KeyEvents, so the rest of the client never
+// sees escape sequences.
 //
 // Incremental: a chunk may end inside a UTF-8 character, an escape
 // sequence or a bracketed paste; the tail waits in the decoder state for
 // the next chunk. A trailing lone ESC is ambiguous (Escape key or the
-// start of a sequence), so it waits too — the caller calls flush() after
+// start of a sequence), so it waits too - the caller calls flush() after
 // a short idle to turn it into Escape.
 //
 // Unsupported sequences (unknown CSI, mouse, OSC/DCS replies, F-keys...)

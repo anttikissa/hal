@@ -1,4 +1,4 @@
-// Terminal adapter for the shared find modal and block navigation.
+// Connects the shared find modal and block navigation to the terminal.
 import { backfill } from '../common/backfill.ts'
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'

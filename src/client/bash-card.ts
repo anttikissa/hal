@@ -1,5 +1,6 @@
-// The short Bash card's command in the terminal (task hyt): in the
-// output's color, after the title when it fits, else on its own rows.
+// Draws the command on the short Bash card in the terminal (task hyt):
+// in the output's color, after the title when it fits, else on its own
+// rows.
 // A one-line command too long for its room scrolls once from its start
 // to its end as its call appears live; a multi-line one shows its first
 // and last lines joined by ↵. Pure.

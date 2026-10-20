@@ -1,4 +1,5 @@
-// Terminal adapter for the shared protected queue editor (task jsg).
+// Connects the shared protected queue editor (common/queue-edit.ts) to
+// the terminal prompt's keys (task jsg).
 import { queueEdit } from '../common/queue-edit.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'

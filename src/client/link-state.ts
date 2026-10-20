@@ -1,8 +1,9 @@
-// The terminal hears the link change (task r6). Every connection brings
-// the tabs; tab-start asks the host to name the tab to show: the focused
-// one if any, else the start's. Before the first join nothing was lost,
-// so no "host lost": a join slower than joiningMs says it is connecting
-// (deciding host or peer, or dialing a remote host).
+// Reacts when the terminal's link to the host changes (task r6). Every
+// connection brings the tabs; tab-start asks the host to name the tab
+// to show: the focused one if any, else the start's. Before the first
+// join nothing was lost, so it never says "host lost"; a join slower
+// than joiningMs says it is connecting (deciding host or peer, or
+// dialing a remote host).
 
 import { connection, type LinkState } from '../common/connection.ts'
 import { queueEdit } from '../common/queue-edit.ts'

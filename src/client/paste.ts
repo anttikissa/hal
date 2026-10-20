@@ -1,12 +1,12 @@
-// Pastes that become attachments in the terminal (task zc): an image on
-// the clipboard (Ctrl-V), a pasted line that is the path of an image or
-// text file (a drop; the same files the web attaches, common
-// attachments.fileKind), and text longer than settings.pasteLines(). Each is sent with an
-// `attach` command and stands in the prompt as a placeholder until the
-// host answers (common/uploads.ts). The command goes after the caller
-// has put the placeholder in the prompt: the host process's own
-// connection answers synchronously, and an answer before the
-// placeholder is there would have nothing to replace (task qy).
+// Turns some pastes in the terminal into attachments (task zc): an
+// image on the clipboard (Ctrl-V), a pasted line that is the path of an
+// image or text file (a drop; the same files the web attaches, common
+// attachments.fileKind), and text longer than settings.pasteLines().
+// Each is sent with an `attach` command and stands in the prompt as a
+// placeholder until the host answers (common/uploads.ts). The command
+// goes after the caller has put the placeholder in the prompt: the host
+// process's own connection answers synchronously, and an answer before
+// the placeholder is there would have nothing to replace (task qy).
 
 import { readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'

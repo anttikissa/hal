@@ -1,6 +1,6 @@
-// The terminal's local copy of each session's draft and unacknowledged
-// prompts (common/drafts.ts): one ASON file per session in dir(), so
-// typed text outlives a lost host and a crash of this process. Written
+// Keeps typed text when the host is lost or this process crashes: the
+// terminal's local copy of each session's draft and unacknowledged
+// prompts (common/drafts.ts), one ASON file per session in dir(). Written
 // atomically (temp file + rename) on every change; a session with
 // nothing to keep has no file.
 
