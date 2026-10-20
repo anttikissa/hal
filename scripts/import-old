@@ -1,3 +1,4 @@
 #!/bin/bash
-# usage: scripts/import-old <old-state> <new-home>  (task 3q)
+# Imports the old Hal's sessions into a Hal home (task 3q).
+# usage: scripts/import-old <old-state> <new-home>
 exec bun "$(dirname "$0")/../src/import-old.ts" "$@"

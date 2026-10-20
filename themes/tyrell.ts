@@ -1,9 +1,9 @@
+// Blade Runner (1982): blue-black night, hot pink neon for Hal, neon
+// cyan for you, amber warnings.
 import { render } from '../src/client/render.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
-// Blade Runner (1982): blue-black night, hot pink neon for Hal, neon
-// cyan for you, amber warnings.
 export const look: Look = {
 	screen: [0.15, 0.035, 275],
 	fgL: 0.8,

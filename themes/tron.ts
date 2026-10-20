@@ -1,9 +1,9 @@
+// Tron (1982): cyan light lines on black, orange for Hal (the other
+// side of the grid), cards barely tinted: lines on black.
 import { render } from '../src/client/render.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
-// Tron (1982): cyan light lines on black, orange for Hal (the other
-// side of the grid), cards barely tinted: lines on black.
 export const look: Look = {
 	screen: [0.12, 0, 0],
 	fgL: 0.85,

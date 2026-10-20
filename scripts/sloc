@@ -1,5 +1,7 @@
 #!/bin/bash
-# usage: scripts/sloc <git-dir> <rev>  -> non-blank, non-comment lines in non-test .ts/.tsx files
+# Measures code size: counts non-blank, non-comment lines in non-test
+# .ts/.tsx files.
+# usage: scripts/sloc <git-dir> <rev>
 cd "$1"
 git ls-tree -r --name-only "$2" | grep -E '\.(ts|tsx)$' | grep -vE '(\.test\.tsx?$|/tests?/|test-|\.d\.ts$|^tasks/|^docs/)' | while read f; do git show "$2:$f"; echo; done |
 awk '

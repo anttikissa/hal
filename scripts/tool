@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// The model's view for a human (task 2m1): prints the system prompt Hal
+// Shows a human what the model sees (task 2m1): prints the system prompt Hal
 // would send for this directory, then runs typed tool calls (BASH "ls",
 // READ a.ts, HELP...) through the real tool modules and prints what the
 // model would get. An incomplete call continues on the next line; an

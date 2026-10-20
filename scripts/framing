@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
-// The share of provider input Hal adds (task qtg): headers, <meta>
-// lines, notices, missing tool results. Replays each history twice:
-// as is, and with every text the user, model or a tool wrote emptied;
-// what the second replay still holds is framing. Sizes in characters;
-// images and thinking signatures are not counted. No provider calls.
+// Measures how much of the provider input Hal adds itself (task qtg):
+// headers, <meta> lines, notices, missing tool results. Replays each
+// history twice: as is, and with every text the user, model or a tool
+// wrote emptied; what the second replay still holds is framing. Sizes in
+// characters; images and thinking signatures are not counted. No provider
+// calls.
 import type { HistoryRecord } from '../src/common/replay.ts'
 import type { Message } from '../src/common/blocks.ts'
 import { replay } from '../src/common/replay.ts'

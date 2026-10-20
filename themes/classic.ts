@@ -1,9 +1,9 @@
+// Classic: Hal's built-in look before Nostromo's became it. Orange
+// replies, a bright blue user card, a blue-gray screen.
 import { render } from '../src/client/render.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
-// Classic: Hal's built-in look before Nostromo's became it. Orange
-// replies, a bright blue user card, a blue-gray screen.
 export const look: Look = {
 	screen: [0.16, 0.01, 260],
 	fgL: 0.85,

@@ -1,8 +1,8 @@
+// Alien (1979): amber text, green phosphor for you, brown-black screen.
 import { render } from '../src/client/render.ts'
 import { colors, type Look } from '../src/common/colors.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
-// Alien (1979): amber text, green phosphor for you, brown-black screen.
 export const look: Look = {
 	screen: [0.15, 0.015, 85],
 	fgL: 0.84,

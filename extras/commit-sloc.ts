@@ -1,8 +1,9 @@
-// Rewrites each commit card file row to the code lines (non-blank,
-// non-comment) the commit added and removed, and tags the card title and
-// tells the model the net code lines over source files by scripts/sloc
-// rules (non-test .ts/.tsx). Tests, tasks and other text files keep their
-// rows but stay out of the total; binary files are left as they are.
+// Shows the code lines a commit added and removed, on its commit card and
+// to the model. Each file row of the card shows its code lines (non-blank,
+// non-comment). The card title and the model get the net code lines over
+// source files, by scripts/sloc rules (non-test .ts/.tsx). Tests, tasks and
+// other text files keep their rows but stay out of the total; binary files
+// are left as they are.
 // Enable with plugins/commit-sloc.ts (see extras/README.md).
 //
 // Also rejects background Bash calls that commit: only a foreground call's

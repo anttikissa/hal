@@ -1,6 +1,7 @@
-// EDIT parser leniency for the models that need it (task ybg). A strict
-// EDIT failure from a listed model is retried after a text rewrite, one
-// per quirk; any other model, or an unknown one, gets the strict error.
+// Some models write EDIT calls that the strict parser rejects; this module
+// accepts them for those models only (task ybg). A strict EDIT failure
+// from a listed model is retried after a text rewrite, one per quirk; any
+// other model, or an unknown one, gets the strict error.
 // Each firing goes to state/diag.log with its model: delete a quirk once
 // the log shows no use, and this file once none is left.
 // Enable with plugins/edit-quirks.ts: export { default } from '../extras/edit-quirks.ts'

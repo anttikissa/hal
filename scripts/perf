@@ -1,3 +1,4 @@
 #!/bin/bash
-# usage: scripts/perf [scale]  (task te; generated data, never real)
+# Measures Hal's performance on generated data, never real (task te).
+# usage: scripts/perf [scale]
 exec bun "$(dirname "$0")/../src/perf/run.ts" "$@"

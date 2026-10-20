@@ -1,5 +1,6 @@
-// Records real Anthropic SSE streams for src/e2e.test.ts's fake server:
-// a text reply and a tool call. Run by hand: bun scripts/record-anthropic.ts
+// Records real Anthropic SSE streams, so src/e2e.test.ts's fake server
+// replays real responses: a text reply and a tool call. Run by hand:
+// bun scripts/record-anthropic.ts
 import { writeFileSync } from 'fs'
 import { anthropic } from '../src/host/anthropic.ts'
 import { nativeTool } from '../src/host/native-tool.ts'
