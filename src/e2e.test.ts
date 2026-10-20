@@ -366,3 +366,24 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)
+
+test('a peer that takes over keeps tabs and names the old host changed after the peer started', async () => {
+	let open = () => (ason.parse(readFileSync(`${home}/state/tabs.ason`, 'utf8')) as any).open as string[]
+	let name = (id: string) => (ason.parse(readFileSync(`${home}/sessions/${id}/session.ason`, 'utf8')) as any).name
+	let a = run()
+	await until('the first host', hostReady)
+	let b = run()
+	await until('the joining peer', () => seen(b, 'peer'))
+	type(a, '/new\r')
+	await until('the new tab on disk', () => existsSync(`${home}/state/tabs.ason`) && open().length === 2)
+	let [, added] = open()
+	type(a, '/rename Kept after takeover\r')
+	await until('the name on disk', () => name(added!) === 'Kept after takeover')
+
+	type(a, '\x03')
+	await until('the host to quit', () => a.exit !== undefined)
+	type(b, '/new\r') // a write by the new host
+	await until('the new host to add a tab', () => open().length === 3)
+	expect(open()).toContain(added)
+	expect(name(added!)).toBe('Kept after takeover')
+}, 30_000)
