@@ -170,11 +170,11 @@ browserTest(
 				await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
 				await input('My separate draft')
 				let geometry = await b.evaluate(
-					`(() => { let cards = [...document.querySelectorAll('.Card.queued')]; return { overflow: document.documentElement.scrollWidth > innerWidth + 1, edits: cards.map(c => { let e = c.querySelector('.edit').getBoundingClientRect(), r = c.querySelector('.link')?.getBoundingClientRect(); return { width: e.width, height: e.height, overlap: !!r && e.right > r.left + 1, within: e.bottom <= c.getBoundingClientRect().bottom + 1 }; }) }; })()`,
+					`(() => { let cards = [...document.querySelectorAll('.Card.queued')]; return { overflow: document.documentElement.scrollWidth > innerWidth + 1, edits: cards.map(c => { let e = c.querySelector('.edit').getBoundingClientRect(), r = c.querySelector('.link')?.getBoundingClientRect(); return { width: e.width, compact: e.height === 22 + parseFloat(getComputedStyle(c).lineHeight) / 2, overlap: !!r && e.right > r.left + 1, within: e.bottom <= c.getBoundingClientRect().bottom + 1 }; }) }; })()`,
 				)
 				expect(geometry.overflow).toBe(false)
 				for (let control of geometry.edits)
-					expect(control).toMatchObject({ width: 44, height: 44, overlap: false, within: true })
+					expect(control).toMatchObject({ width: 44, compact: true, overlap: false, within: true })
 				await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
 				await b.waitFor(
 					`!!document.querySelector('.EditBar') && document.querySelector('textarea').value.startsWith('First queued')`,

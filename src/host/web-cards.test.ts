@@ -80,7 +80,7 @@ browserTest(
 			).toBe(5)
 			let shot = async (name: string) => {
 				await b.evaluate(
-					`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+					`Promise.all(document.getAnimations().filter(a => a.timeline === document.timeline && a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
 				)
 				writeFileSync(
 					`/tmp/hal-172-ink-disclosure-${name}.png`,
@@ -90,7 +90,7 @@ browserTest(
 			let rotate = async (selector: string) => {
 				await b.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)
 				await b.evaluate(
-					`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+					`Promise.all(document.getAnimations().filter(a => a.timeline === document.timeline && a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
 				)
 			}
 			await shot('start')
@@ -217,12 +217,12 @@ browserTest(
 					)
 					await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 					let geometry = await b.evaluate(
-						`Array.from(document.querySelectorAll('.Transcript > .Card, .Transcript > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position }; })`,
+						`Array.from(document.querySelectorAll('.Transcript > .Card, .Transcript > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position === 'sticky', tall:c.matches('.tall, .Question') }; })`,
 					)
 					expect(geometry.length).toBeGreaterThanOrEqual(10)
-					expect(
-						geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === 'sticky'),
-					).toBe(true)
+					expect(geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === c.tall)).toBe(
+						true,
+					)
 					expect(
 						Math.max(...geometry.map((c: any) => c.x)) - Math.min(...geometry.map((c: any) => c.x)),
 					).toBeLessThanOrEqual(1)

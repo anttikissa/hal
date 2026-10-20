@@ -65,7 +65,7 @@ browserTest(
 					if (open) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
 					await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
 					let rows = await b.evaluate(
-						`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector('.status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector('.status').textContent, title: h.querySelector('.title').textContent }; })`,
+						`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector(':scope > .status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, compactHeight: 22 + parseFloat(getComputedStyle(h).lineHeight) / 2, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector(':scope > .status').textContent, title: h.querySelector('.title').textContent }; })`,
 					)
 					for (let row of rows) {
 						expect(row.fits).toBe(true)
@@ -76,7 +76,7 @@ browserTest(
 							expect(row.flowWidth).toBeGreaterThan(width! / 2)
 						} else {
 							expect(row.flowWidth).toBeGreaterThan(row.statusWidth)
-							expect(row.rowHeight).toBe(44)
+							expect(row.rowHeight).toBe(row.compactHeight)
 						}
 					}
 					expect(rows[1].stats).toContain('120')
@@ -230,7 +230,7 @@ browserTest('foreground and background Bash share header status without losing o
 			let headers = await b.evaluate(
 				`Array.from(document.querySelectorAll('.Card > .CardHeader'), h => ({ status: h.querySelector(':scope > .status:not(.line-count)').textContent, beforeLink: h.querySelector(':scope > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`,
 			)
-			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1)'])
+			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1, 1 line)'])
 			expect(headers.every((h: any) => h.beforeLink && h.fits && h.exit === 'exit 1')).toBe(true)
 		}
 		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
@@ -243,7 +243,7 @@ browserTest('foreground and background Bash share header status without losing o
 			'#t1',
 		)
 		expect(await b.evaluate(`document.querySelector('.Card.background-result .label').textContent`)).toBe(
-			'$ printf example',
+			'Output of t1: $ printf example',
 		)
 		expect(
 			await b.evaluate(
@@ -251,7 +251,7 @@ browserTest('foreground and background Bash share header status without losing o
 			),
 		).toBe(true)
 		await b.evaluate(
-			`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
+			`Promise.all(document.getAnimations().filter(a => a.timeline === document.timeline && a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`,
 		)
 		let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
 		writeFileSync('/tmp/hal-shared-bash-header.png', Buffer.from(screenshot.result.data, 'base64'))

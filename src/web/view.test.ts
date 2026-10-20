@@ -154,12 +154,12 @@ test('the open question is filled in with browser keys and answered; afterwards 
 	expect(shown(st)).toEqual([{ kind: 'question warning', text: '    rm -rf x\n\n  yes' }])
 })
 
-test('Up on an empty input while the model works edits the last prompt; Enter sends it, Down or Escape continues', () => {
+test('Up while the model works edits the last prompt, whatever the input holds; Enter sends it, Down or Escape continues', () => {
 	let running = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'running', phase: 'streaming' } } },
 		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake', n: 5 },
 	])
-	expect(view.editKey(running, 'up', 'draft')).toBeUndefined()
+	expect(view.editKey(running, 'up', 'draft')).toMatchObject({ text: 'fix ti' })
 	let up = view.editKey(running, 'up', '')!
 	expect(up).toMatchObject({ command: { type: 'pause', sessionId }, text: 'fix ti' })
 	let editing = fold([{ type: 'state', sessionId, state: { type: 'paused' } }], up.view)

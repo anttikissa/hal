@@ -221,7 +221,7 @@ function parts(st: RebaseState, row: RebaseRow): Part[] {
 			}
 		else if (r.type === 'assistant') {
 			let b = r.block
-			// Bash's lines start with its $ command; other tools' with the rest.
+			// Bash's lines start with its command; other tools' with the rest.
 			let lines = b.type === 'tool_call' || b.type === 'hosted_tool' ? toolDetails.lines(b.name, b.input) : []
 			if (b.type === 'tool_call' || b.type === 'hosted_tool')
 				text('call', (b.name === 'bash' ? lines : [toolDetails.headline(b.name, b.input).text, ...lines]).join('\n'))

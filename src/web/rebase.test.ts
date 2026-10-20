@@ -136,7 +136,7 @@ test('an opened row shows readable parts, not JSON', () => {
 	let st = start()
 	let parts = rebaseView.parts(st, st.snapshot.rows[2]!)
 	expect(parts.map((p) => (p.kind === 'text' ? [p.label, p.text.slice(0, 8)] : p.kind))).toEqual([
-		['call', '$ ./test'],
+		['call', './test'],
 		['output', 'xxxxxxxx'],
 	])
 })

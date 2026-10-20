@@ -91,7 +91,7 @@ test('a block that is in no page gives up with a notice once every page is in', 
 	app.onEvent(snapshot(late, 100))
 	app.onEvent({ type: 'history', sessionId, before: 100, records: early } as Event)
 	expect(app.state.target).toBeUndefined()
-	expect(app.notice()).toContain('#99')
+	expect(app.notice()).toBe('no block 99 in this session')
 	expect(sent.filter((c) => c.type === 'history')).toHaveLength(1)
 })
 
@@ -102,7 +102,7 @@ test('a dropped record link says why without fetching pages; undo makes it linka
 	snap.snapshot.dropped = [3]
 	app.onEvent(snap)
 	expect(app.state.target).toBeUndefined()
-	expect(app.notice()).toBe('Block #3.1 was dropped by rebase.')
+	expect(app.notice()).toBe('Block 3.1 was dropped by rebase.')
 	expect(sent.filter((c) => c.type === 'history')).toEqual([])
 	app.onEvent(snapshot([...early, ...late]))
 	address = `http://h/${sessionId}#3`

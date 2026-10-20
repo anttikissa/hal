@@ -91,10 +91,19 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
 	// The call the session runs now: its card ticks (task hyt).
-	let running = () => {
-		let st = props.view.transcript?.state
-		return st?.type === 'running' && st.phase === 'tools' && st.call ? { call: st.call, since: st.since } : undefined
-	}
+	// Cards read these memos, not props.view, which changes with every
+	// streamed delta: thousands of card bindings would re-run each time.
+	let running = createMemo(
+		() => {
+			let st = props.view.transcript?.state
+			return st?.type === 'running' && st.phase === 'tools' && st.call ? { call: st.call, since: st.since } : undefined
+		},
+		{ equals: (a, b) => a?.call === b?.call && a?.since === b?.since },
+	)
+	let session = createMemo(id)
+	let blocks = createMemo(() => forms.cards(props.view.form, props.view.transcript?.meta.blocks))
+	let queueHold = createMemo(() => props.view.transcript?.queueHold)
+	let formId = createMemo(() => props.view.form?.id)
 	// Otherwise its own line after the last row, before waiting and
 	// pending messages: the cursor is the work now, they the future.
 	let line = () => (
@@ -107,7 +116,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
 	// One queued message is edited at a time, in one window.
 	let editableWaiting = (r: Row) =>
-		!props.view.transcript?.queueHold &&
+		!queueHold() &&
 		r.note !== undefined &&
 		r.item.type === 'prompt' &&
 		r.item.from === undefined &&
@@ -126,7 +135,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		(i) => void (i >= 0 && setStart(i)),
 	)
 	createEffect(shown, () => void requestAnimationFrame(check))
-	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
+	let open = (row: Row) => (row.item.type === 'question' && formId() === row.item.id ? row.item : undefined)
 	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
@@ -138,14 +147,14 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 							fallback={
 								<Card
 									row={row()}
-									session={props.view.transcript?.meta.id ?? ''}
-									blocks={forms.cards(props.view.form, props.view.transcript?.meta.blocks)}
+									session={session()}
+									blocks={blocks()}
 									running={running()}
 									cursor={cursorKey() === row().key}
 									target={hit() === row().key}
 									job={jobs().has(row().item.key) ? row().item.key : undefined}
 									edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
-									discard={row().note !== undefined && row().key !== props.view.transcript?.queueHold}
+									discard={row().note !== undefined && row().key !== queueHold()}
 									waiting={waiting}
 								/>
 							}

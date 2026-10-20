@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Invariant restored: .CardHeader .link has no min-width. Commit 9ad36a76 (task gwr) re-added min-width: 44px, padding short references like r48 by about 3ch; the ::after layer already gives the 44px target.',
-		'Invariant restored: an idle ticker (no live spinner) is display: none, so it adds no grid column gap; it stays in the DOM because removing header nodes mid-stream breaks a held selection (web.test select-all).'
+		'Invariant restored: an idle ticker (no live spinner) is display: none, so it adds no grid column gap; it stays in the DOM because removing header nodes mid-stream breaks a held selection (web.test select-all).',
+		'Bug fix (180-sag): the centered ::after tap layer stuck out past the right edge of the card, so every card with a header reference had scrollWidth > clientWidth and the overflow tests in web-cards, web-card-text and web-phone failed. Invariant restored: a header reference tap layer stays inside its card. It is anchored to the right of the reference and grows left only.'
 	],
 	needs: ['0z']
 }
