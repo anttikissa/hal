@@ -13,7 +13,7 @@ import type { ModalAction, ModalState, TreeRow } from './modals.ts'
 import { fuzzy } from './fuzzy.ts'
 import { titles } from './titles.ts'
 import { modals } from './modals.ts'
-import { effort, type EffortCapability, type EffortLevel } from './effort.ts'
+import { effortLevels, type EffortCapability, type EffortLevel } from './effort-levels.ts'
 import { modelAliases } from './model-aliases.ts'
 
 // The ids matching `query`, best first; ties keep the given order,
@@ -423,12 +423,14 @@ function level(st: ModalState, id: string): string | undefined {
 	let cap = st.tree?.capabilities?.[id]
 	let asked = st.tree?.searchEffort ?? st.tree?.effort
 	let draft = (asked === 'ultra' ? 'max' : asked) as EffortLevel | undefined
-	return draft && effort.levels.includes(draft) && cap?.levels.length ? effort.closest(cap.levels, draft) : undefined
+	return draft && effortLevels.levels.includes(draft) && cap?.levels.length
+		? effortLevels.closest(cap.levels, draft)
+		: undefined
 }
 // The effort choice of `id`'s row; '' without effort control.
 function label(st: ModalState, id: string): string {
 	let cap = st.tree?.capabilities?.[id]
-	return cap?.levels.length ? effort.label(cap, picker.level(st, id)) : ''
+	return cap?.levels.length ? effortLevels.label(cap, picker.level(st, id)) : ''
 }
 // The effort column's width: the widest choice of any model row, with
 // both chevrons, so moving and ←/→ never shift the columns.
@@ -437,7 +439,7 @@ function effortWidth(st: ModalState): number {
 	for (let r of st.tree?.rows ?? []) {
 		let cap = r.id ? st.tree?.capabilities?.[r.id] : undefined
 		if (!cap?.levels.length) continue
-		for (let l of [undefined, ...cap.levels]) widest = Math.max(widest, effort.label(cap, l).length + 4)
+		for (let l of [undefined, ...cap.levels]) widest = Math.max(widest, effortLevels.label(cap, l).length + 4)
 	}
 	return widest
 }

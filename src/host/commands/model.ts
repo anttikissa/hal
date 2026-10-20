@@ -4,7 +4,7 @@
 
 import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
-import { effort } from '../effort.ts'
+import { modelEffort } from '../model-effort.ts'
 import { host } from '../host.ts'
 import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
@@ -69,19 +69,19 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 		let id = colon ? (models.resolve(args.slice(0, colon)).id ?? args) : ctx.model
 		let level = args.slice(colon + 1)
 		if (!level) return `effort of ${id}`
-		let cap = effort.describe(id)
+		let cap = modelEffort.describe(id)
 		return level === 'default'
 			? `${id}: default (${cap?.policy ?? cap?.default ?? 'provider default'})`
 			: `${id}:${level}`
 	},
 	// Effort completions for `id`: default first, then its levels (task 7vt).
-	levels: (id: string) => ['default', ...(effort.describe(id)?.levels ?? [])],
+	levels: (id: string) => ['default', ...(modelEffort.describe(id)?.levels ?? [])],
 	run(args, _answers, ctx) {
 		if (!args) return { say: `model: ${models.qualified(ctx.model, ctx.effort)}`, open: 'models' }
 		// ":high" alone changes only the effort; a bare model keeps it.
 		let choice = models.selection(args.startsWith(':') ? ctx.model + args : args, ctx.effort)
 		if (!models.valid(choice.id)) return { error: `${args}: no such model (want provider/model; /model lists them)` }
-		let cap = effort.describe(choice.id)
+		let cap = modelEffort.describe(choice.id)
 		let fallback = cap?.policy ?? cap?.default
 		let cacheChanged =
 			ctx.model === choice.id &&

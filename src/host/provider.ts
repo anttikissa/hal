@@ -9,7 +9,7 @@ import { limits } from './limits.ts'
 import { usage } from './usage.ts'
 import { auth } from './auth.ts'
 import { statusUsage } from './status-usage.ts'
-import type { Capability } from './effort.ts'
+import type { Capability } from './model-effort.ts'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { tokenCalibration } from './token-calibration.ts'
 

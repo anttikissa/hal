@@ -15,7 +15,7 @@ import { provider as catalog } from './providers/openai.ts'
 import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
-import { effort } from './effort.ts'
+import { modelEffort } from './model-effort.ts'
 import { openaiWs } from './openai-ws.ts'
 import { tools } from './tools.ts'
 
@@ -116,7 +116,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 		b.reasoning = { summary: 'auto', ...(effort && { effort }) }
 		b.include = [...((b.include as string[] | undefined) ?? []), 'reasoning.encrypted_content']
 	}
-	Object.assign(b, effort.wire('openai', req.model, req.effort))
+	Object.assign(b, modelEffort.wire('openai', req.model, req.effort))
 	if (req.cacheId ?? req.sessionId) b.prompt_cache_key = req.cacheId ?? req.sessionId
 	if (codex) b.text = { verbosity: 'low' }
 	// The Codex backend rejects max_output_tokens.

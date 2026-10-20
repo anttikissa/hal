@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { effort } from './effort.ts'
+import { modelEffort } from './model-effort.ts'
 import { auth } from './auth.ts'
 import { useHost } from './host-fixture.test.ts'
 import { models } from './models.ts'
@@ -69,8 +69,8 @@ test('frontier bodies map validated explicit effort without changing default pol
 		summary: 'auto',
 		effort: 'none',
 	})
-	expect(() => effort.wire('anthropic', 'claude-sonnet-4-5', 'high', 10000)).toThrow('must be below')
-	expect(effort.wire('custom', 'unknown')).toEqual({})
+	expect(() => modelEffort.wire('anthropic', 'claude-sonnet-4-5', 'high', 10000)).toThrow('must be below')
+	expect(modelEffort.wire('custom', 'unknown')).toEqual({})
 })
 
 test('gateway metadata distinguishes missing/null effort values and mandatory thinking; endpoint hook reaches body', async () => {
@@ -92,9 +92,9 @@ test('gateway metadata distinguishes missing/null effort values and mandatory th
 		)
 	try {
 		await p.models!(new AbortController().signal)
-		expect(effort.describe('openrouter/missing')).toBeUndefined()
-		expect(effort.describe('openrouter/all')?.levels).not.toContain('none')
-		expect(effort.describe('openrouter/all')?.default).toBe('high')
+		expect(modelEffort.describe('openrouter/missing')).toBeUndefined()
+		expect(modelEffort.describe('openrouter/all')?.levels).not.toContain('none')
+		expect(modelEffort.describe('openrouter/all')?.default).toBe('high')
 		expect((await p.request({ model: 'limited', effort: 'low', messages: [] })).body).toMatchObject({
 			reasoning: { effort: 'low' },
 		})

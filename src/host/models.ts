@@ -46,8 +46,8 @@ import { modelsDev } from './models-dev.ts'
 import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 import { synthetic } from './synthetic.ts'
-import { effort } from './effort.ts'
-import { effort as vocabulary } from '../common/effort.ts'
+import { modelEffort } from './model-effort.ts'
+import { effortLevels } from '../common/effort-levels.ts'
 
 // One provider's model ids ("provider/model") and when they were got.
 type Listing = { at: number; ids: string[]; key?: string }
@@ -277,7 +277,7 @@ export const models = {
 		let parsed = blocks.parseModelId(id)
 		return (
 			selected ??
-			effort.describe(id)?.policy ??
+			modelEffort.describe(id)?.policy ??
 			(parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
 		)
 	},
@@ -291,12 +291,12 @@ export const models = {
 				let suffix = input.slice(colon + 1)
 				let candidate = input.slice(0, colon)
 				let alias = models.resolve(candidate)
-				if (suffix === 'default' || suffix === 'ultra' || vocabulary.levels.includes(suffix as any)) {
+				if (suffix === 'default' || suffix === 'ultra' || effortLevels.levels.includes(suffix as any)) {
 					base = candidate
 					level = suffix
 				} else if (models.known().includes(candidate) || alias.id !== candidate || alias.login)
 					throw new Error(
-						`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`,
+						`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? modelEffort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`,
 					)
 			}
 		}
@@ -304,7 +304,7 @@ export const models = {
 		if (!choice.id) throw new Error(`${base}: no access; ${choice.login} to use it`)
 		level ??= carry
 		if (!level || level === 'default') return { id: choice.id }
-		let snapped = effort.nearest(choice.id, level)
+		let snapped = modelEffort.nearest(choice.id, level)
 		return {
 			id: choice.id,
 			...(snapped.level && { effort: snapped.level }),

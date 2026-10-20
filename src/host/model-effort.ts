@@ -1,7 +1,7 @@
 // Says which reasoning-effort levels a model accepts and how a request
 // asks for one. One hook covers provider and model together, so a plugin
 // can override both in one place (task w7).
-import { effort as vocabulary, type EffortCapability, type EffortLevel } from '../common/effort.ts'
+import { effortLevels, type EffortCapability, type EffortLevel } from '../common/effort-levels.ts'
 import { blocks } from '../common/blocks.ts'
 import { provider as registry } from './provider.ts'
 
@@ -63,13 +63,13 @@ function capability(provider: string, model: string): Capability | undefined {
 
 function describe(id: string): EffortCapability | undefined {
 	let parsed = blocks.parseModelId(id)
-	let cap = parsed && effort.capability(parsed.provider, parsed.model)
+	let cap = parsed && modelEffort.capability(parsed.provider, parsed.model)
 	return cap
 		? { levels: cap.levels, ...(cap.default && { default: cap.default }), ...(cap.policy && { policy: cap.policy }) }
 		: undefined
 }
 function validate(id: string, level: string): EffortLevel {
-	let cap = effort.describe(id)
+	let cap = modelEffort.describe(id)
 	if (!cap?.levels.includes(level as EffortLevel))
 		throw new Error(
 			`${id}: unsupported effort '${level}'; allowed: ${cap?.levels.join(', ') || 'default only (no verified effort control)'}`,
@@ -83,14 +83,14 @@ function validate(id: string, level: string): EffortLevel {
 function nearest(id: string, asked: string): { level?: EffortLevel; note?: string } {
 	let ultra = asked === 'ultra'
 	let want = (ultra ? 'max' : asked) as EffortLevel
-	let rank = vocabulary.levels.indexOf(want)
+	let rank = effortLevels.levels.indexOf(want)
 	if (rank < 0)
 		throw new Error(
-			`${id}: unknown effort '${asked}'; use default or ${effort.describe(id)?.levels.join(', ') || 'no verified effort control'}`,
+			`${id}: unknown effort '${asked}'; use default or ${modelEffort.describe(id)?.levels.join(', ') || 'no verified effort control'}`,
 		)
-	let cap = effort.describe(id)
+	let cap = modelEffort.describe(id)
 	if (!cap?.levels.length) return { note: `${id} has no effort control; effort ${asked} dropped` }
-	let level = vocabulary.closest(cap.levels, want)!
+	let level = effortLevels.closest(cap.levels, want)!
 	let notes = [
 		ultra && 'ultra → max (Hal has no Ultra mode; ask for subagents in the prompt)',
 		level !== want && `${want} → ${level} (closest supported by ${id})`,
@@ -98,10 +98,10 @@ function nearest(id: string, asked: string): { level?: EffortLevel; note?: strin
 	return { level, ...(notes.length && { note: notes.join('; ') }) }
 }
 function wire(provider: string, model: string, selected?: string, maxTokens?: number): Record<string, unknown> {
-	let cap = effort.capability(provider, model)
+	let cap = modelEffort.capability(provider, model)
 	let level = selected ?? cap?.policy
 	if (level === undefined) return {}
-	effort.validate(`${provider}/${model}`, level)
+	modelEffort.validate(`${provider}/${model}`, level)
 	return cap!.wire(level as EffortLevel, maxTokens)
 }
-export const effort = { capability, describe, validate, nearest, wire }
+export const modelEffort = { capability, describe, validate, nearest, wire }

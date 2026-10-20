@@ -2,12 +2,12 @@
 // which levels each model supports; clients never guess.
 export type EffortLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type EffortCapability = { levels: EffortLevel[]; default?: EffortLevel; policy?: EffortLevel }
-export const effort = {
+export const effortLevels = {
 	levels: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as EffortLevel[],
 	// The level of `levels` nearest `want` by rank, ties rounding up
 	// (task 7vt); `want` itself when supported.
 	closest(levels: EffortLevel[], want: EffortLevel): EffortLevel | undefined {
-		let rank = (l: EffortLevel) => effort.levels.indexOf(l)
+		let rank = (l: EffortLevel) => effortLevels.levels.indexOf(l)
 		return [...levels].sort(
 			(a, b) => Math.abs(rank(a) - rank(want)) - Math.abs(rank(b) - rank(want)) || rank(b) - rank(a),
 		)[0]

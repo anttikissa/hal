@@ -2,7 +2,7 @@
 // state/effort-catalog.ason, so they survive a restart. Only the levels
 // are stored; the functions that shape requests (wire) are not.
 import { mkdirSync } from 'fs'
-import { effort, type EffortCapability } from '../common/effort.ts'
+import { effortLevels, type EffortCapability } from '../common/effort-levels.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
@@ -16,7 +16,7 @@ function read(): Record<string, EffortCapability> {
 			if (
 				!cap ||
 				!Array.isArray(cap.levels) ||
-				!cap.levels.every((l) => effort.levels.includes(l)) ||
+				!cap.levels.every((l) => effortLevels.levels.includes(l)) ||
 				(cap.default !== undefined && !cap.levels.includes(cap.default))
 			)
 				throw new Error(`${effortCatalog.file()}: invalid effort capability for ${id}`)

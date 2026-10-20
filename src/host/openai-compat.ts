@@ -4,10 +4,10 @@
 import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
-import { effort } from './effort.ts'
+import { modelEffort } from './model-effort.ts'
 import { compatCatalog } from './compat-catalog.ts'
 export type { Endpoint } from './compat-catalog.ts'
-import { effort as vocabulary, type EffortLevel } from '../common/effort.ts'
+import { effortLevels, type EffortLevel } from '../common/effort-levels.ts'
 import { effortCatalog } from './effort-catalog.ts'
 
 // `images`: whether the endpoint takes image input.
@@ -172,7 +172,7 @@ function create(name: string): Provider {
 				headers: { ...headers, ...ep?.headers?.(req) },
 				body: {
 					...openaiCompat.body(req, ep?.images !== false),
-					...effort.wire(name, req.model, req.effort, req.maxTokens),
+					...modelEffort.wire(name, req.model, req.effort, req.maxTokens),
 				},
 			}
 		},
@@ -202,7 +202,7 @@ function create(name: string): Provider {
 					openaiCompat.state.capabilities.delete(`${name}/${m.id}`)
 					continue
 				}
-				let levels = vocabulary.levels.filter(
+				let levels = effortLevels.levels.filter(
 					(l) =>
 						(supported === null || (Array.isArray(supported) && supported.includes(l))) &&
 						!(r?.mandatory && l === 'none'),

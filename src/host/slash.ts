@@ -22,7 +22,7 @@ import { status } from './status.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { turns } from './turns.ts'
-import { effort } from './effort.ts'
+import { modelEffort } from './model-effort.ts'
 
 // Records a slash command (origin: model for Hal, from for another session,
 // otherwise the human) and
@@ -269,7 +269,7 @@ async function listing(id: string): Promise<Event & { type: 'models' }> {
 	let items = await modelList.list(current)
 	let capabilities = Object.fromEntries(
 		items.flatMap((model) => {
-			let cap = effort.describe(model)
+			let cap = modelEffort.describe(model)
 			return cap ? [[model, cap]] : []
 		}),
 	)

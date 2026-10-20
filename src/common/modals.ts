@@ -17,7 +17,7 @@
 // 'send' action sends a command and keeps the modal open.
 
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
-import type { EffortCapability } from './effort.ts'
+import type { EffortCapability } from './effort-levels.ts'
 import type { FindDialog } from './find-dialog.ts'
 import { bashResult } from './bash-result.ts'
 

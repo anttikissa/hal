@@ -1,4 +1,4 @@
-import type { EffortCapability } from './effort.ts'
+import type { EffortCapability } from './effort-levels.ts'
 import { expect, test } from 'bun:test'
 import { modals } from './modals.ts'
 import { picker } from './picker.ts'

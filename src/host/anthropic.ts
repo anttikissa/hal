@@ -12,7 +12,7 @@ import {
 } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
-import { effort } from './effort.ts'
+import { modelEffort } from './model-effort.ts'
 import { provider as catalog } from './providers/anthropic.ts'
 import { tools as registry } from './tools.ts'
 
@@ -138,7 +138,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 			budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget, maxTokens - 1024)),
 		}
 	}
-	Object.assign(b, effort.wire('anthropic', req.model, req.effort, maxTokens))
+	Object.assign(b, modelEffort.wire('anthropic', req.model, req.effort, maxTokens))
 	return b
 }
 
