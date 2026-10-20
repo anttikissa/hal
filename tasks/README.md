@@ -101,6 +101,8 @@ minimize those exceptions and report the reason through render.clear.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
+- Line-per-record files (histories, logs, traces) are ASONL, never
+  JSONL.
 - Credentials, tokens and private keys live only in `secrets/` in the
   home (task de): owner-only (0700), every file 0600, opened through
   `secrets.file` in `src/host/secrets.ts`. Logs, diagnostics, caches
