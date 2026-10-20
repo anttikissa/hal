@@ -409,10 +409,8 @@ function pasted(id: string | undefined, r: Clip): void {
 	app.onKeys([{ key: 'paste', text, shift: false, alt: false, ctrl: false, cmd: false }])
 }
 
-// Takes keys from the terminal and paints the first frame. Idempotent.
+// Paints the first frame. Idempotent.
 function init(): void {
-	terminal.onKeys = (events) => app.onKeys(events)
-	terminal.onScreen = () => app.sendScreen()
 	notices.onChange = () => app.show()
 	app.show()
 }

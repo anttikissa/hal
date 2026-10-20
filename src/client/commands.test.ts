@@ -88,14 +88,8 @@ test('every command key shows in /keys', () => {
 test('Ctrl-Shift-R reaches restart all through terminal decoding without losing the draft', () => {
 	open()
 	app.state.prompt = { ...app.state.prompt, text: 'draft', cursor: 5 }
-	let onKeys = terminal.onKeys
-	try {
-		terminal.onKeys = app.onKeys
-		terminal.onData('\x1b[114;')
-		terminal.onData('6u')
-	} finally {
-		terminal.onKeys = onKeys
-	}
+	terminal.onData('\x1b[114;')
+	terminal.onData('6u')
 	expect(ran).toEqual([])
 	expect(sent).toEqual([{ type: 'submit', sessionId: 'a', text: '/restart all' }])
 	expect(app.state.prompt.text).toBe('draft')

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { terminal, type TerminalIO } from './terminal.ts'
 import { render } from './render.ts'
+import { app } from './app.ts'
 import type { KeyEvent } from './keys.ts'
 
 // A fake terminal: records raw mode, output, exits and stops, and lets
@@ -45,7 +46,8 @@ function fixture() {
 	}
 	let keys: KeyEvent[] = []
 	let redraws = 0
-	terminal.onKeys = (events) => keys.push(...events)
+	app.onKeys = (events) => void keys.push(...events)
+	app.sendScreen = () => {}
 	render.request = (full) => void (full === 'a terminal resize' ? log.push('resize') : redraws++)
 	render.park = () => void log.push('park')
 	terminal.init(io)
@@ -72,10 +74,16 @@ function fixture() {
 	}
 }
 
-const defaults = { onKeys: terminal.onKeys, park: render.park, request: render.request }
+const defaults = {
+	onKeys: app.onKeys,
+	sendScreen: app.sendScreen,
+	park: render.park,
+	request: render.request,
+}
 afterEach(() => {
 	terminal.reset()
-	terminal.onKeys = defaults.onKeys
+	app.onKeys = defaults.onKeys
+	app.sendScreen = defaults.sendScreen
 	render.park = defaults.park
 	render.request = defaults.request
 })
@@ -172,7 +180,7 @@ describe('quit and restart', () => {
 
 	test('a busy key handler cannot delay them', () => {
 		let t = fixture()
-		terminal.onKeys = () => {
+		app.onKeys = () => {
 			throw new Error('editor is broken')
 		}
 		t.type('\x03')

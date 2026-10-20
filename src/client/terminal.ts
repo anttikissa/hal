@@ -10,6 +10,7 @@ import { emergency, type EmergencyAction, type EmergencyState } from '../common/
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
 import { render } from './render.ts'
+import { app } from './app.ts'
 import fs from 'fs'
 
 /** The process and tty operations the terminal needs; faked in tests. */
@@ -211,7 +212,7 @@ function resumed(): void {
 // Only while we own the terminal; a resize during a suspend is answered
 // by the redraw on resume.
 function resized(): void {
-	terminal.onScreen()
+	app.sendScreen()
 	if (terminal.state.entered) render.request('a terminal resize')
 }
 
@@ -248,7 +249,7 @@ function onData(chunk: string | Uint8Array): void {
 
 function deliver(events: KeyEvent[]): void {
 	events = events.filter((k) => !isEmergency(k))
-	if (events.length) terminal.onKeys(events)
+	if (events.length) app.onKeys(events)
 }
 
 /** Take over the terminal. Idempotent; call only with a TTY. */
@@ -280,13 +281,9 @@ export const terminal = {
 	escapeMs: 50,
 	/** Whether there is a terminal to take over; tests replace it. */
 	available: (): boolean => !!process.stdin.isTTY,
-	/** Receives decoded keys; replaced by the prompt. */
-	onKeys: (_events: KeyEvent[]): void => {},
 	/** Runs as the user quits, before the exit; set by main. Must be
 	 * synchronous, quick and never throw or wait on the host. */
 	onQuit: (): void => {},
-	/** Tells the host the new size; replaced by the app. */
-	onScreen: (): void => {},
 	writer,
 	realIO,
 	init,
