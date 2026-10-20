@@ -13,6 +13,7 @@ import { synthetic } from './synthetic.ts'
 import { client, until } from './host-fixture.test.ts'
 import { picker } from '../common/picker.ts'
 import { paths } from './paths.ts'
+import { apiKeys } from './api-keys.ts'
 
 // /model and the model list: the host lists every configured
 // provider's models, and switching is an ordinary command.
@@ -97,7 +98,7 @@ test('family aliases choose a subscription before an API key, and explain missin
 		expect(models.resolve('kimi').login).toContain('/login opencode')
 		process.env.OPENROUTER_API_KEY = 'test-key'
 		expect(models.resolve('kimi').id).toBe('openrouter/moonshotai/kimi-k2')
-		process.env.OPENCODE_API_KEY = 'test-key'
+		apiKeys.save('opencode-go', 'test-key')
 		expect(models.resolve('kimi').id).toBe('opencode-go/kimi-k2')
 	} finally {
 		if (before[0] === undefined) delete process.env.OPENCODE_API_KEY

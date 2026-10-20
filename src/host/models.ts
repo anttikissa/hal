@@ -215,10 +215,7 @@ function resolve(input: string): { id?: string; login?: string } {
 						auth.envKey(name as Kind) ||
 						(existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length)
 					)
-				: !!(
-						apiKeys.get(name === 'opencode-go' ? 'opencode' : name) ||
-						process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY']
-					)
+				: !!(apiKeys.get(name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
 		if (!available) continue
 		let found = version
 			? candidates.find((id) => id.startsWith(`${name}/`))
