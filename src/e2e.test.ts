@@ -384,6 +384,6 @@ test('a peer that takes over keeps tabs and names the old host changed after the
 	await until('the host to quit', () => a.exit !== undefined)
 	type(b, '/new\r') // a write by the new host
 	await until('the new host to add a tab', () => open().length === 3)
-	expect(open()).toContain(added)
+	expect(open()).toContain(added!)
 	expect(name(added!)).toBe('Kept after takeover')
 }, 30_000)
