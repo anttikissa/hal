@@ -62,8 +62,8 @@ will not run in parallel. It maximizes parallelism; the result is
 equivalent, but faster.
 
 Guidance for all projects goes to SYSTEM.md. Mark each change to SYSTEM.md
-or Hal's AGENTS.md that the user has not approved with an adjacent
-`<!-- TODO - to be reviewed by a human -<current session id> -->` comment.
+or Hal's AGENTS.md that the user has not approved with a comment above
+it: `<!-- TODO - to be reviewed by a human -<current session id> -->`.
 
 # Security
 
