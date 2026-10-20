@@ -1,7 +1,8 @@
-// Task ar: changes to system-prompt files (SYSTEM.md, its includes,
-// AGENTS.md) as transcript output items. Consecutive ones show as one
-// card: "3 changes to SYSTEM.md, AGENTS.md since 10:44", the diffs
-// inside. Both clients group with this before drawing.
+// Groups changes to system-prompt files (SYSTEM.md, its includes,
+// AGENTS.md) so a run of them does not flood the transcript (task ar).
+// Each change is an output item; consecutive ones show as one card: "3
+// changes to SYSTEM.md, AGENTS.md since 10:44", the diffs inside. Both
+// clients group with this before drawing.
 
 import type { Item } from './transcript.ts'
 import { titles } from './titles.ts'

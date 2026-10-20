@@ -1,4 +1,6 @@
-// A single client's debounce and cancellation; no timers until opened.
+// Runs find requests for one client: it waits for typing to pause before
+// it searches, and cancels the previous search. No timers run until find
+// opens.
 import { findDialog } from './find-dialog.ts'
 import type { FindBatch, FindFilter } from './find.ts'
 import type { ModalState } from './modals.ts'

@@ -1,5 +1,5 @@
-// Where a model's earlier provider input ended, marked so Anthropic
-// finds its cached prefix again after another model ran (task g5j).
+// Lets Anthropic find its cached prefix again after another model ran
+// (task g5j), by marking where a model's earlier provider input ended.
 
 import type { Message } from './blocks.ts'
 import { replay, type HistoryRecord } from './replay.ts'

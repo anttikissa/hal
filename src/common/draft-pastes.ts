@@ -1,3 +1,7 @@
+// Lets the user turn paste markers in a draft back into the pasted text.
+// It loads each marker's contents from the host (`paste-text` events),
+// says why expansion cannot happen yet, and keeps the cursor and
+// selection in place when it does.
 import { attachments } from './attachments.ts'
 import type { Event } from './protocol.ts'
 import { uploads } from './uploads.ts'

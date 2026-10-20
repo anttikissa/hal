@@ -1,4 +1,5 @@
-// Host-established sender metadata shared by history and protocol validation.
+// Who sent a message, as the host sets it. History and protocol
+// validation share these checks.
 // Tasks: rj, jf, rqq.
 function invalid(value: unknown): string | undefined {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return 'sender must be an object'

@@ -1,3 +1,7 @@
+// Picks the newest model id for a short family name (opus, sol; openai,
+// gpt, anthropic and claude map to a family), so a default model needs
+// no exact id. Dated snapshot ids are skipped; at equal versions, larger
+// tiers win.
 const newest = new Intl.Collator('en', { numeric: true })
 
 function select(input: string, ids: string[]): string | undefined {

@@ -1,4 +1,5 @@
-// One client-wide account store; plans only identify an account (task w0d).
+// Subscription usage per account, in one store for the whole client
+// (task w0d); a plan only names its account.
 // The browser installs a Solid 2 store; terminal clients use plain data.
 import type { Plan } from './snapshot.ts'
 

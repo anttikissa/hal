@@ -1,5 +1,7 @@
-// Hal facts, not human prompts. Delivery is frozen on an existing user
-// record before a request; sources remain in history for the UI.
+// Tells the model facts that Hal knows and the user did not type: model
+// and cwd changes, edited instructions, recaps, failed or paused turns.
+// They are not human prompts. Before a request, delivery is frozen on an
+// existing user record; the sources stay in history for the UI.
 // Tasks: nzv, nvm.
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 

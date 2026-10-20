@@ -1,10 +1,11 @@
-// Protected editing of queued prompts (tasks jsg, zez), shared by both
-// clients. Only the host's acquisition reply opens the editor. Edits live
-// beside, not inside, the shared draft, so reloads and acknowledgements
-// lose neither. One window edits at a time: `window` names the window
-// that owns an edit (the store's, else this page load's or process's), so a store
+// Lets the user edit a queued prompt without losing it or racing other
+// windows, the same in both clients (tasks jsg, zez). Only the host's
+// acquisition reply opens the editor. Edits live beside the shared
+// draft, not inside it, so reloads and acknowledgements lose neither.
+// One window edits at a time: `window` names the window that owns an
+// edit (the store's, else this page load's or process's). So a store
 // shared with other windows (localStorage, draft files) never makes them
-// act on it; an edit left by a window that is gone is adopted.
+// act on it. An edit left by a window that is gone is adopted.
 // Tasks: rqq.
 import { connection } from './connection.ts'
 import { drafts } from './drafts.ts'

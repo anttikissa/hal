@@ -1,5 +1,6 @@
-// Shared card decisions (tasks c5x, hyt): which blocks expand and
-// collapse, how much of each shows at first, and their text.
+// Card decisions both clients share, so cards act the same everywhere
+// (tasks c5x, hyt): which blocks expand and collapse, how much of each
+// shows at first, and their text.
 
 import { bashResult } from './bash-result.ts'
 import type { SessionMeta } from './session.ts'

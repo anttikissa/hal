@@ -1,4 +1,5 @@
-// Provider-neutral conversation blocks and stream events. How they map
+// Conversation blocks and stream events that fit every provider, so the
+// rest of Hal never depends on one provider's API. How they map
 // onto Anthropic Messages, OpenAI Responses and Chat Completions is
 // recorded in tasks/7f/mapping.md. These types are both the wire format
 // (protocol events) and the persisted one (history records), so a field

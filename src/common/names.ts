@@ -1,4 +1,6 @@
-// Naming controls are suffixes, never examples embedded in prose or code.
+// Session names: checks a name, and finds the <rename> tag a model may
+// end its answer with. A naming control counts only as such a suffix,
+// never as an example inside prose or code.
 function validate(text: string): string {
 	if (/[\p{Cc}\p{Cf}<>]/u.test(text)) throw new Error('session name contains controls or markup')
 	let name = text.replace(/\s+/gu, ' ').trim()

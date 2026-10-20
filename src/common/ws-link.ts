@@ -1,13 +1,14 @@
-// The WebSocket transport to a host's web endpoint for the common
-// connection (src/common/connection.ts), used by the browser and by a
-// terminal on a remote host (client/remote.ts, task tr): one WebSocket
-// at /ws, each message one ASON command or event. The host closes it
-// with code 4000 when a page was built from other code than the host
-// runs, and with 4001 when /auth revoke logged every client out: either
-// way reload() runs (the page reloads, the terminal quits). A socket
-// refused before it opens may mean the login expired or was revoked
-// while the client was away: if the host then says the token is no
-// good, reload() runs too instead of retrying forever.
+// Carries the common connection (src/common/connection.ts) over a
+// WebSocket to a host's web endpoint, for the browser and for a terminal
+// on a remote host (client/remote.ts, task tr). One WebSocket at /ws;
+// each message is one ASON command or event.
+//
+// The host closes it with code 4000 when the page was built from other
+// code than the host runs, and with 4001 when /auth revoke logged every
+// client out. Either way reload() runs: the page reloads, the terminal
+// quits. A socket refused before it opens may mean the login expired or
+// was revoked while the client was away. If the host then says the token
+// is no good, reload() runs too, instead of retrying forever.
 
 import { ason } from './ason.ts'
 import { connection, type Conn, type LinkState, type Transport } from './connection.ts'

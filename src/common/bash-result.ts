@@ -1,6 +1,6 @@
-// Presentation of a Bash result. Keep the original output in history
-// and provider input; the UI shows a nonzero status in the card's
-// title instead of an output row (tasks wm0, kx0).
+// Shows a Bash result without changing what the model sees (tasks wm0,
+// kx0). History and provider input keep the original output; the UI
+// shows a nonzero status in the card's title instead of an output row.
 
 import type { Shown } from './transcript.ts'
 

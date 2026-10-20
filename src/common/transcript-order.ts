@@ -1,5 +1,6 @@
-// Blocks reserve their number when they start, not when their stream ends.
-// Use that order in both clients; keep synthetic/un-numbered items in place.
+// Keeps transcript items in the order their blocks started, the same in
+// both clients: a block reserves its number when it starts, not when its
+// stream ends. Synthetic and unnumbered items stay in place.
 import type { Item } from './transcript.ts'
 
 function order(items: Item[]): Item[] {

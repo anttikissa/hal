@@ -1,4 +1,6 @@
-// Sparse rebase syntax and snapshot targeting; no history mutation.
+// Parses the sparse rebase syntax, which names records by kind letter
+// and number, and finds its targets in a snapshot. It never changes
+// history.
 // Tasks: svt.
 import { rebase, type RebasePlan } from './rebase.ts'
 import type { RebaseRow, RebaseRows } from './rebase-rows.ts'

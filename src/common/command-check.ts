@@ -1,4 +1,5 @@
-// Validation of commands on the host side; protocol.ts holds the types.
+// Checks each command a client sends before the host acts on it.
+// protocol.ts holds the types.
 // Tasks: 6, qt, svt.
 import type { CommandType } from './protocol.ts'
 import { sendKeys } from './send-keys.ts'

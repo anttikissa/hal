@@ -1,5 +1,5 @@
-// The summary a compact record (task bc) stands in for the records
-// before it with, built without a model call, as the old Hal did: the
+// Lets a compact record (task bc) stand in for the records before it,
+// with a summary built without a model call, as the old Hal did: the
 // first prompt and the answer after it, the last three prompts and
 // every answer after the first of them, each under its record number;
 // every omitted run is one line counting what it held. Long answers

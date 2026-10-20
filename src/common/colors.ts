@@ -1,11 +1,14 @@
-// The built-in look, hal, as code; other themes are plugins that
-// replace fields (themes/, task d3). The shared values (fgL, screen, mix) are plain
-// values; every other top-level field is a function, read at call time:
-// styles computed from them, so overriding a value (colors.fgL = 0.9 from
-// local.ts, or plugin.set(colors, 'fgL', 0.9), which can undo it) moves
-// everything derived from it. A style names its colors: fg and bg, plus extras
-// such as bold, code or cursor for later renderers. Every color is
-// OKLCH [lightness, chroma, hue]: equal L and C across hues look equally
+// One source of colors for the terminal and the web: the built-in look,
+// hal, as code. Other themes are plugins that replace fields (themes/,
+// task d3).
+//
+// The shared values (fgL, screen, mix) are plain values. Every other
+// top-level field is a function, read at call time, that computes styles
+// from them. So overriding a value (colors.fgL = 0.9 from local.ts, or
+// plugin.set(colors, 'fgL', 0.9), which can undo it) moves everything
+// derived from it. A style names its colors: fg and bg, plus extras such
+// as bold, code or cursor for later renderers. Every color is OKLCH
+// [lightness, chroma, hue]: equal L and C across hues look equally
 // bright and vivid.
 //
 // The terminal turns styles into escape codes (client/ansi.ts); the

@@ -1,4 +1,5 @@
-// Shared diff presentation; generation belongs on the host (task k8y).
+// Shows diffs the same way in both clients: line tones, Markdown fences
+// and change counts. The host makes the diffs (task k8y).
 export type DiffTone = 'add' | 'del' | 'dim'
 function tone(line: string): DiffTone {
 	return line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'dim'

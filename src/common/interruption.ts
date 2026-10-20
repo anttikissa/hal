@@ -1,5 +1,6 @@
-// Interrupted text's display-only tail. Markdown trims trailing whitespace;
-// restore it before the marker, without changing prose or provider input.
+// Shows exactly where interrupted text stopped. Markdown trims trailing
+// whitespace, so this restores it before the interruption marker, for
+// display only: prose and provider input stay unchanged.
 // Tasks: 6eq.
 function tail(text: string): string {
 	return (text.match(/\s*$/)?.[0] ?? '') + (/\S$/.test(text) ? ' --' : '--')

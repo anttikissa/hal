@@ -1,4 +1,5 @@
-// Transient find protocol and ranking, shared by host and clients.
+// Find messages and ranking, shared so host and clients agree on what
+// matches. Find results are transient: never stored.
 export type FindKind = 'metadata' | 'user' | 'assistant' | 'thinking' | 'tool-call' | 'tool-output' | 'other'
 export type FindFilter = 'text' | 'thinking' | 'tools' | 'other'
 export type FindResult = {

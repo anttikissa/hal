@@ -1,5 +1,6 @@
-// A same-length view with literal code masked out. Consumers can locate
-// controls in prose without coupling Markdown rendering to their semantics.
+// Lets callers find controls in prose while ignoring code: a view of the
+// text at the same length, with literal code masked out. Markdown
+// rendering need not know what the controls mean.
 function mask(text: string): string {
 	let fence: { marker: string; size: number } | undefined
 	return text

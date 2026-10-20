@@ -1,4 +1,5 @@
-// Browser-safe descriptions sent by the host; clients never infer support.
+// Reasoning effort levels, safe to load in the browser. The host sends
+// which levels each model supports; clients never guess.
 export type EffortLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type EffortCapability = { levels: EffortLevel[]; default?: EffortLevel; policy?: EffortLevel }
 export const effort = {

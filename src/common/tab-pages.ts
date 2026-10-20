@@ -1,10 +1,11 @@
-// Which tabs a tab strip shows (task 3k), the same arithmetic for the
-// terminal's tab bar and the web's strip. Every cell has one width, so
-// Ctrl-N/P move one cell and no number shifts. Names show only when
-// every tab fits with one; else numbers; when not even those fit, the
-// tabs come in fixed pages (1..k, k+1..2k, ..., the last one ending at
-// the last tab) between two edges of fixed width, and the page shown is the one holding the current tab:
-// a pure function of (count, current, width), never of history.
+// Decides which tabs a tab strip shows (task 3k), with the same
+// arithmetic for the terminal's tab bar and the web's strip. Every cell
+// has one width, so Ctrl-N/P move one cell and no number shifts. Names
+// show only when every tab fits with one; else numbers. When not even
+// those fit, the tabs come in fixed pages (1..k, k+1..2k, ..., the last
+// one ending at the last tab) between two edges of fixed width. The page
+// shown is the one holding the current tab: a pure function of (count,
+// current, width), never of history.
 // Widths are in any one unit: terminal columns, CSS pixels.
 
 import type { Tab } from './protocol.ts'

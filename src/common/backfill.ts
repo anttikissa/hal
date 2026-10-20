@@ -1,7 +1,7 @@
-// Earlier history, fetched after the snapshot (task bq). A snapshot
-// holds only the tail of a session's history; a client asks for the
-// records before it page by page (`history` commands) and puts them in
-// front of its transcript (transcript.prepend). The terminal fetches
+// A snapshot holds only the tail of a session's history, so clients
+// fetch the earlier records afterward (task bq). A client asks for them
+// page by page (`history` commands) and puts them in front of its
+// transcript (transcript.prepend). The terminal fetches
 // every page in the background and shows them at once; the web fetches
 // one when the reader scrolls near the top.
 

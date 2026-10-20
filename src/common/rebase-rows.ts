@@ -1,4 +1,5 @@
-// Shared terminal/web rows and the interactive todo-file format (tasks 01d, svt).
+// The /rebase rows, the same in the terminal and the web, and the
+// todo-file format for editing them interactively (tasks 01d, svt).
 // Tasks: rqq.
 import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'

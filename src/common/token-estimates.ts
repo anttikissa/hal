@@ -1,4 +1,5 @@
-// Character estimates share the same ratio on every surface (task 1dk).
+// Estimates tokens from characters with one ratio on every surface, so
+// the numbers agree (task 1dk).
 import type { Message } from './blocks.ts'
 
 function estimate(characters: number, model?: string, ratios: Record<string, number> = {}): number {

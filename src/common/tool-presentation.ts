@@ -1,3 +1,6 @@
+// Lets a tool show its result as titled text, code and diff blocks
+// instead of raw output. A block holds its text or a range of the
+// output; check() rejects a malformed presentation.
 export type PresentationBlock = {
 	kind: 'text' | 'code' | 'diff'
 	path?: string

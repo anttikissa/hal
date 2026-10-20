@@ -1,4 +1,5 @@
-// Structural browser diagnostics only: never text, URLs or identifiers.
+// Browser diagnostics that help debug the page without leaking anything:
+// structure only, never text, URLs or identifiers.
 export const diagnosticKinds = [
 	'start',
 	'error',

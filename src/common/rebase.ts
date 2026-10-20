@@ -1,4 +1,5 @@
-// Append-only context surgery. Numbers refer to records, never positions.
+// Lets the user drop or edit earlier context without rewriting history:
+// each rebase is appended. Numbers refer to records, never positions.
 import type { HistoryRecord } from './replay.ts'
 import { ason } from './ason.ts'
 import { modelNotices } from './model-notices.ts'

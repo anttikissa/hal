@@ -1,14 +1,15 @@
-// Editing the last message the user sent (tasks/j1/states.md, task
-// dg), the part every client shares. Up on the prompt's top row loads
-// it into the editor; the draft is set aside and comes back after, as in
-// history browsing. A message still waiting in the inbox is edited in place
-// there, with no pause: the model never saw it. Otherwise, while the
-// model works, Up pauses the turn and edits the last prompt; Enter sends
-// the edit, and the host decides from history whether it replaces that
-// prompt (only reading happened since) or goes on top (something
-// changed). Down with the text unchanged, or Escape, continues the
-// paused turn. Messages another session sent (`from`) are never
-// recalled.
+// Lets the user fix the last message they sent, the same way in every
+// client (tasks/j1/states.md, task dg). Up on the prompt's top row loads
+// that message into the editor. The draft is set aside and comes back
+// after, as in history browsing.
+//
+// A message still waiting in the inbox is edited in place there, with
+// no pause: the model never saw it. Otherwise, while the model works, Up
+// pauses the turn and edits the last prompt. Enter sends the edit, and
+// the host decides from history whether it replaces that prompt (only
+// reading happened since) or goes on top (something changed). Down with
+// the text unchanged, or Escape, continues the paused turn. Messages
+// another session sent (`from`) are never recalled.
 // Tasks: rqq.
 
 import { drafts } from './drafts.ts'

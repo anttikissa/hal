@@ -1,4 +1,5 @@
-// Validation of host events on the client side; protocol.ts holds the types.
+// Checks each host event before the client uses it. protocol.ts holds
+// the types.
 // Tasks: qt, 6eq, 81y.
 import { sender } from './sender.ts'
 import type { EventType } from './protocol.ts'

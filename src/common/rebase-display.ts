@@ -1,4 +1,5 @@
-// Rebase controls are display-only; provider replay still excludes them.
+// Shows rebases in the transcript: what changed and how to go back.
+// These controls are display only; provider replay still leaves them out.
 import { rebase } from './rebase.ts'
 import { rebaseRows } from './rebase-rows.ts'
 import type { Item } from './transcript.ts'

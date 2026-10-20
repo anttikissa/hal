@@ -1,4 +1,6 @@
-// Durable context-change intent, carried by command output (tasks jf, svt).
+// Keeps a requested context change (clear, compact or rebase) in history
+// until it is done or canceled: command output records carry the intent
+// (tasks jf, svt).
 import type { SparseRebase } from './rebase-sparse.ts'
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
