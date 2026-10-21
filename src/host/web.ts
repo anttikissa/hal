@@ -180,11 +180,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
 			headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' },
 		})
-	if (get && /^\/fonts\/IBMPlexMono-(Light|Medium)\.woff2$/.test(pathname))
-		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
-			headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' },
-		})
-	if (get && /^\/fonts\/SourceCodePro-(Light|Medium)Italic\.woff2$/.test(pathname))
+	if (get && /^\/fonts\/IBMPlexMono-(Light|Medium)(Italic)?\.woff2$/.test(pathname))
 		return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), {
 			headers: { 'content-type': 'font/woff2', 'cache-control': 'public, max-age=86400' },
 		})

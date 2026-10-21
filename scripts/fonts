@@ -3,17 +3,13 @@
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p src/web/fonts
-if [ "$#" -eq 0 ]; then set -- Light Medium SourceCodePro-LightItalic SourceCodePro-MediumItalic; fi
+if [ "$#" -eq 0 ]; then set -- Light Medium LightItalic MediumItalic; fi
 for face in "$@"; do
   case "$face" in
-    Light|Medium)
+    Light|Medium|LightItalic|MediumItalic)
       file="IBMPlexMono-$face.woff2"
       url="https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/woff2/$file"
       license='https://raw.githubusercontent.com/IBM/plex/master/LICENSE.txt' ;;
-    SourceCodePro-LightItalic|SourceCodePro-MediumItalic)
-      file="$face.woff2"
-      url="https://raw.githubusercontent.com/adobe-fonts/source-code-pro/release/WOFF2/TTF/${face%Italic}It.ttf.woff2"
-      license='https://raw.githubusercontent.com/adobe-fonts/source-code-pro/release/LICENSE.md' ;;
     *) printf 'Unknown font face: %s\n' "$face" >&2; exit 1 ;;
   esac
   target="src/web/fonts/$file"

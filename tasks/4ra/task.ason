@@ -1,0 +1,10 @@
+{
+	title: 'Restore Plex web italic faces',
+	spec: 'All web italic text uses locally bundled IBM Plex Mono Light Italic 300 and Medium Italic 500 instead of Source Code Pro. Upright Light and Medium faces, sizes, spacing, colors, and italic semantics remain unchanged. CSS font declarations, same-origin font routes, downloader defaults, and tracked font asset allowlist select the four Plex app faces. Both italic Plex assets are tracked and covered by the existing Plex license. This supersedes the Source Code Pro italic choice in xd0 and msg. Terminal font selection is unchanged.',
+	status: 'done',
+	notes: [
+		'Verified in Chrome through CSS.getPlatformFontsForNode: italic 300 renders IBMPlexMono-LightItalic and italic 500 renders IBMPlexMono-MedmItalic, both custom fonts without fallback. All four app font routes return 200, font/woff2, and wOF2 signatures. The temporary browser check and five web-serve tests passed; the one-off check was then removed. Downloader shell syntax, web.ts lint, and diff checks passed. Retired Source Code Pro font binaries remain local but are no longer tracked or served. No layout loops or growing state added.'
+	],
+	needs: ['7wk', 'xd0'],
+	foldInto: ['7wk', 'xd0']
+}

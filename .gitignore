@@ -19,6 +19,6 @@ secrets/
 /src/web/fonts/*.LICENSE
 !/src/web/fonts/IBMPlexMono-Light.woff2
 !/src/web/fonts/IBMPlexMono-Medium.woff2
-!/src/web/fonts/SourceCodePro-LightItalic.woff2
-!/src/web/fonts/SourceCodePro-MediumItalic.woff2
+!/src/web/fonts/IBMPlexMono-LightItalic.woff2
+!/src/web/fonts/IBMPlexMono-MediumItalic.woff2
 /SYSTEM.local.md
