@@ -30,7 +30,8 @@ function hiddenEvent(event: Event): void {
 		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 		let kept = st.hidden.get(event.sessionId) ?? { prompt: prompt.empty() }
 		kept.transcript = transcriptLive.fold(kept.transcript, event)
-		if (event.type === 'snapshot' && kept.transcript)
+		// An edit in progress keeps its text (task dg).
+		if (event.type === 'snapshot' && kept.transcript && !kept.editing)
 			kept.prompt = { text: drafts.text(event.sessionId), cursor: drafts.text(event.sessionId).length }
 		queuedPrompt.sync(kept, event)
 		st.hidden.set(event.sessionId, kept)
@@ -115,9 +116,13 @@ function focusOn(focus: Focus): void {
 			st.hidden.delete(focus.tab)
 			if (!back) drafts.join(focus.tab, early)
 			// Cached editor text can lag draft events received while hidden (qhz).
-			app.setPrompt(
-				queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : (recall.shown(focus.tab) ?? drafts.text(focus.tab)),
-			)
+			// An edit in progress keeps its text (task dg).
+			if (!st.editing || st.editing.queueEdit)
+				app.setPrompt(
+					queueEdit.editing(focus.tab)
+						? queueEdit.text(focus.tab)
+						: (recall.shown(focus.tab) ?? drafts.text(focus.tab)),
+				)
 			if (!st.background.has(focus.tab)) {
 				st.background.add(focus.tab)
 				app.send({ type: 'open', sessionId: focus.tab })

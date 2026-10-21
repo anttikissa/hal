@@ -215,7 +215,7 @@ function onEvent(event: Event): void {
 		let t = transcriptLive.fold(st.transcript, event)
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
-		if (event.type === 'snapshot' && t)
+		if (event.type === 'snapshot' && t && (!st.editing || st.editing.queueEdit))
 			app.setPrompt(
 				queueEdit.editing(t.meta.id) ? queueEdit.text(t.meta.id) : (recall.shown(t.meta.id) ?? drafts.text(t.meta.id)),
 			)

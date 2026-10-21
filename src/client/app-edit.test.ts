@@ -19,6 +19,7 @@ import {
 	up,
 	down,
 	paused,
+	tabsEvent,
 } from './app-fixture.test.ts'
 
 useApp()
@@ -120,6 +121,20 @@ test('Up edits with text typed; the draft comes back after leaving or sending th
 	enter()
 	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/edit 5\nfix ti!', aside: true })
 	expect(appView.view().prompt.text).toBe('x')
+})
+
+test('an edit in progress keeps its text across a tab switch and a snapshot', () => {
+	app.onEvent(tabsEvent('s1', 's2'))
+	app.focusOn({ tab: 's1' })
+	working()
+	up()
+	paused()
+	type('!')
+	app.focusOn({ tab: 's2' })
+	app.focusOn({ tab: 's1' })
+	app.onEvent(snapshot('s1', { type: 'paused' }))
+	expect(appView.view().prompt.text).toBe('fix ti!')
+	expect(appView.view().editing).toContain('[editing prompt]')
 })
 
 test('Up opens a queued editor only after host protection, Alt-Enter saves in place and restores the draft', () => {
