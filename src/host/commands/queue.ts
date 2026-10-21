@@ -2,11 +2,11 @@
 // Tasks: jq, gr4, rqq.
 import { sendKeys } from '../../common/send-keys.ts'
 import type { SlashCommand } from '../commands.ts'
-import { history } from '../history.ts'
 import { host } from '../host.ts'
 import { prompts } from '../prompts.ts'
 import { queueEdits } from '../queue-edits.ts'
 import { queueNext } from '../queue-next.ts'
+import { slash } from '../slash.ts'
 import { status } from '../status.ts'
 
 const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.delivery === 'after-turn')
@@ -57,12 +57,14 @@ export const command: SlashCommand = {
 	run(args, _answers, ctx) {
 		let id = ctx.sessionId
 		let queued = queuedOf(id)
-		if (!args) return { say: queued.length ? queued.map((m, i) => `${i + 1}. ${m.text}`).join('\n') : 'queue is empty' }
+		if (!args)
+			return { say: queued.length ? queued.map((m, i) => `${i + 1}. ${m.text}`).join('\n') : 'The queue is empty.' }
 		if (args === 'help') return { say: command.help!('') }
 		if (args === 'clear') {
-			for (let item of queued) history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
-			if (queued.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-			return { say: `cleared ${queued.length} queued message${queued.length === 1 ? '' : 's'}` }
+			if (!queued.length) return { say: 'The queue is empty.' }
+			queued.forEach((item, i) => slash.drop(id, item, i + 1))
+			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+			return {}
 		}
 		let drop = args.match(dropPattern)
 		if (drop) {
@@ -78,10 +80,10 @@ export const command: SlashCommand = {
 				}
 			if (item.id === queueEdits.held(id))
 				return { error: 'That message is being edited; save or cancel the edit first.' }
-			// The durable withdrawal /queue clear uses; the others keep their order.
-			history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
+			// The others keep their order.
+			slash.drop(id, item, n)
 			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-			return { say: `dropped queued message ${n}: ${item.text}` }
+			return {}
 		}
 		let early = args.match(/^(next|now)(?:\s+(\S+))?$/)
 		if (early) {
@@ -92,6 +94,6 @@ export const command: SlashCommand = {
 		}
 		if (args === 'undo') return queueNext.undo(id)
 		let refused = prompts.submit(id, args, undefined, 'queue')
-		return refused ? { error: refused } : { say: 'queued' }
+		return refused ? { error: refused } : { say: 'Queued.' }
 	},
 }

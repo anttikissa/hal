@@ -291,6 +291,14 @@ function dismiss(id: string, question: string): void {
 	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, canceled: true })
 }
 
+// Queued message `item`, the `n`th, dropped: withdrawn, and a card that
+// keeps its text, since a drop has no undo.
+function drop(id: string, item: { id: string; text: string }, n: number): void {
+	history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
+	let { ts, n: at } = history.append(id, { type: 'output', text: item.text, dropped: n })
+	host.broadcast(id, { type: 'output', sessionId: id, text: item.text, dropped: n, n: at, ts, ...slash.placed(id) })
+}
+
 // What a command said. `origin: model` marks a model-run command's
 // outcome, which its tool card shows instead (task 9g).
 function output(id: string, text: string, error = false, origin?: 'model', synthetic = false): void {
@@ -330,6 +338,7 @@ export const slash = {
 	runCommand,
 	attempt,
 	report,
+	drop,
 	models,
 	dismiss,
 	output,

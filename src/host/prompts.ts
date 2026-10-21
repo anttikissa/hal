@@ -207,13 +207,22 @@ function edit(id: string, message: string, text: string, command?: string, held 
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined
 	if (refused) return refused
-	let dropped = held && !text.trim()
+	if (held && !text.trim()) {
+		let n =
+			status
+				.inboxOf(id)
+				.filter((m) => m.delivery === 'after-turn')
+				.indexOf(waiting) + 1
+		slash.drop(id, waiting, n)
+		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+		return
+	}
 	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = {
 		type: 'inbox',
 		id: message,
-		text: call ? text : dropped ? waiting.text : literal.strip(text),
+		text: call ? text : literal.strip(text),
 	}
-	if (call || dropped) record.withdrawn = true
+	if (call) record.withdrawn = true
 	else Object.assign(record, inbox.sender(waiting))
 	if (command !== undefined) record.command = command
 	history.append(id, record)

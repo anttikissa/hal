@@ -322,8 +322,9 @@ function itemLines(
 			)
 		case 'output': {
 			// A commit (task 179): 'HH:MM Committed <short> <subject>';
-			// open, its files and the hook's lines.
-			if (item.commit) {
+			// open, its files and the hook's lines. A dropped queued
+			// message: 'HH:MM Queue item #3 was dropped', then its text.
+			if (item.commit || item.dropped !== undefined) {
 				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
 				return itemView.headed(
 					item,

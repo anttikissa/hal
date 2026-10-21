@@ -15,6 +15,7 @@ import {
 	type ToolDisplay,
 	type Usage,
 } from './blocks.ts'
+import { commandCards } from './command-cards.ts'
 import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { TurnStatus } from './protocol.ts'
@@ -86,7 +87,16 @@ export type Shown = { originSession?: string } &
 		| { type: 'command'; text: string; from?: string; label?: string; output?: string; error?: true; ts?: string }
 		// What a command said.
 		// `commit`: a commit a Bash call made (task 179), its own card.
-		| { type: 'output'; text: string; error?: true; change?: PromptChange; commit?: CommitBlock; ts?: string }
+		// `dropped`: a dropped queued message's position; `text` is the message.
+		| {
+				type: 'output'
+				text: string
+				error?: true
+				change?: PromptChange
+				commit?: CommitBlock
+				dropped?: number
+				ts?: string
+		  }
 		// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 		// shows as an output: 'HH:MM Context cleared. `/clear undo` to go back.'.
 		| { type: 'divider'; text: string; ts?: string }
@@ -271,7 +281,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 		((r.type === 'command' || r.type === 'output') && r.origin === 'model')
 	)
 		return [] // model-run: its tool card shows it (9g)
-	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
+	if (r.type === 'command' || r.type === 'output') return [commandCards.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'user')
@@ -307,73 +317,6 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 	return r.type === 'reset'
 		? 'Context cleared. `/clear undo` to go back.'
 		: `Context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized). \`/compact undo\` to go back.`
-}
-
-function aside(
-	r:
-		| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
-		| {
-				type: 'output'
-				text: string
-				error?: true
-				synthetic?: true
-				change?: PromptChange
-				commit?: CommitBlock
-				ts?: string
-		  }
-		| { type: 'divider'; text: string; ts?: string; clear?: true }
-		| { type: 'question'; id: string; form: Form; ts?: string },
-): Shown {
-	if (r.type === 'question')
-		return { type: 'question', id: r.id, form: r.form, command: true, ...(r.ts !== undefined && { ts: r.ts }) }
-	if (r.type === 'divider')
-		return { type: r.clear ? 'output' : 'divider', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) }
-	if (r.type === 'command')
-		return {
-			type: 'command',
-			text: r.text,
-			...(r.from !== undefined && { from: r.from }),
-			...(r.label !== undefined && { label: r.label }),
-			...(r.ts !== undefined && { ts: r.ts }),
-		}
-	return r.synthetic
-		? { type: 'text', text: r.text, synthetic: true, ...(r.ts !== undefined && { ts: r.ts }) }
-		: {
-				type: 'output',
-				text: r.text,
-				...(r.error && { error: true }),
-				...(r.change && { change: r.change }),
-				...(r.commit && { commit: r.commit }),
-				...(r.ts !== undefined && { ts: r.ts }),
-			}
-}
-
-// Whether output `next` joins the human's command `prev` in one card:
-// the command, then what it said, adjacent. Prompt-file changes and
-// commits keep their own cards; synthetic text is a reply.
-function joins(prev: Item, next: Item): prev is Item & { type: 'command' } {
-	return prev.type === 'command' && prev.from === undefined && next.type === 'output' && !next.change && !next.commit
-}
-
-// Command `cmd` with `out` said after it.
-function join(cmd: Item & { type: 'command' }, out: Item): Item {
-	let o = out as Item & { type: 'output' }
-	return {
-		...cmd,
-		output: cmd.output === undefined ? o.text : `${cmd.output}\n\n${o.text}`,
-		...((cmd.error || o.error) && { error: true as const }),
-	}
-}
-
-// `items` with each human command's adjacent output joined into it.
-function joined(items: Item[]): Item[] {
-	let out: Item[] = []
-	for (let item of items) {
-		let last = out.at(-1)
-		if (last && transcript.joins(last, item)) out[out.length - 1] = transcript.join(last, item)
-		else out.push(item)
-	}
-	return out
 }
 
 // The question waiting for an answer from this transcript, if any: a
@@ -415,7 +358,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let promptKey = items[prompt ?? -1]?.key
-	items = transcript.joined(transcriptOrder.order(items))
+	items = commandCards.joined(transcriptOrder.order(items))
 	items = rebaseDisplay.insert(items, snapshot.rewrites)
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = items.findIndex((item) => item.key === promptKey)
@@ -497,10 +440,6 @@ export const transcript = {
 	recordShown,
 	endItem,
 	boundary,
-	aside,
-	joins,
-	join,
-	joined,
 	answered,
 	question,
 	standIns,

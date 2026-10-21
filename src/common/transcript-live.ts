@@ -2,6 +2,7 @@
 // (transcript.ts), and the running turn they stream into. A client
 // following live events shows what a later snapshot would. Tasks: ca, 6eq.
 
+import { commandCards } from './command-cards.ts'
 import { blocks } from './blocks.ts'
 import type { Event } from './protocol.ts'
 import type { LiveTurn } from './snapshot.ts'
@@ -85,7 +86,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	// A command's question is an aside too: it never ends the turn.
 	if (event.type === 'divider' && event.clear && !t.live) {
 		let { prompt: _p, earlier: _e, ...rest } = t
-		return { ...rest, items: transcript.keyed([transcript.aside(event)], event.n, 0) }
+		return { ...rest, items: transcript.keyed([commandCards.aside(event)], event.n, 0) }
 	}
 	if (
 		event.type === 'command' ||
@@ -93,10 +94,10 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		event.type === 'divider' ||
 		(event.type === 'question' && event.command)
 	) {
-		let added = transcript.keyed([transcript.aside(event)], event.n, t.items.length)
+		let added = transcript.keyed([commandCards.aside(event)], event.n, t.items.length)
 		let last = t.items.at(-1)
-		if (last && transcript.joins(last, added[0]!))
-			return { ...t, items: [...t.items.slice(0, -1), transcript.join(last, added[0]!)] }
+		if (last && commandCards.joins(last, added[0]!))
+			return { ...t, items: [...t.items.slice(0, -1), commandCards.join(last, added[0]!)] }
 		return { ...t, items: [...t.items, ...added] }
 	}
 	if (event.type === 'turn-start') {

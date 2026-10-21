@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'/queue completes its operations with descriptions, and next, now and drop complete message numbers with each message first line (2026-10-21).',
-		'Completions are plain values like other commands; descriptions pushed the prompt up (user, 2026-10-21).'
+		'Completions are plain values like other commands; descriptions pushed the prompt up (user, 2026-10-21).',
+		'A dropped queued message (/queue drop, /queue clear, an emptied queue edit) gets a closed notice card, Queue item #N was dropped, holding its text, since a drop has no undo; /queue replies start with a capital (STYLE.md) (2026-10-21).'
 	],
 	needs: ['gr4', 'jsg'],
 	foldInto: ['gr4', 'jsg']
