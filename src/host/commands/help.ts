@@ -21,10 +21,11 @@ Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*,
 auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets.
 Public keys (*.pub) are not secret.
 
-This is best effort: it catches mistakes, not a determined attacker,
-such as a man-in-the-middle at the provider.
-
-To change it: /config security (best-effort or yolo)`,
+Settings (/config security):
+  best-effort  Default. Catches mistakes, not a determined attacker,
+               such as a man-in-the-middle at the provider.
+  yolo         No security whatsoever. Recommended only in a sandbox
+               with no leakable secrets.`,
 }
 
 export const command: SlashCommand = {
