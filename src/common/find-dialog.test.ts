@@ -6,6 +6,7 @@ const hit = (blockId: string, score: number, kind: FindKind = 'user'): FindResul
 	sessionId: '1-abc',
 	name: 'Example',
 	blockId,
+	card: `u${blockId}`,
 	kind,
 	age: 0,
 	score,

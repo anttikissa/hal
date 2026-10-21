@@ -221,7 +221,7 @@ function invalidEvent(value: unknown): string | undefined {
 		let valid = (value.results as unknown[]).every(
 			(r) =>
 				isObject(r) &&
-				['sessionId', 'name', 'blockId', 'snippet', 'href'].every((k) => typeof r[k] === 'string') &&
+				['sessionId', 'name', 'blockId', 'card', 'snippet', 'href'].every((k) => typeof r[k] === 'string') &&
 				tiers.includes(r.kind as string) &&
 				typeof r.age === 'number' &&
 				Number.isFinite(r.age) &&

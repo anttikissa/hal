@@ -37,6 +37,7 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 		sessionId: row.sessionId,
 		name: meta.name ?? '',
 		blockId: row.blockId,
+		card: row.card + row.blockId,
 		kind: row.kind,
 		age,
 		...match,
@@ -98,6 +99,7 @@ async function search(c: Search): Promise<void> {
 					sessionId: m.id,
 					name: m.name ?? '',
 					blockId: '',
+					card: '',
 					kind: 'metadata',
 					age: Math.max(0, now - at),
 					snippet: m.cwd,
@@ -126,6 +128,7 @@ async function search(c: Search): Promise<void> {
 					take({
 						sessionId: m.id,
 						blockId: '',
+						card: '',
 						kind: tier,
 						ts: Date.parse(m.createdAt),
 						text: `${m.id} ${m.name ?? ''} ${m.model} ${m.cwd}`,

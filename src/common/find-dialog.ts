@@ -120,17 +120,18 @@ function age(ms: number): string {
 				: `${Math.floor(ms / 86400000)}d`
 }
 // Result rows as aligned columns: tab number (blank for a closed
-// session), session id, name cut to leave the snippet room, age, kind
-// (none for session matches), snippet.
+// session), session/card id, name cut to leave the snippet room, age,
+// kind (none for session matches), snippet.
 function rows(results: FindResult[], tabs: string[], columns = 120, query = ''): string[] {
 	let width = (f: (r: FindResult) => string) => Math.max(0, ...results.map((r) => f(r).length))
 	let tab = (r: FindResult) => {
 		let n = tabs.indexOf(r.sessionId)
 		return n < 0 ? '' : String(n + 1)
 	}
+	let id = (r: FindResult) => (r.card ? `${r.sessionId}/${r.card}` : r.sessionId)
 	let kind = (r: FindResult) => (r.kind === 'metadata' ? '' : `[${r.kind}]`)
 	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + (n ? '…' : '') : s)
-	let w = { tab: width(tab), id: width((r) => r.sessionId), name: 0, age: width((r) => age(r.age)), kind: width(kind) }
+	let w = { tab: width(tab), id: width(id), name: 0, age: width((r) => age(r.age)), kind: width(kind) }
 	let fixed = [w.tab, w.id, w.age, w.kind].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
 	w.name = Math.min(
 		width((r) => r.name),
@@ -147,7 +148,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 	}
 	let cells = (r: FindResult) => [
 		w.tab && tab(r).padStart(w.tab),
-		r.sessionId.padEnd(w.id),
+		id(r).padEnd(w.id),
 		w.name && cut(r.name, w.name).padEnd(w.name),
 		age(r.age).padStart(w.age),
 		w.kind && kind(r).padEnd(w.kind),

@@ -6,6 +6,8 @@ export type FindResult = {
 	sessionId: string
 	name: string
 	blockId: string
+	// Card id as the transcript shows it, e.g. a1313; empty for session matches.
+	card: string
 	kind: FindKind
 	age: number
 	snippet: string

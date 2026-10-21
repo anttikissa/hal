@@ -14,7 +14,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 
-export type FindRow = { sessionId: string; blockId: string; kind: FindKind; ts: number; text: string }
+export type FindRow = { sessionId: string; blockId: string; card: string; kind: FindKind; ts: number; text: string }
 type Mark = { offset: number; size: number; mtime: number }
 
 function init(): void {
@@ -22,14 +22,14 @@ function init(): void {
 	let db = new Database(`${paths.stateDir()}/find.sqlite`, { create: true })
 	findIndex.state.db = db
 	// The projection is disposable; version changes reindex immutable history.
-	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 3) {
+	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 4) {
 		db.exec(
-			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=3;',
+			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=4;',
 		)
 	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
-		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId));
+		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId));
 		CREATE INDEX IF NOT EXISTS doc_kind ON docs(kind);
 		CREATE VIRTUAL TABLE IF NOT EXISTS words USING fts5(text, content='docs', content_rowid='id', tokenize='unicode61');
 		CREATE VIRTUAL TABLE IF NOT EXISTS grams USING fts5(text, content='docs', content_rowid='id', tokenize='trigram');
@@ -70,10 +70,31 @@ async function text(sessionId: string, value: string): Promise<string> {
 async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 	let out: FindRow[] = [],
 		ts = Date.parse(r.ts)
+	// The card id's letter, as titles.letter gives it in the transcript.
+	let letters: Partial<Record<FindKind, string>> = {
+		user: 'u',
+		assistant: 'a',
+		thinking: 'r',
+		'tool-call': 't',
+		'tool-output': 't',
+	}
+	let letter = (kind: FindKind) =>
+		r.type === 'command' || r.type === 'inbox'
+			? r.from !== undefined
+				? r.type === 'inbox' && r.label?.startsWith('bash ')
+					? 's'
+					: 'm'
+				: r.origin === 'model'
+					? 's'
+					: 'u'
+			: r.type === 'question' || r.type === 'answer'
+				? 'q'
+				: (letters[kind] ?? 's')
 	let add = async (kind: FindKind, value: string, i = 0) => {
 		out.push({
 			sessionId,
 			blockId: i ? `${r.n}.${i}` : `${r.n}`,
+			card: letter(kind),
 			kind,
 			ts,
 			text: await findIndex.text(sessionId, value),
@@ -167,9 +188,10 @@ async function catchup(sessionId: string): Promise<void> {
 	let flush = () =>
 		db.transaction(() => {
 			for (let row of batch)
-				db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,kind,ts,text) VALUES(?,?,?,?,?)').run(
+				db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,card,kind,ts,text) VALUES(?,?,?,?,?,?)').run(
 					row.sessionId,
 					row.blockId,
+					row.card,
 					row.kind,
 					row.ts,
 					row.text,
