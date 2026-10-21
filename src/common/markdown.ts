@@ -52,6 +52,7 @@ function closes(s: string, i: number, until: string): boolean {
 function opener(s: string, i: number): string | undefined {
 	if (WORD.test(s[i - 1] ?? '')) return undefined
 	let m = s.startsWith('**', i) ? '**' : s[i] === '*' || s[i] === '_' ? s[i]! : undefined
+	if ((m === '*' || m === '_') && /^\.[\p{L}\p{N}]/u.test(s.slice(i + 1))) return undefined
 	return m && /\S/.test(s[i + m.length] ?? ' ') ? m : undefined
 }
 

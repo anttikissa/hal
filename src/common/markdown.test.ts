@@ -50,6 +50,26 @@ describe('inline', () => {
 		expect(markdown.inline('`src/*test*`')).toEqual([{ text: 'src/*test*', code: true }])
 	})
 
+	test('extension-like markers do not open italics', () => {
+		for (let streaming of [false, true]) {
+			for (let text of [
+				'Block *.pfx and (*.pub)',
+				'Use *.ts and *.js',
+				'*.NET* supports this',
+				'_.NET_ supports this',
+				'*.5* is the threshold',
+				'*.ä and (*.𐐀)',
+			])
+				expect(markdown.inline(text, streaming)).toEqual([{ text }])
+			expect(markdown.inline('*Use *.ts files*', streaming)).toEqual([{ text: 'Use *.ts files', italic: true }])
+			expect(markdown.inline('Use *.ts, then *restart*', streaming)).toEqual([
+				{ text: 'Use *.ts, then ' },
+				{ text: 'restart', italic: true },
+			])
+			expect(markdown.inline('**.NET**', streaming)).toEqual([{ text: '.NET', bold: true }])
+		}
+	})
+
 	test('an unclosed marker opens while the text may grow, shows when done', () => {
 		expect(open('at **17:40')).toBe('at **17:40**')
 		expect(done('at **17:40')).toBe('at **17:40')
