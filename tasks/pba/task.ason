@@ -1,6 +1,6 @@
 {
 	title: 'Scrollback notice links its card',
-	spec: `The terminal notice after /go or Ctrl-F names the card as <session>#<id> with its kind letter ("Hal can't scroll the terminal, but 181-den#t526 is about 98% down the scrollback."). Notices render through markdownView with a block-id resolver, the path model text uses, so the id is a link to that card on the web.
+	spec: `The terminal notice after /go or Ctrl-F names the card as <session>/<id> with its kind letter, the task 2kh form ("Hal can't scroll the terminal, but 181-den/t526 is about 98% down the scrollback."). Notices render through markdownView with a block-id resolver, the path model text uses, so the id is a link to that card on the web.
 
 Invariant restored (bug, 2026-10-21): the notice showed a bare key (1286) and no link.`,
 	status: 'done',

@@ -1,15 +1,15 @@
 {
 	title: '/go goes to cards; one described completion row each',
-	spec: `/go also goes to a card: it shows the session as before and reveals the card as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the card is ("Hal can't scroll the terminal, but #123 is about 29% down the scrollback."). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the card, and the router keeps the hash on that switch.
+	spec: `/go also goes to a card: it shows the session as before and reveals the card as Ctrl-F does (task 6m). The terminal switches to the tab without changing its transcript: Hal can't scroll the terminal, so once the tab's history is all in, a notice says where the card is ("Hal can't scroll the terminal, but 166-eta/t123 is about 29% down the scrollback."). The terminal never cuts its transcript. The web uses the task 0z address /<session>#<id>: the go event carries the card, and the router keeps the hash on that switch.
 
 Targets:
 - n: tab n. A bare number is always a tab, never a card.
 - #n, #<k>n or <k>n, where k is a kind letter of task 9p: card n of this session. Any letter or none names the same card, so #r12 opens card 12 even if it is a tool call. An unknown card is an error that names it. An exact session name (such as "t12") wins over a card.
-- <session>#<card> or <session>/<card>: a card of another session. <session> is any session target (tab number, id or name), and a closed session is reopened first, as today. The / form is a shortcut for users who forget the #. When a path also matches (a session directory such as ~/src/123), the path wins.
+- <session>/<card> (old form <session>#<card> still accepted): a card of another session. <session> is any session target (tab number, id or name), and a closed session is reopened first, as today. When a path also matches (a session directory such as ~/src/123), the path wins.
 - Directories work as today: the cwd of an open or closed session, never any other directory.
 This differs from /toggle and web anchors, where a bare number is a card. That is the user's decision: /go numbers stay tab numbers.
 
-Help: '/go <tab|session|directory>[#card]: go to a session, reopening it if closed, or to a card in it (#t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.'
+Help: '/go <tab|session|directory>[/card]: go to a session, reopening it if closed, or to a card in it (t12, 4/u7, 166-eta/a30). A directory picks its first open tab, else its newest session.'
 
 Completion lists each candidate once, with a description. The terminal and the web show the same rows. The web shows the value in bold with the description under it. The terminal shows one candidate per row in the help area, at most 10, then "+N more". This also changes how the terminal shows the described completions of /model, /effort and /restart.
 - Empty or digits: open tabs by number. "1  Design /go navigation to message cards  166-eta".

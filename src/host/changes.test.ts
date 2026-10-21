@@ -171,7 +171,7 @@ test('/changes lists a file once with the cards of the calls that changed it, ne
 	expect(rows).toHaveLength(1)
 	expect(rows[0]).toMatch(
 		new RegExp(
-			`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[#t5\\]\\([^)]*/${id}#t5\\) \\[#t9\\]\\([^)]*/${id}#t9\\)$`,
+			`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[t5\\]\\([^)]*/${id}#t5\\) \\[t9\\]\\([^)]*/${id}#t9\\)$`,
 		),
 	)
 	expect(say).not.toContain('toolu_')

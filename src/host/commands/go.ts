@@ -120,7 +120,7 @@ function dirRows(text: string, ctx: Context): Candidate[] {
 export const command: SlashCommand = {
 	quiet: true,
 	help: () =>
-		'/go <tab|session|directory>[#card]: go to a session, reopening it if closed, or to a card in it (t12, 4#u7, 166-eta#a30). A directory picks its first open tab, else its newest session.',
+		'/go <tab|session|directory>[/card]: go to a session, reopening it if closed, or to a card in it (t12, 4/u7, 166-eta/a30). A directory picks its first open tab, else its newest session.',
 	complete(args, ctx) {
 		if (/^[~/.]/.test(args)) return dirRows(args, ctx)
 		if (/^\d*$/.test(args))

@@ -149,7 +149,7 @@ function shown(file: ChangedFile, cwd: string): string {
 // (task 0z). Records from before task jts have no call number: no id.
 function calls(id: string, file: ChangedFile): { block: string; href: string }[] {
 	let blocks = [...new Set(file.steps.flatMap((s) => (s.call === undefined ? [] : [`t${s.call}`])))]
-	return blocks.map((b) => ({ block: `#${b}`, href: `/${id}#${b}` }))
+	return blocks.map((b) => ({ block: b, href: `/${id}#${b}` }))
 }
 
 function href(id: string, path?: string): string {

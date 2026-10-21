@@ -54,7 +54,7 @@ function report(): void {
 	find.target = undefined
 	let f = frame.build(appView.view(), app.cols(), 24, true),
 		at = f.items!.findIndex((i) => i.key === r.blockId)
-	app.state.notice = `Hal can't scroll the terminal, but ${r.sessionId}#${f.items![at] ? titles.blockId(f.items![at]!) : r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback.`
+	app.state.notice = `Hal can't scroll the terminal, but ${r.sessionId}/${f.items![at] ? titles.blockId(f.items![at]!) : r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback.`
 }
 export const find = {
 	state: findController.create(),
