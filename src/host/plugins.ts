@@ -19,8 +19,11 @@ type Keys<T> = { [K in keyof T]-?: T[K] extends Fn ? K : never }[keyof T] & stri
 type F<T, K extends keyof T> = Extract<T[K], Fn>
 
 // The registration function's argument. Types keep around's return
-// type the target's: a sync target needs a sync replacement. See README.md,
-// Plugins, for local redraw requests after setup and cleanup.
+// type the target's: a sync target needs a sync replacement.
+// After changing rendering state, call render.request(reason) from
+// src/client/render.ts. Hooks apply during setup and are restored before
+// the returned cleanup runs, so a redraw in either sees the right state.
+// Example: themes/hal.ts.
 export type Plugin = {
 	before<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (...args: Parameters<F<T, K>>) => void): void
 	after<T extends object, K extends Keys<T>>(
