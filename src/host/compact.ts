@@ -103,7 +103,7 @@ function retry(id: string, e: ErrorEvent, tried: boolean): boolean {
 	if (e.canceled || !compact.tooLong(e)) return false
 	delete e.failure
 	if (tried || compact.run(id, true) === undefined) return false
-	slash.output(id, 'the provider said the prompt is too long: compacted, trying again')
+	slash.output(id, 'The provider said the prompt is too long: compacted, trying again')
 	return true
 }
 
