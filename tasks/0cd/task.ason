@@ -7,7 +7,8 @@
 		'Keys seen in ps -E (user report): only Hal and its children carried OPENAI_API_KEY; login, zsh and ./run did not. The source of the key in bun is not yet known.',
 		"The no-approval security value is 'yolo' (was 'none'); an old 'none' in the config is invalid and falls back to best-effort, by the user's choice. Approval questions are titled 'Approval needed'; a question's title is its text's first line, the rest is body text in the body color, in both clients (forms.title, forms.details).",
 		"The approval's yes option reads 'yes, I take responsibility' so the user hesitates before accepting; no stays the default.",
-		'/help security lists the settings on separate rows: best-effort (default, catches mistakes, not a determined attacker) and yolo (no security whatsoever; recommended only in a sandbox with no leakable secrets).'
+		'/help security lists the settings on separate rows: best-effort (default, catches mistakes, not a determined attacker) and yolo (no security whatsoever; recommended only in a sandbox with no leakable secrets).',
+		'Invariant: ps, cat, head and tail are checked as commands after assignments, (, {, ! and inside command substitutions anywhere in a segment. Bug: c=$(ps -E ...) in a loop ran without approval, because only a segment start counted.'
 	],
 	needs: ['6f'],
 	foldInto: ['6f']

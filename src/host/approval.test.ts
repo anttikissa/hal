@@ -60,7 +60,9 @@ test('dangerous commands are caught and their offending part marked; harmless on
 test('only bash is checked, and the form asks y/N with No as default, giving each reason once', () => {
 	expect(approval.form({ type: 'tool_call', id: 'r', name: 'read', input: { path: 'rm -rf x' } })).toBeUndefined()
 	let form = approval.form(bash('rm -rf build; rm -rf dist; git reset --hard'))!
-	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes, I take responsibility', 'no'], initial: 1 }])
+	expect(form.fields).toEqual([
+		{ type: 'choice', name: 'run', options: ['yes, I take responsibility', 'no'], initial: 1 },
+	])
 	expect(form.quote!.text).toBe('rm -rf build; rm -rf dist; git reset --hard')
 	expect(form.text).toBe(
 		'Approval needed\nMay wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',
@@ -80,6 +82,9 @@ test('env dumps are caught; ps without env options is not', () => {
 		['ps -e', []],
 		['ps -o user,pid', []],
 		['echo ps -E', []],
+		['c=$(ps -E -p 1 | grep -c X)', ['ps -E -p 1']],
+		['echo `ps e`', ['ps e`']],
+		['(ps -E)', ['ps -E)']],
 	]
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
 	expect(approval.form(bash('ps -E'))!.text.split('\n')[1]).toStartWith('Reveals env variables.')
@@ -103,6 +108,10 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 		// Public keys are meant to be shared.
 		['cat ~/.ssh/id_ed25519.pub', []],
 		['echo "cat ~/.ssh/id_rsa"', []],
+		['k=$(cat .env)', ['cat .env)']],
+		['A=1 head .env', ['head .env']],
+		['echo "$(cat .env)"', ['cat .env)"']],
+		['{ tail ~/.ssh/id_rsa; }', ['tail ~/.ssh/id_rsa']],
 	]
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
 	let original = settings.security

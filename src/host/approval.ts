@@ -118,16 +118,25 @@ const git: [RegExp, string][] = [
 ]
 
 // A command that starts the segment, like `cat x` but not `echo "cat x"`.
+// It may follow assignments (`x=$(cat x)`, `A=1 cat x`), `(`, `{`, `!`,
+// or a command substitution anywhere (`echo "$(cat x)"`).
 function leading(seg: string, re: RegExp): RegExpMatchArray | null {
 	let m = seg.match(re)
-	return m && !seg.slice(0, m.index).trim() ? m : null
+	let before = m && seg.slice(0, m.index)
+	return m && (/^(\s*([A-Za-z_]\w*=\S*|[$<]?\(|`|\{|!))*\s*$/.test(before!) || /([$<]\(|`)\s*$/.test(before!))
+		? m
+		: null
 }
 
 // ps -E (macOS) or ps e (BSD-style options, first argument) prints
 // every process's environment; so does /proc/<pid>/environ.
 function envDump(seg: string): RegExpMatchArray | null {
-	let ps = leading(seg, /(?<!\S)(?:\/bin\/)?ps(?:\s+(.*)|$)/)
-	let args = ps?.[1]?.trim().split(/\s+/) ?? []
+	let ps = leading(seg, /(?<![^\s(`{])(?:\/bin\/)?ps(?:\s+(.*)|$)/)
+	let args =
+		ps?.[1]
+			?.trim()
+			.replace(/[)`]+$/, '')
+			.split(/\s+/) ?? []
 	if (ps && (args.some((a) => /^-[a-zA-Z]*E/.test(a)) || /^[a-zA-Z]*e[a-zA-Z]*$/.test(args[0] ?? ''))) return ps
 	return seg.match(/\S*\/proc\/[^\s/]+\/environ\S*/)
 }
@@ -157,12 +166,12 @@ function findings(command: string): { at: Mark; reason: string }[] {
 		}
 		for (let [re, why] of git) if (!found && (found = seg.match(re))) reason = why
 		if (!found && (found = envDump(seg))) reason = reasons.env
-		let print = leading(seg, /(?<!\S)(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
+		let print = leading(seg, /(?<![^\s(`{])(?:\/(?:usr\/)?bin\/)?(?:cat|head|tail)\s+(.*)/)
 		if (
 			!found &&
 			print &&
 			(print[1]!.match(/"[^"]*"|'[^']*'|[^\s<>]+/g) ?? []).some((t) =>
-				approval.sensitive(t.replace(/^['"]|['"]$/g, '')),
+				approval.sensitive(t.replace(/^['"]|['"]$/g, '').replace(/[)`]+$/, '')),
 			)
 		) {
 			found = print
