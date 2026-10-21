@@ -20,14 +20,7 @@ function target(id: string, key: string, byId = false): { n: number; item?: { id
 	let n = !byId && /^\d+$/.test(key) ? Number(key) : queued.findIndex((m) => m.id === key) + 1
 	return { n, item: n > 0 ? queued[n - 1] : undefined }
 }
-const operations = [
-	{ value: 'next', description: 'soft-steer with the oldest or nth message, or run it when idle' },
-	{ value: 'now', description: 'steer with the oldest or nth message' },
-	{ value: 'drop', description: 'drop the newest or nth message' },
-	{ value: 'undo', description: 'queue again the message /queue next moved' },
-	{ value: 'clear', description: 'drop all queued messages' },
-	{ value: 'help', description: 'show /queue usage' },
-]
+const operations = ['next', 'now', 'drop', 'undo', 'clear', 'help']
 function dropKey(id: string, drop: RegExpMatchArray): string {
 	return drop[1] ?? drop[2] ?? String(queuedOf(id).length)
 }
@@ -47,9 +40,9 @@ export const command: SlashCommand = {
 		let numbered = args.match(/^(next|now|drop)\s+\d*$/)
 		if (numbered)
 			return queuedOf(ctx.sessionId)
-				.map((m, i) => ({ value: `${numbered[1]} ${i + 1}`, description: m.text.split('\n')[0]! }))
-				.filter((c) => c.value.startsWith(args))
-		return operations.filter((o) => o.value.startsWith(args))
+				.map((_, i) => `${numbered[1]} ${i + 1}`)
+				.filter((c) => c.startsWith(args))
+		return operations.filter((o) => o.startsWith(args))
 	},
 	record(args, id) {
 		let drop = args.match(dropPattern)

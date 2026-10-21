@@ -204,7 +204,8 @@ with an explanation and the canonical syntax.
   Tools disclose detail progressively (HELP) and let Hal's tool set
   change without busting the prompt cache.
 - When you add or change a slash command, its `complete` offers every
-  subcommand, flag and enumerable argument, each with a description.
+  subcommand, flag and enumerable argument, as plain values like the
+  other commands.
 - Configure with command-line flags (e.g. `hal --no-user`), never
   environment variables: they hide information and are hard to
   discover and cumbersome to use. Replace an existing one with a flag
