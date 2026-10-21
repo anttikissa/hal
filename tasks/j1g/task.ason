@@ -1,0 +1,10 @@
+{
+	title: 'Nudge from Enter outside the web prompt',
+	spec: 'On the web, plain Enter outside the composer nudges an idle session when the draft is empty, through the same submission path as Enter in the composer. Focused fields, buttons, links, other native interactive controls, open dialogs and questions retain their keyboard ownership. Modified Enter, IME, nonempty drafts and prompt editing do not trigger this outside-prompt nudge. Terminal behavior is unchanged. Restore the invariant that idle empty-prompt nudging does not depend on composer focus.',
+	status: 'done',
+	notes: [
+		'Outside Enter reuses app.send and the configured Enter delivery. Eligibility stays idle, empty draft and no prompt edit; select and summary retain native keys alongside fields, buttons, links and dialogs. Focused web keys/view tests pass (26 tests), TypeScript noEmit passes, and changed-source oxlint reports no warnings or errors. No timers, growing state or history scans added.'
+	],
+	needs: ['yhn', 'qn'],
+	foldInto: ['yhn']
+}

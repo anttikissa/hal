@@ -234,6 +234,19 @@ function key(e: KeyInput, target: Target): boolean {
 		return false
 	}
 	if (target.kind !== 'message') {
+		if (
+			plain &&
+			e.key === 'Enter' &&
+			target.kind === 'other' &&
+			!st.text.trim() &&
+			!st.view.editing &&
+			view.nudge(st.view, 0)
+		) {
+			let delivery = sendKeys.delivery({})
+			if (!delivery) return false
+			app.send(delivery)
+			return true
+		}
 		// Typing outside any field goes into the box at its caret, as in
 		// Slack; Space still presses a focused button or link.
 		if (target.kind === 'field' || !typing(e) || (target.kind === 'button' && e.key === ' ')) return false

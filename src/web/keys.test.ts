@@ -66,12 +66,38 @@ test('a printable key outside any field types into the box, keeping the key', ()
 	expect(typed).toEqual(['h', 'H', 'ä'])
 })
 
+test('plain Enter outside the empty idle composer nudges without taking control keys', () => {
+	for (let target of [{ kind: 'field' }, { kind: 'button', submits: false }, { kind: 'link' }] as Target[])
+		expect(press('Enter', target)).toBe(false)
+	for (let mods of [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }, { isComposing: true }])
+		expect(press('Enter', other, mods)).toBe(false)
+	expect(sent).toEqual([])
+	expect(press('Enter', other)).toBe(true)
+	expect(sent).toHaveLength(1)
+	expect(sent[0]).toMatchObject({ type: 'submit', sessionId })
+	expect(sent[0].text.trim()).not.toBe('')
+})
+
+test('outside Enter leaves drafts, prompt edits and non-idle sessions alone', () => {
+	app.input('draft')
+	expect(press('Enter', other)).toBe(false)
+	expect(app.state.text).toBe('draft')
+	app.input('')
+	app.setView({ ...app.state.view, editing: { original: 'earlier', text: '', aside: true } as any })
+	expect(press('Enter', other)).toBe(false)
+	app.setView({ ...app.state.view, editing: undefined })
+	for (let state of [{ type: 'running', phase: 'streaming' }, { type: 'paused' }] as const) {
+		app.onEvent({ type: 'state', sessionId, state })
+		expect(press('Enter', other)).toBe(false)
+	}
+	expect(sent.some((c) => c.type === 'submit' || c.type === 'continue')).toBe(false)
+})
+
 test('keys that do not type, fields, and Space on a button stay where they are', () => {
 	for (let [key, mods] of [
 		['a', { ctrlKey: true }],
 		['a', { metaKey: true }],
 		['ArrowDown', {}],
-		['Enter', {}],
 		['F5', {}],
 	] as const)
 		expect(press(key, other, mods)).toBe(false)
