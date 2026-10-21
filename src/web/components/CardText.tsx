@@ -25,11 +25,14 @@ export function CardText(props: { item: Item; text: string }) {
 						{marked && l ? <mark>{l}</mark> : l}
 					</>
 				))
+			let details = forms.details(item.form)
+			let head = details.length ? `${details.join('\n')}\n\n` : ''
 			return (
 				<>
+					{head}
 					{'    '}
 					<For each={forms.quoteParts(q)}>{(p) => indent(p.text, p.marked)}</For>
-					{props.text.slice(q.text.length + 4 * q.text.split('\n').length)}
+					{props.text.slice(head.length + q.text.length + 4 * q.text.split('\n').length)}
 				</>
 			)
 		}

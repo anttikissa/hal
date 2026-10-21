@@ -5,7 +5,8 @@
 	notes: [
 		'ps -e is all processes on both macOS and Linux, not env; only -E (dashed) and e (undashed, first argument) show env. The undashed check looks only at the first argument so -o user is not taken for an e group.',
 		'Keys seen in ps -E (user report): only Hal and its children carried OPENAI_API_KEY; login, zsh and ./run did not. The source of the key in bun is not yet known.',
-		"The no-approval security value is 'yolo' (was 'none'); an old 'none' in the config is invalid and falls back to best-effort, by the user's choice. Approval questions are titled 'Approval needed'; a question's title is its text's first line, the rest is body text in the body color, in both clients (forms.title, forms.details)."
+		"The no-approval security value is 'yolo' (was 'none'); an old 'none' in the config is invalid and falls back to best-effort, by the user's choice. Approval questions are titled 'Approval needed'; a question's title is its text's first line, the rest is body text in the body color, in both clients (forms.title, forms.details).",
+		"The approval's yes option reads 'yes, I take responsibility' so the user hesitates before accepting; no stays the default."
 	],
 	needs: ['6f'],
 	foldInto: ['6f']

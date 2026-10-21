@@ -60,7 +60,7 @@ test('dangerous commands are caught and their offending part marked; harmless on
 test('only bash is checked, and the form asks y/N with No as default, giving each reason once', () => {
 	expect(approval.form({ type: 'tool_call', id: 'r', name: 'read', input: { path: 'rm -rf x' } })).toBeUndefined()
 	let form = approval.form(bash('rm -rf build; rm -rf dist; git reset --hard'))!
-	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }])
+	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes, I take responsibility', 'no'], initial: 1 }])
 	expect(form.quote!.text).toBe('rm -rf build; rm -rf dist; git reset --hard')
 	expect(form.text).toBe(
 		'Approval needed\nMay wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',

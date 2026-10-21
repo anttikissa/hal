@@ -185,7 +185,7 @@ function form(call: ToolCallBlock): Form | undefined {
 	return {
 		text: ['Approval needed', ...new Set(found.map((f) => f.reason)), '/help security to learn more.'].join('\n'),
 		quote: { text: command, marks: found.map((f) => f.at) },
-		fields: [{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }],
+		fields: [{ type: 'choice', name: 'run', options: ['yes, I take responsibility', 'no'], initial: 1 }],
 	}
 }
 
@@ -222,7 +222,7 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 			open = true
 		} else if (r.type === 'answer' && r.question === asked?.id) {
 			open = false
-			decided.set(asked.call!, r.answers.run === 'yes')
+			decided.set(asked.call!, String(r.answers.run).startsWith('yes'))
 		} else if (r.type === 'continue' && !open) return undefined
 	}
 	return asked ? { calls, decided } : undefined

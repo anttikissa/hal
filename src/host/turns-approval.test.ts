@@ -123,7 +123,7 @@ test('each dangerous call is asked once, harmless ones not at all; answers survi
 	await until(() => transcript.question(a.views.get(id)))
 	let first = transcript.question(a.views.get(id))!
 	expect(first.form.quote!.text).toBe('rm -rf junk')
-	a.conn.send({ type: 'answer', sessionId: id, question: first.id, answers: { run: 'yes' } })
+	a.conn.send({ type: 'answer', sessionId: id, question: first.id, answers: { run: 'yes, I take responsibility' } })
 	await until(() => transcript.question(a.views.get(id))?.id !== first.id && transcript.question(a.views.get(id)))
 	let second = transcript.question(a.views.get(id))!
 	expect(second.form.quote!.text).toBe('git reset --hard')
@@ -195,7 +195,7 @@ test("Escape at an approval pauses with the turn's usage; the call has not run a
 	let again = transcript.question(a.views.get(id))!
 	expect(again.id).not.toBe(first.id)
 	expect(calls).toHaveLength(1)
-	a.conn.send({ type: 'answer', sessionId: id, question: again.id, answers: { run: 'yes' } })
+	a.conn.send({ type: 'answer', sessionId: id, question: again.id, answers: { run: 'yes, I take responsibility' } })
 	await until(() => calls.length === 2)
 	expect(ran).toEqual(['b1'])
 	expect(results(calls[1]!)).toEqual([expect.objectContaining({ id: 'b1', output: expect.stringMatching(/exit 0/) })])

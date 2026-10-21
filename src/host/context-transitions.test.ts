@@ -257,7 +257,7 @@ test('clear at a parked approval closes the old turn and held calls never resume
 	await until(() => c.of('divider').length === 1)
 	expect(c.views.get(id)!.state.type).toBe('idle')
 	expect((await fresh(id)).state.type).toBe('idle')
-	c.conn.send({ type: 'answer', sessionId: id, question, answers: { run: 'yes' } })
+	c.conn.send({ type: 'answer', sessionId: id, question, answers: { run: 'yes, I take responsibility' } })
 	await until(() => c.of('rejected').length === 1)
 	restartHost()
 	await turns.recover()
