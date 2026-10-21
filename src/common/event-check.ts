@@ -4,6 +4,7 @@
 import { sender } from './sender.ts'
 import type { EventType } from './protocol.ts'
 import { pluginSyncWire } from './plugin-sync.ts'
+import { findQuery } from './find.ts'
 
 // What each event carries, checked by clients (connection.ts) before
 // use: a page or terminal can outlive a host restart onto newer code.
@@ -215,7 +216,7 @@ function invalidEvent(value: unknown): string | undefined {
 		return 'tabs: invalid question kind'
 	if (value.type === 'plugin-sync') return pluginSyncWire.invalidEvent(value)
 	if (value.type === 'find-results') {
-		let tiers = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']
+		let tiers: string[] = findQuery.tiers
 		if (!tiers.includes(value.tier as string)) return 'find-results: invalid tier'
 		let valid = (value.results as unknown[]).every(
 			(r) =>
