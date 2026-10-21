@@ -261,7 +261,7 @@ export function Composer(props: {
 				class={p.class}
 				data-diagnostic-action={p.kind}
 				aria-label={b().label}
-				title={`${b().label} — ${b().caption}`}
+				aria-description={b().caption}
 				disabled={p.disabled}
 				onPointerDown={(e) => e.preventDefault()}
 				onPointerEnter={show}
