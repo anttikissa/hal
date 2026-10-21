@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Existing around hooks are outermost in filename order, so append-on-return hooks add tools in reverse hook order; this change does not alter composition. Lookup uses find, so plugins replacing an existing tool should map/filter the array rather than append a duplicate. Regression coverage checks array extension through lookup, HELP, prompt summary, read-only classification and execution; provider fallback coverage removes a tool with filter.',
-		'Verification: full normal suite ran 1661 tests, 1660 passed; the sole failure was the concurrently modified src/common/transcript.ts exceeding the source size limit. Whole-project typecheck and lint of the nine changed source/test files passed. Full lint reported unrelated warnings in frame.ts and find-index.ts; their owners were notified.'
+		'Verification: full normal suite ran 1661 tests, 1660 passed; the sole failure was the concurrently modified src/common/transcript.ts exceeding the source size limit. Whole-project typecheck and lint of the nine changed source/test files passed. Full lint reported unrelated warnings in frame.ts and find-index.ts; their owners were notified.',
+		'Follow-up invariant: Anthropic native-search fallback uses the same array membership lookup as OpenAI. Its tools import is aliased registry; that hunk was already present in the shared working tree during verification but omitted from the initial commit. Include aliased consumers when auditing registry API changes.'
 	],
 	needs: ['an'],
 	foldInto: ['an']

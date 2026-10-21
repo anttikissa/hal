@@ -129,7 +129,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	if (
 		req.tools?.some((t) => t.name === 'tool') &&
 		catalog.webSearchModels.includes(req.model) &&
-		(!auth.serperKey() || !registry.all().has('google'))
+		(!auth.serperKey() || !registry.all().some((t) => t.name === 'google'))
 	) {
 		;(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
 	}
