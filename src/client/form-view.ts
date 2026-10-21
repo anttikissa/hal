@@ -22,7 +22,11 @@ function formLines(
 	ts?: string,
 ): { rows: string[]; cursor: { row: number; col: number } } {
 	let quote = itemView.quoteLines(st.form.quote, width)
-	let rows = [...ansi.wrap(titles.stamp(ts, st.form.text), width), ...(quote.length ? ['', ...quote] : [])]
+	let rows = [
+		...ansi.wrap(titles.stamp(ts, forms.title(st.form)), width).map((row) => ansi.heading(row, colors.question())),
+		...forms.details(st.form).flatMap((l) => ansi.wrap(l, width)),
+		...(quote.length ? ['', ...quote] : []),
+	]
 	let f = formView.fieldLines(st, width)
 	let escape = st.form.skip ? 'Escape: skip' : 'Escape: pause'
 	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`

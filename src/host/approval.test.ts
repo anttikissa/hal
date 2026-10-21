@@ -63,7 +63,7 @@ test('only bash is checked, and the form asks y/N with No as default, giving eac
 	expect(form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }])
 	expect(form.quote!.text).toBe('rm -rf build; rm -rf dist; git reset --hard')
 	expect(form.text).toBe(
-		'May wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',
+		'Approval needed\nMay wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',
 	)
 })
 
@@ -82,11 +82,11 @@ test('env dumps are caught; ps without env options is not', () => {
 		['echo ps -E', []],
 	]
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
-	expect(approval.form(bash('ps -E'))!.text).toStartWith('Reveals env variables.')
+	expect(approval.form(bash('ps -E'))!.text.split('\n')[1]).toStartWith('Reveals env variables.')
 	expect(approval.sensitive('/proc/1/environ')).toBe(true)
 })
 
-test('secret-printing approvals are narrow, use the shared path policy and honor security none', () => {
+test('secret-printing approvals are narrow, use the shared path policy and honor security yolo', () => {
 	let table: [string, string[]][] = [
 		['cat ~/.ssh/id_rsa', ['cat ~/.ssh/id_rsa']],
 		['head -n 5 "$HOME/.aws/credentials"', ['head -n 5 "$HOME/.aws/credentials"']],
@@ -107,7 +107,7 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
 	let original = settings.security
 	try {
-		settings.security = () => 'none'
+		settings.security = () => 'yolo'
 		expect(approval.form(bash('cat ~/.ssh/id_rsa'))).toBeUndefined()
 	} finally {
 		settings.security = original

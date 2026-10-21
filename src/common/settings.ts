@@ -47,9 +47,9 @@ const table: Setting[] = [
 	{
 		name: 'security',
 		label: 'Security',
-		type: { kind: 'choice', options: ['best-effort', 'none'] },
+		type: { kind: 'choice', options: ['best-effort', 'yolo'] },
 		default: 'best-effort',
-		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (none).',
+		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (yolo).',
 	},
 	{
 		name: 'promptRows',
@@ -245,7 +245,7 @@ export const settings = {
 	warnings: (): string[] => settings.check(settings.state.raw).warnings,
 	subagentSlots: (): number => settings.value('subagentSlots') as number,
 	model: (): string => settings.value('model') as string,
-	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
+	security: (): 'best-effort' | 'yolo' => settings.value('security') as 'best-effort' | 'yolo',
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).
 	webUrl: (): string =>

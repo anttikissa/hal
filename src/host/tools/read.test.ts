@@ -135,9 +135,9 @@ test('READ refuses sensitive paths and symlink targets without exposing contents
 	expect(batch.output).not.toContain(secret)
 })
 
-test('security none explicitly permits READ of synthetic sensitive files', async () => {
+test('security yolo explicitly permits READ of synthetic sensitive files', async () => {
 	writeFileSync(`${home}/.env`, 'FAKE-SECRET-CONTENT\n')
-	settings.security = () => 'none'
+	settings.security = () => 'yolo'
 	let result = await read('.env')
 	expect(result.isError).toBeUndefined()
 	expect(result.output).toContain('1: FAKE-SECRET-CONTENT')

@@ -25,6 +25,7 @@ import { cardIcons } from '../card-icons.ts'
 import { cardMotion } from '../card-motion.ts'
 import { bashResult } from '../../common/bash-result.ts'
 import { card } from '../../common/card.ts'
+import { forms } from '../../common/forms.ts'
 import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
@@ -147,8 +148,7 @@ export function Card(props: {
 	let who = () => {
 		let item = props.row.item
 		// A question is headed by its text, its addresses links.
-		if (item.type === 'question')
-			if (item.type === 'question') return <LinkedText parts={hrefs.urlParts(item.form.text)} />
+		if (item.type === 'question') return <LinkedText parts={hrefs.urlParts(forms.title(item.form))} />
 		let ref = source(),
 			t = titles.who(item)
 		if (titles.letter(item) === 'm') t = cardIcons.unmark(t)

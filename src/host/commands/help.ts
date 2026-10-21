@@ -24,7 +24,7 @@ Public keys (*.pub) are not secret.
 This is best effort: it catches mistakes, not a determined attacker,
 such as a man-in-the-middle at the provider.
 
-To change it: /config security`,
+To change it: /config security (best-effort or yolo)`,
 }
 
 export const command: SlashCommand = {

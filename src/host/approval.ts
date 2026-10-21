@@ -178,12 +178,12 @@ function findings(command: string): { at: Mark; reason: string }[] {
 // The question for a call that needs approval, or undefined if it may
 // run without asking.
 function form(call: ToolCallBlock): Form | undefined {
-	if (settings.security() === 'none' || call.name !== 'bash' || typeof call.input.command !== 'string') return undefined
+	if (settings.security() === 'yolo' || call.name !== 'bash' || typeof call.input.command !== 'string') return undefined
 	let command = call.input.command
 	let found = approval.findings(command)
 	if (!found.length) return undefined
 	return {
-		text: [...new Set(found.map((f) => f.reason)), '/help security to learn more.'].join('\n'),
+		text: ['Approval needed', ...new Set(found.map((f) => f.reason)), '/help security to learn more.'].join('\n'),
 		quote: { text: command, marks: found.map((f) => f.at) },
 		fields: [{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }],
 	}

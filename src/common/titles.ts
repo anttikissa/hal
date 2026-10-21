@@ -6,6 +6,7 @@
 import type { Shown } from './transcript.ts'
 import { bashResult } from './bash-result.ts'
 import { card } from './card.ts'
+import { forms } from './forms.ts'
 import { summary } from './summary.ts'
 
 // Names sent by the host's cached models.dev catalog; fall back to the
@@ -192,7 +193,7 @@ function hidden(item: Shown): number {
 // '10:52 Hal (Opus 5.5)', '10:52 Run this command? …' for a question;
 // undefined for an item without a header.
 function title(item: Shown): string | undefined {
-	if (item.type === 'question') return stamp(item.ts, item.form.text)
+	if (item.type === 'question') return stamp(item.ts, forms.title(item.form))
 	if (item.type === 'output' && !item.commit && !item.error) return titles.time(item.ts) || undefined
 	let w = item.type === 'prompt' && item.report && item.summary ? titles.compact(item) : titles.who(item)
 	if (w === undefined) return undefined

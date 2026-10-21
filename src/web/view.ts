@@ -380,7 +380,11 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 					? forms.summary(item.form, item.answers, item.secrets)
 					: ['(not answered)']
 			let quote = item.form.quote ? [...item.form.quote.text.split('\n').map((l) => `    ${l}`), ''] : []
-			return { kind: 'question warning', text: [...quote, ...said.map((l) => `  ${l}`)].join('\n') }
+			let details = forms.details(item.form)
+			return {
+				kind: 'question warning',
+				text: [...(details.length ? [...details, ''] : []), ...quote, ...said.map((l) => `  ${l}`)].join('\n'),
+			}
 		}
 		case 'command':
 			// Another session's: drawn as the prompt it was sent as (Card

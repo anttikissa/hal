@@ -298,8 +298,10 @@ function itemLines(
 				: item.answers
 					? forms.summary(item.form, item.answers, item.secrets)
 					: ['(not answered)']
+			let details = forms.details(item.form)
 			return [
 				...ansi.wrap(titles.title(item)!, width).map((row) => ansi.heading(row, itemView.itemStyle(item))),
+				...details.flatMap((l) => ansi.wrap(l, width)),
 				'',
 				...quote,
 				...(quote.length ? [''] : []),

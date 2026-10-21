@@ -26,7 +26,7 @@ export function Question(props: {
 }) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
-	let parts = createMemo(() => hrefs.urlParts(form().text))
+	let parts = createMemo(() => hrefs.urlParts(forms.title(form())))
 	// The focused field takes the focus (its chosen option, for a group).
 	// The memo gates on equality: other updates re-run an effect's
 	// callback, and a focus() then would clear a reader's selection.
@@ -97,6 +97,9 @@ export function Question(props: {
 					</button>
 				}
 			/>
+			<Show when={forms.details(form()).length}>
+				<p class="details">{forms.details(form()).join('\n')}</p>
+			</Show>
 			<Show when={form().quote}>
 				{(quote) => (
 					<pre class="quote">

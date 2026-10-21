@@ -100,7 +100,7 @@ export const tool: Tool<ToolOutput> = {
 		let offset = count(input, 'offset', 1)
 		let limit = count(input, 'limit', 0)
 		let path = resolve(ctx.cwd, paths.expand(input.path))
-		if (settings.security() !== 'none' && (approval.sensitive(path) || approval.sensitive(realpathSync(path))))
+		if (settings.security() !== 'yolo' && (approval.sensitive(path) || approval.sensitive(realpathSync(path))))
 			throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
 		let st = statSync(path)
 		if (st.isDirectory()) {

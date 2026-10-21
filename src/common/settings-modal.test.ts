@@ -16,7 +16,7 @@ test('Space and Enter change a setting at once and keep the modal open', () => {
 		command: { type: 'submit', sessionId: 's', text: '/config push false' },
 	})
 	expect(settingsModal.step(at('security'), key('enter'), 's').action).toMatchObject({
-		command: { text: '/config security none' },
+		command: { text: '/config security yolo' },
 	})
 })
 
@@ -42,8 +42,8 @@ test('Left and Right adjust integers, booleans and choices without crossing boun
 		['webPort', '65535', '65534', undefined],
 		['push', 'true', 'false', undefined],
 		['push', 'false', undefined, 'true'],
-		['security', 'best-effort', undefined, 'none'],
-		['security', 'none', 'best-effort', undefined],
+		['security', 'best-effort', undefined, 'yolo'],
+		['security', 'yolo', 'best-effort', undefined],
 	] as const) {
 		let st = at(name)
 		st.settings!.values = { ...data.values, [name]: now }
@@ -62,7 +62,7 @@ test('Left and Right adjust integers, booleans and choices without crossing boun
 	}
 	let searched = settingsModal.search(settingsModal.open(data), 'secu')
 	expect(settingsModal.step(searched, key('right'), 's').action).toMatchObject({
-		command: { text: '/config security none' },
+		command: { text: '/config security yolo' },
 	})
 	expect(settingsModal.step(at('webPort'), { key: 'right', ctrl: true }, 's').action).toBeUndefined()
 })

@@ -159,7 +159,7 @@ dangerous patterns (`rm -rf` and friends; not plain `rm -f`, which
 models overuse and which is rarely dangerous). A match asks y/N (default
 No), showing the call with the matching part highlighted, open or
 answered. One setting
-picks the policy: `security: 'best-effort'` (ask on matches) or `'none'`
+picks the policy: `security: 'best-effort'` (ask on matches) or `'yolo'`
 (never ask). Best effort by name: there is no sandbox, and patterns
 don't stop a determined model.
 

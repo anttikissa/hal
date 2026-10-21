@@ -20,7 +20,7 @@ test('an empty file means every declared default, and every default passes its o
 test('valid values are taken', () => {
 	let given = {
 		model: 'openai/gpt-5',
-		security: 'none',
+		security: 'yolo',
 		webPort: 8080,
 		webUrl: 'https://h.example',
 		promptRows: 4,

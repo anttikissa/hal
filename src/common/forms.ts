@@ -166,6 +166,14 @@ function quoteParts(q: Quote): { text: string; marked: boolean }[] {
 	return out
 }
 
+// A question's title is its text's first line; the rest is body text.
+function title(form: Form): string {
+	return form.text.split('\n')[0]!
+}
+function details(form: Form): string[] {
+	return form.text.split('\n').slice(1)
+}
+
 // A question answered, in one line per field: "Dave", "API key: (given)".
 function summary(form: Form, answers: Answers, secrets: string[] = []): string[] {
 	return form.fields.map((f) => {
@@ -339,6 +347,8 @@ export const forms = {
 	open,
 	quoteParts,
 	summary,
+	title,
+	details,
 	start,
 	follow,
 	example,

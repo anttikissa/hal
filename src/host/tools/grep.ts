@@ -263,7 +263,7 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 			found = await search({ ...q, regex: undefined, literals })
 			if ('invalid' in found) throw new Error(found.invalid)
 		}
-		if (settings.security() !== 'none') {
+		if (settings.security() !== 'yolo') {
 			let hidden = new Set([...found.files].filter((f) => approval.sensitive(resolve(ctx.cwd, f))))
 			if (hidden.size) {
 				found.matches -= found.lines.filter((l) => l.match && hidden.has(l.path)).length
