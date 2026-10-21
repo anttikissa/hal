@@ -6,26 +6,19 @@ import { commandList } from '../../common/commands/list.ts'
 import { commands, type SlashCommand } from '../commands.ts'
 
 const topics: Record<string, string> = {
-	security: `Hal asks before it runs a command that may destroy work or leak
-secrets. A leaked secret is sent to the model provider and stored
-in plaintext in session files.
+	security: `By default, Hal asks before it runs a command that may destroy work or leak secrets. A leaked secret is sent to the model provider and stored in plaintext in session files.
 
 Hal asks about:
   rm -rf outside /tmp
-  git reset --hard, clean, stash drop/clear, push --force,
-    checkout/restore of files
+  git reset --hard, clean, stash drop/clear, push --force, checkout/restore of files
   Reading secret files (READ refuses them)
   ps -E, ps e, /proc/*/environ (env variables)
 
-Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*,
-auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets.
-Public keys (*.pub) are not secret.
+Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*, auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets. Public keys (*.pub) are not secret.
 
 Settings (/config security):
-  best-effort  Default. Catches mistakes, not a determined attacker,
-               such as a man-in-the-middle at the provider.
-  yolo         No security whatsoever. Recommended only in a sandbox
-               with no leakable secrets.`,
+  best-effort: The default. Catches mistakes, not a determined attacker, such as a man-in-the-middle at the provider.
+  yolo: No security whatsoever. Recommended only in a sandbox with no leakable secrets.`,
 }
 
 export const command: SlashCommand = {
