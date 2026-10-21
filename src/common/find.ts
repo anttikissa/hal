@@ -38,7 +38,13 @@ const groups: Record<string, FindKind[]> = {
 
 function parse(text: string, filters?: FindFilter[]): FindQuery {
 	let q: FindQuery = { words: [], kinds: [...tiers] }
-	if (filters) q.kinds = ['metadata', ...tiers.filter((k) => filters.some((f) => groups[f]!.includes(k)))]
+	if (filters) {
+		let all = (['text', 'thinking', 'tools', 'commit', 'other'] as const).every((f) => filters.includes(f))
+		q.kinds = [
+			...(all ? ['metadata' as const] : []),
+			...tiers.filter((k) => filters.some((f) => groups[f]!.includes(k))),
+		]
+	}
 	for (let word of text.trim().split(/\s+/).filter(Boolean)) {
 		let m = /^(in|model|cwd|since):(.+)$/i.exec(word)
 		if (!m) {
