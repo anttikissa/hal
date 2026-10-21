@@ -182,6 +182,15 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle') && ${atBottom}`)
 		// Let the turn's last redraw land, so nothing else pulls the view.
 		await b.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		// A card tap must not leave navigation armed for a later layout shift.
+		await b.evaluate(`(() => {
+			let t = document.querySelector('.Transcript');
+			t.dispatchEvent(new Event('touchstart', { bubbles: true }));
+			t.dispatchEvent(new Event('touchend', { bubbles: true }));
+			t.scrollTop -= 37;
+			t.appendChild(document.createTextNode('layout update'));
+		})()`)
+		await b.waitFor(atBottom)
 		// A style change is not a DOM mutation and fires no scroll event.
 		// Two frames later the view must be back, not left short until
 		// some later change happens to pull it.

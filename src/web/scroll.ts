@@ -219,6 +219,12 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	let wheel = (e: WheelEvent) => {
 		if (!e.ctrlKey && e.deltaY) intent(e)
 	}
+	let released = () => {
+		navigate()
+		if (scroll.state.pinned) scroll.state.intent = undefined
+	}
+	addEventListener('pointerup', released, { passive: true })
+	addEventListener('touchend', released, { passive: true })
 	el.addEventListener('pointerdown', intent, { passive: true })
 	el.addEventListener('touchstart', intent, { passive: true })
 	el.addEventListener('touchmove', intent, { passive: true })
@@ -236,6 +242,8 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		el.removeEventListener('touchstart', intent)
 		el.removeEventListener('touchmove', intent)
 		el.removeEventListener('wheel', wheel)
+		removeEventListener('pointerup', released)
+		removeEventListener('touchend', released)
 		removeEventListener('keydown', onKey)
 	}
 }
