@@ -6,7 +6,8 @@
 		"Implemented: src/host/commands/queue.ts takes /queue drop <n> (position in /queue's list) or /queue drop <inbox id>; the web × sends the id so a queue that changed meanwhile cannot shift the target. SlashCommand.record gets the session id, so history and other clients show '/queue drop <n>', never the id. 'drop' followed by one word is now reserved like 'next' and 'clear'.",
 		"Order: drop refuses the locked message (queueEdits.held), so a session in 'waiting for queue edit' still waits for that edit and its release delivers as before; drop never starts delivery and never reorders the rest. The × shows on every queued card except the locked one, including messages from other sessions, which /queue clear drops too.",
 		'Invariant restored (2026-10-10): sending a queued message early keeps queuedAt. queueNext rewrote it with inbox.sender, which drops the arrival time, so an early send lost when it first arrived; it now uses inbox.provenance. titles.who shows queued at whenever queuedAt is set.',
-		'Invariant restored (2026-10-12): /queue <prompt> queues a prompt unless it matches a reserved operation. The old drop-plus-any-word parser treated drop it as an ID and refused it. Numeric drops are reserved; the web uses explicit --id targeting, still recording the resolved queue position. Regression coverage includes ordinary words matching a live ID, bare drop, numeric IDs and stale clicks.'
+		'Invariant restored (2026-10-12): /queue <prompt> queues a prompt unless it matches a reserved operation. The old drop-plus-any-word parser treated drop it as an ID and refused it. Numeric drops are reserved; the web uses explicit --id targeting, still recording the resolved queue position. Regression coverage includes ordinary words matching a live ID, bare drop, numeric IDs and stale clicks.',
+		'Superseded (2026-10-21, task f19): bare /queue drop drops the newest queued message; /queue help shows help.'
 	],
 	needs: ['jq', '16', 'jsg']
 }

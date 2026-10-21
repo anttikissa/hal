@@ -12,12 +12,16 @@ import { status } from '../status.ts'
 const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.delivery === 'after-turn')
 
 // The web's × names an inbox id explicitly, so a queue that changed in
-// between cannot shift the target. Other text after /queue is a prompt.
-const dropPattern = /^drop\s+(?:(\d+)|--id\s+(\S+))$/
+// between cannot shift the target. Bare drop takes the newest message:
+// usually the one just queued by mistake. Other text after /queue is a prompt.
+const dropPattern = /^drop(?:\s+(?:(\d+)|--id\s+(\S+)))?$/
 function target(id: string, key: string, byId = false): { n: number; item?: { id: string; text: string } } {
 	let queued = queuedOf(id)
 	let n = !byId && /^\d+$/.test(key) ? Number(key) : queued.findIndex((m) => m.id === key) + 1
 	return { n, item: n > 0 ? queued[n - 1] : undefined }
+}
+function dropKey(id: string, drop: RegExpMatchArray): string {
+	return drop[1] ?? drop[2] ?? String(queuedOf(id).length)
 }
 
 export const command: SlashCommand = {
@@ -28,13 +32,13 @@ export const command: SlashCommand = {
 			`/queue next [n] soft-steers a running turn with the oldest or nth message, or runs it when idle (${sendKeys.name('soft-steer')} on an empty prompt).`,
 			`/queue now [n] steers with the oldest or nth message (${sendKeys.name('steer')}).`,
 			'/queue undo queues the message /queue next moved again, if the turn has not read it (Cmd-Z on an empty prompt).',
-			'/queue drop <n> drops the nth message in the list.',
+			'/queue drop [n] drops the nth message in the list, or the newest.',
 			'/queue clear drops all queued messages.',
 		].join('\n'),
 	record(args, id) {
 		let drop = args.match(dropPattern)
 		if (drop) {
-			let { n } = target(id, (drop[1] ?? drop[2])!, drop[2] !== undefined)
+			let { n } = target(id, dropKey(id, drop), drop[2] !== undefined)
 			return n > 0 ? `/queue drop ${n}` : undefined
 		}
 		let m = args.match(/^(next|now)\s+(\S+)$/)
@@ -45,6 +49,7 @@ export const command: SlashCommand = {
 		let id = ctx.sessionId
 		let queued = queuedOf(id)
 		if (!args) return { say: queued.length ? queued.map((m, i) => `${i + 1}. ${m.text}`).join('\n') : 'queue is empty' }
+		if (args === 'help') return { say: command.help!('') }
 		if (args === 'clear') {
 			for (let item of queued) history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
 			if (queued.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
@@ -52,12 +57,13 @@ export const command: SlashCommand = {
 		}
 		let drop = args.match(dropPattern)
 		if (drop) {
-			let key = (drop[1] ?? drop[2])!
+			if (!queued.length) return { error: 'The queue is empty.' }
+			let key = dropKey(id, drop)
 			let { n, item } = target(id, key, drop[2] !== undefined)
 			if (!item)
 				return {
 					error:
-						drop[1] !== undefined
+						drop[2] === undefined
 							? `There is no queued message ${key}. The queue has ${queued.length}.`
 							: 'That message is no longer queued: it was already delivered or dropped.',
 				}

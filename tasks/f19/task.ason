@@ -1,0 +1,7 @@
+{
+	title: 'Browse and drop queued messages from the prompt',
+	spec: 'Editing and dropping queued messages is quick in the terminal. /queue help shows the /queue help instead of queueing the text. Bare /queue drop drops the newest queued message (usually the one just queued by mistake) and is recorded as /queue drop <n>; /queue drop <n> and --id <inbox id> stay; other text after drop still queues as a prompt. This replaces the gr4 rule that bare /queue drop queues drop as a prompt (user, 2026-10-21). A queue edit saved empty drops the message: the host withdraws it atomically under the edit lock, so release never delivers it first; this holds in both clients, since they share common/queue-edit.ts. Terminal only: with the queue-edit text unchanged, Up on the top row edits the next older queued message and Down the next newer one; Down on the newest leaves the edit, as before. The help row names the keys: browse, esc: back, empty + enter: drop; enter: drop when empty; enter: save when changed. The web keeps Down/Escape to leave and gets no browsing until the user decides.',
+	status: 'done',
+	needs: ['gr4', 'jsg'],
+	foldInto: ['gr4', 'jsg']
+}

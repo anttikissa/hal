@@ -146,9 +146,16 @@ function bar(editing: Editing): string {
 }
 
 export const amend = {
-	hint: (editing?: Editing, text = editing?.original) => {
+	// `browse`: Up and Down move between queued messages (terminal).
+	hint: (editing?: Editing, text = editing?.original, browse = false) => {
 		if (!editing) return ''
-		let waiting = !!editing.queueEdit || (editing.inbox !== undefined && !editing.paused)
+		if (editing.queueEdit) {
+			let label = '[editing queued message] '
+			if (!text?.trim()) return `${label}enter: drop, esc: back`
+			if (text !== editing.original) return `${label}enter: save, esc: back`
+			return `${label}${browse ? '↑/↓: browse queue, esc' : '↓/esc'}: back, empty + enter: drop`
+		}
+		let waiting = editing.inbox !== undefined && !editing.paused
 		let changed = text !== editing.original
 		let label = waiting ? 'editing waiting message' : 'editing prompt'
 		if (editing.rewind !== undefined) label += ` #${editing.rewind}`

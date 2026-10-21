@@ -14,7 +14,17 @@ function key(st: PromptKeysState, k: KeyEvent, top: boolean): boolean {
 	let plain = !k.shift && !k.ctrl && !k.alt && !k.cmd
 	let e = queueEdit.current(id)
 	if (e?.active && e.saving) return true
-	if (e?.active && plain && (k.key === 'escape' || (k.key === 'down' && st.prompt.text === e.original))) {
+	let unchanged = e?.active && e.original !== undefined && st.prompt.text === e.original
+	if (unchanged && plain && (top || k.key === 'down')) {
+		let other = queueEdit.neighbor(t, top ? -1 : 1)
+		if (other) {
+			queueEdit.move(t, other.id)
+			sync(st)
+			return true
+		}
+		if (top) return true
+	}
+	if (e?.active && plain && (k.key === 'escape' || (k.key === 'down' && unchanged))) {
 		queueEdit.cancel(id)
 		st.editing = undefined
 		st.prompt = { ...prompt.cleared(st.prompt), text: drafts.text(id), cursor: drafts.text(id).length }

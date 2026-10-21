@@ -52,7 +52,7 @@ function view(): View {
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
 	if (st.notice) v.noticeClearable = true
-	if (st.editing) v.editing = amend.hint(st.editing, st.prompt.text)
+	if (st.editing) v.editing = amend.hint(st.editing, st.prompt.text, true)
 	if (versions.state.newCode) v.newCode = true
 	if (appView.state.noUser) v.noUser = true
 	let activity = t && appView.activity(t)

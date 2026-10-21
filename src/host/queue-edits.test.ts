@@ -48,6 +48,18 @@ test('turn end: a locked first message waits with the ones behind it; save sends
 	expect(waiting(id)).toEqual(['later', 'last'])
 })
 
+test('saved empty, a locked first message is dropped and the next one goes', async () => {
+	let { a, id } = await queued()
+	acquire(a, id)
+	end(0)
+	await until(() => !turns.state.running.has(id))
+	save(a, id, '')
+	await until(() => calls.length === 2)
+	expect(lastPrompt(1)).toContain('later')
+	expect(lastPrompt(1)).not.toContain('old')
+	expect((await fresh(id)).inbox).toEqual([])
+})
+
 test('turn end wins: acquisition is refused as already delivered', async () => {
 	let { a, id } = await queued()
 	end(0)

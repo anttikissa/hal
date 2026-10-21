@@ -151,7 +151,7 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 		app.onEvent({ type: 'queue-hold', sessionId: 's1', message: 'q1' })
 		app.onEvent({ type: 'queue-edit', sessionId: 's1', edit: acquire.edit, message: 'q1', text: 'queued text' })
 		expect(app.state.prompt.text).toBe('queued text')
-		expect(appView.view().editing).toContain('waiting message')
+		expect(appView.view().editing).toContain('queued message')
 		app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'a separate draft', rev: 1 } })
 		expect(app.state.prompt.text).toBe('queued text')
 		type('!')
@@ -162,6 +162,44 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 		app.onEvent({ type: 'ack', id: drafts.local('s1').queueEdit!.saving! })
 		expect(app.state.editing).toBeUndefined()
 		expect(app.state.prompt.text).toBe('a separate draft')
+	} finally {
+		connection.send = send
+	}
+})
+
+test('Up and Down on an unchanged queued edit move between queued messages; Enter on empty drops', () => {
+	let send = connection.send
+	connection.send = record
+	try {
+		app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+		let inbox = [
+			{ id: 'q1', text: 'one', delivery: 'after-turn' as const },
+			{ id: 'q2', text: 'two', delivery: 'after-turn' as const },
+		]
+		app.onEvent({ type: 'inbox', sessionId: 's1', inbox })
+		let open = (message: string, text: string) => {
+			let acquire = sent.at(-1)
+			expect(acquire).toMatchObject({ type: 'queue-edit', message })
+			app.onEvent({ type: 'queue-hold', sessionId: 's1', message })
+			app.onEvent({ type: 'queue-edit', sessionId: 's1', edit: acquire.edit, message, text })
+			expect(app.state.prompt.text).toBe(text)
+			return acquire.edit
+		}
+		up()
+		let two = open('q2', 'two')
+		expect(appView.view().editing).toContain('↑/↓: browse queue')
+		up()
+		expect(sent.at(-2)).toEqual({ type: 'queue-edit-cancel', sessionId: 's1', edit: two })
+		app.onEvent({ type: 'queue-hold', sessionId: 's1' })
+		let one = open('q1', 'one')
+		down()
+		expect(sent.at(-2)).toEqual({ type: 'queue-edit-cancel', sessionId: 's1', edit: one })
+		app.onEvent({ type: 'queue-hold', sessionId: 's1' })
+		let again = open('q2', 'two')
+		app.onKeys([key('backspace'), key('backspace'), key('backspace')])
+		expect(appView.view().editing).toContain('enter: drop')
+		enter()
+		expect(sent.at(-1)).toMatchObject({ type: 'submit', edits: 'q2', queueEdit: again, text: '' })
 	} finally {
 		connection.send = send
 	}

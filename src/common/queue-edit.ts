@@ -25,8 +25,25 @@ export type QueueEditing = {
 	window?: string
 }
 
+function editable(m: InboxItem): boolean {
+	return m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model'
+}
 function candidate(t: Transcript | undefined): InboxItem | undefined {
-	return t?.inbox.findLast((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')
+	return t?.inbox.findLast(editable)
+}
+// The queued message before (-1) or after (1) the one being edited.
+function neighbor(t: Transcript, dir: -1 | 1): InboxItem | undefined {
+	let e = queueEdit.current(t.meta.id)
+	let list = t.inbox.filter(editable)
+	let i = list.findIndex((m) => m.id === e?.message)
+	return i < 0 ? undefined : list[i + dir]
+}
+// Leaves an unchanged edit for another queued message. The host releases
+// the old lock before it takes the new one, so the old hold is no
+// longer another window's.
+function move(t: Transcript, message: string): boolean {
+	queueEdit.cancel(t.meta.id)
+	return queueEdit.begin({ ...t, queueHold: undefined }, message)
 }
 
 function mine(e?: QueueEditing): QueueEditing | undefined {
@@ -88,9 +105,7 @@ function recover(id: string): void {
 }
 function begin(t: Transcript, message: string): boolean {
 	let id = t.meta.id
-	let waiting = t.inbox.find(
-		(m) => m.id === message && m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model',
-	)
+	let waiting = t.inbox.find((m) => m.id === message && editable(m))
 	if (!waiting) return false
 	// Another window edits: the notice says so; nothing to begin here.
 	if (queueEdit.elsewhere(t)) return true
@@ -132,7 +147,8 @@ function cancel(id: string): string | undefined {
 function save(id: string): string | undefined {
 	let e = queueEdit.current(id)
 	if (!queueEdit.ready(id) || !e) return 'The queued message is not open for editing yet. Wait a moment, then save.'
-	if (!e.text.trim() || e.text === e.original) return queueEdit.cancel(id)
+	// Saved empty, the host drops the message.
+	if (e.text === e.original) return queueEdit.cancel(id)
 	// Never clear the original draft or show a second optimistic queue row.
 	e.saving = connection.nextId()
 	drafts.save(id)
@@ -226,6 +242,8 @@ function disconnected(): void {
 export const queueEdit = {
 	state: { ready: new Set<string>(), window: crypto.randomUUID() as string },
 	candidate,
+	neighbor,
+	move,
 	windowId,
 	mine,
 	current,

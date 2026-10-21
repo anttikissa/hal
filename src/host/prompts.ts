@@ -195,9 +195,10 @@ function amend(id: string, text: string, command?: string, target?: number): str
 
 // An edit of inbox message `message`. While it waits, the edit takes
 // its place (the model never saw it); one that became a slash command
-// takes it out and runs. Delivered meanwhile, it is an edit of the last
-// prompt (prompts.amend). Messages from other sessions are not the
-// user's to edit.
+// takes it out and runs, and a held (queue-edit) one saved empty drops
+// it. Delivered meanwhile, it is an edit of the last prompt
+// (prompts.amend). Messages from other sessions are not the user's to
+// edit.
 function edit(id: string, message: string, text: string, command?: string, held = false): string | undefined {
 	let waiting = status.inboxOf(id).find((m) => m.id === message)
 	if (waiting?.from !== undefined || waiting?.origin === 'model') return 'that message was not sent by the human'
@@ -206,12 +207,13 @@ function edit(id: string, message: string, text: string, command?: string, held 
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined
 	if (refused) return refused
+	let dropped = held && !text.trim()
 	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = {
 		type: 'inbox',
 		id: message,
-		text: call ? text : literal.strip(text),
+		text: call ? text : dropped ? waiting.text : literal.strip(text),
 	}
-	if (call) record.withdrawn = true
+	if (call || dropped) record.withdrawn = true
 	else Object.assign(record, inbox.sender(waiting))
 	if (command !== undefined) record.command = command
 	history.append(id, record)
