@@ -44,7 +44,6 @@ import { titles } from '../common/titles.ts'
 import { notices } from '../common/notices.ts'
 import { find } from './find.ts'
 import { sendKeys } from '../common/send-keys.ts'
-import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
 import { linkState } from './link-state.ts'
 
@@ -82,7 +81,7 @@ export type AppState = {
 	loading?: string
 	timer?: ReturnType<typeof setTimeout>
 	typing?: ReturnType<typeof setTimeout>
-	choices?: string[] | Hint[]
+	choices?: string[]
 	// The theme an open form previews (previewTheme).
 	previewed?: string
 }
@@ -290,13 +289,13 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 function completed(event: Event & { type: 'completions' }): void {
 	let st = app.state
 	if (st.transcript?.meta.id !== event.sessionId || st.prompt.text !== event.text) return
-	let { text, choices } = completion.apply(event.text, event.items)
+	// The terminal lists every choice; it has no menu to show a filled default as one of them.
+	let { text, choices } = completion.apply(event.text, event.items, false)
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
 	if (!event.items.length || st.notice === 'no completions')
 		st.notice = event.items.length ? undefined : 'no completions'
-	// Described candidates (task 4qh) list one per row.
-	st.choices = choices && event.descriptions ? choices.map((c, i): Hint => [c, event.descriptions![i]!]) : choices
+	st.choices = choices
 }
 
 // Puts `text` in the prompt, unless it is there already (the cursor

@@ -11,14 +11,15 @@ function request(sessionId: string, text: string): unknown {
 	return text.startsWith('/') ? { type: 'complete', sessionId, text } : undefined
 }
 
-// Explicit completion fills a declared default for a bare command.
-// Otherwise prefix matches complete first, word matches only as a fallback.
+// Explicit completion fills a declared default for a bare command, if
+// `fillDefault`. Otherwise prefix matches complete first, word matches
+// only as a fallback.
 // All candidates stay listed from where their shared part last breaks
 // (a whole name, a directory's last part), including provider-qualified ids.
-function apply(text: string, items: string[]): { text: string; choices?: string[] } {
+function apply(text: string, items: string[], fillDefault = true): { text: string; choices?: string[] } {
 	let bare = /^\/([a-z][a-z0-9-]*)\s*$/.exec(text)
-	let args = bare && commandList.byName(bare[1]!)?.defaultArgs
-	let preferred = args === undefined || !bare ? undefined : `/${bare[1]} ${args}`
+	let args = bare && fillDefault ? commandList.byName(bare[1]!)?.defaultArgs : undefined
+	let preferred = args === undefined ? undefined : `/${bare![1]} ${args}`
 	if (preferred && items.includes(preferred)) return { text: preferred }
 	if (items.length <= 1) return { text: items[0] ?? text }
 	let prefix = items.filter((item) => item.startsWith(text))

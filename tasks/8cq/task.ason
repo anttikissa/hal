@@ -1,0 +1,7 @@
+{
+	title: 'Terminal completions stay on the one help row',
+	spec: 'The terminal lists completion choices as plain values on the help row only, never as described rows, so the prompt never moves (task p0 rule; this replaces the 4qh terminal rule of one described row per candidate). Tab on a bare command in the terminal lists its choices instead of filling a declared default: /restart then Tab lists all host both local (this replaces the terminal half of mm). The web keeps descriptions and the mm default fill (user, 2026-10-21).',
+	status: 'done',
+	needs: ['4qh', 'mm', 'p0'],
+	foldInto: ['p0', '4qh', 'mm']
+}

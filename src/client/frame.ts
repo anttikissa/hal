@@ -49,9 +49,8 @@ export interface View {
 	/** The host's tabs and the one shown: a tab bar row above the prompt;
 	 * `lit` is the blink phase while an indicator blinks. */
 	tabs?: { list: Tab[]; focused?: string; lit?: boolean; alt?: boolean }
-	/** Tab completion's choices: listed in the help row, or described
-	 * one per row in the help area (task 4qh). */
-	choices?: string[] | Hint[]
+	/** Tab completion's choices, listed in the help row. */
+	choices?: string[]
 	/** What the session is doing, centered in the prompt's top rule. */
 	activity?: string
 	/** The hint while the last prompt is edited: the help row shows it. */
@@ -262,7 +261,7 @@ function build(
 	lines.push(rule(join(p.below ? `↓${p.below}` : '', s.bottomLeft()), s.bottomCenter(), s.bottomRight()))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
-	lines.push(...helpRow.rows(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
+	lines.push(helpRow.row(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
 	let pad = full ? Math.max(0, Math.max(rows, floor) - lines.length - history.length) : 0
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)
