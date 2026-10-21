@@ -167,7 +167,7 @@ browserTest(
 browserTest('pending question URLs are safe native links and wrap at phone and desktop widths', async () => {
 	let id = sessions.create({ cwd: testHome(), model: 'anthropic/claude-opus-5-5' }).id
 	let url = `https://example.com/oauth?state=a_b&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=${'user%3Aprofile+'.repeat(30)}#fragment`
-	let text = `Open (${url}).\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
+	let text = `Open (${url}) and sign in with the account you use for this provider.\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
 	history.append(id, {
 		type: 'question',
 		id: 'q-links',
@@ -187,9 +187,9 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`!!document.querySelector('.Question .label a')`)
 		let link = await b.evaluate(
-			`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`,
+			`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, details: q.querySelector('.details')?.textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`,
 		)
-		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text, links: 2, scripts: 0 })
+		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text: text.split('\n')[0], details: text.split('\n')[1], links: 2, scripts: 0 })
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width,
