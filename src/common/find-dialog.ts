@@ -22,6 +22,9 @@ const labels = ['user/assistant', 'thinking', 'tools', 'commits', 'other']
 const resultsFocus = filters.length + 1
 const question = 'Find anything: text, tab, card, project, whatever'
 const recent = 'Showing recent tabs'
+function recentLabel(filters: string[]): string {
+	return filters.join() === 'commit' ? 'Showing recent commits' : recent
+}
 const keys = [
 	'↓: filters · enter: open · esc: close',
 	'←→: move · space: toggle · ↑↓: field/results · esc: close',
@@ -53,7 +56,7 @@ function input(m: ModalState, text: string): ModalState {
 			moved: false,
 			done: false,
 			failed: undefined,
-			status: text.trim() ? 'Searching…' : recent,
+			status: text.trim() ? 'Searching…' : recentLabel(m.find!.filters),
 		},
 	}
 }
@@ -181,7 +184,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 	let status = b.error
 		? `Find failed: ${b.error}`
 		: !query
-			? recent
+			? recentLabel(f.filters)
 			: b.done
 				? results.length
 					? `Showing ${count}`

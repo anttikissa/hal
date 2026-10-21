@@ -33,6 +33,9 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 	if (q.since !== undefined && age > q.since) return
 	let match = findQuery.match(row.text, q.words, age)
 	if (!match) return
+	// A matching commit ranks by recency alone and shows its title line.
+	if (row.kind === 'commit')
+		match = { score: 4 + 1.5 * Math.pow(0.5, age / 259200000), snippet: row.text.split('\n')[0]! }
 	return {
 		sessionId: row.sessionId,
 		name: meta.name ?? '',
@@ -43,6 +46,12 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 		...match,
 		href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}`,
 	}
+}
+
+// One row per commit: its title line names the hash. Other sessions get a
+// copy that warns "this session did not change"; the committer's card wins.
+function key(h: FindResult): string {
+	return h.kind === 'commit' ? h.snippet : `${h.sessionId}#${h.blockId}`
 }
 
 // Each call prepares its own statement. db.query() caches one statement per
@@ -88,7 +97,7 @@ async function search(c: Search): Promise<void> {
 		let q = findQuery.parse(c.query, c.kinds),
 			now = Date.now()
 		// No query: the sessions whose histories changed last (task 6m).
-		if (!c.query.trim()) {
+		if (!c.query.trim() && q.kinds.join() !== 'commit') {
 			let recent = [...findIndex.state.meta.values()].map((m) => ({
 				m,
 				at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt),
@@ -113,11 +122,17 @@ async function search(c: Search): Promise<void> {
 		let pending: { meta: SessionMeta; offset: number }[] | undefined
 		let rebuilding = new Set<string>()
 		for (tier of q.kinds) {
-			let hits = new Map<string, FindResult>()
+			let hits = new Map<string, FindResult>(),
+				foreign = new WeakSet<FindResult>()
 			let take = (row: FindRow) => {
 				let h = findWorker.hit(row, q, now)
-				if (h) hits.set(`${h.sessionId}#${h.blockId}`, h)
-				if (hits.size > 100) hits = new Map(top().map((h) => [`${h.sessionId}#${h.blockId}`, h]))
+				if (!h) return
+				if (row.text.includes('this session did not change')) foreign.add(h)
+				let old = hits.get(key(h))
+				let better =
+					!old || (foreign.has(old) && !foreign.has(h)) || (foreign.has(old) === foreign.has(h) && h.score > old.score)
+				if (better) hits.set(key(h), h)
+				if (hits.size > 100) hits = new Map(top().map((h) => [key(h), h]))
 			}
 			let top = () =>
 				[...hits.values()]

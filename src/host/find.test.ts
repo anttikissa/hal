@@ -109,7 +109,9 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 	expect(await find.top('cache cwd:/wrong')).toEqual([])
 	expect(await find.top('cache model:other')).toEqual([])
 	// Commit cards match their title; plumbing like rounds is not indexed.
-	expect((await find.top('committed tune')).map((h) => h.kind)).toEqual(['commit'])
+	expect((await find.top('commit tune')).map((h) => [h.kind, h.snippet])).toEqual([
+		['commit', 'Commit 1234abcd (Tune cache): +1 LOC'],
+	])
 	expect(await find.top('in:other cache')).toEqual([])
 	ready = caughtUp()
 	history.append(a.id, { type: 'assistant', block: { type: 'text', text: 'incremental uniquenew' } })

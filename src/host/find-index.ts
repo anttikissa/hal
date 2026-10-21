@@ -22,9 +22,9 @@ function init(): void {
 	let db = new Database(`${paths.stateDir()}/find.sqlite`, { create: true })
 	findIndex.state.db = db
 	// The projection is disposable; version changes reindex immutable history.
-	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 5) {
+	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 6) {
 		db.exec(
-			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=5;',
+			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=6;',
 		)
 	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
@@ -114,10 +114,11 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 			}
 		}
 	} else if (r.type === 'output' && r.commit) {
-		// The card's title words, so "committed" finds commits.
+		// "Commit <hash> (<subject>): <tags>", then the file lines.
 		let c = r.commit
-		let tags = c.tags?.length ? ` (${c.tags.join(', ')})` : ''
-		await add('commit', `${c.amend ? 'Amended' : 'Committed'}${tags} ${r.text}`)
+		let tags = c.tags?.length ? `: ${c.tags.join(', ')}` : ''
+		let rest = r.text.slice(r.text.indexOf('\n') + 1 || r.text.length)
+		await add('commit', `${c.amend ? 'Amended commit' : 'Commit'} ${c.short} (${c.subject})${tags}\n${rest}`)
 	} else if (r.type === 'command' || r.type === 'output') {
 		// Older successful rename replies lack the command name. Keep them
 		// discoverable without changing history or maintaining a title store.
