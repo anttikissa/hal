@@ -92,14 +92,12 @@ function reveal(): void {
 	let t = app.state.target
 	if (!t?.found || t.shown) return
 	flush()
-	let card = document.querySelector('.Transcript .Card.target')
+	let card = document.querySelector('.Transcript > .target')
 	if (!card) return
 	t.shown = true
-	// The reader asked for this card: leaving the bottom is theirs.
-	scroll.leave('link')
 	card.scrollIntoView({ block: 'start' })
-	scroll.moved()
 	scroll.hold(card)
+	scroll.moved()
 	flash.card(card)
 	away(card)
 }

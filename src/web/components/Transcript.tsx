@@ -171,7 +171,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 								/>
 							}
 						>
-							{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
+							{(q) => <Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />}
 						</Show>
 						<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
 					</>

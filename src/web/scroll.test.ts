@@ -153,6 +153,30 @@ test('forced bottom navigation releases a linked-card anchor', () => {
 	}
 })
 
+test('link navigation follows only when it lands at the bottom', () => {
+	let original = { ...scroll.state },
+		el = box(1000, 200, 400)
+	let card = { isConnected: true, getBoundingClientRect: () => ({ top: 200 - el.scrollTop }) } as Element
+	Object.assign(scroll.state, { el, pinned: true, held: undefined, intent: true })
+	try {
+		scroll.hold(card)
+		scroll.moved()
+		expect(scroll.state.pinned).toBe(false)
+		expect(scroll.state.held?.card).toBe(card)
+		el.scrollTop = 599.5
+		scroll.hold(card)
+		scroll.moved()
+		expect(scroll.state.pinned).toBe(true)
+		expect(scroll.state.held).toBeUndefined()
+		scroll.follow(() => {
+			el.scrollHeight += 100
+		})
+		expect(el.scrollTop).toBe(700)
+	} finally {
+		Object.assign(scroll.state, original)
+	}
+})
+
 test('compositor movement before input delivery still releases following', () => {
 	let original = { ...scroll.state },
 		el = box(1000, 600, 400)

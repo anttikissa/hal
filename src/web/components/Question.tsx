@@ -23,6 +23,7 @@ export function Question(props: {
 	item: Item & { type: 'question' } & { key: string }
 	form: FormState
 	session: string
+	target?: boolean
 }) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
@@ -63,7 +64,7 @@ export function Question(props: {
 		app.submitForm()
 	}
 	return (
-		<form class="Question question" onSubmit={submit}>
+		<form class={['Question question', props.target ? 'target' : '']} onSubmit={submit}>
 			<CardHeader
 				time={titles.time(props.item.ts)}
 				label={

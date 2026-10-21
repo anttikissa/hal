@@ -4,6 +4,8 @@
 import { expect } from 'bun:test'
 import { blobs } from './blobs.ts'
 import { history } from './history.ts'
+import { host } from './host.ts'
+import { snapshots } from './snapshots.ts'
 import { pages } from './pages.ts'
 import { tabs } from './tabs.ts'
 import { server } from './server.ts'
@@ -184,6 +186,42 @@ browserTest(
 	},
 	20000,
 )
+
+browserTest('answering a linked question keeps following new output at the bottom', async () => {
+	let id = tabs.create('/tmp')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier history\n'.repeat(80) }] })
+	let question = history.append(id, {
+		type: 'question',
+		id: 'approval',
+		form: { text: 'Approval needed', fields: [{ type: 'text', name: 'answer' }] },
+		from: { command: 'example', args: '' },
+	})
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', {
+			width: 1200,
+			height: 800,
+			deviceScaleFactor: 1,
+			mobile: false,
+		})
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#q${question.n}` })
+		await b.waitFor(`!!document.querySelector('.Question.target')`)
+		let bottom = `(() => { let m = document.querySelector('.Transcript'); return m.scrollHeight - m.clientHeight - m.scrollTop <= 1 })()`
+		await b.waitFor(bottom)
+		history.append(id, { type: 'answer', question: 'approval', answers: { answer: 'yes' } })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: 'approval', answers: { answer: 'yes' } })
+		await b.waitFor(`!document.querySelector('.Question') && !!document.querySelector('.Card.question')`)
+		history.append(id, { type: 'assistant', block: { type: 'text', text: 'New output\n'.repeat(80) } })
+		host.broadcast(id, { type: 'snapshot', sessionId: id, snapshot: snapshots.build(id) })
+		await b.waitFor(`document.querySelector('.Transcript')?.innerText.includes('New output')`)
+		await b.waitFor(bottom)
+		expect(await b.evaluate(bottom)).toBe(true)
+	} finally {
+		await b.close()
+	}
+})
 
 browserTest('Find keeps focus stable while results arrive and filters take focus', async () => {
 	let id = tabs.create('/tmp')

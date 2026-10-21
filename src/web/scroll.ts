@@ -39,11 +39,14 @@ function leave(why: string): void {
 	scroll.state.held = undefined
 }
 
-// The card a block link opened (task 0z) stays where it was put while
-// content above it grows, as images load, until the reader moves the
-// view: the transcript turns off the browser's scroll anchoring.
+// Link navigation follows the bottom if it lands there; otherwise hold
+// the linked card in place through layout changes until the reader moves.
 function hold(card: Element): void {
-	scroll.state.held = { card, top: card.getBoundingClientRect().top }
+	let st = scroll.state
+	if (!st.el) return
+	st.intent = undefined
+	pin(scroll.gap(st.el) <= atBottom, 'link')
+	st.held = st.pinned ? undefined : { card, top: card.getBoundingClientRect().top }
 }
 
 // Puts the held card back in place; whether a card is held.
