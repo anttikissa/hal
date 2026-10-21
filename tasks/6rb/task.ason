@@ -1,0 +1,10 @@
+{
+	title: 'Read card titles retain every file and URL',
+	spec: 'In terminal and web, READ card titles name every target in resolved multi-target input, including URL-only and mixed file/URL lists. READ_ENTRY and READ_BLOB lists retain their entry IDs. Empty or unrecognized target lists fall back to readable input instead of a bare read mark. Expanded details retain ranges and unknown fields. Focused regression coverage exercises resolved native READ calls without fetching pages.',
+	status: 'done',
+	notes: [
+		'Cause: resolved multi-target READ contains path or url objects; the formatter extracted only path. The shared formatter now accepts both and renders readable input when no target is recognized. Verified 34 focused tool/card tests, 517 common tests, tsc --noEmit, focused oxlint, and a direct terminal/web header-text check without network reads.'
+	],
+	needs: ['3fv'],
+	foldInto: ['b3k']
+}

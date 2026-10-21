@@ -160,28 +160,21 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'read_url':
 		case 'read_blob':
 		case 'read_entry': {
-			let list = (key: string, many: unknown) =>
-				Array.isArray(many)
-					? many
-							.map((p) =>
-								typeof p === 'string'
-									? p
-									: p && typeof p === 'object'
-										? (p as Record<string, unknown>)[key]
-										: undefined,
-							)
-							.filter((p): p is string => typeof p === 'string' && p !== '')
-					: []
-			if (name === 'read' && Array.isArray(input.paths))
-				return {
-					text: marked(
-						list('path', input.paths)
-							.map((p) => oneLine(p))
-							.join(', '),
-					),
-				}
 			let entries = name === 'read_blob' || name === 'read_entry'
-			if (entries && Array.isArray(input.ids)) return { text: marked(list('id', input.ids).join(', ')) }
+			let many = entries ? input.ids : name === 'read' ? input.paths : undefined
+			if (Array.isArray(many)) {
+				let targets = many
+					.map((p) => {
+						if (typeof p === 'string') return p
+						if (!p || typeof p !== 'object') return undefined
+						let item = p as Record<string, unknown>
+						return entries ? item.id : (item.path ?? item.url)
+					})
+					.filter((p): p is string => typeof p === 'string' && oneLine(p) !== '')
+				return {
+					text: marked(targets.length ? targets.map(oneLine).join(', ') : oneLine(toolDetails.value(input).join(' '))),
+				}
+			}
 			let key = entries ? 'id' : str('url') ? 'url' : 'path'
 			if (str(key)) return { text: marked(str(key)!), key }
 			break

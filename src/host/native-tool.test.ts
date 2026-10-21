@@ -8,6 +8,7 @@ import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { replayText } from '../common/replay-text.ts'
 import type { ToolResultBlock } from '../common/blocks.ts'
+import { toolDetails } from '../common/tool-details.ts'
 import { nativeTool } from './native-tool.ts'
 import { toolPresentations } from './tool-presentation.ts'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
@@ -55,6 +56,20 @@ test('trailing first-line comments work for EDIT, BASH and READ without changing
 		['BASH ls // hello', 'BASH /* hello */ ls'],
 	] as const)
 		expect(nativeTool.resolve(call)).toEqual(nativeTool.resolve(plain))
+})
+
+test('resolved READ titles retain single, multiple and mixed URL targets', () => {
+	for (let [cmd, title] of [
+		['READ "https://example.com/pricing"', '< https://example.com/pricing'],
+		[
+			'READ "https://example.com/pricing" "https://example.com/payments"',
+			'< https://example.com/pricing, https://example.com/payments',
+		],
+		['READ "local.ts:3-4" "https://example.com/pricing"', '< local.ts, https://example.com/pricing'],
+	] as const) {
+		let call = nativeTool.arrived({ type: 'tool_call', id: 'read-title', name: 'tool', input: { cmd } })
+		expect(toolDetails.headline(call.name, call.input).text).toBe(title)
+	}
 })
 
 test('EDIT descriptions title both the call and its result', () => {

@@ -128,6 +128,36 @@ test('multi-file reads retain every range and unknown argument under its file', 
 	expect(toolDetails.lines('read', { paths: [null] }).join('\n')).toContain('(null)')
 })
 
+test('read lists keep URLs, mixed targets and readable invalid input', () => {
+	for (let input of [
+		{ paths: [{ url: 'https://example.com/pricing' }, { url: 'https://example.com/payments' }] },
+		{
+			paths: [
+				{ path: 'local.ts', offset: 3 },
+				{ url: 'https://example.com/pricing', extra: 'keep' },
+			],
+		},
+	]) {
+		let targets = input.paths.map((p) => ('path' in p ? p.path : p.url))
+		expect(toolDetails.headline('read', input).text).toBe(`< ${targets.join(', ')}`)
+		for (let target of targets) expect(toolDetails.lines('read', input).join('\n')).toContain(target!)
+	}
+	for (let [name, key] of [
+		['read', 'paths'],
+		['read_entry', 'ids'],
+		['read_blob', 'ids'],
+	] as const) {
+		for (let [many, detail] of [
+			[[], '(empty list)'],
+			[[null], '1. (null)'],
+			[[{ unknown: 'target' }], '1. unknown: target'],
+		] as const) {
+			expect(toolDetails.headline(name, { [key]: many }).text).toBe(`< ${key}: ${detail}`)
+		}
+	}
+	expect(toolDetails.headline('read_entry', { ids: ['t1', { id: 't2' }] }).text).toBe('< t1, t2')
+})
+
 test('wait headers follow background-work result contracts and preserve invalid targets', () => {
 	expect(toolDetails.headline('wait', {}).text).toBe('… Waiting for background work')
 	expect(
