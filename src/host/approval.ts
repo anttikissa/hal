@@ -102,7 +102,7 @@ function dirs(command: string, segs: Mark[], vars: Map<string, string>): (string
 
 const reasons = {
 	rm: 'May wipe out important files by accident.',
-	print: 'Will likely leak your secrets.',
+	print: "Model wants to read your secret files. You likely don't want this.",
 	env: 'Reveals env variables. If you have secrets like OPENAI_API_KEY in env, this will leak them.',
 }
 
