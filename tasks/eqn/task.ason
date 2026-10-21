@@ -1,0 +1,10 @@
+{
+	title: 'Run a command with files at HEAD (at-head)',
+	spec: 'scripts/at-head <files...> -- <command...> saves the named files to a mktemp dir under /tmp (printing its path), puts their HEAD versions in place (removing files absent from HEAD), runs the command, then restores the saved versions (removing files that did not exist) and exits with the command status. It restores on failure, SIGINT, SIGTERM and SIGHUP: the command runs in the background under wait, so the trap runs at once, inside the 2 seconds before Hal SIGKILLs a stopped tool group. A path neither in the working tree nor in HEAD, or a missing --, is a usage error (exit 2) before anything changes. SYSTEM.md tells agents never to use git stash and to use $hal_src/scripts/at-head instead; Hal AGENTS.md keeps only --no-autostash for shared checkouts.',
+	status: 'done',
+	notes: [
+		'Why: agents stashed in shared checkouts to test without their change (6 of 312 sessions in a week; one bare git stash -u took every tab work). The shared stash list makes a bare pop take another tab entry. at-head needs no stash list and cannot leave a restore undone except on SIGKILL from outside; the /tmp copy covers that.',
+		'Tested once in a scratch repo (then deleted): HEAD contents during the run, restore after success and exit 7, a new file removed then restored, a deleted file restored as absent, the exec bit kept, a subdirectory path, usage errors, SIGTERM with a child that ignores TERM, SIGINT to the process group, no /tmp leftovers. If you change the script, rerun these cases.'
+	],
+	needs: []
+}

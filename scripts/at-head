@@ -1,0 +1,67 @@
+#!/bin/bash
+# Runs a command with some files at their HEAD version, then restores
+# them, so agents can test against HEAD without git stash in a shared
+# checkout. Restores on success, failure, Ctrl-C and SIGTERM.
+# usage: at-head <files...> -- <command...>
+
+usage() { echo 'usage: at-head <files...> -- <command...>' >&2; exit 2; }
+
+files=()
+while [ $# -gt 0 ] && [ "$1" != -- ]; do files+=("$1"); shift; done
+[ ${#files[@]} -gt 0 ] && [ "${1-}" = -- ] || usage
+shift
+[ $# -gt 0 ] || usage
+git rev-parse --git-dir >/dev/null || exit 2
+
+for f in "${files[@]}"; do
+	if [ ! -e "$f" ] && ! git cat-file -e "HEAD:./$f" 2>/dev/null; then
+		echo "at-head: $f is neither in the working tree nor in HEAD" >&2
+		exit 2
+	fi
+done
+
+saved=$(mktemp -d /tmp/at-head.XXXXXX) || exit 2
+echo "at-head: your versions are saved in $saved" >&2
+
+restore() {
+	local i=0 f
+	for f in "${files[@]}"; do
+		if [ -e "$saved/$i" ]; then cp -p "$saved/$i" "$f"; else rm -f "$f"; fi
+		i=$((i + 1))
+	done
+	rm -rf "$saved"
+}
+
+i=0
+for f in "${files[@]}"; do
+	if [ -e "$f" ]; then cp -p "$f" "$saved/$i" || exit 2; fi
+	i=$((i + 1))
+done
+
+stop() {
+	trap '' INT TERM HUP
+	restore
+	[ -n "${pid-}" ] && kill -TERM "$pid" 2>/dev/null
+	exit "$1"
+}
+trap 'stop 130' INT
+trap 'stop 143' TERM
+trap 'stop 129' HUP
+
+for f in "${files[@]}"; do
+	if git cat-file -e "HEAD:./$f" 2>/dev/null; then
+		git show "HEAD:./$f" >"$f"
+	else
+		rm -f "$f"
+	fi
+done
+
+# Background plus wait lets the trap run at once on a signal, before
+# Hal's SIGKILL follows 2 seconds after SIGTERM.
+"$@" <&0 &
+pid=$!
+wait "$pid"
+status=$?
+trap '' INT TERM HUP
+restore
+exit "$status"
