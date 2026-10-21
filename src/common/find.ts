@@ -93,6 +93,15 @@ function match(text: string, words: string[], age: number): { score: number; sni
 		if (!best) return undefined
 		quality += best
 	}
+	// Recency is a bonus, not a factor: recent hits rise among equals, but an
+	// exact match of any age outranks every inexact one (task v8).
+	let phrase = words.join(' '),
+		flatLower = lower.replace(/\s+/g, ' ').trim()
+	if (words.length) {
+		quality /= words.length
+		if (flatLower.includes(phrase)) quality++
+		if (flatLower.replace(/^\//, '') === phrase) quality++
+	}
 	// A short lead, from a word start, padded so every match starts at the
 	// same column: the highlights line up and clipped rows still show them.
 	let flat = (s: string) => s.replace(/\s+/g, ' ')
@@ -100,7 +109,7 @@ function match(text: string, words: string[], age: number): { score: number; sni
 	if (at > 20) lead = '…' + lead.slice(lead.indexOf(' ') + 1)
 	let to = Math.min(text.length, at + 160)
 	return {
-		score: quality * Math.pow(0.5, age / 259200000),
+		score: quality + 1.5 * Math.pow(0.5, age / 259200000),
 		snippet: (words.length ? lead.padStart(21) : lead) + flat(text.slice(at, to)) + (to < text.length ? '…' : ''),
 	}
 }

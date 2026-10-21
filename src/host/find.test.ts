@@ -62,6 +62,15 @@ test('ranking requires every word, distinguishes word/prefix/substring and decay
 	expect(findQuery.match('cache hit', ['cache', 'hit'], 86400000)!.score).toBeGreaterThan(
 		findQuery.match('cache hit', ['cache', 'hit'], 864000000)!.score,
 	)
+	// Recency lifts a recent prefix hit over an old whole-word one, but an
+	// old exact match (such as a command) still beats any recent inexact one.
+	let day = 86400000
+	expect(findQuery.match('cached hits', ['cache', 'hit'], 0)!.score).toBeGreaterThan(
+		findQuery.match('a cache and a hit', ['cache', 'hit'], 30 * day)!.score,
+	)
+	expect(findQuery.match('/help security', ['help', 'security'], 90 * day)!.score).toBeGreaterThan(
+		findQuery.match('help with security', ['help', 'security'], 0)!.score,
+	)
 })
 
 test('worker projection streams tiers, catches durable appends, indexes blobs and rebuilds byte-stable links', async () => {

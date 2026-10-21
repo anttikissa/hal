@@ -170,7 +170,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 			results = [...results, ...next.slice(existing.length)]
 		} else
 			results = [...results.filter((r) => r.kind !== b.tier), ...next].sort(
-				(a, c) => findQuery.tiers.indexOf(a.kind) - findQuery.tiers.indexOf(c.kind) || c.score - a.score,
+				(a, c) => c.score - a.score || findQuery.tiers.indexOf(a.kind) - findQuery.tiers.indexOf(c.kind),
 			)
 	}
 	let query = !!m.form!.values[0]!.trim()
