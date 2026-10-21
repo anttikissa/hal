@@ -19,6 +19,7 @@ import { sendKeys } from '../common/send-keys.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
+import { findDialog } from '../common/find-dialog.ts'
 import type { Key } from '../common/forms.ts'
 import { prompt } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
@@ -130,7 +131,7 @@ function key(e: KeyInput, target: Target): boolean {
 		if (st.view.modal.find) {
 			// Arrows move among field, filters and results; Space toggles a filter.
 			let f = st.view.modal.find.focus,
-				filters = f > 0 && f < 5
+				filters = f > 0 && f < findDialog.resultsFocus
 			let space = filters && k?.text === ' '
 			if (
 				!k ||

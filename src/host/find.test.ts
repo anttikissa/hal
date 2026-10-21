@@ -83,6 +83,12 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 		block: { type: 'tool_call', id: 'a', name: 'bash', input: { description: 'cache metrics' } },
 	})
 	history.append(a.id, { type: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'uncached output' }] })
+	history.append(a.id, {
+		type: 'output',
+		text: '1234abcd Tune cache\n+1 -0 a.ts',
+		commit: { hash: '1234abcd00', short: '1234abcd', subject: 'Tune cache', files: [], tags: ['+1 LOC'] },
+	})
+	history.append(a.id, { type: 'round', usage: { input: 1, output: 1 } as any, model: 'cache/model' })
 	let before = readFileSync(history.file(a.id))
 	let ready = caughtUp()
 	find.init()
@@ -95,12 +101,16 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 		'thinking',
 		'tool-call',
 		'tool-output',
+		'commit',
 		'other',
 	])
 	expect((await find.top('needleblob'))[0]?.blockId).toBe('1')
 	expect((await find.top('in:tools cache')).map((h) => h.kind)).toEqual(['tool-call', 'tool-output'])
 	expect(await find.top('cache cwd:/wrong')).toEqual([])
 	expect(await find.top('cache model:other')).toEqual([])
+	// Commit cards match their title; plumbing like rounds is not indexed.
+	expect((await find.top('committed tune')).map((h) => h.kind)).toEqual(['commit'])
+	expect(await find.top('in:other cache')).toEqual([])
 	ready = caughtUp()
 	history.append(a.id, { type: 'assistant', block: { type: 'text', text: 'incremental uniquenew' } })
 	await ready
@@ -109,12 +119,12 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 	try {
 		ansi.state.web = { url: 'https://hal.example', code: 'example-code' }
 		expect(markdownView.lines(`[found](${hit.href})`, 80).join('')).toContain(
-			`https://hal.example/${a.id}?auth=example-code#5`,
+			`https://hal.example/${a.id}?auth=example-code#7`,
 		)
 	} finally {
 		ansi.state.web = web
 	}
-	expect(hit.href).toBe(`/${a.id}#5`)
+	expect(hit.href).toBe(`/${a.id}#7`)
 	find.reset()
 	let db = new Database(`${home}/state/find.sqlite`, { readonly: true })
 	expect((db.query('SELECT offset FROM marks WHERE sessionId=?').get(a.id) as { offset: number }).offset).toBe(

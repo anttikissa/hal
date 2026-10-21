@@ -95,7 +95,7 @@ function invalid(value: unknown): string | undefined {
 		let kinds = c.kinds
 		let valid =
 			kinds === undefined ||
-			(Array.isArray(kinds) && kinds.every((k) => ['text', 'thinking', 'tools', 'other'].includes(k)))
+			(Array.isArray(kinds) && kinds.every((k) => ['text', 'thinking', 'tools', 'commit', 'other'].includes(k)))
 		return (
 			str('request') ??
 			str('query') ??

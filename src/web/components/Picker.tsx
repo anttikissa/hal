@@ -251,7 +251,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				role="listbox"
 				aria-label={props.modal?.restart ? 'Choices' : 'Results'}
 				tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
-				onFocus={() => find.focus(5)}
+				onFocus={() => find.focus(findDialog.resultsFocus)}
 				aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
 			>
 				<For each={items()}>

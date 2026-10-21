@@ -26,7 +26,7 @@ test('stream replacements rank before navigation, then preserve rows and ignore 
 	m = findDialog.batch(m, batch([hit('2', 5), hit('1', 1)]))
 	expect(m.find!.results.map((r) => r.blockId)).toEqual(['2', '1'])
 	m = findDialog.step(findDialog.step(m, { key: 'down' }).state, { key: 'down' }).state
-	expect(m.find!.focus).toBe(5)
+	expect(m.find!.focus).toBe(findDialog.resultsFocus)
 	let selected = m.find!.results[m.selected]
 	m = findDialog.batch(m, batch([hit('3', 10), hit('2', 5)]))
 	m = findDialog.batch(m, batch([hit('4', 20, 'thinking')], 'thinking'))

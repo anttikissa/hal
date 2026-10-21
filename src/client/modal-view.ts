@@ -80,7 +80,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 			}
 			row += cell
 		})
-		if (m.find.focus > 0 && m.find.focus < 5) fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
+		if (m.find.focus > 0 && m.find.focus < findDialog.resultsFocus)
+			fields.cursor = { row: content.length, col: Math.min(col, inner - 1) }
 		content.push(strings.clipVisual(row, inner), '')
 	}
 	if (m.blocks) content.push(...modalView.blocksLines(m, inner))
@@ -137,7 +138,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (value?.cursor !== undefined)
 			cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
-			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
+			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === findDialog.resultsFocus))
+				cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight color.
 			row =
 				(ansi.sgr(current) || ansi.INVERSE) +

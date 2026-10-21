@@ -1,5 +1,5 @@
 // The transient find modal shared by terminal and browser (task 6m).
-// Focus: 0 the field, 1-4 the filters, 5 the results.
+// Focus: 0 the field, 1..filters.length the filters, then the results.
 import { findQuery, type FindBatch, type FindFilter, type FindResult } from './find.ts'
 import { forms, type Key } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
@@ -16,8 +16,10 @@ export type FindDialog = {
 	failed?: true
 	tabs: string[]
 }
-const filters: FindFilter[] = ['text', 'thinking', 'tools', 'other']
-const labels = ['user/assistant', 'thinking', 'tools', 'other']
+const filters: FindFilter[] = ['text', 'thinking', 'tools', 'commit', 'other']
+const labels = ['user/assistant', 'thinking', 'tools', 'commits', 'other']
+// The results' focus stop, after the field and the filters.
+const resultsFocus = filters.length + 1
 const question = 'Find anything: text, tab, card, project, whatever'
 const recent = 'Showing recent tabs'
 const keys = [
@@ -73,27 +75,27 @@ function toggle(m: ModalState, i: number): ModalState {
 }
 // `m` with focus on `focus` and the footer naming that part's keys.
 function focus(m: ModalState, focus: number): ModalState {
-	let moved = m.find!.moved || focus === 5
-	return { ...m, hint: keys[focus === 0 ? 0 : focus < 5 ? 1 : 2], find: { ...m.find!, focus, moved } }
+	let moved = m.find!.moved || focus === resultsFocus
+	return { ...m, hint: keys[focus === 0 ? 0 : focus < resultsFocus ? 1 : 2], find: { ...m.find!, focus, moved } }
 }
 // Down goes field, filters, results; Up back. Left and Right move among
-// the filters, Space or Enter toggles one; Tab cycles all six stops.
+// the filters, Space or Enter toggles one; Tab cycles every stop.
 function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 	let f = m.find!
 	let to = (n: number) => ({ state: findDialog.focus(m, n) })
 	if (k.key === 'escape') return { state: m, action: { type: 'cancel' } }
-	if (k.key === 'tab') return to((f.focus + (k.shift ? 5 : 1)) % 6)
-	if (f.focus > 0 && f.focus < 5) {
+	if (k.key === 'tab') return to((f.focus + (k.shift ? resultsFocus : 1)) % (resultsFocus + 1))
+	if (f.focus > 0 && f.focus < resultsFocus) {
 		if (k.key === 'left' || k.key === 'right')
-			return to(Math.min(4, Math.max(1, f.focus + (k.key === 'left' ? -1 : 1))))
+			return to(Math.min(filters.length, Math.max(1, f.focus + (k.key === 'left' ? -1 : 1))))
 		if (k.key === ' ' || k.key === 'space' || k.key === 'enter') return { state: findDialog.toggle(m, f.focus - 1) }
 		if (k.key === 'up') return to(0)
 		if (k.key === 'down')
-			return m.items.length ? { state: { ...findDialog.focus(m, 5), selected: 0, scroll: 0 } } : { state: m }
+			return m.items.length ? { state: { ...findDialog.focus(m, resultsFocus), selected: 0, scroll: 0 } } : { state: m }
 		return { state: m }
 	}
 	if (f.focus === 0 && (k.key === 'down' || k.key === 'up')) return k.key === 'down' ? to(1) : { state: m }
-	if (f.focus === 5 && k.key === 'up' && m.selected === 0) return to(1)
+	if (f.focus === resultsFocus && k.key === 'up' && m.selected === 0) return to(1)
 	if (k.key === 'up' || k.key === 'down') {
 		let r = modals.step(m, k)
 		return { state: { ...r.state, find: { ...f, moved: true } } }
@@ -206,4 +208,18 @@ function marks(text: string, query: string): [number, number][] {
 	}
 	return out
 }
-export const findDialog = { filters, labels, question, open, input, toggle, focus, step, words, rows, batch, marks }
+export const findDialog = {
+	filters,
+	labels,
+	resultsFocus,
+	question,
+	open,
+	input,
+	toggle,
+	focus,
+	step,
+	words,
+	rows,
+	batch,
+	marks,
+}

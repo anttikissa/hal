@@ -1,7 +1,7 @@
 // Find messages and ranking, shared so host and clients agree on what
 // matches. Find results are transient: never stored.
-export type FindKind = 'metadata' | 'user' | 'assistant' | 'thinking' | 'tool-call' | 'tool-output' | 'other'
-export type FindFilter = 'text' | 'thinking' | 'tools' | 'other'
+export type FindKind = 'metadata' | 'user' | 'assistant' | 'thinking' | 'tool-call' | 'tool-output' | 'commit' | 'other'
+export type FindFilter = 'text' | 'thinking' | 'tools' | 'commit' | 'other'
 export type FindResult = {
 	sessionId: string
 	name: string
@@ -22,11 +22,12 @@ export type FindBatch = {
 	error?: string
 }
 export type FindQuery = { words: string[]; kinds: FindKind[]; model?: string; cwd?: string; since?: number }
-const tiers: FindKind[] = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']
+const tiers: FindKind[] = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'commit', 'other']
 const groups: Record<string, FindKind[]> = {
 	text: ['user', 'assistant'],
 	thinking: ['thinking'],
 	tools: ['tool-call', 'tool-output'],
+	commit: ['commit'],
 	other: ['other'],
 	user: ['user'],
 	assistant: ['assistant'],
