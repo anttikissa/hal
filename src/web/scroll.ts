@@ -85,6 +85,7 @@ function navigate(): void {
 	// Layout can clamp the old position; only movement beyond that is navigation.
 	if (st.intent && Math.abs(el.scrollTop - Math.min(st.top, scroll.target(el, 0))) > atBottom) {
 		pin(scroll.gap(el) <= atBottom, 'drag')
+		if (st.pinned) st.intent = undefined
 		st.held = undefined
 		scroll.onTrace(st.pinned ? 'resume' : 'drag')
 	}
@@ -220,6 +221,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	}
 	el.addEventListener('pointerdown', intent, { passive: true })
 	el.addEventListener('touchstart', intent, { passive: true })
+	el.addEventListener('touchmove', intent, { passive: true })
 	el.addEventListener('wheel', wheel, { passive: true })
 	addEventListener('keydown', onKey)
 	return () => {
@@ -232,6 +234,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		document.removeEventListener('visibilitychange', shown)
 		el.removeEventListener('pointerdown', intent)
 		el.removeEventListener('touchstart', intent)
+		el.removeEventListener('touchmove', intent)
 		el.removeEventListener('wheel', wheel)
 		removeEventListener('keydown', onKey)
 	}

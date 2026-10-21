@@ -193,3 +193,32 @@ test('compositor movement before input delivery still releases following', () =>
 		Object.assign(scroll.state, original)
 	}
 })
+
+test('returning to bottom consumes navigation intent before iPhone rebound and content updates', () => {
+	let original = { ...scroll.state },
+		el = box(2189, 1198, 622)
+	Object.assign(scroll.state, { el, top: 1191, pinned: false, intent: true })
+	try {
+		el.scrollTop = 1567
+		scroll.check('scroll')
+		expect(scroll.state.pinned).toBe(true)
+		// Safari reports positions beyond the bottom while rubber-banding.
+		el.scrollTop = 1576
+		scroll.check('scroll')
+		el.scrollTop = 1569
+		scroll.check('scroll')
+		// The next streamed layout moves the view with no new reader input.
+		el.scrollHeight = 2194
+		el.scrollTop = 1530
+		scroll.check('content')
+		expect(scroll.state.pinned).toBe(true)
+		expect(el.scrollTop).toBe(1572)
+		// A deliberate reverse movement within the same touch still releases it.
+		scroll.intent(new Event('touchmove'))
+		el.scrollTop = 1550
+		scroll.check('scroll')
+		expect(scroll.state.pinned).toBe(false)
+	} finally {
+		Object.assign(scroll.state, original)
+	}
+})
