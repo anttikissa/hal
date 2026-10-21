@@ -42,7 +42,7 @@ function init(): void {
 			gap,
 			wheel === undefined ? undefined : { delta: Math.abs(wheel), up: wheel < 0 },
 		)
-	// Debug marker (desktop): green while following the bottom, red for
+	// Debug marker: green while following the bottom, red for
 	// 8 s after following ends, so the moment is noticed.
 	let mark = document.body.appendChild(document.createElement('div')),
 		fade: ReturnType<typeof setTimeout> | undefined

@@ -1084,7 +1084,7 @@
 					opacity: 0;
 				}
 			}
-			/* Opt-in scroll-follow debug marker (web/drift.ts, task 981), desktop only. */
+			/* Opt-in scroll-follow debug marker (web/drift.ts, task 981). */
 			.ScrollMark {
 				position: fixed;
 				top: 2lh;
@@ -1099,11 +1099,6 @@
 			.ScrollMark.heat-100 {
 				font-weight: bold;
 				background: color-mix(in oklab, var(--heat) 20%, var(--overlay-bg));
-			}
-			@media (pointer: coarse) {
-				.ScrollMark {
-					display: none;
-				}
 			}
 			/* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 			.Notices {
