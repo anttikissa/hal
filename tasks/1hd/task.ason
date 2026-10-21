@@ -1,0 +1,7 @@
+{
+	title: 'STYLE.md holds the look',
+	spec: "STYLE.md at the repo root holds Hal's look rules, user-facing style only: Look (retro sci-fi terminal), Motion (web) and Readable text (invariant, terminal and web), with the status-line rule. tasks/README.md keeps a heading with these section names that points to STYLE.md, so specs citing the readable-text invariant of tasks/README.md still resolve. AGENTS.md tells agents to read STYLE.md before changing UI. tasks/project.ason keeps STYLE.md across tsk clean. Rationale (user, 2026-10-21): each project keeps its style in STYLE.md, read by the personal antti-design skill, which stays generic.",
+	status: 'done',
+	needs: [],
+	foldInto: ['gn', 'arg']
+}

@@ -45,6 +45,8 @@ any hand edit, run `tsk show <id>`.
 
 Before changing code, read tasks/README.md for architecture, module
 conventions and invariants, including emergency keys.
+<!-- TODO - to be reviewed by a human -181-hug -->
+Before changing UI, read STYLE.md.
 
 ## Writing specs and system prompts / AGENTS.md
 
