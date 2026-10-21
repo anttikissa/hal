@@ -7,7 +7,8 @@ import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { router } from './router.ts'
 import { tabs } from './tabs.ts'
-import { useApp, alt, fx, message, press, snapOf, tab, tabsEvent } from './app-fixture.test.ts'
+import { editPrompt } from './edit-prompt.ts'
+import { useApp, alt, fx, message, meta, press, snapOf, snapshot, tab, tabsEvent, ts } from './app-fixture.test.ts'
 
 useApp()
 
@@ -114,6 +115,21 @@ test('choosing a tab pushes an entry, moves the following, and each tab keeps it
 	// Alt with no such tab does nothing.
 	alt(9)
 	expect(app.state.shown).toBe('1-aaa')
+})
+
+test('an edit in progress keeps its text across a tab switch', () => {
+	app.onEvent(tabsEvent(tab(meta.id), tab('2-bbb')))
+	app.onEvent(
+		snapshot({ type: 'running', phase: 'streaming' }, [
+			{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts },
+		]),
+	)
+	expect(editPrompt.edit('1')).toBe(true)
+	app.input('one!')
+	tabs.show('2-bbb', false)
+	tabs.show(meta.id, false)
+	expect(app.state.text).toBe('one!')
+	expect(app.state.view.editing).toBeDefined()
 })
 
 test('/go changes this page only if it currently shows the source tab', () => {

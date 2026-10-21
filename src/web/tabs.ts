@@ -161,7 +161,8 @@ function show(id: string, replace: boolean, block?: string): void {
 	if (id === st.shown) return
 	if (st.shown) {
 		scroll.save(st.shown)
-		if (st.tabs.some((tab) => tab.id === st.shown)) st.cached.set(st.shown, st.view)
+		if (st.tabs.some((tab) => tab.id === st.shown))
+			st.cached.set(st.shown, st.view.editing ? { ...st.view, editText: st.text } : st.view)
 		else {
 			st.background.delete(st.shown)
 			connection.send({ type: 'close', sessionId: st.shown })
@@ -170,9 +171,15 @@ function show(id: string, replace: boolean, block?: string): void {
 	}
 	st.shown = id
 	diagnostics.load('selected', performance.now(), st.tabs.findIndex((t) => t.id === id) + 1)
-	st.view = st.cached.get(id) ?? {}
+	let { editText, ...cached } = st.cached.get(id) ?? {}
+	st.view = cached
 	st.cached.delete(id)
-	st.text = queueEdit.editing(id) ? queueEdit.text(id) : (recall.shown(id) ?? drafts.text(id))
+	// An edit in progress keeps its text (task dg).
+	st.text = queueEdit.editing(id)
+		? queueEdit.text(id)
+		: cached.editing && editText !== undefined
+			? editText
+			: (recall.shown(id) ?? drafts.text(id))
 	queuedPrompt.sync()
 	router.store.save(id)
 	if (!st.background.has(id)) {

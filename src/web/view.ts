@@ -27,7 +27,8 @@ import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
 
 // `form`: the open question as filled in on this page.
-// `editing`: the last prompt is in the input (src/common/amend.ts).
+// `editing`: the last prompt is in the input (src/common/amend.ts);
+// `editText`: the input's text then, kept while the tab is hidden.
 // `modal`: the model picker over the page, taking the keys first;
 // `models` the host's full list it filters.
 // `sent`: the command id of each prompt or slash command this client
@@ -39,6 +40,7 @@ export type ViewState = {
 	notice?: string
 	form?: FormState
 	editing?: Editing
+	editText?: string
 	modal?: ModalState
 	models?: string[]
 	names?: Record<string, string>
