@@ -105,11 +105,13 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 		for (let [i, b] of blocks.entries()) {
 			if (b.type === 'text') await add(r.type, b.text, i)
 			else if (b.type === 'thinking') await add('thinking', b.text, i)
-			else if (b.type === 'tool_call')
-				(await add('tool-call', `${b.name} ${ason.stringify(b.input, 'short')}`, i),
-					findIndex.state.calls.set(b.id, `${r.n}`))
-			else if (b.type === 'tool_result')
-				(await add('tool-output', b.output, i, findIndex.state.calls.get(b.id)), findIndex.state.calls.delete(b.id))
+			else if (b.type === 'tool_call') {
+				findIndex.state.calls.set(b.id, `${r.n}`)
+				await add('tool-call', `${b.name} ${ason.stringify(b.input, 'short')}`, i)
+			} else if (b.type === 'tool_result') {
+				await add('tool-output', b.output, i, findIndex.state.calls.get(b.id))
+				findIndex.state.calls.delete(b.id)
+			}
 		}
 	} else if (r.type === 'output' && r.commit) {
 		// The card's title words, so "committed" finds commits.
