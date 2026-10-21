@@ -39,6 +39,7 @@ import { recap } from './recap.ts'
 import { promptCache } from './prompt-cache.ts'
 import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
+import { diag } from './diag.ts'
 import { usage } from './usage.ts'
 import { commandCheck } from '../common/command-check.ts'
 import { userQuit } from '../common/user-quit.ts'
@@ -274,6 +275,8 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			: serverLog.state.on
 				? { refused: 'hal serve already hosts this home' }
 				: (handover.request(), {})
+	if (c.type === 'terminal-error')
+		return (diag.log(`${client.record.kind} client pid ${client.record.pid ?? '?'}: ${c.text}`), {})
 	if (c.type === 'hello' || c.type === 'screen')
 		return c.type === 'hello'
 			? clients.hello(client.record, c.pid, c.version, c.newCode)

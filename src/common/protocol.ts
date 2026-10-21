@@ -169,6 +169,9 @@ export type Command = (
 	// A terminal client's size and terminal (TERM, program, color depth),
 	// on connecting and on every resize, for the inspect tool; untrusted.
 	| { type: 'screen'; cols: number; rows: number; term?: string }
+	// A terminal client could not write to its terminal (task wr8); the
+	// host appends `text` to state/diag.log. Untrusted.
+	| { type: 'terminal-error'; text: string }
 	// A remote terminal compares portable plugins (task zh7).
 	| PluginSyncCommand
 ) & { id?: string }

@@ -1,0 +1,7 @@
+{
+	title: 'A failed terminal write is never silent',
+	spec: 'When the terminal client fails to write to its terminal (terminal.writer), it shows a lasting failed notice (stays) naming the error code and the bytes dropped, and sends a terminal-error command whose text the host appends to state/diag.log with the client kind and pid. This works for the host terminal, peers and hal -r alike. One report per run of failures: it reports again only after a write has succeeded, so a terminal that stays gone does not loop repaint, notice and report. Invariant restored: no terminal write error is dropped silently; before, the writer discarded the queue without a word, which could leave half-written frames on screen with no trace.',
+	status: 'done',
+	needs: [],
+	foldInto: ['7j']
+}

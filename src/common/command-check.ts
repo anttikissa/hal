@@ -41,6 +41,7 @@ const commandTypes: CommandType[] = [
 	'hello',
 	'handover',
 	'screen',
+	'terminal-error',
 	'plugin-sync',
 ]
 
@@ -89,6 +90,10 @@ function invalid(value: unknown): string | undefined {
 			(((c.term as string | undefined)?.length ?? 0) > 200 ? 'screen: term exceeds 200 characters' : undefined)
 		)
 	}
+	if (c.type === 'terminal-error')
+		return (
+			str('text') ?? ((c.text as string).length > 1000 ? 'terminal-error: text exceeds 1000 characters' : undefined)
+		)
 	if (c.type === 'find-cancel' || c.type === 'handover') return undefined
 	if (c.type === 'plugin-sync') return pluginSyncWire.invalidCommand(c)
 	if (c.type === 'find') {

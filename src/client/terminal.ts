@@ -13,6 +13,7 @@ import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
 import { render } from './render.ts'
 import { app } from './app.ts'
+import { notices } from '../common/notices.ts'
 import fs from 'fs'
 
 /** The process and tty operations the terminal needs; faked in tests. */
@@ -79,6 +80,7 @@ function writer(
 ): { write(s: string): void; defer(make: () => string): void; flush(): void } {
 	let queue: (Buffer | (() => string))[] = []
 	let busy = false
+	let failing = false
 	let pump = (): void => {
 		let next = queue.shift()
 		busy = next !== undefined
@@ -89,12 +91,16 @@ function writer(
 			b = b.subarray(0, chunk)
 		}
 		fs.write(fd, b, (err, n) => {
-			// The terminal is gone: nothing more can reach it.
 			if (err) {
+				let lost = queue.reduce((sum, q) => sum + (typeof q === 'function' ? 0 : q.length), b.length)
 				queue = []
 				busy = false
+				// Once per run of failures, so a gone terminal does not loop.
+				if (!failing) terminal.writeFailed(err, lost)
+				failing = true
 				return
 			}
+			failing = false
 			if (n < b.length) queue.unshift(b.subarray(n))
 			pump()
 		})
@@ -119,6 +125,14 @@ function writer(
 			} catch {}
 		},
 	}
+}
+
+// A failed write is never silent (task wr8): a lasting notice here and a
+// line in the host's diag.log.
+function writeFailed(err: NodeJS.ErrnoException, lost: number): void {
+	let text = `terminal write failed: ${err.code ?? err.message}; ${lost} bytes dropped`
+	notices.add({ key: 'terminal-write', kind: 'failed', title: 'Terminal write failed', line: text, stays: true })
+	app.send({ type: 'terminal-error', text })
 }
 
 function realIO(): TerminalIO {
@@ -282,6 +296,7 @@ export const terminal = {
 	/** Whether there is a terminal to take over; tests replace it. */
 	available: (): boolean => !!process.stdin.isTTY,
 	writer,
+	writeFailed,
 	realIO,
 	init,
 	reset,
