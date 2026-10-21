@@ -9,6 +9,7 @@ import type { Folded } from '../common/notices.ts'
 import { notices } from '../common/notices.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
+import { markdownView } from './markdown-view.ts'
 import { modalView } from './modal-view.ts'
 
 // The stack's width on a terminal `cols` wide.
@@ -55,7 +56,9 @@ function messages(
 	clearable: boolean | undefined,
 	w: number,
 ): string[] {
-	let told = [why, notice].filter((t) => t).map((t) => ansi.wrap(t!, w))
+	let told = [why, notice]
+		.filter((t) => t)
+		.map((t) => markdownView.lines(t!, w, false, undefined, (s, b) => s && `/${s}${b ? `#${b}` : ''}`))
 	if (notice && clearable) {
 		let rows = told[told.length - 1]!,
 			hint = '(esc to clear)'

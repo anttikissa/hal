@@ -1,5 +1,6 @@
 // Connects the shared find modal and block navigation to the terminal.
 import { backfill } from '../common/backfill.ts'
+import { titles } from '../common/titles.ts'
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
@@ -53,7 +54,7 @@ function report(): void {
 	find.target = undefined
 	let f = frame.build(appView.view(), app.cols(), 24, true),
 		at = f.items!.findIndex((i) => i.key === r.blockId)
-	app.state.notice = `Hal can't scroll the terminal, but ${r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback.`
+	app.state.notice = `Hal can't scroll the terminal, but ${r.sessionId}#${f.items![at] ? titles.blockId(f.items![at]!) : r.blockId} is about ${Math.round((100 * (f.ends![at - 1] ?? 0)) / f.lines.length)}% down the scrollback.`
 }
 export const find = {
 	state: findController.create(),

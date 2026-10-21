@@ -22,14 +22,14 @@ function init(): void {
 	let db = new Database(`${paths.stateDir()}/find.sqlite`, { create: true })
 	findIndex.state.db = db
 	// The projection is disposable; version changes reindex immutable history.
-	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 4) {
+	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 5) {
 		db.exec(
-			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=4;',
+			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=5;',
 		)
 	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
-		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId));
+		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId,kind));
 		CREATE INDEX IF NOT EXISTS doc_kind ON docs(kind);
 		CREATE VIRTUAL TABLE IF NOT EXISTS words USING fts5(text, content='docs', content_rowid='id', tokenize='unicode61');
 		CREATE VIRTUAL TABLE IF NOT EXISTS grams USING fts5(text, content='docs', content_rowid='id', tokenize='trigram');
@@ -90,10 +90,10 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 			: r.type === 'question' || r.type === 'answer'
 				? 'q'
 				: (letters[kind] ?? 's')
-	let add = async (kind: FindKind, value: string, i = 0) => {
+	let add = async (kind: FindKind, value: string, i = 0, card?: string) => {
 		out.push({
 			sessionId,
-			blockId: i ? `${r.n}.${i}` : `${r.n}`,
+			blockId: card ?? (i ? `${r.n}.${i}` : `${r.n}`),
 			card: letter(kind),
 			kind,
 			ts,
@@ -105,8 +105,11 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 		for (let [i, b] of blocks.entries()) {
 			if (b.type === 'text') await add(r.type, b.text, i)
 			else if (b.type === 'thinking') await add('thinking', b.text, i)
-			else if (b.type === 'tool_call') await add('tool-call', `${b.name} ${ason.stringify(b.input, 'short')}`, i)
-			else if (b.type === 'tool_result') await add('tool-output', b.output, i)
+			else if (b.type === 'tool_call')
+				(await add('tool-call', `${b.name} ${ason.stringify(b.input, 'short')}`, i),
+					findIndex.state.calls.set(b.id, `${r.n}`))
+			else if (b.type === 'tool_result')
+				(await add('tool-output', b.output, i, findIndex.state.calls.get(b.id)), findIndex.state.calls.delete(b.id))
 		}
 	} else if (r.type === 'output' && r.commit) {
 		// The card's title words, so "committed" finds commits.
@@ -229,7 +232,11 @@ async function catchup(sessionId: string): Promise<void> {
 }
 
 export const findIndex = {
-	state: { db: undefined as Database | undefined, meta: new Map<string, SessionMeta>() },
+	state: {
+		db: undefined as Database | undefined,
+		meta: new Map<string, SessionMeta>(),
+		calls: new Map<string, string>(),
+	},
 	init,
 	catalog,
 	text,

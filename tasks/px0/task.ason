@@ -1,0 +1,14 @@
+{
+	title: 'Find hits name the visible card',
+	spec: `A tool output find hit names its call's card (t526), so its link opens a card the user can see. The index remembers each call's record number until its result is indexed (findIndex.state.calls); rows are unique per (session, blockId, kind).
+
+Invariant restored (bug, screenshot 2026-10-21): Ctrl-F found t528.1, a tool result that shows in t526.`,
+	status: 'done',
+	notes: [
+		'User limit: this fix stays minimal (a few lines); a first version mapping answers and command outputs too (about 65 lines) was rejected.',
+		'Still indexed but shown in no card: model-run commands and outputs (their tool card shows them), notices and inbox records; the rename test relies on model-run renames being found. User decision pending.',
+		'Decision (2026-10-21): the user left open whether text shown in no card stays findable; it stays indexed under its own id until decided.'
+	],
+	needs: [],
+	foldInto: ['v8']
+}
