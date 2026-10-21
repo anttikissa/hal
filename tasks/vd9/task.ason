@@ -6,7 +6,8 @@
 		'SYSTEM.md sections: Actions (general rules), READ, BASH, EDIT, Other actions ($tools_summary). The BASH/EDIT purpose hints moved into their own sections. Plugins that rewrite a guide must anchor on its section heading (# EDIT), not on neighboring lines: multiedit.ts matched "- Commands run in cwd;" and would have stopped installing its guide silently when that line moved.',
 		'Measured cost of a plugin swap before this: enabling, disabling or a .broken fallback of an EDIT plugin rebuilt every live session prompt (full cache write). Regression test in system-prompt.test.ts fails on the old inspect (hooked sections were dropped and their text counted as outside).',
 		'Sections renamed (task wev): Actions is now Tools, Other actions is now Other tools.',
-		'$tools_summary was renamed $other_tools, with a comment in SYSTEM.md saying which tools get detailed sections and which get one line (user request, 177-cub).'
+		'$tools_summary was renamed $other_tools, with a comment in SYSTEM.md saying which tools get detailed sections and which get one line (user request, 177-cub).',
+		'SyntaxSpec.summary documentation explains that Hal prefixes the description with the capitalized tool name, shows an input/output example, and recommends false when SYSTEM.md already describes the tool to avoid repetition.'
 	],
 	needs: ['q5g'],
 	foldInto: ['q5g']

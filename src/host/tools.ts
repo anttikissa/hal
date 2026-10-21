@@ -55,9 +55,12 @@ export type ToolOutput =
 // instead, so clients know too (task 26q). run returns the output; throwing makes an error
 // result with the message.
 // `syntax`: how call text reaches this tool (native-tool.ts, task
-// aks). `summary` follows the name in $other_tools (false: the system
-// prompt explains the tool already); `usage` lists exact syntax lines
-// for HELP (default: made from the schema); `positional` names the
+// aks). `summary`: description used in $other_tools. Hal prefixes it with the
+// capitalized tool name: 'read a history entry' becomes
+// 'READ_ENTRY read a history entry'. Set false when SYSTEM.md already
+// describes the tool, to avoid repeating it.
+// `usage` lists exact syntax lines for HELP (default: made from the schema);
+// `positional` names the
 // fields string arguments fill, in order (default: required fields);
 // field descriptions come only from `parameters`;
 // `resolve` maps the text after the name to a call when the grammar is
