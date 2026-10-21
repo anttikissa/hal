@@ -32,7 +32,7 @@ export const tool: Tool = {
 		// Purpose comments are taught only to interactive sessions (task 2bq).
 		let interactive = promptCache.interactive(ctx.sessionId)
 		if (input.name) return nativeTool.help(nativeTool.find(input.name.toLowerCase()), interactive)
-		let lines = [...tools.all().values()].flatMap((t) => nativeTool.shown(t, interactive))
+		let lines = tools.all().flatMap((t) => nativeTool.shown(t, interactive))
 		return [
 			`Syntax: <TOOL> ${interactive ? '[ /* <description> */ ] ' : ''}[ <args>... ]`,
 			'',

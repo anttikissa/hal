@@ -87,14 +87,14 @@ function dir(): string {
 	return `${import.meta.dir}/tools`
 }
 
-// Every tool by name, sorted, read from the directory each time.
-function all(): Map<string, Tool<ToolOutput>> {
-	let found = new Map<string, Tool>()
+// Every tool in filename order, read from the directory each time.
+function all(): Tool<ToolOutput>[] {
+	let found: Tool<ToolOutput>[] = []
 	for (let file of readdirSync(tools.dir()).sort()) {
 		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
 		let tool: Tool = require(`${tools.dir()}/${file}`).tool
 		if (tool.name !== file.slice(0, -3)) throw new Error(`${tools.dir()}/${file} defines tool '${tool.name}'`)
-		found.set(tool.name, tool)
+		found.push(tool)
 	}
 	return found
 }
@@ -147,10 +147,10 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 			else nativeTool.resolve(call.input.cmd, ctx)
 			throw new Error('the tool call did not resolve when it arrived; send it again')
 		}
-		let tool = tools.all().get(call.name)
+		let tool = tools.all().find((t) => t.name === call.name)
 		if (!tool)
 			throw new Error(
-				`'${call.name}' is not a provider tool: the model called it at the top level. Hal tools run inside tool: tool { cmd: "${tools.all().has(call.name.toLowerCase()) ? call.name.toUpperCase() : '<TOOL>'} <args...>" }; tool { cmd: "HELP" } lists them.`,
+				`'${call.name}' is not a provider tool: the model called it at the top level. Hal tools run inside tool: tool { cmd: "${tools.all().some((t) => t.name === call.name.toLowerCase()) ? call.name.toUpperCase() : '<TOOL>'} <args...>" }; tool { cmd: "HELP" } lists them.`,
 			)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
@@ -287,9 +287,9 @@ export const tools = {
 	maxFileBytes: 20_000_000,
 	// Unknown tools count as having side effects.
 	readOnly: (name: string, input: Record<string, unknown> = {}): boolean =>
-		toolDetails.harmless(name, input) || tools.all().get(name)?.readOnly === true,
+		toolDetails.harmless(name, input) || tools.all().find((t) => t.name === name)?.readOnly === true,
 	defs: (): ToolDef[] =>
-		[...tools.all().values()].map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+		tools.all().map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
 	killAfterMs: 2000,
 	// Foreground bash streams its output while it runs.
 	streams: (call: ToolCallBlock): boolean => call.name === 'bash' && call.input.background !== true,

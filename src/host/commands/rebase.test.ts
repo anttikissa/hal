@@ -87,7 +87,7 @@ test('append activity is allowed, context rewrites and malformed plans refuse; b
 	await expect(
 		tools
 			.all()
-			.get('command')!
+			.find((t) => t.name === 'command')!
 			.run({ command: '/rebase' }, { sessionId: id, signal: new AbortController().signal } as any),
 	).rejects.toThrow('Use /rebase show')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'running' })

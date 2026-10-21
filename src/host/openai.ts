@@ -103,7 +103,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 		if (
 			req.tools.some((t) => t.name === 'tool') &&
 			catalog.webSearchModels.includes(req.model) &&
-			(!auth.serperKey() || !tools.all().has('google'))
+			(!auth.serperKey() || !tools.all().some((t) => t.name === 'google'))
 		) {
 			;(b.tools as unknown[]).push({ type: 'web_search' })
 			b.include = ['web_search_call.action.sources']

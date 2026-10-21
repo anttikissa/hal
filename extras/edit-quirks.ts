@@ -26,7 +26,7 @@ const N = '\n'
 const header = / (replace|insert-before|insert-after|delete|create|write)(?: \d+(?:-\d+)?)?\s*$/
 const known = (l: string) => {
 	const m = /^([A-Z][A-Z_]*)(?=\s|\/\*|$)/.exec(l)?.[1]
-	return !!m && tools.all().has(m.toLowerCase())
+	return !!m && tools.all().some((t) => t.name === m.toLowerCase())
 }
 const applies = (q: Quirk, ctx?: CallContext) =>
 	!!ctx?.model && quirks[q].some((p) => new Bun.Glob(p).match(ctx.model!))

@@ -1,0 +1,11 @@
+{
+	title: 'Expose tools as an ordered array',
+	spec: 'tools.all() returns Tool[] in built-in filename order instead of a Map keyed by the redundant tool name. Plugins extend or reorder the result through existing around hooks, for example next => [...next(), myTool]; the example plugin teaches this pattern. Existing hook composition order stays unchanged. Callers use array lookup and iteration for parsing, execution, read-only scheduling, HELP, prompt summaries and provider search fallback. No cache, secondary registry or new registration API is added.',
+	status: 'done',
+	notes: [
+		'Existing around hooks are outermost in filename order, so append-on-return hooks add tools in reverse hook order; this change does not alter composition. Lookup uses find, so plugins replacing an existing tool should map/filter the array rather than append a duplicate. Regression coverage checks array extension through lookup, HELP, prompt summary, read-only classification and execution; provider fallback coverage removes a tool with filter.',
+		'Verification: full normal suite ran 1661 tests, 1660 passed; the sole failure was the concurrently modified src/common/transcript.ts exceeding the source size limit. Whole-project typecheck and lint of the nine changed source/test files passed. Full lint reported unrelated warnings in frame.ts and find-index.ts; their owners were notified.'
+	],
+	needs: ['an'],
+	foldInto: ['an']
+}

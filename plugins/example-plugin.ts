@@ -83,15 +83,13 @@ export default (plugin: Plugin) => {
 	// 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))
 	//
 	// 	// A harmless extra tool, added to the registry's result.
-	// 	plugin.after(tools, 'all', (found) => {
-	// 		found.set('today', {
-	// 			name: 'today',
-	// 			description: "Today's date.",
-	// 			parameters: { type: 'object', properties: {} },
-	// 			readOnly: true,
-	// 			run: async () => new Date().toDateString(),
-	// 		})
-	// 	})
+	// 	plugin.around(tools, 'all', (next) => [...next(), {
+	// 		name: 'today',
+	// 		description: "Today's date.",
+	// 		parameters: { type: 'object', properties: {} },
+	// 		readOnly: true,
+	// 		run: async () => new Date().toDateString(),
+	// 	}])
 	//
 	// 	// A theme: colors are OKLCH [lightness, chroma, hue]. set replaces a
 	// 	// shared value, around a style. Nothing repaints for you: redraw now

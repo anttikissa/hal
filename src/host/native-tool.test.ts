@@ -23,6 +23,31 @@ async function act(id: string, text: string): Promise<{ output: string; isError?
 }
 const versionOf = (out: string) => /@(\w{5})/.exec(out)![1]!
 
+test('array tool extensions participate in lookup, HELP, summaries and execution', async () => {
+	let all = tools.all
+	let extra = {
+		name: 'example',
+		description: 'Example tool',
+		syntax: { summary: 'show an example' },
+		parameters: { type: 'object' as const, properties: {} },
+		readOnly: true as const,
+		run: async () => 'example result',
+	}
+	try {
+		tools.all = () => [extra, ...all()]
+		let id = created(client(), testHome())
+		expect(nativeTool.find('example')).toBe(extra)
+		expect(tools.defs()[0]?.name).toBe('example')
+		expect(nativeTool.summary().split('\n')[0]).toBe('\tEXAMPLE show an example')
+		expect((await act(id, 'HELP')).output).toContain('EXAMPLE')
+		expect(tools.readOnly('example')).toBe(true)
+		expect((await act(id, 'EXAMPLE')).output).toBe('example result')
+	} finally {
+		tools.all = all
+	}
+	expect(() => nativeTool.find('example')).toThrow('unknown tool EXAMPLE')
+})
+
 test('only interactive HELP teaches purpose comments; validation never does', async () => {
 	let id = created(client(), testHome())
 	expect((await act(id, 'HELP')).output).toContain('/* <description> */')

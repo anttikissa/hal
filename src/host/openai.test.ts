@@ -136,11 +136,7 @@ test('native search requires an allowlisted model, Hal tools, and absent or disa
 	expect(openai.body(req, true).tools).not.toContainEqual({ type: 'web_search' })
 	let all = tools.all
 	try {
-		tools.all = () => {
-			let found = all()
-			found.delete('google')
-			return found
-		}
+		tools.all = () => all().filter((t) => t.name !== 'google')
 		expect(openai.body(req, true).tools).toContainEqual({ type: 'web_search' })
 	} finally {
 		tools.all = all

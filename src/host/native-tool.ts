@@ -40,10 +40,13 @@ function def(): ToolDef {
 
 function find(id: string): Tool<unknown> {
 	// READ_BLOB was READ_ENTRY's name; old notices in histories still say it.
-	let tool = tools.all().get(id === 'read_blob' ? 'read_entry' : id)
+	let tool = tools.all().find((t) => t.name === (id === 'read_blob' ? 'read_entry' : id))
 	if (!tool)
 		throw new Error(
-			`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${[...tools.all().keys()].map((n) => n.toUpperCase()).join(', ')}. HELP lists them; shell commands go in BASH "..."`,
+			`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${tools
+				.all()
+				.map((t) => t.name.toUpperCase())
+				.join(', ')}. HELP lists them; shell commands go in BASH "..."`,
 		)
 	return tool
 }
@@ -216,7 +219,8 @@ function help(tool: Tool<unknown>, interactive = false): string {
 
 // One line per tool the system prompt does not explain, for $other_tools.
 function summary(): string {
-	return [...tools.all().values()]
+	return tools
+		.all()
 		.filter((t) => t.syntax?.summary !== false)
 		.map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`)
 		.join('\n')

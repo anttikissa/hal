@@ -56,7 +56,7 @@ function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: st
 		then: string[] = []
 	const known = (l: string) => {
 		const m = /^([A-Z][A-Z_]*)(?=\s|\/\*|$)/.exec(l)?.[1]
-		return m && tools.all().has(m.toLowerCase()) ? m : undefined
+		return m && tools.all().some((t) => t.name === m.toLowerCase()) ? m : undefined
 	}
 	while (i < lines.length) {
 		const line = lines[i]!.trim(),
