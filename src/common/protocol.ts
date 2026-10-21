@@ -330,7 +330,7 @@ export type Event =
 			origin?: 'model'
 			change?: PromptChange
 			commit?: CommitBlock
-			dropped?: number
+			notice?: true
 			n?: number
 			streaming?: true
 	  }

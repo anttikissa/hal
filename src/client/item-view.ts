@@ -322,9 +322,8 @@ function itemLines(
 			)
 		case 'output': {
 			// A commit (task 179): 'HH:MM Committed <short> <subject>';
-			// open, its files and the hook's lines. A dropped queued
-			// message: 'HH:MM Queue item #3 was dropped', then its text.
-			if (item.commit || item.dropped !== undefined) {
+			// open, its files and the hook's lines.
+			if (item.commit) {
 				let body = item.text.split('\n').flatMap((l) => ansi.wrap(l, width))
 				return itemView.headed(
 					item,
@@ -366,13 +365,14 @@ function itemLines(
 					]),
 				]
 			}
-			return itemView.headed(
-				item,
-				markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)),
-				width,
-				undefined,
-				false,
-			)
+			let body = item.notice
+				? ansi.wrap(titles.stamp(item.ts, item.text), width)
+				: markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item))
+			if (item.notice)
+				return fold === 'short'
+					? blockView.short(body, width, false, itemView.itemStyle(item), settings.shortRows())
+					: body
+			return itemView.headed(item, body, width, undefined, false)
 		}
 		// One row: the text centered in a rule across the width.
 		case 'divider': {

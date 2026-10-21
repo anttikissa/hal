@@ -152,6 +152,7 @@ export type HistoryRecord = Numbered &
 				synthetic?: true
 				change?: PromptChange
 				commit?: CommitBlock
+				notice?: true
 				// A dropped queued message: its position then; `text` is the message.
 				dropped?: number
 				transition?: ContextTransition

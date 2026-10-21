@@ -25,7 +25,7 @@ test('/queue lists in order, next steers a running turn, clear drops only queued
 	])
 	send('/queue clear')
 	await until(() => b.views.get(id)?.inbox.length === 1)
-	await until(() => a.of('output').some((e) => e.dropped === 1 && e.text === 'second'))
+	await until(() => a.of('output').some((e) => e.notice && e.text === 'Queue item #1 was dropped: second'))
 	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['first'])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)

@@ -295,19 +295,19 @@ function dismiss(id: string, question: string): void {
 // keeps its text, since a drop has no undo.
 function drop(id: string, item: { id: string; text: string }, n: number): void {
 	history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
-	let { ts, n: at } = history.append(id, { type: 'output', text: item.text, dropped: n })
-	host.broadcast(id, { type: 'output', sessionId: id, text: item.text, dropped: n, n: at, ts, ...slash.placed(id) })
+	slash.output(id, `Queue item #${n} was dropped: ${item.text}`, false, undefined, false, true)
 }
 
 // What a command said. `origin: model` marks a model-run command's
 // outcome, which its tool card shows instead (task 9g).
-function output(id: string, text: string, error = false, origin?: 'model', synthetic = false): void {
+function output(id: string, text: string, error = false, origin?: 'model', synthetic = false, notice = false): void {
 	let { n, ts } = history.append(id, {
 		type: 'output',
 		text,
 		...(error && { error: true as const }),
 		...(origin && { origin }),
 		...(synthetic && { synthetic: true }),
+		...(notice && { notice: true }),
 	})
 	host.broadcast(id, {
 		type: 'output',
@@ -316,6 +316,7 @@ function output(id: string, text: string, error = false, origin?: 'model', synth
 		...(error && { error: true as const }),
 		...(origin && { origin }),
 		...(synthetic && { synthetic: true }),
+		...(notice && { notice: true }),
 		n,
 		ts,
 		...slash.placed(id),

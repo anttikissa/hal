@@ -155,7 +155,7 @@ test('/queue drop: refused for the locked message; a dropped one never runs, eve
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop --id later' })
 	expect(waiting(id)).toEqual(['queued'])
 	await until(() => a.of('output').length === 2)
-	expect(a.of('output').map((e) => [e.text, e.dropped])).toContainEqual(['later', 2])
+	expect(a.of('output').map((e) => [e.text, e.notice])).toContainEqual(['Queue item #2 was dropped: later', true])
 	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual([
 		'/queue drop 1',
 		'/queue drop 2',

@@ -30,7 +30,7 @@ function kind(item: Shown, failed = false): Kind | undefined {
 		case 'tool':
 			return failed ? 'failed' : messaging.has(item.name) ? 'message' : 'tool'
 		case 'output':
-			return item.commit ? 'commit' : item.change || item.dropped !== undefined ? 'notice' : undefined
+			return item.commit ? 'commit' : item.change || item.notice ? 'notice' : undefined
 		case 'prompt':
 			if (bashResult.background(item)) return card.failed({ output: item.text }, true) ? 'failed' : 'tool'
 			if (item.from === undefined && item.origin === 'model') return 'notice'

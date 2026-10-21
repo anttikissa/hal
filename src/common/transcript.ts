@@ -87,14 +87,13 @@ export type Shown = { originSession?: string } &
 		| { type: 'command'; text: string; from?: string; label?: string; output?: string; error?: true; ts?: string }
 		// What a command said.
 		// `commit`: a commit a Bash call made (task 179), its own card.
-		// `dropped`: a dropped queued message's position; `text` is the message.
 		| {
 				type: 'output'
 				text: string
 				error?: true
 				change?: PromptChange
 				commit?: CommitBlock
-				dropped?: number
+				notice?: true
 				ts?: string
 		  }
 		// A compact (task bc), drawn as a one-row rule. A /clear (task vh)

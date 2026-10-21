@@ -5,6 +5,7 @@ import type { Snapshot } from './snapshot.ts'
 import { transcript, type Transcript } from './transcript.ts'
 import { transcriptLive } from './transcript-live.ts'
 import { titles } from './titles.ts'
+import { card } from './card.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -26,6 +27,20 @@ const said = (block: AssistantBlock, n: number) => ({ type: 'assistant' as const
 function snap(snapshot: Omit<Snapshot, 'meta' | 'state'>): Event {
 	return { type: 'snapshot', sessionId, snapshot: { meta, state: { type: 'idle' }, ...snapshot } }
 }
+
+test('plain notices stay closed and separate from commands, including saved drop cards', () => {
+	let command = { type: 'command' as const, text: '/queue drop', n: 1, ts }
+	let text = 'Queue item #3 was dropped: first\nsecond'
+	let output = { type: 'output' as const, text, notice: true as const, n: 2, ts }
+	let live = fold([snap({ history: [command] }), { ...output, sessionId }])!
+	let restored = fold([snap({ history: [command, output] })])!
+	let legacy = fold([snap({ history: [command, { type: 'output', text: 'first\nsecond', dropped: 3, n: 2, ts }] })])!
+	expect(live.items).toEqual(restored.items)
+	expect(legacy.items).toEqual(restored.items)
+	expect(restored.items).toHaveLength(2)
+	expect(card.initial(restored.items[1]!)).toBe('short')
+	expect(card.initial(restored.items[1]!, { notice: 'long' })).toBe('long')
+})
 
 test('live and restored tool images share stable items, including legacy single-image results', () => {
 	let images = [

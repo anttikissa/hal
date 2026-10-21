@@ -18,6 +18,7 @@ function aside(
 				synthetic?: true
 				change?: PromptChange
 				commit?: CommitBlock
+				notice?: true
 				dropped?: number
 				ts?: string
 		  }
@@ -40,11 +41,11 @@ function aside(
 		? { type: 'text', text: r.text, synthetic: true, ...(r.ts !== undefined && { ts: r.ts }) }
 		: {
 				type: 'output',
-				text: r.text,
+				text: r.dropped === undefined ? r.text : `Queue item #${r.dropped} was dropped: ${r.text}`,
 				...(r.error && { error: true }),
 				...(r.change && { change: r.change }),
 				...(r.commit && { commit: r.commit }),
-				...(r.dropped !== undefined && { dropped: r.dropped }),
+				...((r.notice || r.dropped !== undefined) && { notice: true }),
 				...(r.ts !== undefined && { ts: r.ts }),
 			}
 }
