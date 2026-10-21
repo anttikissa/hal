@@ -83,8 +83,9 @@ interface RenderState {
 	/** Why the queued paint repaints every row (task e4c), if it does. */
 	full: string | undefined
 	/** The items' rows painted last and whose tab they are: shown again
-	 * while a long history is laid out in slices. */
-	past: { session: string | undefined; past: Past } | undefined
+	 * while a long history is laid out in slices. `tail` when they are
+	 * only the history's last screenful. */
+	past: { session: string | undefined; past: Past; tail: boolean } | undefined
 	/** The next slice of that layout. */
 	slicing: ReturnType<typeof setTimeout> | null
 }

@@ -1,7 +1,7 @@
 // Builds terminal frames and schedules incremental paints and canonical
 // rebuilds.
 import { frame, type View } from './frame.ts'
-import { frameLayout } from './frame-layout.ts'
+import { frameLayout, type Past } from './frame-layout.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { batchOrder } from './batch-order.ts'
@@ -37,15 +37,32 @@ function draw(force = false, trigger?: string): void {
 		st.past = undefined
 	}
 	let session = st.view.transcript?.meta.id
-	let past = frameLayout.layout(st.view, cols, force ? Infinity : performance.now() + render.sliceMs, true, rows)
-	if (!past) {
+	// No paint lays out the whole history at once, not even a forced one
+	// (task 7j): until the slices finish, the last rows painted or the
+	// history's tail stand in.
+	let lay = (): Past => {
+		let kept = st.past?.session === session ? st.past : undefined
+		let full = frameLayout.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)
+		if (full) {
+			st.past = { session, past: full, tail: false }
+			return full
+		}
 		render.later()
-		past =
-			st.past && st.past.session === session
-				? st.past.past
-				: frameLayout.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
+		st.past = kept ?? {
+			session,
+			past: frameLayout.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!,
+			tail: true,
+		}
+		return st.past.past
 	}
-	st.past = { session, past }
+	let wasTail = st.past?.tail === true && st.past.session === session
+	let past = lay()
+	// The whole history replaces its tail in one canonical repaint; it was
+	// just laid out, so it needs no rebuild.
+	if (wasTail && !st.past!.tail) {
+		force = true
+		trigger ??= 'the end of a sliced layout'
+	}
 	// Full mode never shrinks between forced paints: rows given up turn
 	// into padding above the chrome instead of clearing scrollback.
 	let next = frame.build(st.view, cols, rows, st.fullscreen, past, st.fullscreen && !force ? st.prev.length : 0)
@@ -55,9 +72,8 @@ function draw(force = false, trigger?: string): void {
 	let pending = ''
 	for (let p of render.paintParts(next, rows, force, trigger, () => {
 		rebuild(st.view)
-		past = frameLayout.layout(st.view, cols, Infinity, true, rows)!
-		st.past = { session, past }
-		return frame.build(st.view, cols, rows, st.fullscreen, past)
+		st.past = undefined
+		return frame.build(st.view, cols, rows, st.fullscreen, lay())
 	})) {
 		if (typeof p === 'string') pending += p
 		else if (out.defer) {

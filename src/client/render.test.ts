@@ -424,6 +424,24 @@ describe('a long history (task 7j)', () => {
 			render.sliceMs = slice
 		}
 	})
+
+	test('a forced repaint, such as a tab switch, is sliced too', async () => {
+		let slice = render.sliceMs
+		render.sliceMs = -1
+		try {
+			setup(8, 30)
+			render.state.view = { transcript: transcript(items(40)), prompt: { text: '', cursor: 0 } }
+			render.draw(true, 'a tab switch')
+			expect(render.state.slicing).not.toBeNull()
+			expect(term.content().join('\n')).toContain(' a39')
+			expect(term.content().join('\n')).not.toContain(' q0')
+			while (render.state.slicing) await Bun.sleep(1)
+			expect(term.content()).toEqual(frameText())
+			expect(frameText()).toContain(' q0')
+		} finally {
+			render.sliceMs = slice
+		}
+	})
 })
 
 describe('clear reasons (task e4c)', () => {
