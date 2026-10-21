@@ -27,7 +27,7 @@ import { pageSlices } from './page-slices.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
 type Marks = {
-	rebaseVersion?: 1
+	rebaseVersion?: 2
 	rebase?: number
 	transitions?: number[]
 	size: number
@@ -36,6 +36,7 @@ type Marks = {
 	turnQuestion?: string
 	answer?: number
 	turn?: number
+	ended?: number
 	prompt?: number
 	inbox: Record<string, number | number[]>
 	changes?: number[]
@@ -148,6 +149,7 @@ function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
 		// A turn end is the turn's last record; it closes only a turn's
 		// question (forms.open), so the last answer is kept apart.
 		if (r.type === 'answer') m.answer = offset
+		if (r.type === 'turn_end') m.ended = offset
 		if (r.type === 'turn_end' || r.question === m.turnQuestion) m.turn = offset
 	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
 	// Every record of a message: an edit keeps the place of the first.
@@ -202,11 +204,11 @@ function* catchUp(id: string): Steps<Marks> {
 		if (
 			m.size < 0 ||
 			m.size > size ||
-			(m.size > 0 && (m.next === undefined || m.changes === undefined || !('rebaseVersion' in m))) ||
+			(m.size > 0 && (m.next === undefined || m.changes === undefined || m.rebaseVersion !== 2)) ||
 			'close' in m
 		) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 1 })
+			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 2 })
 			changedFiles.reset(m)
 		}
 		if (m.size >= size) return m
@@ -248,9 +250,15 @@ function marked(id: string): Line[] {
 function* markedSteps(id: string): Steps<Line[]> {
 	let m = yield* pages.catchUp(id)
 	let offsets = new Set(
-		[m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat(), ...(m.transitions ?? [])].filter(
-			(o) => o !== undefined,
-		),
+		[
+			m.question,
+			m.answer,
+			m.ended,
+			m.turn,
+			m.prompt,
+			...Object.values(m.inbox).flat(),
+			...(m.transitions ?? []),
+		].filter((o) => o !== undefined),
 	)
 	let path = history.file(id)
 	let out: Line[] = []

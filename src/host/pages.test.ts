@@ -158,12 +158,25 @@ test('what the state needs from earlier stays right as history grows and without
 	check()
 	history.append(id, { type: 'turn_end', status: 'error', error: 'boom', usage: {} })
 	check()
+	// A paused turn's question stays closed while the next turn runs.
+	history.append(id, { type: 'question', id: 'q', form: { text: 'Allow?', fields: [{ type: 'text', name: 'ok' }] } })
+	history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+	history.submit(id, 'again')
+	turn(id, 1)
+	check()
+	expect(forms.open(pages.essentials(id))).toBeUndefined()
 	// Written by someone else, then by an older host with no marks.
 	appendFileSync(history.file(id), lines.encode({ type: 'continue', ts: new Date().toISOString() }))
 	check()
 	pages.reset()
-	expect(existsSync(`${paths.sessionDir(id)}/marks.ason`)).toBe(true)
-	rmSync(`${paths.sessionDir(id)}/marks.ason`)
+	let marks = `${paths.sessionDir(id)}/marks.ason`
+	expect(existsSync(marks)).toBe(true)
+	// Marks kept before the turn end was marked are rebuilt.
+	let old = readFileSync(marks, 'utf8').replace('rebaseVersion: 2', 'rebaseVersion: 1')
+	writeFileSync(marks, old.replace(/\n\s*ended: \d+,/, ''))
+	check()
+	pages.reset()
+	rmSync(marks)
 	check()
 })
 
