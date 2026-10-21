@@ -110,9 +110,9 @@ effort.
 # Forking
 
 Fork the current session with `ctrl-b` (for "branch", since `ctrl-f` is
-for "find"/"filter") to ask a quick question or try another approach
-with the same context. If you fork while the parent is working, the fork
-starts idle, so the work is not done twice.
+for "find"/"filter") to ask a quick question, do a side quest, or try
+another approach with the same context. If you fork while the parent
+is working, the fork starts idle to avoid conflicting tool calls.
 
 # Rebase and edit
 

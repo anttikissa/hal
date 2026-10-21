@@ -176,8 +176,8 @@ object. Keep derived values callable: prefer
 to destructuring and method aliases captured in exported objects.
 Literal constants and local snapshots inside functions are fine.
 
-Core functions have concrete, navigable implementations. Do not use empty
-placeholder functions that another module overwrites at startup.
+Core functions have concrete, navigable implementations. Do not overwrite
+functions with another implementation.
 
 Avoid indirection without useful meaning: call `ansi.INVERSE`, not a
 local alias of it, and import the module that implements a function
