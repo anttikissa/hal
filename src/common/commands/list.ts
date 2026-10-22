@@ -39,7 +39,11 @@ const list: CommandInfo[] = [
 	{ name: 'clients', description: 'show who is connected to the host', category: 'debug' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w' },
 	{ name: 'collapse', description: 'collapse cards (t*, 10-24)', category: 'session' },
-	{ name: 'compact', description: 'summarize the context so far', category: 'session' },
+	{
+		name: 'compact',
+		description: 'summarize context; /compact [focus] guides the summary; /compact undo restores it',
+		category: 'session',
+	},
 	{ name: 'config', description: 'show or change settings', category: 'app' },
 	{
 		name: 'edit',
