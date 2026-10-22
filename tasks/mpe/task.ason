@@ -1,7 +1,0 @@
-{
-	title: 'Deterministic renderer and host-timezone checks',
-	spec: 'Tests do not assume a default rendering slice completes within a wall-clock deadline or that changing TZ in a running Bun process changes Intl timezone caches. Remove the flaky sliced-versus-unsliced render test, retaining deterministic renderer coverage. Check host-local timezone fallback against the actual host timezone; explicit client timezone conversion coverage stays. Restores the invariant that normal tests fail only for behavioral regressions rather than runtime timing or cached timezone behavior.',
-	status: 'done',
-	needs: [],
-	foldInto: ['7j', 'wgx']
-}

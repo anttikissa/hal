@@ -67,34 +67,28 @@ test('self-issued clear records results for later undispatched calls, ends old t
 	expect(shown((await fresh(id)).items)).toEqual(shown(c.views.get(id)!.items))
 })
 
-test('compact refuses mixed tool rounds, then preserves prompt and continues after a solo checkpoint', async () => {
+test('self-issued compact waits for every tool result, preserves prompt and continues same turn', async () => {
 	let c = client(),
 		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'active prompt' })
 	await until(() => calls.length === 1)
-	calls[0]!.push(
-		{ type: 'tool_call', id: 'reset', name: 'compact', input: { summary: 'Premature checkpoint' } },
-		commandCall('/rename Later tool', 'later'),
-		{
-			type: 'done',
-			reason: 'tool_use',
-		},
-	)
+	calls[0]!.push(commandCall('/compact'), commandCall('/rename Later tool', 'later'), {
+		type: 'done',
+		reason: 'tool_use',
+	})
 	await until(() => calls.length === 2)
-	expect((await records(id)).some((r) => r.type === 'compact')).toBe(false)
-	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Call COMPACT alone')
-	calls[1]!.push(
-		{ type: 'tool_call', id: 'checkpoint', name: 'compact', input: { summary: 'Renamed; continue the active task.' } },
-		{ type: 'done', reason: 'tool_use' },
-	)
-	await until(() => calls.length === 3)
 	let all = await records(id),
 		boundary = all.findIndex((r) => r.type === 'compact')
-	expect(all[boundary - 1]).toMatchObject({ type: 'user', blocks: [{ type: 'tool_result', id: 'checkpoint' }] })
-	expect(JSON.stringify(calls[2]!.input.messages)).toContain('active prompt')
-	expect(JSON.stringify(calls[2]!.input.messages)).toContain('Renamed; continue the active task.')
+	expect(all[boundary - 1]).toMatchObject({
+		type: 'user',
+		blocks: [
+			{ type: 'tool_result', id: 'reset' },
+			{ type: 'tool_result', id: 'later' },
+		],
+	})
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('active prompt')
 	expect(c.of('turn-end').length).toBe(0)
-	calls[2]!.push({ type: 'done', reason: 'end' })
+	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
 })
 
@@ -315,35 +309,6 @@ test("human clear starts its continuation only after the round's calls settle", 
 		await until(() => c.of('turn-end').length === 2)
 	} finally {
 		tools.run = original
-	}
-})
-
-test('checkpoint recovery installs the accepted summary exactly once', async () => {
-	for (let written of [false, true]) {
-		let c = client(),
-			id = created(c)
-		let prompt = history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Original request' }] })
-		let intent = {
-			id: 'checkpoint-intent',
-			kind: 'compact' as const,
-			summary: 'Durable working state',
-			sender: { origin: 'model' as const },
-		}
-		history.append(id, { type: 'output', text: 'accepted', transition: intent })
-		if (written)
-			history.append(id, {
-				type: 'compact',
-				summary: intent.summary,
-				prompts: 1,
-				keep: [prompt.n!],
-				transition: intent.id,
-			})
-		restartHost()
-		contextTransitions.apply(id)
-		contextTransitions.apply(id)
-		let checkpoints = history.readSync(id).filter((r) => r.type === 'compact')
-		expect(checkpoints).toHaveLength(1)
-		expect(checkpoints[0]).toMatchObject({ summary: expect.stringContaining(intent.summary), keep: [prompt.n!] })
 	}
 })
 

@@ -10,7 +10,6 @@ export type ContextTransition = {
 	kind: 'clear' | 'compact' | 'rebase'
 	rebase?: { sparse: SparseRebase; paused?: true; resume?: true; call?: string }
 	prompt?: string
-	summary?: string
 	sender: Sender
 	canceled?: true
 }

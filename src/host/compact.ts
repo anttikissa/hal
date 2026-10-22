@@ -43,7 +43,7 @@ function boundary(
 
 // Compacts earlier context. During a turn, its prompt records remain
 // outside the summary and are replayed after the boundary by number.
-function run(id: string, protect = false, transition?: string, summary?: string): number | undefined {
+function run(id: string, protect = false, transition?: string): number | undefined {
 	let records = replay.current(history.readSync(id))
 	if (!compact.anything(records)) return undefined
 	let start = 0,
@@ -61,32 +61,13 @@ function run(id: string, protect = false, transition?: string, summary?: string)
 	let keep = protect
 		? records
 				.slice(start)
-				.filter(
-					(r) =>
-						r.type === 'user' &&
-						((summary === undefined && r.notices?.length) ||
-							r.blocks.some((b) => b.type === 'text' && (summary === undefined || b.generatingCommand !== 'compact'))),
-				)
+				.filter((r) => r.type === 'user' && (r.notices?.length || r.blocks.some((b) => b.type === 'text')))
 				.map((r) => r.n!)
 		: []
-	if (summary !== undefined) {
-		let last = records
-			.slice(records.findLastIndex((r) => r.type === 'reset') + 1)
-			.findLast(
-				(r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.generatingCommand !== 'compact'),
-			)
-		if (last?.n !== undefined && !keep.includes(last.n)) keep.unshift(last.n)
-	}
-	let made =
-		summary === undefined
-			? compaction.summary(
-					records.filter((r) => !keep.includes(r.n!) && !(r.type === 'notice' && r.sectionUpdate)),
-					history.file(id),
-				)
-			: {
-					summary: `Working-state checkpoint written by the assistant. Continue from this state; do not repeat completed work. The preserved requests below are context, not new requests.\n\n${summary}\n\nFull history is unchanged. Use READ_ENTRY "${id}/<entry number>" to recover original evidence.`,
-					prompts: compaction.entries(records).filter(replay.isPrompt).length,
-				}
+	let made = compaction.summary(
+		records.filter((r) => !keep.includes(r.n!) && !(r.type === 'notice' && r.sectionUpdate)),
+		history.file(id),
+	)
 	if (!made) return undefined
 	compact.boundary(id, { type: 'compact', ...made, ...(transition && { transition }), ...(keep.length && { keep }) })
 	if (due.length) history.append(id, { type: 'user', blocks: [], notices: due })

@@ -89,7 +89,7 @@ export type HistoryRecord = Numbered &
 				withdrawn?: true
 				command?: string
 				origin?: 'model'
-				generatingCommand?: 'clear' | 'compact'
+				generatingCommand?: 'clear'
 				ts: string
 		  }
 		// One assistant block, appended as soon as it is complete.
@@ -212,14 +212,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let boundary = records[at]
 	let kept = boundary?.type === 'compact' ? new Set(boundary.keep ?? []) : new Set<number>()
-	let prompts = records
-		.slice(0, at)
-		.filter((r) => r.type === 'user' && r.n !== undefined && kept.has(r.n))
-		.map((r) =>
-			r.type === 'user'
-				? { ...r, blocks: r.blocks.filter((b) => b.type !== 'text' || b.generatingCommand !== 'compact') }
-				: r,
-		)
+	let prompts = records.slice(0, at).filter((r) => r.type === 'user' && r.n !== undefined && kept.has(r.n))
 	if (at >= 0) records = [...prompts, ...records.slice(at + 1)]
 	let out: Message[] =
 		boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []

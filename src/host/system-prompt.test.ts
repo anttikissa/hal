@@ -110,13 +110,17 @@ test('@path imports never read outside the project, even through a symlink', () 
 })
 
 test('without a client, the date uses the host local timezone and offset', () => {
-	let now = Date.UTC(2026, 8, 26, 21, 30)
-	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-	let session = systemPrompt.inspect({ cwd: root, model: 'm/x', now }).sections.find((s) => s.title === 'Session')!
-	expect(session.body).toContain(`Timezone: ${timezone}`)
-	let parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
-	let part = (type: string) => parts.find((p) => p.type === type)!.value
-	expect(session.body).toContain(`${part('year')}-${part('month')}-${part('day')}`)
+	let tz = process.env.TZ
+	try {
+		let noon = Date.UTC(2026, 8, 26, 21, 30)
+		process.env.TZ = 'UTC'
+		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: noon })).toMatch(/2026-09-26, Saturday\b.*UTC(?![+-])/)
+		process.env.TZ = 'Asia/Kolkata'
+		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: noon })).toMatch(/2026-09-27, Sunday\b.*UTC\+05:30/)
+	} finally {
+		if (tz === undefined) delete process.env.TZ
+		else process.env.TZ = tz
+	}
 })
 
 test('the Session section uses the client zone and follows zone changes on a UTC host', () => {
