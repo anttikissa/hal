@@ -26,10 +26,15 @@ function lines(presentation: ToolPresentation, output: string, width: number, st
 	])
 }
 
-// `rows` cut to `max`, the last one saying how many more there are.
+// `rows` cut to `max`, saying how many more there are: after the last
+// kept row, or on the only one, so a closed card still shows its command.
 function cut(rows: string[], max: number, width: number, style: Style | undefined): string[] {
 	if (rows.length <= max) return rows
 	if (max <= 0) return []
+	if (max === 1) {
+		let marker = ansi.quiet(`  … ${rows.length - 1} more lines`, style)
+		return [strings.clipVisual(rows[0]!, Math.max(1, width - strings.visLen(marker))) + marker]
+	}
 	let marker = ansi.quiet(`… ${rows.length - max + 1} more lines`, style)
 	return [...rows.slice(0, max - 1), strings.clipVisual(marker, width)]
 }

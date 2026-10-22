@@ -98,7 +98,7 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 			input: { cmd: 'EVAL /* Add */ "return 1+1"' },
 		})
 		expect(run!.presentation).toEqual({
-			title: 'Add',
+			title: 'EVAL: Add',
 			blocks: [{ kind: 'code', text: 'return 1+1', language: 'javascript' }],
 			readOnly: false,
 			icon: 'code',
@@ -115,7 +115,7 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 		expect(failed.presentation!.blocks).toHaveLength(1)
 		let [task] = nativeTool.expand({ type: 'tool_call', id: 't', name: 'tool', input: { cmd: 'TASK "m3a"' } })
 		expect(task!.presentation).toEqual({
-			title: 'Task',
+			title: 'TASK',
 			blocks: [{ kind: 'text', text: 'id: m3a' }],
 			readOnly: true,
 			icon: 'sparkle',

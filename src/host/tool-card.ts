@@ -1,7 +1,7 @@
 // Plugin tools get a good card without writing a presentation (task
-// m3a): the title says why the call ran, the second row shows the raw
-// command as code, then the result in full, colored by the tool's kind
-// or hue. Tools in src/host/tools/ keep their own rendering.
+// m3a): the title names the tool and why the call ran, the second row
+// shows the raw command as code, then the result in full, colored by the
+// tool's kind. Tools in src/host/tools/ keep their own rendering.
 import { existsSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { callText } from '../common/call-text.ts'
@@ -20,9 +20,9 @@ function purpose(call: ToolCallBlock): string | undefined {
 	return said?.replace(/\s+/g, ' ').trim() || undefined
 }
 
-// read_url → 'Read url'.
+// The name the model calls it by: EVAL, READ_URL.
 function name(tool: Tool<unknown>): string {
-	return (tool.name.charAt(0).toUpperCase() + tool.name.slice(1)).replaceAll('_', ' ')
+	return tool.name.toUpperCase()
 }
 
 // The call's arguments: the raw command as code, then the others as
@@ -52,8 +52,9 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 	let blocks = args(tool, call.input)
 	// A failure shows complete, once, under these blocks.
 	if (result?.output && !result.isError) blocks.push({ kind: 'text', text: { from: 0, to: result.output.length } })
+	let said = purpose(call) || tool.card?.title?.(call.input, result)?.trim()
 	return {
-		title: purpose(call) || tool.card?.title?.(call.input, result)?.trim() || name(tool),
+		title: said ? `${name(tool)}: ${said}` : name(tool),
 		blocks,
 		readOnly: tool.readOnly === true,
 		icon: tool.card?.icon ?? 'sparkle',
