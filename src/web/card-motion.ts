@@ -53,6 +53,7 @@ function toggler(card: Toggle): { click: (e: MouseEvent) => void; press: (e: Mou
 					top = root?.getBoundingClientRect().top,
 					edge = el?.getBoundingClientRect().top
 				if (
+					!scroll.state.pinned &&
 					card.expanded() &&
 					el &&
 					top !== undefined &&

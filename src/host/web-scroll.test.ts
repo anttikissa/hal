@@ -182,6 +182,23 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle') && ${atBottom}`)
 		// Let the turn's last redraw land, so nothing else pulls the view.
 		await b.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		expect(
+			await b.evaluate(`(() => {
+			let t = document.querySelector('.Transcript'), c = t.querySelector('.Card:last-of-type');
+			return c.getBoundingClientRect().top + c.querySelector('header').offsetHeight <= t.getBoundingClientRect().top;
+		})()`),
+		).toBe(true)
+		await b.evaluate(`document.querySelector('.Transcript .Card:last-of-type .mark').click()`)
+		await b.waitFor(`document.querySelector('.Transcript .Card:last-of-type').offsetHeight < 200`)
+		await b.evaluate(`(() => {
+			let extra = document.createElement('div'); extra.id = 'collapse-growth'; extra.style.height = '300px';
+			document.querySelector('.Transcript').append(extra);
+		})()`)
+		await b.waitFor(atBottom)
+		await b.evaluate(
+			`document.querySelector('#collapse-growth').remove(); document.querySelector('.Transcript .Card:last-of-type .mark').click()`,
+		)
+		await b.waitFor(`document.querySelector('.Transcript .Card:last-of-type').offsetHeight > 1000 && ${atBottom}`)
 		// A card tap must not leave navigation armed for a later layout shift.
 		await b.evaluate(`(() => {
 			let t = document.querySelector('.Transcript');
