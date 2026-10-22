@@ -20,9 +20,9 @@ function purpose(call: ToolCallBlock): string | undefined {
 	return said?.replace(/\s+/g, ' ').trim() || undefined
 }
 
-// The name the model calls it by: EVAL, READ_URL.
+// The name as built-in titles show it (Google foo): read_url → 'Read url'.
 function name(tool: Tool<unknown>): string {
-	return tool.name.toUpperCase()
+	return (tool.name.charAt(0).toUpperCase() + tool.name.slice(1)).replaceAll('_', ' ')
 }
 
 // The call's arguments: the raw command as code, then the others as
@@ -54,7 +54,7 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 	if (result?.output && !result.isError) blocks.push({ kind: 'text', text: { from: 0, to: result.output.length } })
 	let said = purpose(call) || tool.card?.title?.(call.input, result)?.trim()
 	return {
-		title: said ? `${name(tool)}: ${said}` : name(tool),
+		title: said ? `${name(tool)} ${said}` : name(tool),
 		blocks,
 		readOnly: tool.readOnly === true,
 		icon: tool.card?.icon ?? 'sparkle',

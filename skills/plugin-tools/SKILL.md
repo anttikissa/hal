@@ -39,8 +39,9 @@ Every plugin tool gets a card; `card` (Tool.card in src/host/tools.ts)
 tunes it. Hal builds it on the host and records it with the call, so
 history replays it even after the plugin is gone.
 
-1. **Title**: the tool's name, then why the call ran:
-   `EVAL: Count open tabs`. The model's `/* purpose */` comment wins
+1. **Title**: as built-in titles read (`Google foo`, `Grep "x" in
+   src`): the tool's name in sentence case, a space, then why the call
+   ran: `Sql Count users`. The model's `/* purpose */` comment wins
    (HELP teaches it for every plugin tool), else `card.title(input,
    result?)` - what the call works on (`app.db`; with the result, what
    it found). Never the raw command.
@@ -75,15 +76,14 @@ Plugin icons: `sparkle`, `code`, `database`, `terminal`, `checklist`,
 `image`, `message`, `bell`. A new icon goes in src/web/icons.ts, from
 Phosphor Regular.
 
-## Five examples
+## Four examples
 
 | Tool | Kind, color | Title | Second row | Body | Icon |
 |---|---|---|---|---|---|
-| EVAL | side effect, purple | `EVAL: <purpose>` | JS code | inspected value | `code` |
-| SQL | read-only, green | `SQL: app.db` | the query | rows as a table | `database` |
-| PYTHON | side effect, purple | `PYTHON: <purpose>` | Python code | stdout, stderr | `terminal` |
-| TASK | read-only, green | `TASK: m3a <title>` from the result | - | spec, notes | `checklist` |
-| SCREENSHOT | read-only, green | `SCREENSHOT: <url> at 390 px` | - | saved path, image | `camera` |
+| sql | read-only, green | `Sql app.db` | the query | rows as a table | `database` |
+| python | side effect, purple | `Python <purpose>` | Python code | stdout, stderr | `terminal` |
+| task | read-only, green | `Task m3a: <title>` from the result | - | spec, notes | `checklist` |
+| screenshot | read-only, green | `Screenshot <url> at 390 px` | - | saved path, image | `camera` |
 
 ## Beyond the card
 
