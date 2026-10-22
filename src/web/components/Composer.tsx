@@ -296,8 +296,15 @@ export function Composer(props: {
 					<span>{props.notice}</span>
 				</Show>
 				<Show when={props.view.notice}>
-					<button type="button" class="clear-notice" onClick={() => app.setNotice(undefined)}>
-						(esc to clear)
+					<button
+						type="button"
+						class="clear-notice"
+						aria-label="Dismiss notice"
+						title="Dismiss notice"
+						onClick={() => app.setNotice(undefined)}
+					>
+						<span class="keyboard-hint">(esc to clear)</span>
+						<Icon name="close" />
 					</button>
 				</Show>
 			</div>

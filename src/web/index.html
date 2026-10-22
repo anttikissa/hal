@@ -1472,6 +1472,31 @@
 				color: inherit;
 				white-space: nowrap;
 			}
+			.Composer .clear-notice > .icon {
+				display: none;
+			}
+			@media (pointer: coarse) {
+				.Composer > #notice {
+					flex-wrap: nowrap;
+					align-items: flex-start;
+				}
+				.Composer > #notice > span {
+					flex: 1;
+				}
+				.Composer .clear-notice {
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					flex: 0 0 44px;
+					min-height: 44px;
+				}
+				.Composer .clear-notice > .keyboard-hint {
+					display: none;
+				}
+				.Composer .clear-notice > .icon {
+					display: block;
+				}
+			}
 			.Composer .status {
 				padding: 0.125lh 0;
 			}

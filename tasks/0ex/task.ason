@@ -1,0 +1,10 @@
+{
+	title: 'Touchable mobile notice dismissal',
+	spec: 'The web composer passing action notice has a native dismiss button with an accessible Dismiss notice name. On coarse-pointer devices it shows the existing close X icon instead of the Esc hint, with at least a 44 by 44 CSS pixel touch target, reachable beside long wrapping notice text at phone widths. Tapping clears only the passing notice through app.setNotice, preserves the message draft and does not pause or submit a turn. Desktop web keeps its clickable Esc to clear hint and Escape shortcut; terminal Escape behavior stays unchanged. Session failure reasons and persistent status remain nondismissible. Restores the invariant that passing action feedback can be dismissed without a physical keyboard.',
+	status: 'done',
+	notes: [
+		'Reuses the existing native clear-notice button, app.setNotice handler and close icon. CSS selects the icon and 44px target only for coarse pointers, keeping desktop wording unchanged. One-off Chromium check verified an actual emulated touch tap, long wrapping notice layout at 390px, desktop Escape, and draft preservation; removed the experimental UI check afterward. Existing web-composer tests (4) also passed, plus typecheck and changed-file lint. Browser emulation must wait for App viewport height to settle before measuring touch coordinates; otherwise a moving composer causes taps to miss.'
+	],
+	needs: ['x1t'],
+	foldInto: ['x1t']
+}
