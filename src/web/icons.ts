@@ -72,6 +72,18 @@ const phosphor = {
 		'<rect x="32" y="48" width="192" height="160" rx="8" class="s"/><circle cx="156" cy="100" r="12"/><path d="M147.31,164,173,138.34a8,8,0,0,1,11.31,0L224,178.06" class="s"/><path d="M32,168.69l54.34-54.35a8,8,0,0,1,11.32,0L191.31,208" class="s"/>',
 	thinking:
 		'<line x1="88" y1="232" x2="168" y2="232" class="s"/><path d="M78.7,167A79.87,79.87,0,0,1,48,104.45C47.76,61.09,82.72,25,126.07,24a80,80,0,0,1,51.34,142.9A24.3,24.3,0,0,0,168,186v6a8,8,0,0,1-8,8H96a8,8,0,0,1-8-8v-6A24.11,24.11,0,0,0,78.7,167Z" class="s"/><path d="M136,56c20,3.37,36.61,20,40,40" class="s"/>',
+	// Plugin tool icons (Tool.card.icon, task m3a); sparkle is the default.
+	sparkle:
+		'<path d="M84.27,171.73l-55.09-20.3a7.92,7.92,0,0,1,0-14.86l55.09-20.3,20.3-55.09a7.92,7.92,0,0,1,14.86,0l20.3,55.09,55.09,20.3a7.92,7.92,0,0,1,0,14.86l-55.09,20.3-20.3,55.09a7.92,7.92,0,0,1-14.86,0Z" class="s"/><line x1="176" y1="16" x2="176" y2="64" class="s"/><line x1="224" y1="72" x2="224" y2="104" class="s"/><line x1="152" y1="40" x2="200" y2="40" class="s"/><line x1="208" y1="88" x2="240" y2="88" class="s"/>',
+	code: '<polyline points="64 88 16 128 64 168" class="s"/><polyline points="192 88 240 128 192 168" class="s"/><line x1="160" y1="40" x2="96" y2="216" class="s"/>',
+	database:
+		'<ellipse cx="128" cy="80" rx="88" ry="48" class="s"/><path d="M40,80v48c0,26.51,39.4,48,88,48s88-21.49,88-48V80" class="s"/><path d="M40,128v48c0,26.51,39.4,48,88,48s88-21.49,88-48V128" class="s"/>',
+	terminal:
+		'<polyline points="80 96 120 128 80 160" class="s"/><line x1="136" y1="160" x2="176" y2="160" class="s"/><rect x="32" y="48" width="192" height="160" rx="8" class="s"/>',
+	checklist:
+		'<line x1="128" y1="128" x2="216" y2="128" class="s"/><line x1="128" y1="64" x2="216" y2="64" class="s"/><line x1="128" y1="192" x2="216" y2="192" class="s"/><polyline points="40 64 56 80 88 48" class="s"/><polyline points="40 128 56 144 88 112" class="s"/><polyline points="40 192 56 208 88 176" class="s"/>',
+	camera:
+		'<path d="M208,208H48a16,16,0,0,1-16-16V80A16,16,0,0,1,48,64H80L96,40h64l16,24h32a16,16,0,0,1,16,16V192A16,16,0,0,1,208,208Z" class="s"/><circle cx="128" cy="132" r="36" class="s"/>',
 }
 
 const grid24 = {
@@ -82,6 +94,9 @@ const grid24 = {
 export type IconName = keyof typeof phosphor | keyof typeof grid24
 
 export const icons = {
+	has(name: string): name is IconName {
+		return Object.hasOwn(phosphor, name) || Object.hasOwn(grid24, name)
+	},
 	/** An icon's inner SVG markup and the grid it is drawn on. */
 	svg(name: IconName): { body: string; grid: 24 | 256 } {
 		return name in grid24

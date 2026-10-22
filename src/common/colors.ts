@@ -33,7 +33,7 @@ export type Look = {
 // Fields that derive a color from others, so take arguments; every
 // other field is a plain value (fgL, screen, mix) or a style, a function
 // read with no arguments.
-export const DERIVED = ['quiet', 'title', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent'] as const
+export const DERIVED = ['quiet', 'title', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent', 'cardHue'] as const
 
 // Plain names for colors.project() p0..p7, so a model can answer "which
 // is the cyan project" (task jm).
@@ -235,4 +235,8 @@ export const colors = {
 	toolNotify: (): Style => colors.toolBash(),
 	// Inter-tab messages, both directions, in the message pink.
 	toolSend: (): Style => colors.message(),
+	// A plugin tool's own hue (Tool.card.hue, task m3a) at the levels every
+	// tool shares, so it is as readable as the built-in ones. The web has
+	// a class per 5° (.tool-hue-150).
+	cardHue: (hue: number): Style => ({ fg: [colors.fgL, colors.fgC, hue], bg: [colors.bgL, colors.bgC, hue] }),
 }

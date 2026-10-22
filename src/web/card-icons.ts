@@ -3,7 +3,7 @@
 
 import type { Item } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
-import type { IconName } from './icons.ts'
+import { icons, type IconName } from './icons.ts'
 
 // Tool cards' header icons, by tool name.
 const toolIcons: Record<string, IconName> = {
@@ -30,7 +30,8 @@ function kind(item: Item): IconName | undefined {
 	if (item.type === 'thinking') return 'thinking'
 	if (titles.letter(item) === 'm') return 'message'
 	if (item.type !== 'tool') return undefined
-	return cardIcons.toolIcons[item.name]
+	let named = item.presentation?.icon
+	return cardIcons.toolIcons[item.name] ?? (named === undefined ? undefined : icons.has(named) ? named : 'sparkle')
 }
 
 // A title without its leading mark ($, <, =>, …): the icon shows it.

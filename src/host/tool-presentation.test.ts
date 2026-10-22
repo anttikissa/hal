@@ -72,6 +72,59 @@ test('a broken presentation keeps the execution outcome and reaches model and us
 	expect(JSON.stringify(replay.toMessages(records))).toContain('Display error (execution outcome unchanged)')
 })
 
+// Task m3a: a plugin tool's card never takes its title from the command.
+test('a plugin tool gets a card: purpose title, command as code, result, kind and look', () => {
+	let all = tools.all
+	let evalTool = {
+		name: 'eval',
+		description: 'Run code.',
+		parameters: { type: 'object' as const, properties: { code: { type: 'string' } }, required: ['code'] },
+		card: { command: 'code', language: 'javascript', hue: 265, icon: 'code' },
+		run: async () => '2',
+	}
+	let taskTool = {
+		name: 'task',
+		description: 'Show a task.',
+		readOnly: true as const,
+		parameters: { type: 'object' as const, properties: { id: { type: 'string' } }, required: ['id'] },
+		run: async () => 'm3a: Cards',
+	}
+	tools.all = () => [...all(), evalTool, taskTool]
+	try {
+		let [run] = nativeTool.expand({
+			type: 'tool_call',
+			id: 'e',
+			name: 'tool',
+			input: { cmd: 'EVAL /* Add */ "return 1+1"' },
+		})
+		expect(run!.presentation).toEqual({
+			title: 'Add',
+			blocks: [{ kind: 'code', text: 'return 1+1', language: 'javascript' }],
+			readOnly: false,
+			icon: 'code',
+			hue: 265,
+		})
+		let done = toolPresentations.attach(run!, { type: 'tool_result', id: 'e', output: '2' } as ToolResultBlock)
+		expect(done.presentation!.blocks[1]).toEqual({ kind: 'text', text: { from: 0, to: 1 } })
+		let failed = toolPresentations.attach(run!, {
+			type: 'tool_result',
+			id: 'e',
+			output: 'Error: x',
+			isError: true,
+		} as ToolResultBlock)
+		expect(failed.presentation!.blocks).toHaveLength(1)
+		let [task] = nativeTool.expand({ type: 'tool_call', id: 't', name: 'tool', input: { cmd: 'TASK "m3a"' } })
+		expect(task!.presentation).toEqual({
+			title: 'Task',
+			blocks: [{ kind: 'text', text: 'id: m3a' }],
+			readOnly: true,
+			icon: 'sparkle',
+		})
+	} finally {
+		tools.all = all
+	}
+})
+
 test('invalid output references fall back before persistence and corrupt recorded data fails', () => {
 	toolPresentations.present = () => ({ title: 'Edited', blocks: [{ kind: 'diff', text: { from: -1, to: 99 } }] })
 	let result = toolPresentations.attach(call, { type: 'tool_result', id: call.id, output: 'ok' } as ToolResultBlock)

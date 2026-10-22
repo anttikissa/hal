@@ -346,7 +346,15 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool': {
-			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+			// A plugin tool's presented look (task m3a): its hue, else its kind.
+			let p = item.presentation
+			let look =
+				p?.hue !== undefined
+					? ` tool-hue-${(Math.round(p.hue / 5) * 5) % 360}`
+					: p?.readOnly !== undefined
+						? ` tool-${p.readOnly ? 'read' : 'bash'}`
+						: ''
+			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}${look}`
 			return { kind, text: toolDetails.headline(item.name, item.input).text }
 		}
 		case 'tool-result': {

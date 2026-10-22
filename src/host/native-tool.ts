@@ -7,6 +7,7 @@
 // and a call that fails to resolve becomes an error result.
 
 import { toolPresentations } from './tool-presentation.ts'
+import { toolCard } from './tool-card.ts'
 import { callText } from '../common/call-text.ts'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
@@ -173,8 +174,8 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 	if (interactive) {
 		let lines = usage(tool),
 			name = tool.name.toUpperCase()
-		if (!Object.hasOwn(schema(tool).properties ?? {}, 'description') || lines.some((u) => u.includes('/*')))
-			return lines
+		let keeps = Object.hasOwn(schema(tool).properties ?? {}, 'description') || toolCard.has(tool)
+		if (!keeps || lines.some((u) => u.includes('/*'))) return lines
 		return lines.map((u) =>
 			u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <description> */`) : u,
 		)

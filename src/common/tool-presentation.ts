@@ -1,18 +1,34 @@
 // Lets a tool show its result as titled text, code and diff blocks
 // instead of raw output. A block holds its text or a range of the
 // output; check() rejects a malformed presentation.
+// The look rides along so history replays it without the plugin (task
+// m3a): `hue` colors the card at the shared vivid levels (colors.cardHue),
+// else `readOnly` picks the read or side-effect color; `icon` names a
+// web icon (web/icons.ts).
 export type PresentationBlock = {
 	kind: 'text' | 'code' | 'diff'
 	path?: string
 	language?: string
 	text: string | { from: number; to: number }
 }
-export type ToolPresentation = { title: string; blocks: PresentationBlock[] }
+export type ToolPresentation = {
+	title: string
+	blocks: PresentationBlock[]
+	hue?: number
+	readOnly?: boolean
+	icon?: string
+}
 
 function check(value: unknown, output = ''): void {
 	let p = value as ToolPresentation
 	if (!p || typeof p !== 'object' || typeof p.title !== 'string' || !p.title.trim() || !Array.isArray(p.blocks))
 		throw new Error('Invalid tool presentation: expected title and blocks')
+	if (p.hue !== undefined && !(Number.isFinite(p.hue) && p.hue >= 0 && p.hue < 360))
+		throw new Error(`Invalid tool presentation hue ${p.hue}: expected 0 <= hue < 360`)
+	if (p.readOnly !== undefined && typeof p.readOnly !== 'boolean')
+		throw new Error('Invalid tool presentation readOnly: expected a boolean')
+	if (p.icon !== undefined && typeof p.icon !== 'string')
+		throw new Error('Invalid tool presentation icon: expected an icon name')
 	for (let b of p.blocks) {
 		if (
 			!b ||

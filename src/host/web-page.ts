@@ -81,6 +81,7 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 // machine-output color (colors.toolOutput).
 function css(): string {
 	let rules: string[] = []
+	let styles: [string, Style][] = []
 	for (let [key, value] of Object.entries(colors)) {
 		if ((DERIVED as readonly string[]).includes(key)) continue
 		if (key === 'mix') {
@@ -92,8 +93,11 @@ function css(): string {
 			continue
 		}
 		// Shared values (fgL, screen) are numbers or one color, not styles.
-		if (typeof value !== 'function') continue
-		let style = (value as () => Style)()
+		if (typeof value === 'function') styles.push([kebab(key), (value as () => Style)()])
+	}
+	// Plugin tools' hues (colors.cardHue), one class per 5°.
+	for (let hue = 0; hue < 360; hue += 5) styles.push([`tool-hue-${hue}`, colors.cardHue(hue)])
+	for (let [name, style] of styles) {
 		let decls = Object.entries(style).map(([part, c]) => {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toCss(c)}`
@@ -105,8 +109,8 @@ function css(): string {
 		// Selection is reverse video in the style's own color (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (fg && !style.output) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
-		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
-		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
+		if (name === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
+		rules.push(`.${name} { ${decls.join('; ')} }`)
 	}
 	let tab = colors.tab(),
 		hal = colors.assistant()

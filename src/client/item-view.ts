@@ -9,6 +9,7 @@ import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
 import { card } from '../common/card.ts'
 import { colors, type Style } from '../common/colors.ts'
+import type { ToolPresentation } from '../common/tool-presentation.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
@@ -46,9 +47,11 @@ export type Look = {
 	lines?: (width: number) => string[]
 }
 
-// The style of a tool's name: tool + camel-case name (read_entry is
-// toolReadEntry), else the default tool.
-function toolStyle(name: string): Style {
+// The style of a tool's name: a presented hue (colors.cardHue), else
+// tool + camel-case name (read_entry is toolReadEntry), else the
+// presented kind's (read or side effect, task m3a), else the default tool.
+function toolStyle(name: string, presentation?: ToolPresentation): Style {
+	if (presentation?.hue !== undefined) return colors.cardHue(presentation.hue)
 	let key =
 		'tool' +
 		name
@@ -56,7 +59,9 @@ function toolStyle(name: string): Style {
 			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 			.join('')
 	let style = (colors as Record<string, unknown>)[key]
-	return typeof style === 'function' ? style() : colors.tool()
+	if (typeof style === 'function') return style()
+	if (presentation?.readOnly !== undefined) return presentation.readOnly ? colors.toolRead() : colors.toolBash()
+	return colors.tool()
 }
 
 // A style's text and title colors, without its background.
@@ -68,7 +73,7 @@ function bare({ fg, title }: Style): Style {
 // whether attached to its call or drawn separately.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
-		let { fg, bg, output } = itemView.toolStyle(tool)
+		let { fg, bg, output } = itemView.toolStyle(tool, item.presentation)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		return { fg: item.isError ? colors.error().fg! : (output ?? colors.toolOutput(fg)), bg }
 	}
@@ -86,7 +91,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'thinking':
 			return { fg: colors.thinking().fg! }
 		case 'tool':
-			return itemView.toolStyle(item.name)
+			return itemView.toolStyle(item.name, item.presentation)
 		case 'tool-result':
 			return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		case 'turn-end':

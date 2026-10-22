@@ -82,12 +82,16 @@ export default (plugin: Plugin) => {
 	// 	// Observing: log every account choice.
 	// 	plugin.before(auth, 'pickAccount', (kind, list) => diag.log(`pick ${kind}: ${list.map((a) => a.name).join(', ')}`))
 	//
-	// 	// A harmless extra tool, added to the registry's result.
+	// 	// An extra tool, added to the registry's result. Its card (task m3a,
+	// 	// skills/plugin-tools): the model's /* purpose */ or card.title as
+	// 	// title, card.command's field as code, then the result; readOnly
+	// 	// tools are green and run in parallel, others purple.
 	// 	plugin.around(tools, 'all', (next) => [...next(), {
 	// 		name: 'today',
 	// 		description: "Today's date.",
 	// 		parameters: { type: 'object', properties: {} },
 	// 		readOnly: true,
+	// 		card: { icon: 'sparkle', title: () => "Today's date" },
 	// 		run: async () => new Date().toDateString(),
 	// 	}])
 	//
