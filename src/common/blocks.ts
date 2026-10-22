@@ -91,7 +91,7 @@ export type Sender = {
 	report?: 'question' | 'summary'
 	origin?: 'model'
 	call?: string
-	generatingCommand?: 'clear'
+	generatingCommand?: 'clear' | 'compact'
 }
 
 // A prompt's text, saying who sent it.

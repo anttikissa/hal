@@ -58,6 +58,7 @@ function check(value: unknown): HistoryRecord {
 			typeof t.id !== 'string' ||
 			!['clear', 'compact', 'rebase'].includes(t.kind) ||
 			(t.prompt !== undefined && typeof t.prompt !== 'string') ||
+			(t.summary !== undefined && (typeof t.summary !== 'string' || !t.summary.trim())) ||
 			(t.canceled !== undefined && t.canceled !== true) ||
 			sender.invalid(t.sender)
 		)

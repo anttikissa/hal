@@ -67,7 +67,7 @@ function contextNotice(id: string, records: HistoryRecord[], usage: Usage): void
 	if (crossed.length)
 		history.append(id, {
 			type: 'notice',
-			text: `Context usage crossed ${crossed.map((n) => `${n / 1000}k`).join(', ')} tokens. Last provider round used ${context} input tokens, including cached input. These are absolute thresholds, independent of the model registry's context window.`,
+			text: `Context usage crossed ${crossed.map((n) => `${n / 1000}k`).join(', ')} tokens. Last provider round used ${context} input tokens, including cached input. If you have not compacted since this measurement: ${context >= 200_000 ? 'Use COMPACT with a working-state checkpoint before further substantial work.' : 'Prepare to use COMPACT at the next sensible stopping point: finish the immediate investigation or edit, then preserve the working state.'} These are absolute thresholds, independent of the model registry's context window.`,
 		})
 }
 
