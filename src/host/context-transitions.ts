@@ -30,7 +30,7 @@ function output(
 	if (!fields.transitionDone) host.broadcast(id, { type: 'output', sessionId: id, text, n: r.n, ts: r.ts })
 }
 
-function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}): Reply {
+function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}, summary?: string): Reply {
 	if (contextTransitions.pending(id)) return { error: 'a context transition is already pending; wait or press Escape' }
 	if (
 		kind === 'compact' &&
@@ -46,6 +46,7 @@ function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: 
 		kind,
 		sender: inbox.sender({ ...sender, advisory: undefined, delivery: undefined, summary: undefined }),
 		...(kind === 'clear' && prompt.length && { prompt }),
+		...(summary !== undefined && { summary }),
 	}
 	contextTransitions.output(id, `/${kind} accepted; applying after active work settles.`, { transition: intent })
 	let running = turns.state.running.get(id)
@@ -102,7 +103,8 @@ function apply(id: string): boolean {
 	let records = history.readSync(id)
 	let boundary = records.some((r) => (r.type === 'reset' || r.type === 'compact') && r.transition === intent.id)
 	if (!boundary && !(intent.canceled && intent.kind === 'compact')) {
-		if (intent.kind === 'compact') compact.run(id, turns.state.running.has(id) || history.unfinished(id), intent.id)
+		if (intent.kind === 'compact')
+			compact.run(id, turns.state.running.has(id) || history.unfinished(id), intent.id, intent.summary)
 		else compact.boundary(id, { type: 'reset', transition: intent.id })
 		if (intent.kind === 'clear' && intent.prompt === undefined && sessions.open(id).model === 'hal/tool') {
 			let { toolModel } = require('./tool-model.ts') as typeof import('./tool-model.ts')

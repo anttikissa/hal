@@ -22,10 +22,66 @@ async function ask(c: C, id: string, text: string, answer = `re ${text}`): Promi
 async function command(c: C, id: string, text: string): Promise<void> {
 	let outputs = c.events.length
 	c.conn.send({ type: 'submit', sessionId: id, text })
-	await until(() => c.events.slice(outputs).some((e) => e.type === 'divider' || e.type === 'output'))
+	if (text === '/compact') {
+		let count = calls.length
+		await until(
+			() =>
+				calls.length > count ||
+				calls
+					.at(-1)
+					?.input.messages.some((m: any) => JSON.stringify(m).includes('The user requested context compaction')),
+		)
+		calls
+			.at(-1)!
+			.push(
+				{ type: 'tool_call', id: 'checkpoint', name: 'compact', input: { summary: 'Findings and next action.' } },
+				{ type: 'done', reason: 'tool_use' },
+			)
+		let before = calls.length
+		await until(() => calls.length > before)
+		let ends = c.of('turn-end').length
+		calls.at(-1)!.push({ type: 'done', reason: 'end' })
+		await until(() => c.of('turn-end').length > ends)
+	} else await until(() => c.events.slice(outputs).some((e) => e.type === 'divider' || e.type === 'output'))
 }
 
 const text = (m: any) => JSON.stringify(m)
+
+test('native COMPACT validates without dropping evidence, replaces prior checkpoints and supports undo', async () => {
+	let c = client(),
+		id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'Keep this exact requirement' })
+	await until(() => calls.length === 1)
+	calls[0]!.push(
+		{ type: 'text', text: 'Original evidence' },
+		{ type: 'tool_call', id: 'invalid', name: 'tool', input: { cmd: 'COMPACT { summary: " " }' } },
+		{ type: 'done', reason: 'tool_use' },
+	)
+	await until(() => calls.length === 2)
+	expect(history.readSync(id).some((r) => r.type === 'compact')).toBe(false)
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Original evidence')
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('nonempty summary')
+	for (let [i, summary] of ['First checkpoint', 'Updated checkpoint'].entries()) {
+		calls
+			.at(-1)!
+			.push(
+				{ type: 'tool_call', id: `checkpoint-${i}`, name: 'tool', input: { cmd: `COMPACT { summary: "${summary}" }` } },
+				{ type: 'done', reason: 'tool_use' },
+			)
+		await until(() => calls.length === i + 3)
+		let input = JSON.stringify(calls.at(-1)!.input.messages)
+		expect(input).toContain(summary)
+		expect(input).toContain('Keep this exact requirement')
+		expect(input).not.toContain('Original evidence')
+		if (i) expect(input).not.toContain('First checkpoint')
+	}
+	calls.at(-1)!.push({ type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/compact undo' })
+	await until(() => history.readSync(id).some((r) => r.type === 'rebase'))
+	expect(JSON.stringify(await historyInput.messages(id))).toContain('First checkpoint')
+	expect(JSON.stringify(history.readSync(id))).toContain('Original evidence')
+})
 
 test('/compact: the next request holds the summary and only later records; the transcript stays whole', async () => {
 	let c = client()
@@ -34,16 +90,18 @@ test('/compact: the next request holds the summary and only later records; the t
 	await command(c, id, '/compact')
 	await ask(c, id, 'after')
 	let input = calls.at(-1)!.input.messages
-	expect(input[0].blocks[0].text).toStartWith('Context was compacted')
-	expect(input[0].blocks[0].text).toContain(history.file(id))
+	expect(input[0].blocks[0].text).toStartWith('Working-state checkpoint')
+	expect(input[0].blocks[0].text).toContain('Findings and next action.')
 	expect(input.slice(1).map(text).join()).not.toContain('re p5')
 	expect(input.slice(1).map(text).join()).toContain('after')
+	expect(input.slice(1).map(text).join()).toContain('p5')
+	expect(JSON.stringify(input)).not.toContain('The user requested context compaction')
 	let view = shown(c.views.get(id)!.items)!
 	expect(view).toContainEqual({
 		type: 'divider',
-		text: 'Context compacted (5 prompts summarized). `/compact undo` to go back.',
+		text: 'Context compacted (6 prompts summarized). `/compact undo` to go back.',
 	})
-	expect(view.filter((i) => i.type === 'prompt').length).toBe(6)
+	expect(view.filter((i) => i.type === 'prompt').length).toBe(7)
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	// A new host rebuilds the very same input.
 	let before = await historyInput.messages(id)
@@ -57,13 +115,21 @@ test('/compact during streaming waits for settlement and continues with its acti
 		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'p1' })
 	await until(() => calls.length === 1)
-	await command(c, id, '/compact')
+	c.conn.send({ type: 'submit', sessionId: id, text: '/compact preserve decisions' })
 	expect(c.of('divider').length).toBe(0)
 	calls[0]!.push({ type: 'text', text: 'partial answer' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('p1')
+	expect(c.of('divider').length).toBe(0)
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Focus: preserve decisions')
+	calls[1]!.push(
+		{ type: 'tool_call', id: 'checkpoint', name: 'compact', input: { summary: 'Keep the decisions.' } },
+		{ type: 'done', reason: 'tool_use' },
+	)
+	await until(() => calls.length === 3)
 	expect(c.of('divider').length).toBe(1)
-	calls[1]!.push({ type: 'done', reason: 'end' })
+	expect(JSON.stringify(calls[2]!.input.messages)).toContain('p1')
+	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)
 })
 
@@ -86,7 +152,8 @@ test('/clear: the next request holds only later records; a compact after it summ
 	await command(c, id, '/compact')
 	await ask(c, id, 'last')
 	let summary = calls.at(-1)!.input.messages[0].blocks[0].text
-	expect(summary).toContain('user: later')
+	expect(summary).toContain('Findings and next action.')
+	expect(JSON.stringify(calls.at(-1)!.input.messages)).toContain('later')
 	expect(summary).not.toContain('after')
 })
 
