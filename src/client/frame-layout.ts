@@ -72,13 +72,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	if (kept?.look === look)
 		while (start < kept.items.length && items[start] === kept.items[start]) {
 			let item = items[start]!
+			let after = kept.items[start + 1] ?? kept.next
 			if (item.type === 'question' && item.id === view.form?.id) break
 			if (
 				item.type === 'tool' &&
-				(item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1] || frame.scrolls(item, view.now))
+				(item.id === view.tick?.call || items[start + 1] !== after || frame.scrolls(item, view.now))
 			)
 				break
-			if (item.type === 'tool-result' && items[start + 1] !== kept.items[start + 1]) break
+			if (item.type === 'tool-result' && items[start + 1] !== after) break
 			start++
 		}
 	// A call is laid out with all its results, so its card is measured whole.
@@ -94,13 +95,22 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let stable = start
 	let keep = () => {
 		if (save)
-			frameLayout.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), tools, lines }
+			frameLayout.state.history = {
+				look,
+				items: items.slice(0, stable),
+				next: items[stable],
+				ends: ends.slice(0, stable),
+				tools,
+				lines,
+			}
 	}
 	let imageStart = start
 	while (imageStart > 0 && items[imageStart - 1]?.type === 'image') imageStart--
 	let imagePrompt = items[imageStart - 1]?.type === 'prompt'
 	for (let i = start; i < items.length; i++) {
-		if (stable === i && i > start && performance.now() > deadline) {
+		// A call is laid out with its results: stopping between them would
+		// lay the call out again next slice, forever if it outlasts one.
+		if (stable === i && i > start && items[i]!.type !== 'tool-result' && performance.now() > deadline) {
 			keep()
 			return undefined
 		}
@@ -275,6 +285,9 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 type History = {
 	look: string
 	items: Item[]
+	/** The item after `items` when they were laid out, if any: a slice
+	 * that ends after a call still knows the call's results were there. */
+	next: Item | undefined
 	ends: number[]
 	tools: (NonNullable<Look['call']> & { at: number; id: string; fold: Verbosity })[]
 	lines: string[]

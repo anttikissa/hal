@@ -50,7 +50,7 @@ function draw(force = false, trigger?: string): void {
 		render.later()
 		st.past = kept ?? {
 			session,
-			past: frameLayout.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!,
+			past: render.tail(st.view, cols, rows),
 			tail: true,
 		}
 		return st.past.past
@@ -86,12 +86,18 @@ function draw(force = false, trigger?: string): void {
 	render.painted(st.view)
 }
 
-function tail(view: View, cols: number, rows: number): View {
-	let t = view.transcript
-	if (!t) return view
-	let at = t.items.length
-	for (let n = 0; at > 0 && n < rows;) n += frame.itemRows(t.items[--at]!, cols, t.meta.id).length + 1
-	return { ...view, transcript: { ...t, items: t.items.slice(at) } }
+// The history's last screenful, laid out as the whole history will be,
+// so the canonical repaint that replaces it moves nothing on the screen.
+function tail(view: View, cols: number, rows: number): Past {
+	let items = view.transcript?.items ?? []
+	for (let n = rows; ; n *= 2) {
+		let at = Math.max(0, items.length - n)
+		// A call is laid out with its results, so its card is measured whole.
+		while (at > 0 && items[at]!.type === 'tool-result') at--
+		let part = view.transcript ? { ...view, transcript: { ...view.transcript, items: items.slice(at) } } : view
+		let past = frameLayout.layout(part, cols, Infinity, false, rows)!
+		if (at === 0 || past.lines.length >= rows) return past
+	}
 }
 
 function later(): void {

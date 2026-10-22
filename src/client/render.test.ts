@@ -442,6 +442,29 @@ describe('a long history (task 7j)', () => {
 			render.sliceMs = slice
 		}
 	})
+
+	test('a tab switch paints the same screen before and after the slices finish', async () => {
+		let slice = render.sliceMs
+		render.sliceMs = -1
+		try {
+			setup(16, 30)
+			let output = Array.from({ length: 50 }, (_, i) => `out ${i}`).join('\n')
+			let list: Item[] = [
+				...items(30),
+				{ type: 'tool', id: 'b', name: 'bash', input: { command: 'ls' } },
+				{ type: 'tool-result', id: 'b', output: `[exit 0]\n${output}` },
+				...items(1, 30),
+			]
+			render.state.view = { transcript: transcript(list), prompt: { text: '', cursor: 0 } }
+			render.draw(true, 'a tab switch')
+			expect(render.state.slicing).not.toBeNull()
+			let first = term.screen()
+			while (render.state.slicing) await Bun.sleep(1)
+			expect(term.screen()).toEqual(first)
+		} finally {
+			render.sliceMs = slice
+		}
+	})
 })
 
 describe('clear reasons (task e4c)', () => {
