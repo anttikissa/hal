@@ -18,6 +18,7 @@ import { CardHeader } from './CardHeader.tsx'
 import { titles } from '../../common/titles.ts'
 import { target } from '../target.ts'
 import { CardReference } from './CardReference.tsx'
+import { LinkedText } from './LinkedText.tsx'
 
 export function Question(props: {
 	item: Item & { type: 'question' } & { key: string }
@@ -99,7 +100,9 @@ export function Question(props: {
 				}
 			/>
 			<Show when={forms.details(form()).length}>
-				<p class="details">{forms.details(form()).join('\n')}</p>
+				<p class="details">
+					<LinkedText parts={hrefs.urlParts(forms.details(form()).join('\n'))} />
+				</p>
 			</Show>
 			<Show when={form().quote}>
 				{(quote) => (
