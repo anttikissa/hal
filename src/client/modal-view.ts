@@ -64,8 +64,12 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let content = fields.rows.slice(0, height - 2)
 	if (m.find) {
 		if (m.find.focus !== 0) fields.cursor = undefined
-		let red = m.find.failed ? ansi.sgr({ fg: colors.error().fg! }) : ''
-		content.push(...strings.wordWrap(m.find.status, inner).map((r) => (red ? red + r + ansi.UNCOLOR : r)), '')
+		// The status is in the title; a failure gets its own row, whole.
+		if (m.find.failed)
+			content.push(
+				...strings.wordWrap(m.find.status, inner).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR),
+				'',
+			)
 		// The filters: the focused one lit like a picker's selection, the
 		// cursor on its box.
 		let lit = ansi.sgr(colors.popupCurrent(colors.popup().neutralFg!)) || ansi.INVERSE
@@ -161,7 +165,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		return ' ' + fit + ansi.RESET + ' '.repeat(inner - strings.visLen(fit)) + ' '
 	}
 	let after = m.items.length - scroll - visible
-	let place = scroll > 0 || after > 0 ? `${m.selected + 1}/${m.items.length}` : ''
+	let place = !m.find && (scroll > 0 || after > 0) ? `${m.selected + 1}/${m.items.length}` : ''
 	let rows = [line + modalView.border('┌', '┐', m.title, '', width) + ansi.UNCOLOR]
 	for (let r = 0; r < height - 2; r++) rows.push(side('│') + pad(content[r] ?? '') + side('│'))
 	rows.push(line + modalView.border('└', '┘', m.hint ?? '', place, width) + ansi.UNCOLOR)

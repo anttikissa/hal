@@ -1,7 +1,7 @@
 // Find messages and ranking, shared so host and clients agree on what
 // matches. Find results are transient: never stored.
 export type FindKind = 'metadata' | 'user' | 'assistant' | 'thinking' | 'tool-call' | 'tool-output' | 'commit' | 'other'
-export type FindFilter = 'text' | 'thinking' | 'tools' | 'commit' | 'other'
+export type FindFilter = 'user' | 'hal' | 'reasoning' | 'tools' | 'commits' | 'other'
 export type FindResult = {
 	sessionId: string
 	name: string
@@ -9,6 +9,10 @@ export type FindResult = {
 	// Card id as the transcript shows it, e.g. a1313; empty for session matches.
 	card: string
 	kind: FindKind
+	// The evidence: title, former title, commit, request, files, reply...
+	why: string
+	// Tab rows: how many cards of the tab matched. Card rows: 0.
+	count: number
 	age: number
 	snippet: string
 	score: number
@@ -25,110 +29,143 @@ export type FindBatch = {
 }
 export type FindQuery = {
 	words: string[]
+	// "Quoted words": whole-word phrases.
+	phrases: string[]
 	exclude: string[]
 	kinds: FindKind[]
-	model?: string
-	cwd?: string
+	// in: values other than kind names: here, ., ids, tab numbers, paths.
+	scope: string[]
 	since?: number
 }
-const tiers: FindKind[] = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'commit', 'other']
-const groups: Record<string, FindKind[]> = {
-	text: ['user', 'assistant'],
-	thinking: ['thinking'],
-	tools: ['tool-call', 'tool-output'],
-	commit: ['commit'],
-	other: ['other'],
+// Strong evidence streams first, so the first batches already rank well.
+const tiers: FindKind[] = ['metadata', 'commit', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']
+const filters: FindFilter[] = ['user', 'hal', 'reasoning', 'tools', 'commits', 'other']
+const groups: Record<FindFilter, FindKind[]> = {
 	user: ['user'],
-	assistant: ['assistant'],
-	'tool-call': ['tool-call'],
-	'tool-output': ['tool-output'],
-	metadata: ['metadata'],
+	hal: ['assistant'],
+	reasoning: ['thinking'],
+	tools: ['tool-call', 'tool-output'],
+	commits: ['commit'],
+	other: ['other'],
 }
+// Evidence weights, strongest first (task yhm).
+const weights: Record<string, number> = {
+	title: 100,
+	'former title': 80,
+	commit: 60,
+	request: 40,
+	files: 15,
+	reply: 12,
+	pasted: 8,
+	reasoning: 4,
+	tool: 3,
+	other: 2,
+}
+const strong = ['title', 'former title', 'commit', 'request']
+const scopeHelp =
+	'in: takes here, a tab id (181-ibm), tab numbers (10-19), . (this directory), a path (~/x) or user, hal, reasoning, tools, commits, other'
 
-function parse(text: string, filters?: FindFilter[]): FindQuery {
-	let q: FindQuery = { words: [], exclude: [], kinds: [...tiers] }
-	if (filters) {
-		let all = (['text', 'thinking', 'tools', 'commit', 'other'] as const).every((f) => filters.includes(f))
+function scopeValue(v: string): boolean {
+	return /^(here|\.|\d+-[a-z]{3}|\d+(-\d+)?|[~/].*)$/i.test(v)
+}
+function parse(text: string, enabled?: FindFilter[]): FindQuery {
+	let q: FindQuery = { words: [], phrases: [], exclude: [], kinds: [...tiers], scope: [] }
+	if (enabled) {
+		let all = filters.every((f) => enabled.includes(f))
 		q.kinds = [
 			...(all ? ['metadata' as const] : []),
-			...tiers.filter((k) => filters.some((f) => groups[f]!.includes(k))),
+			...tiers.filter((k) => enabled.some((f) => groups[f].includes(k))),
 		]
 	}
-	for (let word of text.trim().split(/\s+/).filter(Boolean)) {
-		let m = /^(in|model|cwd|since):(.+)$/i.exec(word)
+	let kinds: FindKind[] = []
+	for (let [, quoted, word] of text.matchAll(/"([^"]*)"?|(\S+)/g)) {
+		if (quoted !== undefined) {
+			if (quoted.trim()) q.phrases.push(quoted.trim().replace(/\s+/g, ' ').toLocaleLowerCase())
+			continue
+		}
+		let m = /^(in|since):(.+)$/i.exec(word!)
 		if (!m) {
-			if (/^-./.test(word)) q.exclude.push(word.slice(1).toLocaleLowerCase())
-			else q.words.push(word.toLocaleLowerCase())
+			if (/^-./.test(word!)) q.exclude.push(word!.slice(1).toLocaleLowerCase())
+			else q.words.push(word!.toLocaleLowerCase())
 			continue
 		}
 		let value = m[2]!
-		switch (m[1]!.toLowerCase()) {
-			case 'in': {
-				let kinds = value.split(',').flatMap((k) => {
-					let group = groups[k.toLowerCase()]
-					if (!group) throw new Error(`unknown find kind: ${k}`)
-					return group
-				})
-				q.kinds = q.kinds.filter((k) => kinds.includes(k))
-				break
+		if (m[1]!.toLowerCase() === 'in') {
+			for (let v of value.split(',').filter(Boolean)) {
+				let group = groups[v.toLowerCase() as FindFilter]
+				if (group) kinds.push(...group)
+				else if (scopeValue(v)) q.scope.push(v)
+				else throw new Error(`unknown in: value ${v}. ${scopeHelp}`)
 			}
-			case 'model':
-				q.model = value.toLocaleLowerCase()
-				break
-			case 'cwd':
-				q.cwd = value.toLocaleLowerCase()
-				break
-			case 'since': {
-				let age = /^(\d+(?:\.\d+)?)(m|h|d|w)$/i.exec(value)
-				if (!age) throw new Error('since: use an age such as 30m, 12h, 3d or 2w')
-				q.since = Number(age[1]) * { m: 60000, h: 3600000, d: 86400000, w: 604800000 }[age[2]!.toLowerCase()]!
-				break
-			}
+		} else {
+			let age = /^(\d+(?:\.\d+)?)(m|h|d|w)$/i.exec(value)
+			if (!age) throw new Error('since: use an age such as 30m, 12h, 3d or 2w')
+			q.since = Number(age[1]) * { m: 60000, h: 3600000, d: 86400000, w: 604800000 }[age[2]!.toLowerCase()]!
 		}
 	}
+	if (kinds.length) q.kinds = q.kinds.filter((k) => kinds.includes(k))
 	return q
 }
 
-function match(text: string, words: string[], age: number): { score: number; snippet: string } | undefined {
+function bounded(lower: string, pos: number, length: number): number {
+	let start = !/[\p{L}\p{N}_]/u.test(lower[pos - 1] ?? ''),
+		end = !/[\p{L}\p{N}_]/u.test(lower[pos + length] ?? '')
+	return start ? (end ? 3 : 2) : 1
+}
+// Match quality (word boundaries, phrase) and a snippet. Recency is not
+// part of it: callers use it only to break ties (task yhm).
+function match(
+	text: string,
+	words: string[],
+	phrases: string[] = [],
+): { quality: number; snippet: string } | undefined {
 	let lower = text.toLocaleLowerCase(),
-		quality = words.length ? 0 : 1,
-		at = 0
+		flatLower = lower.replace(/\s+/g, ' '),
+		quality = 0,
+		at = -1
+	for (let phrase of phrases) {
+		let re = new RegExp(phrase.split(' ').map(RegExp.escape).join('\\s+'), 'g'),
+			pos = -1
+		for (let m of lower.matchAll(re))
+			if (findQuery.bounded(lower, m.index, m[0].length) === 3) {
+				pos = m.index
+				break
+			}
+		if (pos < 0) return undefined
+		quality += 4
+		if (at < 0) at = pos
+	}
 	for (let word of words) {
 		let best = 0,
-			pos = lower.indexOf(word)
+			pos = lower.indexOf(word),
+			first = -1
 		while (pos >= 0) {
-			let start = !/[\p{L}\p{N}_]/u.test(lower[pos - 1] ?? ''),
-				end = !/[\p{L}\p{N}_]/u.test(lower[pos + word.length] ?? '')
-			let score = start ? (end ? 3 : 2) : 1
+			let score = findQuery.bounded(lower, pos, word.length)
 			if (score > best) {
 				best = score
-				at = pos
+				first = pos
 			}
 			if (best === 3) break
 			pos = lower.indexOf(word, pos + 1)
 		}
 		if (!best) return undefined
 		quality += best
+		if (at < 0) at = first
 	}
-	// Recency is a bonus, not a factor: recent hits rise among equals, but an
-	// exact match of any age outranks every inexact one (task v8).
-	let phrase = words.join(' '),
-		flatLower = lower.replace(/\s+/g, ' ').trim()
-	if (words.length) {
-		quality /= words.length
-		if (flatLower.includes(phrase)) quality++
-		if (flatLower.replace(/^\//, '') === phrase) quality++
-	}
+	let terms = words.length + phrases.length
+	if (!terms) return { quality: 1, snippet: text.slice(0, 160).replace(/\s+/g, ' ') }
+	quality /= terms
+	let phrase = words.join(' ')
+	if (words.length && flatLower.includes(phrase)) quality++
+	if (!phrases.length && flatLower.trim().replace(/^\//, '') === phrase) quality++
+	at = Math.max(0, at)
 	// A short lead, from a word start, padded so every match starts at the
 	// same column: the highlights line up and clipped rows still show them.
 	let flat = (s: string) => s.replace(/\s+/g, ' ')
 	let lead = flat(text.slice(Math.max(0, at - 20), at)).trimStart()
 	if (at > 20) lead = '…' + lead.slice(lead.indexOf(' ') + 1)
 	let to = Math.min(text.length, at + 160)
-	return {
-		score: quality + 1.5 * Math.pow(0.5, age / 259200000),
-		snippet: (words.length ? lead.padStart(21) : lead) + flat(text.slice(at, to)) + (to < text.length ? '…' : ''),
-	}
+	return { quality, snippet: lead.padStart(21) + flat(text.slice(at, to)) + (to < text.length ? '…' : '') }
 }
 
-export const findQuery = { tiers, groups, parse, match }
+export const findQuery = { tiers, filters, groups, weights, strong, scopeHelp, parse, bounded, match }

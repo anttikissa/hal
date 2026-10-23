@@ -23,6 +23,7 @@ function open(): void {
 		findDialog.open(
 			find.state.filters,
 			app.state.tabs.map((t) => t.id),
+			app.state.view.transcript?.meta.id,
 		),
 	)
 }
@@ -45,8 +46,12 @@ function key(k: Key): void {
 		let hit = r.action.type === 'submit' && m.find.results[r.action.item ?? 0]
 		find.close()
 		if (hit) location.assign(hit.href)
-	} else if (r.state.find!.filters !== m.find.filters) findController.update(find.state, hooks, r.state)
-	else hooks.set(r.state)
+	} else if (r.state.find!.filters !== m.find.filters || r.state.form?.values[0] !== m.form?.values[0])
+		findController.update(find.state, hooks, r.state)
+	else {
+		hooks.set(r.state)
+		findController.more(hooks, findDialog.near(r.state))
+	}
 }
 function focus(index: number): void {
 	let m = hooks.get()
@@ -60,6 +65,7 @@ export const find = {
 	toggle,
 	key,
 	focus,
+	more: (near: boolean): void => findController.more(hooks, near),
 	cancel: (): void => findController.close(find.state, hooks),
 	event: (b: FindBatch): void => findController.event(hooks, b),
 }

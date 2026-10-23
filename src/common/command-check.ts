@@ -2,6 +2,7 @@
 // protocol.ts holds the types.
 // Tasks: 6, qt, svt.
 import type { CommandType } from './protocol.ts'
+import { findQuery } from './find.ts'
 import { sendKeys } from './send-keys.ts'
 import { rebase } from './rebase.ts'
 import { pluginSyncWire } from './plugin-sync.ts'
@@ -97,18 +98,22 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'find-cancel' || c.type === 'handover') return undefined
 	if (c.type === 'plugin-sync') return pluginSyncWire.invalidCommand(c)
 	if (c.type === 'find') {
-		let kinds = c.kinds
+		let kinds = c.kinds,
+			strings = (v: unknown) => Array.isArray(v) && v.every((s) => typeof s === 'string')
 		let valid =
-			kinds === undefined ||
-			(Array.isArray(kinds) && kinds.every((k) => ['text', 'thinking', 'tools', 'commit', 'other'].includes(k)))
+			kinds === undefined || (strings(kinds) && kinds.every((k: string) => findQuery.filters.includes(k as never)))
 		return (
 			str('request') ??
 			str('query') ??
 			((c.query as string).length > 4096
 				? 'find: query exceeds 4096 characters'
-				: valid
-					? undefined
-					: 'find: invalid kinds')
+				: !valid
+					? 'find: invalid kinds'
+					: (c.here !== undefined && typeof c.here !== 'string') || (c.tabs !== undefined && !strings(c.tabs))
+						? 'find: invalid here or tabs'
+						: c.limit !== undefined && !(Number.isSafeInteger(c.limit) && (c.limit as number) > 0)
+							? 'find: invalid limit'
+							: undefined)
 		)
 	}
 	if (c.type === 'auth')

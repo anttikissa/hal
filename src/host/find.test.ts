@@ -26,6 +26,7 @@ beforeEach(() => {
 })
 afterEach(() => {
 	host.reset()
+	find.reset()
 	sessions.closeAll()
 	find.indexed = originalIndexed
 	if (savedHome === undefined) paths.state.home = undefined
@@ -52,26 +53,80 @@ function search(query: string): Promise<FindBatch[]> {
 	})
 }
 
-test('ranking requires every word, distinguishes word/prefix/substring and decays across kinds', () => {
-	let whole = findQuery.match('A CACHE hit', ['cache', 'hit'], 0)!
-	let prefix = findQuery.match('cached hit', ['cache', 'hit'], 0)!
-	let substring = findQuery.match('uncached hit', ['cache', 'hit'], 0)!
-	expect(whole.score).toBeGreaterThan(prefix.score)
-	expect(prefix.score).toBeGreaterThan(substring.score)
-	expect(findQuery.match('cache miss', ['cache', 'hit'], 0)).toBeUndefined()
-	expect(findQuery.match('cache hit', ['cache', 'hit'], 86400000)!.score).toBeGreaterThan(
-		findQuery.match('cache hit', ['cache', 'hit'], 864000000)!.score,
+test('match requires every word and phrase, and ranks word over prefix over substring', () => {
+	let quality = (text: string, words: string[], phrases: string[] = []) =>
+		findQuery.match(text, words, phrases)?.quality
+	expect(quality('A CACHE hit', ['cache', 'hit'])!).toBeGreaterThan(quality('cached hit', ['cache', 'hit'])!)
+	expect(quality('cached hit', ['cache', 'hit'])!).toBeGreaterThan(quality('uncached hit', ['cache', 'hit'])!)
+	expect(quality('cache miss', ['cache', 'hit'])).toBeUndefined()
+	// A command typed exactly beats the same words in prose.
+	expect(quality('/help security', ['help', 'security'])!).toBeGreaterThan(
+		quality('help with security', ['help', 'security'])!,
 	)
-	// Recency lifts a recent prefix hit over an old whole-word one, but an
-	// old exact match (such as a command) still beats any recent inexact one.
-	let day = 86400000
-	expect(findQuery.match('cached hits', ['cache', 'hit'], 0)!.score).toBeGreaterThan(
-		findQuery.match('a cache and a hit', ['cache', 'hit'], 30 * day)!.score,
-	)
-	expect(findQuery.match('/help security', ['help', 'security'], 90 * day)!.score).toBeGreaterThan(
-		findQuery.match('help with security', ['help', 'security'], 0)!.score,
-	)
+	// "Quoted" phrases match whole words across whitespace only.
+	expect(quality('edit the live\nfile', [], ['live file'])).toBeDefined()
+	expect(quality('a live-files list', [], ['live-file'])).toBeUndefined()
+	let q = findQuery.parse('"live file" rebase -conflict in:tools,10-19,here since:24h')
+	expect([q.words, q.phrases, q.exclude, q.scope, q.kinds, q.since]).toEqual([
+		['rebase'],
+		['live file'],
+		['conflict'],
+		['10-19', 'here'],
+		['tool-call', 'tool-output'],
+		86400000,
+	])
+	expect(() => findQuery.parse('in:nowhere')).toThrow('unknown in: value nowhere')
 })
+
+test('tab rows rank authorship over mentions; copied commits and inherited fork history are not evidence', async () => {
+	let commit = (subject: string, note = '') => ({
+		type: 'output' as const,
+		text: `abcd1234 ${subject}\n+1 -0 a.ts${note}`,
+		commit: { hash: 'abcd1234ff', short: 'abcd1234', subject, files: [] },
+	})
+	let author = sessions.create({ cwd: '/example', model: 'example/model', name: 'Cursor work' })
+	history.append(author.id, commit('Blink the cursor'))
+	let chatty = sessions.create({ cwd: '/example', model: 'example/model', name: 'Chat' })
+	for (let i = 0; i < 10; i++)
+		history.append(chatty.id, { type: 'assistant', block: { type: 'text', text: `blink reply ${i}` } })
+	history.append(chatty.id, commit('Blink the cursor', '\n(this session did not change these files)'))
+	let fork = sessions.create({ cwd: '/example', model: 'example/model', name: 'Fork' })
+	sessions.state.open.get(fork.id)!.forkedFrom = author.id
+	appendFileSync(
+		history.file(fork.id),
+		lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'blink it' }], ts: '2000-01-01T00:00:00.000Z' }),
+	)
+	let ready = caughtUp()
+	find.init()
+	await ready
+	let rows = await find.top('blink')
+	expect(rows.map((r) => [r.sessionId, r.why])).toEqual([
+		[author.id, 'commit'],
+		[chatty.id, 'reply'],
+	])
+	expect(rows[1]!.count).toBe(11)
+	// Load more: the same request with a higher limit resends the kept ranking.
+	let owner = {}
+	let page = (limit: number) =>
+		new Promise<string[]>((resolve) => {
+			let rows: string[] = []
+			find.search(
+				owner,
+				'more',
+				'blink',
+				undefined,
+				(b) => (b.done ? resolve(rows) : (rows = b.results.map((r) => r.sessionId))),
+				{ limit },
+			)
+		})
+	expect(await page(1)).toEqual([author.id])
+	expect(await page(2)).toEqual([author.id, chatty.id])
+	find.cancel(owner)
+	// One scoped tab lists its cards.
+	let cards = await find.top(`blink in:${chatty.id}`)
+	expect(cards.length).toBe(11)
+	expect(cards.every((c) => c.count === 0)).toBe(true)
+}, 10000)
 
 test('worker projection streams tiers, catches durable appends, indexes blobs and rebuilds byte-stable links', async () => {
 	let a = sessions.create({ cwd: '/example/project', model: 'example/model', name: 'Cache work' })
@@ -96,21 +151,21 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 	let batches = await search('cache')
 	expect(batches.filter((b) => !b.done).map((b) => b.tier)).toEqual([
 		'metadata',
+		'commit',
 		'user',
 		'assistant',
 		'thinking',
 		'tool-call',
 		'tool-output',
-		'commit',
 		'other',
 	])
 	expect((await find.top('needleblob'))[0]?.blockId).toBe('1')
-	expect((await find.top('in:tools cache')).map((h) => h.kind)).toEqual(['tool-call', 'tool-output'])
-	expect(await find.top('cache cwd:/wrong')).toEqual([])
-	expect(await find.top('cache model:other')).toEqual([])
+	expect((await find.top(`in:${a.id},tools cache`)).map((h) => h.kind)).toEqual(['tool-call', 'tool-output'])
+	expect(await find.top('cache in:/wrong')).toEqual([])
+	expect(new Set((await find.top('cache in:/example')).map((h) => h.sessionId))).toEqual(new Set([a.id]))
 	// Commit cards match their title; plumbing like rounds is not indexed.
-	expect((await find.top('commit tune')).map((h) => [h.kind, h.snippet])).toEqual([
-		['commit', 'Commit 1234abcd (Tune cache): +1 LOC'],
+	expect((await find.top('commit tune')).map((h) => [h.kind, h.why, h.snippet])).toEqual([
+		['commit', 'commit', 'Commit 1234abcd (Tune cache): +1 LOC'],
 	])
 	expect(await find.top('in:other cache')).toEqual([])
 	ready = caughtUp()
@@ -206,7 +261,7 @@ test('rename search exposes old and new titles from both origins, including old 
 	find.init()
 	await ready
 	let verify = async () => {
-		let hits = await find.top('/rename')
+		let hits = await find.top(`in:${a.id} /rename`)
 		expect(
 			hits
 				.filter((h) => h.kind === 'other')
@@ -239,7 +294,9 @@ test('rename search exposes old and new titles from both origins, including old 
 			ts: new Date().toISOString(),
 		}),
 	)
-	expect((await find.top('/rename')).find((h) => h.blockId === '85')?.snippet).toContain('Model topic → Final topic')
+	expect((await find.top(`in:${a.id} /rename`)).find((h) => h.blockId === '85')?.snippet).toContain(
+		'Model topic → Final topic',
+	)
 	expect(readFileSync(history.file(a.id)).subarray(0, before.length)).toEqual(before)
 }, 10000)
 

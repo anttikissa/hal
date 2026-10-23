@@ -25,6 +25,7 @@ function open(): void {
 		findDialog.open(
 			find.state.filters,
 			app.state.tabs.map((t) => t.id),
+			app.state.transcript?.meta.id,
 		),
 		(a, m) => {
 			let r = m.find!.results[a.item ?? 0]
@@ -34,6 +35,8 @@ function open(): void {
 			let r = findDialog.step(m, k)
 			if (r.state.form?.values[0] !== m.form?.values[0] || r.state.find!.filters !== m.find!.filters)
 				findController.update(find.state, hooks, r.state)
+			// After the caller shows `r`.
+			else queueMicrotask(() => app.state.modal?.find && findController.more(hooks, findDialog.near(app.state.modal)))
 			return r
 		},
 	)

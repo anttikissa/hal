@@ -126,7 +126,9 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			onClick={outside}
 		>
 			<div class="top">
-				<div class="title">{props.modal?.title ?? ''}</div>
+				<div class="title" role={props.modal?.find ? 'status' : undefined}>
+					{props.modal?.title ?? ''}
+				</div>
 				<button type="button" class="close" aria-label="Close" onClick={cancel}>
 					<Icon name="close" />
 				</button>
@@ -152,9 +154,9 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					onFocus={() => find.focus(0)}
 				/>
 			</Show>
-			<Show when={props.modal?.find}>
+			<Show when={props.modal?.find?.failed && props.modal.find}>
 				{(f) => (
-					<div class={f().failed ? 'blocks-hint refused' : 'blocks-hint'} role="status">
+					<div class="blocks-hint refused" role="alert">
 						{f().status}
 					</div>
 				)}
@@ -253,6 +255,10 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
 				onFocus={() => find.focus(findDialog.resultsFocus)}
 				aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
+				onScroll={(e) => {
+					let l = e.currentTarget
+					if (props.modal?.find) find.more(l.scrollTop + l.clientHeight >= l.scrollHeight - l.clientHeight / 2)
+				}}
 			>
 				<For each={items()}>
 					{(item, i) => (

@@ -13,69 +13,88 @@ import {
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { findIndex, type FindRow } from './find-index.ts'
+import { findRank } from './find-rank.ts'
 import { replay } from '../common/replay.ts'
 import type { SessionMeta } from './sessions.ts'
 
-type Search = { channel: string; request: string; query: string; kinds?: FindFilter[]; meta?: SessionMeta[] }
-type Reply = { channel: string; batch: FindBatch }
-
-function eligible(meta: SessionMeta, q: FindQuery): boolean {
-	return (
-		(!q.model || meta.model.toLocaleLowerCase().includes(q.model)) &&
-		(!q.cwd || meta.cwd.toLocaleLowerCase().includes(q.cwd))
-	)
+// `here`: the tab Find opened from; `tabs`: the open tabs in order (in:).
+type Search = {
+	channel: string
+	request: string
+	query: string
+	kinds?: FindFilter[]
+	here?: string
+	tabs?: string[]
+	limit?: number
+	meta?: SessionMeta[]
 }
+type Reply = { channel: string; batch: FindBatch }
+// What every hit in one search shares: the query, its sessions, and
+// whether rows fold into tabs.
+type Context = { q: FindQuery; now: number; ids?: Set<string>; tabs: boolean }
 
-function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
+function hit(row: FindRow, c: Context): FindResult | undefined {
 	let meta = findIndex.state.meta.get(row.sessionId)
-	if (!meta || !findWorker.eligible(meta, q)) return
-	let age = Math.max(0, now - row.ts)
+	if (!meta || (c.ids && !c.ids.has(row.sessionId))) return
+	let q = c.q,
+		age = Math.max(0, c.now - row.ts)
 	if (q.since !== undefined && age > q.since) return
+	// A fork's history before its creation belongs to its origin.
+	if (c.tabs && meta.forkedFrom && findIndex.state.meta.has(meta.forkedFrom) && row.ts < Date.parse(meta.createdAt))
+		return
 	if (q.exclude.length) {
 		let haystack = `${row.sessionId} ${meta.name ?? ''} ${row.text}`.toLocaleLowerCase()
 		if (q.exclude.some((w) => haystack.includes(w))) return
 	}
-	let match = findQuery.match(row.text, q.words, age)
+	let match = findQuery.match(row.text, q.words, q.phrases)
 	if (!match) return
-	// A matching commit ranks by recency alone and shows its title line.
-	if (row.kind === 'commit')
-		match = { score: 4 + 1.5 * Math.pow(0.5, age / 259200000), snippet: row.text.split('\n')[0]! }
+	let why = findRank.why(row, q)
+	// A commit shows its title line, which names the hash and subject.
+	if (row.kind === 'commit') match.snippet = row.text.split('\n')[0]!
 	return {
 		sessionId: row.sessionId,
 		name: meta.name ?? '',
 		blockId: row.blockId,
 		card: row.card + row.blockId,
 		kind: row.kind,
+		why,
+		count: 0,
 		age,
-		...match,
+		snippet: match.snippet,
+		score: findQuery.weights[why]! * match.quality,
 		href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}`,
 	}
-}
-
-// One row per commit: its title line names the hash. Other sessions get a
-// copy that warns "this session did not change"; the committer's card wins.
-function key(h: FindResult): string {
-	return h.kind === 'commit' ? h.snippet : `${h.sessionId}#${h.blockId}`
 }
 
 // Each call prepares its own statement. db.query() caches one statement per
 // SQL text, and search() pauses mid-iteration; a newer search reusing that
 // statement then failed with SQLITE_MISUSE ("bad parameter or other API
 // misuse") while the older cursor was still open.
-function* candidates(kind: FindKind, q: FindQuery): Generator<FindRow> {
+function* candidates(kind: FindKind, q: FindQuery, ids?: Set<string>, where = ''): Generator<FindRow> {
 	let db = findIndex.state.db!,
-		words = q.words.filter((w) => [...w].length >= 3)
+		terms = [...q.words, ...q.phrases].filter((w) => [...w].length >= 3)
 	let quote = (w: string) => '"' + w.replaceAll('"', '""') + '"'
-	let grams = words.map(quote).join(' AND ')
+	let grams = terms.map(quote).join(' AND ')
 	let tokens = q.words
 		.filter((w) => /^[\p{L}\p{N}_]+$/u.test(w))
 		.map((w) => quote(w) + '*')
 		.join(' AND ')
-	let stmt = !words.length
-		? db.prepare('SELECT * FROM docs WHERE kind=?')
-		: db.prepare(`SELECT * FROM docs WHERE kind=? AND id IN
-		(SELECT rowid FROM grams WHERE grams MATCH ? ${tokens ? 'UNION SELECT rowid FROM words WHERE words MATCH ?' : ''})`)
-	let args = !words.length ? [kind] : tokens ? [kind, grams, tokens] : [kind, grams]
+	let sql = 'SELECT * FROM docs WHERE kind=?' + where,
+		args: (string | number)[] = [kind]
+	if (ids) {
+		sql += ' AND sessionId IN (SELECT value FROM json_each(?))'
+		args.push(JSON.stringify([...ids]))
+	}
+	if (q.since !== undefined) {
+		sql += ' AND ts>=?'
+		args.push(Date.now() - q.since)
+	}
+	if (terms.length) {
+		sql += ` AND id IN (SELECT rowid FROM grams WHERE grams MATCH ? ${tokens && !q.phrases.length ? 'UNION SELECT rowid FROM words WHERE words MATCH ?' : ''})`
+		args.push(grams)
+		if (tokens && !q.phrases.length) args.push(tokens)
+	}
+	let stmt = db.prepare(sql)
 	try {
 		yield* stmt.iterate(...args) as Iterable<FindRow>
 	} finally {
@@ -94,12 +113,21 @@ async function search(c: Search): Promise<void> {
 				batch: { type: 'find-results', request: c.request, tier, results, done, scanning, ...(error ? { error } : {}) },
 			} satisfies Reply)
 	}
+	let limit = c.limit ?? 50
+	let kept = findWorker.state.kept.get(c.channel)
+	if (kept?.request === c.request) {
+		send(kept.top(limit))
+		send([], true)
+		return
+	}
+	findWorker.state.kept.delete(c.channel)
 	try {
 		await findWorker.state.ready
 		if (!current()) return
 		for (let m of c.meta ?? []) findIndex.state.meta.set(m.id, m)
 		let q = findQuery.parse(c.query, c.kinds),
 			now = Date.now()
+		let ids = findRank.scope(q, c.here, c.tabs ?? [], findIndex.state.meta)
 		// No query: the sessions whose histories changed last (task 6m).
 		if (!c.query.trim() && q.kinds.join() !== 'commit') {
 			let recent = [...findIndex.state.meta.values()].map((m) => ({
@@ -108,12 +136,14 @@ async function search(c: Search): Promise<void> {
 			}))
 			recent.sort((a, b) => b.at - a.at)
 			send(
-				recent.slice(0, 50).map(({ m, at }) => ({
+				recent.slice(0, limit).map(({ m, at }) => ({
 					sessionId: m.id,
 					name: m.name ?? '',
 					blockId: '',
 					card: '',
 					kind: 'metadata',
+					why: '',
+					count: 0,
 					age: Math.max(0, now - at),
 					snippet: m.cwd,
 					score: at,
@@ -123,25 +153,30 @@ async function search(c: Search): Promise<void> {
 			send([], true)
 			return
 		}
+		// One scoped tab lists its cards; otherwise one row per tab.
+		let ctx: Context = { q, now, ids, tabs: ids?.size !== 1 }
+		let tabs = findRank.group(),
+			cards = new Map<string, FindResult>()
+		let take = (row: FindRow) => {
+			let h = findWorker.hit(row, ctx)
+			if (!h) return
+			if (ctx.tabs) return tabs.add(h)
+			let key = `${h.sessionId}#${h.blockId}#${h.kind}`
+			if (!cards.has(key) || h.score > cards.get(key)!.score) cards.set(key, h)
+		}
+		let ranked = (n: number) => (ctx.tabs ? tabs.top(n) : [...cards.values()].sort(findRank.order).slice(0, n))
+		let top = () => ranked(limit)
+		findWorker.state.kept.set(c.channel, { request: c.request, top: ranked })
 		let pending: { meta: SessionMeta; offset: number }[] | undefined
 		let rebuilding = new Set<string>()
+		let started = performance.now()
+		let pause = async () => {
+			if (performance.now() - started <= 4) return true
+			await Bun.sleep(0)
+			started = performance.now()
+			return current()
+		}
 		for (tier of q.kinds) {
-			let hits = new Map<string, FindResult>(),
-				foreign = new WeakSet<FindResult>()
-			let take = (row: FindRow) => {
-				let h = findWorker.hit(row, q, now)
-				if (!h) return
-				if (row.text.includes('this session did not change')) foreign.add(h)
-				let old = hits.get(key(h))
-				let better =
-					!old || (foreign.has(old) && !foreign.has(h)) || (foreign.has(old) === foreign.has(h) && h.score > old.score)
-				if (better) hits.set(key(h), h)
-				if (hits.size > 100) hits = new Map(top().map((h) => [key(h), h]))
-			}
-			let top = () =>
-				[...hits.values()]
-					.sort((a, b) => b.score - a.score || a.age - b.age || a.href.localeCompare(b.href))
-					.slice(0, 50)
 			if (tier === 'metadata') {
 				for (let m of findIndex.state.meta.values())
 					take({
@@ -150,19 +185,29 @@ async function search(c: Search): Promise<void> {
 						card: '',
 						kind: tier,
 						ts: Date.parse(m.createdAt),
-						text: `${m.id} ${m.name ?? ''} ${m.model} ${m.cwd}`,
+						text: `${m.id} ${m.name ?? ''}`,
 					})
+				// Former titles: /rename commands and their replies.
+				for (let row of findWorker.candidates(
+					'other',
+					q,
+					ids,
+					" AND (text LIKE '/rename%' OR text LIKE 'Session renamed: %')",
+				)) {
+					take(row)
+					if (!(await pause())) return
+				}
 				send(top())
 				await Bun.sleep(0)
 				if (!current()) return
 				continue
 			}
-			let started = performance.now()
+			started = performance.now()
 			// Capture fallback offsets once before yielding while querying SQLite.
 			if (!pending) {
 				pending = []
 				for (let m of findIndex.state.meta.values()) {
-					if (!findWorker.eligible(m, q)) continue
+					if (ids && !ids.has(m.id)) continue
 					let stat = statSync(history.file(m.id), { throwIfNoEntry: false }),
 						mark = findIndex.mark(m.id)
 					let offset = mark?.offset ?? 0
@@ -174,21 +219,16 @@ async function search(c: Search): Promise<void> {
 						pending.push({ meta: m, offset })
 						rebuilding.add(m.id)
 					}
-					if (performance.now() - started > 4) {
-						await Bun.sleep(0)
-						started = performance.now()
-						if (!current()) return
-					}
+					if (!(await pause())) return
 				}
 				pending.sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
 			}
-			for (let row of findWorker.candidates(tier, q)) {
-				if (!rebuilding.has(row.sessionId)) take(row)
-				if (performance.now() - started > 4) {
-					await Bun.sleep(0)
-					started = performance.now()
-					if (!current()) return
-				}
+			// The metadata tier already took the former titles.
+			let skip = (row: FindRow) =>
+				rebuilding.has(row.sessionId) || (q.kinds.includes('metadata') && findRank.renamed(row.text))
+			for (let row of findWorker.candidates(tier, q, ids)) {
+				if (!skip(row)) take(row)
+				if (!(await pause())) return
 			}
 			send(top(), false, pending.length)
 			for (let [i, p] of pending.entries()) {
@@ -236,8 +276,14 @@ async function init(home: string): Promise<void> {
 }
 
 export const findWorker = {
-	state: { ready: Promise.resolve(), active: new Map<string, string>(), dirty: new Set<string>(), indexing: false },
-	eligible,
+	state: {
+		ready: Promise.resolve(),
+		active: new Map<string, string>(),
+		// Each channel's last ranking, for load more.
+		kept: new Map<string, { request: string; top(n: number): FindResult[] }>(),
+		dirty: new Set<string>(),
+		indexing: false,
+	},
 	hit,
 	candidates,
 	search,
@@ -252,8 +298,10 @@ if (!isMainThread) {
 			findWorker.state.ready = findWorker.init(c.home)
 			void findWorker.state.ready.catch((e) => postMessage({ error: String(e?.message ?? e) }))
 		} else if (c.type === 'search') void findWorker.search(c)
-		else if (c.type === 'cancel') findWorker.state.active.delete(c.channel)
-		else if (c.type === 'dirty') {
+		else if (c.type === 'cancel') {
+			findWorker.state.active.delete(c.channel)
+			findWorker.state.kept.delete(c.channel)
+		} else if (c.type === 'dirty') {
 			if (c.meta) findIndex.state.meta.set(c.meta.id, c.meta)
 			findWorker.state.dirty.add(c.sessionId)
 			void findWorker.state.ready.then(() => findWorker.drain())

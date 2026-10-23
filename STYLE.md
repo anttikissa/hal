@@ -13,6 +13,8 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
 - Lit solid edges: a card's left bar is an LED, not a hairline. The
   light comes from color alone, with no glow or blur effects.
 - Square corners on cards, buttons, tabs, fields and dialogs.
+- Focus and other outlines are 1px, never 2px. A list whose selected
+  row shows the focus draws no outline of its own.
 - Spacing follows the terminal grid: quarter lines vertically, whole
   ch across. Small text is fine where space is scarce.
 - Propose color changes to the user with options before they land.

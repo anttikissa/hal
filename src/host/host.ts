@@ -217,7 +217,7 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined {
 	clients.input(client.record, c)
 	if (c.type === 'find') {
-		find.search(client, c.request, c.query, c.kinds, client.deliver)
+		find.search(client, c.request, c.query, c.kinds, client.deliver, { here: c.here, tabs: c.tabs, limit: c.limit })
 		return {}
 	}
 	if (c.type === 'find-cancel') {

@@ -51,12 +51,16 @@ function dirty(sessionId: string): void {
 	}, 0)
 }
 
+// `scope`: the tab Find opened from and the open tabs in order (in:);
+// `limit`: how many rows to send. Repeating a request with a higher
+// limit resends the kept ranking without searching again.
 function search(
 	owner: object,
 	request: string,
 	query: string,
 	kinds: FindFilter[] | undefined,
 	deliver: (batch: FindBatch) => void,
+	scope: { here?: string; tabs?: string[]; limit?: number } = {},
 ): void {
 	find.init()
 	if (find.state.error) {
@@ -71,6 +75,7 @@ function search(
 		request,
 		query,
 		kinds,
+		...scope,
 		meta: [...sessions.state.open.values()].map(plain),
 	})
 }
@@ -81,27 +86,30 @@ function cancel(owner: object): void {
 	find.state.listeners.delete(owner)
 }
 
-function top(query: string): Promise<FindResult[]> {
+// Each batch replaces the ranking so far; the last one before done is final.
+function top(query: string, scope: { here?: string; tabs?: string[] } = {}): Promise<FindResult[]> {
 	return new Promise((resolve, reject) => {
 		let owner = {},
-			tiers = new Map<string, FindResult[]>()
-		find.search(owner, crypto.randomUUID(), query, undefined, (batch) => {
-			if (batch.error) {
-				find.cancel(owner)
-				reject(new Error(batch.error))
-				return
-			}
-			if (!batch.done) tiers.set(batch.tier, batch.results)
-			if (batch.done) {
-				find.cancel(owner)
-				resolve(
-					[...tiers.values()]
-						.flat()
-						.sort((a, b) => b.score - a.score || a.age - b.age)
-						.slice(0, 20),
-				)
-			}
-		})
+			results: FindResult[] = []
+		find.search(
+			owner,
+			crypto.randomUUID(),
+			query,
+			undefined,
+			(batch) => {
+				if (batch.error) {
+					find.cancel(owner)
+					reject(new Error(batch.error))
+					return
+				}
+				if (!batch.done) results = batch.results
+				else {
+					find.cancel(owner)
+					resolve(results.slice(0, 20))
+				}
+			},
+			scope,
+		)
 	})
 }
 

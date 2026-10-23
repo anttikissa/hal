@@ -1,10 +1,12 @@
-// The transient find modal shared by terminal and browser (task 6m).
+// The transient find modal shared by terminal and browser (tasks 6m, yhm).
 // Focus: 0 the field, 1..filters.length the filters, then the results.
 import { findQuery, type FindBatch, type FindFilter, type FindResult } from './find.ts'
 import { forms, type Key } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
 
 // `tabs`: the open tabs' session ids in tab order, for the tab numbers.
+// `here`: the tab Find opened from (in:here). `back`: the query before
+// Right listed one tab's cards; Left restores it.
 export type FindDialog = {
 	filters: FindFilter[]
 	results: FindResult[]
@@ -15,34 +17,57 @@ export type FindDialog = {
 	status: string
 	failed?: true
 	tabs: string[]
+	here?: string
+	back?: string
+	// How many rows the host sends; load more raises it.
+	limit: number
 }
-const filters: FindFilter[] = ['text', 'thinking', 'tools', 'commit', 'other']
-const labels = ['user/assistant', 'thinking', 'tools', 'commits', 'other']
+const filters = findQuery.filters
+const labels = ['user', 'Hal', 'reasoning', 'tools', 'commits', 'other']
 // The results' focus stop, after the field and the filters.
 const resultsFocus = filters.length + 1
-const question = 'Find anything: text, tab, card, project, whatever'
-const recent = 'Showing recent tabs'
+const question =
+	'Find anything: tab names, requests, commits, tool output\nExamples: compact in:here · "live file" · rebase -conflict · since:24h · /help find for more'
+const page = 50
+const recent = 'recent tabs'
 function recentLabel(filters: string[]): string {
-	return filters.join() === 'commit' ? 'Showing recent commits' : recent
+	return filters.join() === 'commits' ? 'tabs with commits' : recent
+}
+// The title carries the status; a failure has its own row instead.
+function title(status: string, failed?: boolean): string {
+	return failed ? 'Find' : `Find · ${status}`
 }
 const keys = [
 	'↓: filters · enter: open · esc: close',
 	'←→: move · space: toggle · ↑↓: field/results · esc: close',
-	'↑↓: move · enter: open · esc: close',
+	'↑↓: move · →: cards · enter: open · esc: close',
+	'↑↓: move · ←: tabs · enter: open · esc: close',
 ]
 
-function open(remembered: FindFilter[], tabs: string[] = []): ModalState {
-	let m = modals.open({ title: 'Find', form: { text: 'Find', fields: [{ name: 'query', type: 'text' }] } })
+function open(remembered: FindFilter[], tabs: string[] = [], here?: string): ModalState {
+	let m = modals.open({ title: title(recent), form: { text: 'Find', fields: [{ name: 'query', type: 'text' }] } })
 	return {
 		...m,
 		question,
 		hint: keys[0],
-		find: { filters: [...remembered], results: [], moved: false, focus: 0, done: false, status: recent, tabs },
+		find: {
+			filters: [...remembered],
+			results: [],
+			moved: false,
+			focus: 0,
+			done: false,
+			status: recent,
+			tabs,
+			here,
+			limit: page,
+		},
 	}
 }
 function input(m: ModalState, text: string): ModalState {
+	let status = text.trim() ? m.find!.status : recentLabel(m.find!.filters)
 	return {
 		...m,
+		title: title(status),
 		form: forms.set(m.form!, 0, text),
 		query: findDialog.words(text),
 		selected: 0,
@@ -56,13 +81,26 @@ function input(m: ModalState, text: string): ModalState {
 			moved: false,
 			done: false,
 			failed: undefined,
-			status: text.trim() ? 'Searching…' : recentLabel(m.find!.filters),
+			limit: page,
+			status,
 		},
 	}
 }
+// Load more: `m` asking for the next page once a finished search filled
+// its limit and the view `near`s the end; undefined otherwise.
+function more(m: ModalState, near: boolean): ModalState | undefined {
+	let f = m.find!
+	if (!near || !f.done || f.failed || !f.request || f.results.length < f.limit) return
+	return { ...m, find: { ...f, done: false, limit: f.limit + page } }
+}
+// The selection is in the last rows of the results.
+function near(m: ModalState): boolean {
+	return m.find!.focus === resultsFocus && m.selected >= m.items.length - 10
+}
 function words(text: string): string {
 	try {
-		return findQuery.parse(text).words.join(' ')
+		let q = findQuery.parse(text)
+		return [...q.words, ...q.phrases].join(' ')
 	} catch {
 		return ''
 	}
@@ -79,10 +117,32 @@ function toggle(m: ModalState, i: number): ModalState {
 // `m` with focus on `focus` and the footer naming that part's keys.
 function focus(m: ModalState, focus: number): ModalState {
 	let moved = m.find!.moved || focus === resultsFocus
-	return { ...m, hint: keys[focus === 0 ? 0 : focus < resultsFocus ? 1 : 2], find: { ...m.find!, focus, moved } }
+	let hint = focus === 0 ? 0 : focus < resultsFocus ? 1 : m.find!.back !== undefined ? 3 : 2
+	return { ...m, hint: keys[hint], find: { ...m.find!, focus, moved } }
+}
+// The query listing one tab's cards: its in: tab values replaced by `id`,
+// kind values kept.
+function scoped(text: string, id: string): string {
+	let kinds = new Set<string>(findQuery.filters)
+	let rest = text
+		.trim()
+		.split(/\s+/)
+		.flatMap((w) => {
+			let m = /^in:(.*)$/i.exec(w)
+			if (!m) return [w]
+			let kept = m[1]!.split(',').filter((v) => kinds.has(v.toLowerCase()))
+			return kept.length ? [`in:${kept.join(',')}`] : []
+		})
+	return [...rest.filter(Boolean), `in:${id}`].join(' ')
+}
+// `m` with query `text`, keeping the focus on the results.
+function requery(m: ModalState, text: string, back: string | undefined): ModalState {
+	let next = findDialog.focus(findDialog.input(m, text), resultsFocus)
+	return { ...next, find: { ...next.find!, back, moved: false } }
 }
 // Down goes field, filters, results; Up back. Left and Right move among
-// the filters, Space or Enter toggles one; Tab cycles every stop.
+// the filters, Space or Enter toggles one; Tab cycles every stop. In the
+// results Right lists the selected tab's cards and Left goes back.
 function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 	let f = m.find!
 	let to = (n: number) => ({ state: findDialog.focus(m, n) })
@@ -98,7 +158,14 @@ function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 		return { state: m }
 	}
 	if (f.focus === 0 && (k.key === 'down' || k.key === 'up')) return k.key === 'down' ? to(1) : { state: m }
-	if (f.focus === resultsFocus && k.key === 'up' && m.selected === 0) return to(1)
+	if (f.focus === resultsFocus) {
+		let text = m.form!.values[0]!,
+			row = f.results[m.selected]
+		if (k.key === 'up' && m.selected === 0) return to(1)
+		if (k.key === 'right' && row?.count)
+			return { state: findDialog.requery(m, findDialog.scoped(text, row.sessionId), f.back ?? text) }
+		if (k.key === 'left' && f.back !== undefined) return { state: findDialog.requery(m, f.back, undefined) }
+	}
 	if (k.key === 'up' || k.key === 'down') {
 		let r = modals.step(m, k)
 		return { state: { ...r.state, find: { ...f, moved: true } } }
@@ -123,19 +190,20 @@ function age(ms: number): string {
 				: `${Math.floor(ms / 86400000)}d`
 }
 // Result rows as aligned columns: tab number (blank for a closed
-// session), session/card id, name cut to leave the snippet room, age,
-// kind (none for session matches), snippet.
+// session), session id (card rows: session/card), name cut to leave the
+// snippet room, age, why label (tab rows: with their other matches),
+// snippet.
 function rows(results: FindResult[], tabs: string[], columns = 120, query = ''): string[] {
 	let width = (f: (r: FindResult) => string) => Math.max(0, ...results.map((r) => f(r).length))
 	let tab = (r: FindResult) => {
 		let n = tabs.indexOf(r.sessionId)
 		return n < 0 ? '' : String(n + 1)
 	}
-	let id = (r: FindResult) => (r.card ? `${r.sessionId}/${r.card}` : r.sessionId)
-	let kind = (r: FindResult) => (r.kind === 'metadata' ? '' : `[${r.kind}]`)
+	let id = (r: FindResult) => (r.card && !r.count ? `${r.sessionId}/${r.card}` : r.sessionId)
+	let why = (r: FindResult) => (r.count > 1 ? `${r.why} +${r.count - 1}` : r.why)
 	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + (n ? '…' : '') : s)
-	let w = { tab: width(tab), id: width(id), name: 0, age: width((r) => age(r.age)), kind: width(kind) }
-	let fixed = [w.tab, w.id, w.age, w.kind].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
+	let w = { tab: width(tab), id: width(id), name: 0, age: width((r) => age(r.age)), why: width(why) }
+	let fixed = [w.tab, w.id, w.age, w.why].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
 	w.name = Math.min(
 		width((r) => r.name),
 		Math.max(0, columns - fixed - 62),
@@ -154,7 +222,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 		id(r).padEnd(w.id),
 		w.name && cut(r.name, w.name).padEnd(w.name),
 		age(r.age).padStart(w.age),
-		w.kind && kind(r).padEnd(w.kind),
+		w.why && why(r).padEnd(w.why),
 		snippet(r),
 	]
 	return results.map((r) =>
@@ -163,37 +231,39 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 			.join('  '),
 	)
 }
+// Each batch carries the whole ranking so far. Until the selection moves
+// it replaces the rows; after that rows stay put and unseen ones append.
 function batch(m: ModalState, b: FindBatch): ModalState {
 	let f = m.find!
 	if (b.request !== f.request) return m
 	let results = f.results
 	if (!b.done) {
-		let next = b.results,
-			existing = results.filter((r) => r.kind === b.tier)
+		let key = (r: FindResult) => (r.count ? r.sessionId : `${r.href} ${r.kind}`)
 		if (f.moved) {
-			// Keep visible rows in place, even if the host's top-50 changed.
-			next = [...existing, ...next.filter((r) => !existing.some((e) => e.href === r.href))]
-			results = [...results, ...next.slice(existing.length)]
-		} else
-			results = [...results.filter((r) => r.kind !== b.tier), ...next].sort(
-				(a, c) => c.score - a.score || findQuery.tiers.indexOf(a.kind) - findQuery.tiers.indexOf(c.kind),
-			)
+			let seen = new Set(results.map(key))
+			results = [...results, ...b.results.filter((r) => !seen.has(key(r)))]
+		} else results = b.results
 	}
 	let query = !!m.form!.values[0]!.trim()
-	let count = `${results.length} result${results.length === 1 ? '' : 's'}`
+	let noun = results[0]?.count ? 'tab' : 'card'
+	let count = `${results.length} ${noun}${results.length === 1 ? '' : 's'}`
+	// Batches arrive within milliseconds, so the title keeps its last
+	// settled text until the search ends; only a slow index scan shows.
 	let status = b.error
 		? `Find failed: ${b.error}`
 		: !query
 			? recentLabel(f.filters)
 			: b.done
 				? results.length
-					? `Showing ${count}`
+					? count
 					: 'No results'
 				: b.scanning
-					? `Showing ${count}, scanning ${b.scanning.toLocaleString()} histories…`
-					: `Showing ${count}, searching ${b.tier}…`
+					? `scanning ${b.scanning.toLocaleString()} histories…`
+					: f.status
+	// Restores the focused part's key hint over "searching…".
 	return {
-		...m,
+		...findDialog.focus(m, f.focus),
+		title: title(status, !!b.error),
 		items: findDialog.rows(results, f.tabs),
 		find: { ...f, results, done: b.done, status, ...(b.error ? { failed: true as const } : { failed: undefined }) },
 	}
@@ -223,6 +293,10 @@ export const findDialog = {
 	focus,
 	step,
 	words,
+	near,
+	more,
+	scoped,
+	requery,
 	rows,
 	batch,
 	marks,

@@ -43,7 +43,15 @@ export type Delivery = 'steer' | 'soft-steer' | 'queue'
 
 export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string; autoclose?: boolean }
-	| { type: 'find'; request: string; query: string; kinds?: FindFilter[] }
+	| {
+			type: 'find'
+			request: string
+			query: string
+			kinds?: FindFilter[]
+			here?: string
+			tabs?: string[]
+			limit?: number
+	  }
 	| { type: 'find-cancel' }
 	// Open the newest session, or create one in cwd (the host's own
 	// working directory if none is given) when there is none.
