@@ -65,7 +65,8 @@ export function Card(props: {
 	running?: { call: string; since?: string }
 	waiting?: (title: string) => ReturnType<typeof hrefs.urlParts> | undefined
 }) {
-	let id = () => `${props.session}#${props.row.item.key}`
+	// A job's streaming card folds apart from its call's (task 6nn).
+	let id = () => `${props.session}#${props.row.job ? props.row.key : props.row.item.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && cardMotion.enter(root))
 	let bash = () =>
@@ -78,7 +79,8 @@ export function Card(props: {
 	let resultTime = () => (props.row.result ? titles.resultTime(props.row.item.ts, props.row.result.ts) : '')
 	// Short or long (task hyt): as the session starts its kind, until a
 	// click, /toggle or Ctrl-O switches it; a call fails with its result.
-	let level = () => folds.level(id(), card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash())))
+	let level = () =>
+		folds.level(id(), folds.start(props.session, props.row.item, card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash()))))
 	let open = () => level() === 'long'
 	// The setters may run in an effect: they read the state as of the call.
 	let setLevel = (fold: Verbosity) =>

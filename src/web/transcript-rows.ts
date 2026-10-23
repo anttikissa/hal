@@ -15,6 +15,7 @@ import { transcript, type Item } from '../common/transcript.ts'
 // prompt or command this client sent, the command id it had while pending.
 // `pending`: sent, not yet acknowledged. `waiting`: in the inbox;
 // `note`: a queued message's compact row starts with it (task 16).
+// `job`: a running background job's call again, streaming (task 6nn).
 export type Row = {
 	item: Item
 	at: number
@@ -24,6 +25,7 @@ export type Row = {
 	pending?: true
 	waiting?: true
 	note?: string
+	job?: true
 }
 
 function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = []): Row[] {
@@ -64,13 +66,16 @@ function rows(items: Item[], sent: Record<string, string> = {}, before: Row[] = 
 // `rows` and after them the prompts still pending (`id`: the submit's
 // command id), but for one the host already put in the transcript: it
 // is a row already, under the same key, so its card stays. `tabs`: the
-// host's tab ids in order, numbering a queued message's sender.
+// host's tab ids in order, numbering a queued message's sender. Running
+// background jobs come first (task 6nn): their calls again, streaming,
+// under `job:<key>` so the transcript's card stays as it was.
 function withPending(
 	rows: Row[],
 	pending: { id: string; text: string; ts?: string }[],
 	waiting: InboxItem[] = [],
 	tabs: string[] = [],
 	held?: string,
+	running: Item[] = [],
 ): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
@@ -80,12 +85,13 @@ function withPending(
 			r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
 		return r
 	}
+	let jobs = running.map((item): Row => ({ item, at, key: `job:${item.key}`, job: true }))
 	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)
 	for (let row of queued) keys.add(row.key)
 	let more = pending
 		.filter((s) => !keys.has(s.id))
 		.map((s): Row => ({ item: { type: 'prompt', text: s.text, ts: s.ts, key: s.id }, at, key: s.id, pending: true }))
-	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
+	return jobs.length || queued.length || more.length ? [...rows, ...jobs, ...queued, ...more] : rows
 }
 
 // Keys of the background Bash calls whose job still runs: started (the

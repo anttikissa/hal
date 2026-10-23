@@ -86,7 +86,7 @@ export const tool: Tool<ToolOutput> = {
 				input.command as string,
 				ctx.cwd,
 				given ?? (input.background ? jobs.backgroundMs : 120_000),
-				input.background ? undefined : ctx.onOutput,
+				ctx.onOutput,
 			)
 			launched = true
 			// Lines from commits.committed follow the output (task sg0).
@@ -116,6 +116,7 @@ export const tool: Tool<ToolOutput> = {
 						ctx.callId,
 						launch,
 						input.unsafeToStop === true ? input : undefined,
+						ctx.holdOutput,
 					),
 				)
 			let run = launch()

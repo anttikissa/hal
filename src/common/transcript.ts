@@ -56,6 +56,7 @@ export type Shown = { originSession?: string } &
 				input: Record<string, unknown>
 				cmd?: string
 				partial?: string
+				partialFrom?: number
 				ts?: string
 		  })
 		| (ToolDisplay & {
@@ -103,6 +104,8 @@ export type Shown = { originSession?: string } &
 
 // Stable key: record n, n.i for extra items; unnumbered events use ~position.
 export type Item = Shown & { key: string }
+// Streamed Bash output: `from` characters before `output` were dropped.
+export type Streamed = { output: string; from: number }
 
 export type Transcript = {
 	dropped?: number[]
@@ -113,6 +116,8 @@ export type Transcript = {
 	// Messages waiting for the turn (src/common/inbox.ts); always shown.
 	inbox: InboxItem[]
 	queueHold?: string
+	// Running background jobs' output by call id, apart from items (task 6nn).
+	jobOutput?: Record<string, Streamed>
 	// Everything to show, in order, including the running turn's output.
 	items: Item[]
 	// Where a last-prompt edit replaces items and everything after.
@@ -376,13 +381,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 			...(turn.ns?.map((n) => t.items.findIndex((item) => item.key === String(n))).filter((at) => at >= 0) ?? []),
 		)
 	}
-	if (snapshot.toolOutput) {
-		let partial = new Map(snapshot.toolOutput.map((p) => [p.id, p.output]))
-		t.items = t.items.map((item) =>
-			item.type === 'tool' && partial.has(item.id) ? { ...item, partial: partial.get(item.id)! } : item,
-		)
-	}
-	return t
+	return snapshot.toolOutput ? transcriptLive.attach(t, snapshot.toolOutput) : t
 }
 
 // `t` with the items of `page`, the history just before `loaded` (the

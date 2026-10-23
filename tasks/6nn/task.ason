@@ -1,0 +1,14 @@
+{
+	title: 'Background Bash jobs stream to a sticky card',
+	spec: `A running background Bash job streams its output where the user can see it: a live card for each running job sticks to the bottom of the transcript, above waiting and pending messages, in web and terminal alike. The card is the job's own call item rendered by the ordinary card code (same title, & mark, t<n> link, timer, colors, fold, Kill), with the streamed output as its partial; it shows while the session metadata lists the job in background and disappears when the job ends, after which the bash t<n> message carries the result as before. Toggling it toggles the call's fold like any card. Open, it shows only the newest rows, as a foreground Bash card does (look.streamRows in the terminal).
+
+The original call card never changes while the job runs: the job's output is kept apart from the call item, so no row above the bottom changes (the terminal cannot edit scrollback; the web keeps the reading position).
+
+Host: background Bash streams through the same tool-output event and toolOutput state as foreground Bash; the job, not the tool call, ends the stream (exit, /kill, STOP, tab close; host exit loses it like the job). The streamed preview keeps the newest output, at most the preview cap, with absolute offsets, so an endless or long command keeps updating; clients keep the same bound. Snapshots carry it for late joiners as for foreground output.`,
+	status: 'done',
+	notes: [
+		'Invariant: a card never shrinks as its job ends. The job result card (bash t<n>) starts in the fold state its streaming card had: web reads <session>#job:<n>, terminal the call key <n> it shares with the job card (bashResult.job).'
+	],
+	needs: ['v0'],
+	foldInto: ['v0']
+}

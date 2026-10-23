@@ -4,6 +4,7 @@
 // command) changes them too. In memory only, per session: not stored,
 // not synced to other clients.
 
+import { bashResult } from '../common/bash-result.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Verbosity } from '../common/card.ts'
 import { modals, type ModalState } from '../common/modals.ts'
@@ -47,7 +48,7 @@ function at(id: string): (item: Item) => Verbosity {
 	let t = folds.transcriptOf(id)
 	let start = t ? toggle.starts(t) : () => 'long' as Verbosity
 	let states = folds.of(id)
-	return (item) => states.get(item.key) ?? start(item)
+	return (item) => states.get(item.key) ?? states.get(bashResult.job(item) ?? '') ?? start(item)
 }
 
 // The transcript of session `id`, shown or kept for a hidden tab.

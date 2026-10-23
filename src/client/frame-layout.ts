@@ -127,7 +127,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let fold =
 			item.type === 'tool-result'
 				? (callFolds.get(item.id) ?? 'short')
-				: (view.folds?.states.get(item.key) ?? card.initial(item, blocks, failed))
+				: frameLayout.fold(view, item, card.initial(item, blocks, failed))
 		if (item.type === 'tool') callFolds.set(item.id, fold)
 		let look: Look = { fold }
 		if (item.type === 'tool') {
@@ -205,14 +205,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 				)
 			if (item.type === 'tool' && item.name === 'bash' && view.now !== undefined) look.now = view.now
 			if (cell) look.status = look.status ? `${look.status} ${cell}` : cell
-			if (item.type === 'tool' && item.name === 'bash' && item.input.background === true)
-				look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
-			if (
-				fold === 'long' &&
-				((item.type === 'tool' && item.partial !== undefined && !look.result) ||
-					(item.type === 'tool-result' && (item as Item & { live?: boolean }).live))
-			)
-				look.streamRows = Math.max(1, Math.floor(screenRows / 2) - 10)
+			frameLayout.streamLook(item, look, fold, screenRows)
 			look = frame.look(item, look)
 			let rows = merged
 				? []
@@ -293,10 +286,32 @@ type History = {
 	lines: string[]
 }
 
+// A Bash card's '&' mark and, while it streams open, its bounded tail;
+// also for a running job's card at the bottom (task 6nn).
+function streamLook(item: Item, look: Look, fold: Verbosity, screenRows: number): void {
+	if (item.type === 'tool' && item.name === 'bash' && item.input.background === true)
+		look.status = look.status?.trimEnd() ? `${look.status.trimEnd()} &` : '&'
+	if (
+		fold === 'long' &&
+		((item.type === 'tool' && item.partial !== undefined && !look.result) ||
+			(item.type === 'tool-result' && (item as Item & { live?: boolean }).live))
+	)
+		look.streamRows = Math.max(1, Math.floor(screenRows / 2) - 10)
+}
+
+// How card `item` shows: toggled here, else a job's result as its
+// streaming card was (task 6nn: a card never shrinks as its job ends),
+// else `initial`. For transcript and waiting cards alike.
+function fold(view: View, item: Item, initial: Verbosity): Verbosity {
+	return view.folds?.states.get(item.key) ?? view.folds?.states.get(bashResult.job(item) ?? '') ?? initial
+}
+
 export const frameLayout = {
 	state: {
 		history: undefined as History | undefined,
 		ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined,
 	},
 	layout,
+	streamLook,
+	fold,
 }

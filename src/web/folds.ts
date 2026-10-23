@@ -6,6 +6,7 @@
 // model's command arrives as an event.
 
 import { createSignal, flush, untrack } from 'solid-js'
+import { bashResult } from '../common/bash-result.ts'
 import type { Verbosity } from '../common/card.ts'
 import type { ModalState } from '../common/modals.ts'
 import type { Key } from '../common/forms.ts'
@@ -55,10 +56,17 @@ function disclose(id: string, start: Verbosity, keys: string[]): void {
 	set(id, toggle.step(level(id, start)), keys)
 }
 
+// How card `item` starts: a job's result as its streaming card was
+// (task 6nn), so a card never shrinks as its job ends.
+function start(session: string, item: Item, initial: Verbosity): Verbosity {
+	let job = bashResult.job(item)
+	return job ? folds.level(`${session}#job:${job}`, initial) : initial
+}
+
 // The states of `t`'s cards, as the shared rules see them; one per use.
 function at(t: Transcript): (item: Item) => Verbosity {
 	let start = toggle.starts(t)
-	return (item) => folds.level(`${t.meta.id}#${item.key}`, start(item))
+	return (item) => folds.level(`${t.meta.id}#${item.key}`, folds.start(t.meta.id, item, start(item)))
 }
 
 // Applies `mode` with `args` to the cards of the session shown, as
@@ -172,4 +180,4 @@ function key(k: Key, cursor?: number): void {
 	if (error) app.setNotice(error)
 }
 
-export const folds = { raw, setRaw, toggled, level, set, disclose, at, run, typed, onEvent, hinted, open, input, key }
+export const folds = { raw, setRaw, toggled, level, set, disclose, start, at, run, typed, onEvent, hinted, open, input, key }

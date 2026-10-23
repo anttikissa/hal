@@ -34,6 +34,8 @@ export type ToolContext = CallContext & {
 	callId?: string
 	endTurn?: () => void
 	onOutput?: (chunk: string) => void
+	// A background job keeps onOutput's stream past the call; call the end.
+	holdOutput?: () => () => void
 }
 // `diff`: what the call changed, for display only; providers never see it.
 export type ToolOutput =
@@ -307,8 +309,8 @@ export const tools = {
 	defs: (): ToolDef[] =>
 		tools.all().map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
 	killAfterMs: 2000,
-	// Foreground bash streams its output while it runs.
-	streams: (call: ToolCallBlock): boolean => call.name === 'bash' && call.input.background !== true,
+	// Bash streams its output while it runs, a background job until it ends.
+	streams: (call: ToolCallBlock): boolean => call.name === 'bash',
 	// A foreground call flagged unsafeToStop (task ker).
 	unsafe: (call: ToolCallBlock): boolean =>
 		call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true,

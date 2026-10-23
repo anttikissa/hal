@@ -374,7 +374,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (tools.unsafe(call)) (running.unsafe ??= new Map()).set(call.id, { input: call.input, at: Date.now() })
 				try {
 					return turnPolicy.stoppedBy(
-						await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx),
+						await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput, holdOutput: stream.hold } : ctx),
 						signal,
 					)
 				} finally {

@@ -55,6 +55,8 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 export const bashResult = {
 	background: (item: Shown) =>
 		item.type === 'prompt' ? /^bash #?(t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined,
+	// The key of the call whose background job `item` reports.
+	job: (item: Shown) => bashResult.background(item)?.match(/^t?(\d+)$/)?.[1],
 	display,
 	trim,
 	exit,

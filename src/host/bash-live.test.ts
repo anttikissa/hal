@@ -40,3 +40,31 @@ test('foreground bash streams to every client, late snapshots match, final resul
 	).toHaveLength(1)
 	calls[1]?.push({ type: 'done', reason: 'end' })
 })
+
+test('a background job streams apart from its unchanged call card until it ends (task 6nn)', async () => {
+	let first = client()
+	let id = created(first, testHome())
+	first.conn.send({ type: 'submit', sessionId: id, text: 'run in background' })
+	await until(() => calls.length === 1)
+	calls[0]!.push(
+		{
+			type: 'tool_call',
+			id: 'j1',
+			name: 'bash',
+			input: { command: "sleep .3; printf 'late\\n'; sleep .3", description: 'Report later', background: true },
+		},
+		{ type: 'done', reason: 'tool_use' },
+	)
+	await until(() => first.of('tool-results').length > 0)
+	calls[1]?.push({ type: 'done', reason: 'end' })
+	let call = () => first.views.get(id)!.items.find((item) => item.type === 'tool')!
+	let before = call()
+	await until(() => first.views.get(id)!.jobOutput?.j1?.output === 'late\n')
+	expect(call()).toBe(before)
+	expect(call()).not.toHaveProperty('partial')
+	let late = await fresh(id)
+	expect(late.jobOutput).toEqual(first.views.get(id)!.jobOutput)
+	await until(() => !first.views.get(id)!.meta.background)
+	expect(first.views.get(id)!.jobOutput).toBeUndefined()
+	expect((await fresh(id)).jobOutput).toBeUndefined()
+})

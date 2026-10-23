@@ -15,6 +15,7 @@ import { amend } from '../../common/amend.ts'
 import { forms } from '../../common/forms.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import type { Item } from '../../common/transcript.ts'
+import { transcriptLive } from '../../common/transcript-live.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
@@ -92,6 +93,9 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), {
 		equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true),
 	})
+	let jobCalls = createMemo(() => (props.view.transcript ? transcriptLive.jobItems(props.view.transcript) : none), {
+		equals: (a, b) => a.length === b.length && a.every((item, i) => item === b[i]),
+	})
 	let all = createMemo(() =>
 		transcriptRows.withPending(
 			rows(),
@@ -99,6 +103,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			props.view.transcript?.inbox,
 			tabIds(),
 			props.view.transcript?.queueHold,
+			jobCalls(),
 		),
 	)
 	// The row Hal's cursor sits in: the last, while it streams.
@@ -168,7 +173,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 									row={row()}
 									session={session()}
 									blocks={blocks()}
-									running={running()}
+									running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
 									cursor={cursorKey() === row().key}
 									target={hit() === row().key}
 									job={jobs().has(row().item.key) ? row().item.key : undefined}

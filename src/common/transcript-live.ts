@@ -6,7 +6,7 @@ import { commandCards } from './command-cards.ts'
 import { blocks } from './blocks.ts'
 import type { Event } from './protocol.ts'
 import type { LiveTurn } from './snapshot.ts'
-import { transcript, type Item, type Shown, type Transcript } from './transcript.ts'
+import { transcript, type Item, type Shown, type Streamed, type Transcript } from './transcript.ts'
 import { transcriptOrder } from './transcript-order.ts'
 
 // A live turn's blocks as items going at `at`.
@@ -54,7 +54,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
-	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
+	if (event.type === 'meta')
+		return transcriptLive.endedJobs({ ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) })
 	if (event.type === 'turn-stats') return { ...t, stats: event.stats }
 	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
 	if (event.type === 'assistant-interrupted') {
@@ -66,14 +67,24 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return { ...t, items, ...(t.live && { live: { start: items.length, turn: transcriptLive.fresh(t.live.turn) } }) }
 	}
 	if (event.type === 'tool-output') {
+		let job =
+			t.jobOutput?.[event.id] ??
+			(transcriptLive.jobCalls(t).some((item) => item.id === event.id) ? { output: '', from: 0 } : undefined)
+		if (job) {
+			let grown = transcriptLive.grow(job, event.at, event.chunk)
+			return grown ? { ...t, jobOutput: { ...t.jobOutput, [event.id]: grown } } : t
+		}
 		let changed = false
 		let items = t.items.map((item): Item => {
 			if (item.type !== 'tool' || item.id !== event.id) return item
-			let before = item.partial ?? ''
-			let added = event.chunk.slice(Math.max(0, before.length - event.at))
-			if (!added || event.at > before.length) return item
+			let grown = transcriptLive.grow(
+				{ output: item.partial ?? '', from: item.partialFrom ?? 0 },
+				event.at,
+				event.chunk,
+			)
+			if (!grown) return item
 			changed = true
-			return { ...item, partial: before + added }
+			return { ...item, partial: grown.output, ...(grown.from && { partialFrom: grown.from }) }
 		})
 		return changed ? { ...t, items } : t
 	}
@@ -160,11 +171,16 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
-		let done = transcriptLive
-			.settle(t.items, t.live)
-			.map((item): Item =>
-				item.type === 'tool' && event.results.some((r) => r.id === item.id) ? { ...item, partial: undefined } : item,
-			)
+		// A call that went to the background moves its output apart.
+		let jobs = transcriptLive.jobKeys(t)
+		let jobOutput = t.jobOutput
+		let done = transcriptLive.settle(t.items, t.live).map((item): Item => {
+			if (item.type !== 'tool' || !event.results.some((r) => r.id === item.id)) return item
+			if (jobs.has(item.key) && !jobOutput?.[item.id])
+				jobOutput = { ...jobOutput, [item.id]: { output: item.partial ?? '', from: item.partialFrom ?? 0 } }
+			let { partial: _p, partialFrom: _f, ...rest } = item
+			return rest
+		})
 		let items = [
 			...done,
 			...transcript.keyed(
@@ -173,7 +189,12 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 				done.length,
 			),
 		]
-		return { ...t, items, live: { start: items.length, turn: transcriptLive.fresh(t.live.turn) } }
+		return {
+			...t,
+			...(jobOutput && { jobOutput }),
+			items,
+			live: { start: items.length, turn: transcriptLive.fresh(t.live.turn) },
+		}
 	}
 	// Attachments, notices and other session events are not turn ends.
 	if (event.type !== 'question' && event.type !== 'turn-end') return t
@@ -214,6 +235,77 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
+// Keys of this session's Bash calls whose background job still runs
+// (task 6nn): the host lists them in meta as `<session>:<n>`.
+function jobKeys(t: Transcript): Set<string> {
+	let prefix = `${t.meta.id}:`
+	return new Set((t.meta.background ?? []).filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length)))
+}
+
+// The calls of running background jobs.
+function jobCalls(t: Transcript): (Item & { type: 'tool' })[] {
+	let keys = transcriptLive.jobKeys(t)
+	if (!keys.size) return []
+	return t.items.filter((item): item is Item & { type: 'tool' } => item.type === 'tool' && keys.has(item.key))
+}
+
+// The calls of running background jobs with their output, streaming at
+// the bottom. An unchanged job gives the same object, so cards keep.
+const shown = new WeakMap<object, { call: Item; item: Item & { type: 'tool' } }>()
+function jobItems(t: Transcript): (Item & { type: 'tool' })[] {
+	return transcriptLive.jobCalls(t).map((call) => {
+		let out = t.jobOutput?.[call.id]
+		if (!out) return call
+		let seen = shown.get(out)
+		if (seen?.call === call) return seen.item
+		let item = { ...call, partial: out.output, ...(out.from && { partialFrom: out.from }) }
+		shown.set(out, { call, item })
+		return item
+	})
+}
+
+// Raises `s` by `chunk`, sent at offset `at`; undefined when it adds
+// nothing or leaves a gap. Like the host, keeps only the newest output.
+function grow(s: Streamed, at: number, chunk: string): Streamed | undefined {
+	let end = s.from + s.output.length
+	let added = chunk.slice(Math.max(0, end - at))
+	if (!added || at > end) return undefined
+	let output = s.output + added
+	let from = s.from
+	let max = transcriptLive.partialMax
+	if (output.length > 2 * max) {
+		from += output.length - max
+		output = output.slice(-max)
+	}
+	return { output, from }
+}
+
+// `t` with a snapshot's output in flight: on its call, or apart for a
+// background job, whose call card must not change.
+function attach(t: Transcript, outputs: (Streamed & { id: string })[]): Transcript {
+	let partial = new Map(outputs.map((p) => [p.id, p]))
+	let jobs = transcriptLive.jobKeys(t)
+	let jobOutput = t.jobOutput
+	let items = t.items.map((item) => {
+		let p = item.type === 'tool' ? partial.get(item.id) : undefined
+		if (!p || item.type !== 'tool') return item
+		if (!jobs.has(item.key)) return { ...item, partial: p.output, ...(p.from && { partialFrom: p.from }) }
+		jobOutput = { ...jobOutput, [item.id]: { output: p.output, from: p.from } }
+		return item
+	})
+	return { ...t, items, ...(jobOutput && { jobOutput }) }
+}
+
+// Drops the output of jobs that ended.
+function endedJobs(t: Transcript): Transcript {
+	if (!t.jobOutput) return t
+	let running = new Set(transcriptLive.jobCalls(t).map((c) => c.id))
+	let kept = Object.entries(t.jobOutput).filter(([id]) => running.has(id))
+	if (kept.length === Object.keys(t.jobOutput).length) return t
+	let { jobOutput: _j, ...rest } = t
+	return kept.length ? { ...rest, jobOutput: Object.fromEntries(kept) } : rest
+}
+
 export const transcriptLive = {
 	turnItems,
 	copyTurn,
@@ -221,4 +313,11 @@ export const transcriptLive = {
 	fold,
 	settle,
 	prompted,
+	jobKeys,
+	jobCalls,
+	jobItems,
+	grow,
+	attach,
+	endedJobs,
+	partialMax: 1_000_000,
 }
