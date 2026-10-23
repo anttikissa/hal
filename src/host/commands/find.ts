@@ -13,7 +13,7 @@ export const command: SlashCommand = {
 				? hits
 						.map(
 							(h) =>
-								`[${h.kind}] [${h.sessionId}${h.blockId ? '#' + h.blockId : ''}](${h.href}) ${h.name} · ${Math.floor(h.age / 3600000)}h · ${h.snippet}`,
+								`[${h.kind}] [${h.sessionId}${h.blockId ? `/${h.card}${h.blockId}` : ''}](${h.href}) ${h.name} · ${Math.floor(h.age / 3600000)}h · ${h.snippet}`,
 						)
 						.join('\n')
 				: 'No matches.',

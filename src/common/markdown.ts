@@ -129,7 +129,7 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 			i += bare.length
 			continue
 		}
-		// A block id (task d92), t5, #t5 or <session>/t5, or a bare session id
+		// A block id (task d92), t5 or <session>/t5, or a bare session id
 		// (task b4b), where the resolver knows it: a link. Else text.
 		let id =
 			markdown.state.links &&

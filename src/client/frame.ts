@@ -9,6 +9,7 @@ import { forms, type FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
 import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import { transcriptLive } from '../common/transcript-live.ts'
 import { ansi } from './ansi.ts'
 import { batchOrder } from './batch-order.ts'
 import { frameLayout, type Past } from './frame-layout.ts'
@@ -95,7 +96,7 @@ function promptWidth(cols: number): number {
 }
 
 // An item's painted rows on a terminal `cols` wide. An item with a
-// block id shows it dim at the right of its first row, `#t35`, an OSC 8
+// block id shows it dim at the right of its first row, `t35`, an OSC 8
 // link to the same block on the web (tasks wc, 0z); a gutter as wide
 // as the id is kept free on every row, as the web keeps a column for
 // it. `hal`: the item streams: a long block's Hal cursor follows its
@@ -199,11 +200,14 @@ function build(
 		lines.push('')
 		lines.push(ansi.PAD + halCursor.glyph(view.hal))
 	}
-	// Unsent and waiting messages use the normal prompt renderer; queued
-	// ones stack as compact rows, the sender's tab number redrawn here.
+	// Running background jobs stream here (task 6nn), then unsent and
+	// waiting messages use the normal prompt renderer; queued ones stack
+	// as compact rows, the sender's tab number redrawn here. A job's call
+	// card above stays as it was: scrollback cannot change.
 	let session = view.transcript?.meta.id
 	let waiting = view.transcript?.inbox ?? []
 	let tail = [
+		...(view.transcript ? transcriptLive.jobItems(view.transcript) : []).map((item) => ({ item, m: undefined })),
 		...waiting.map((m) => ({ item: transcript.waitingItem(m), m })),
 		...(view.pending ?? []).map((text) => ({ item: { type: 'prompt', text, key: '' } as Item, m: undefined })),
 	]
@@ -214,10 +218,13 @@ function build(
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
 		let look: Look = {
-			fold:
-				view.folds?.states.get(item.key) ?? card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks)),
+			fold: frameLayout.fold(view, item, card.initial(item, forms.cards(view.form, view.transcript?.meta.blocks))),
 		}
-		let rows = queued
+		if (!m && item.type === 'tool') {
+			frameLayout.streamLook(item, look, look.fold!, rows)
+			look = frame.look(item, look)
+		}
+		let drawn = queued
 			? frame.queuedRows(
 					item as Item & { type: 'prompt' },
 					inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold),
@@ -225,14 +232,14 @@ function build(
 					session,
 					look,
 				)
-			: frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', look)
+			: frame.itemRows(item, cols, session, undefined, undefined, undefined, [], look.status ?? '', look)
 		let edge = queued ? ansi.paint('', itemView.itemStyle(item), cols) : undefined
 		let joined = edge !== undefined && stacked === edge
 		if (stacked && !joined) lines.push(stacked)
-		if (rows.length && !joined) lines.push('')
+		if (drawn.length && !joined) lines.push('')
 		if (edge && !joined) lines.push(edge)
 		stacked = edge
-		lines.push(...rows)
+		lines.push(...drawn)
 	}
 	if (stacked) lines.push(stacked)
 	// The chrome, built apart to know its height for the padding.

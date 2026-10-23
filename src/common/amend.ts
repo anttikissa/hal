@@ -158,7 +158,7 @@ export const amend = {
 		let waiting = editing.inbox !== undefined && !editing.paused
 		let changed = text !== editing.original
 		let label = waiting ? 'editing waiting message' : 'editing prompt'
-		if (editing.rewind !== undefined) label += ` #${editing.rewind}`
+		if (editing.rewind !== undefined) label += ` u${editing.rewind}`
 		let edit = editing.rewind !== undefined ? 'edit and discard later prompts' : 'edit'
 		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : edit}, ` : ''
 		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'cancel' : 'continue'}`

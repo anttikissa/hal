@@ -203,7 +203,7 @@ export const tool: Tool<ToolOutput> = {
 			target: {
 				type: 'string',
 				description:
-					'Session ID or local tool-call reference (#t123, t123 or 123): status, available output and pending question. Bare numbers mean tool calls, not tabs. Cannot combine with what, scope or fields.',
+					'Session ID or local tool-call reference (t123 or 123): status, available output and pending question. Bare numbers mean tool calls, not tabs. Cannot combine with what, scope or fields.',
 			},
 			what: {
 				type: 'string',
