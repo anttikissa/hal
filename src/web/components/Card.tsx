@@ -502,7 +502,7 @@ export function Card(props: {
 							<span class="unsafe">unsafe to stop</span>
 						</Show>
 						<Show when={failed()}>
-							<span class="error">✗</span>
+							<span class="error">×</span>
 						</Show>
 						<Show when={latest()}>{(l) => <span class="latest">{l()}</span>}</Show>
 					</CardHeader>

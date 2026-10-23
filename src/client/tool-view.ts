@@ -190,7 +190,7 @@ function result(
 		status = status ? `${status} ${link}` : link
 	}
 	let res = shown.map((l, i) => {
-		let prefix = !i && item.isError ? '✗ ' : ''
+		let prefix = !i && item.isError ? '× ' : ''
 		if (stamp) prefix = (i ? ' '.repeat(inset) : `${stamp} `) + prefix
 		// Apart from its call, a result is its own block: it leads with its time.
 		if (!i && !tool && !title) prefix = titles.stamp(item.ts, prefix)

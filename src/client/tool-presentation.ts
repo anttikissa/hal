@@ -67,7 +67,7 @@ function result(
 ): string[] {
 	let rows = item.presentationError ? ansi.wrap(ansi.clean(item.presentationError), width) : []
 	if (item.isError || item.interrupted || !item.presentation)
-		rows.push(...ansi.wrap(ansi.clean((item.isError ? '✗ ' : '') + out), width))
+		rows.push(...ansi.wrap(ansi.clean((item.isError ? '× ' : '') + out), width))
 	if (item.presentation) {
 		let blocks = presentationView.lines(item.presentation, item.output, width, style)
 		let back = style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m'

@@ -36,7 +36,7 @@ test('each tab shows at most one indicator for what it needs', () => {
 		{ ...tab('j'), question: 'ordinary' as const },
 		tab('k', { type: 'blocked', reason: 'log in' }),
 	]
-	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5✗  6Ⅱ  7✓  8   9? 10? 11! ')
+	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5×  6Ⅱ  7✓  8   9? 10? 11! ')
 	expect(tabBar.indicator(list[0]!)?.fg).toEqual(colors.assistant().cursor)
 	expect(tabBar.indicator(list[2]!)?.fg).toEqual(colors.tab().doneFg)
 	expect(tabBar.indicator(list[3]!)?.fg).toEqual(colors.tab().warningFg)
@@ -102,10 +102,10 @@ test('the bar stays one row: hints go, then it pages', () => {
 	expect(at('ctrl-n/p')).toBeLessThan(at('alt-#'))
 	expect(seen.some((r) => r.includes('Tabs:'))).toBe(false)
 	// Every cell is 4 wide (two digits, marker, gap), none clipped.
-	expect(seen).toContain('  1✗  2   3   4   5   6   7   8   9  10  11  12  ')
+	expect(seen).toContain('  1×  2   3   4   5   6   7   8   9  10  11  12  ')
 	// Paged: 7 per page in 36 columns, edges at both ends with no count.
 	// The last page ends at tab 12 and is full; the left edge carries
 	// tab 1's failure.
-	expect(bar(list, 't10', 38)).toBe(' ‹✗  6   7   8   9  10  11  12     › ')
-	expect(bar(list, 't0', 38)).toBe(' ‹   1✗  2   3   4   5   6   7     › ')
+	expect(bar(list, 't10', 38)).toBe(' ‹×  6   7   8   9  10  11  12     › ')
+	expect(bar(list, 't0', 38)).toBe(' ‹   1×  2   3   4   5   6   7     › ')
 })

@@ -47,7 +47,13 @@ function Marker(props: { mark: Mark | undefined }) {
 			role="img"
 			aria-label={props.mark?.label}
 		>
-			{props.mark?.glyph === '▪' ? '' : (props.mark?.glyph ?? '')}
+			{props.mark?.kind === 'paused' ? (
+				<Icon name="pause" />
+			) : props.mark?.glyph === '▪' ? (
+				''
+			) : (
+				(props.mark?.glyph ?? '')
+			)}
 		</span>
 	)
 }

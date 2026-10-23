@@ -55,7 +55,7 @@ test('long and failed tool results show marked short rows, and all of it in full
 	let output = Array.from({ length: settings.shortRows() + 3 }, (_, i) => `l${i}`).join('\n')
 	let s = view.show({ type: 'tool-result', id: 't', output, isError: true })!
 	expect(s.kind).toContain('error')
-	expect(s.text.startsWith('✗ l0\n')).toBe(true)
+	expect(s.text.startsWith('× l0\n')).toBe(true)
 	expect(s.text.split('\n')).toHaveLength(settings.shortRows() + 1)
 	expect(s.text.endsWith('… 3 more lines')).toBe(true)
 	expect(view.show({ type: 'tool-result', id: 't', output }, true)!.text).toContain(`l${settings.shortRows() + 2}`)

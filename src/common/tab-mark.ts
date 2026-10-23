@@ -22,7 +22,7 @@ export type Mark = { glyph: string; kind: MarkKind; blinks: boolean; label: stri
 
 function mark(tab: Tab): Mark | undefined {
 	let s = tab.state
-	if (s.type === 'error') return { glyph: '✗', kind: 'failed', blinks: false, label: 'failed' }
+	if (s.type === 'error') return { glyph: '×', kind: 'failed', blinks: false, label: 'failed' }
 	if (s.type === 'paused') return { glyph: 'Ⅱ', kind: 'paused', blinks: false, label: 'paused' }
 	if (tab.question === 'approval') return { glyph: '?', kind: 'approval', blinks: false, label: 'waiting for approval' }
 	if (s.type === 'blocked')
