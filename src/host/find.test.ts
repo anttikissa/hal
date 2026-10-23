@@ -257,6 +257,12 @@ test('rename search exposes old and new titles from both origins, including old 
 	expect(tail.older).toBeDefined()
 	expect(tail.history.some((r) => r.type === 'command' || r.type === 'output')).toBe(false)
 	let before = readFileSync(history.file(a.id))
+	findIndex.init()
+	await findIndex.catchup(a.id)
+	let db = findIndex.state.db!
+	db.exec("DELETE FROM docs WHERE blockId='2'; PRAGMA user_version=0;")
+	db.close()
+	findIndex.state.db = undefined
 	let ready = caughtUp()
 	find.init()
 	await ready
@@ -273,15 +279,6 @@ test('rename search exposes old and new titles from both origins, including old 
 		expect(hits.find((h) => h.blockId === '2')?.href).toBe(`/${a.id}#2`)
 		expect(hits.find((h) => h.blockId === '4')?.href).toBe(`/${a.id}#4`)
 	}
-	await verify()
-	find.reset()
-	// An old fully caught-up projection must be rebuilt, not just its tail.
-	let db = new Database(`${home}/state/find.sqlite`)
-	db.exec("DELETE FROM docs WHERE blockId='2'; PRAGMA user_version=0;")
-	db.close()
-	ready = caughtUp()
-	find.init()
-	await ready
 	await verify()
 	// Unnotified appends exercise the same projection during fallback scans.
 	appendFileSync(
