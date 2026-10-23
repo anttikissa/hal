@@ -128,18 +128,23 @@ else ever happened. Of course you can undo that too: `/edit undo`.
 
 # Compact
 
-Hal's compaction is rudimentary and mechanical: no model call.
-`/compact` replaces the earlier context with a summary that keeps the
-first prompt and its answer, and the last three prompts and every
-answer after them. Each omitted run becomes one line saying what it
-held, and long answers keep only their head and tail. The transcript
-and history stay whole. Only what the model sees shrinks. You can undo
-it with `/compact undo`.
+The model can use `COMPACT` to write a working-state checkpoint and
+continue in the same session with less context. It carries forward your
+goals, unresolved requests, decisions, findings, work and verification
+state, and the next action. Current requests stay verbatim.
 
-If you want a fancier compact, write a plugin. Or use a handoff
-continuation: "Write me handoff.md and then clear the context with
-continuation". The `/clear` command accepts a continuation prompt like
-"Follow instructions in handoff.md".
+Use `/compact` to request a checkpoint, or `/compact <focus>` to guide
+what it preserves, e.g. `/compact preserve the design decisions and
+remaining work`. `/compact undo` restores the previous context while
+keeping later work.
+
+Hal nudges the model to compact at a sensible stopping point at 150k
+tokens, and before further substantial work at 200k and 250k. These are
+reminders, not forced compaction.
+
+The transcript and full history stay intact: only what the model sees
+shrinks. You can still browse the original discussion, and the model
+can recover details with `READ_ENTRY`.
 
 # Server
 

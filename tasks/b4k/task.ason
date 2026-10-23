@@ -5,7 +5,8 @@
 	notes: [
 		'COMPACT uses the existing durable context-transition intent with a summary field; installation happens after tool results and crash recovery deduplicates by transition ID. Mixed tool rounds are refused because their outcomes are not yet known to the summary writer. Manual requests use the normal prompt scheduler, attributed to Hal with generatingCommand compact; fulfilled preparation text is omitted from kept provider prompts to prevent compaction loops, but remains in history. No additional model call or background job. Existing generic tool details expose the supplied summary in both clients.',
 		'Current turn text requests and the latest substantive request stay verbatim. Notice-only records are not retained for model-written checkpoints; context nudges explicitly refer to the pre-compaction measurement to avoid stale-pressure loops. Overflow recovery still uses the old deterministic summary. Full history and existing undo/search/READ_ENTRY remain unchanged.',
-		'Shared command-list description advertises /compact [focus] as free-form summary guidance and /compact undo, so the /help overview and command picker in both clients expose the optional focus rather than only detailed /help compact.'
+		'Shared command-list description advertises /compact [focus] as free-form summary guidance and /compact undo, so the /help overview and command picker in both clients expose the optional focus rather than only detailed /help compact.',
+		'README Compact section documents model-written checkpoints, /compact with free-form focus and undo, advisory 150k/200k/250k nudges, verbatim current requests and preserved original history with READ_ENTRY recovery; superseded mechanical-summary and plugin-workaround guidance is removed.'
 	],
 	needs: ['bc', 'jf', 'mq'],
 	foldInto: ['bc', 'jf', 'mq']
