@@ -48,7 +48,7 @@ function Marker(props: { mark: Mark | undefined }) {
 			aria-label={props.mark?.label}
 		>
 			{props.mark?.kind === 'paused' ? (
-				<Icon name="pause" />
+				<Icon name="pauseFill" />
 			) : props.mark?.glyph === '▪' ? (
 				''
 			) : (

@@ -1,6 +1,6 @@
 {
 	title: 'Failure mark × and web pause icon',
-	spec: 'Every failure mark is × (U+00D7), never ✗ (U+2717, which the user finds ugly), on the terminal and the web: the failed tab mark, the first row of a failed tool result, and the web card header error mark. The web tab strip draws the paused mark as the Phosphor pause icon (icons.ts pause, 0.8em) in pausedFg; the terminal keeps Ⅱ. User chose both in session 23-bed on 2026-10-23.',
+	spec: 'Every failure mark is × (U+00D7), never ✗ (U+2717, which the user finds ugly), on the terminal and the web: the failed tab mark, the first row of a failed tool result, and the web card header error mark. The web tab strip draws the paused mark as the filled Phosphor pause icon (icons.ts pauseFill, 0.8em) in pausedFg, never the outline one; the terminal keeps Ⅱ. User chose both in session 23-bed on 2026-10-23.',
 	status: 'done',
 	needs: ['kx2'],
 	foldInto: ['kx2', 'hr', 'cc']
