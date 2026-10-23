@@ -10,6 +10,7 @@ import { pluginSync } from './plugin-sync.ts'
 import { paths } from './paths.ts'
 import { plugins } from './plugins.ts'
 import { prompts } from './prompts.ts'
+import { warnings } from './warnings.ts'
 
 // The session and call that last declared and changed `path`.
 function lastEditor(path: string): Promise<{ id: string; call?: number; ts: string } | undefined> {
@@ -19,7 +20,7 @@ function lastEditor(path: string): Promise<{ id: string; call?: number; ts: stri
 // To every client of this host; a remote terminal (task zh7), whose
 // process loads its own home's plugins, shows them itself instead.
 function deliver(event: NoticeEvent | { type: 'warning'; text: string }): void {
-	for (let client of host.state.clients) client.deliver(event)
+	warnings.tell(event)
 }
 
 function everyone(text: string): void {
@@ -37,7 +38,6 @@ function everyone(text: string): void {
 
 // `path`: the plugin file, when the failure disabled it.
 async function report(text: string, path?: string): Promise<void> {
-	process.stderr.write(`${text}\n`)
 	let editor = path === undefined ? undefined : await pluginReports.lastEditor(path)
 	if (!editor) return everyone(text)
 	let by = editor.call === undefined ? 'A bash call' : `Your bash call t${editor.call}`

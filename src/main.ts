@@ -66,7 +66,7 @@ async function loadLocal(): Promise<void> {
 }
 
 // Loads and follows plugins/*.ts (task an), after local.ts. A failure
-// goes to stderr and, on the host, to every open session and client.
+// goes to its last editor's session or, failing that, to every client.
 async function loadPlugins(): Promise<void> {
 	plugins.report = (text, path) => void pluginReports.report(text, path)
 	plugins.changed = pluginReports.changed

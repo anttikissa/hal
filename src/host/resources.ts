@@ -79,7 +79,7 @@ function check(sample = resources.measure()): void {
 			try {
 				turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`)
 			} catch (e) {
-				process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`)
+				warnings.tell({ type: 'warning', text: `resource pause for ${id}: ${e instanceof Error ? e.stack : e}` })
 			}
 		}
 	if (st.level === before) return

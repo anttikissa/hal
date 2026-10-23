@@ -286,6 +286,11 @@ asking.
 
 # UI: visible plumbing
 
+<!-- TODO - to be reviewed by a human -183-lcd -->
+Only the renderer writes to the terminal. Never write to stdout or
+stderr (console.*, process.stderr.write) from code that runs while the
+UI is up: send a notice, a warning or a session message instead.
+
 Never hide an error. Every failure reaches the user complete: message,
 provider body, raw input, path. Store it with the session and show it
 where it happened. A failure is never reduced to a headline or dropped

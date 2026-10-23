@@ -45,7 +45,7 @@ function announce(): void {
 				continue
 			history.append(id, { type: 'notice', text: modelText })
 		} catch (e) {
-			process.stderr.write(`restart notice for ${id}: ${e instanceof Error ? e.stack : e}\n`)
+			warnings.tell({ type: 'warning', text: `restart notice for ${id}: ${e instanceof Error ? e.stack : e}` })
 		}
 	}
 }
