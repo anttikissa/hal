@@ -67,11 +67,18 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// content growing below a still reader moves the bottom away.
 	let [away, setAway] = createSignal(false)
 	let check = () => el && setAway(scroll.gap(el) > scroll.awayPx)
-	// Headers stick only on blocks over 10 lines tall, of every kind.
+	// Headers stick only on blocks over 10 lines tall, of every kind, and
+	// only while they fit in a third of the transcript: a long open title
+	// pinned at the top would hide the body scrolling under it.
 	let tall = new ResizeObserver((entries) => {
 		for (let { target } of entries) {
 			let block = target as HTMLElement
-			block.toggleAttribute('data-tall', block.offsetHeight > 10 * parseFloat(getComputedStyle(block).lineHeight))
+			let head = block.querySelector<HTMLElement>(':scope .CardHeader:not(.inline)')
+			let fits = !head || head.offsetHeight <= el.clientHeight / 3
+			block.toggleAttribute(
+				'data-tall',
+				fits && block.offsetHeight > 10 * parseFloat(getComputedStyle(block).lineHeight),
+			)
 		}
 	})
 	onSettled(() => {
