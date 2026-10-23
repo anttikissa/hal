@@ -189,9 +189,9 @@ function age(ms: number): string {
 				: `${Math.floor(ms / 86400000)}d`
 }
 // Result rows as aligned columns: tab number (blank for a closed
-// session), session id (card rows: session/card), name cut to leave the
-// snippet room, age, why label (tab rows: with their other matches),
-// snippet.
+// session), session id (card rows: session/card), name, age, why label,
+// snippet. A narrow list (beside the preview) keeps up to 32 columns of
+// name and shortens the snippet; the preview shows the whole match.
 function rows(results: FindResult[], tabs: string[], columns = 120, query = ''): string[] {
 	let width = (f: (r: FindResult) => string) => Math.max(0, ...results.map((r) => f(r).length))
 	let tab = (r: FindResult) => {
@@ -199,15 +199,21 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 		return n < 0 ? '' : String(n + 1)
 	}
 	let id = (r: FindResult) => (r.card && !r.count ? `${r.sessionId}/${r.card}` : r.sessionId)
-	let why = (r: FindResult) => (r.count > 1 ? `${r.why} +${r.count - 1}` : r.why)
 	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + (n ? '…' : '') : s)
 	// A long directory keeps its end, the part that tells tabs apart.
 	let dir = (r: FindResult) => (r.cwd.length > 24 ? '…' + r.cwd.slice(-23) : r.cwd)
-	let w = { tab: width(tab), id: width(id), name: 0, dir: width(dir), age: width((r) => age(r.age)), why: width(why) }
+	let w = {
+		tab: width(tab),
+		id: width(id),
+		name: 0,
+		dir: width(dir),
+		age: width((r) => age(r.age)),
+		why: width((r) => r.why),
+	}
 	let fixed = [w.tab, w.id, w.dir, w.age, w.why].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
 	w.name = Math.min(
 		width((r) => r.name),
-		Math.max(0, columns - fixed - 62),
+		Math.max(0, columns - fixed - 62, Math.min(32, columns - fixed - 24)),
 	)
 	let textWidth = Math.max(1, columns - fixed - (w.name ? w.name + 2 : 0))
 	let leadWidth = Math.min(21, Math.max(0, Math.floor(textWidth / 4)))
@@ -224,7 +230,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 		w.name && cut(r.name, w.name).padEnd(w.name),
 		w.dir && dir(r).padEnd(w.dir),
 		age(r.age).padStart(w.age),
-		w.why && why(r).padEnd(w.why),
+		w.why && r.why.padEnd(w.why),
 		snippet(r),
 	]
 	return results.map((r) =>

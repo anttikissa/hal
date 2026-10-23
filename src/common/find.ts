@@ -77,7 +77,6 @@ const weights: Record<string, number> = {
 	tool: 3,
 	other: 2,
 }
-const strong = ['title', 'cwd', 'commit', 'request']
 const scopeHelp =
 	'in: takes here, a tab id (181-ibm), tab numbers (10-19), . (this directory), a path (~/x) or user, hal, reasoning, tools, commits, other'
 
@@ -173,7 +172,6 @@ function match(
 	quality /= terms
 	let phrase = words.join(' ')
 	if (words.length && flatLower.includes(phrase)) quality++
-	if (!phrases.length && flatLower.trim().replace(/^\//, '') === phrase) quality++
 	at = Math.max(0, at)
 	// A short lead, from a word start, padded so every match starts at the
 	// same column: the highlights line up and clipped rows still show them.
@@ -184,4 +182,4 @@ function match(
 	return { quality, snippet: lead.padStart(21) + flat(text.slice(at, to)) + (to < text.length ? '…' : '') }
 }
 
-export const findQuery = { tiers, filters, groups, weights, strong, scopeHelp, parse, bounded, match }
+export const findQuery = { tiers, filters, groups, weights, scopeHelp, parse, bounded, match }

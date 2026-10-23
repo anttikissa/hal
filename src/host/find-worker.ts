@@ -35,7 +35,7 @@ type Reply = { channel: string; batch: FindBatch }
 // What every hit in one search shares: the query, its sessions, and
 // whether rows fold into tabs.
 type Context = { q: FindQuery; now: number; ids?: Set<string>; tabs: boolean }
-type Tab = { best: FindResult; count: number; strong: Set<string>; strongCount: number; age: number }
+type Tab = { best: FindResult; count: number }
 
 // The label naming why a row matched.
 const why: Record<FindKind, string> = {
@@ -126,30 +126,20 @@ function order(a: FindResult, b: FindResult): number {
 	return Math.round(b.score) - Math.round(a.score) || a.age - b.age || a.href.localeCompare(b.href)
 }
 
-// One row per tab: its best evidence, the number of matching cards, and
-// a bonus for each kind of strong evidence and for their count.
+// One row per tab: its best evidence (the newest among equals) and the
+// number of matching cards.
 function group(): { add(h: FindResult): void; top(n: number): FindResult[] } {
 	let tabs = new Map<string, Tab>()
 	return {
 		add(h) {
 			let t = tabs.get(h.sessionId)
-			if (!t) tabs.set(h.sessionId, (t = { best: h, count: 0, strong: new Set(), strongCount: 0, age: h.age }))
+			if (!t) tabs.set(h.sessionId, (t = { best: h, count: 0 }))
 			t.count++
-			t.age = Math.min(t.age, h.age)
-			if (findQuery.strong.includes(h.why)) {
-				t.strong.add(h.why)
-				if (h.why === 'commit' || h.why === 'request') t.strongCount++
-			}
-			if (h.score > t.best.score) t.best = h
+			if (h.score > t.best.score || (h.score === t.best.score && h.age < t.best.age)) t.best = h
 		},
 		top(n) {
 			return [...tabs.values()]
-				.map((t) => ({
-					...t.best,
-					count: t.count,
-					age: t.age,
-					score: t.best.score + 10 * t.strong.size + Math.min(5, Math.log2(1 + t.strongCount)),
-				}))
+				.map((t) => ({ ...t.best, count: t.count }))
 				.sort(findWorker.order)
 				.slice(0, n)
 		},
