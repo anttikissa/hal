@@ -123,6 +123,7 @@ function onEvent(event: Event): void {
 	let st = app.state
 	let queueChanged = queueEdit.onEvent(event)
 	if (event.type === 'find-results') return find.event(event)
+	if (event.type === 'find-preview') return find.previewed(event)
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'restart-ask') delete restart.state.mark
 	if (event.type === 'web-update') {

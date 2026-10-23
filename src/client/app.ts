@@ -163,6 +163,7 @@ function onEvent(event: Event): void {
 			app.show()
 		})
 	if (event.type === 'find-results') return find.event(event)
+	if (event.type === 'find-preview') return find.previewed(event)
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine =
 		st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined

@@ -4,7 +4,7 @@ import { titles } from '../common/titles.ts'
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
-import type { FindBatch } from '../common/find.ts'
+import type { FindBatch, FindPreview } from '../common/find.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
@@ -15,6 +15,7 @@ const hooks = {
 	set: (m: NonNullable<typeof app.state.modal>) => {
 		app.state.modal = m
 		app.show()
+		findController.preview(find.state, hooks)
 	},
 	send: (c: unknown) => app.send(c),
 	id: () => connection.nextId(),
@@ -36,7 +37,12 @@ function open(): void {
 			if (r.state.form?.values[0] !== m.form?.values[0] || r.state.find!.filters !== m.find!.filters)
 				findController.update(find.state, hooks, r.state)
 			// After the caller shows `r`.
-			else queueMicrotask(() => app.state.modal?.find && findController.more(hooks, findDialog.near(app.state.modal)))
+			else
+				queueMicrotask(() => {
+					if (!app.state.modal?.find) return
+					findController.preview(find.state, hooks)
+					findController.more(hooks, findDialog.near(app.state.modal))
+				})
 			return r
 		},
 	)
@@ -67,4 +73,5 @@ export const find = {
 	report,
 	close: (): void => findController.close(find.state, hooks),
 	event: (b: FindBatch): void => findController.event(hooks, b),
+	previewed: (p: FindPreview): void => findController.previewed(find.state, hooks, p),
 }

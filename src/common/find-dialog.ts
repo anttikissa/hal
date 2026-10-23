@@ -1,6 +1,6 @@
 // The transient find modal shared by terminal and browser (tasks 6m, yhm).
 // Focus: 0 the field, 1..filters.length the filters, then the results.
-import { findQuery, type FindBatch, type FindFilter, type FindResult } from './find.ts'
+import { findQuery, type FindBatch, type FindFilter, type FindPreview, type FindResult } from './find.ts'
 import { forms, type Key } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
 
@@ -21,6 +21,8 @@ export type FindDialog = {
 	back?: string
 	// How many rows the host sends; load more raises it.
 	limit: number
+	// The last preview that arrived; it stays until the next (task w17).
+	preview?: FindPreview
 }
 const filters = findQuery.filters
 const labels = ['user', 'Hal', 'reasoning', 'tools', 'commits', 'other']

@@ -10,6 +10,7 @@ import {
 	type FindBatch,
 	type FindFilter,
 	type FindKind,
+	type FindPreview,
 	type FindQuery,
 	type FindResult,
 } from '../common/find.ts'
@@ -322,6 +323,77 @@ async function search(c: Search): Promise<void> {
 	}
 }
 
+// `text` cut for the preview: a neighbor's start, or with `terms` the hit
+// from a few lines above its first match (task w17).
+function clip(text: string, terms?: string[]): string {
+	let lines = 6,
+		chars = 400,
+		start = 0
+	if (terms) {
+		lines = 30
+		chars = 1600
+		let lower = text.toLocaleLowerCase()
+		let found = terms.map((t) => lower.indexOf(t)).filter((i) => i >= 0)
+		let at = found.length ? Math.min(...found) : 0
+		start = at
+		for (let n = 0; n < 4 && start > 0; n++) start = text.lastIndexOf('\n', start - 2) + 1
+		// A long line starts just before the match.
+		if (at - start > 800) start = at - 200
+	}
+	let out = text.slice(start).split('\n').slice(0, lines).join('\n')
+	let more = start + out.length < text.length || out.length > chars
+	return (start ? '…' : '') + out.slice(0, chars) + (more ? '…' : '')
+}
+
+// The card `c` names among its neighbors, or the tab's last cards when it
+// names none (task w17).
+async function preview(c: Omit<FindPreview, 'type' | 'cards' | 'error'> & { channel: string }): Promise<void> {
+	let reply: FindPreview = {
+		type: 'find-preview',
+		sessionId: c.sessionId,
+		blockId: c.blockId,
+		kind: c.kind,
+		query: c.query,
+		cards: [],
+	}
+	try {
+		await findWorker.state.ready
+		let db = findIndex.state.db!
+		type Row = FindRow & { id: number }
+		let hit = c.blockId
+			? (db
+					.query('SELECT id FROM docs WHERE sessionId=? AND blockId=? AND kind=?')
+					.get(c.sessionId, c.blockId, c.kind) as { id: number } | null)
+			: null
+		let rows = hit
+			? [
+					...(
+						db
+							.query('SELECT * FROM docs WHERE sessionId=? AND id<? ORDER BY id DESC LIMIT 3')
+							.all(c.sessionId, hit.id) as Row[]
+					).reverse(),
+					...(db
+						.query('SELECT * FROM docs WHERE sessionId=? AND id>=? ORDER BY id LIMIT 4')
+						.all(c.sessionId, hit.id) as Row[]),
+				]
+			: (db.query('SELECT * FROM docs WHERE sessionId=? ORDER BY id DESC LIMIT 6').all(c.sessionId) as Row[]).reverse()
+		let terms: string[] = []
+		try {
+			let q = findQuery.parse(c.query)
+			terms = [...q.words, ...q.phrases]
+		} catch {}
+		reply.cards = rows.map((r) => ({
+			card: r.card + r.blockId,
+			why: why[r.kind],
+			text: findWorker.clip(r.text, r.id === hit?.id ? terms : undefined),
+			hit: r.id === hit?.id,
+		}))
+	} catch (e: any) {
+		reply.error = String(e?.message ?? e)
+	}
+	postMessage({ channel: c.channel, preview: reply })
+}
+
 async function drain(): Promise<void> {
 	if (findWorker.state.indexing) return
 	findWorker.state.indexing = true
@@ -365,6 +437,8 @@ export const findWorker = {
 	group,
 	candidates,
 	search,
+	clip,
+	preview,
 	drain,
 	init,
 }
@@ -376,6 +450,7 @@ if (!isMainThread) {
 			findWorker.state.ready = findWorker.init(c.home)
 			void findWorker.state.ready.catch((e) => postMessage({ error: String(e?.message ?? e) }))
 		} else if (c.type === 'search') void findWorker.search(c)
+		else if (c.type === 'preview') void findWorker.preview(c)
 		else if (c.type === 'cancel') {
 			findWorker.state.active.delete(c.channel)
 			findWorker.state.kept.delete(c.channel)

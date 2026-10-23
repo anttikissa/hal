@@ -14,6 +14,7 @@ const commandTypes: CommandType[] = [
 	'rebase-apply',
 	'find',
 	'find-cancel',
+	'find-preview',
 	'create',
 	'open-newest',
 	'open',
@@ -97,6 +98,17 @@ function invalid(value: unknown): string | undefined {
 		)
 	if (c.type === 'find-cancel' || c.type === 'handover') return undefined
 	if (c.type === 'plugin-sync') return pluginSyncWire.invalidCommand(c)
+	if (c.type === 'find-preview')
+		return (
+			str('sessionId') ??
+			str('blockId') ??
+			str('query') ??
+			((c.query as string).length > 4096
+				? 'find-preview: query exceeds 4096 characters'
+				: findQuery.tiers.includes(c.kind as never)
+					? undefined
+					: 'find-preview: invalid kind')
+		)
 	if (c.type === 'find') {
 		let kinds = c.kinds,
 			strings = (v: unknown) => Array.isArray(v) && v.every((s) => typeof s === 'string')

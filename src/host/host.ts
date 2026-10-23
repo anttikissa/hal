@@ -220,6 +220,10 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		find.search(client, c.request, c.query, c.kinds, client.deliver, { here: c.here, limit: c.limit })
 		return {}
 	}
+	if (c.type === 'find-preview') {
+		find.preview(client, c)
+		return {}
+	}
 	if (c.type === 'find-cancel') {
 		find.cancel(client)
 		return {}

@@ -33,6 +33,7 @@ function Match(props: { text: string }) {
 export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement, search: HTMLInputElement | undefined, list!: HTMLUListElement
 	let edit: HTMLInputElement | undefined
+	let pane: HTMLDivElement | undefined
 	let [findColumns, setColumns] = createSignal(120)
 	onSettled(() => {
 		let measure = document.createElement('span')
@@ -97,6 +98,15 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			}
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
+	)
+	// The preview scrolls its hit a third down (task w17).
+	createEffect(
+		() => props.modal?.find?.preview,
+		() =>
+			untrack(() => {
+				let hit = pane?.querySelector<HTMLElement>('.hit')
+				if (pane) pane.scrollTop = hit ? hit.offsetTop - pane.clientHeight / 3 : 0
+			}),
 	)
 	// Find: the focused part takes the DOM focus, as arrow keys move it.
 	let filters: HTMLButtonElement[] = []
@@ -247,95 +257,115 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					</For>
 				</div>
 			</Show>
-			<ul
-				ref={(e) => (list = e)}
-				hidden={props.modal?.compact}
-				role="listbox"
-				aria-label={props.modal?.restart ? 'Choices' : 'Results'}
-				tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
-				onFocus={() => find.focus(findDialog.resultsFocus)}
-				aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-				onScroll={(e) => {
-					let l = e.currentTarget
-					if (props.modal?.find) find.more(l.scrollTop + l.clientHeight >= l.scrollHeight - l.clientHeight / 2)
-				}}
-			>
-				<For each={items()}>
-					{(item, i) => (
-						<li
-							role="option"
-							id={`modal-item-${i()}`}
-							aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
-							class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined}
-							style={
-								props.modal?.tree
-									? props.modal.values?.[i()]
-										? { '--columns': columns() }
-										: undefined
-									: props.modal?.values
-										? { '--label': width() }
-										: undefined
-							}
-							onClick={() => {
-								if (!props.modal?.find) app.modalPick(i())
-							}}
-						>
-							<Show
-								when={props.modal?.values}
-								fallback={
-									<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
-										<a
-											href={props.modal?.find?.results[i()]?.href}
-											tabindex={-1}
-											onClick={(e) => {
-												if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.button === 0) find.close()
-											}}
-										>
-											{marked(item, props.modal?.query, true)}
-										</a>
-									</Show>
+			<div class="body">
+				<ul
+					ref={(e) => (list = e)}
+					hidden={props.modal?.compact}
+					role="listbox"
+					aria-label={props.modal?.restart ? 'Choices' : 'Results'}
+					tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
+					onFocus={() => find.focus(findDialog.resultsFocus)}
+					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
+					onScroll={(e) => {
+						let l = e.currentTarget
+						if (props.modal?.find) find.more(l.scrollTop + l.clientHeight >= l.scrollHeight - l.clientHeight / 2)
+					}}
+				>
+					<For each={items()}>
+						{(item, i) => (
+							<li
+								role="option"
+								id={`modal-item-${i()}`}
+								aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
+								class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined}
+								style={
+									props.modal?.tree
+										? props.modal.values?.[i()]
+											? { '--columns': columns() }
+											: undefined
+										: props.modal?.values
+											? { '--label': width() }
+											: undefined
 								}
+								onClick={() => {
+									if (!props.modal?.find) app.modalPick(i())
+								}}
 							>
-								<span class="label">{marked(item, props.modal?.query)}</span>
 								<Show
-									when={props.modal?.edit?.index === i()}
+									when={props.modal?.values}
 									fallback={
-										<Show
-											when={props.modal?.tree}
-											fallback={
-												<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>
-											}
-										>
-											<For each={props.modal?.values?.[i()] ? props.modal.values[i()]!.split('\t') : []}>
-												{(cell, k) => (
-													<span class={k() === 0 ? 'effort' : 'value'}>{marked(cell, props.modal?.query)}</span>
-												)}
-											</For>
+										<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
+											<a
+												href={props.modal?.find?.results[i()]?.href}
+												tabindex={-1}
+												onClick={(e) => {
+													if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.button === 0) find.close()
+												}}
+											>
+												{marked(item, props.modal?.query, true)}
+											</a>
 										</Show>
 									}
 								>
-									<input
-										ref={(e) => (edit = e)}
-										class="value input"
-										autocomplete="off"
-										aria-label={`${item}: value`}
-										type={props.modal?.edit?.form.form.fields[0]?.type === 'secret' ? 'password' : 'text'}
-										inputmode={
-											settings.table.find((s) => s.name === props.modal?.settings?.names[i()])?.type.kind === 'integer'
-												? 'numeric'
-												: undefined
+									<span class="label">{marked(item, props.modal?.query)}</span>
+									<Show
+										when={props.modal?.edit?.index === i()}
+										fallback={
+											<Show
+												when={props.modal?.tree}
+												fallback={
+													<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>
+												}
+											>
+												<For each={props.modal?.values?.[i()] ? props.modal.values[i()]!.split('\t') : []}>
+													{(cell, k) => (
+														<span class={k() === 0 ? 'effort' : 'value'}>{marked(cell, props.modal?.query)}</span>
+													)}
+												</For>
+											</Show>
 										}
-										value={props.modal?.edit?.form.values[0] ?? ''}
-										onInput={(e) => app.search(e.currentTarget.value, true)}
-										onClick={(e) => e.stopPropagation()}
-									/>
+									>
+										<input
+											ref={(e) => (edit = e)}
+											class="value input"
+											autocomplete="off"
+											aria-label={`${item}: value`}
+											type={props.modal?.edit?.form.form.fields[0]?.type === 'secret' ? 'password' : 'text'}
+											inputmode={
+												settings.table.find((s) => s.name === props.modal?.settings?.names[i()])?.type.kind ===
+												'integer'
+													? 'numeric'
+													: undefined
+											}
+											value={props.modal?.edit?.form.values[0] ?? ''}
+											onInput={(e) => app.search(e.currentTarget.value, true)}
+											onClick={(e) => e.stopPropagation()}
+										/>
+									</Show>
+									<span class="note popup-note">{props.modal?.notes?.[i()] ?? ''}</span>
 								</Show>
-								<span class="note popup-note">{props.modal?.notes?.[i()] ?? ''}</span>
-							</Show>
-						</li>
+							</li>
+						)}
+					</For>
+				</ul>
+				<Show when={props.modal?.items.length ? props.modal.find?.preview : undefined}>
+					{(p) => (
+						<div class="preview" ref={(e) => (pane = e)} aria-label="Preview">
+							<Show when={p().error}>{(e) => <div class="refused">{e()}</div>}</Show>
+							<For each={p().cards}>
+								{(c) => (
+									<div class={c.hit ? 'card hit' : 'card'}>
+										<div class="label">
+											{c.card} {c.why}
+										</div>
+										{marked(c.text, props.modal?.query, true)}
+									</div>
+								)}
+							</For>
+						</div>
 					)}
-				</For>
-			</ul>
+				</Show>
+			</div>
 			<Show when={props.modal?.tree}>
 				<div class="effort-controls" role="group" aria-label="Selected model effort">
 					<button

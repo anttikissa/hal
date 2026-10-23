@@ -1,14 +1,14 @@
 // Searches every session (/find) without stalling the host. Disk reads,
 // ASON parsing and SQLite all run in a worker, so even one enormous
 // history record cannot stall typing. Results are not stored.
-import type { FindBatch, FindFilter, FindResult } from '../common/find.ts'
+import type { FindBatch, FindFilter, FindKind, FindPreview, FindResult } from '../common/find.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
-type Listener = { channel: string; request: string; deliver: (batch: FindBatch) => void }
+type Listener = { channel: string; request: string; deliver: (batch: FindBatch | FindPreview) => void }
 
 function init(): void {
 	if (find.state.worker) return
@@ -24,9 +24,10 @@ function init(): void {
 			find.indexed()
 			return
 		}
-		if (!data.batch) return
 		for (let listener of find.state.listeners.values()) {
-			if (listener.channel === data.channel && listener.request === data.batch.request) listener.deliver(data.batch)
+			if (listener.channel !== data.channel) continue
+			if (data.preview) listener.deliver(data.preview)
+			else if (data.batch && listener.request === data.batch.request) listener.deliver(data.batch)
 		}
 	}
 	worker.onerror = (event) => find.fail(event.message)
@@ -69,7 +70,7 @@ function search(
 		return
 	}
 	let channel = find.state.listeners.get(owner)?.channel ?? String(++find.state.serial)
-	find.state.listeners.set(owner, { channel, request, deliver })
+	find.state.listeners.set(owner, { channel, request, deliver: deliver as Listener['deliver'] })
 	find.state.worker!.postMessage({
 		type: 'search',
 		channel,
@@ -80,6 +81,12 @@ function search(
 		tabs: [...tabs.file().open],
 		meta: [...sessions.state.open.values()].map(plain),
 	})
+}
+
+// The selected row's neighborhood, for the owner's open search (task w17).
+function preview(owner: object, c: { sessionId: string; blockId: string; kind: FindKind; query: string }): void {
+	let listener = find.state.listeners.get(owner)
+	if (listener) find.state.worker?.postMessage({ ...c, type: 'preview', channel: listener.channel })
 }
 
 function cancel(owner: object): void {
@@ -154,6 +161,7 @@ export const find = {
 	init,
 	dirty,
 	search,
+	preview,
 	cancel,
 	top,
 	fail,

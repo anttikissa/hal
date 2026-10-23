@@ -3,14 +3,17 @@
 import { connection } from '../common/connection.ts'
 import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
-import type { FindBatch } from '../common/find.ts'
+import type { FindBatch, FindPreview } from '../common/find.ts'
 import type { Key } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
 import { app } from './app.ts'
 
 const hooks = {
 	get: () => app.state.view.modal,
-	set: (modal: ModalState) => app.setView({ ...app.state.view, modal }),
+	set: (modal: ModalState) => {
+		app.setView({ ...app.state.view, modal })
+		findController.preview(find.state, hooks)
+	},
 	send: (c: unknown) => connection.send(c),
 	id: () => connection.nextId(),
 }
@@ -68,4 +71,5 @@ export const find = {
 	more: (near: boolean): void => findController.more(hooks, near),
 	cancel: (): void => findController.close(find.state, hooks),
 	event: (b: FindBatch): void => findController.event(hooks, b),
+	previewed: (p: FindPreview): void => findController.previewed(find.state, hooks, p),
 }

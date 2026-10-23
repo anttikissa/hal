@@ -115,13 +115,17 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let table = m.tree ? modalView.table(m, inner) : undefined
 	let column =
 		m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
-	let labels = m.find ? findDialog.rows(m.find.results, m.find.tabs, inner - 2, m.query) : m.items
+	// Find from 160 columns: the preview pane takes the right part (task w17).
+	let pane = m.find && inner >= 160 && m.items.length ? Math.floor(inner * 0.45) : 0
+	let list = pane ? inner - pane - 3 : inner
+	let top = content.length
+	let labels = m.find ? findDialog.rows(m.find.results, m.find.tabs, list - 2, m.query) : m.items
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
 		let label = ansi.clean(labels[i]!).replace(/[\r\n\t]+/g, ' ')
 		if (column) label = strings.clipVisual(label, column - 2).padEnd(column - 2) + '  '
 		// The model tree's highlight alone marks the selection.
-		let row = strings.clipVisual((m.tree ? '' : i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
+		let row = strings.clipVisual((m.tree ? '' : i === m.selected ? `${formView.ARROW} ` : '  ') + label, list)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
 		let value = m.tree ? undefined : modalView.cell(m, i, current)
 		if (table && m.values?.[i]) {
@@ -148,7 +152,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 			row =
 				(ansi.sgr(current) || ansi.INVERSE) +
 				row +
-				' '.repeat(inner - strings.visLen(row)) +
+				' '.repeat(list - strings.visLen(row)) +
 				ansi.UNCOLOR +
 				ansi.UNINVERSE
 		}
@@ -156,6 +160,19 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	}
 	// The footer sits at the bottom, below the list's empty rows.
 	while (content.length < height - 2 - below.length) content.push('')
+	if (pane) {
+		let line = ansi.sgr({ fg: colors.popup().neutralFg! })
+		let preview = modalView.previewLines(m, pane, visible, current)
+		for (let r = 0; r < visible; r++) {
+			let row = content[top + r]!
+			content[top + r] =
+				row +
+				ansi.RESET +
+				' '.repeat(Math.max(0, list - strings.visLen(row))) +
+				` ${line}│${ansi.UNCOLOR} ` +
+				(preview[r] ?? '')
+		}
+	}
 	content.push(...below)
 	let line = ansi.sgr({ fg: colors.popup().neutralFg! })
 	let side = (s: string) => (width >= 2 ? line + s + ansi.UNCOLOR : '')
@@ -235,6 +252,30 @@ function blocksLines(m: ModalState, width: number): string[] {
 	let ids = m.blocks!.choices
 	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + ansi.UNCOLOR)
 	return [...hint, '', ...rows.map((r) => strings.clipVisual(r, width))]
+}
+
+// Find's preview pane, `width` × `height`: each card's label (the hit's
+// lit like the selection), then its text with the matches marked,
+// scrolled so the hit sits a third down (task w17).
+function previewLines(m: ModalState, width: number, height: number, current: Style): string[] {
+	let p = m.find!.preview
+	if (!p) return []
+	if (p.error)
+		return strings.wordWrap(p.error, width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR)
+	let note = ansi.mono() ? '' : ansi.sgr({ fg: colors.popupNote().fg! })
+	let lit = ansi.sgr(current) || ansi.INVERSE
+	let rows: string[] = [],
+		hit = 0
+	for (let c of p.cards) {
+		if (rows.length) rows.push('')
+		if (c.hit) hit = rows.length
+		let label = strings.clipVisual(`${c.card} ${c.why}`, width)
+		rows.push(c.hit ? lit + label.padEnd(width) + ansi.UNCOLOR + ansi.UNINVERSE : note + label + ansi.UNCOLOR)
+		for (let r of strings.wordWrap(strings.expandTabs(ansi.clean(c.text)), width))
+			rows.push(m.query ? modalView.highlight(r, m.query, undefined, true) : r)
+	}
+	let from = Math.max(0, Math.min(hit - Math.floor(height / 3), rows.length - height))
+	return rows.slice(from, from + height)
 }
 
 // The rows below the list: the selected item's details, wrapped, and why
@@ -318,6 +359,7 @@ export const modalView = {
 	cell,
 	head,
 	blocksLines,
+	previewLines,
 	footer,
 	highlight,
 	modalScroll,

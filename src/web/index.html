@@ -2286,6 +2286,43 @@
 			.Picker.find :is(.question, .filters) {
 				margin-bottom: 0;
 			}
+			/* Find's preview pane beside the results when wide (task w17). */
+			.Picker .body {
+				display: contents;
+			}
+			.Picker .preview {
+				display: none;
+			}
+			@media (min-width: 1200px) {
+				.Picker.find .body {
+					flex: 1;
+					min-height: 0;
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) minmax(44ch, 0.8fr);
+					grid-template-rows: minmax(0, 1fr);
+				}
+				.Picker.find .preview {
+					display: block;
+					position: relative;
+					overflow-y: auto;
+					overscroll-behavior: contain;
+					border-left: 1px solid var(--line);
+					padding: 0 2ch;
+				}
+			}
+			.Picker .preview .card {
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				padding: 0 1ch;
+				margin-bottom: 0.5lh;
+			}
+			.Picker .preview .hit {
+				background: var(--pick);
+			}
+			.Picker .preview .match {
+				color: var(--title-fg);
+				font-weight: bold;
+			}
 			/* Ctrl-O (task v8y): as tall as its field, hint and help. */
 			.Picker.compact,
 			.Picker.compact[open] {

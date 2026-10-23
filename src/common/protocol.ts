@@ -19,7 +19,7 @@ import type { NoticeEntry, NoticeEvent } from './notices.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { Draft, Snapshot, Stats } from './snapshot.ts'
-import type { FindBatch, FindFilter } from './find.ts'
+import type { FindBatch, FindCommand, FindPreview } from './find.ts'
 import type { SessionState } from './states.ts'
 import type { EffortCapability } from './effort-levels.ts'
 import type { FlaggedCall } from './modals.ts'
@@ -43,15 +43,7 @@ export type Delivery = 'steer' | 'soft-steer' | 'queue'
 
 export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string; autoclose?: boolean }
-	| {
-			type: 'find'
-			request: string
-			query: string
-			kinds?: FindFilter[]
-			here?: string
-			limit?: number
-	  }
-	| { type: 'find-cancel' }
+	| FindCommand
 	// Open the newest session, or create one in cwd (the host's own
 	// working directory if none is given) when there is none.
 	| { type: 'open-newest'; cwd?: string }
@@ -212,6 +204,7 @@ export type Tab = {
 export type Event =
 	| { type: 'subscription-usage'; accounts: SubscriptionData; replace?: boolean }
 	| FindBatch
+	| FindPreview
 	| { type: 'rebase-result'; sessionId: string; command?: string; ok: boolean; text: string }
 	| { type: 'rebase-plan'; sessionId: string; snapshot: RebaseRows; todo: string }
 	| { type: 'history-rewritten'; sessionId: string; from: number; snapshot: Snapshot }
