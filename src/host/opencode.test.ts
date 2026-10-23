@@ -37,6 +37,14 @@ function stream(path: string): string {
 			{ type: 'response.output_text.delta', delta: 'ok' },
 			{ type: 'response.completed', response: { usage: { input_tokens: 5, output_tokens: 1 } } },
 		])
+	if (path.endsWith(':streamGenerateContent'))
+		return sse([
+			{ candidates: [{ index: 0, content: { role: 'model', parts: [{ text: 'ok' }] } }] },
+			{
+				candidates: [{ finishReason: 'STOP', index: 0, content: { role: 'model', parts: [{ text: '' }] } }],
+				usageMetadata: { candidatesTokenCount: 1, promptTokenCount: 5 },
+			},
+		])
 	if (path.endsWith('/messages'))
 		return sse([
 			{ type: 'message_start', message: { usage: { input_tokens: 0, output_tokens: 0 } } },
@@ -206,13 +214,17 @@ test('the model list comes from models.dev, without asking the server', async ()
 
 // Invariant: each model goes to the protocol models.dev names for it,
 // with the rotating account's key; the gateway refuses other protocols.
-test('models.dev routes each model to Responses, Messages or Chat Completions, with the account key', async () => {
+test('models.dev routes each model to Responses, Messages, Gemini or Chat Completions, with the account key', async () => {
 	let info = modelsDev.info
-	let npm: Record<string, string> = { 'opencode-go/grok': '@ai-sdk/openai', 'opencode-go/minimax': '@ai-sdk/anthropic' }
+	let npm: Record<string, string> = {
+		'opencode-go/grok': '@ai-sdk/openai',
+		'opencode-go/minimax': '@ai-sdk/anthropic',
+		'opencode-go/gemini': '@ai-sdk/google',
+	}
 	modelsDev.info = (id: string) => (npm[id] ? { npm: npm[id] } : undefined)
 	writeFileSync(file(), ason.stringify({ 'opencode-go': [{ apiKey: 'k1' }] }), { mode: 0o600 })
 	try {
-		for (let model of ['grok', 'minimax', 'glm'])
+		for (let model of ['grok', 'minimax', 'gemini', 'glm'])
 			expect((await send('s1', model)).events.filter((t) => t !== 'usage')).toEqual(['text', 'done'])
 	} finally {
 		modelsDev.info = info
@@ -220,8 +232,14 @@ test('models.dev routes each model to Responses, Messages or Chat Completions, w
 	expect(routes).toEqual([
 		'/inference/go/openai/v1/responses',
 		'/inference/go/anthropic/v1/messages',
+		'/inference/go/google/v1beta/models/gemini:streamGenerateContent',
 		'/inference/go/openai/v1/chat/completions',
 	])
-	expect(seen.map((h) => h.get('authorization') ?? h.get('x-api-key'))).toEqual(['Bearer k1', 'k1', 'Bearer k1'])
+	expect(seen.map((h) => h.get('authorization') ?? h.get('x-api-key') ?? h.get('x-goog-api-key'))).toEqual([
+		'Bearer k1',
+		'k1',
+		'k1',
+		'Bearer k1',
+	])
 	expect(seen.every((h) => h.get('x-opencode-session') === 's1')).toBe(true)
 })

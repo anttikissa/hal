@@ -1,6 +1,7 @@
 // OpenAI-compatible Chat Completions provider (OpenRouter, OpenCode Go,
 // Ollama and other local servers). OpenCode Go models that only speak
-// Responses or Messages reuse openai.ts and anthropic.ts (opencodeRoute).
+// Responses, Messages or Gemini reuse openai.ts, anthropic.ts and
+// gemini.ts (opencodeRoute).
 // Wire mapping: tasks/7f/mapping.md.
 
 import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
@@ -167,12 +168,12 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 }
 
 // The OpenCode Go request for `req`: models.dev names the AI SDK package
-// each model needs (Responses or Messages); the rest, undefined here,
-// take Chat Completions. `base` is the gateway's OpenAI root (…/openai/v1).
-// Gemini models (@ai-sdk/google) also get Chat Completions: Hal has no
-// Gemini client, and the gateway's refusal reaches the user whole.
+// each model needs (Responses, Messages or Gemini); the rest, undefined
+// here, take Chat Completions. `base` is the gateway's OpenAI root
+// (…/openai/v1).
 function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpRequest | undefined {
 	let npm = modelsDev.info(`opencode-go/${req.model}`)?.npm
+	let root = base.replace(/\/openai\/v1$/, '')
 	if (npm === '@ai-sdk/openai') {
 		let { openai } = require('./openai.ts') as typeof import('./openai.ts')
 		return {
@@ -185,10 +186,19 @@ function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpReq
 	if (npm === '@ai-sdk/anthropic') {
 		let { anthropic } = require('./anthropic.ts') as typeof import('./anthropic.ts')
 		return {
-			url: `${base.replace(/\/openai\/v1$/, '')}/anthropic/v1/messages`,
+			url: `${root}/anthropic/v1/messages`,
 			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
 			body: anthropic.body(req, false, false),
 			parse: anthropic.parse,
+		}
+	}
+	if (npm === '@ai-sdk/google') {
+		let { gemini } = require('./gemini.ts') as typeof import('./gemini.ts')
+		return {
+			url: `${root}/google/v1beta/models/${encodeURIComponent(req.model)}:streamGenerateContent?alt=sse`,
+			headers: { 'x-goog-api-key': key },
+			body: gemini.body(req),
+			parse: gemini.parse,
 		}
 	}
 	return undefined
