@@ -12,7 +12,7 @@
 // effects ran since: a new record that supersedes it and its turn for the
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
-// Tasks: yq, 2r, zb0, kar, rqq, 81y.
+// Tasks: yq, 2r, zb0, kar, rqq, 81y, zbw.
 
 import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
@@ -37,6 +37,7 @@ import { sessions } from './sessions.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
+import { tabs } from './tabs.ts'
 import { notify } from './notify.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
@@ -51,11 +52,12 @@ import { turns } from './turns.ts'
 //
 // `sender`: another session sent it (task rj), set by the host from the
 // sending session, never by a client. Such a message never ends a
-// pause or a failure the user has to see to: it waits in the inbox
-// unless the session is idle, where it runs as a turn of its own and
-// so gets full attention (no longer advisory). An emergency (a sender's
-// 'steer', task zb0) is the exception: it ends a pause or failure and
-// does not wait behind the user's answer.
+// pause or a failure the user has to see to, nor wakes a session whose
+// tab the user closed: it waits in the inbox unless the session is
+// idle, where it runs as a turn of its own and so gets full attention
+// (no longer advisory). An emergency (a sender's 'steer', task zb0) is
+// the exception: it ends a pause or failure and does not wait behind
+// the user's answer.
 //
 // `delivery` (task csn): 'soft-steer' leaves the stream and
 // running tools alone, the turn delivering it before its next request;
@@ -97,7 +99,7 @@ function submit(
 		(queue && notify.asked(id)) ||
 		turns.state.running.has(id) ||
 		states.busy(state) ||
-		((queue || (agent && !emergency)) && state.type !== 'idle')
+		((queue || (agent && !emergency)) && (state.type !== 'idle' || tabs.closed(id)))
 	) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = {
 			type: 'inbox',

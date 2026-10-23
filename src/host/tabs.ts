@@ -243,6 +243,12 @@ function resume(id?: string): Outcome {
 	return { tab: entry.id }
 }
 
+// The user closed its tab and nobody reopened it; a session that never
+// had a tab is not closed.
+function closed(id: string): boolean {
+	return !tabs.file().open.includes(id) && sessions.open(id).closedAt !== undefined
+}
+
 function start(cwd?: string, last?: string, timezone?: string): Outcome {
 	let open = tabs.file().open
 	// An unreadable session is in no cwd; list() shows it failed.
@@ -349,6 +355,7 @@ export const tabs = {
 	stopOwned,
 	close,
 	resume,
+	closed,
 	start,
 	act,
 	observe,

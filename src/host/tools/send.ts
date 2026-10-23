@@ -6,8 +6,9 @@
 // as a user message does; queue waits for its current turn to end. An
 // idle recipient gets it as a turn of its own (prompts.submit). The
 // result says which happened, including a message left waiting for the
-// user because the recipient is paused, failed or blocked.
-// Tasks: rqq.
+// user because the recipient is paused, failed, blocked or closed. Only
+// a steer wakes a closed session, reopening its tab so its work shows.
+// Tasks: rqq, zbw.
 
 import { existsSync } from 'fs'
 import type { Sender } from '../../common/blocks.ts'
@@ -32,6 +33,8 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	let item = status.inboxOf(id).findLast((m) => m.from === from && m.text === text)
 	if (!item) return `Sent to ${to}: it started a turn`
 	let state = status.stateOf(id)
+	if (tabs.closed(id))
+		return `Waiting in ${to}: the user closed its tab; this message stays pending until it is reopened. If it should act now, SEND "${id}" again with { delivery: "steer" }: that reopens its tab and wakes it`
 	if (item.delivery === 'after-turn' && notify.asked(id))
 		return `Queued in ${to}: it waits for the user's answer, then reads this`
 	let held = { paused: 'paused', error: 'failed' }[state.type as string]
@@ -83,6 +86,7 @@ export const tool: Tool = {
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
+		if (delivery === 'steer' && tabs.closed(id)) tabs.act({ type: 'tab-resume', sessionId: id })
 		let sender: Sender = {
 			from: ctx.sessionId,
 			label: tabs.label(ctx.sessionId),

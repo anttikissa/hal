@@ -1,0 +1,7 @@
+{
+	title: 'send never wakes a closed tab unless it steers, and then reopens it',
+	spec: 'A session whose tab the user closed (closedAt set, not among open tabs) is closed; a session that never had a tab is not. An ordinary send (soft-steer or queue) to a closed session waits in its inbox and starts no turn, even when it is idle; the result says the user closed its tab and that sending again with delivery steer reopens and wakes it. A steer reopens the tab in the background at its old place, then delivers as to any paused session. Invariant restored: a session never runs without a visible tab because another session messaged it, and a sender is told when its message waits behind a closed tab, not that the recipient is paused (on 2026-10-23 22-lid asked its closed fork 23-eol for a reply, read "it is paused", and answered the user with its own guess).',
+	status: 'done',
+	needs: ['zb0'],
+	foldInto: ['rj']
+}

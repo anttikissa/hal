@@ -18,6 +18,7 @@ import {
 	useHost,
 } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
+import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 
 useHost()
@@ -227,6 +228,22 @@ test('an ordinary send respects a pause and offers explicit continuation', async
 	c.conn.send({ type: 'continue', sessionId: a })
 	await until(() => calls.length === next + 2)
 	expect(lastText(next + 1)).toMatch(/\nfyi$/)
+})
+
+test('a send to a closed tab waits; a steer reopens the tab and wakes it', async () => {
+	let c = client()
+	let { a, b } = pair(c)
+	tabs.close(a)
+	let next = await send(c, b, { to: a, text: 'fyi' })
+	expect(resultOf(next).output).toContain('the user closed its tab')
+	expect(resultOf(next).output).toContain(`SEND "${a}" again with { delivery: "steer" }`)
+	expect(status.inboxOf(a).map((m) => m.text)).toEqual(['fyi'])
+	expect(tabs.file().open).not.toContain(a)
+	calls[next]!.push(sendCall({ to: a, text: 'now', delivery: 'steer' }, 's2'), { type: 'done', reason: 'tool_use' })
+	let woke = () => calls.findIndex((call) => call.input.sessionId === a)
+	await until(() => woke() >= 0)
+	expect(tabs.file().open).toContain(a)
+	expect(lastText(woke())).toMatch(/\nnow$/)
 })
 
 test('a default send behind a human question is read with the answer, not after the answer turn', async () => {
