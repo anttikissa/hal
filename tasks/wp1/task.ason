@@ -1,0 +1,10 @@
+{
+	title: 'Restore thinking-card disclosure',
+	spec: 'Web thinking cards open their full reasoning when the reader clicks their collapsed preview or timestamp, and collapse from their header. Preserve links and native text selection. Diagnose the reported failure where none of the thinking cards open; keep the shared card event policy and leave terminal behavior unchanged.',
+	status: 'planned',
+	notes: [
+		'Existing web-cards browser checks passed (4 tests). A real CDP mouse click on a thinking preview also expanded it. A temporary reproduction with 15 thinking cards, each with a long single-line body, expanded and exposed its full body when run in isolation. Its first combined run timed out and stalled subsequent checks; the temporary checks were removed rather than extending timeouts or retaining a flaky test. The reported failure is not reproduced. Ask whether the timestamp also fails and whether the issue persists after refreshing. Unrelated hover CSS was reverted in 91b94394.'
+	],
+	needs: ['gwr'],
+	foldInto: ['gwr']
+}
