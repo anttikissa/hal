@@ -408,9 +408,11 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
 		liveFiles.save(config.state.data!)
 	}
 	// The theme (task 4c1): the answer writes plugins/theme.ts, which the
-	// plugin loader applies at once; a rerun starts from the active one.
-	// Only the answer itself selects, so a later /theme is not undone.
+	// plugin loader applies at once; a rerun starts from the active one,
+	// a first run from hal. Only the answer itself selects, so a later
+	// /theme is not undone.
 	let current = theme.active()
+	let initial = current.name === theme.none ? 'hal' : (current.name ?? '')
 	if (answered(run, 'theme') === undefined)
 		return reply({
 			ask: {
@@ -420,7 +422,7 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
 						type: 'choice',
 						name: 'theme',
 						options: theme.names(),
-						initial: Math.max(0, theme.names().indexOf(current.name ?? '')),
+						initial: Math.max(0, theme.names().indexOf(initial)),
 						preview: 'theme',
 					},
 				],

@@ -1,0 +1,11 @@
+{
+	title: 'Built-in look is grayscale; hal is a selectable theme',
+	spec: "The built-in look (src/common/colors.ts) is nameless and grayscale: every style uses chroma 0 at distinct lightness, so a user who changes one field sees where it is used. Hal amber [0.84, 0.16, 75] colors only the Hal home path in the status row (colors.halHome, web class .hal-home) and percentages (colors.heat). Diffs stay readable through lightness: additions bright, removals dim. themes/hal.ts writes out Hal's colorful look in full, every colors field: amber replies, cyan user cards and prompt, green read tools, magenta write tools, pink messages, brown-black page with a green accent; selecting it gives what the built-in look was before this task. /theme offers <none> first, then every themes/*.ts including hal; <none> removes plugins/theme.ts. The intro's theme question preselects hal when no theme is selected, so a new user gets hal by default. The selector header written to plugins/theme.ts names no task (// The color theme, chosen with /theme.); the older header with (task 4c1) is still recognized. The web modal search field (Find, pickers) uses the page field and text colors, so its fill and focus border come from one theme; the .input class (user/prompt colors) no longer paints it. Supersedes 9pa's built-in Nostromo look; its cyan prompt decision lives on in themes/hal.ts. User approved in session 183-fez on 2026-10-23.",
+	status: 'done',
+	notes: [
+		'Where the Find field blue came from: Picker.tsx gives its search input class input, and host/web-page.ts turns colors.input() into a .input rule (user cyan on dark blue) that beat the generic input { background: var(--field) } rule, while the focus border stayed the page accent green. A .Picker input.input rule restores the page colors.',
+		'Intro side effect: a rerun after choosing <none> preselects hal again, since <none> and no answer look the same on disk.'
+	],
+	needs: ['4c1', '9pa'],
+	foldInto: ['d3', '4c1', '9pa']
+}

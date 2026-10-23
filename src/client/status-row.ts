@@ -57,7 +57,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 	let home = info.home
 	let cwd =
 		home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
-	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : (info.color ?? hi) }])
+	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.halHome().fg! : (info.color ?? hi) }])
 	out.push([
 		{
 			text: ansi.clean(

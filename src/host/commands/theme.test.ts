@@ -25,7 +25,7 @@ function session() {
 	return { a, id, say }
 }
 
-test('/theme writes a portable selector the loader applies live; hal, the built-in, removes it', async () => {
+test('/theme writes a portable selector the loader applies live; <none>, the built-in, removes it', async () => {
 	let { a, id, say } = session()
 	let canvas = colors.page().canvas
 	let ask = async () => {
@@ -36,7 +36,7 @@ test('/theme writes a portable selector the loader applies live; hal, the built-
 	}
 	let field = await ask()
 	expect(field.options).toContain('wopr')
-	expect(field.options[field.initial]).toBe('hal')
+	expect(field.options[field.initial]).toBe('<none>')
 	// Answering the question switches, like /theme <name>.
 	let n = a.of('output').length
 	a.conn.send({ type: 'answer', sessionId: id, question: a.of('question').at(-1)!.id, answers: { theme: 'classic' } })
@@ -56,7 +56,7 @@ test('/theme writes a portable selector the loader applies live; hal, the built-
 		await say('/theme tron')
 		expect(selected()).toBe('tron')
 		await until(() => colors.page().canvas?.join() !== classic)
-		await say('/theme hal')
+		await say('/theme <none>')
 		expect(existsSync(file())).toBe(false)
 		await until(() => colors.page().canvas?.join() === canvas?.join())
 	} finally {

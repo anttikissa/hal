@@ -98,7 +98,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				</span>
 				<span class="secondary">
 					<span
-						class={['cwd', props.hal && 'assistant']}
+						class={['cwd', props.hal && 'hal-home']}
 						style={props.hal || props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}
 					>
 						<bdi>{cwd()}</bdi>

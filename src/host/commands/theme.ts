@@ -1,6 +1,6 @@
 // /theme (tasks d3, 4c1): the color theme is plugins/theme.ts, a small
 // portable plugin re-exporting one of the tracked themes/<name>.ts; no
-// file is the built-in look, hal (src/common/colors.ts). The plugin
+// file (<none>) is the built-in look (src/common/colors.ts). The plugin
 // loader sees the file change and swaps the theme in every process that
 // watches plugins/. An older plugins/color-theme.ts symlink into themes/
 // is converted to theme.ts with the same theme.
@@ -23,19 +23,20 @@ import { plugins } from '../plugins.ts'
 const themesDir = () => join(import.meta.dir, '../../../themes')
 const file = () => join(plugins.dir(), 'theme.ts')
 const oldLink = () => join(plugins.dir(), 'color-theme.ts')
-const header = '// The color theme, chosen with /theme (task 4c1).\n'
+const header = '// The color theme, chosen with /theme.\n'
 const selector =
-	/^(?:\/\/ The color theme, chosen with \/theme \(task 4c1\)\.\n)?export const portable = true\nexport \{ default \} from '[^'\n]*themes\/([\w.-]+)\.ts'\n$/
+	/^(?:\/\/ The color theme, chosen with \/theme(?: \(task 4c1\))?\.\n)?export const portable = true\nexport \{ default \} from '[^'\n]*themes\/([\w.-]+)\.ts'\n$/
+
+// The choice that removes theme.ts, leaving the built-in look.
+const none = '<none>'
 
 function names(): string[] {
 	return [
-		...new Set([
-			'hal',
-			...readdirSync(themesDir())
-				.filter((f) => f.endsWith('.ts'))
-				.map((f) => f.slice(0, -3))
-				.sort(),
-		]),
+		none,
+		...readdirSync(themesDir())
+			.filter((f) => f.endsWith('.ts'))
+			.map((f) => f.slice(0, -3))
+			.sort(),
 	]
 }
 
@@ -57,18 +58,18 @@ function active(): { name: string; own?: undefined } | { name?: undefined; own: 
 	try {
 		if (lstatSync(path).isSymbolicLink()) return { own: `${path} is a symlink /theme did not write` }
 	} catch {
-		return { name: linked() ?? 'hal' }
+		return { name: linked() ?? none }
 	}
 	let name = readFileSync(path, 'utf8').match(selector)?.[1]
 	return name ? { name } : { own: `${path} is your own file, not a theme selector` }
 }
 
 // Selects a theme by name, writing theme.ts in one rename so the loader
-// never sees none; hal removes it. Returns why it refused, if it did.
+// never sees none; <none> removes it. Returns why it refused, if it did.
 function select(name: string): string | undefined {
 	let now = active()
 	if (now.own) return `${now.own}; /theme will not replace it. Move it away to use /theme.`
-	if (name === 'hal') rmSync(file(), { force: true })
+	if (name === none) rmSync(file(), { force: true })
 	else {
 		mkdirSync(plugins.dir(), { recursive: true })
 		// Relative between real paths: '../themes' in a checkout home.
@@ -90,18 +91,18 @@ function migrate(): void {
 	if (linked() !== undefined && now.name !== undefined) select(now.name)
 }
 
-// Shows theme `name` in this process until preview() with none; hal,
+// Shows theme `name` in this process until preview() with none; <none>,
 // the built-in look, has no file.
 async function preview(name?: string): Promise<void> {
 	if (name === undefined) return plugins.unpreview()
-	await plugins.preview(file(), name === 'hal' ? undefined : join(themesDir(), `${name}.ts`))
+	await plugins.preview(file(), name === none ? undefined : join(themesDir(), `${name}.ts`))
 }
 
-export const theme = { names, active, select, migrate, file, preview }
+export const theme = { none, names, active, select, migrate, file, preview }
 
 export const command: SlashCommand = {
 	help: () =>
-		'/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
+		'/theme asks which color theme to use, the active one chosen.\n/theme <name> switches to it (<none> is the built-in grayscale look). Web pages show it on their next load.',
 	complete: (args) => names().filter((n) => n.startsWith(args)),
 	run(args, answers) {
 		let now = active()

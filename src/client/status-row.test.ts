@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { colors } from '../common/colors.ts'
 import { subscriptions } from '../common/subscriptions.ts'
 import { titles } from '../common/titles.ts'
 import { strings } from '../common/strings.ts'
@@ -58,8 +59,7 @@ test('the context is a heat-colored percentage of the window', () => {
 	let high = at(190_000)
 	expect(low.map((p) => p.text).join('')).toBe('20k/200k (10%)')
 	expect(high.map((p) => p.text).join('')).toBe('190k/200k (95%)')
-	// Hotter is redder: the hue falls from green towards red.
-	expect(high[0]!.fg![2]).toBeLessThan(low[0]!.fg![2])
+	expect(high[0]!.fg).toEqual(colors.heat(95))
 	// A new session: nothing used yet.
 	expect(
 		statusRow
