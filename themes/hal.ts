@@ -170,18 +170,18 @@ export const look: Look = {
 	// Edit diffs: soft pastels, easy on the eyes. Errors and exit
 	// statuses share the removal red.
 	diff: (): Style => ({ addFg: [0.8, 0.16, 146], removeFg: [0.72, 0.16, 28] }),
-	// The web page's own surfaces (custom properties on .page): canvas
-	// and text, the focus accent, form fields, borders, and buttons (the
-	// picker's selected item too), and search matches. The terminal has its own.
+	// The web page's own surfaces (custom properties on .page), taken from
+	// the terminal's fields so both match: fields and the focus accent are
+	// the prompt's colors, text and buttons plain's, borders the terminal
+	// dialog frame's. Canvas, overlay, matches and flashes are web-only.
 	page: (): Style => ({
 		canvas: [0.13, 0.015, 85],
 		overlayBg: [0, 0, 0],
-		text: [0.88, 0.12, 85],
-		accent: [0.86, 0.2, 145],
-		field: [0.17, 0.02, 85],
-		// Brown-black surfaces with warm lines and buttons.
-		border: [0.5, 0.07, 85],
-		button: [0.25, 0.04, 85],
+		text: colors.plain().fg!,
+		accent: colors.input().fg!,
+		field: colors.input().bg!,
+		border: colors.popup().neutralFg!,
+		button: colors.plain().bg!,
 		// Search matches in the picker's list.
 		match: [0.92, 0.14, 95],
 		// Where a press or a linked card's flash starts (web/flash.ts).

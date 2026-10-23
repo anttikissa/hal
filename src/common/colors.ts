@@ -165,17 +165,18 @@ export const colors = {
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
 	// Edit diffs: additions bright, removals dim.
 	diff: (): Style => ({ addFg: gray(0.92), removeFg: gray(0.62) }),
-	// The web page's own surfaces (custom properties on .page): canvas
-	// and text, the focus accent, form fields, borders, and buttons (the
-	// picker's selected item too), and search matches. The terminal has its own.
+	// The web page's own surfaces (custom properties on .page), taken from
+	// the terminal's fields so both match: fields and the focus accent are
+	// the prompt's colors, text and buttons plain's, borders the terminal
+	// dialog frame's. Canvas, overlay, matches and flashes are web-only.
 	page: (): Style => ({
 		canvas: gray(0.13),
 		overlayBg: gray(0),
-		text: gray(0.88),
-		accent: gray(0.95),
-		field: gray(0.17),
-		border: gray(0.5),
-		button: gray(0.25),
+		text: colors.plain().fg!,
+		accent: colors.input().fg!,
+		field: colors.input().bg!,
+		border: colors.popup().neutralFg!,
+		button: colors.plain().bg!,
 		// Search matches in the picker's list.
 		match: gray(1),
 		// Where a press or a linked card's flash starts (web/flash.ts).
