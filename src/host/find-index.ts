@@ -39,11 +39,17 @@ function init(): void {
 			INSERT INTO words(words,rowid,text) VALUES('delete',old.id,old.text); INSERT INTO grams(grams,rowid,text) VALUES('delete',old.id,old.text); END;`)
 }
 
+// Session meta (cwd, name) changes with its history: reload it after each
+// catch-up, so /cd shows in Find.
+function load(id: string): void {
+	let meta = sessions.load(id, false)
+	findIndex.state.meta.set(id, { ...meta })
+	liveFiles.close(meta)
+}
+
 async function catalog(): Promise<void> {
 	for (let id of sessions.ids()) {
-		let meta = sessions.load(id, false)
-		findIndex.state.meta.set(id, { ...meta })
-		liveFiles.close(meta)
+		findIndex.load(id)
 		await Bun.sleep(0)
 	}
 }
@@ -241,6 +247,7 @@ export const findIndex = {
 		calls: new Map<string, string>(),
 	},
 	init,
+	load,
 	catalog,
 	text,
 	rows,

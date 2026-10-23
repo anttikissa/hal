@@ -10,6 +10,7 @@ const hit = (blockId: string, score: number, kind: FindKind = 'user', count = 0)
 	kind,
 	why: 'request',
 	count,
+	cwd: '~/x',
 	age: 0,
 	score,
 	snippet: 'needle',

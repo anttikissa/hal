@@ -18,7 +18,7 @@ function why(row: FindRow, q: FindQuery): string {
 	let matches = (text: string) => !!findQuery.match(text, q.words, q.phrases)
 	switch (row.kind) {
 		case 'metadata':
-			return 'title'
+			return row.blockId === 'cwd' ? 'cwd' : 'title'
 		case 'commit':
 			// A copied commit notice is not authorship.
 			if (row.text.includes('this session did not change')) return 'other'

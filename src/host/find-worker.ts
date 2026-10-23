@@ -51,19 +51,27 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 	let why = findRank.why(row, q)
 	// A commit shows its title line, which names the hash and subject.
 	if (row.kind === 'commit') match.snippet = row.text.split('\n')[0]!
+	// A title or cwd match links to the tab itself.
+	let block = row.kind === 'metadata' ? '' : row.blockId
 	return {
 		sessionId: row.sessionId,
 		name: meta.name ?? '',
-		blockId: row.blockId,
-		card: row.card + row.blockId,
+		cwd: findWorker.home(meta.cwd),
+		blockId: block,
+		card: row.card + block,
 		kind: row.kind,
 		why,
 		count: 0,
 		age,
 		snippet: match.snippet,
 		score: findQuery.weights[why]! * match.quality,
-		href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}`,
+		href: `/${row.sessionId}${block ? '#' + block : ''}`,
 	}
+}
+
+function home(dir: string): string {
+	let h = paths.home()
+	return dir === h || dir.startsWith(h + '/') ? '~' + dir.slice(h.length) : dir
 }
 
 // Each call prepares its own statement. db.query() caches one statement per
@@ -139,13 +147,14 @@ async function search(c: Search): Promise<void> {
 				recent.slice(0, limit).map(({ m, at }) => ({
 					sessionId: m.id,
 					name: m.name ?? '',
+					cwd: findWorker.home(m.cwd),
 					blockId: '',
 					card: '',
 					kind: 'metadata',
 					why: '',
 					count: 0,
 					age: Math.max(0, now - at),
-					snippet: m.cwd,
+					snippet: '',
 					score: at,
 					href: `/${m.id}`,
 				})),
@@ -187,6 +196,8 @@ async function search(c: Search): Promise<void> {
 						ts: Date.parse(m.createdAt),
 						text: `${m.id} ${m.name ?? ''}`,
 					})
+				for (let m of findIndex.state.meta.values())
+					take({ sessionId: m.id, blockId: 'cwd', card: '', kind: tier, ts: Date.parse(m.createdAt), text: m.cwd })
 				// Former titles: /rename commands and their replies.
 				for (let row of findWorker.candidates(
 					'other',
@@ -256,6 +267,7 @@ async function drain(): Promise<void> {
 		for (let id of findWorker.state.dirty) {
 			findWorker.state.dirty.delete(id)
 			await findIndex.catchup(id)
+			findIndex.load(id)
 			await Bun.sleep(0)
 		}
 		postMessage({ indexed: true })
@@ -276,6 +288,7 @@ async function init(home: string): Promise<void> {
 }
 
 export const findWorker = {
+	home,
 	state: {
 		ready: Promise.resolve(),
 		active: new Map<string, string>(),

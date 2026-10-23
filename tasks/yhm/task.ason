@@ -11,7 +11,8 @@ The filter toggles are user, Hal, reasoning, tools, commits, other (user request
 	notes: [
 		'The title carries the status (Find · 50 tabs); a failure alone gets its own red row. Batches arrive within milliseconds, so the title keeps its last settled text until a search ends; only the slow first index scan shows progress (user: never show something for 50 ms).',
 		'Load more: the worker keeps each channel ranking; a repeated find request with a higher limit resends it without searching again. Terminal asks when the selection is within 10 rows of the end, the web also when the list scrolls within half a view. Find drops the 12/50 position.',
-		'Card rows key by session, block and kind: a tool call and its output share a block id, and keying by block alone hid one of them.'
+		'Card rows key by session, block and kind: a tool call and its output share a block id, and keying by block alone hid one of them.',
+		'Rows show the tab current cwd (session.ason, reloaded after each history catch-up so /cd shows); a cwd match is evidence ranked like the title.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']

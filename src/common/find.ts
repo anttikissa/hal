@@ -5,6 +5,8 @@ export type FindFilter = 'user' | 'hal' | 'reasoning' | 'tools' | 'commits' | 'o
 export type FindResult = {
 	sessionId: string
 	name: string
+	// The tab's current directory, ~ for home.
+	cwd: string
 	blockId: string
 	// Card id as the transcript shows it, e.g. a1313; empty for session matches.
 	card: string
@@ -51,6 +53,7 @@ const groups: Record<FindFilter, FindKind[]> = {
 // Evidence weights, strongest first (task yhm).
 const weights: Record<string, number> = {
 	title: 100,
+	cwd: 90,
 	'former title': 80,
 	commit: 60,
 	request: 40,
@@ -61,7 +64,7 @@ const weights: Record<string, number> = {
 	tool: 3,
 	other: 2,
 }
-const strong = ['title', 'former title', 'commit', 'request']
+const strong = ['title', 'cwd', 'former title', 'commit', 'request']
 const scopeHelp =
 	'in: takes here, a tab id (181-ibm), tab numbers (10-19), . (this directory), a path (~/x) or user, hal, reasoning, tools, commits, other'
 

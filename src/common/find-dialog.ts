@@ -202,8 +202,10 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 	let id = (r: FindResult) => (r.card && !r.count ? `${r.sessionId}/${r.card}` : r.sessionId)
 	let why = (r: FindResult) => (r.count > 1 ? `${r.why} +${r.count - 1}` : r.why)
 	let cut = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + (n ? '…' : '') : s)
-	let w = { tab: width(tab), id: width(id), name: 0, age: width((r) => age(r.age)), why: width(why) }
-	let fixed = [w.tab, w.id, w.age, w.why].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
+	// A long directory keeps its end, the part that tells tabs apart.
+	let dir = (r: FindResult) => (r.cwd.length > 24 ? '…' + r.cwd.slice(-23) : r.cwd)
+	let w = { tab: width(tab), id: width(id), name: 0, dir: width(dir), age: width((r) => age(r.age)), why: width(why) }
+	let fixed = [w.tab, w.id, w.dir, w.age, w.why].filter(Boolean).reduce((sum, n) => sum + n + 2, 0)
 	w.name = Math.min(
 		width((r) => r.name),
 		Math.max(0, columns - fixed - 62),
@@ -221,6 +223,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 		w.tab && tab(r).padStart(w.tab),
 		id(r).padEnd(w.id),
 		w.name && cut(r.name, w.name).padEnd(w.name),
+		w.dir && dir(r).padEnd(w.dir),
 		age(r.age).padStart(w.age),
 		w.why && why(r).padEnd(w.why),
 		snippet(r),
