@@ -149,7 +149,10 @@ test('subscriptions refresh plans and windows, mark the caller and report quota 
 	}
 	let key = { name: 'OPENAI_API_KEY', entry: { apiKey: 'key-secret' }, replace: () => {} }
 	let requests: string[] = []
-	auth.all = ((kind: string) => ({ data: {}, list: kind === 'anthropic' ? [a] : [b, key] })) as typeof all
+	auth.all = ((kind: string) => ({
+		data: {},
+		list: kind === 'anthropic' ? [a] : kind === 'openai' ? [b, key] : [],
+	})) as typeof all
 	auth.credential = (async (_data, account) => ({
 		type: 'token',
 		value: account.entry.accessToken,

@@ -27,6 +27,24 @@ export type UsageRow = {
 	loginRequired?: boolean
 	windows: Windows
 	apiKey: boolean
+	// Until when (epoch ms) a recorded rate limit holds the account; 0 if none.
+	limited?: number
+}
+
+// The latest rate limit recorded on any model of `kind` for `account`.
+function limitedUntil(kind: string, account: string): number {
+	return Math.max(
+		0,
+		...Object.keys(limits.store())
+			.filter((k) => limits.ofKind(k, kind) && k.slice(k.indexOf(' ') + 1) === account)
+			.map((k) => limits.until(k)),
+	)
+}
+
+const TITLES: Record<Kind, string> = {
+	anthropic: 'Anthropic subscriptions:',
+	openai: 'OpenAI subscriptions:',
+	'opencode-go': 'OpenCode Go accounts:',
 }
 
 const reset = (at: string, now = clock.now(), zone?: string): string => usageWindows.reset(at, now, zone)
@@ -39,15 +57,15 @@ function bar(percent: number): string {
 
 function table(rows: UsageRow[], zone?: string): string {
 	let groups: string[] = []
-	for (let kind of ['anthropic', 'openai'] as const) {
+	for (let kind of ['anthropic', 'openai', 'opencode-go'] as const) {
 		let accounts = rows.filter((row) => row.provider === kind)
 		if (!accounts.length) continue
 		let names = [
 			...new Set(accounts.flatMap((row) => Object.keys(row.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name)))),
 		].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-		let cols = names.length ? names : ['5h', '7d']
+		let cols = names.length ? names : accounts.every((row) => row.apiKey) ? ['Limit'] : ['5h', '7d']
 		let lines = [
-			`${kind === 'anthropic' ? 'Anthropic' : 'OpenAI'} subscriptions:`,
+			TITLES[kind],
 			'',
 			`| Slot | Account | ${cols.join(' | ')} |`,
 			`|${Array(cols.length + 2)
@@ -58,7 +76,10 @@ function table(rows: UsageRow[], zone?: string): string {
 			let safe = (value: string) => value.replace(/[|<>]/g, ' ').replace(/\*/g, '\\*')
 			let account = `${safe(row.account)}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
 			let cells = cols.map((name) => {
-				if (row.apiKey) return 'API key'
+				if (row.apiKey)
+					return row.limited
+						? `API key<br>rate limited until ${statusUsage.reset(new Date(row.limited).toISOString(), clock.now(), zone)}`
+						: 'API key'
 				let w = row.windows[name]
 				return w
 					? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${statusUsage.reset(w.resets, clock.now(), zone)})` : ''}`
@@ -213,7 +234,7 @@ function runtime(zone?: string): string {
 
 async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 	let rows: UsageRow[] = []
-	for (let kind of ['anthropic', 'openai'] as const) {
+	for (let kind of ['anthropic', 'openai', 'opencode-go'] as const) {
 		let list: Account[]
 		try {
 			list = auth.all(kind).list
@@ -258,6 +279,7 @@ async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 				loginRequired,
 				windows: apiKey ? {} : usage.windows(kind, key),
 				apiKey,
+				limited: statusUsage.limitedUntil(kind, account.name),
 			})
 		}
 	}
@@ -314,5 +336,6 @@ export const statusUsage = {
 	problem,
 	runtime,
 	rows,
+	limitedUntil,
 	show,
 }

@@ -122,15 +122,18 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 function logins(): string {
 	if (!existsSync(paths.authFile())) return 'No stored logins.'
 	let rows = Object.entries(auth.store()).flatMap(([provider, value]) =>
-		[value]
-			.flat()
-			.map((e: any, i: number) => [
+		[value].flat().map((e: any, i: number) => {
+			let account = typeof e?.email === 'string' ? e.email : `account ${i + 1}`
+			let until = statusUsage.limitedUntil(provider, account)
+			return [
 				provider,
 				e?.apiKey && !e?.accessToken ? 'API key' : 'subscription',
-				typeof e?.email === 'string' ? e.email : `account ${i + 1}`,
-			]),
+				account,
+				until ? `until ${new Date(until).toISOString()}` : 'none',
+			]
+		}),
 	)
-	return rows.length ? table(['provider', 'type', 'account'], rows) : 'No stored logins.'
+	return rows.length ? table(['provider', 'type', 'account', 'rate limit'], rows) : 'No stored logins.'
 }
 
 const usage = () =>

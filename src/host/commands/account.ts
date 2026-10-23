@@ -9,7 +9,8 @@ export const command: SlashCommand = {
 		"/account moves this session to the next login of its model's provider, from the next request. /status lists them.",
 	run(_args, _answers, ctx) {
 		let kind = ctx.model.split('/')[0]
-		if (kind !== 'anthropic' && kind !== 'openai') return { error: `${ctx.model} has no accounts to switch` }
+		if (kind !== 'anthropic' && kind !== 'openai' && kind !== 'opencode-go')
+			return { error: `${ctx.model} has no accounts to switch` }
 		let key = `${kind} ${ctx.sessionId}`
 		let list = auth.all(kind).list.map((a) => a.name)
 		let now = auth.state.picked.get(key) ?? auth.state.chosen.get(key) ?? ''

@@ -1,4 +1,4 @@
-// Anthropic and OpenAI credentials: this home's secrets/auth.ason (old
+// Anthropic, OpenAI and OpenCode Go credentials: this home's secrets/auth.ason (old
 // Hal's single-entry or array shape per provider, copied in or written by
 // /login claude or chatgpt: login.ts, login-chatgpt.ts), then the
 // environment's ANTHROPIC_API_KEY or OPENAI_API_KEY as the last account,
@@ -42,8 +42,9 @@ export type Credential = {
 	accountId?: string
 }
 type Failure = 'auth' | 'temporary' | 'limited'
-// The providers whose logins live in the credentials file.
-export type Kind = 'anthropic' | 'openai'
+// The providers whose logins live in the credentials file. OpenCode Go
+// has API keys only (/login opencode adds one per key, api-keys.ts).
+export type Kind = 'anthropic' | 'openai' | 'opencode-go'
 
 type Entry = Record<string, any>
 
@@ -54,8 +55,16 @@ export const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 
 // What every message asking the user to log in says.
 export const LOG_IN = 'run /login claude or set ANTHROPIC_API_KEY'
-const LOG_INS: Record<Kind, string> = { anthropic: LOG_IN, openai: 'run /login chatgpt or set OPENAI_API_KEY' }
-const ENV: Record<Kind, string> = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' }
+const LOG_INS: Record<Kind, string> = {
+	anthropic: LOG_IN,
+	openai: 'run /login chatgpt or set OPENAI_API_KEY',
+	'opencode-go': 'run /login opencode or set OPENCODE_API_KEY',
+}
+const ENV: Record<Kind, string> = {
+	anthropic: 'ANTHROPIC_API_KEY',
+	openai: 'OPENAI_API_KEY',
+	'opencode-go': 'OPENCODE_API_KEY',
+}
 
 function tokenUrl(kind: Kind = 'anthropic'): string {
 	return kind === 'openai' ? 'https://auth.openai.com/oauth/token' : 'https://console.anthropic.com/v1/oauth/token'
@@ -263,7 +272,7 @@ function tellBroken(kind: Kind, account: Account, why: string, who: For): void {
 function limitedUntil(modelId: string): number {
 	let kind = modelId.split('/')[0]!
 	let names: string[] = []
-	if (kind === 'anthropic' || kind === 'openai') {
+	if (kind === 'anthropic' || kind === 'openai' || kind === 'opencode-go') {
 		try {
 			names = auth.all(kind).list.map((a) => a.name)
 		} catch {} // no login: the turn reports that

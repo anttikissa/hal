@@ -35,6 +35,8 @@ function create(name: string): Provider {
 	let p: Provider = {
 		request: (req) => load().request(req),
 		parse: (messages) => load().parse(messages),
+		rejected: (account) => load().rejected?.(account),
+		spent: (account) => load().spent?.(account),
 		available: () => {
 			let env = compatCatalog.endpoints()[name]?.keyEnv
 			return !env || !!(apiKeys.get(name) ?? process.env[env])

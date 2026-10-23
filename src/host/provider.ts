@@ -232,7 +232,8 @@ function resetAt(headers: Headers, body: string): number | undefined {
 // rejected request re-reads the plan so a lapsed subscription (plus →
 // free) shows as the cause, not just a refused model.
 async function who(kind: string, name: string | undefined, status: number): Promise<string> {
-	if (!name || (kind !== 'openai' && kind !== 'anthropic')) return ''
+	if (!name) return ''
+	if (kind !== 'openai' && kind !== 'anthropic') return ` (${name})`
 	let find = () => auth.all(kind).list.find((a) => a.name === name)
 	let account = find()
 	if (!account) return ` (${name})`

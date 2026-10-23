@@ -3,6 +3,7 @@
 
 import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
+import { auth } from './auth.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
 import { compatCatalog } from './compat-catalog.ts'
@@ -164,9 +165,13 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 
 function create(name: string): Provider {
 	let p: Provider = {
-		request(req) {
-			let { base, headers } = openaiCompat.endpoint(name)
+		async request(req) {
 			let ep = openaiCompat.endpoints()[name]
+			// OpenCode Go keys are accounts that rotate on limits (auth.ts).
+			let cred = name === 'opencode-go' ? await auth.pick(name, req.model, { session: req.sessionId }) : undefined
+			let { base, headers } = cred
+				? { base: ep!.baseUrl.replace(/\/+$/, ''), headers: { authorization: `Bearer ${cred.value}` } }
+				: openaiCompat.endpoint(name)
 			return {
 				url: `${base}/chat/completions`,
 				headers: { ...headers, ...ep?.headers?.(req) },
@@ -174,8 +179,13 @@ function create(name: string): Provider {
 					...openaiCompat.body(req, ep?.images !== false),
 					...modelEffort.wire(name, req.model, req.effort, req.maxTokens),
 				},
+				...(cred && { account: cred.account }),
 			}
 		},
+		...(name === 'opencode-go' && {
+			rejected: (account: string) => auth.rejected(account, 'opencode-go'),
+			spent: (account: string) => auth.spent(account, 'opencode-go'),
+		}),
 		parse: openaiCompat.parse,
 		capability: (model) =>
 			openaiCompat.endpoints()[name]?.capability?.(model) ?? openaiCompat.cachedCapability(name, model),

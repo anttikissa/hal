@@ -13,6 +13,7 @@ const savedEnv = {
 	HOME: process.env.HOME,
 	ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+	OPENCODE_API_KEY: process.env.OPENCODE_API_KEY,
 }
 const origTokenUrl = auth.tokenUrl
 let home = ''
@@ -28,6 +29,7 @@ beforeEach(() => {
 	// Real keys never reach a test, even run outside ./test.
 	delete process.env.ANTHROPIC_API_KEY
 	delete process.env.OPENAI_API_KEY
+	delete process.env.OPENCODE_API_KEY
 	requests = []
 	server = Bun.serve({
 		port: 0,
@@ -258,6 +260,26 @@ test('accounts rotate: one limited for the model or with a broken login is skipp
 		expect(requests).toHaveLength(1)
 	} finally {
 		auth.broke = original
+		limits.close()
+	}
+})
+
+test('opencode-go keys are accounts that rotate on limits', async () => {
+	let { limits } = await import('./limits.ts')
+	let { apiKeys } = await import('./api-keys.ts')
+	paths.init()
+	try {
+		write({ 'opencode-go': { apiKey: 'k1' } })
+		apiKeys.save('opencode-go', 'k2')
+		apiKeys.save('opencode-go', 'k2')
+		expect(disk()['opencode-go']).toEqual([{ apiKey: 'k1' }, { apiKey: 'k2' }])
+		// An account-less limit blocks none.
+		limits.set(limits.key('opencode-go/m'), now() + 3600_000)
+		expect(await auth.pick('opencode-go', 'm')).toMatchObject({ value: 'k1', account: 'account 1' })
+		limits.set(limits.key('opencode-go', 'account 1'), now() + 3600_000)
+		expect(await auth.pick('opencode-go', 'm')).toMatchObject({ value: 'k2', account: 'account 2' })
+		expect(auth.limitedUntil('opencode-go/m')).toBe(0)
+	} finally {
 		limits.close()
 	}
 })
