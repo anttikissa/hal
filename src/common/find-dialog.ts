@@ -30,9 +30,6 @@ const question =
 	'Find anything: tab names, requests, commits, tool output\nExamples: compact in:here · "live file" · rebase -conflict · since:24h · /help find for more'
 const page = 50
 const recent = 'recent tabs'
-function recentLabel(filters: string[]): string {
-	return filters.join() === 'commits' ? 'tabs with commits' : recent
-}
 // The title carries the status; a failure has its own row instead.
 function title(status: string, failed?: boolean): string {
 	return failed ? 'Find' : `Find · ${status}`
@@ -64,7 +61,7 @@ function open(remembered: FindFilter[], tabs: string[] = [], here?: string): Mod
 	}
 }
 function input(m: ModalState, text: string): ModalState {
-	let status = text.trim() ? m.find!.status : recentLabel(m.find!.filters)
+	let status = text.trim() ? m.find!.status : recent
 	return {
 		...m,
 		title: title(status),
@@ -255,7 +252,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 	let status = b.error
 		? `Find failed: ${b.error}`
 		: !query
-			? recentLabel(f.filters)
+			? recent
 			: b.done
 				? results.length
 					? count

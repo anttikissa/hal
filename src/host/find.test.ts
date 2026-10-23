@@ -78,18 +78,17 @@ test('match requires every word and phrase, and ranks word over prefix over subs
 	expect(() => findQuery.parse('in:nowhere')).toThrow('unknown in: value nowhere')
 })
 
-test('tab rows rank authorship over mentions; copied commits and inherited fork history are not evidence', async () => {
-	let commit = (subject: string, note = '') => ({
+test('tab rows rank authorship over mentions; inherited fork history is not evidence', async () => {
+	let commit = (subject: string) => ({
 		type: 'output' as const,
-		text: `abcd1234 ${subject}\n+1 -0 a.ts${note}`,
+		text: `abcd1234 ${subject}\n+1 -0 a.ts`,
 		commit: { hash: 'abcd1234ff', short: 'abcd1234', subject, files: [] },
 	})
 	let author = sessions.create({ cwd: '/example', model: 'example/model', name: 'Cursor work' })
 	history.append(author.id, commit('Blink the cursor'))
 	let chatty = sessions.create({ cwd: '/example', model: 'example/model', name: 'Chat' })
-	for (let i = 0; i < 10; i++)
+	for (let i = 0; i < 11; i++)
 		history.append(chatty.id, { type: 'assistant', block: { type: 'text', text: `blink reply ${i}` } })
-	history.append(chatty.id, commit('Blink the cursor', '\n(this session did not change these files)'))
 	let fork = sessions.create({ cwd: '/example', model: 'example/model', name: 'Fork' })
 	sessions.state.open.get(fork.id)!.forkedFrom = author.id
 	appendFileSync(

@@ -49,7 +49,6 @@ export type Command = (
 			query: string
 			kinds?: FindFilter[]
 			here?: string
-			tabs?: string[]
 			limit?: number
 	  }
 	| { type: 'find-cancel' }

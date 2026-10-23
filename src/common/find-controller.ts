@@ -15,6 +15,11 @@ function close(st: FindController, h: Hooks): void {
 	delete st.timer
 	h.send({ type: 'find-cancel' })
 }
+// The find command for `m`'s query, filters and row limit.
+function command(m: ModalState): object {
+	let f = m.find!
+	return { type: 'find', request: f.request, query: m.form!.values[0]!, kinds: f.filters, here: f.here, limit: f.limit }
+}
 function update(st: FindController, h: Hooks, m: ModalState): void {
 	st.filters = [...m.find!.filters]
 	findController.close(st, h)
@@ -23,16 +28,9 @@ function update(st: FindController, h: Hooks, m: ModalState): void {
 		delete st.timer
 		m = h.get()!
 		if (!m?.find) return
-		let request = h.id()
-		h.set({ ...m, find: { ...m.find!, request } })
-		h.send({
-			type: 'find',
-			request,
-			query: m.form!.values[0]!,
-			kinds: st.filters,
-			here: m.find!.here,
-			tabs: m.find!.tabs,
-		})
+		m = { ...m, find: { ...m.find, request: h.id() } }
+		h.set(m)
+		h.send(findController.command(m))
 	}, 80)
 }
 // Asks for the next page when `near` the end of a full result list.
@@ -41,19 +39,10 @@ function more(h: Hooks, near: boolean): void {
 	let next = m?.find && findDialog.more(m, near)
 	if (!next) return
 	h.set(next)
-	let f = next.find!
-	h.send({
-		type: 'find',
-		request: f.request,
-		query: next.form!.values[0]!,
-		kinds: f.filters,
-		here: f.here,
-		tabs: f.tabs,
-		limit: f.limit,
-	})
+	h.send(findController.command(next))
 }
 function event(h: Hooks, b: FindBatch): void {
 	let m = h.get()
 	if (m?.find) h.set(findDialog.batch(m, b))
 }
-export const findController = { create, close, update, more, event }
+export const findController = { create, close, command, update, more, event }

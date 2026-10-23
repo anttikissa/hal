@@ -6,6 +6,7 @@ import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
+import { tabs } from './tabs.ts'
 
 type Listener = { channel: string; request: string; deliver: (batch: FindBatch) => void }
 
@@ -51,16 +52,16 @@ function dirty(sessionId: string): void {
 	}, 0)
 }
 
-// `scope`: the tab Find opened from and the open tabs in order (in:);
-// `limit`: how many rows to send. Repeating a request with a higher
-// limit resends the kept ranking without searching again.
+// `scope`: the tab Find opened from (in:here); `limit`: how many rows to
+// send. Repeating a request with a higher limit resends the kept ranking
+// without searching again.
 function search(
 	owner: object,
 	request: string,
 	query: string,
 	kinds: FindFilter[] | undefined,
 	deliver: (batch: FindBatch) => void,
-	scope: { here?: string; tabs?: string[]; limit?: number } = {},
+	scope: { here?: string; limit?: number } = {},
 ): void {
 	find.init()
 	if (find.state.error) {
@@ -76,6 +77,7 @@ function search(
 		query,
 		kinds,
 		...scope,
+		tabs: [...tabs.file().open],
 		meta: [...sessions.state.open.values()].map(plain),
 	})
 }
@@ -87,7 +89,7 @@ function cancel(owner: object): void {
 }
 
 // Each batch replaces the ranking so far; the last one before done is final.
-function top(query: string, scope: { here?: string; tabs?: string[] } = {}): Promise<FindResult[]> {
+function top(query: string, scope: { here?: string } = {}): Promise<FindResult[]> {
 	return new Promise((resolve, reject) => {
 		let owner = {},
 			results: FindResult[] = []

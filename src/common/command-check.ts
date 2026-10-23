@@ -109,8 +109,8 @@ function invalid(value: unknown): string | undefined {
 				? 'find: query exceeds 4096 characters'
 				: !valid
 					? 'find: invalid kinds'
-					: (c.here !== undefined && typeof c.here !== 'string') || (c.tabs !== undefined && !strings(c.tabs))
-						? 'find: invalid here or tabs'
+					: c.here !== undefined && typeof c.here !== 'string'
+						? 'find: invalid here'
 						: c.limit !== undefined && !(Number.isSafeInteger(c.limit) && (c.limit as number) > 0)
 							? 'find: invalid limit'
 							: undefined)

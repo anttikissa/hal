@@ -11,7 +11,7 @@ export type FindResult = {
 	// Card id as the transcript shows it, e.g. a1313; empty for session matches.
 	card: string
 	kind: FindKind
-	// The evidence: title, former title, commit, request, files, reply...
+	// Why it matched: title, cwd, commit, request, reply...
 	why: string
 	// Tab rows: how many cards of the tab matched. Card rows: 0.
 	count: number
@@ -50,21 +50,18 @@ const groups: Record<FindFilter, FindKind[]> = {
 	commits: ['commit'],
 	other: ['other'],
 }
-// Evidence weights, strongest first (task yhm).
+// Weights of why a row matched, strongest first (task yhm).
 const weights: Record<string, number> = {
 	title: 100,
 	cwd: 90,
-	'former title': 80,
 	commit: 60,
 	request: 40,
-	files: 15,
 	reply: 12,
-	pasted: 8,
 	reasoning: 4,
 	tool: 3,
 	other: 2,
 }
-const strong = ['title', 'cwd', 'former title', 'commit', 'request']
+const strong = ['title', 'cwd', 'commit', 'request']
 const scopeHelp =
 	'in: takes here, a tab id (181-ibm), tab numbers (10-19), . (this directory), a path (~/x) or user, hal, reasoning, tools, commits, other'
 

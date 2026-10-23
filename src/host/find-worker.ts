@@ -1,7 +1,10 @@
 // Entry point of the find worker, which keeps search off the host's
-// thread. Importing this module in the host does no work.
+// thread. Importing this module in the host does no work. A query answers
+// "which tab did this?": hits fold into one row per tab before the result
+// limit (task yhm).
 import { isMainThread } from 'worker_threads'
 import { statSync } from 'fs'
+import { homedir } from 'os'
 import {
 	findQuery,
 	type FindBatch,
@@ -13,11 +16,10 @@ import {
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { findIndex, type FindRow } from './find-index.ts'
-import { findRank } from './find-rank.ts'
 import { replay } from '../common/replay.ts'
 import type { SessionMeta } from './sessions.ts'
-
-// `here`: the tab Find opened from; `tabs`: the open tabs in order (in:).
+// `here`: the tab Find opened from; `tabs`: the open tabs in order, from
+// the host (in:).
 type Search = {
 	channel: string
 	request: string
@@ -32,6 +34,19 @@ type Reply = { channel: string; batch: FindBatch }
 // What every hit in one search shares: the query, its sessions, and
 // whether rows fold into tabs.
 type Context = { q: FindQuery; now: number; ids?: Set<string>; tabs: boolean }
+type Tab = { best: FindResult; count: number; strong: Set<string>; strongCount: number; age: number }
+
+// The label naming why a row matched.
+const why: Record<FindKind, string> = {
+	metadata: 'title',
+	commit: 'commit',
+	user: 'request',
+	assistant: 'reply',
+	thinking: 'reasoning',
+	'tool-call': 'tool',
+	'tool-output': 'tool',
+	other: 'other',
+}
 
 function hit(row: FindRow, c: Context): FindResult | undefined {
 	let meta = findIndex.state.meta.get(row.sessionId)
@@ -48,7 +63,7 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 	}
 	let match = findQuery.match(row.text, q.words, q.phrases)
 	if (!match) return
-	let why = findRank.why(row, q)
+	let label = row.blockId === 'cwd' ? 'cwd' : why[row.kind]
 	// A commit shows its title line, which names the hash and subject.
 	if (row.kind === 'commit') match.snippet = row.text.split('\n')[0]!
 	// A title or cwd match links to the tab itself.
@@ -60,11 +75,11 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 		blockId: block,
 		card: row.card + block,
 		kind: row.kind,
-		why,
+		why: label,
 		count: 0,
 		age,
 		snippet: match.snippet,
-		score: findQuery.weights[why]! * match.quality,
+		score: findQuery.weights[label]! * match.quality,
 		href: `/${row.sessionId}${block ? '#' + block : ''}`,
 	}
 }
@@ -74,11 +89,77 @@ function home(dir: string): string {
 	return dir === h || dir.startsWith(h + '/') ? '~' + dir.slice(h.length) : dir
 }
 
+// The sessions an in: scope names, or undefined for every session.
+function scope(q: FindQuery, here: string | undefined, tabs: string[]): Set<string> | undefined {
+	if (!q.scope.length) return undefined
+	let meta = findIndex.state.meta,
+		ids = new Set<string>()
+	let current = () => {
+		if (!here || !meta.has(here)) throw new Error('in:here and in:. need the tab Find was opened from')
+		return here
+	}
+	for (let v of q.scope) {
+		let range = /^(\d+)(?:-(\d+))?$/.exec(v)
+		if (v.toLowerCase() === 'here') ids.add(current())
+		else if (/^\d+-[a-z]{3}$/i.test(v)) {
+			if (!meta.has(v.toLowerCase())) throw new Error(`in: no session ${v}`)
+			ids.add(v.toLowerCase())
+		} else if (range) {
+			let from = Number(range[1]),
+				to = Number(range[2] ?? range[1])
+			let found = tabs.slice(Math.min(from, to) - 1, Math.max(from, to))
+			if (!found.length) throw new Error(`in: no tab ${v}`)
+			for (let id of found) ids.add(id)
+		} else {
+			let dir = v === '.' ? meta.get(current())!.cwd : v.replace(/^~(?=\/|$)/, homedir())
+			dir = dir.replace(/\/+$/, '') || '/'
+			for (let m of meta.values()) if (m.cwd === dir || m.cwd.startsWith(dir === '/' ? '/' : dir + '/')) ids.add(m.id)
+		}
+	}
+	return ids
+}
+
+// Score order: relevance first; recency breaks ties between scores that
+// round alike.
+function order(a: FindResult, b: FindResult): number {
+	return Math.round(b.score) - Math.round(a.score) || a.age - b.age || a.href.localeCompare(b.href)
+}
+
+// One row per tab: its best evidence, the number of matching cards, and
+// a bonus for each kind of strong evidence and for their count.
+function group(): { add(h: FindResult): void; top(n: number): FindResult[] } {
+	let tabs = new Map<string, Tab>()
+	return {
+		add(h) {
+			let t = tabs.get(h.sessionId)
+			if (!t) tabs.set(h.sessionId, (t = { best: h, count: 0, strong: new Set(), strongCount: 0, age: h.age }))
+			t.count++
+			t.age = Math.min(t.age, h.age)
+			if (findQuery.strong.includes(h.why)) {
+				t.strong.add(h.why)
+				if (h.why === 'commit' || h.why === 'request') t.strongCount++
+			}
+			if (h.score > t.best.score) t.best = h
+		},
+		top(n) {
+			return [...tabs.values()]
+				.map((t) => ({
+					...t.best,
+					count: t.count,
+					age: t.age,
+					score: t.best.score + 10 * t.strong.size + Math.min(5, Math.log2(1 + t.strongCount)),
+				}))
+				.sort(findWorker.order)
+				.slice(0, n)
+		},
+	}
+}
+
 // Each call prepares its own statement. db.query() caches one statement per
 // SQL text, and search() pauses mid-iteration; a newer search reusing that
 // statement then failed with SQLITE_MISUSE ("bad parameter or other API
 // misuse") while the older cursor was still open.
-function* candidates(kind: FindKind, q: FindQuery, ids?: Set<string>, where = ''): Generator<FindRow> {
+function* candidates(kind: FindKind, q: FindQuery, ids?: Set<string>): Generator<FindRow> {
 	let db = findIndex.state.db!,
 		terms = [...q.words, ...q.phrases].filter((w) => [...w].length >= 3)
 	let quote = (w: string) => '"' + w.replaceAll('"', '""') + '"'
@@ -87,7 +168,7 @@ function* candidates(kind: FindKind, q: FindQuery, ids?: Set<string>, where = ''
 		.filter((w) => /^[\p{L}\p{N}_]+$/u.test(w))
 		.map((w) => quote(w) + '*')
 		.join(' AND ')
-	let sql = 'SELECT * FROM docs WHERE kind=?' + where,
+	let sql = 'SELECT * FROM docs WHERE kind=?',
 		args: (string | number)[] = [kind]
 	if (ids) {
 		sql += ' AND sessionId IN (SELECT value FROM json_each(?))'
@@ -135,9 +216,9 @@ async function search(c: Search): Promise<void> {
 		for (let m of c.meta ?? []) findIndex.state.meta.set(m.id, m)
 		let q = findQuery.parse(c.query, c.kinds),
 			now = Date.now()
-		let ids = findRank.scope(q, c.here, c.tabs ?? [], findIndex.state.meta)
+		let ids = findWorker.scope(q, c.here, c.tabs ?? [])
 		// No query: the sessions whose histories changed last (task 6m).
-		if (!c.query.trim() && q.kinds.join() !== 'commit') {
+		if (!c.query.trim()) {
 			let recent = [...findIndex.state.meta.values()].map((m) => ({
 				m,
 				at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt),
@@ -164,7 +245,7 @@ async function search(c: Search): Promise<void> {
 		}
 		// One scoped tab lists its cards; otherwise one row per tab.
 		let ctx: Context = { q, now, ids, tabs: ids?.size !== 1 }
-		let tabs = findRank.group(),
+		let tabs = findWorker.group(),
 			cards = new Map<string, FindResult>()
 		let take = (row: FindRow) => {
 			let h = findWorker.hit(row, ctx)
@@ -173,7 +254,7 @@ async function search(c: Search): Promise<void> {
 			let key = `${h.sessionId}#${h.blockId}#${h.kind}`
 			if (!cards.has(key) || h.score > cards.get(key)!.score) cards.set(key, h)
 		}
-		let ranked = (n: number) => (ctx.tabs ? tabs.top(n) : [...cards.values()].sort(findRank.order).slice(0, n))
+		let ranked = (n: number) => (ctx.tabs ? tabs.top(n) : [...cards.values()].sort(findWorker.order).slice(0, n))
 		let top = () => ranked(limit)
 		findWorker.state.kept.set(c.channel, { request: c.request, top: ranked })
 		let pending: { meta: SessionMeta; offset: number }[] | undefined
@@ -187,26 +268,10 @@ async function search(c: Search): Promise<void> {
 		}
 		for (tier of q.kinds) {
 			if (tier === 'metadata') {
-				for (let m of findIndex.state.meta.values())
-					take({
-						sessionId: m.id,
-						blockId: '',
-						card: '',
-						kind: tier,
-						ts: Date.parse(m.createdAt),
-						text: `${m.id} ${m.name ?? ''}`,
-					})
-				for (let m of findIndex.state.meta.values())
-					take({ sessionId: m.id, blockId: 'cwd', card: '', kind: tier, ts: Date.parse(m.createdAt), text: m.cwd })
-				// Former titles: /rename commands and their replies.
-				for (let row of findWorker.candidates(
-					'other',
-					q,
-					ids,
-					" AND (text LIKE '/rename%' OR text LIKE 'Session renamed: %')",
-				)) {
-					take(row)
-					if (!(await pause())) return
+				for (let m of findIndex.state.meta.values()) {
+					let row = { sessionId: m.id, card: '', kind: tier, ts: Date.parse(m.createdAt) }
+					take({ ...row, blockId: '', text: `${m.id} ${m.name ?? ''}` })
+					take({ ...row, blockId: 'cwd', text: m.cwd })
 				}
 				send(top())
 				await Bun.sleep(0)
@@ -234,11 +299,8 @@ async function search(c: Search): Promise<void> {
 				}
 				pending.sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
 			}
-			// The metadata tier already took the former titles.
-			let skip = (row: FindRow) =>
-				rebuilding.has(row.sessionId) || (q.kinds.includes('metadata') && findRank.renamed(row.text))
 			for (let row of findWorker.candidates(tier, q, ids)) {
-				if (!skip(row)) take(row)
+				if (!rebuilding.has(row.sessionId)) take(row)
 				if (!(await pause())) return
 			}
 			send(top(), false, pending.length)
@@ -298,6 +360,9 @@ export const findWorker = {
 		indexing: false,
 	},
 	hit,
+	scope,
+	order,
+	group,
 	candidates,
 	search,
 	drain,
