@@ -112,7 +112,7 @@ async function send(sessionId?: string, model = 'm'): Promise<{ events: string[]
 		messages: [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }],
 		sessionId,
 	})) {
-		out.push(e.type)
+		if (e.type !== 'usage') out.push(e.type)
 		if (e.type === 'error') message = e.message
 	}
 	return { events: out, message }
@@ -212,20 +212,22 @@ test('the model list comes from models.dev, without asking the server', async ()
 	expect(seen).toHaveLength(0)
 })
 
-// Invariant: each model goes to the protocol models.dev names for it,
-// with the rotating account's key; the gateway refuses other protocols.
+// Invariant: each model goes to the protocol models.dev names for it
+// (unlisted: Responses), with the rotating account's key; the gateway
+// refuses other protocols.
 test('models.dev routes each model to Responses, Messages, Gemini or Chat Completions, with the account key', async () => {
 	let info = modelsDev.info
-	let npm: Record<string, string> = {
+	let npm: Record<string, string | undefined> = {
 		'opencode-go/grok': '@ai-sdk/openai',
 		'opencode-go/minimax': '@ai-sdk/anthropic',
 		'opencode-go/gemini': '@ai-sdk/google',
+		'opencode-go/glm': undefined,
 	}
-	modelsDev.info = (id: string) => (npm[id] ? { npm: npm[id] } : undefined)
+	modelsDev.info = (id: string) => (id in npm ? { npm: npm[id] } : undefined)
 	writeFileSync(file(), ason.stringify({ 'opencode-go': [{ apiKey: 'k1' }] }), { mode: 0o600 })
 	try {
-		for (let model of ['grok', 'minimax', 'gemini', 'glm'])
-			expect((await send('s1', model)).events.filter((t) => t !== 'usage')).toEqual(['text', 'done'])
+		for (let model of ['grok', 'minimax', 'gemini', 'glm', 'unlisted'])
+			expect((await send('s1', model)).events).toEqual(['text', 'done'])
 	} finally {
 		modelsDev.info = info
 	}
@@ -234,11 +236,13 @@ test('models.dev routes each model to Responses, Messages, Gemini or Chat Comple
 		'/inference/go/anthropic/v1/messages',
 		'/inference/go/google/v1beta/models/gemini:streamGenerateContent',
 		'/inference/go/openai/v1/chat/completions',
+		'/inference/go/openai/v1/responses',
 	])
 	expect(seen.map((h) => h.get('authorization') ?? h.get('x-api-key') ?? h.get('x-goog-api-key'))).toEqual([
 		'Bearer k1',
 		'k1',
 		'k1',
+		'Bearer k1',
 		'Bearer k1',
 	])
 	expect(seen.every((h) => h.get('x-opencode-session') === 's1')).toBe(true)

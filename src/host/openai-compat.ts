@@ -168,11 +168,14 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 }
 
 // The OpenCode Go request for `req`: models.dev names the AI SDK package
-// each model needs (Responses, Messages or Gemini); the rest, undefined
-// here, take Chat Completions. `base` is the gateway's OpenAI root
-// (…/openai/v1).
+// each model needs (Responses, Messages or Gemini); its other models,
+// undefined here, take Chat Completions. A model models.dev does not
+// list goes to Responses: the gateway serves every non-Gemini model
+// there, and some (grok-4.6) only there. `base` is the gateway's OpenAI
+// root (…/openai/v1).
 function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpRequest | undefined {
-	let npm = modelsDev.info(`opencode-go/${req.model}`)?.npm
+	let info = modelsDev.info(`opencode-go/${req.model}`)
+	let npm = info ? info.npm : '@ai-sdk/openai'
 	let root = base.replace(/\/openai\/v1$/, '')
 	if (npm === '@ai-sdk/openai') {
 		let { openai } = require('./openai.ts') as typeof import('./openai.ts')
