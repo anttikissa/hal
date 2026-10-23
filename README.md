@@ -128,6 +128,7 @@ else ever happened. Of course you can undo that too: `/edit undo`.
 
 # Compact
 
+<!-- TODO: review this -->
 The model can use `COMPACT` to write a working-state checkpoint and
 continue in the same session with less context. It carries forward your
 goals, unresolved requests, decisions, findings, work and verification
