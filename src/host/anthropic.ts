@@ -103,7 +103,8 @@ function adaptive(model: string): boolean {
 	return /^claude-(?:opus-(?:4-[678]|5(?:-|$))|sonnet-(?:4-6|5(?:-|$))|fable-5(?:-|$))/.test(model)
 }
 
-function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
+// `webSearch`: whether the endpoint offers Anthropic's hosted web search.
+function body(req: ProviderRequest, oauth: boolean, webSearch = true): Record<string, unknown> {
 	let maxTokens = req.maxTokens ?? anthropic.maxTokens
 	let system: unknown[] = []
 	if (oauth) system.push({ type: 'text', text: IDENTITY })
@@ -127,6 +128,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 				: { input_schema: t.inputSchema }),
 		}))
 	if (
+		webSearch &&
 		req.tools?.some((t) => t.name === 'tool') &&
 		catalog.webSearchModels.includes(req.model) &&
 		(!auth.serperKey() || !registry.all().some((t) => t.name === 'google'))

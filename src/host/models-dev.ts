@@ -14,7 +14,10 @@ import { modelsDevWorker } from './models-dev-worker.ts'
 import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 
-export type ModelInfo = { name?: string; context?: number; pricing?: Pricing }
+// `npm`: the AI SDK package a model's gateway route speaks, when it
+// differs from its provider's (opencode-go serves some models only over
+// OpenAI Responses or Anthropic Messages).
+export type ModelInfo = { name?: string; context?: number; pricing?: Pricing; npm?: string }
 // models.dev provider id -> model id (without "provider/") -> info.
 export type Catalog = Record<string, Record<string, ModelInfo>>
 
@@ -89,6 +92,7 @@ function parse(data: unknown): Catalog {
 			let info: ModelInfo = {}
 			if (typeof raw?.name === 'string') info.name = raw.name
 			if (typeof raw?.limit?.context === 'number' && raw.limit.context > 0) info.context = raw.limit.context
+			if (typeof raw?.provider?.npm === 'string') info.npm = raw.provider.npm
 			let cost = raw?.cost
 			if (typeof cost?.input === 'number' && typeof cost?.output === 'number') {
 				let prices: Pricing = { input: cost.input, output: cost.output }

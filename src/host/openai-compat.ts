@@ -1,10 +1,13 @@
 // OpenAI-compatible Chat Completions provider (OpenRouter, OpenCode Go,
-// Ollama and other local servers). Wire mapping: tasks/7f/mapping.md.
+// Ollama and other local servers). OpenCode Go models that only speak
+// Responses or Messages reuse openai.ts and anthropic.ts (opencodeRoute).
+// Wire mapping: tasks/7f/mapping.md.
 
 import { blocks, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
 import { auth } from './auth.ts'
-import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { provider, type HttpRequest, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { modelsDev } from './models-dev.ts'
 import { modelEffort } from './model-effort.ts'
 import { compatCatalog } from './compat-catalog.ts'
 export type { Endpoint } from './compat-catalog.ts'
@@ -163,15 +166,44 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 	return { base: ep.baseUrl.replace(/\/+$/, ''), headers }
 }
 
+// The OpenCode Go request for `req`: models.dev names the AI SDK package
+// each model needs (Responses or Messages); the rest, undefined here,
+// take Chat Completions. `base` is the gateway's OpenAI root (…/openai/v1).
+// Gemini models (@ai-sdk/google) also get Chat Completions: Hal has no
+// Gemini client, and the gateway's refusal reaches the user whole.
+function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpRequest | undefined {
+	let npm = modelsDev.info(`opencode-go/${req.model}`)?.npm
+	if (npm === '@ai-sdk/openai') {
+		let { openai } = require('./openai.ts') as typeof import('./openai.ts')
+		return {
+			url: `${base}/responses`,
+			headers: { authorization: `Bearer ${key}`, accept: 'text/event-stream' },
+			body: openai.body(req, false, false),
+			parse: openai.parse,
+		}
+	}
+	if (npm === '@ai-sdk/anthropic') {
+		let { anthropic } = require('./anthropic.ts') as typeof import('./anthropic.ts')
+		return {
+			url: `${base.replace(/\/openai\/v1$/, '')}/anthropic/v1/messages`,
+			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+			body: anthropic.body(req, false, false),
+			parse: anthropic.parse,
+		}
+	}
+	return undefined
+}
+
 function create(name: string): Provider {
 	let p: Provider = {
 		async request(req) {
 			let ep = openaiCompat.endpoints()[name]
 			// OpenCode Go keys are accounts that rotate on limits (auth.ts).
 			let cred = name === 'opencode-go' ? await auth.pick(name, req.model, { session: req.sessionId }) : undefined
-			let { base, headers } = cred
-				? { base: ep!.baseUrl.replace(/\/+$/, ''), headers: { authorization: `Bearer ${cred.value}` } }
-				: openaiCompat.endpoint(name)
+			let base = ep?.baseUrl.replace(/\/+$/, '') ?? ''
+			let routed = cred && openaiCompat.opencodeRoute(base, req, cred.value)
+			if (routed) return { ...routed, headers: { ...routed.headers, ...ep?.headers?.(req) }, account: cred!.account }
+			let { headers } = cred ? { headers: { authorization: `Bearer ${cred.value}` } } : openaiCompat.endpoint(name)
 			return {
 				url: `${base}/chat/completions`,
 				headers: { ...headers, ...ep?.headers?.(req) },
@@ -267,6 +299,7 @@ export const openaiCompat = {
 	body,
 	parse,
 	endpoint,
+	opencodeRoute,
 	create,
 	init,
 }

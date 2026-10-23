@@ -35,13 +35,15 @@ export type ProviderRequest = {
 // `account` names the credentials used, for providers with several
 // (rate limits are per account; a 401 is reported back by name).
 // `encoding` compresses the body, for endpoints verified to accept it:
-// HTTP re-sends the whole conversation every round.
+// HTTP re-sends the whole conversation every round. `parse` replaces
+// the provider's parser for a gateway that speaks several protocols.
 export type HttpRequest = {
 	url: string
 	headers: Record<string, string>
 	body: unknown
 	account?: string
 	encoding?: 'zstd' | 'gzip'
+	parse?: Provider['parse']
 }
 
 type Failure = NonNullable<ErrorEvent['failure']>
@@ -375,7 +377,7 @@ async function* stream(
 			return
 		}
 		let counted: { input?: number; cacheRead?: number; cacheWrite?: number } = {}
-		for await (let event of p.parse(provider.sse(res.body, conn.signal))) {
+		for await (let event of (http.parse ?? p.parse)(provider.sse(res.body, conn.signal))) {
 			if (signal?.aborted) throw new Canceled()
 			if (event.type === 'error') {
 				yield failed(p, modelId, http.account, event)

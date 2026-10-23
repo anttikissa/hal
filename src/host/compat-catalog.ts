@@ -56,7 +56,7 @@ export const compatCatalog = {
 		return {
 			openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
 			'opencode-go': {
-				baseUrl: 'https://opencode.ai/zen/go/v1',
+				baseUrl: 'https://opencode.ai/inference/go/openai/v1',
 				keyEnv: 'OPENCODE_API_KEY',
 				login: 'opencode',
 				models: false,

@@ -26,6 +26,32 @@ const orig = { endpoints: openaiCompat.endpoints, pollMs: auth.pollMs, onError: 
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: Headers[] = []
+let routes: string[] = []
+
+// Trimmed from the real gateway's streams, one per protocol.
+function stream(path: string): string {
+	let sse = (events: unknown[]) =>
+		events.map((c) => `data: ${typeof c === 'string' ? c : JSON.stringify(c)}\n\n`).join('')
+	if (path.endsWith('/responses'))
+		return sse([
+			{ type: 'response.output_text.delta', delta: 'ok' },
+			{ type: 'response.completed', response: { usage: { input_tokens: 5, output_tokens: 1 } } },
+		])
+	if (path.endsWith('/messages'))
+		return sse([
+			{ type: 'message_start', message: { usage: { input_tokens: 0, output_tokens: 0 } } },
+			{ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+			{ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+			{ type: 'content_block_stop', index: 0 },
+			{ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { input_tokens: 5, output_tokens: 1 } },
+			{ type: 'message_stop' },
+		])
+	return sse([
+		{ choices: [{ delta: { content: 'ok' } }] },
+		{ choices: [{ delta: {}, finish_reason: 'stop' }] },
+		'[DONE]',
+	])
+}
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-opencode-`)
@@ -33,21 +59,20 @@ beforeEach(() => {
 	paths.state.home = home
 	delete process.env.OPENCODE_API_KEY
 	seen = []
+	routes = []
 	server = Bun.serve({
 		port: 0,
 		fetch(req) {
 			seen.push(req.headers)
-			let chunks = [
-				{ choices: [{ delta: { content: 'ok' } }] },
-				{ choices: [{ delta: {}, finish_reason: 'stop' }] },
-				'[DONE]',
-			]
-			return new Response(chunks.map((c) => `data: ${typeof c === 'string' ? c : JSON.stringify(c)}\n\n`).join(''))
+			routes.push(new URL(req.url).pathname)
+			return new Response(stream(new URL(req.url).pathname))
 		},
 	})
 	// The real endpoint, pointed at the fake server.
 	let real = orig.endpoints()['opencode-go']!
-	openaiCompat.endpoints = () => ({ 'opencode-go': { ...real, baseUrl: `http://127.0.0.1:${server.port}/v1` } })
+	openaiCompat.endpoints = () => ({
+		'opencode-go': { ...real, baseUrl: `http://127.0.0.1:${server.port}/inference/go/openai/v1` },
+	})
 	openaiCompat.init()
 	liveFiles.onError = () => {}
 })
@@ -72,10 +97,10 @@ afterEach(() => {
 const ctx = { sessionId: 's', cwd: '/tmp', model: 'opencode-go/m', setCwd() {}, setModel() {}, say() {} }
 const file = () => `${home}/secrets/auth.ason`
 
-async function send(sessionId?: string): Promise<{ events: string[]; message?: string }> {
+async function send(sessionId?: string, model = 'm'): Promise<{ events: string[]; message?: string }> {
 	let out: string[] = []
 	let message: string | undefined
-	for await (let e of provider.stream('opencode-go/m', {
+	for await (let e of provider.stream(`opencode-go/${model}`, {
 		messages: [{ role: 'user', blocks: [{ type: 'text', text: 'hi' }] }],
 		sessionId,
 	})) {
@@ -148,4 +173,26 @@ test('the model list comes from models.dev, without asking the server', async ()
 		modelsDev.ids = ids
 	}
 	expect(seen).toHaveLength(0)
+})
+
+// Invariant: each model goes to the protocol models.dev names for it,
+// with the rotating account's key; the gateway refuses other protocols.
+test('models.dev routes each model to Responses, Messages or Chat Completions, with the account key', async () => {
+	let info = modelsDev.info
+	let npm: Record<string, string> = { 'opencode-go/grok': '@ai-sdk/openai', 'opencode-go/minimax': '@ai-sdk/anthropic' }
+	modelsDev.info = (id: string) => (npm[id] ? { npm: npm[id] } : undefined)
+	writeFileSync(file(), ason.stringify({ 'opencode-go': [{ apiKey: 'k1' }] }), { mode: 0o600 })
+	try {
+		for (let model of ['grok', 'minimax', 'glm'])
+			expect((await send('s1', model)).events.filter((t) => t !== 'usage')).toEqual(['text', 'done'])
+	} finally {
+		modelsDev.info = info
+	}
+	expect(routes).toEqual([
+		'/inference/go/openai/v1/responses',
+		'/inference/go/anthropic/v1/messages',
+		'/inference/go/openai/v1/chat/completions',
+	])
+	expect(seen.map((h) => h.get('authorization') ?? h.get('x-api-key'))).toEqual(['Bearer k1', 'k1', 'Bearer k1'])
+	expect(seen.every((h) => h.get('x-opencode-session') === 's1')).toBe(true)
 })

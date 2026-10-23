@@ -90,7 +90,8 @@ function reasons(model: string): boolean {
 	return /^(gpt-[56]|o\d|codex)/.test(model)
 }
 
-function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
+// `webSearch`: whether the endpoint offers OpenAI's hosted web search.
+function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<string, unknown> {
 	let b: Record<string, unknown> = { model: req.model, store: false, stream: true, input: openai.input(req) }
 	if (req.system) b.instructions = req.system
 	if (req.tools?.length) {
@@ -101,6 +102,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 			parameters: t.inputSchema,
 		}))
 		if (
+			webSearch &&
 			req.tools.some((t) => t.name === 'tool') &&
 			catalog.webSearchModels.includes(req.model) &&
 			(!auth.serperKey() || !tools.all().some((t) => t.name === 'google'))
