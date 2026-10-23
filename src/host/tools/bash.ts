@@ -75,6 +75,7 @@ export const tool: Tool<ToolOutput> = {
 		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 		let given = input.timeout === undefined ? undefined : Math.round((input.timeout as number) * 1000)
 		let observation = await fileChanges.begin(ctx, patterns)
+		if (observation.commits) observation.commits.command = input.command
 		let launched = false
 		// The call's commits (task 179); a background job finishing after
 		// its result has none to give.

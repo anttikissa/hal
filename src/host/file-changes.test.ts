@@ -302,10 +302,8 @@ test('a commit in a bash call notifies other tabs once; a reset does not; an ame
 	try {
 		let git = 'git -c user.name=t -c user.email=t@example.com'
 		await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
-		expect(elsewhere.splice(0)).toMatchObject([
-			{ session: '', name: 'repo', line: expect.stringMatching(/ untrailed$/) },
-		])
-		expect(watching.splice(0)).toHaveLength(1)
+		expect(elsewhere.splice(0)).toMatchObject([{ session: id, line: expect.stringMatching(/ untrailed$/) }])
+		expect(watching.splice(0)).toHaveLength(0)
 		await bash(`printf a > a && ${git} add a && ${git} commit -qm 'first line' -m 'body' -m 'Session: ${id}'`)
 		let hash = (await fileChanges.git(cwd, ['rev-parse', 'HEAD'])).text.trim()
 		expect(elsewhere).toMatchObject([

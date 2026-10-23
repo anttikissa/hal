@@ -21,7 +21,15 @@ import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { transcript } from '../common/transcript.ts'
 
-type Watch = { sessionId: string; callId?: string; cwd: string; log: string; size: number; start: number }
+type Watch = {
+	sessionId: string
+	callId?: string
+	cwd: string
+	log: string
+	size: number
+	start: number
+	command?: string
+}
 // What commits.committed gets: one commit a Bash call of `sessionId` made
 // (its Session trailer names that session). Paths are absolute; a binary
 // file counts -1 lines. Hooks may rewrite files' counts for the card and
@@ -203,8 +211,11 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 			let c = info.get(e.hash)
 			if (!c) continue
 			let id = commits.attribute(c.trailer)
+			// No trailer: the call that ran `git commit` made it.
+			let own = !id && /\bgit\b[^;&|]*\bcommit\b/.test(watch.command ?? '')
+			if (own) id = watch.sessionId
 			commits.announce(id, e.hash, c.short, c.subject, e.amend, basename(watch.cwd))
-			if (id) commits.verify(id, c.short, c.subject, e.time)
+			if (id && !own) commits.verify(id, c.short, c.subject, e.time)
 			if (id !== watch.sessionId) continue
 			try {
 				root ??= (await fileChanges.git(watch.cwd, ['rev-parse', '--show-toplevel'])).text.trim()
