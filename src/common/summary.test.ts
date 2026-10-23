@@ -88,4 +88,6 @@ test('questions remain inline beside prose and literal code in replayed answers'
 	let text = 'My recommendation.\n\n<question>Use `/help` in both clients?</question>'
 	expect(summary.answer(text)).toBe('My recommendation.\n\nUse `/help` in both clients?')
 	expect(summary.answer('Example: `<question>Literal?</question>`')).toBe('Example: `<question>Literal?</question>`')
+	// Invariant: newlines just inside the tag add no blank rows.
+	expect(summary.answer('Task.\n\n<question>\n1. A?\n</question>')).toBe('Task.\n\n1. A?')
 })

@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		"summary.ts handles both tags with one regex; summary.asks(text) is true when the last complete tag is <question>. notify.asked(id) reads the latest turn's last text block from pages (history), and gates three places: notify.kind (attention instead of done), prompts.next and prompts.submit (a queued submit to an idle session after an asking turn stays queued), and tabs (tab-seen does not clear the mark; a busy state event does).",
-		'The initial design hid questions like redundant summaries and only held queue:true messages. Ordinary agent reports could start a fresh turn and erase the history-derived wait. Preserve question text in shared answer rendering and classify incoming agent messages as queued while asking; keep the existing inbox and human overrides.'
+		'The initial design hid questions like redundant summaries and only held queue:true messages. Ordinary agent reports could start a fresh turn and erase the history-derived wait. Preserve question text in shared answer rendering and classify incoming agent messages as queued while asking; keep the existing inbox and human overrides.',
+		'Invariant (bug fix, 183-gal): inlined question content is trimmed, so newlines just inside the tag never add a second blank row.'
 	],
 	needs: ['qm', '2r', 'nzv'],
 	foldInto: ['x8']

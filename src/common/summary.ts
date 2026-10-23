@@ -44,7 +44,7 @@ function strip(text: string, questions = false): string {
 		if (questions && match[1] === 'question') {
 			out +=
 				text.slice(at, match.index) +
-				text.slice(match.index + '<question>'.length, match.index + match[0].length - '</question>'.length)
+				text.slice(match.index + '<question>'.length, match.index + match[0].length - '</question>'.length).trim()
 		} else out += text.slice(at, match.index).trimEnd()
 		at = match.index + match[0].length
 	}
