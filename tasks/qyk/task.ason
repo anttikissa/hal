@@ -1,0 +1,7 @@
+{
+	title: 'Web shows the lost link once, in the status line',
+	spec: 'While the web page has no host link, the composer status line alone says reconnecting; the link state sets no notice, so retries (joining, then disconnected) do not flip text above the composer. Reconnecting clears the notice, such as a stale "not connected" refusal. Invariant (bug fix): one reconnecting text, steady while retries cycle; the old notice alternated connecting… and disconnected; reconnecting… on every attempt and duplicated the status line.',
+	status: 'done',
+	needs: [],
+	foldInto: ['4s']
+}

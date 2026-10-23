@@ -263,10 +263,8 @@ function onState(state: LinkState): void {
 	if (state.type === 'connected') {
 		tabs.connected()
 		push.visibility(app.state.shown)
+		app.setNotice(undefined)
 	}
-	app.setNotice(
-		state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…',
-	)
 }
 
 // The message box now says `text`; stale replies may never reopen the menu.

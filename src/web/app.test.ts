@@ -140,9 +140,11 @@ test('settings arrows adjust values but leave inline editing native', () => {
 	expect(fx.sent).toHaveLength(count)
 })
 
-test('the link state shows as a notice until connected', () => {
+test('the link state leaves the notice to the status line and clears it on connect', () => {
+	app.setNotice('not connected; try again in a moment')
+	app.onState({ type: 'joining' })
 	app.onState({ type: 'disconnected', retryAt: 0 })
-	expect(app.notice()).toMatch(/reconnect/)
+	expect(app.notice()).toBe('not connected; try again in a moment')
 	app.onState({ type: 'connected', role: 'client' })
 	expect(app.notice()).toBeUndefined()
 })
