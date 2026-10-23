@@ -7,7 +7,8 @@ The original call card never changes while the job runs: the job's output is kep
 Host: background Bash streams through the same tool-output event and toolOutput state as foreground Bash; the job, not the tool call, ends the stream (exit, /kill, STOP, tab close; host exit loses it like the job). The streamed preview keeps the newest output, at most the preview cap, with absolute offsets, so an endless or long command keeps updating; clients keep the same bound. Snapshots carry it for late joiners as for foreground output.`,
 	status: 'done',
 	notes: [
-		'Invariant: a card never shrinks as its job ends. The job result card (bash t<n>) starts in the fold state its streaming card had: web reads <session>#job:<n>, terminal the call key <n> it shares with the job card (bashResult.job).'
+		'Invariant: a card never shrinks as its job ends. The job result card (bash t<n>) starts in the fold state its streaming card had: web reads <session>#job:<n>, terminal the call key <n> it shares with the job card (bashResult.job).',
+		'In the terminal a closed background result card shows its last rows (blockView.short), as its closed job card did, so it keeps its height.'
 	],
 	needs: ['v0'],
 	foldInto: ['v0']

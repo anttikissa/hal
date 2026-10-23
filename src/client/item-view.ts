@@ -191,9 +191,10 @@ function itemLines(
 						itemView.itemStyle(item),
 					),
 				)
-				return fold === 'short'
-					? head
-					: [...head, ...ansi.wrap(card.text(item), width).map((row) => bashCard.paint(row, itemView.itemStyle(item)))]
+				// Closed, its last rows, as its job card showed them: a card
+				// never shrinks as its job ends (task 6nn).
+				let body = ansi.wrap(card.text(item), width).map((row) => bashCard.paint(row, itemView.itemStyle(item)))
+				return [...head, ...(fold === 'short' ? blockView.short(body, width, true, itemView.itemStyle(item)) : body)]
 			}
 			let source = card.text(item)
 			let body = !source.trim()
