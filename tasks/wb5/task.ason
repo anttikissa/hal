@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'The count follows the title, not the reference: placed before the reference it covered header status such as (1.8s). Its zero-width column cancels the grid gap with margin-left: -1ch. This fix landed inside 886b18f1 (176-spy) through the shared index.',
-		'Tall blocks are decided in one place for every kind: Transcript.tsx measures each block (ResizeObserver) and sets data-tall when it is over 10 lines tall. Headers of other blocks are static. Questions follow the same rule.'
+		'Tall blocks are decided in one place for every kind: Transcript.tsx measures each block (ResizeObserver) and sets data-tall when it is over 10 lines tall. Headers of other blocks are static. Questions follow the same rule.',
+		'Invariant: the (+N lines) count covers the title text under it opaquely. 50% opacity on the whole hint let the covered title show through and garble both (23-hen); the cover stays opaque and only the count text is faded with color-mix.'
 	],
 	needs: ['gwr']
 }
