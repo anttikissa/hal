@@ -2246,11 +2246,11 @@
 				display: flex;
 				flex-wrap: wrap;
 				gap: 0.25lh 1ch;
-				white-space: pre-line;
 				margin-bottom: 0.75lh;
 			}
 			.Picker .question {
 				flex: none;
+				white-space: pre-line;
 				margin: 0 0 0.75lh;
 			}
 			.Picker .filters button {
@@ -2262,10 +2262,14 @@
 			}
 			.Picker li a {
 				display: block;
-				min-height: 44px;
 				padding-block: 0.25lh;
 				color: inherit;
 				text-decoration: none;
+			}
+			.Picker.find li a {
+				white-space: pre;
+				overflow: hidden;
+				text-overflow: ellipsis;
 			}
 			.Picker li :focus-visible,
 			.Picker li:focus-visible {
@@ -2352,6 +2356,9 @@
 				}
 				.Picker li:has(> a) {
 					padding-block: 0;
+				}
+				.Picker li a {
+					min-height: 44px;
 				}
 				.Picker .close {
 					min-width: 44px;
