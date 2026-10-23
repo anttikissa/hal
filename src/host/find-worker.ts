@@ -31,7 +31,10 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 	if (!meta || !findWorker.eligible(meta, q)) return
 	let age = Math.max(0, now - row.ts)
 	if (q.since !== undefined && age > q.since) return
-	if (q.exclude.length && q.exclude.some((w) => row.text.toLocaleLowerCase().includes(w))) return
+	if (q.exclude.length) {
+		let haystack = `${row.sessionId} ${meta.name ?? ''} ${row.text}`.toLocaleLowerCase()
+		if (q.exclude.some((w) => haystack.includes(w))) return
+	}
 	let match = findQuery.match(row.text, q.words, age)
 	if (!match) return
 	// A matching commit ranks by recency alone and shows its title line.

@@ -1,7 +1,10 @@
 {
 	title: 'Find: exclude words with -word',
-	spec: 'A find query word starting with - (followed by at least one character) excludes every block, session metadata included, whose text contains the rest as a case-insensitive substring; a lone - stays an ordinary word. Excluded words take no part in ranking, snippets or highlighting. /find help documents -word. Example: compact -siren finds COMPACT work without blocks mentioning siren.',
+	spec: 'A find query word starting with - (followed by at least one character) excludes every result whose session id, session name or block text contains the rest as a case-insensitive substring; a lone - stays an ordinary word. Excluded words take no part in ranking, snippets or highlighting. /find help documents -word. Examples: compact -siren hides blocks in tabs named SIREN even when the block itself lacks the word; -23-box hides that session.',
 	status: 'done',
+	notes: [
+		'First version matched block text only, so compact -siren still listed /compact applied. rows from the tab named Compact SIREN piano architecture. Invariant: an excluded word also hides results by session id and name. Checked against a copy of the live index; in:commit compact then lists 22-dew commits first.'
+	],
 	needs: ['v8'],
 	foldInto: ['v8']
 }
