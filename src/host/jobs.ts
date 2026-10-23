@@ -24,12 +24,10 @@ import { busy } from './busy.ts'
 
 export type Run = { done: Promise<string>; stop: (why?: string) => void; output: () => string }
 // `unsafe`: the call was flagged unsafeToStop, so a restart asks first.
-// `endOutput`: ends the job's streamed preview (task 6nn).
 type Job = {
 	sessionId: string
 	stop: () => void
 	output?: () => string
-	endOutput?: () => void
 	unsafe?: { input: Record<string, unknown>; at: number }
 }
 
@@ -105,7 +103,6 @@ async function start(
 	callId?: string,
 	prepared?: () => Run,
 	unsafe?: Record<string, unknown>,
-	holdOutput?: () => () => void,
 ): Promise<string> {
 	let call = callId
 		? history
@@ -115,12 +112,10 @@ async function start(
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded card id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
-	let endOutput = holdOutput?.()
 	jobs.state.running.set(id, {
 		sessionId,
 		stop: run.stop,
 		output: run.output,
-		...(endOutput && { endOutput }),
 		...(unsafe && { unsafe: { input: unsafe, at: Date.now() } }),
 	})
 	let meta = sessions.open(sessionId)
@@ -129,13 +124,11 @@ async function start(
 	try {
 		let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
 		if (early !== undefined) {
-			endOutput?.()
 			jobs.state.running.delete(id)
 			jobs.forget(sessionId, id)
 			return early
 		}
 	} catch (e) {
-		endOutput?.()
 		jobs.state.running.delete(id)
 		jobs.forget(sessionId, id)
 		throw e
@@ -166,7 +159,6 @@ function forget(sessionId: string, id: string): void {
 function finish(id: string, out: string): void {
 	let job = jobs.state.running.get(id)
 	if (!job) return
-	job.endOutput?.()
 	jobs.state.running.delete(id)
 	jobs.forget(job.sessionId, id)
 	jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId, tools.bashMaxChars, tools.bashMaxLines))
@@ -208,9 +200,7 @@ function running(sessionId: string): string[] {
 // closed).
 function kill(sessionId: string): void {
 	for (let id of jobs.running(sessionId)) {
-		let job = jobs.state.running.get(id)!
-		job.stop()
-		job.endOutput?.()
+		jobs.state.running.get(id)!.stop()
 		jobs.state.running.delete(id)
 		jobs.forget(sessionId, id)
 	}
@@ -243,10 +233,7 @@ function stop(sessionId: string, ref: string): { refused?: string; stopped?: str
 // This process exits: stops every background command, leaving the
 // metadata for the next host to report them lost. Synchronous.
 function killAll(): void {
-	for (let job of jobs.state.running.values()) {
-		job.stop()
-		job.endOutput?.()
-	}
+	for (let job of jobs.state.running.values()) job.stop()
 	jobs.state.running.clear()
 	jobs.state.delivering.clear()
 }
