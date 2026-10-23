@@ -119,8 +119,7 @@ function save(entry: Entry, kind: Kind = 'anthropic'): void {
 	if (created) liveFiles.close(data)
 	// The name auth.all gives this account; its old limits no longer hold.
 	let i = same >= 0 ? same : list.length - 1
-	let email = list[i]?.email
-	limits.forget(kind, auth.usable(email) ? email : `account ${i + 1}`)
+	limits.forget(kind, auth.accountName(kind, list[i] ?? {}, i))
 }
 
 export const login = {

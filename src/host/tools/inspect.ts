@@ -123,7 +123,7 @@ function logins(): string {
 	if (!existsSync(paths.authFile())) return 'No stored logins.'
 	let rows = Object.entries(auth.store()).flatMap(([provider, value]) =>
 		[value].flat().map((e: any, i: number) => {
-			let account = typeof e?.email === 'string' ? e.email : `account ${i + 1}`
+			let account = auth.accountName(provider, e ?? {}, i)
 			let until = statusUsage.limitedUntil(provider, account)
 			return [
 				provider,

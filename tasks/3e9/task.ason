@@ -1,0 +1,10 @@
+{
+	title: 'OpenCode Go key accounts keep stable identities',
+	spec: 'An OpenCode Go API-key account is named by a short hash of its key (key <6 hex>), not its position, everywhere the name keys state: rate limits, session account choice, /status and INSPECT logins. Removing or reordering keys never moves one key’s rate limit onto another. Invariant restored: a recorded cooldown belongs to the credential that received the 429. Anthropic and OpenAI naming is unchanged.',
+	status: 'done',
+	notes: [
+		'23 Oct 2026: limits.ason held opencode-go account 1/account 2 cooldowns. After the invalid first key was removed, positions shifted: the limited key became account 1 and the fresh key inherited account 2. Hashed names leave old positional limits orphaned until they expire.'
+	],
+	needs: ['83'],
+	foldInto: ['83']
+}

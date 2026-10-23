@@ -144,11 +144,21 @@ function accounts(data: Entry, kind: Kind = 'anthropic'): Account[] {
 		if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
 		if (!usable(entry.accessToken) && !usable(entry.apiKey)) continue
 		let replace = Array.isArray(raw) ? (next: Entry) => (raw[i] = next) : (next: Entry) => (data[kind] = next)
-		let name = usable(entry.email) ? entry.email : `account ${i + 1}`
+		let name = auth.accountName(kind, entry, i)
 		out.push({ entry, name, replace })
 	}
 	if (!out.length) throw fail(`${kind} entry has no accessToken or apiKey`)
 	return out
+}
+
+// An account's name, which keys its limits and session choice. OpenCode
+// Go keys are named by a short hash of the key, so removing one key
+// cannot move its limits onto another (positions shift).
+function accountName(kind: string, entry: Entry, i: number): string {
+	if (usable(entry.email)) return entry.email
+	if (kind === 'opencode-go' && usable(entry.apiKey) && !usable(entry.accessToken))
+		return `key ${Bun.hash(entry.apiKey).toString(16).padStart(16, '0').slice(-6)}`
+	return `account ${i + 1}`
 }
 
 function usable(value: unknown): value is string {
@@ -391,6 +401,7 @@ export const auth = {
 	store,
 	all,
 	accounts,
+	accountName,
 	pickAccount,
 	skipped,
 	limitedUntil,

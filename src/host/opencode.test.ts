@@ -133,6 +133,35 @@ test('the stored key comes first, OPENCODE_API_KEY next; with neither the error 
 	expect(statSync(file()).mode & 0o777).toBe(0o600)
 })
 
+test('opencode-go keys are accounts that rotate on limits', async () => {
+	let { limits } = await import('./limits.ts')
+	let { apiKeys } = await import('./api-keys.ts')
+	paths.init()
+	try {
+		writeFileSync(file(), ason.stringify({ 'opencode-go': { apiKey: 'k1' } }), { mode: 0o600 })
+		apiKeys.save('opencode-go', 'k2')
+		apiKeys.save('opencode-go', 'k2')
+		expect((ason.parse(readFileSync(file(), 'utf8')) as any)['opencode-go']).toEqual([
+			{ apiKey: 'k1' },
+			{ apiKey: 'k2' },
+		])
+		// An account-less limit blocks none.
+		limits.set(limits.key('opencode-go/m'), Date.now() + 3600_000)
+		let first = await auth.pick('opencode-go', 'm')
+		expect(first.value).toBe('k1')
+		limits.set(limits.key('opencode-go', first.account), Date.now() + 3600_000)
+		let second = await auth.pick('opencode-go', 'm')
+		expect(second.value).toBe('k2')
+		expect(auth.limitedUntil('opencode-go/m')).toBe(0)
+		// 23 Oct 2026: removing a key shifted positions, moving its limit onto another key.
+		writeFileSync(file(), ason.stringify({ 'opencode-go': [{ apiKey: 'k2' }] }), { mode: 0o600 })
+		auth.close()
+		expect(await auth.pick('opencode-go', 'm')).toMatchObject({ value: 'k2', account: second.account })
+	} finally {
+		limits.close()
+	}
+})
+
 test('an empty key stores nothing', async () => {
 	expect((await command.run('opencode', { key: '  ' }, ctx)).error).toBeDefined()
 	expect((await send()).message).toContain('/login opencode')
