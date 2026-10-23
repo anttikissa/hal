@@ -23,7 +23,14 @@ export type FindBatch = {
 	scanning?: number
 	error?: string
 }
-export type FindQuery = { words: string[]; kinds: FindKind[]; model?: string; cwd?: string; since?: number }
+export type FindQuery = {
+	words: string[]
+	exclude: string[]
+	kinds: FindKind[]
+	model?: string
+	cwd?: string
+	since?: number
+}
 const tiers: FindKind[] = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'commit', 'other']
 const groups: Record<string, FindKind[]> = {
 	text: ['user', 'assistant'],
@@ -39,7 +46,7 @@ const groups: Record<string, FindKind[]> = {
 }
 
 function parse(text: string, filters?: FindFilter[]): FindQuery {
-	let q: FindQuery = { words: [], kinds: [...tiers] }
+	let q: FindQuery = { words: [], exclude: [], kinds: [...tiers] }
 	if (filters) {
 		let all = (['text', 'thinking', 'tools', 'commit', 'other'] as const).every((f) => filters.includes(f))
 		q.kinds = [
@@ -50,7 +57,8 @@ function parse(text: string, filters?: FindFilter[]): FindQuery {
 	for (let word of text.trim().split(/\s+/).filter(Boolean)) {
 		let m = /^(in|model|cwd|since):(.+)$/i.exec(word)
 		if (!m) {
-			q.words.push(word.toLocaleLowerCase())
+			if (/^-./.test(word)) q.exclude.push(word.slice(1).toLocaleLowerCase())
+			else q.words.push(word.toLocaleLowerCase())
 			continue
 		}
 		let value = m[2]!

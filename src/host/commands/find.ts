@@ -4,7 +4,7 @@ import { find } from '../find.ts'
 
 export const command: SlashCommand = {
 	help: () =>
-		'/find <query> searches every session. Every word must match; in:text|thinking|tools|other, model:<name>, cwd:<path>, since:<age> (3d, 12h) restrict results.',
+		'/find <query> searches every session. Every word must match; -word drops blocks containing it; in:text|thinking|tools|other, model:<name>, cwd:<path>, since:<age> (3d, 12h) restrict results.',
 	run: async (args) => {
 		if (!args.trim()) return { error: 'usage: /find <query>' }
 		let hits = await find.top(args)

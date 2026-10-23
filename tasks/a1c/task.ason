@@ -1,0 +1,7 @@
+{
+	title: 'Find: exclude words with -word',
+	spec: 'A find query word starting with - (followed by at least one character) excludes every block, session metadata included, whose text contains the rest as a case-insensitive substring; a lone - stays an ordinary word. Excluded words take no part in ranking, snippets or highlighting. /find help documents -word. Example: compact -siren finds COMPACT work without blocks mentioning siren.',
+	status: 'done',
+	needs: ['v8'],
+	foldInto: ['v8']
+}
