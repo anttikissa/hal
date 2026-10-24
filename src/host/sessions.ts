@@ -181,13 +181,15 @@ function open(id: string): SessionMeta {
 	let existing = sessions.state.open.get(id)
 	if (existing) return existing
 	let meta = sessions.load(id, false)
+	// Open first, so recover's history read stays cached for later readers.
+	sessions.state.open.set(id, meta)
 	try {
 		if (sessionSettings.recover(meta)) liveFiles.save(meta)
 	} catch (error) {
+		sessions.state.open.delete(id)
 		liveFiles.close(meta)
 		throw error
 	}
-	sessions.state.open.set(id, meta)
 	if (!meta.name?.trim() || meta.name === id) meta.name = names.fallback(id)
 	liveFiles.save(meta)
 	return meta

@@ -39,6 +39,9 @@ function assign(meta: SessionMeta, settings: SessionSettings): void {
 }
 
 function recover(meta: SessionMeta): boolean {
+	let { pages } = require('./pages.ts') as typeof import('./pages.ts')
+	// The marks note every rebase: without one, nothing can need recovering.
+	if (pages.marks(meta.id).rebase === undefined) return false
 	let { history } = require('./history.ts') as typeof import('./history.ts')
 	let raw = history.readSync(meta.id)
 	if (!raw.some((r) => r.type === 'rebase' && r.contextChanged)) return false

@@ -1,0 +1,10 @@
+{
+	title: 'A restart reconnects clients within about a second',
+	spec: 'After a restart the new host serves the Unix socket and the web within about a second, however many tabs are open. Work over every open tab (restart notes, project plugins, turn recovery, lost background jobs) runs after the web listens, a tab at a time. Opening a session reads its full history only if its marks note a rebase, and the read stays cached while the session is open. Web clients retry a lost connection at most 1 s apart (wsLink.maxDelayMs), as terminal clients do.',
+	status: 'done',
+	notes: [
+		'Bug fix invariant: nothing that grows with open-tab count runs between taking the host lock and web.start. Before: becomeHost awaited projectContext.refresh and restartNote.announce, which opened all 174 tabs (sessionSettings.recover parsed every full history, uncached because the session was not yet open), so the web listened 7.5-8.7 s after start; web pages then backed off up to 15 s (10 s cap with jitter) and missed it. Measured on the server with a copy of the 175 open sessions: web on after 10.5 s before, 1.2 s after.',
+		'Remaining: a big rebased session (07-lou, 27 MB) still blocks up to ~1.2 s while restartNote and prompt-files catchUp open it (pages.rebased replay, full parse); slicing within one session belongs to task 7j.'
+	],
+	needs: ['2e', 'tr']
+}

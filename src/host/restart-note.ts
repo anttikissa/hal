@@ -22,7 +22,7 @@ function write(text: string): void {
 	} catch {}
 }
 
-function announce(): void {
+async function announce(): Promise<void> {
 	let text: string | undefined
 	try {
 		let file = `${paths.stateDir()}/restart.ason`
@@ -38,6 +38,7 @@ function announce(): void {
 	// Models hear one line per idle stretch: no cause, no repeat while the
 	// last one is unread, none for a turn turn-recovery continues (it says so).
 	for (let id of tabs.file().open) {
+		await new Promise((resolve) => setImmediate(resolve))
 		try {
 			sessions.open(id)
 			let last = pages.page(id, undefined, 1).records.at(-1)

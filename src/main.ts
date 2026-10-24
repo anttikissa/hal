@@ -192,8 +192,6 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
 	perf.mark('host')
-	await projectContext.refresh()
-	restartNote.announce()
 	main.later(() => {
 		find.init()
 		resources.init()
@@ -207,13 +205,21 @@ async function becomeHost(): Promise<boolean> {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
 			app.show()
 		}
-		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
-		jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
+		void main.settle()
 		// Old marks of sessions not open yet convert off this thread too.
 		if (existsSync(paths.sessionsDir())) void marksWorker.upgrade(readdirSync(paths.sessionsDir()))
 		void main.refreshModels()
 	})
 	return true
+}
+
+// Work over every open tab, after the web listens and a tab at a time,
+// so clients reconnect at once however many tabs are open.
+async function settle(): Promise<void> {
+	await restartNote.announce()
+	await projectContext.refresh().catch((e) => plugins.report(`project plugins: ${e?.stack ?? e}`))
+	turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+	jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
 }
 
 // Refreshes the models.dev cache (task qq); the user hears only if a model
@@ -445,6 +451,7 @@ export const main = {
 	initTerminal,
 	onEvent,
 	becomeHost,
+	settle,
 	mayHost: lifecycle.mayHost,
 	// hal serve (tasks fd1, kp0): the headless host, logging to stdout.
 	serve: async (port?: number) => {
