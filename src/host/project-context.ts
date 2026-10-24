@@ -75,7 +75,7 @@ function question(cwd: string): Form | undefined {
 	let root = projectContext.root(cwd)
 	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.relevant(cwd)) return
 	return {
-		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions. This includes future changes.',
+		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions.',
 		quote: { text: root },
 		fields: [
 			{
