@@ -1,0 +1,10 @@
+{
+	title: 'Record Pi extension compatibility research',
+	spec: 'pi-compat-research.md preserves a dated official Pi extension surface assessment, a popularity-evidenced sample of 10–15 applicable packages distinguished from bundles, and a concrete minimal optional Hal adapter recommendation. It maps lifecycle, tools, commands, UI, sessions, providers and runtime constraints to Hal, records evidence and limitations, and separates research conclusions from implementation commitments.',
+	status: 'done',
+	notes: [
+		'Current official Pi is earendil-works/pi, main package 1.4.0 at d0aa218cb16c333c008f6aa3dcd670ac8b68383c; it now has native MCP and codemode. Older claims that Pi lacks MCP are obsolete. Direct npm monthly counts differ from cached gallery counts; use dated direct measurements and distinguish monorepo stars from extension popularity.',
+		'Selected pi-simplify 0.2.3 for a possible future optional adapter: only registerCommand, exec, sendUserMessage, cwd and notify, with zero runtime Pi imports. An in-memory Bun facade ran the unmodified published package successfully for staged, no-change and explicit-file/ref paths. No Hal adapter was implemented. Upstream HEAD~1 fallback, whitespace argument parsing and hidden Git failure behavior must be disclosed.'
+	],
+	needs: ['an']
+}
