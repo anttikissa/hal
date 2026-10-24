@@ -48,6 +48,10 @@ const why: Record<FindKind, string> = {
 	'tool-output': 'tool',
 	other: 'other',
 }
+// A tool call is labeled by its command verb: tool { cmd: 'READ "a.ts"' } → READ.
+function label(kind: FindKind, text: string): string {
+	return (kind === 'tool-call' && /^(?:\w+ \{ cmd: ['"`])?([A-Z][A-Z_]+)\b/.exec(text)?.[1]) || why[kind]
+}
 
 function hit(row: FindRow, c: Context): FindResult | undefined {
 	let meta = findIndex.state.meta.get(row.sessionId)
@@ -78,7 +82,7 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 		blockId: block,
 		card: row.card + block,
 		kind: row.kind,
-		why: label,
+		why: label === why[row.kind] ? findWorker.label(row.kind, row.text) : label,
 		count: 0,
 		age,
 		snippet: match.snippet,
@@ -376,7 +380,7 @@ async function preview(c: Omit<FindPreview, 'type' | 'cards' | 'error'> & { chan
 		} catch {}
 		reply.cards = rows.map((r) => ({
 			card: r.card + r.blockId,
-			why: why[r.kind],
+			why: findWorker.label(r.kind, r.text),
 			text: findWorker.clip(r.text, r.id === hit?.id ? terms : undefined),
 			hit: r.id === hit?.id,
 		}))
@@ -415,6 +419,7 @@ async function init(home: string): Promise<void> {
 
 export const findWorker = {
 	home,
+	label,
 	state: {
 		ready: Promise.resolve(),
 		active: new Map<string, string>(),

@@ -57,33 +57,29 @@ const letters: Record<string, string> = {
 	q: 'question',
 }
 
-// A tool call's text starts with its tool name: READ src/a.ts.
-function tool(text: string): string | undefined {
-	return /^([A-Z][A-Z_]+)\b/.exec(text)?.[1]
-}
-function toolStyle(text: string): string {
-	let name = tool(text)
-	return name ? `tool tool-${name.toLowerCase().replace(/_/g, '-')}` : 'tool'
+// Tool-call rows and cards are labeled by their command verb, such as READ.
+function toolStyle(name = 'tool'): string {
+	return name === 'tool' ? 'tool' : `tool tool-${name.toLowerCase().replace(/_/g, '-')}`
 }
 function section(r: FindResult): string {
 	return r.count ? 'tabs' : sections[r.kind]
 }
 function rowStyle(r: FindResult): string {
-	return r.count ? 'find-tab' : r.kind === 'tool-call' ? toolStyle(r.snippet) : styles[r.kind]
+	return r.count ? 'find-tab' : r.kind === 'tool-call' ? toolStyle(r.why) : styles[r.kind]
 }
 function who(r: FindResult): string {
 	if (r.count) return ''
-	if (r.kind === 'tool-call') return tool(r.snippet) ?? 'tool'
+	if (r.kind === 'tool-call') return r.why
 	return r.kind === 'metadata' ? r.why : names[r.kind]
 }
 function tabNumber(r: FindResult, tabs: string[]): string {
 	let n = tabs.indexOf(r.sessionId)
 	return n < 0 ? '' : String(n + 1)
 }
-// An open tab's row lights in its project color, as in the tab bar.
+// An open tab's marker in its project color, as in the tab bar.
 function tabColor(r: FindResult) {
 	let color = app.state.tabs.find((t) => t.id === r.sessionId)?.color
-	return color === undefined ? undefined : { '--fg': `var(--p${color})` }
+	return color === undefined ? undefined : { background: `var(--p${color})` }
 }
 
 // The section heading above each row that starts a run of one kind.
@@ -116,20 +112,16 @@ function Row(props: { r: FindResult; title: string; tabs: string[]; query: strin
 	let id = () => (r().card && !r().count ? `${r().sessionId}/${r().card}` : r().sessionId)
 	let text = () => (r().count && r().why === 'title' ? r().cwd : findDialog.snippet(r(), props.query, 6))
 	return (
-		<a
-			class={`find-row ${rowStyle(r())}`}
-			style={r().count ? tabColor(r()) : undefined}
-			href={r().href}
-			title={props.title}
-			tabindex={-1}
-			onClick={props.onOpen}
-		>
+		<a class={`find-row ${rowStyle(r())}`} href={r().href} title={props.title} tabindex={-1} onClick={props.onOpen}>
 			<span class="tab">{tabNumber(r(), props.tabs)}</span>
 			<span class="id">{id()}</span>
 			<span class="who">{who(r())}</span>
 			<span class="name">{marked(r().name, props.query, true)}</span>
 			<span class="text">{marked(text(), props.query, true)}</span>
-			<span class="age">{findDialog.age(r().age)}</span>
+			<span class="age">
+				<Show when={r().count ? tabColor(r()) : undefined}>{(s) => <span class="mark" style={s()} />}</Show>
+				{findDialog.age(r().age)}
+			</span>
 		</a>
 	)
 }
@@ -150,8 +142,11 @@ function Preview(props: {
 	query: string
 	ref: (e: HTMLDivElement) => void
 }) {
+	// A tool output card shares its call's id, so it takes the call's look.
 	let cardStyle = (c: FindPreview['cards'][number]) =>
-		c.card[0] === 't' ? toolStyle(c.text) : (letters[c.card[0] ?? ''] ?? 'plain')
+		c.card[0] === 't'
+			? toolStyle(props.preview.cards.find((o) => o.card === c.card && o.why !== 'tool')?.why)
+			: (letters[c.card[0] ?? ''] ?? 'plain')
 	return (
 		<div class="preview" ref={props.ref} aria-label="Preview">
 			<Show when={props.result}>

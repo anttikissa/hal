@@ -2410,14 +2410,19 @@
 				white-space: pre;
 			}
 			.Picker.find .find-tab {
-				--fg: var(--accent);
+				--fg: var(--quiet);
 			}
 			.Picker.find li[aria-selected='true'] a.find-row {
-				background: color-mix(in oklab, var(--fg) 22%, transparent);
-				color: var(--title-fg);
+				background: color-mix(in oklab, var(--text) 16%, transparent);
 			}
-			.Picker.find li:hover a.find-row {
-				background: color-mix(in oklab, var(--fg) 12%, transparent);
+			.Picker.find li:hover:not([aria-selected='true']) a.find-row {
+				background: var(--pick);
+			}
+			.Picker.find .find-row .mark {
+				display: inline-block;
+				width: 1ch;
+				height: 1ch;
+				margin-right: 2ch;
 			}
 			.Picker.find .find-row > span {
 				min-width: 0;
