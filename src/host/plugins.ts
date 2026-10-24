@@ -10,7 +10,7 @@
 
 import { createHash } from 'crypto'
 import { mkdirSync, readdirSync, readFileSync, realpathSync, watch, type FSWatcher } from 'fs'
-import { basename, join, relative, resolve } from 'path'
+import { basename, dirname, join, relative, resolve } from 'path'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
 
@@ -66,6 +66,8 @@ export type Loaded = {
 	open?: true
 	timer?: Timer
 }
+
+type Directory = { watcher?: FSWatcher; ready: Promise<void> }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -145,7 +147,9 @@ function patchOf(obj: any, key: string): Patch {
 // registration order; the last set wins. An empty chain restores the
 // original exactly.
 function settle(obj: any, key: string, patch: Patch): void {
-	let order = (a: Hook, b: Hook) => (a.file < b.file ? -1 : a.file > b.file ? 1 : a.seq - b.seq)
+	let compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+	let order = (a: Hook, b: Hook) =>
+		compare(basename(a.file), basename(b.file)) || compare(a.file, b.file) || a.seq - b.seq
 	let hooks = patch.hooks.sort(order)
 	let of = (kind: Kind) => hooks.filter((h) => h.kind === kind).map((h) => h.fn)
 	patch.run = { befores: of('before'), arounds: of('around'), afters: of('after') }
@@ -191,7 +195,7 @@ function register(entry: Loaded, h: Omit<Hook, 'file' | 'seq' | 'target'>): void
 		throw new Error(
 			`${entry.path}: ${target} registered after the registration function returned; register in its body`,
 		)
-	let hook: Hook = { ...h, file: basename(entry.path), seq: entry.hooks.length, target }
+	let hook: Hook = { ...h, file: entry.path, seq: entry.hooks.length, target }
 	entry.hooks.push(hook)
 	let patch = plugins.patchOf(h.obj, h.key)
 	patch.hooks.push(hook)
@@ -362,15 +366,56 @@ async function sync(d: string, name: string): Promise<void> {
 	}
 }
 
-// Loads every plugin in filename order, then follows the directory.
+function activateDirectory(d: string): Promise<void> {
+	d = resolve(d)
+	let directories = plugins.state.directories
+	let existing = directories.get(d)
+	if (existing) return existing.ready
+	let entry: Directory = { ready: Promise.resolve() }
+	directories.set(d, entry)
+	let current = () => directories.get(d) === entry
+	entry.ready = Promise.resolve().then(async () => {
+		if (!current()) return
+		try {
+			entry.watcher = watch(d, { persistent: false }, (_event, name) => {
+				if (current() && name) void plugins.sync(d, name)
+			})
+			for (let name of readdirSync(d).sort()) {
+				if (!current()) return
+				await plugins.sync(d, name)
+			}
+		} catch (e) {
+			if (current()) plugins.deactivateDirectory(d)
+			throw e
+		}
+	})
+	return entry.ready
+}
+
+function deactivateDirectory(d: string): void {
+	d = resolve(d)
+	let entry = plugins.state.directories.get(d)
+	plugins.state.directories.delete(d)
+	entry?.watcher?.close()
+	let st = plugins.state
+	for (let path of new Set([...st.files.keys(), ...st.latest.keys()])) {
+		if (dirname(path) !== d) continue
+		plugins.remove(path)
+		st.latest.delete(path)
+	}
+}
+
+// Home history and sync stay separate from other activated directories.
 async function init(d = plugins.dir()): Promise<void> {
-	if (plugins.state.watcher) return
+	d = resolve(d)
+	if (pluginHistory.state.dir) {
+		await plugins.state.directories.get(pluginHistory.state.dir)?.ready
+		return
+	}
 	mkdirSync(d, { recursive: true })
 	pluginHistory.init(d)
-	for (let name of readdirSync(d).sort()) await plugins.sync(d, name)
-	plugins.state.watcher = watch(d, { persistent: false }, (_event, name) => {
-		if (name) void plugins.sync(d, name)
-	})
+	await plugins.activateDirectory(d)
+	if (plugins.state.directories.has(d)) plugins.state.started = true
 }
 
 // Takes `entry`'s hooks out, or puts them back, without its cleanup.
@@ -424,11 +469,12 @@ function unpreview(last = true): void {
 
 // Stops watching and removes every plugin's hooks.
 function close(): void {
-	plugins.state.watcher?.close()
-	plugins.state.watcher = undefined
+	plugins.state.started = false
+	for (let d of plugins.state.directories.keys()) plugins.deactivateDirectory(d)
 	pluginHistory.close()
 	for (let path of plugins.state.files.keys()) plugins.remove(path)
 	plugins.state.files.clear()
+	plugins.state.latest.clear()
 }
 
 // One line per file for /plugins.
@@ -456,7 +502,8 @@ export const plugins = {
 		latest: new Map<string, number>(),
 		gen: 0,
 		imports: false,
-		watcher: undefined as FSWatcher | undefined,
+		directories: new Map<string, Directory>(),
+		started: false,
 		preview: undefined as { entry: Loaded; hidden?: Loaded } | undefined,
 		previewGen: 0,
 	},
@@ -477,6 +524,8 @@ export const plugins = {
 	remove,
 	sync,
 	init,
+	activateDirectory,
+	deactivateDirectory,
 	close,
 	describe,
 	mute,

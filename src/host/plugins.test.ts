@@ -1,10 +1,11 @@
 // Plugins (tasks an, 90v). Every test hooks objects from its own temp module,
 // so nothing leaks into the real module singletons or other test files.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { plugins } from './plugins.ts'
+import { pluginHistory } from './plugin-history.ts'
 
 let dir = ''
 let reports: string[] = []
@@ -317,4 +318,91 @@ test('disable stops the body, removes what it registered, and is not a failure',
 	expect(plugins.describe()).toContain('disabled')
 	plugins.remove(path)
 	expect(g.pluginRuns).toBe(0)
+})
+
+test('directories compose in stable order, unload independently, and leave home history alone', async () => {
+	let home = join(dir, 'home'),
+		a = join(dir, 'a'),
+		b = join(dir, 'b')
+	await plugins.init(home)
+	for (let [d, value] of [
+		[a, 4],
+		[b, 5],
+	] as const) {
+		mkdirSync(d)
+		writeFileSync(
+			join(d, 'same.ts'),
+			`import { t } from ${JSON.stringify(join(dir, 'target.ts'))}
+export default (p: any) => {
+  p.set(t, 'value', ${value});
+  return () => t.log.push(${value});
+}`,
+		)
+	}
+	await plugins.activateDirectory(b)
+	let first = plugins.activateDirectory(a)
+	expect(plugins.activateDirectory(a)).toBe(first)
+	await first
+	expect(t.value).toBe(5)
+	expect(pluginHistory.state.dir).toBe(home)
+	expect(pluginHistory.head('same.ts')).toBeUndefined()
+	plugins.deactivateDirectory(b)
+	expect(t.value).toBe(4)
+	expect(t.log).toEqual([5])
+	plugins.deactivateDirectory(b)
+	expect(t.log).toEqual([5])
+	await plugins.activateDirectory(b)
+	expect(t.value).toBe(5)
+	plugins.deactivateDirectory(a)
+	expect(t.value).toBe(5)
+	plugins.deactivateDirectory(b)
+	expect(t.value).toBe(3)
+	expect(t.log).toEqual([5, 4, 5])
+	expect(plugins.state.directories.size).toBe(1)
+	expect([...plugins.state.latest.keys()].some((p) => p.startsWith(a) || p.startsWith(b))).toBe(false)
+})
+
+test('directory unload cancels a pending import and the rest of its scan without affecting reactivation', async () => {
+	let d = join(dir, 'p')
+	mkdirSync(d)
+	let entered = Promise.withResolvers<void>(),
+		release = Promise.withResolvers<void>()
+	g.pluginGate = { entered: entered.resolve, wait: release.promise }
+	writeFileSync(
+		join(d, 'a.ts'),
+		`globalThis.pluginGate.entered();
+await globalThis.pluginGate.wait;
+export default () => { globalThis.pluginRuns++ }`,
+	)
+	writeFileSync(join(d, 'b.ts'), 'export default () => { globalThis.pluginRuns++ }')
+	let pending = plugins.activateDirectory(d)
+	await entered.promise
+	plugins.deactivateDirectory(d)
+	writeFileSync(join(d, 'a.ts'), 'export default () => { globalThis.pluginRuns += 10 }')
+	await plugins.activateDirectory(d)
+	expect(g.pluginRuns).toBe(11)
+	release.resolve()
+	await pending
+	expect(g.pluginRuns).toBe(11)
+	expect(plugins.state.directories.has(d)).toBe(true)
+	expect(plugins.state.files.size).toBe(2)
+	delete g.pluginGate
+})
+
+test('closing cancels direct imports and an activation that has not begun; missing directories can retry', async () => {
+	let missing = join(dir, 'missing')
+	await expect(plugins.activateDirectory(missing)).rejects.toThrow()
+	expect(plugins.state.directories.has(missing)).toBe(false)
+	mkdirSync(missing)
+	let scan = plugins.activateDirectory(missing)
+	let path = join(dir, 'pending.ts')
+	writeFileSync(path, 'export default () => { globalThis.pluginRuns++ }')
+	let load = plugins.load(path)
+	plugins.close()
+	await Promise.all([scan, load])
+	expect(g.pluginRuns).toBe(0)
+	expect(plugins.state.directories.size).toBe(0)
+	expect(plugins.state.files.size).toBe(0)
+	await plugins.activateDirectory(missing)
+	expect(plugins.state.directories.has(missing)).toBe(true)
 })

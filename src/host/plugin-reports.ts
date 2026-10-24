@@ -66,9 +66,9 @@ function via(path: string, source: string, side?: 'client' | 'server'): void {
 
 // A plugin lifecycle change after the initial scan (task b66): one
 // notice per file to every client, kept in the notice history. Startup
-// and shutdown (no watcher) stay quiet; failures go through report().
+// and shutdown stay quiet; failures go through report().
 function changed(path: string, what: string): void {
-	if (!plugins.state.watcher) return
+	if (!plugins.state.started) return
 	pluginSync.changed(path)
 	let from = pluginReports.state.sources.get(path)
 	pluginReports.state.sources.delete(path)

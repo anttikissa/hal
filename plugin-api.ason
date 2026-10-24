@@ -1,5 +1,5 @@
 {
-	version: 2,
+	version: 3,
 	changes: [
 		{
 			version: 2,
@@ -19,6 +19,33 @@
 					target: 'host/plugins.broken',
 					description: 'Failed plugin files remain at their original paths and unchanged failed bytes are not retried on events',
 					port: 'Fix the original file; do not look for a .broken rename.'
+				}
+			]
+		},
+		{
+			version: 3,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/plugins.activateDirectory',
+					description: 'Loads and watches an existing directory with shared activation'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/plugins.deactivateDirectory',
+					description: 'Removes a directory and prevents late import registration'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/plugins.state.watcher',
+					description: 'Replaced by per-directory state and startup notification state',
+					port: 'Use state.directories for lifetimes and state.started for notices'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/plugins.Loaded.hooks.file',
+					description: 'Stores the full path; equal basenames compose by path then sequence',
+					port: 'Use basename(hook.file) when a display basename is needed'
 				}
 			]
 		}
