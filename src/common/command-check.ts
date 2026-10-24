@@ -44,7 +44,7 @@ const commandTypes: CommandType[] = [
 	'handover',
 	'screen',
 	'terminal-error',
-	'plugin-sync',
+	'sync',
 ]
 
 // Why `value` is not a well-formed command, or undefined if it is.
@@ -97,7 +97,7 @@ function invalid(value: unknown): string | undefined {
 			str('text') ?? ((c.text as string).length > 1000 ? 'terminal-error: text exceeds 1000 characters' : undefined)
 		)
 	if (c.type === 'find-cancel' || c.type === 'handover') return undefined
-	if (c.type === 'plugin-sync') return pluginSyncWire.invalidCommand(c)
+	if (c.type === 'sync') return pluginSyncWire.invalidCommand(c)
 	if (c.type === 'find-preview')
 		return (
 			str('sessionId') ??

@@ -1,11 +1,11 @@
-// The hal/plugin-sync review session (task b81), host side. /plugin-sync
+// The hal/sync review session (task b81), host side. /sync
 // opens or focuses one review tab per client home and starts its turn.
 // The scripted model relays each turn to that home's remote terminal,
 // which holds the comparison (plugin-sync-client.ts): the terminal
 // applies an answer, then sends a step saying what happened and what to
 // ask next (plugin-sync-review.ts). Questions and answers stay ordinary
 // durable forms in the session. Which home a session reviews is kept in
-// memory: after a host restart, /plugin-sync binds it again. Escape
+// memory: after a host restart, /sync binds it again. Escape
 // aborts a wait; a terminal that goes away ends it with the reason.
 // Tasks: b81.
 
@@ -23,12 +23,12 @@ import { turns } from './turns.ts'
 type Client = { deliver(event: Event): void }
 type Step = { say: string; ask?: Form }
 
-const MODEL = 'hal/plugin-sync'
+const MODEL = 'hal/sync'
 const gone =
-	'The remote terminal reviewing plugins is not connected, so nothing was written here. Type /plugin-sync in it once it is connected to continue.'
+	'The remote terminal running this review is not connected, so nothing was written here. Type /sync in it once it is connected to continue.'
 
 // The review tab's name for client home `home`.
-const nameFor = (home: string): string => `Plugin sync ${home.slice(0, 6)}`
+const nameFor = (home: string): string => `Sync ${home.slice(0, 6)}`
 
 // A connected terminal of `home`, `client` first.
 function terminal(home: string, client?: Client): Client | undefined {
@@ -51,7 +51,7 @@ function ask(id: string, home: string, client: Client, answers: Answers | undefi
 		let abort = () => settle(undefined)
 		signal?.addEventListener('abort', abort)
 		pluginSyncSession.state.waiting.set(id, settle)
-		client.deliver({ type: 'plugin-sync', review: id, ...(answers ? { answers } : {}) })
+		client.deliver({ type: 'sync', review: id, ...(answers ? { answers } : {}) })
 	})
 }
 
@@ -102,7 +102,7 @@ function find(name: string, after: string, cwd: string): string {
 	return closed ?? id!
 }
 
-// /plugin-sync typed in session `from`: binds the review tab to the
+// /sync typed in session `from`: binds the review tab to the
 // typing terminal's home, focuses it there and starts it unless a turn
 // or question is under way.
 function open(from: string, cwd: string): { error?: string; say?: string } {
@@ -112,7 +112,7 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 	if (!client || home === undefined)
 		return {
 			error:
-				'/plugin-sync reviews portable plugins from a terminal started with ./run -r <host> on another Hal home; this client compares none with this host.',
+				'/sync reviews USER.md and portable plugins from a terminal started with ./run -r <host> on another Hal home; this client compares none with this host.',
 		}
 	if (home === pluginSync.home())
 		return { say: "This terminal runs on the host's own home: there is nothing to compare." }

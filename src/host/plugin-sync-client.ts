@@ -5,7 +5,7 @@
 // contents differ, and works out from ancestry whether each differing
 // file is client-ahead, server-ahead, divergent or unrelated. Nothing
 // is written until apply() gets a confirmed choice; timestamps only
-// suggest one. /plugin-sync (task b81) reads state and calls compare,
+// suggest one. /sync (task b81) reads state and calls compare,
 // diff, apply and ignore; onChange tells it the comparison changed,
 // and onReview hands it the host's review turns.
 //
@@ -96,7 +96,7 @@ function link(s: LinkState): void {
 // Takes an event meant for plugin sync; false if it is not one.
 function event(e: Event): boolean {
 	let reqs = pluginSyncClient.state.requests
-	if (e.type === 'plugin-sync') {
+	if (e.type === 'sync') {
 		if (e.changed) pluginSyncClient.schedule()
 		else if (e.request) reqs.get(e.request)?.resolve(e)
 		else if (e.review) pluginSyncClient.onReview(e)
@@ -189,7 +189,7 @@ async function run(): Promise<void> {
 	let ignore = new Set(pluginSync.ignored())
 	let mine = pluginSync.portable()
 	let inv = await pluginSyncClient.request({
-		type: 'plugin-sync',
+		type: 'sync',
 		op: 'inventory',
 		home: pluginSync.home(),
 		names: mine.filter((n) => !ignore.has(n)),
@@ -211,7 +211,7 @@ async function run(): Promise<void> {
 		return absent(c) && absent(s) ? false : c.hash !== s.hash || absent(c) !== absent(s)
 	})
 	let versions = differ.length
-		? ((await pluginSyncClient.request({ type: 'plugin-sync', op: 'history', files: differ })).versions ?? [])
+		? ((await pluginSyncClient.request({ type: 'sync', op: 'history', files: differ })).versions ?? [])
 		: []
 	st.server = new Map(differ.map((f) => [f, versions.filter((v) => v.file === f)]))
 	st.discrepancies = differ.map((file) => {
@@ -241,8 +241,9 @@ async function diff(file: string): Promise<{ client?: string; server?: string; d
 	let client = d.client.hash ? pluginHistory.content(d.client.hash).toString('utf8') : undefined
 	let server: string | undefined
 	if (d.server.hash) {
-		let got = (await pluginSyncClient.request({ type: 'plugin-sync', op: 'content', hashes: [d.server.hash] }))
-			.contents?.[d.server.hash]
+		let got = (await pluginSyncClient.request({ type: 'sync', op: 'content', hashes: [d.server.hash] })).contents?.[
+			d.server.hash
+		]
 		if (got === undefined)
 			throw new Error(`plugin sync: ${pluginSyncClient.state.name} did not send ${file} (${d.server.hash})`)
 		server = Buffer.from(got, 'base64').toString('utf8')
@@ -275,7 +276,7 @@ async function apply(file: string, choice: Choice, expected: Expected): Promise<
 	if (choice === 'server') {
 		let known = pluginSync.versionsOf(file).map((v) => v.id)
 		let r = await pluginSyncClient.request({
-			type: 'plugin-sync',
+			type: 'sync',
 			op: 'fetch',
 			file,
 			known,
@@ -291,7 +292,7 @@ async function apply(file: string, choice: Choice, expected: Expected): Promise<
 			versions.flatMap((v) => (v.hash ? [[v.hash, pluginHistory.content(v.hash).toString('base64')]] : [])),
 		)
 		let r = await pluginSyncClient.request({
-			type: 'plugin-sync',
+			type: 'sync',
 			op: 'apply',
 			file,
 			versions,
@@ -324,7 +325,7 @@ export const pluginSyncClient = {
 	send: (c: object): void => connection.send(c),
 	// Called whenever state changes (b81 repaints its review).
 	onChange: (): void => {},
-	// A host's hal/plugin-sync session asks for its next step (b81).
+	// A host's hal/sync session asks for its next step (b81).
 	onReview: (_e: PluginSyncEvent): void => {},
 	start,
 	link,

@@ -270,8 +270,8 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (tabs.is(c)) return tabs.act(c, client.record.timezone)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
-	if (c.type === 'notice-history' || c.type === 'plugin-sync')
-		return c.type === 'plugin-sync'
+	if (c.type === 'notice-history' || c.type === 'sync')
+		return c.type === 'sync'
 			? pluginSync.command(client, c)
 			: { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'handover')

@@ -1,5 +1,5 @@
 // Scripted models run inside the host, no provider needed: hal/intro
-// (intro.ts), and hal/plugin-sync (plugin-sync-session.ts). Each answered form is durable in history; a model derives
+// (intro.ts), and hal/sync (plugin-sync-session.ts). Each answered form is durable in history; a model derives
 // its next step from those records. A reply's paragraphs arrive with
 // a typing pace (pauseMs); `pause` ends the turn paused with that reason,
 // and `after` runs once the turn has ended (a command the reply starts).
@@ -60,7 +60,7 @@ export const synthetic = {
 		'scroll-test': (records) =>
 			(require('./scroll-test.ts') as typeof import('./scroll-test.ts')).scrollTest.run(records),
 		'queue-test': (records) => (require('./queue-test.ts') as typeof import('./queue-test.ts')).queueTest.run(records),
-		'plugin-sync': (_records, answers, id) =>
+		sync: (_records, answers, id) =>
 			(require('./plugin-sync-session.ts') as typeof import('./plugin-sync-session.ts')).pluginSyncSession.run(
 				answers,
 				id!,
@@ -71,7 +71,7 @@ export const synthetic = {
 		intro: 'Intro',
 		'scroll-test': 'Test scrolling: scripted scroll',
 		'queue-test': 'Steering and queue testing',
-		'plugin-sync': 'Review and sync remote plugins',
+		sync: 'Review and sync remote files',
 	} as Record<string, string>,
 	find,
 	typed,

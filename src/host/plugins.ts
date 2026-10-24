@@ -11,6 +11,7 @@
 import { createHash } from 'crypto'
 import { mkdirSync, readdirSync, readFileSync, realpathSync, watch, type FSWatcher } from 'fs'
 import { basename, dirname, join, relative, resolve } from 'path'
+import { pluginSyncWire } from '../common/plugin-sync.ts'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
 
@@ -409,11 +410,14 @@ function deactivateDirectory(d: string): void {
 	}
 }
 
-// Both personal sources share this home's ledger; project sources stay outside it.
+// Both personal sources share this home's ledger; project sources stay
+// outside it. Default startup also follows the home files sync covers.
 async function init(d?: string, personal?: string): Promise<void> {
+	let home: Record<string, string> = {}
 	if (d === undefined) {
 		d = plugins.dir()
 		personal ??= plugins.personalDir()
+		home = Object.fromEntries(pluginSyncWire.HOME_FILES.map((name) => [name, join(paths.home(), name)]))
 	}
 	d = resolve(d)
 	if (personal) personal = resolve(personal)
@@ -424,7 +428,7 @@ async function init(d?: string, personal?: string): Promise<void> {
 	mkdirSync(d, { recursive: true })
 	if (personal) mkdirSync(personal, { recursive: true })
 	plugins.state.personalDirectories = new Set([d, ...(personal ? [personal] : [])].map((dir) => realpathSync(dir)))
-	pluginHistory.init(d, personal)
+	pluginHistory.init(d, personal, home)
 	await Promise.all([
 		plugins.activateDirectory(d),
 		...(personal && personal !== d ? [plugins.activateDirectory(personal)] : []),

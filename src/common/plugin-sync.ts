@@ -5,7 +5,7 @@
 // the client checks replies before using them; plugin-history.receive
 // also verifies every version id and content hash.
 // A review step (task b81): the remote terminal scripts the host's
-// hal/plugin-sync session. The host asks it with a plugin-sync event
+// hal/sync session. The host asks it with a plugin-sync event
 // naming the session (`review`) and the answers, if any; the terminal
 // answers with a step command: what to say and what to ask next.
 // Tasks: zh7, b81.
@@ -32,7 +32,7 @@ export type SyncHead = { file: string; id?: string; hash?: string; ts?: string; 
 // ids) with their contents, if its head is still `expect` (absent: no
 // history). apply: make `target` (absent: no file) the host's `file`
 // if its head is still `expect`.
-export type PluginSyncCommand = { type: 'plugin-sync' } & (
+export type PluginSyncCommand = { type: 'sync' } & (
 	| { op: 'inventory'; home: string; names: string[] }
 	| { op: 'history'; files: string[] }
 	| { op: 'content'; hashes: string[] }
@@ -52,7 +52,7 @@ export type PluginSyncCommand = { type: 'plugin-sync' } & (
 // portable host plugin changed. `stale`: the head was not the expected
 // one; `head` is the current one. Contents are base64.
 export type PluginSyncEvent = {
-	type: 'plugin-sync'
+	type: 'sync'
 	request?: string
 	changed?: true
 	home?: string
@@ -71,8 +71,11 @@ const ID = /^[0-9a-f]{16}$/
 const HASH = /^[0-9a-f]{64}$/
 const OPS = ['inventory', 'history', 'content', 'fetch', 'apply', 'step']
 
+// Home files synced beside plugins, by name relative to the Hal home.
+const HOME_FILES = ['USER.md']
+
 // Personal names have one fixed namespace; neither namespace accepts paths.
-function isName(name: unknown): name is string {
+function isPlugin(name: unknown): name is string {
 	if (typeof name === 'string' && name.startsWith('personal/')) name = name.slice(9)
 	return (
 		typeof name === 'string' &&
@@ -82,6 +85,10 @@ function isName(name: unknown): name is string {
 		!/[/\\\0]/.test(name) &&
 		name !== '.ts'
 	)
+}
+
+function isName(name: unknown): name is string {
+	return isPlugin(name) || HOME_FILES.includes(name as string)
 }
 
 function isVersion(v: any): v is SyncVersion {
@@ -133,7 +140,7 @@ function invalidCommand(c: Record<string, unknown>): string | undefined {
 		let form = c.ask === undefined ? undefined : forms.invalid(c.ask)
 		return form && bad(`ask: ${form}`)
 	}
-	if (!isName(c.file)) return bad('file must be a top-level plugin filename')
+	if (!isName(c.file)) return bad('file must be a plugin or home filename')
 	if (c.expect !== undefined && !ID.test(c.expect as string)) return bad('expect must be a version id')
 	if (c.op === 'fetch')
 		return list(c.known, (id) => ID.test(id as string)) ? undefined : bad('known must be version ids')
@@ -166,4 +173,13 @@ function ignoreList(text: string): string[] {
 		.filter((l) => l && !l.startsWith('#'))
 }
 
-export const pluginSyncWire = { isName, isVersion, isHead, invalidCommand, invalidEvent, ignoreList }
+export const pluginSyncWire = {
+	HOME_FILES,
+	isPlugin,
+	isName,
+	isVersion,
+	isHead,
+	invalidCommand,
+	invalidEvent,
+	ignoreList,
+}

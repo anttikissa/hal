@@ -1,0 +1,7 @@
+{
+	title: 'Sync USER.md beside portable plugins under /sync',
+	spec: 'Remote-terminal sync covers named home files as well as portable plugins. The home files list (common/plugin-sync.ts HOME_FILES) holds USER.md; its names are exact, relative to the Hal home, and pass the same wire validation as plugin names, so no path leaves the intended files. Home files need no portable export: they always take part, subject to .syncignore. Plugin history records them in the same ledger with the same version, ancestry, tombstone and atomic checkout rules; default startup follows them and watches their directory, while explicit plugin directories (tests, projects) do not. A home file replaced by sync gets the same source-naming notice as a replaced plugin; ordinary edits notify only sync. The command is /sync, the wire type sync, the review session hal/sync and the indicator Files differ (N) - /sync. The ledger stays at plugins/history.asonl to avoid a migration. Adding a home file is one list entry; config.ason stays out until config sync is designed.',
+	status: 'done',
+	needs: ['gev', 'zh7', 'b81'],
+	foldInto: ['zh7']
+}

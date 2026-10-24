@@ -43,7 +43,15 @@ function makeSide(name: string): Side {
 	let s: Side = {
 		home,
 		dir,
-		hist: { dir: undefined, personal: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		hist: {
+			dir: undefined,
+			personal: undefined,
+			home: new Map(),
+			watchers: [],
+			error: undefined,
+			versions: new Map(),
+			heads: new Map(),
+		},
 		files: new Map(),
 	}
 	use(s)
@@ -91,7 +99,7 @@ function answer(c: any): void {
 // One review step in session `s`, as the host's turn would ask for it.
 async function step(answers?: Record<string, string>) {
 	let before = steps.length
-	pluginSyncClient.event({ type: 'plugin-sync', review: 's', ...(answers ? { answers } : {}) })
+	pluginSyncClient.event({ type: 'sync', review: 's', ...(answers ? { answers } : {}) })
 	while (steps.length === before) await Bun.sleep(1)
 	return steps.at(-1)
 }
@@ -135,10 +143,10 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 	put(server, 'theme.ts', 'export const portable = true // light')
 	put(client, 'keys.ts', 'export const portable = true // mine')
 	await pluginSyncClient.compare()
-	expect(shown.at(-1)).toBe('Plugins differ (2) — /plugin-sync')
+	expect(shown.at(-1)).toBe('Files differ (2) — /sync')
 	expect(notices).toHaveLength(1)
-	expect(notices[0]).toMatchObject({ type: 'notice', key: 'plugin-sync', line: 'keys.ts, theme.ts — /plugin-sync' })
-	expect(sent.every((c) => c.type === 'plugin-sync' && c.op !== 'step')).toBe(true)
+	expect(notices[0]).toMatchObject({ type: 'notice', key: 'sync', line: 'keys.ts, theme.ts — /sync' })
+	expect(sent.every((c) => c.type === 'sync' && c.op !== 'step')).toBe(true)
 	await pluginSyncClient.compare()
 	expect(notices).toHaveLength(1)
 
@@ -153,7 +161,7 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 	expect(next.say).toContain('Keeping keys.ts separate')
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
-	expect(shown.at(-1)).toBe('Plugins differ (1) — /plugin-sync')
+	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
 	expect(next.say).toContain('```diff\n')
 	expect(next.ask.text).toStartWith('theme.ts')
 })
@@ -173,7 +181,7 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	let done = await step({ choice: 'Use server version' })
 	expect(done.say).toStartWith('Used the server version of theme.ts: this client applied it.')
 	expect(read(client, 'theme.ts')).toBe('export const portable = true // solarized')
-	expect(done.say).toContain('Portable plugins match example.com.')
+	expect(done.say).toContain('Synced files match example.com.')
 	expect(done.ask).toBeUndefined()
 	expect(shown.at(-1)).toBeUndefined()
 })

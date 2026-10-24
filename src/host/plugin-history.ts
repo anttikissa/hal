@@ -1,5 +1,6 @@
 // Plugin version history (task gev): every version of a top-level
-// plugins/*.ts this home observes, as one ASONL record per version in
+// plugins/*.ts this home observes, and of the home files synced beside
+// them (USER.md), as one ASONL record per version in
 // plugins/history.asonl, its bytes under plugins/history/<sha256>. Both
 // are private and gitignored, and outside what the loader reads.
 //
@@ -29,13 +30,17 @@ import {
 	renameSync,
 	truncateSync,
 	unlinkSync,
+	watch,
 	writeFileSync,
+	type FSWatcher,
 } from 'fs'
 import { basename, dirname, join } from 'path'
 import { ason } from '../common/ason.ts'
 import { pluginSyncWire } from '../common/plugin-sync.ts'
 import { lines } from '../common/lines.ts'
 import { history } from './history.ts'
+import { pluginReports } from './plugin-reports.ts'
+import { pluginSync } from './plugin-sync.ts'
 import { plugins } from './plugins.ts'
 
 export type Version = {
@@ -51,11 +56,14 @@ export type Version = {
 type Checkout = { file: string; checkout: string; ts: string }
 
 const sha = (bytes: Uint8Array | string): string => new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
-const isPlugin = (name: string): boolean => !name.includes('/') && pluginSyncWire.isName(name)
+const isPlugin = (name: string): boolean => !name.includes('/') && pluginSyncWire.isPlugin(name)
 
 function filePath(file: string): string {
 	let st = pluginHistory.state
 	if (!pluginSyncWire.isName(file)) throw new Error(`plugin history: invalid filename ${file}`)
+	let home = st.home.get(file)
+	if (home) return home
+	if (!pluginSyncWire.isPlugin(file)) throw new Error(`plugin history: ${file} is not followed here`)
 	let personal = file.startsWith('personal/')
 	let dir = personal ? st.personal : st.dir
 	if (!dir) throw new Error(`plugin history: directory unavailable for ${file}`)
@@ -64,6 +72,7 @@ function filePath(file: string): string {
 
 function fileName(path: string): string | undefined {
 	let st = pluginHistory.state
+	for (let [name, p] of st.home) if (p === path) return name
 	let name = basename(path)
 	if (!isPlugin(name)) return
 	if (dirname(path) === st.dir) return name
@@ -131,8 +140,9 @@ function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean)
 	return v
 }
 
-// The loader saw `path` change (watcher or startup); a failure is reported.
-function seen(path: string): void {
+// The loader saw `path` change (watcher or startup); a failure is
+// reported. Returns the version recorded, if any.
+function seen(path: string): Version | undefined {
 	let st = pluginHistory.state
 	let file = pluginHistory.fileName(path)
 	if (!st.dir || !file) return
@@ -143,10 +153,18 @@ function seen(path: string): void {
 		} catch (e: any) {
 			if (e?.code !== 'ENOENT') throw e
 		}
-		pluginHistory.observe(file, bytes)
+		return pluginHistory.observe(file, bytes)
 	} catch (e: any) {
 		plugins.report(`plugin history ${ledger()}: recording ${path} failed: ${e?.stack ?? e}`)
 	}
+}
+
+// Home file `path` changed: record it and tell sync. A sync
+// replacement gets the notice a replaced plugin gets.
+function homeChanged(path: string): void {
+	let v = pluginHistory.seen(path)
+	if (pluginReports.state.sources.has(path)) pluginReports.changed(path, existsSync(path) ? 'replaced' : 'removed')
+	else if (v) pluginSync.changed(path)
 }
 
 // Takes in versions from another home, keeping their id, ts and parent.
@@ -199,10 +217,13 @@ function checkout(id: string): void {
 
 // Reads and indexes the ledger, then records what changed while Hal
 // was stopped. A corrupt ledger is reported and disables the history.
-function init(dir: string, personal?: string): void {
+// `home`: home file paths by name, watched here (the loader watches
+// plugin directories).
+function init(dir: string, personal?: string, home: Record<string, string> = {}): void {
 	let st = pluginHistory.state
 	st.dir = dir
 	st.personal = personal === dir ? undefined : personal
+	st.home = new Map(Object.entries(home))
 	st.error = undefined
 	st.versions.clear()
 	st.heads.clear()
@@ -230,27 +251,42 @@ function init(dir: string, personal?: string): void {
 	}
 	let names = new Set(readdirSync(dir).filter(isPlugin))
 	if (st.personal) for (let name of readdirSync(st.personal).filter(isPlugin)) names.add(`personal/${name}`)
+	for (let [name, p] of st.home) if (existsSync(p)) names.add(name)
 	for (let file of new Set([...names, ...st.heads.keys()])) {
 		try {
 			if (file.startsWith('personal/') && !st.personal) continue
+			if (pluginSyncWire.HOME_FILES.includes(file) && !st.home.has(file)) continue
 			pluginHistory.observe(file, names.has(file) ? readFileSync(pluginHistory.filePath(file)) : undefined, true)
 		} catch (e: any) {
 			plugins.report(`plugin history ${path}: recording ${file} failed: ${e?.stack ?? e}`)
 		}
 	}
+	for (let p of st.home.values())
+		st.watchers.push(
+			watch(dirname(p), { persistent: false }, (_event, name) => {
+				if (name === basename(p)) pluginHistory.homeChanged(p)
+			}),
+		)
 }
 
 function close(): void {
-	pluginHistory.state.dir = undefined
-	pluginHistory.state.personal = undefined
+	let st = pluginHistory.state
+	for (let w of st.watchers) w.close()
+	st.watchers = []
+	st.home = new Map()
+	st.dir = undefined
+	st.personal = undefined
 }
 
 export const pluginHistory = {
-	// `dir`: the plugins directory followed; `versions` by id; `heads`:
-	// each file's current version id; `error`: why the ledger is unusable.
+	// `dir`: the plugins directory followed; `home`: home file paths by
+	// name; `versions` by id; `heads`: each file's current version id;
+	// `error`: why the ledger is unusable.
 	state: {
 		dir: undefined as string | undefined,
 		personal: undefined as string | undefined,
+		home: new Map<string, string>(),
+		watchers: [] as FSWatcher[],
 		error: undefined as string | undefined,
 		versions: new Map<string, Version>(),
 		heads: new Map<string, string>(),
@@ -264,6 +300,7 @@ export const pluginHistory = {
 	head,
 	observe,
 	seen,
+	homeChanged,
 	receive,
 	checkout,
 	init,

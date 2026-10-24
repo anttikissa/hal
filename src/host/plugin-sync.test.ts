@@ -37,11 +37,19 @@ function makeSide(name: string, home = join(root, name)): Side {
 	let s: Side = {
 		home,
 		dir,
-		hist: { dir: undefined, personal: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		hist: {
+			dir: undefined,
+			personal: undefined,
+			home: new Map(),
+			watchers: [],
+			error: undefined,
+			versions: new Map(),
+			heads: new Map(),
+		},
 		files: new Map(),
 	}
 	use(s)
-	pluginHistory.init(dir, personal)
+	pluginHistory.init(dir, personal, { 'USER.md': join(home, 'USER.md') })
 	return s
 }
 
@@ -117,6 +125,8 @@ afterEach(() => {
 	clearTimeout(pluginSyncClient.state.timer)
 	pluginSyncClient.state = { ...pluginSyncClient.state, active: false }
 	pluginSync.onLocal = () => {}
+	on(server, () => pluginHistory.close())
+	on(client, () => pluginHistory.close())
 	rmSync(root, { recursive: true, force: true })
 })
 
@@ -167,6 +177,16 @@ export default () => { globalThis.portableHome = paths.home() }
 	}
 })
 
+test('USER.md is compared without being a plugin and replaced on review', async () => {
+	put(client, 'USER.md', 'client notes', false)
+	put(server, 'USER.md', 'server notes', false)
+	await pluginSyncClient.compare()
+	expect(one('USER.md')?.relation).toBe('unrelated')
+	await pluginSyncClient.apply('USER.md', 'client', expected('USER.md'))
+	expect(read(server, 'USER.md')).toBe('client notes')
+	expect(one('USER.md')).toBeUndefined()
+})
+
 test('reviewed personal transfers stay in their namespace and reject nonportable collisions', async () => {
 	put(client, 'same.ts', 'home')
 	put(client, 'personal/same.ts', 'personal')
@@ -184,7 +204,7 @@ test('reviewed personal transfers stay in their namespace and reject nonportable
 		server,
 		() =>
 			pluginSync.command(host, {
-				type: 'plugin-sync',
+				type: 'sync',
 				op: 'history',
 				files: ['personal/private.ts'],
 			}).reply,
@@ -344,10 +364,11 @@ test('the same home compares nothing; file names cannot leave the plugins direct
 		'personal/a/b.ts',
 		'personal/\\x.ts',
 		'personal/.ts',
+		'../USER.md',
+		'personal/USER.md',
+		'user.md',
 	])
-		expect(commandCheck.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain(
-			'top-level plugin filename',
-		)
+		expect(commandCheck.invalid({ type: 'sync', op: 'fetch', file, known: [] })).toContain('plugin or home filename')
 })
 
 test('comparisons asked for while one runs collapse into one more', async () => {

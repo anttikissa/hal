@@ -55,11 +55,12 @@ function dir(): string {
 	return st.dir
 }
 
-// Names in plugins/.syncignore; none if it is absent.
+// Names in plugins/.syncignore and nonportable plugins; none if absent.
 function ignored(): string[] {
 	let path = join(pluginSync.dir(), '.syncignore')
 	let ignored = existsSync(path) ? pluginSyncWire.ignoreList(readFileSync(path, 'utf8')) : []
 	for (let file of pluginHistory.state.heads.keys()) {
+		if (!pluginSyncWire.isPlugin(file)) continue
 		if (file.startsWith('personal/') && !pluginHistory.state.personal) {
 			ignored.push(file)
 			continue
@@ -70,14 +71,16 @@ function ignored(): string[] {
 	return [...new Set(ignored)]
 }
 
-// Loaded top-level plugins marked portable, expired ones included.
+// Home files, and loaded top-level plugins marked portable, expired
+// ones included.
 function portable(): string[] {
-	return [...plugins.state.files.values()]
-		.flatMap((f) => {
+	return [
+		...pluginHistory.state.home.keys(),
+		...[...plugins.state.files.values()].flatMap((f) => {
 			let name = f.portable && pluginHistory.fileName(f.path)
 			return name ? [name] : []
-		})
-		.sort()
+		}),
+	].sort()
 }
 
 function headOf(file: string): SyncHead {
@@ -145,9 +148,9 @@ function holds(file: string, target: string | undefined): boolean {
 }
 
 // A host's answer to a plugin-sync command; throws to refuse it.
-function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): { reply: Event } {
+function command(client: Client, c: Extract<Command, { type: 'sync' }>): { reply: Event } {
 	let reply = (fields: Omit<PluginSyncEvent, 'type'>): { reply: Event } => ({
-		reply: { type: 'plugin-sync', ...(c.id !== undefined ? { request: c.id } : {}), ...fields },
+		reply: { type: 'sync', ...(c.id !== undefined ? { request: c.id } : {}), ...fields },
 	})
 	let ignore = new Set(pluginSync.ignored())
 	let open = (file: string) => {
@@ -194,7 +197,7 @@ function changed(path: string): void {
 	let followers = pluginSync.state.followers
 	for (let client of followers.keys()) {
 		if (!host.state.clients.has(client as any)) followers.delete(client)
-		else client.deliver({ type: 'plugin-sync', changed: true })
+		else client.deliver({ type: 'sync', changed: true })
 	}
 	pluginSync.onLocal(path)
 }

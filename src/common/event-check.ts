@@ -107,7 +107,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'web-update': {},
 	redraw: { sessionId: 's' },
 	auth: { code: 's', link: 's?' },
-	'plugin-sync': {
+	sync: {
 		request: 's?',
 		changed: 'b?',
 		stale: 'b?',
@@ -215,7 +215,7 @@ function invalidEvent(value: unknown): string | undefined {
 		)
 	)
 		return 'tabs: invalid question kind'
-	if (value.type === 'plugin-sync') return pluginSyncWire.invalidEvent(value)
+	if (value.type === 'sync') return pluginSyncWire.invalidEvent(value)
 	if (
 		value.type === 'find-preview' &&
 		!(value.cards as unknown[]).every(

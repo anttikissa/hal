@@ -1,6 +1,6 @@
 // The plugin review script (task b81), run by a remote terminal: it
 // turns this home's comparison (plugin-sync-client.ts) into the steps of
-// the host's hal/plugin-sync session (plugin-sync-session.ts), and
+// the host's hal/sync session (plugin-sync-session.ts), and
 // keeps the terminal's indicator and notice current. Startup never
 // moves focus or opens anything: the status row says how many portable
 // plugins differ, and each newly found discrepancy gets one notice.
@@ -12,7 +12,7 @@
 
 import { join } from 'path'
 import type { Answers, Form } from '../common/forms.ts'
-import type { PluginSyncEvent } from '../common/plugin-sync.ts'
+import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError, type Choice, type Discrepancy, type SideInfo } from './plugin-sync-client.ts'
@@ -39,6 +39,7 @@ const STATUS: Record<SideInfo['status'], string> = {
 
 const host = () => pluginSyncClient.state.name
 const key = (d: Discrepancy) => `${d.file} ${d.client.id ?? ''} ${d.server.id ?? ''}`
+const where = (file: string) => (pluginSyncWire.isPlugin(file) ? `plugins/${file}` : file)
 const when = (ts?: string) => (ts ? `${ts.slice(0, 16).replace('T', ' ')} UTC` : 'no date')
 
 // Starts comparing with host `name`; `show` puts the indicator (or
@@ -56,18 +57,18 @@ function changed(): void {
 	let st = pluginSyncClient.state,
 		rs = pluginSyncReview.state
 	let list = st.same ? [] : st.discrepancies
-	pluginSyncReview.show(list.length ? `Plugins differ (${list.length}) — /plugin-sync` : undefined)
+	pluginSyncReview.show(list.length ? `Files differ (${list.length}) — /sync` : undefined)
 	let fresh = list.filter((d) => !rs.announced.has(key(d)))
 	rs.announced = new Set(list.map(key))
 	if (fresh.length)
 		pluginReports.deliver({
 			type: 'notice',
 			session: '',
-			name: 'Plugins differ',
+			name: 'Files differ',
 			what: `from ${host()}`,
 			kind: 'update',
-			line: `${fresh.map((d) => d.file).join(', ')} — /plugin-sync`,
-			key: 'plugin-sync',
+			line: `${fresh.map((d) => d.file).join(', ')} — /sync`,
+			key: 'sync',
 		})
 }
 
@@ -91,7 +92,7 @@ function describe(d: Discrepancy, diff: string): { say: string; ask: Form } {
 	let lines = [
 		`**${file}** differs between this client and ${host()}: ${RELATION[d.relation]}.`,
 		[side("Client (this terminal's home)", d.client), side(`Server (${host()})`, d.server)].join('\n'),
-		`${CLIENT} ${effect(d.client, `the server's plugins/${file}`)}; ${SERVER} ${effect(d.server, `this client's plugins/${file}`)}. The replaced version stays in plugin history. Keep separate writes nothing to either file.`,
+		`${CLIENT} ${effect(d.client, `the server's ${where(file)}`)}; ${SERVER} ${effect(d.server, `this client's ${where(file)}`)}. The replaced version stays in plugin history. Keep separate writes nothing to either file.`,
 	]
 	if (d.suggest)
 		lines.push(
@@ -165,12 +166,12 @@ async function review(session: string, answers?: Answers): Promise<void> {
 			})
 		} else if (!st.error) {
 			let ex = st.excluded.map((x) => `${x.file} (ignored by ${x.by === 'both' ? 'both sides' : `the ${x.by}`})`)
-			said.push(`Portable plugins match ${host()}.${ex.length ? ` Not compared: ${ex.join(', ')}.` : ''}`)
+			said.push(`Synced files match ${host()}.${ex.length ? ` Not compared: ${ex.join(', ')}.` : ''}`)
 		}
 	} catch (e: any) {
 		said.push(`Could not prepare the next comparison: ${e?.message ?? e}`)
 	}
-	pluginSyncClient.send({ type: 'plugin-sync', op: 'step', session, say: said.join('\n\n'), ...(ask ? { ask } : {}) })
+	pluginSyncClient.send({ type: 'sync', op: 'step', session, say: said.join('\n\n'), ...(ask ? { ask } : {}) })
 }
 
 export const pluginSyncReview = {

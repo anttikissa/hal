@@ -1,5 +1,5 @@
 {
-	version: 7,
+	version: 8,
 	changes: [
 		{
 			version: 2,
@@ -108,6 +108,27 @@
 					kind: 'compatible',
 					target: 'common/protocol.Event',
 					description: 'turn-end adds optional pauseReason'
+				}
+			]
+		},
+		{
+			version: 8,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'common/plugin-sync.PluginSyncCommand',
+					description: 'Wire type plugin-sync is now sync',
+					port: "Send and match type 'sync'"
+				},
+				{
+					kind: 'compatible',
+					target: 'common/plugin-sync.pluginSyncWire',
+					description: 'Adds HOME_FILES and isPlugin; isName also accepts home files'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/plugin-history.pluginHistory',
+					description: 'init takes home files; seen returns the recorded version'
 				}
 			]
 		}

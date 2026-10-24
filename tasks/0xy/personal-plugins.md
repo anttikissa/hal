@@ -16,7 +16,7 @@ not arbitrary paths: only the fixed `personal/` prefix is accepted.
 work in both terminal and web clients.
 
 `export const portable = true` makes a loaded file eligible for
-`/plugin-sync`. The existing hash checks, ancestry comparison, explicit
+`/sync`. The existing hash checks, ancestry comparison, explicit
 review choices and stale-choice rejection apply to both namespaces. A
 receiving machine resolves personal names against its own user directory.
 No remote project directory is executed or used as a sync destination.

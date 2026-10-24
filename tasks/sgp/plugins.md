@@ -14,7 +14,7 @@ beside the plugin. Include the `.ts` extension. `paths.home()` and
 `paths.stateDir()` give this machine's Hal paths; `import.meta.dir` is the
 plugin's directory. Do not bake in another machine's absolute paths.
 
-`export const portable = true` opts a file into existing `/plugin-sync`
+`export const portable = true` opts a file into existing `/sync`
 review. Sync transfers that file and its history, not its imported helpers,
 assets, installed programs, or private state. A self-contained file can
 use Bun, Node, and the running Hal. Other dependencies must exist on both
