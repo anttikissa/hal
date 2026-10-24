@@ -189,7 +189,15 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 		let link = await b.evaluate(
 			`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, details: q.querySelector('.details')?.textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`,
 		)
-		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text: text.split('\n')[0], details: text.split('\n')[1], links: 2, scripts: 0 })
+		expect(link).toEqual({
+			href: url,
+			target: '_blank',
+			rel: 'noopener noreferrer',
+			text: text.split('\n')[0],
+			details: text.split('\n')[1],
+			links: 2,
+			scripts: 0,
+		})
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width,
@@ -206,7 +214,7 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 			// A wrapped question continues at the left edge, under its time, as in the terminal.
 			expect(
 				await b.evaluate(
-					`(() => { let h = document.querySelector('.Question .CardHeader'), rects = [...h.querySelector('.title .label').getClientRects()]; return Math.abs(rects.at(-1).left - h.querySelector('.stamp').getBoundingClientRect().left) })()`,
+					`(() => { let h = document.querySelector('.Question .CardHeader'), rects = [...h.querySelector('.title .label').getClientRects()]; return Math.abs(Math.min(...rects.filter(r => r.top > rects[0].top + 1).map(r => r.left)) - h.querySelector('.stamp').getBoundingClientRect().left) })()`,
 				),
 			).toBeLessThanOrEqual(1)
 		}

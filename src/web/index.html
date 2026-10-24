@@ -441,14 +441,29 @@
 			.Card .change .head:not(:first-child) {
 				margin-top: 0.5lh;
 			}
-			/* Shared first-line alignment, including wrapped titles. */
+			/* Side items sit at the right of the first line, after the title in reading order; a float spacer
+			   sized to them (CardHeader.tsx) lets wrapped title lines below use the full width. */
 			.CardHeader {
-				display: grid;
-				grid-template-columns: minmax(0, 1fr);
-				grid-auto-flow: column;
+				display: flow-root;
+				padding-inline: 1ch;
+			}
+			.CardHeader:not(.inline)::before {
+				content: '';
+				float: right;
+				width: var(--side-width, 0);
+				height: var(--side-height, 0);
+				margin-left: 1ch;
+			}
+			.CardHeader .side {
+				position: absolute;
+				top: 0;
+				right: 1ch;
+				display: flex;
 				align-items: start;
 				column-gap: 1ch;
-				padding-inline: 1ch;
+			}
+			.CardHeader .side:empty {
+				display: none;
 			}
 			.Transcript > :is(.Card, .Question) {
 				view-timeline: --sticky-card block;
@@ -463,7 +478,7 @@
 			@supports (animation-timeline: --sticky-card) {
 				.CardHeader:not(.inline),
 				.CardHeader.inline .stamp,
-				.CardHeader.inline > :not(.flow) {
+				.CardHeader.inline .side > * {
 					animation: sticky-shade linear both;
 					animation-timeline: --sticky-card;
 					animation-range: exit-crossing 20px exit-crossing 40px;
@@ -481,9 +496,13 @@
 			.CardHeader.inline {
 				position: static;
 				background: none;
+				display: grid;
 				grid-template-columns: auto minmax(0, 1fr);
+				grid-auto-flow: column;
+				align-items: start;
+				column-gap: 1ch;
 			}
-			.CardHeader.inline .flow {
+			.CardHeader.inline :is(.flow, .side) {
 				display: contents;
 			}
 			.CardHeader.inline .title {
@@ -491,28 +510,32 @@
 				padding-block: var(--card-inset);
 			}
 			.CardHeader.inline .stamp,
-			.CardHeader.inline > :not(.flow) {
+			.CardHeader.inline .side > * {
 				position: sticky;
 				top: 0;
 				z-index: 1;
 				align-self: start;
 				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
 			}
-			.Transcript > :not([data-tall]) :is(.CardHeader, .CardHeader.inline .stamp, .CardHeader.inline > :not(.flow)) {
+			.Transcript > :not([data-tall]) :is(.CardHeader.inline .stamp, .CardHeader.inline .side > *) {
 				position: static;
+			}
+			.Transcript > :not([data-tall]) .CardHeader:not(.inline) {
+				position: relative;
 			}
 			.CardHeader.inline .stamp {
 				padding-block: var(--card-inset);
 			}
 			.CardHeader .flow,
 			.CardHeader .link,
-			.CardHeader > .call {
+			.CardHeader .side > .call {
 				padding-block: var(--card-inset);
 			}
-			.CardHeader > .call {
+			.CardHeader .side > .call {
 				white-space: nowrap;
 			}
 			.CardHeader .flow {
+				display: block;
 				min-width: 0;
 			}
 			.CardHeader .stamp {
@@ -543,6 +566,7 @@
 				opacity: 0.8;
 			}
 			.Card.folds:not(.open) .CardHeader .flow {
+				display: flow-root;
 				overflow: clip visible;
 				text-overflow: ellipsis;
 				white-space: nowrap;
@@ -567,7 +591,7 @@
 					transition-duration: 100ms;
 				}
 			}
-			.CardHeader > .peek {
+			.CardHeader .side > .peek {
 				width: 0;
 				margin-left: -1ch;
 				display: flex;
@@ -575,12 +599,12 @@
 				opacity: 0;
 				transition: opacity 250ms ease;
 			}
-			.CardHeader > .peek > .status {
+			.CardHeader .side > .peek > .status {
 				padding-left: 1ch;
 				background: var(--sticky-bg);
 			}
 			@media (hover: hover) and (pointer: fine) {
-				.CardHeader:hover > .peek {
+				.CardHeader:hover .side > .peek {
 					opacity: 0.5;
 					transition-duration: 100ms;
 				}
@@ -597,7 +621,7 @@
 				align-items: center;
 				flex-shrink: 0;
 			}
-			.CardHeader > .receipt {
+			.CardHeader .side > .receipt {
 				padding-block: var(--card-inset);
 			}
 			.Card .link:has(.receipt) {
@@ -622,32 +646,20 @@
 				overflow: hidden;
 				text-overflow: ellipsis;
 			}
-			.Card.open .CardHeader:has(> .status.diff) {
-				grid-template-columns: minmax(0, 1fr) auto auto;
-			}
-			.Card.open .CardHeader:has(> .status.diff) > .ticker {
-				grid-column: 2;
-				grid-row: 1;
-			}
-			.Card.open .CardHeader:has(> .status.diff) > .link {
-				grid-column: 3;
-				grid-row: 1;
-			}
-			.Card.open .CardHeader > .status.diff {
-				grid-column: 1 / -1;
-				grid-row: 2;
+			/* An open card's diff stats take their own row under the title. */
+			.CardHeader > .status.diff {
+				display: block;
+				clear: right;
 				max-width: none;
 				white-space: normal;
 				padding-top: 0;
 				overflow: visible;
 			}
-			.Card.open .CardHeader:has(> .status.diff) > .line-count {
-				grid-column: 3;
-				grid-row: 2;
+			.CardHeader > .line-count {
+				float: right;
+				clear: right;
+				margin-left: 1ch;
 				padding-top: 0;
-			}
-			.Card.open .CardHeader:has(> .line-count) > .status.diff {
-				grid-column: 1 / 3;
 			}
 			.CardHeader .unsafe {
 				margin-left: 1ch;
@@ -766,6 +778,7 @@
 				cursor: pointer;
 			}
 			.Card.queued:not(.open) .CardHeader .flow {
+				display: flow-root;
 				overflow: clip visible;
 				text-overflow: ellipsis;
 				white-space: nowrap;

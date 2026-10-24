@@ -65,7 +65,7 @@ browserTest(
 					if (open) await b.evaluate(`document.querySelectorAll('.Card.tool .mark').forEach(b => b.click())`)
 					await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
 					let rows = await b.evaluate(
-						`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector(':scope > .status').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: flow.right <= link.left, stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, compactHeight: 22 + parseFloat(getComputedStyle(h).lineHeight) / 2, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector(':scope > .status').textContent, title: h.querySelector('.title').textContent }; })`,
+						`Array.from(document.querySelectorAll('.Card.tool'), c => { let h = c.querySelector('.CardHeader'), flow = h.querySelector('.flow').getBoundingClientRect(), status = h.querySelector('.status.diff').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(), stamp = h.querySelector('.stamp').getBoundingClientRect(); return { flowWidth: flow.width, statusWidth: status.width, separated: status.top >= flow.bottom - 1, linkClear: (c.classList.contains('open') ? [...h.querySelector('.title').getClientRects()] : [flow]).every(r => r.right <= link.left || r.top >= link.bottom - 1), stampFits: stamp.right <= flow.right, rowHeight: h.getBoundingClientRect().height, compactHeight: 22 + parseFloat(getComputedStyle(h).lineHeight) / 2, fits: c.scrollWidth <= c.clientWidth, stats: h.querySelector('.status.diff').textContent, title: h.querySelector('.title').textContent }; })`,
 					)
 					for (let row of rows) {
 						expect(row.fits).toBe(true)
@@ -228,7 +228,7 @@ browserTest('foreground and background Bash share header status without losing o
 				mobile: width === 320,
 			})
 			let headers = await b.evaluate(
-				`Array.from(document.querySelectorAll('.Card > .CardHeader'), h => ({ status: h.querySelector(':scope > .status:not(.line-count)').textContent, beforeLink: h.querySelector(':scope > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`,
+				`Array.from(document.querySelectorAll('.Card > .CardHeader'), h => ({ status: h.querySelector('.side > .status:not(.line-count)').textContent, beforeLink: h.querySelector('.side > .status ~ .link') !== null, fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`,
 			)
 			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1, 1 line)'])
 			expect(headers.every((h: any) => h.beforeLink && h.fits && h.exit === 'exit 1')).toBe(true)
