@@ -1,5 +1,5 @@
 {
-	version: 5,
+	version: 6,
 	changes: [
 		{
 			version: 2,
@@ -88,6 +88,16 @@
 					kind: 'compatible',
 					target: 'common/plugin-sync',
 					description: 'Accepts personal plugin names'
+				}
+			]
+		},
+		{
+			version: 6,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/tools.run',
+					description: "Errors thrown by a plugin tool's run reach the model with their stack."
 				}
 			]
 		}

@@ -56,7 +56,8 @@ history replays it even after the plugin is gone.
    command (code, a query, a shell line). It shows as code; a closed
    card shows its first line. Other arguments follow as `key: value`
    lines.
-3. **Body**: the result, in full. A failure shows complete, once.
+3. **Body**: the result, in full. A failure shows complete, once: to
+   fail, throw; Hal reports the error with its stack.
 
 ## Kind and color
 

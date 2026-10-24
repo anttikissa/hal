@@ -10,7 +10,7 @@
 // the round sequential in call order. WAIT always runs last (task aa5).
 
 import { spawn } from 'child_process'
-import { readdirSync } from 'fs'
+import { existsSync, readdirSync } from 'fs'
 import type { CommitBlock, ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { toolPresentations } from './tool-presentation.ts'
@@ -143,6 +143,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	let key = `${ctx.sessionId}:${call.id}`
 	tools.running.set(key, { call, controller })
 	ctx = { ...ctx, signal: AbortSignal.any([ctx.signal, controller.signal]) }
+	let stack = false
 	try {
 		let copied = pruning.copied(call.input)
 		if (copied)
@@ -167,7 +168,10 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 			throw new Error(
 				`'${call.name}' is not a provider tool: the model called it at the top level. Hal tools run inside tool: tool { cmd: "${tools.all().some((t) => t.name === call.name.toLowerCase()) ? call.name.toUpperCase() : '<TOOL>'} <args...>" }; tool { cmd: "HELP" } lists them.`,
 			)
+		// A plugin tool's failure keeps its stack, which points into the plugin.
+		stack = !existsSync(`${tools.dir()}/${tool.name}.ts`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
+		stack = false
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
 		else {
 			result = {
@@ -192,7 +196,8 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 			else if (images.length) result.images = images
 		}
 	} catch (e: any) {
-		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }
+		let text = stack && typeof e?.stack === 'string' ? e.stack : `Error: ${e?.message ?? e}`
+		result = { type: 'tool_result', id: call.id, output: text, isError: true }
 	} finally {
 		if (tools.running.get(key)?.controller === controller) tools.running.delete(key)
 	}
