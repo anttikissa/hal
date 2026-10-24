@@ -68,7 +68,7 @@ test('durable receipt aborts a provider; late tool calls cannot dispatch before 
 })
 
 for (let stop of ['none', 'pause', 'close'] as const) {
-	test(`a round's calls all start, settle on a steer, and nothing new dispatches; ${stop} controls restart`, async () => {
+	test(`a steer settles the running call and cancels undispatched effects; ${stop} controls restart`, async () => {
 		let settling = gate()
 		let original = tools.run
 		let dispatched: string[] = []
@@ -93,7 +93,7 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 				{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'concurrent' } },
 				{ type: 'done', reason: 'tool_use' },
 			)
-			await until(() => dispatched.length === 2)
+			await until(() => dispatched.length === 1)
 			a.conn.send({ type: 'submit', sessionId: id, text: 'one' })
 			a.conn.send({ type: 'submit', sessionId: id, text: 'two' })
 			expect(toolSignal!.aborted).toBe(true)
@@ -105,11 +105,13 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 				await until(() => calls.length === 2)
 				let blocks = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 				expect(blocks).toContainEqual({ type: 'tool_result', id: 'first', output: 'settled partial output' })
-				expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: 'settled partial output' })
+				expect(blocks).toContainEqual(
+					expect.objectContaining({ type: 'tool_result', id: 'pending', interrupted: 'canceled' }),
+				)
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}
 			await until(() => a.of('turn-end').length)
-			expect(dispatched).toEqual(['first', 'pending'])
+			expect(dispatched).toEqual(['first'])
 			if (stop !== 'none') {
 				expect(calls.length).toBe(1)
 				expect(a.views.get(id)!.state.type).toBe('paused')
@@ -170,7 +172,7 @@ for (let escape of [false, true]) {
 				{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'concurrent' } },
 				{ type: 'done', reason: 'tool_use' },
 			)
-			await until(() => dispatched.length === 2)
+			await until(() => dispatched.length === 1)
 			a.conn.send({ type: 'submit', sessionId: id, text: 'steer' })
 			expect(toolSignal!.aborted).toBe(false)
 			expect(a.views.get(id)!.inbox.map((m) => m.text)).toEqual(['steer'])
@@ -194,16 +196,18 @@ for (let escape of [false, true]) {
 					id: 'flagged',
 					output: 'migrated',
 				})
-				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({
-					type: 'tool_result',
-					id: 'pending',
-					output: 'migrated',
-				})
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual(
+					expect.objectContaining({
+						type: 'tool_result',
+						id: 'pending',
+						interrupted: 'canceled',
+					}),
+				)
 				expect(messages.at(-1).blocks.at(-1).text).toEqual(stamped('steer'))
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}
 			await until(() => a.of('turn-end').length)
-			expect(dispatched).toEqual(['flagged', 'pending'])
+			expect(dispatched).toEqual(['flagged'])
 			if (escape) expect(a.views.get(id)!.state.type).toBe('paused')
 			expect(restarts).toBe(0)
 			// With no flagged call left, it restarts without asking.

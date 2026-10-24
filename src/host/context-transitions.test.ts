@@ -146,7 +146,7 @@ test('human clear lets foreground work settle; Escape cancels continuation and c
 		expect((await records(id)).findLast((r) => r.type === 'user')).toMatchObject({
 			blocks: [
 				{ type: 'tool_result', id: 'held', output: 'settled' },
-				{ type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') },
+				{ type: 'tool_result', id: 'later', isError: true, output: expect.stringContaining('before dispatch') },
 			],
 		})
 	} finally {
@@ -308,7 +308,7 @@ test("human clear starts its continuation only after the round's calls settle", 
 			type: 'user',
 			blocks: [
 				{ type: 'tool_result', id: 'held', output: 'settled' },
-				{ type: 'tool_result', id: 'later', output: expect.stringContaining('concurrent') },
+				{ type: 'tool_result', id: 'later', isError: true, output: expect.stringContaining('before dispatch') },
 			],
 		})
 		calls[1]!.push({ type: 'done', reason: 'end' })

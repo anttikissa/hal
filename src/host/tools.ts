@@ -1,5 +1,4 @@
-// Local tools the model may call. A round's calls run concurrently
-// (turns.ts).
+// Local tools the model may call, scheduled across the whole round.
 // Long results stay in session blobs; the model sees their head and tail.
 //
 // A call is recorded before it runs and its result after, so a host
@@ -7,10 +6,8 @@
 // may or may not have run. That is what makes bash, which mutates,
 // safe to offer.
 //
-// A round's calls run concurrently, their results in call order; only
-// wait starts after the others settle, so it sees children spawned in
-// the same round. Commands within one native call run concurrently only
-// when all are read-only; otherwise they run in written order (task ep8).
+// Only wholly read-only rounds run concurrently. Any effectful call makes
+// the round sequential in call order. WAIT always runs last (task aa5).
 
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
@@ -223,25 +220,15 @@ async function round(
 	ctx: CallContext,
 	runOne: (call: ToolCallBlock) => Promise<ToolResultBlock>,
 ): Promise<ToolResultBlock[]> {
-	let groups = new Map<string, ToolCallBlock[]>()
-	for (let call of calls) {
-		let key = call.sequence ?? call.id
-		let group = groups.get(key)
-		if (group) group.push(call)
-		else groups.set(key, [call])
-	}
-	let batches = [...groups.values()].flatMap((group) =>
-		group.length > 1 && group.every((c) => c.name !== 'command' && tools.readOnly(c.name, c.input))
-			? group.map((c) => [c])
-			: [group],
-	)
 	let settled = new Map<string, ToolResultBlock>()
-	let dispatch = async (group: ToolCallBlock[]) => {
-		for (let call of group) settled.set(call.id, await runOne(call))
+	let dispatch = async (call: ToolCallBlock) => {
+		settled.set(call.id, await runOne(call))
 	}
-	let early = batches.filter((g) => g[0]!.name !== 'wait')
-	await Promise.all(early.map(dispatch))
-	for (let group of batches) if (!settled.has(group[0]!.id)) await dispatch(group)
+	let early = calls.filter((call) => call.name !== 'wait')
+	if (early.every((call) => call.name !== 'command' && tools.readOnly(call.name, call.input)))
+		await Promise.all(early.map(dispatch))
+	else for (let call of early) await dispatch(call)
+	for (let call of calls) if (call.name === 'wait') await dispatch(call)
 	return calls.map((c) => settled.get(c.id)!)
 }
 

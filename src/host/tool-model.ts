@@ -55,7 +55,7 @@ console.log('Hello world!')
 !!END
 \`\`\`
 
-Multiple tool calls per message run in parallel if safe. Tools like BASH, EDIT, or COMMAND run serially.
+Only wholly read-only work runs in parallel. Any side-effectful call makes the whole round sequential, across tool-call boundaries. WAIT always runs last.
 
 Hal is tolerant in what it receives and strict in what it sends. Officially, arguments use "strings", { objects }, and /* comments */, but unambiguous variations are tolerated. Like, you don't have to capitalize tool names.
 

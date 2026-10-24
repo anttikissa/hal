@@ -98,50 +98,60 @@ test('direct mode accepts multiple EDITs and preserves runtime errors without dr
 	expect(results[3]!.output).toContain('new a')
 })
 
-test.each(['provider', 'hal/tool'])('%s read-only batches run concurrently and retain result order', async (mode) => {
-	let c = client(),
-		id = created(c, testHome())
-	for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, path + '\n')
-	if (mode === 'hal/tool') {
-		c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
-		await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
-	}
-	let gate = Promise.withResolvers<void>(),
-		started: unknown[] = []
-	let original = tools.run
-	let spy = spyOn(tools, 'run').mockImplementation(async (call, ctx) => {
-		started.push(call.input.path)
-		if (call.input.path === 'a.txt') await gate.promise
-		return original(call, ctx)
-	})
-	try {
-		let cmd = 'READ a.txt\nREAD b.txt'
-		c.conn.send({ type: 'submit', sessionId: id, text: mode === 'hal/tool' ? cmd : 'go' })
-		if (mode === 'provider') {
-			await until(() => calls.length === 1)
-			calls[0]!.push(
-				{ type: 'tool_call', id: 'compound', name: 'tool', input: { cmd } },
-				{ type: 'done', reason: 'tool_use' },
-			)
+test.each(['provider', 'separate', 'hal/tool'])(
+	'%s read-only batches run concurrently and retain result order',
+	async (mode) => {
+		let c = client(),
+			id = created(c, testHome())
+		for (let path of ['a.txt', 'b.txt']) writeFileSync(`${testHome()}/${path}`, path + '\n')
+		if (mode === 'hal/tool') {
+			c.conn.send({ type: 'submit', sessionId: id, text: '/model hal/tool' })
+			await until(() => history.readSync(id).some((r) => r.type === 'change' && r.model === 'hal/tool'))
 		}
-		await until(() => started.length === 2)
-		expect(started).toEqual(['a.txt', 'b.txt'])
-		gate.resolve()
-		if (mode === 'provider') {
-			await until(() => calls.length === 2)
-			calls[1]!.push({ type: 'done', reason: 'end' })
+		let gate = Promise.withResolvers<void>(),
+			started: unknown[] = []
+		let original = tools.run
+		let spy = spyOn(tools, 'run').mockImplementation(async (call, ctx) => {
+			started.push(call.input.path)
+			if (call.input.path === 'a.txt') await gate.promise
+			return original(call, ctx)
+		})
+		try {
+			let cmd = 'READ a.txt\nREAD b.txt'
+			c.conn.send({ type: 'submit', sessionId: id, text: mode === 'hal/tool' ? cmd : 'go' })
+			if (mode !== 'hal/tool') {
+				await until(() => calls.length === 1)
+				calls[0]!.push(
+					...(mode === 'separate'
+						? ['a.txt', 'b.txt'].map((path) => ({
+								type: 'tool_call' as const,
+								id: path,
+								name: 'tool',
+								input: { cmd: `READ ${path}` },
+							}))
+						: [{ type: 'tool_call' as const, id: 'compound', name: 'tool', input: { cmd } }]),
+					{ type: 'done', reason: 'tool_use' },
+				)
+			}
+			await until(() => started.length === 2)
+			expect(started).toEqual(['a.txt', 'b.txt'])
+			gate.resolve()
+			if (mode !== 'hal/tool') {
+				await until(() => calls.length === 2)
+				calls[1]!.push({ type: 'done', reason: 'end' })
+			}
+			await until(() => c.of('turn-end').length)
+			let records = history.readSync(id)
+			let invoked = records.flatMap((r) => (r.type === 'assistant' && r.block.type === 'tool_call' ? [r.block] : []))
+			let results = records.flatMap((r) => (r.type === 'user' ? r.blocks.filter((b) => b.type === 'tool_result') : []))
+			expect(results.map((r) => r.id)).toEqual(invoked.map((b) => b.id))
+			expect(results.map((r) => r.output.split('\n')[1])).toEqual(['1: a.txt', '1: b.txt'])
+		} finally {
+			gate.resolve()
+			spy.mockRestore()
 		}
-		await until(() => c.of('turn-end').length)
-		let records = history.readSync(id)
-		let invoked = records.flatMap((r) => (r.type === 'assistant' && r.block.type === 'tool_call' ? [r.block] : []))
-		let results = records.flatMap((r) => (r.type === 'user' ? r.blocks.filter((b) => b.type === 'tool_result') : []))
-		expect(results.map((r) => r.id)).toEqual(invoked.map((b) => b.id))
-		expect(results.map((r) => r.output.split('\n')[1])).toEqual(['1: a.txt', '1: b.txt'])
-	} finally {
-		gate.resolve()
-		spy.mockRestore()
-	}
-})
+	},
+)
 
 test.each(['bash', 'command', 'unregistered'])('%s makes the whole compound batch sequential', async (name) => {
 	let members = expand('READ a\nREAD b\nBASH true\nREAD c\nREAD d')
@@ -170,7 +180,7 @@ test.each(['bash', 'command', 'unregistered'])('%s makes the whole compound batc
 test('read-only batches defer WAIT until other round work settles', async () => {
 	let members = [
 		...expand('WAIT\nREAD a'),
-		{ type: 'tool_call' as const, id: 'other', name: 'bash', input: { command: 'true' } },
+		{ type: 'tool_call' as const, id: 'other', name: 'read', input: { path: 'b' } },
 	]
 	let gate = Promise.withResolvers<void>(),
 		other = Promise.withResolvers<void>(),
@@ -185,11 +195,53 @@ test('read-only batches defer WAIT until other round work settles', async () => 
 	})
 	try {
 		await other.promise
-		expect(started).toEqual(['read', 'bash'])
+		expect(started).toEqual(['read', 'read'])
 	} finally {
 		gate.resolve()
 	}
 	let results = await pending
-	expect(started).toEqual(['read', 'bash', 'wait'])
-	expect(results.map((r) => r.output)).toEqual(['wait', 'read', 'bash'])
+	expect(started).toEqual(['read', 'read', 'wait'])
+	expect(results.map((r) => r.output)).toEqual(['wait', 'read', 'read'])
 })
+
+test.each(['compound', 'separate'])('%s WAIT calls run last in effectful rounds', async (mode) => {
+	let members = expand('WAIT\nREAD a\nBASH true\nWAIT\nREAD b')
+	if (mode === 'separate') members = members.map(({ sequence: _sequence, ...call }) => call)
+	let started: string[] = []
+	let results = await tools.round(members, { cwd: testHome(), sessionId: 'batch' }, async (call) => {
+		started.push(call.name)
+		return { type: 'tool_result', id: call.id, output: call.name }
+	})
+	expect(started).toEqual(['read', 'bash', 'read', 'wait', 'wait'])
+	expect(results.map((r) => r.output)).toEqual(['wait', 'read', 'bash', 'wait', 'read'])
+})
+
+test.each(['edit', 'bash', 'command', 'unregistered'])(
+	'%s serializes separate calls and compound siblings',
+	async (name) => {
+		let members = [
+			...expand('READ a\nREAD b'),
+			{ type: 'tool_call' as const, id: 'effect', name, input: {} },
+			...expand('READ c\nREAD d').map((call) => ({ ...call, id: `after-${call.id}`, sequence: 'after' })),
+		]
+		let gate = Promise.withResolvers<void>()
+		let first = Promise.withResolvers<void>()
+		let started: string[] = []
+		let pending = tools.round(members, { cwd: testHome(), sessionId: 'batch' }, async (call) => {
+			started.push(call.name)
+			if (started.length === 1) {
+				first.resolve()
+				await gate.promise
+			}
+			return { type: 'tool_result', id: call.id, output: call.name }
+		})
+		try {
+			await first.promise
+			expect(started).toEqual(['read'])
+		} finally {
+			gate.resolve()
+			await pending
+		}
+		expect(started).toEqual(['read', 'read', name, 'read', 'read'])
+	},
+)

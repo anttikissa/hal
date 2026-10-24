@@ -20,7 +20,9 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true, parent: '01-abc', kind: 'subagent', autoclose: true }
 	let interactive = systemPrompt.inspect(input)
 	expect(interactive.text).toContain('BASH /*')
-	expect(interactive.sections.find((s) => s.title === 'BASH')?.body).toContain('so user messages')
+	expect(interactive.sections.find((s) => s.title === 'BASH')?.body).toContain(
+		'Long-running commands must use background: true',
+	)
 	let unattended = systemPrompt.inspect({ ...input, interactive: false })
 	expect(unattended.problems).toEqual([])
 	expect(unattended.text).not.toContain('/*')
@@ -28,7 +30,6 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 	expect(unattended.text).toContain('modifies')
 	expect(unattended.text).toContain('path')
 	let bash = unattended.sections.find((s) => s.title === 'BASH')?.body
-	expect(bash).not.toContain('user messages')
 	expect(bash).toContain('foreground')
 	expect(bash).toContain('parallel work')
 	expect(bash).toContain('WAIT for completion')

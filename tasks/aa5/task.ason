@@ -1,0 +1,11 @@
+{
+	title: 'Serialize effectful calls across the whole round',
+	spec: 'Only wholly read-only round work runs concurrently. If any non-WAIT call is effectful, all non-WAIT calls execute sequentially in original order across native tool-call boundaries, including compound calls. BASH, EDIT, COMMAND and unknown tools are effectful for scheduling; harmless-command prompt amendment exemptions do not change this. WAIT calls always execute last, in original order, after every other call settles, even within mixed compound calls. Results retain original call order and individual errors, approval and cancellation semantics. This host scheduler applies equally to providers and hal/tool, terminal and web. Tasks and architecture guidance state this invariant without a separate-native-call concurrency exception. Regression coverage includes separate EDIT followed by BASH reading the created file, wholly read-only concurrency, effectful and unknown calls across boundaries, and WAIT at the end of mixed compound and separate calls.',
+	status: 'done',
+	notes: [
+		'The earlier scheduler grouped by native call sequence and launched separate groups concurrently, so separate EDIT and BASH could race. Scheduling now classifies the entire round, serializes every non-WAIT call when any is effectful, and dispatches WAIT last. Gate-based regressions reproduced early BASH dispatch and cross-call concurrency before the fix. Interruption and model-handoff contracts now check cancellation of undispatched effects. The full suite also exposed an obsolete prompt wording assertion; it now checks the current interactive background rule. Scheduling uses only per-round arrays and a result map, with no persistent state, timers or history scans.',
+		'Verification: ./test passed 1676 tests with 2 existing skips and 0 failures; TypeScript and lint passed with 0 warnings and 0 errors. The scheduler regressions failed before the fix, including BASH starting before a gated EDIT completed.'
+	],
+	needs: ['ep8', 'asp'],
+	foldInto: ['ep8', 'asp']
+}

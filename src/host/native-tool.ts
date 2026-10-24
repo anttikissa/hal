@@ -30,7 +30,7 @@ function def(): ToolDef {
 			properties: {
 				cmd: {
 					type: 'string',
-					description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Read-only tools are run in parallel.`,
+					description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Only wholly read-only work runs in parallel; any side-effectful call makes the whole round sequential. WAIT always runs last.`,
 				},
 			},
 			required: ['cmd'],

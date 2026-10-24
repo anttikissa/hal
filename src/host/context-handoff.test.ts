@@ -68,7 +68,7 @@ test('invalid and unchanged settings do not interrupt; changes do not override a
 	).toBe(false)
 })
 
-test('model handoff lets the round, unsafe work included, settle once', async () => {
+test('model handoff settles unsafe work and cancels undispatched effects', async () => {
 	let finish!: () => void
 	let settled = new Promise<void>((resolve) => {
 		finish = resolve
@@ -92,7 +92,7 @@ test('model handoff lets the round, unsafe work included, settle once', async ()
 			{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'concurrent' } },
 			{ type: 'done', reason: 'tool_use' },
 		)
-		await until(() => dispatched.length === 2)
+		await until(() => dispatched.length === 1)
 		slash.change(id, { model: 'other/m2' })
 		expect(signal!.aborted).toBe(false)
 		expect(calls).toHaveLength(1)
@@ -101,8 +101,10 @@ test('model handoff lets the round, unsafe work included, settle once', async ()
 		expect(calls[1]!.model).toBe('other/m2')
 		let blocks = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 		expect(blocks).toContainEqual({ type: 'tool_result', id: 'migration', output: 'Migration finished.' })
-		expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: 'Migration finished.' })
-		expect(dispatched).toEqual(['migration', 'pending'])
+		expect(blocks).toContainEqual(
+			expect.objectContaining({ type: 'tool_result', id: 'pending', interrupted: 'canceled' }),
+		)
+		expect(dispatched).toEqual(['migration'])
 		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length)
 	} finally {

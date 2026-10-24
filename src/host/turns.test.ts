@@ -182,31 +182,41 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	expect((await records(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
 })
 
-test("a round's calls run concurrently, results in call order", async () => {
+test('separate EDIT and BASH calls finish in order before results replay', async () => {
 	let a = client()
 	let id = toolSession(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	let bash = (callId: string, command: string): StreamEvent => ({
-		type: 'tool_call',
-		id: callId,
-		name: 'bash',
-		input: { command, description: 'x', timeout: 5 },
+	let gate = Promise.withResolvers<void>()
+	let started: string[] = []
+	let original = tools.run
+	let spy = spyOn(tools, 'run').mockImplementation(async (call, ctx) => {
+		started.push(call.name)
+		if (call.name === 'edit') await gate.promise
+		return original(call, ctx)
 	})
-	// The first waits for what the second does: run in order, it times out.
-	calls[0]!.push(bash('t1', 'until [ -f ready ]; do sleep 0.01; done; echo saw it'), bash('t2', 'touch ready'), {
-		type: 'done',
-		reason: 'tool_use',
-	})
-	await until(() => calls.length === 2)
-	let results = calls[1]!.input.messages.at(-1).blocks
-	expect(results.map((b: any) => [b.id, b.isError ?? false])).toEqual([
-		['t1', false],
-		['t2', false],
-	])
-	expect(results[0].output).toContain('saw it')
-	calls[1]!.push({ type: 'done', reason: 'end' })
-	await until(() => a.of('turn-end').length)
+	try {
+		a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+		await until(() => calls.length === 1)
+		calls[0]!.push(
+			{ type: 'tool_call', id: 't1', name: 'tool', input: { cmd: 'EDIT ready.txt create\n!!NEW\nready\n!!END' } },
+			{ type: 'tool_call', id: 't2', name: 'tool', input: { cmd: 'BASH "cat ready.txt"' } },
+			{ type: 'done', reason: 'tool_use' },
+		)
+		await until(() => started.length > 0)
+		expect(started).toEqual(['edit'])
+		gate.resolve()
+		await until(() => calls.length === 2)
+		let results = calls[1]!.input.messages.at(-1).blocks
+		expect(results.map((b: any) => [b.id, b.isError ?? false])).toEqual([
+			['t1', false],
+			['t2', false],
+		])
+		expect(results[1].output).toContain('ready')
+		calls[1]!.push({ type: 'done', reason: 'end' })
+		await until(() => a.of('turn-end').length)
+	} finally {
+		gate.resolve()
+		spy.mockRestore()
+	}
 })
 
 test('a restart after a tool ran keeps its result, continues, and does not run it again', async () => {

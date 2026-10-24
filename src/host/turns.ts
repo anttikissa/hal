@@ -356,9 +356,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			status.transition(id, { type: 'tools' })
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, model, endTurn: () => (ending = true) }
-			// The round's calls run concurrently; results keep call order.
-			// wait starts once the others settle, so it sees children
-			// spawned in the same round.
+			// Scheduling preserves result order and runs WAIT last (tools.round).
 			let runOne = async (call: ToolCallBlock): Promise<ToolResultBlock> => {
 				if (signal.aborted && signal.reason === jobs.steered) return turnPolicy.canceled(call.id)
 				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear')
