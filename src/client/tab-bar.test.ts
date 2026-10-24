@@ -36,7 +36,7 @@ test('each tab shows at most one indicator for what it needs', () => {
 		{ ...tab('j'), question: 'ordinary' as const },
 		tab('k', { type: 'blocked', reason: 'log in' }),
 	]
-	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5×  6Ⅱ  7✓  8   9? 10? 11! ')
+	expect(bar(list, 'h', 200)).toStartWith('  1▪  2▪  3?  4▪  5×  6Ⅱ  7✓ [8] 9?  10?  11! ')
 	expect(tabBar.indicator(list[0]!)?.fg).toEqual(colors.assistant().cursor)
 	expect(tabBar.indicator(list[2]!)?.fg).toEqual(colors.tab().doneFg)
 	expect(tabBar.indicator(list[3]!)?.fg).toEqual(colors.tab().warningFg)
@@ -79,11 +79,11 @@ test('without colors a blinking indicator comes and goes', () => {
 	saved.mono = ansi.mono
 	ansi.mono = () => true
 	let list = [tab('a', { type: 'running', phase: 'streaming' }), tab('b', { type: 'paused' })]
-	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' 1▪ 2Ⅱ ')
+	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith('  1▪ [2Ⅱ] ')
 	// The same width dark, so nothing after it moves.
-	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' 1  2Ⅱ ')
-	// The focused number is underlined even without colors.
-	expect(tabBar.row(list, 'b', 80)).toContain('\x1b[4m\x1b]8;;')
+	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith('  1  [2Ⅱ] ')
+	// Tight, the focused number is underlined even without colors.
+	expect(tabBar.row(list, 'b', 8)).toContain('\x1b[4m\x1b]8;;')
 })
 
 test('the bar stays one row: hints go, then it pages', () => {
@@ -101,11 +101,11 @@ test('the bar stays one row: hints go, then it pages', () => {
 	expect(at('ctrl-w')).toBeLessThan(at('ctrl-n/p'))
 	expect(at('ctrl-n/p')).toBeLessThan(at('alt-#'))
 	expect(seen.some((r) => r.includes('Tabs:'))).toBe(false)
-	// Every cell is 4 wide (two digits, marker, gap), none clipped.
-	expect(seen).toContain('  1×  2   3   4   5   6   7   8   9  10  11  12  ')
-	// Paged: 7 per page in 36 columns, edges at both ends with no count.
-	// The last page ends at tab 12 and is full; the left edge carries
-	// tab 1's failure.
-	expect(bar(list, 't10', 38)).toBe(' ‹×  6   7   8   9  10  11  12     › ')
-	expect(bar(list, 't0', 38)).toBe(' ‹   1×  2   3   4   5   6   7     › ')
+	// Roomy, then tight; a mark adds a column, none clipped.
+	expect(seen).toContain('  1×  2  3  4  5  6  7  8  9  10 [11] 12 ')
+	expect(seen).toContain(' 1× 2 3 4 5 6 7 8 9 10 11 12')
+	// Paged: tight labels between edges with no count. The last page
+	// ends at tab 12 and is full; the left edge carries tab 1's failure.
+	expect(bar(list, 't10', 28)).toBe(' ‹× 4 5 6 7 8 9 10 11 12 › ')
+	expect(bar(list, 't0', 28)).toBe(' ‹  1× 2 3 4 5 6 7 8 9   › ')
 })

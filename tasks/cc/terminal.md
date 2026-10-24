@@ -140,14 +140,15 @@ hottest repaint path. Do keep their widths in agreement.
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
-The tab bar uses numeric labels in equal cells, the active tab's number
-underlined (no brackets, task 3k), and a one-character status indicator
-after the tab number when needed. With one tab,
+The tab bar shows ` 2 ` labels, the active tab as `[2]`; when they do not
+fit, tight `1 2 3` labels with the active number underlined (task c83). A
+one-character status indicator follows a tab number when needed. With one tab,
 it shows creation hints such as `ctrl-t: new`; with multiple tabs, it switches
 to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
 row: tab-specific hints are dropped from lowest to highest priority, then the
-tabs come in pages (task 3k) between count-less ‹ and › edges at the row's
-ends, rather than wrapping or clipping. There is no "Tabs:" label.
+labels turn tight, then the tight labels come in pages (task c83) between
+count-less ‹ and › edges at the row's ends, rather than wrapping or clipping.
+There is no "Tabs:" label.
 Tab labels are OSC 8 links to the same session in the browser; only the
 `(sessionId/blockId)` reference in a block header links to that block in the
 web transcript. Image and saved-paste markers link to their host-backed content.

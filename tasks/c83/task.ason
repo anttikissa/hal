@@ -1,0 +1,7 @@
+{
+	title: 'Terminal tab bar: roomy, then tight labels, then pages',
+	spec: 'The terminal tab bar shows variable-width labels before it pages, replacing 3k\'s equal terminal cells (user, 2026-10-23: the bar must be more compact, like the old Hal\'s). Roomy: each tab is " 2 ", the focused one "[2]" in the active color, so switching tabs moves no number. A tab\'s mark (task fr) follows its number and adds one column ("[4✓]", " 5▪ "); marks change rarely, so that shift is accepted. A blinking mark keeps its width in the dark phase. Tight, when roomy does not fit: numbers one space apart ("1 2 3"), the focused number underlined, marks added the same way. Order: roomy with hints, dropping hints from the lowest priority; then tight, the same; then pages of tight labels between 3k\'s ‹ › edges: pages fill greedily from tab 1, the last one ends at the last tab and is full, and the shown page is the one holding the current tab, a pure function of the tabs, their marks and the width (user, 2026-10-24: equal cells wasted space). Pages may shift when a mark comes or goes. The project-color row (task 22) draws ▁ over each number and its mark only. The web strip is unchanged.',
+	status: 'done',
+	needs: ['3k', '22'],
+	foldInto: ['3k']
+}
