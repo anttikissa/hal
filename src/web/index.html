@@ -447,11 +447,12 @@
 				display: flow-root;
 				padding-inline: 1ch;
 			}
+			/* The spacer covers only the first line, even when touch targets make the side taller. */
 			.CardHeader:not(.inline)::before {
 				content: '';
 				float: right;
 				width: var(--side-width, 0);
-				height: var(--side-height, 0);
+				height: min(var(--side-height, 0px), calc(var(--card-inset) + 1lh));
 				margin-left: 1ch;
 			}
 			.CardHeader .side {
@@ -2040,17 +2041,26 @@
 				flex-direction: column;
 				gap: 0.5lh;
 			}
+			/* One gap everywhere: header, quote, options and the card's bottom
+   are var(--card-inset) apart; every body row starts at the title's x. */
 			.Question {
 				position: relative;
 				margin: 0 0 0.5lh;
-				padding: 0 0 0.25lh;
+				padding: 0 0 var(--card-inset);
 				display: flex;
 				flex-direction: column;
-				gap: 0.25lh;
+				gap: var(--card-inset);
 				--card-inset: calc((44px - 1lh) / 2);
+			}
+			.Question > .CardHeader .flow {
+				padding-bottom: 0;
 			}
 			.Question > :not(.CardHeader) {
 				margin-inline: 1ch;
+			}
+			/* Flush, so the chosen option's ring doesn't jut out of the column. */
+			.Question button:focus-visible {
+				outline-offset: 0;
 			}
 			/* Options: a hairline in the card's color; the chosen one solid in it,
    its text the canvas color (text-fill keeps currentColor the card's).
@@ -2072,12 +2082,12 @@
 					background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent);
 				}
 			}
-			/* Options wrap with the same gap across and down. */
+			/* Options wrap with the card's gap down and 1ch across. */
 			.Question [role='group'] {
 				display: flex;
 				flex-wrap: wrap;
 				align-items: baseline;
-				gap: 0.5lh 1ch;
+				gap: var(--card-inset) 1ch;
 			}
 			/* Answer: the options' colors, a button's shape. */
 			.Question button.answer {
@@ -2114,7 +2124,7 @@
 				}
 			}
 			.Question pre.quote {
-				margin: 0 0 0 2ch;
+				margin: 0 1ch;
 				white-space: pre-wrap;
 				overflow-wrap: anywhere;
 				font: inherit;
