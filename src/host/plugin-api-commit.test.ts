@@ -89,12 +89,18 @@ Plugin-API: breaking host/items.save | Completes before persistence
 	expect(current().version).toBe(2)
 })
 
-test('missing, mixed, duplicate and incomplete declarations fail without changing the index', () => {
+test('a commit without a declaration succeeds as none, so users can always commit', () => {
+	write('file.ts', 'export const c = 1\n')
+	ok('add', '--', 'file.ts')
+	ok('commit', '-qm', 'User commit')
+	expect(current().version).toBe(1)
+})
+
+test('mixed, duplicate and incomplete declarations fail without changing the index', () => {
 	write('file.ts', 'export const b = 1\n')
 	ok('add', '--', 'file.ts')
 	let index = ok('write-tree')
 	for (let declaration of [
-		'',
 		'Plugin-API: none\nPlugin-API: rename a -> b',
 		'Plugin-API: breaking a | Changed behavior',
 		'Plugin-API: rename a -> a',
