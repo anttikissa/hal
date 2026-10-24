@@ -33,6 +33,7 @@ import {
 } from 'fs'
 import { basename, dirname, join } from 'path'
 import { ason } from '../common/ason.ts'
+import { pluginSyncWire } from '../common/plugin-sync.ts'
 import { lines } from '../common/lines.ts'
 import { history } from './history.ts'
 import { plugins } from './plugins.ts'
@@ -50,7 +51,24 @@ export type Version = {
 type Checkout = { file: string; checkout: string; ts: string }
 
 const sha = (bytes: Uint8Array | string): string => new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
-const isPlugin = (name: string): boolean => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.includes('/')
+const isPlugin = (name: string): boolean => !name.includes('/') && pluginSyncWire.isName(name)
+
+function filePath(file: string): string {
+	let st = pluginHistory.state
+	if (!pluginSyncWire.isName(file)) throw new Error(`plugin history: invalid filename ${file}`)
+	let personal = file.startsWith('personal/')
+	let dir = personal ? st.personal : st.dir
+	if (!dir) throw new Error(`plugin history: directory unavailable for ${file}`)
+	return join(dir, personal ? file.slice(9) : file)
+}
+
+function fileName(path: string): string | undefined {
+	let st = pluginHistory.state
+	let name = basename(path)
+	if (!isPlugin(name)) return
+	if (dirname(path) === st.dir) return name
+	if (st.personal && dirname(path) === st.personal) return `personal/${name}`
+}
 
 function idOf(v: Omit<Version, 'id'>): string {
 	return sha(`${v.file}\n${v.hash ?? 'deleted'}\n${v.parent ?? ''}\n${v.ts}`).slice(0, 16)
@@ -116,7 +134,8 @@ function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean)
 // The loader saw `path` change (watcher or startup); a failure is reported.
 function seen(path: string): void {
 	let st = pluginHistory.state
-	if (!st.dir || dirname(path) !== st.dir) return
+	let file = pluginHistory.fileName(path)
+	if (!st.dir || !file) return
 	try {
 		let bytes: Buffer | undefined
 		try {
@@ -124,7 +143,7 @@ function seen(path: string): void {
 		} catch (e: any) {
 			if (e?.code !== 'ENOENT') throw e
 		}
-		pluginHistory.observe(basename(path), bytes)
+		pluginHistory.observe(file, bytes)
 	} catch (e: any) {
 		plugins.report(`plugin history ${ledger()}: recording ${path} failed: ${e?.stack ?? e}`)
 	}
@@ -149,7 +168,7 @@ function receive(list: Version[], bytes: Map<string, Uint8Array>): void {
 		}
 		let data = hash ? bytes.get(hash) : undefined
 		if (
-			!isPlugin(file) ||
+			!pluginSyncWire.isName(file) ||
 			typeof ts !== 'string' ||
 			!hash === !deleted ||
 			id !== idOf(clean) ||
@@ -170,7 +189,7 @@ function checkout(id: string): void {
 	let v = st.versions.get(id)
 	if (!v || !st.dir || st.error)
 		throw new Error(`plugin history: cannot check out ${id}: ${st.error ?? 'unknown version'}`)
-	let path = join(st.dir, v.file)
+	let path = pluginHistory.filePath(v.file)
 	pluginHistory.seen(path)
 	if (v.deleted) {
 		if (existsSync(path)) unlinkSync(path)
@@ -180,9 +199,10 @@ function checkout(id: string): void {
 
 // Reads and indexes the ledger, then records what changed while Hal
 // was stopped. A corrupt ledger is reported and disables the history.
-function init(dir: string): void {
+function init(dir: string, personal?: string): void {
 	let st = pluginHistory.state
 	st.dir = dir
+	st.personal = personal === dir ? undefined : personal
 	st.error = undefined
 	st.versions.clear()
 	st.heads.clear()
@@ -209,9 +229,11 @@ function init(dir: string): void {
 		)
 	}
 	let names = new Set(readdirSync(dir).filter(isPlugin))
+	if (st.personal) for (let name of readdirSync(st.personal).filter(isPlugin)) names.add(`personal/${name}`)
 	for (let file of new Set([...names, ...st.heads.keys()])) {
 		try {
-			pluginHistory.observe(file, names.has(file) ? readFileSync(join(dir, file)) : undefined, true)
+			if (file.startsWith('personal/') && !st.personal) continue
+			pluginHistory.observe(file, names.has(file) ? readFileSync(pluginHistory.filePath(file)) : undefined, true)
 		} catch (e: any) {
 			plugins.report(`plugin history ${path}: recording ${file} failed: ${e?.stack ?? e}`)
 		}
@@ -220,6 +242,7 @@ function init(dir: string): void {
 
 function close(): void {
 	pluginHistory.state.dir = undefined
+	pluginHistory.state.personal = undefined
 }
 
 export const pluginHistory = {
@@ -227,11 +250,14 @@ export const pluginHistory = {
 	// each file's current version id; `error`: why the ledger is unusable.
 	state: {
 		dir: undefined as string | undefined,
+		personal: undefined as string | undefined,
 		error: undefined as string | undefined,
 		versions: new Map<string, Version>(),
 		heads: new Map<string, string>(),
 	},
 	idOf,
+	filePath,
+	fileName,
 	content,
 	store,
 	index,

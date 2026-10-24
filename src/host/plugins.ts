@@ -75,6 +75,10 @@ function dir(): string {
 	return join(paths.home(), 'plugins')
 }
 
+function personalDir(): string {
+	return join(paths.userHome(), '.agents/plugins/hal')
+}
+
 function imports(): void {
 	if (plugins.state.imports) return
 	Bun.plugin({
@@ -405,16 +409,26 @@ function deactivateDirectory(d: string): void {
 	}
 }
 
-// Home history and sync stay separate from other activated directories.
-async function init(d = plugins.dir()): Promise<void> {
+// Both personal sources share this home's ledger; project sources stay outside it.
+async function init(d?: string, personal?: string): Promise<void> {
+	if (d === undefined) {
+		d = plugins.dir()
+		personal ??= plugins.personalDir()
+	}
 	d = resolve(d)
+	if (personal) personal = resolve(personal)
 	if (pluginHistory.state.dir) {
-		await plugins.state.directories.get(pluginHistory.state.dir)?.ready
+		await Promise.all([...plugins.state.directories.values()].map((entry) => entry.ready))
 		return
 	}
 	mkdirSync(d, { recursive: true })
-	pluginHistory.init(d)
-	await plugins.activateDirectory(d)
+	if (personal) mkdirSync(personal, { recursive: true })
+	plugins.state.personalDirectories = new Set([d, ...(personal ? [personal] : [])].map((dir) => realpathSync(dir)))
+	pluginHistory.init(d, personal)
+	await Promise.all([
+		plugins.activateDirectory(d),
+		...(personal && personal !== d ? [plugins.activateDirectory(personal)] : []),
+	])
 	if (plugins.state.directories.has(d)) plugins.state.started = true
 }
 
@@ -471,6 +485,7 @@ function unpreview(last = true): void {
 function close(): void {
 	plugins.state.started = false
 	for (let d of plugins.state.directories.keys()) plugins.deactivateDirectory(d)
+	plugins.state.personalDirectories.clear()
 	pluginHistory.close()
 	for (let path of plugins.state.files.keys()) plugins.remove(path)
 	plugins.state.files.clear()
@@ -483,7 +498,7 @@ function describe(): string {
 	if (!files.length) return `no plugins in ${plugins.dir()}`
 	return files
 		.map((f) => {
-			let parts = [basename(f.path), f.hash]
+			let parts = [pluginHistory.fileName(f.path) ?? paths.display(f.path), f.hash]
 			if (f.portable) parts.push('portable')
 			if (f.disabled) parts.push('disabled')
 			if (f.expires) parts.push(`${f.expired ? 'expired' : 'expires'} ${f.expires}`)
@@ -503,11 +518,13 @@ export const plugins = {
 		gen: 0,
 		imports: false,
 		directories: new Map<string, Directory>(),
+		personalDirectories: new Set<string>(),
 		started: false,
 		preview: undefined as { entry: Loaded; hidden?: Loaded } | undefined,
 		previewGen: 0,
 	},
 	dir,
+	personalDir,
 	imports,
 	report,
 	changed,

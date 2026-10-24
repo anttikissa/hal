@@ -1,5 +1,5 @@
 {
-	version: 4,
+	version: 5,
 	changes: [
 		{
 			version: 2,
@@ -68,6 +68,26 @@
 					target: 'host/commands/cd.command.run',
 					description: 'May return a trust form',
 					port: 'Handle ask and resume with user answers before changing cwd'
+				}
+			]
+		},
+		{
+			version: 5,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/plugins',
+					description: 'Discovers personal native plugins; adds personalDir and optional personal directory to init'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/plugin-history',
+					description: 'Namespaced personal history; adds filePath and fileName mappings'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/plugin-sync',
+					description: 'Accepts personal plugin names'
 				}
 			]
 		}

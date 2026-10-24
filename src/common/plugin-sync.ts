@@ -71,9 +71,9 @@ const ID = /^[0-9a-f]{16}$/
 const HASH = /^[0-9a-f]{64}$/
 const OPS = ['inventory', 'history', 'content', 'fetch', 'apply', 'step']
 
-// A top-level plugin filename: no path, so a file operation stays in
-// the plugins directory.
+// Personal names have one fixed namespace; neither namespace accepts paths.
 function isName(name: unknown): name is string {
+	if (typeof name === 'string' && name.startsWith('personal/')) name = name.slice(9)
 	return (
 		typeof name === 'string' &&
 		name.length <= 200 &&

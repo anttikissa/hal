@@ -31,15 +31,17 @@ let lose = false
 
 function makeSide(name: string, home = join(root, name)): Side {
 	let dir = join(home, 'plugins')
+	let personal = join(home, '.agents/plugins/hal')
 	mkdirSync(dir, { recursive: true })
+	mkdirSync(personal, { recursive: true })
 	let s: Side = {
 		home,
 		dir,
-		hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		hist: { dir: undefined, personal: undefined, error: undefined, versions: new Map(), heads: new Map() },
 		files: new Map(),
 	}
 	use(s)
-	pluginHistory.init(dir)
+	pluginHistory.init(dir, personal)
 	return s
 }
 
@@ -61,7 +63,7 @@ function on<T>(s: Side, fn: () => T): T {
 // Writes (undefined: deletes) a portable plugin on side `s`.
 function put(s: Side, file: string, text: string | undefined, portable = true): void {
 	on(s, () => {
-		let path = join(s.dir, file)
+		let path = pluginHistory.filePath(file)
 		if (text === undefined) {
 			if (existsSync(path)) unlinkSync(path)
 		} else writeFileSync(path, text)
@@ -71,7 +73,10 @@ function put(s: Side, file: string, text: string | undefined, portable = true): 
 }
 
 const read = (s: Side, file: string) =>
-	existsSync(join(s.dir, file)) ? readFileSync(join(s.dir, file), 'utf8') : undefined
+	on(s, () => {
+		let path = pluginHistory.filePath(file)
+		return existsSync(path) ? readFileSync(path, 'utf8') : undefined
+	})
 const ledger = (s: Side) => readFileSync(join(s.dir, 'history.asonl'), 'utf8')
 const one = (file: string) => pluginSyncClient.state.discrepancies.find((d) => d.file === file)
 const expected = (file: string) => ({
@@ -162,6 +167,45 @@ export default () => { globalThis.portableHome = paths.home() }
 	}
 })
 
+test('reviewed personal transfers stay in their namespace and reject nonportable collisions', async () => {
+	put(client, 'same.ts', 'home')
+	put(client, 'personal/same.ts', 'personal')
+	put(server, 'same.ts', 'server home')
+	put(server, 'personal/private.ts', 'private', false)
+	put(client, 'personal/private.ts', 'portable')
+	await pluginSyncClient.compare()
+	expect(read(server, 'personal/same.ts')).toBeUndefined()
+	expect(one('personal/same.ts')).toBeDefined()
+	expect(one('personal/private.ts')).toBeUndefined()
+	await pluginSyncClient.apply('personal/same.ts', 'client', expected('personal/same.ts'))
+	expect(read(server, 'personal/same.ts')).toBe('personal')
+	expect(read(server, 'same.ts')).toBe('server home')
+	let privateVersions = on(
+		server,
+		() =>
+			pluginSync.command(host, {
+				type: 'plugin-sync',
+				op: 'history',
+				files: ['personal/private.ts'],
+			}).reply,
+	)
+	expect(privateVersions).toMatchObject({ versions: [] })
+	await expect(
+		pluginSyncClient.apply('personal/private.ts', 'client', {
+			client: on(client, () => pluginSync.headOf('personal/private.ts').id),
+			server: on(server, () => pluginSync.headOf('personal/private.ts').id),
+		}),
+	).rejects.toThrow('excluded')
+	expect(read(server, 'personal/private.ts')).toBe('private')
+	put(server, 'personal/same.ts', read(server, 'personal/same.ts'))
+	expect(() =>
+		on(server, () => pluginSync.install('personal/same.ts', [], {}, pluginSync.headOf('same.ts').id, 'test', 'server')),
+	).toThrow('was not received')
+	expect(read(server, 'personal/same.ts')).toBe('personal')
+	await pluginSyncClient.ignore('personal/same.ts')
+	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('personal/same.ts\n')
+})
+
 test('reports each relation, sends only heads for equal files, and suggests the later time', async () => {
 	put(server, 'same.ts', 'x')
 	put(client, 'same.ts', 'x')
@@ -197,6 +241,7 @@ test('missing, empty and deleted stay distinct, and choosing an absent source de
 	put(server, 'gone.ts', 'old')
 	await pluginSyncClient.compare()
 	await pluginSyncClient.apply('gone.ts', 'server', expected('gone.ts'))
+	put(client, 'gone.ts', read(client, 'gone.ts'))
 	put(server, 'gone.ts', undefined)
 	put(server, 'blank.ts', '')
 	await pluginSyncClient.compare()
@@ -290,7 +335,16 @@ test('the same home compares nothing; file names cannot leave the plugins direct
 	await pluginSyncClient.compare()
 	expect(pluginSyncClient.state.same).toBe(true)
 	expect(sent.map((c) => c.op)).toEqual(['inventory'])
-	for (let file of ['../x.ts', 'a/b.ts', 'x.d.ts', 'x.js'])
+	for (let file of [
+		'../x.ts',
+		'a/b.ts',
+		'x.d.ts',
+		'x.js',
+		'personal/../x.ts',
+		'personal/a/b.ts',
+		'personal/\\x.ts',
+		'personal/.ts',
+	])
 		expect(commandCheck.invalid({ type: 'plugin-sync', op: 'fetch', file, known: [] })).toContain(
 			'top-level plugin filename',
 		)

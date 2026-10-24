@@ -110,7 +110,10 @@ async function refresh(): Promise<void> {
 		if (!projectContext.allowed(cwd)) continue
 		for (let dir of systemPrompt.candidates(cwd)) {
 			let path = `${dir}/.agents/plugins/hal`
-			if (existsSync(path)) wanted.add(realpathSync(path))
+			if (existsSync(path)) {
+				let canonical = realpathSync(path)
+				if (!plugins.state.personalDirectories.has(canonical)) wanted.add(canonical)
+			}
 		}
 	}
 	let old = projectContext.state.active

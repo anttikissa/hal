@@ -4,9 +4,11 @@
 // hvk), so turning a plugin off needs no editor and no model.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import type { SlashCommand } from '../commands.ts'
 import { plugins } from '../plugins.ts'
+import { pluginHistory } from '../plugin-history.ts'
+import { pluginSyncWire } from '../../common/plugin-sync.ts'
 
 // `export default (plugin: Plugin) => {` or `export default function (plugin) {`;
 // group 1 or 2 is the parameter name.
@@ -16,15 +18,21 @@ const HEAD =
 const line = (p: string) => new RegExp(`^[ \\t]*${p}\\.disable\\(\\)[ \\t;]*(?://.*)?\\r?\\n`, 'm')
 
 const files = () =>
-	readdirSync(plugins.dir())
-		.filter((n) => n.endsWith('.ts') && !n.endsWith('.d.ts'))
-		.sort()
+	[
+		...readdirSync(plugins.dir()).filter((n) => pluginSyncWire.isName(n) && !n.includes('/')),
+		...(pluginHistory.state.personal
+			? readdirSync(pluginHistory.state.personal)
+					.filter((n) => pluginSyncWire.isName(n) && !n.includes('/'))
+					.map((n) => `personal/${n}`)
+			: []),
+	].sort()
 
 async function toggle(verb: 'disable' | 'enable', arg: string) {
 	let name = arg.endsWith('.ts') ? arg : `${arg}.ts`
-	let path = join(plugins.dir(), name)
-	if (!arg || name.includes('/') || !existsSync(path))
-		return { error: `/plugins ${verb}: no plugin file ${arg ? path : 'given'}; files: ${files().join(', ') || 'none'}` }
+	let valid = pluginSyncWire.isName(name) && (!name.startsWith('personal/') || !!pluginHistory.state.personal)
+	let path = valid ? (name.startsWith('personal/') ? pluginHistory.filePath(name) : join(plugins.dir(), name)) : ''
+	if (!arg || !path || !existsSync(path))
+		return { error: `/plugins ${verb}: no plugin file ${arg || 'given'}; files: ${files().join(', ') || 'none'}` }
 	let src = readFileSync(path, 'utf8')
 	let m = HEAD.exec(src)
 	if (!m)
@@ -47,7 +55,7 @@ async function toggle(verb: 'disable' | 'enable', arg: string) {
 		while (line(p).test(src)) src = src.replace(line(p), '')
 	}
 	writeFileSync(path, src)
-	await plugins.sync(plugins.dir(), name)
+	await plugins.sync(dirname(path), basename(path))
 	// The watcher's load of the same write may supersede ours; wait for
 	// whichever load reaches this content.
 	let hash = plugins.hashOf(path)
@@ -62,7 +70,7 @@ async function toggle(verb: 'disable' | 'enable', arg: string) {
 
 export const command: SlashCommand = {
 	help: () =>
-		`/plugins lists the plugin files in ${plugins.dir()}: content hash, expiry, each hook as module.key kind, and the last load error.\n/plugins disable <file> adds plugin.disable() as the first line of the file's registration body, switching it off without deleting it.\n/plugins enable <file> removes that line.`,
+		`/plugins lists loaded plugin files: content hash, expiry, each hook as module.key kind, and the last load error. Personal files use personal/<file>.ts.\n/plugins disable <file> adds plugin.disable() as the first line of the file's registration body, switching it off without deleting it.\n/plugins enable <file> removes that line.`,
 	complete: (args) => {
 		let m = /^(disable|enable) (.*)$/.exec(args)
 		if (m)

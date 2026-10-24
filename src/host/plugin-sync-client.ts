@@ -269,6 +269,7 @@ async function apply(file: string, choice: Choice, expected: Expected): Promise<
 	if (!pluginSyncWire.isName(file)) throw new Error(`plugin sync: not a plugin filename: ${file}`)
 	if (!st.connected)
 		throw new Error(`plugin sync: not connected to ${st.name}; nothing was written. Try again once it reconnects.`)
+	if (pluginSync.ignored().includes(file)) throw new Error(`plugin sync: ${file} is excluded or nonportable`)
 	let mineNow = () => pluginSync.headOf(file).id
 	if (mineNow() !== expected.client) return pluginSyncClient.stale(file, 'client')
 	if (choice === 'server') {

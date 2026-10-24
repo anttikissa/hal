@@ -76,6 +76,24 @@ test('a durable trust answer gates instructions and plugins; two tabs share one 
 	expect((globalThis as any).projectStarts).toBe(3)
 })
 
+test('closing a tab rooted at the personal directory keeps personal plugins loaded', async () => {
+	let root = project()
+	await plugins.init(`${testHome()}/plugins`, `${root}/.agents/plugins/hal`)
+	try {
+		projectContext.decide(root, true)
+		let id = tab(client(), root)
+		await projectContext.refresh()
+		expect((globalThis as any).projectStarts).toBe(1)
+		tabs.close(id)
+		await projectContext.refresh()
+		projectContext.reset()
+		expect((globalThis as any).projectStops).toBe(0)
+		expect(plugins.state.files.has(`${root}/.agents/plugins/hal/test.ts`)).toBe(true)
+	} finally {
+		plugins.close()
+	}
+})
+
 test('an unreadable open tab does not block another project activation', async () => {
 	let root = project()
 	projectContext.decide(root, true)

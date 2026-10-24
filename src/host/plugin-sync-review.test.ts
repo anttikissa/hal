@@ -43,7 +43,7 @@ function makeSide(name: string): Side {
 	let s: Side = {
 		home,
 		dir,
-		hist: { dir: undefined, error: undefined, versions: new Map(), heads: new Map() },
+		hist: { dir: undefined, personal: undefined, error: undefined, versions: new Map(), heads: new Map() },
 		files: new Map(),
 	}
 	use(s)

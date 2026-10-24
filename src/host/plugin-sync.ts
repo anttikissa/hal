@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, realpathSync, unlinkSync } from 'fs'
 import { hostname } from 'os'
-import { basename, dirname, join } from 'path'
+import { join } from 'path'
 import type { Command, Event } from '../common/protocol.ts'
 import {
 	pluginSyncWire,
@@ -58,15 +58,25 @@ function dir(): string {
 // Names in plugins/.syncignore; none if it is absent.
 function ignored(): string[] {
 	let path = join(pluginSync.dir(), '.syncignore')
-	return existsSync(path) ? pluginSyncWire.ignoreList(readFileSync(path, 'utf8')) : []
+	let ignored = existsSync(path) ? pluginSyncWire.ignoreList(readFileSync(path, 'utf8')) : []
+	for (let file of pluginHistory.state.heads.keys()) {
+		if (file.startsWith('personal/') && !pluginHistory.state.personal) {
+			ignored.push(file)
+			continue
+		}
+		let source = pluginHistory.filePath(file)
+		if (existsSync(source) && !plugins.state.files.get(source)?.portable) ignored.push(file)
+	}
+	return [...new Set(ignored)]
 }
 
 // Loaded top-level plugins marked portable, expired ones included.
 function portable(): string[] {
-	let d = pluginSync.dir()
 	return [...plugins.state.files.values()]
-		.filter((f) => f.portable && dirname(f.path) === d)
-		.map((f) => basename(f.path))
+		.flatMap((f) => {
+			let name = f.portable && pluginHistory.fileName(f.path)
+			return name ? [name] : []
+		})
 		.sort()
 }
 
@@ -108,14 +118,16 @@ function install(
 	source: string,
 	side: 'client' | 'server',
 ): void {
-	let path = join(pluginSync.dir(), file)
+	let path = pluginHistory.filePath(file)
+	if (pluginSync.ignored().includes(file)) throw new Error(`plugin sync: ${file} is excluded or nonportable`)
+	if (versions.some((v) => v.file !== file)) throw new Error(`plugin sync: received unrelated versions for ${file}`)
 	let bytes = new Map(Object.entries(contents).map(([h, b]) => [h, Buffer.from(b, 'base64') as Uint8Array]))
 	pluginHistory.receive(versions, bytes)
 	pluginHistory.seen(path)
 	let cur = pluginHistory.head(file)
 	if (target !== undefined) {
 		let v = pluginHistory.state.versions.get(target)
-		if (!v) throw new Error(`plugin sync: version ${target} of ${file} was not received`)
+		if (!v || v.file !== file) throw new Error(`plugin sync: version ${target} of ${file} was not received`)
 		if (cur?.id === target) return
 		if (v.hash !== cur?.hash || !!v.deleted !== !!cur?.deleted) pluginReports.via(path, source, side)
 		return pluginHistory.checkout(target)

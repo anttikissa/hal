@@ -84,5 +84,5 @@ test('/plugin-sync focuses one review tab, relays answers, and Escape asks nothi
 	})
 	await until(() => status.stateOf(review).type === 'idle')
 	expect(tabs.file().open.filter((id) => sessions.open(id).model === 'hal/plugin-sync')).toEqual([review])
-	pluginHistory.state = { dir: undefined, error: undefined, versions: new Map(), heads: new Map() }
+	pluginHistory.state = { dir: undefined, personal: undefined, error: undefined, versions: new Map(), heads: new Map() }
 })

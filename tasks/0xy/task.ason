@@ -1,7 +1,11 @@
 {
 	title: 'Personal native plugin directory and reviewed sync',
 	spec: 'Personal native Hal plugins live in ~/.agents/plugins/hal. Preserve existing Hal-home plugin source and history while integrating personal discovery. Portable personal plugins synchronize through the reviewed client/server protocol with hash checks and explicit choices. Project plugin lifetimes and trust remain separate; unrelated project namespaces and nonportable files are never swept into personal sync. Discovery works in the host and terminal processes without executing untrusted remote project paths.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Personal sources load alongside Hal-home sources in host and terminal. Existing Hal-home files and ledger IDs stay unchanged; personal/<basename>.ts identifies personal versions in the same per-home ledger and reviewed wire protocol. Mapping accepts only this fixed namespace and top-level filenames, never project paths. The Hal-home plugins/.syncignore accepts names in both namespaces.',
+		'Invariant: a peer offering a name must not expose or overwrite an existing nonportable local plugin; inventory, history/content fetch and apply exclude such collisions. Received versions and checkout targets must belong to the reviewed namespace/file. Regression coverage also keeps personal plugins alive when a project tab walks through their directory. Startup registers both directory activations before awaiting imports, so close cancels both.'
+	],
 	needs: ['tzr', 'zh7'],
 	foldInto: ['an']
 }

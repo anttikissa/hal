@@ -6,6 +6,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { plugins } from './plugins.ts'
 import { pluginHistory } from './plugin-history.ts'
+import { paths } from './paths.ts'
 
 let dir = ''
 let reports: string[] = []
@@ -47,6 +48,56 @@ async function plugin(name: string, body: string, head = ''): Promise<string> {
 	await plugins.load(path)
 	return path
 }
+
+test('personal and Hal-home plugins coexist, reload and retain separate history across restarts', async () => {
+	let home = join(dir, 'home'),
+		personal = join(dir, '.agents/plugins/hal'),
+		project = join(dir, 'project')
+	for (let d of [home, personal, project]) mkdirSync(d, { recursive: true })
+	let source = (value: number) =>
+		`export const portable = true\nexport default () => { globalThis.pluginRuns += ${value} }\n`
+	writeFileSync(join(home, 'same.ts'), source(1))
+	writeFileSync(join(personal, 'same.ts'), source(10))
+	writeFileSync(join(project, 'same.ts'), source(100))
+	await plugins.init(home, personal)
+	await plugins.activateDirectory(project)
+	expect(g.pluginRuns).toBe(111)
+	expect([...pluginHistory.state.heads.keys()].sort()).toEqual(['personal/same.ts', 'same.ts'])
+	let original = pluginHistory.head('same.ts')!.id
+	let personalHead = pluginHistory.head('personal/same.ts')!.id
+	writeFileSync(join(personal, 'same.ts'), source(20))
+	await plugins.sync(personal, 'same.ts')
+	expect(pluginHistory.head('personal/same.ts')!.parent).toBe(personalHead)
+	expect(pluginHistory.head('same.ts')!.id).toBe(original)
+	plugins.close()
+	await plugins.init(home, personal)
+	expect(pluginHistory.head('same.ts')!.id).toBe(original)
+	pluginHistory.checkout(personalHead)
+	expect(readFileSync(join(personal, 'same.ts'), 'utf8')).toBe(source(10))
+	expect(readFileSync(join(home, 'same.ts'), 'utf8')).toBe(source(1))
+	expect(reports).toEqual([])
+})
+
+test('default startup discovers the user personal namespace, not other agent namespaces', async () => {
+	let home = paths.state.home,
+		userHome = paths.userHome
+	paths.state.home = join(dir, 'home')
+	paths.userHome = () => join(dir, 'user')
+	try {
+		let personal = plugins.personalDir()
+		mkdirSync(personal, { recursive: true })
+		writeFileSync(join(personal, 'personal.ts'), 'export default () => { globalThis.pluginRuns++ }')
+		writeFileSync(join(personal, '../other.ts'), 'throw new Error("wrong namespace")')
+		await plugins.init()
+		expect(g.pluginRuns).toBe(1)
+		expect(pluginHistory.head('personal/personal.ts')).toBeDefined()
+		expect(reports).toEqual([])
+	} finally {
+		plugins.close()
+		paths.state.home = home
+		paths.userHome = userHome
+	}
+})
 
 test('removing each owner leaves the others, and the last puts the original back exactly', async () => {
 	let original = t.f
@@ -284,20 +335,22 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	expect(t.f(1)).toBe('two')
 })
 
-test('/plugins disable and enable toggle a watched plugin and restore its file exactly', async () => {
-	let d = join(dir, 'p')
+test.each(['', 'personal/'])('/plugins toggles a watched %splugin and restores its file exactly', async (prefix) => {
+	let d = join(dir, 'p'),
+		personal = join(dir, 'personal')
 	let realDir = plugins.dir
 	plugins.dir = () => d
 	try {
-		await plugins.init(d)
+		await plugins.init(d, personal)
 		let { command } = await import('./commands/plugins.ts')
-		let path = join(d, 'w.ts')
+		let path = join(prefix ? personal : d, 'w.ts')
 		let text = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default function (p: any) {\n\tp.around(t, 'f', () => 'on')\n}\n`
 		writeFileSync(path, text)
 		for (let i = 0; i < 100 && t.f(1) !== 'on'; i++) await Bun.sleep(20)
-		expect(await command.run('disable w', undefined, {} as any)).toEqual({ say: 'w.ts: disabled' })
+		expect(command.complete?.(`disable ${prefix}`, {} as any)).toContain(`disable ${prefix}w.ts`)
+		expect(await command.run(`disable ${prefix}w`, undefined, {} as any)).toEqual({ say: `${prefix}w.ts: disabled` })
 		expect(t.f(1)).toBe(2)
-		expect(await command.run('enable w.ts', undefined, {} as any)).toEqual({ say: 'w.ts: loaded' })
+		expect(await command.run(`enable ${prefix}w.ts`, undefined, {} as any)).toEqual({ say: `${prefix}w.ts: loaded` })
 		expect(t.f(1)).toBe('on')
 		expect(readFileSync(path, 'utf8')).toBe(text)
 	} finally {
