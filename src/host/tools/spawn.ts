@@ -32,7 +32,11 @@ export const tool: Tool = {
 	parameters: {
 		type: 'object',
 		properties: {
-			task: { type: 'string', description: 'What the session should do. Required unless kind is interactive.' },
+			task: {
+				type: 'string',
+				description:
+					'The goal and constraints only. The session already loads its AGENTS.md and skills; do not repeat them or prescribe steps. Required unless kind is interactive.',
+			},
 			kind: { type: 'string', enum: kinds, description: 'Default subagent.' },
 			mode: {
 				type: 'string',
