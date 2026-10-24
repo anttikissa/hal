@@ -109,7 +109,9 @@ progress, pause it with a reason.
 - Bad request (400) and other unexpected errors: usually a Hal bug or
   an unexpected model limit (say, no image support). The turn ends in
   error, showing the provider's message. The user fixes Hal, restarts or
-  hot-patches, then continues; continue retries the request.
+  hot-patches, then continues; continue retries the request. A model
+  switch also retries it on the new model: the error may be the old
+  model's (say, one the account can't use).
 
 ## Talking while it works (task for the inbox)
 
@@ -135,7 +137,8 @@ Model, cwd, instruction and turn-status notices reach the next request,
 including within a turn. They do not start or resume work by themselves.
 Effective model and cwd changes interrupt active work and continue with the
 new context, independent of the submit key (task 6eq). They reuse hard
-steering, including safe tool settlement, and leave idle or paused work alone.
+steering, including safe tool settlement, and leave idle or paused work alone;
+a model change retries a turn that ended in error.
 Live blocks keep their start position; commands arriving during thinking appear
 below that block in both clients, live and restored.
 A restart (Ctrl-R) never changes what the user sees.

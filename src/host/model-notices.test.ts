@@ -87,6 +87,19 @@ test('changes interrupt streaming, settle pending calls and preserve earlier req
 	expect(await historyInput.messages(id)).toEqual(before)
 })
 
+test('a model switch retries a turn that ended in error on the new model', async () => {
+	let c = client(),
+		id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'Go.' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'error', message: 'model_not_found', status: 400 })
+	await until(() => c.of('turn-end').length === 1)
+	slash.change(id, { model: 'fake/m2' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.model).toBe('fake/m2')
+	expect(texts(calls[1]!.input.messages)).toContain('Switched from fake/m1 to fake/m2.')
+})
+
 test('notice delivery remains once across compact, prompt edits and recovery without waking an idle turn', async () => {
 	let c = client(),
 		id = created(c)

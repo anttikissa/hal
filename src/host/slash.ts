@@ -160,8 +160,10 @@ function change(id: string, patch: { cwd?: string; model?: string }, origin?: 'm
 	history.append(id, { type: 'notice', text: notice })
 	if (continuing) prompts.force(continuing)
 	if (changed.model) {
-		// A turn waiting out a failure tries the new model now.
+		// A turn waiting out a failure tries the new model now; one that
+		// ended in error (say, a model the account lacks) retries on it.
 		running?.rewait?.abort()
+		if (!running && status.stateOf(id).type === 'error') prompts.resume(id)
 		if (names) host.broadcast(id, names)
 	}
 	return switched || undefined
