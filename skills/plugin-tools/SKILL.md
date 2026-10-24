@@ -8,8 +8,8 @@ description: Add a tool to Hal as a plugin (plugins/*.ts) that looks and feels l
 A plugin adds a tool in one line; Hal reloads plugins/*.ts on save:
 
 ```ts
-import type { Plugin } from '../src/host/plugins.ts'
-import { tools, type Tool } from '../src/host/tools.ts'
+import type { Plugin } from 'hal/host/plugins.ts'
+import { tools, type Tool } from 'hal/host/tools.ts'
 
 export default (plugin: Plugin) => {
 	plugin.around(tools, 'all', (next) => [...next(), sqlTool])
@@ -32,6 +32,13 @@ const sqlTool: Tool = {
 	run: async (input) => { /* ... */ return table },
 }
 ```
+
+Import Hal modules as `hal/<dir>/<file>.ts` (it resolves to the
+running Hal wherever the plugin lives), never by relative path. Before
+saving, run the tool's core logic once in a scratch `bun` script: a
+plugin that loads can still fail on its first call. After saving, run
+`/plugins`: the file's row lists its hooks or its full error. Then
+call the tool once.
 
 ## The card
 
