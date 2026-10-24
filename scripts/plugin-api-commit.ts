@@ -30,8 +30,8 @@ function declaration(message: string): Change[] {
 		while (i + 1 < lines.length && /^[ \t]+\S/.test(lines[i + 1]!)) value += ` ${lines[++i]!.trim()}`
 		entries.push(value)
 	}
-	assert(entries.length, `Missing Plugin-API declaration.\n${usage}`)
-	if (entries.length === 1 && entries[0] === 'none') return []
+	// No declaration means none: users commit freely; agents declare changes (AGENTS.md).
+	if (!entries.length || (entries.length === 1 && entries[0] === 'none')) return []
 	assert(!entries.includes('none'), 'Plugin-API: none cannot accompany API changes.')
 	let changes = entries.map((entry): Change => {
 		let rename = /^rename\s+(\S+)\s+->\s+(\S+)$/.exec(entry)

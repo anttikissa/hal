@@ -8,8 +8,9 @@ this ledger or provide compatibility adapters.
 ## When committing Hal changes
 
 The implementing agent classifies the change while its intent is fresh.
-Every commit message includes a `Plugin-API` declaration. If plugin-visible
-behavior is unchanged, including a behavior-preserving refactor:
+Agent commits include a `Plugin-API` declaration. A commit without one
+counts as `none`, so users commit freely. If plugin-visible behavior is
+unchanged, including a behavior-preserving refactor:
 
 ```
 Plugin-API: none
