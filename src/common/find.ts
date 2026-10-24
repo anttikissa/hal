@@ -71,6 +71,7 @@ const weights: Record<string, number> = {
 	title: 100,
 	cwd: 90,
 	commit: 60,
+	command: 50,
 	request: 40,
 	reply: 12,
 	reasoning: 4,

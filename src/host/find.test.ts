@@ -251,6 +251,7 @@ test('rename search exposes old and new titles from both origins, including old 
 	history.append(a.id, { type: 'command', text: '/rename Model topic', origin: 'model' })
 	history.append(a.id, { type: 'output', text: '/rename: Human topic → Model topic', origin: 'model' })
 	for (let i = 0; i < 80; i++) history.submit(a.id, `Later conversation ${i}`)
+	history.submit(a.id, 'Rename: please rename the tab')
 	// A small opening page leaves the rename records loaded on demand.
 	let tail = pages.snapshot(a.id, 1024)
 	expect(tail.older).toBeDefined()
@@ -277,6 +278,8 @@ test('rename search exposes old and new titles from both origins, including old 
 		expect(hits.find((h) => h.blockId === '4')?.snippet).toContain('Human topic → Model topic')
 		expect(hits.find((h) => h.blockId === '2')?.href).toBe(`/${a.id}#2`)
 		expect(hits.find((h) => h.blockId === '4')?.href).toBe(`/${a.id}#4`)
+		// The rename itself outranks requests that mention it.
+		expect((await find.top(`in:${a.id} rename`))[0]?.why).toBe('command')
 	}
 	await verify()
 	// Unnotified appends exercise the same projection during fallback scans.

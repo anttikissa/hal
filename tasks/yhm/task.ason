@@ -2,7 +2,7 @@
 	title: 'Find ranks tabs by evidence; in: scopes and quoted phrases',
 	spec: `Find answers "which tab did this?": typing compact surfaces the tab that implemented COMPACT, not the many tabs that merely used it. Without a single-tab scope, results are one row per tab, grouped before the result limit (top 50 tabs). A row shows the tab's strongest evidence as its snippet, a lowercase why label naming that evidence; Enter or a click opens the tab at that evidence. Expanding a tab (Right in the results) sets the query's scope to in:<id>, which lists that tab's matching cards one per row, best first. Terminal and web share this behavior; only visuals the terminal cannot draw differ.
 
-Why a row matched, strongest first: title, current directory, commit, user request, reply, reasoning, tool calls and output, everything else (notices, inbox, command output, /rename lines). A fork's history before its creation belongs to its origin and is skipped in the fork. A tab's score is its best evidence weight times match quality (word boundaries, phrase). Among equal scores the newest evidence wins, so the latest of many alike requests comes first. No LLM calls or embeddings.
+Why a row matched, strongest first: title, current directory, commit, slash command (such as /rename, by the user or the model), user request, reply, reasoning, tool calls and output, everything else (notices, inbox, command output). A fork's history before its creation belongs to its origin and is skipped in the fork. A tab's score is its best evidence weight times match quality (word boundaries, phrase). Among equal scores the newest evidence wins, so the latest of many alike requests comes first. No LLM calls or embeddings.
 
 Query syntax, parsed in common/find.ts: words match anywhere (word starts rank higher); "quoted words" match only as a whole-word phrase; -word excludes evidence whose tab id, tab name or text contains it; since:30m|12h|3d|2w keeps evidence newer than that, still ranked by relevance; in:<scope> narrows, comma-separated; tab values union, kind values union, and the two intersect: here (the tab Find opened from), a session id (181-ibm), a tab number or range (10-19), . (tabs whose cwd is the current tab's cwd), a path (~/sync/x: tabs whose cwd is it or under it), and the kind names user, hal, reasoning, tools, commits, other. Kind names are reserved; an unknown value is an error naming the accepted forms. model: and cwd: no longer exist.
 
@@ -14,7 +14,8 @@ The filter toggles are user, Hal, reasoning, tools, commits, other (user request
 		'Card rows key by session, block and kind: a tool call and its output share a block id, and keying by block alone hid one of them.',
 		'Rows show the tab current cwd (session.ason, reloaded after each history catch-up so /cd shows); a cwd match is evidence ranked like the title.',
 		'The rename/projection regression prepares a fully caught-up stale index before starting the worker. It must recover old titles from immutable history without modifying it; corrupting SQLite immediately after worker termination races the worker connection and produces database-is-locked failures.',
-		'The host fills in the open tab order for in: ranges (tabs.ason); clients send only here. Renames are ordinary indexed text: no former-title tier.'
+		'The host fills in the open tab order for in: ranges (tabs.ason); clients send only here. Renames are ordinary indexed text: no former-title tier.',
+		'Bug fix: searching rename buried the actual /rename command under 50 requests, replies and tool cards, since everything else ranked last. Invariant: a slash command record outranks requests and tool calls that mention it.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']

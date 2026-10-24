@@ -64,7 +64,9 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 	}
 	let match = findQuery.match(row.text, q.words, q.phrases)
 	if (!match) return
-	let label = row.blockId === 'cwd' ? 'cwd' : why[row.kind]
+	// A slash command, such as /rename, is the action itself (task yhm).
+	let label =
+		row.blockId === 'cwd' ? 'cwd' : row.kind === 'other' && row.text.startsWith('/') ? 'command' : why[row.kind]
 	// A commit shows its title line, which names the hash and subject.
 	if (row.kind === 'commit') match.snippet = row.text.split('\n')[0]!
 	// A title or cwd match links to the tab itself.
