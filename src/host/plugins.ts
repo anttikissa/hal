@@ -4,13 +4,13 @@
 // `expires` (a UTC ISO time). The body registers hooks, which take
 // effect at once, and returns its cleanup. Hooks are owned by their
 // file: replacing, deleting or expiring it removes exactly its hooks,
-// then runs its cleanup; an emptied chain puts the original back. A file
-// that fails to import or throws in its body is renamed to .ts.broken.
+// then runs its cleanup; an emptied chain puts the original back. A failed
+// plugin stays on disk, inactive until edited or restarted.
 // Every version seen is recorded by plugin-history.ts (task gev).
 
 import { createHash } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, watch, type FSWatcher } from 'fs'
-import { basename, join, relative } from 'path'
+import { mkdirSync, readdirSync, readFileSync, realpathSync, watch, type FSWatcher } from 'fs'
+import { basename, join, relative, resolve } from 'path'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
 
@@ -71,6 +71,17 @@ const srcDir = join(import.meta.dir, '..')
 
 function dir(): string {
 	return join(paths.home(), 'plugins')
+}
+
+function imports(): void {
+	if (plugins.state.imports) return
+	Bun.plugin({
+		name: 'hal-plugin-imports',
+		setup(build) {
+			build.onResolve({ filter: /^hal\// }, ({ path }) => ({ path: resolve(srcDir, path.slice(4)) }))
+		},
+	})
+	plugins.state.imports = true
 }
 
 // Where failures go; on the host, main.ts sends them on (task njq).
@@ -245,27 +256,14 @@ function hashOf(path: string): string {
 	return createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 8)
 }
 
-// A file that failed to import or register, like a config file that
-// does not parse: Hal runs without it and renames it to .ts.broken, so
-// the next start skips it too. No rollback to an earlier version. A file
-// that changed since it was read is still being written: a newer load
-// follows, so it stays.
+// Failure is local runtime state, not a source edit to propagate through sync.
 function broken(path: string, hash: string, e: any): void {
 	let st = plugins.state
 	let old = st.files.get(path)
 	if (old) plugins.deactivate(old)
 	let error = String(e?.stack ?? e)
-	if (!error.includes(path)) error = `${path}: ${error}`
-	let to = `${path}.broken`
-	let text: string
-	try {
-		if (hashOf(path) !== hash) return
-		renameSync(path, to)
-		text = `plugin ${path} failed and was renamed to ${to}, so it does not load again; Hal runs without it. Fix it and rename it back to ${basename(path)} to enable it.\n${error}`
-	} catch (r: any) {
-		text = `plugin ${path} failed; Hal runs without it, but renaming it to ${to} failed too (${r?.message ?? r}).\n${error}`
-	}
-	st.files.set(path, { path, hash, hooks: [], error: text })
+	let text = `plugin ${path} failed; inactive until edited or restarted. The file was not changed.\n${error}`
+	st.files.set(path, { ...old, path, hash, hooks: [], error: text })
 	plugins.report(text, path)
 }
 
@@ -278,10 +276,18 @@ async function load(path: string): Promise<void> {
 	let gen = ++st.gen
 	st.latest.set(path, gen)
 	let current = () => st.latest.get(path) === gen
-	let hash = hashOf(path)
+	let hash: string
+	try {
+		hash = hashOf(path)
+	} catch (e: any) {
+		if (e.code === 'ENOENT') return plugins.remove(path)
+		plugins.report(`plugin ${path}: ${e?.stack ?? e}`, path)
+		return
+	}
 	let entry: Loaded = { path, hash, hooks: [] }
 	let mod: any
 	try {
+		plugins.imports()
 		// A query string makes Bun import (and run) the file afresh. The
 		// real path: through a symlinked directory (/tmp on macOS) Bun
 		// cannot find a file created after it first resolved there.
@@ -334,8 +340,6 @@ function remove(path: string): void {
 	let st = plugins.state
 	st.latest.set(path, ++st.gen)
 	let entry = st.files.get(path)
-	// A broken file's entry stays, so /plugins shows why it went.
-	if (entry?.error) return
 	st.files.delete(path)
 	if (!entry) return
 	plugins.deactivate(entry)
@@ -348,10 +352,14 @@ async function sync(d: string, name: string): Promise<void> {
 	if (!name.endsWith('.ts') || name.endsWith('.d.ts')) return
 	let path = join(d, name)
 	pluginHistory.seen(path)
-	if (!existsSync(path)) return plugins.remove(path)
-	let entry = plugins.state.files.get(path)
-	if (entry?.hash === hashOf(path) && !entry.error && plugins.state.latest.has(path)) return
-	await plugins.load(path)
+	try {
+		let entry = plugins.state.files.get(path)
+		if (entry?.hash === hashOf(path) && plugins.state.latest.has(path)) return
+		await plugins.load(path)
+	} catch (e: any) {
+		if (e.code === 'ENOENT') plugins.remove(path)
+		else plugins.report(`plugin ${path}: ${e?.stack ?? e}`, path)
+	}
 }
 
 // Loads every plugin in filename order, then follows the directory.
@@ -382,6 +390,7 @@ async function preview(hide: string, path?: string): Promise<void> {
 	let st = plugins.state
 	let gen = ++st.previewGen
 	let mod: any
+	plugins.imports()
 	try {
 		if (path) mod = await import(realpathSync(path))
 	} catch (e: any) {
@@ -446,11 +455,13 @@ export const plugins = {
 		// The newest load generation per file; an older one is discarded.
 		latest: new Map<string, number>(),
 		gen: 0,
+		imports: false,
 		watcher: undefined as FSWatcher | undefined,
 		preview: undefined as { entry: Loaded; hidden?: Loaded } | undefined,
 		previewGen: 0,
 	},
 	dir,
+	imports,
 	report,
 	changed,
 	patchOf,

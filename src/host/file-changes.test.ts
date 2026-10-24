@@ -10,6 +10,8 @@ import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 import type { ToolContext } from './tools.ts'
 import { paths } from './paths.ts'
+import { pluginFiles } from './plugin-files.ts'
+import { plugins } from './plugins.ts'
 
 let home = '',
 	cwd = '',
@@ -48,6 +50,26 @@ const bash = (command: string, modifies?: unknown, ctx = context()) =>
 	)
 const changes = () => history.readSync(id).filter((r) => r.type === 'file_changes')
 const bytes = (hash: unknown) => readFileSync(fileChanges.blobPath(id, hash as string))
+
+test('Bash observers run after recording and unlocking; failure reports without undoing the write', async () => {
+	const owner = { path: `${home}/observer.ts`, hash: '', hooks: [], open: true as const }
+	plugins.api(owner).around(pluginFiles, 'changed', async (next, files, ctx) => {
+		await next(files, ctx)
+		expect(ctx.sessionId).toBe(id)
+		expect(files.map((f) => f.path)).toEqual(['created'])
+		expect(changes()).toHaveLength(1)
+		expect(fileChanges.state.locks).toHaveLength(0)
+		throw new Error('linter failed after write')
+	})
+	try {
+		const result = await bash('printf saved > created', ['created'])
+		expect(result.isError).toBe(true)
+		expect(result.output).toContain('linter failed after write')
+		expect(readFileSync(`${cwd}/created`, 'utf8')).toBe('saved')
+	} finally {
+		plugins.deactivate(owner)
+	}
+})
 
 // One integration test covers all snapshot transitions; undeclared files are never recorded.
 test('snapshots creations, edits, deletes and new glob matches; records declared paths only', async () => {

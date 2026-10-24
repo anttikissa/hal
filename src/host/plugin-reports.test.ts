@@ -11,7 +11,7 @@ import { plugins } from './plugins.ts'
 
 useHost()
 let failure = (path: string) =>
-	`plugin ${path} failed and was renamed to ${path}.broken, so it does not load again; Hal runs without it. Fix it and rename it back to x.ts to enable it.\nError: boom\n    at x.ts:1:7`
+	`plugin ${path} failed; inactive until edited or restarted. The file was not changed.\nError: boom\n    at x.ts:1:7`
 
 test('the session that last declared and changed the plugin gets the failure as a message', async () => {
 	let c = client(),
@@ -28,7 +28,7 @@ test('the session that last declared and changed the plugin gets the failure as 
 	let text = JSON.stringify(calls[0]!.input.messages)
 	expect(text).toContain('t7 declared and changed /tmp/njq/plugins/x.ts')
 	expect(text).toContain('Error: boom')
-	expect(text).toContain('/tmp/njq/plugins/x.ts.broken')
+	expect(text).toContain('/tmp/njq/plugins/x.ts')
 	expect(c.of('notice')).toEqual([])
 })
 

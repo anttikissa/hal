@@ -6,6 +6,7 @@
 		"module": "Preserve",
 		"moduleDetection": "force",
 		"moduleResolution": "bundler",
+		"paths": { "hal/*": ["./src/*"] },
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,

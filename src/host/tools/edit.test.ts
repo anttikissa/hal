@@ -9,8 +9,60 @@ import { client, created, testHome, useHost } from '../host-fixture.test.ts'
 import { toolPresentations } from '../tool-presentation.ts'
 import { toolPresentation } from '../../common/tool-presentation.ts'
 import { tools } from '../tools.ts'
+import { pluginFiles } from '../plugin-files.ts'
+import { plugins } from '../plugins.ts'
 
 useHost()
+
+test('file-local transforms compose before diffs and writes; observers see creation and deletion', async () => {
+	const owner = { path: `${testHome()}/format-plugin.ts`, hash: '', hooks: [], open: true as const }
+	const p = plugins.api(owner)
+	const seen: string[] = []
+	p.around(pluginFiles, 'transform', async (next, path, text, ctx) => {
+		const result = await next(path, text, ctx)
+		return pluginFiles.within(`${testHome()}/local`, path) ? result.toUpperCase() : result
+	})
+	p.around(pluginFiles, 'changed', async (next, files, ctx) => {
+		await next(files, ctx)
+		for (const f of files) seen.push(`${f.path}:${f.after === null ? 'deleted' : 'written'}`)
+	})
+	try {
+		const output = await run([
+			{ path: 'local/a.ts', new: 'hello' },
+			{ path: 'local-other.ts', new: 'unchanged' },
+		])
+		expect(readFileSync(`${testHome()}/local/a.ts`, 'utf8')).toBe('HELLO')
+		expect(readFileSync(`${testHome()}/local-other.ts`, 'utf8')).toBe('unchanged')
+		expect(output).toContain('HELLO')
+		expect(seen).toContain('local/a.ts:written')
+		await run([{ path: 'local/a.ts', delete: true }])
+		expect(seen).toContain('local/a.ts:deleted')
+	} finally {
+		plugins.deactivate(owner)
+	}
+	expect(await pluginFiles.transform('/tmp/a', 'plain', {} as any)).toBe('plain')
+})
+
+test('a failed transform leaves the entire edit batch unwritten', async () => {
+	const a = file('a', 'old')
+	const owner = { path: `${testHome()}/failing-plugin.ts`, hash: '', hooks: [], open: true as const }
+	plugins.api(owner).around(pluginFiles, 'transform', async (_next, path, text) => {
+		if (path.endsWith('/b')) throw new Error('formatter failed')
+		return text.toUpperCase()
+	})
+	try {
+		await expect(
+			run([
+				{ path: 'a', new: 'new' },
+				{ path: 'b', new: 'new' },
+			]),
+		).rejects.toThrow('formatter failed')
+		expect(readFileSync(a, 'utf8')).toBe('old')
+		expect(existsSync(`${testHome()}/b`)).toBe(false)
+	} finally {
+		plugins.deactivate(owner)
+	}
+})
 
 test('text steps, version-checked ranges and creation return contents or a single diff', async () => {
 	const a = file('a', 'old'),

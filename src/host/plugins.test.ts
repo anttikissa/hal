@@ -173,7 +173,7 @@ return () => t.log.push('cleanup sees ' + t.f(1) + ' ' + t.value)`,
 	expect(t.value).toBe(3)
 })
 
-test('a file that throws in its body runs without its hooks and is renamed to .ts.broken', async () => {
+test('a failed replacement removes hooks but preserves bytes, suppresses duplicate events and retries edits', async () => {
 	let original = t.f
 	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\nreturn () => t.log.push('v1 cleanup')`)
 	writeFileSync(
@@ -183,14 +183,30 @@ test('a file that throws in its body runs without its hooks and is renamed to .t
 	await plugins.load(path)
 	expect(t.f).toBe(original)
 	expect(t.log).toEqual(['v1 cleanup'])
-	expect(existsSync(path)).toBe(false)
-	expect(existsSync(`${path}.broken`)).toBe(true)
+	expect(existsSync(path)).toBe(true)
+	expect(existsSync(`${path}.broken`)).toBe(false)
+	expect(readFileSync(path, 'utf8')).toContain('bad v2')
 	expect(reports).toHaveLength(1)
-	for (let part of [path, `${path}.broken`, 'bad v2']) expect(reports[0]).toContain(part)
+	for (let part of [path, 'bad v2']) expect(reports[0]).toContain(part)
 	expect(plugins.describe()).toContain('bad v2')
-	// Removing the vanished file keeps the error for /plugins.
 	await plugins.sync(dir, 'a.ts')
-	expect(plugins.describe()).toContain('bad v2')
+	expect(reports).toHaveLength(1)
+	await plugin('a.ts', `plugin.around(t, 'f', () => 'fixed')`)
+	expect(t.f()).toBe('fixed')
+	unlinkSync(path)
+	await plugins.sync(dir, 'a.ts')
+	expect(plugins.state.files.has(path)).toBe(false)
+})
+
+test('failed portable setup remains eligible for sync; deletion removes its error and missing loads settle', async () => {
+	let path = await plugin('portable.ts', `throw new Error('missing local dependency')`, 'export const portable = true')
+	expect(plugins.state.files.get(path)?.portable).toBe(true)
+	expect(readFileSync(path, 'utf8')).toContain('export const portable = true')
+	unlinkSync(path)
+	await plugins.sync(dir, 'portable.ts')
+	expect(plugins.state.files.has(path)).toBe(false)
+	await plugins.load(path)
+	expect(plugins.state.files.has(path)).toBe(false)
 })
 
 test('an async registration function is refused, and hooks registered after the body returned are refused', async () => {
@@ -205,7 +221,7 @@ test('an async registration function is refused, and hooks registered after the 
 	await plugins.load(path)
 	expect(t.f).toBe(original)
 	expect(reports[0]).toContain('a Promise')
-	expect(existsSync(`${path}.broken`)).toBe(true)
+	expect(existsSync(path)).toBe(true)
 })
 
 test('deleting a file removes its hooks and runs its cleanup', async () => {

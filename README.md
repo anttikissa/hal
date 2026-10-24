@@ -167,5 +167,6 @@ change history live in `plugin-api.ason`; see
 [API versioning](tasks/q03/api-version.md). The loader does not yet use
 this ledger to adapt older plugins.
 
-Drop a plugin into ~/.hal/plugins (or wherever your $hal_home is) and
-it will be automatically loaded.
+Drop a plugin into `<Hal home>/plugins/` to load it automatically. See
+[Writing plugins](tasks/sgp/plugins.md) for portable imports, syncing, and
+optional file-local formatter and observer hooks.

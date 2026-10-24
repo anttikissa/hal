@@ -13,6 +13,7 @@ import { fileText, type Change } from '../file-text.ts'
 import { textDiff } from '../text-diff.ts'
 import { paths } from '../paths.ts'
 import { editBlocks } from '../edit-blocks.ts'
+import { pluginFiles } from '../plugin-files.ts'
 
 type Plan = {
 	path: string
@@ -365,6 +366,14 @@ export const tool: Tool = {
 						failures.push(`step ${i + 1} (${edits[i]!.path}): ${e.message}`)
 					}
 				if (failures.length) throw new Error(`Nothing written: ${failures.join('; ')}`)
+				for (const p of plans.values()) {
+					if (p.next === null || p.before?.equals(p.next)) continue
+					const text = await pluginFiles.transform(p.path, p.next.toString(), ctx)
+					if (typeof text !== 'string') throw new Error(`${p.path}: plugin transform must return text; nothing written`)
+					p.next = Buffer.from(text)
+					if (p.next.length > tools.maxFileBytes)
+						throw new Error(`${p.path}: transformed result is too large; nothing written`)
+				}
 				const changed = [...plans.values()].filter((p) => p.next === null || !p.before?.equals(p.next))
 				for (const p of changed) {
 					p.diff = textDiff

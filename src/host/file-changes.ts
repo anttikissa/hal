@@ -18,6 +18,7 @@ import { commits } from './commits.ts'
 import { tabs } from './tabs.ts'
 import { jobs } from './jobs.ts'
 import { fileTracking } from './file-tracking.ts'
+import { pluginFiles } from './plugin-files.ts'
 
 type Lock = { sessionId: string; callId?: string; paths: Set<string>; done: Promise<void>; release: () => void }
 type Observation = {
@@ -242,8 +243,8 @@ async function begin(ctx: ToolContext, patterns: string[], literal = false): Pro
 async function finish(observation: Observation): Promise<{ lines: string[]; commits: CommitBlock[] }> {
 	let { ctx, patterns, literal, before, release } = observation
 	let found: { lines: string[]; commits: CommitBlock[] } = { lines: [], commits: [] }
+	let files: FileChange[] = []
 	try {
-		let files: FileChange[] = []
 		let declared = new Set(
 			await fileChanges.tracked(ctx.cwd, [...before.keys(), ...(await fileChanges.expand(ctx.cwd, patterns, literal))]),
 		)
@@ -270,6 +271,7 @@ async function finish(observation: Observation): Promise<{ lines: string[]; comm
 		if (observation.commits) found = await commits.finish(observation.commits)
 		release()
 	}
+	if (files.length) await pluginFiles.changed(files, ctx)
 	return found
 }
 

@@ -124,6 +124,44 @@ afterAll(() => {
 	plugins.report = saved.report
 })
 
+test('a portable plugin loads from another home after reviewed transfer without rewriting imports', async () => {
+	const text = `import { paths } from 'hal/host/paths.ts'
+export const portable = true
+export default () => { globalThis.portableHome = paths.home() }
+`
+	put(client, 'portable.ts', text)
+	await pluginSyncClient.compare()
+	await pluginSyncClient.apply('portable.ts', 'client', expected('portable.ts'))
+	expect(read(server, 'portable.ts')).toBe(text)
+	const child = Bun.spawnSync(
+		[
+			'bun',
+			'-e',
+			`
+		const { paths } = await import(${JSON.stringify(join(import.meta.dir, 'paths.ts'))});
+		const { plugins } = await import(${JSON.stringify(join(import.meta.dir, 'plugins.ts'))});
+		paths.state.home = ${JSON.stringify(server.home)};
+		await plugins.load(${JSON.stringify(join(server.dir, 'portable.ts'))});
+		if (globalThis.portableHome !== paths.home()) throw new Error('portable import failed');
+		plugins.close();
+	`,
+		],
+		{ cwd: server.home, stdout: 'pipe', stderr: 'pipe' },
+	)
+	if (child.exitCode) throw new Error(child.stderr.toString())
+	use(server)
+	try {
+		await plugins.load(join(server.dir, 'portable.ts'))
+		expect((globalThis as any).portableHome).toBe(server.home)
+		expect(pluginSync.portable()).toContain('portable.ts')
+		expect(plugins.state.files.get(join(server.dir, 'portable.ts'))?.error).toBeUndefined()
+	} finally {
+		plugins.remove(join(server.dir, 'portable.ts'))
+		delete (globalThis as any).portableHome
+		use(client)
+	}
+})
+
 test('reports each relation, sends only heads for equal files, and suggests the later time', async () => {
 	put(server, 'same.ts', 'x')
 	put(client, 'same.ts', 'x')

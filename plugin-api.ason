@@ -1,1 +1,26 @@
-{ version: 1, changes: [] }
+{
+	version: 2,
+	changes: [
+		{
+			version: 2,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/plugins.imports',
+					description: 'Resolve hal/*.ts imports against the running Hal before plugin loading and preview.'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/plugin-files',
+					description: 'Add optional within, transform and changed hook points for EDIT and recorded Bash changes.'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/plugins.broken',
+					description: 'Failed plugin files remain at their original paths and unchanged failed bytes are not retried on events',
+					port: 'Fix the original file; do not look for a .broken rename.'
+				}
+			]
+		}
+	]
+}

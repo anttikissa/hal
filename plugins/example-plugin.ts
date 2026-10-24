@@ -27,9 +27,9 @@
 //   to turn a plugin off without deleting it; /plugins disable <file>
 //   adds that line and /plugins enable <file> removes it.
 //
-// A file that fails to import or throws in its body is like a config
-// file that does not parse: Hal reports the error, runs without it and
-// renames it to <name>.ts.broken. Fix it and rename it back to enable it.
+// A failed import or setup removes its hooks and reports the full error.
+// The source stays unchanged; editing it retries. See tasks/sgp/plugins.md
+// for file-local hooks and portable imports.
 //
 // Hooks run in filename order, then registration order; the first
 // around is outermost. A hook is not a security boundary.
@@ -46,16 +46,16 @@
 // each plugins/*.ts is kept, privately, in plugins/history.asonl and
 // plugins/history/ (contents by hash).
 
-import type { Plugin } from '../src/host/plugins.ts'
-// import { auth } from '../src/host/auth.ts'
-// import { models } from '../src/host/models.ts'
-// import { tools } from '../src/host/tools.ts'
-// import { diag } from '../src/host/diag.ts'
-// import { colors } from '../src/common/colors.ts'
-// import { terminal } from '../src/client/terminal.ts'
-// import { sendKeys } from '../src/common/send-keys.ts'
-// import { frame } from '../src/client/frame.ts'
-// import { toolDetails } from '../src/common/tool-details.ts'
+import type { Plugin } from 'hal/host/plugins.ts'
+// import { auth } from 'hal/host/auth.ts'
+// import { models } from 'hal/host/models.ts'
+// import { tools } from 'hal/host/tools.ts'
+// import { diag } from 'hal/host/diag.ts'
+// import { colors } from 'hal/common/colors.ts'
+// import { terminal } from 'hal/client/terminal.ts'
+// import { sendKeys } from 'hal/common/send-keys.ts'
+// import { frame } from 'hal/client/frame.ts'
+// import { toolDetails } from 'hal/common/tool-details.ts'
 //
 // export const expires = '2026-12-31T23:59:00Z'
 // export const portable = true

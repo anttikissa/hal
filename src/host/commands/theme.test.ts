@@ -113,6 +113,6 @@ test('a selector naming a missing theme reports its load error and selects nothi
 	} finally {
 		plugins.close()
 		plugins.report = report
-		for (let f of [file(), `${file()}.broken`]) rmSync(f, { force: true })
+		rmSync(file(), { force: true })
 	}
 })
