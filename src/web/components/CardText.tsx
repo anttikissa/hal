@@ -21,18 +21,18 @@ export function CardText(props: { item: Item; text: string }) {
 			let indent = (t: string, marked: boolean) =>
 				t.split('\n').map((l, i) => (
 					<>
-						{i ? '\n    ' : ''}
+						{i ? '\n  ' : ''}
 						{marked && l ? <mark>{l}</mark> : l}
 					</>
 				))
 			let details = forms.details(item.form)
-			let head = details.length ? `${details.join('\n')}\n\n` : ''
+			let head = details.length ? `${details.join('\n')}\n` : ''
 			return (
 				<>
 					{head}
-					{'    '}
+					{'  '}
 					<For each={forms.quoteParts(q)}>{(p) => indent(p.text, p.marked)}</For>
-					{props.text.slice(head.length + q.text.length + 4 * q.text.split('\n').length)}
+					{props.text.slice(head.length + q.text.length + 2 * q.text.split('\n').length)}
 				</>
 			)
 		}

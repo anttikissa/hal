@@ -92,9 +92,12 @@ test('a quote shows under the question with its marked part highlighted on every
 		let first = lines.findIndex((l) => strip(l).includes('cd build'))
 		let end = lines.findIndex((l, i) => i > first && strip(l).trim() === '')
 		let rows = lines.slice(first, end)
-		// They start at the question's column, as on the web.
-		expect(strip(rows[0]!).indexOf('cd')).toBe(strip(lines.find((l) => strip(l).includes('Run this?'))!).indexOf('Run'))
-		expect(rows.length).toBe(2)
+		// The open form puts them at the question's column; a past card two columns in.
+		let indent = lines === answered ? 2 : 0
+		expect(strip(rows[0]!).indexOf('cd')).toBe(
+			strip(lines.find((l) => strip(l).includes('Run this?'))!).indexOf('Run') + indent,
+		)
+		expect(rows.length).toBeGreaterThan(1)
 		expect(
 			rows
 				.map((r) => strip(r).trim())

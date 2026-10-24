@@ -151,7 +151,7 @@ test('the open question is filled in with browser keys and answered; afterwards 
 	expect(view.formKey(st, browser('Escape')!).command).toEqual({ type: 'pause', sessionId })
 	st = fold([{ type: 'answer', sessionId, question: 'q1', answers: { ok: 'yes' } }], enter.state)
 	expect(st.form).toBeUndefined()
-	expect(shown(st)).toEqual([{ kind: 'question warning', text: '    rm -rf x\n\n  yes' }])
+	expect(shown(st)).toEqual([{ kind: 'question warning', text: '  rm -rf x\n\nyes' }])
 })
 
 test('Up while the model works edits the last prompt, whatever the input holds; Enter sends it, Down or Escape continues', () => {

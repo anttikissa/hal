@@ -6,7 +6,8 @@
 		'First done for questions only (a flow variant beside the hanging grid); the user rejected the scope: one layout for every header, in one place per client.',
 		'Title beside right columns wrapped into a narrow column on phones (one word per line under a long status); the user asked for one short first line and full-width later lines. Floating .side before .flow broke focus and reading order (question Shift+Tab test), hence the absolutely placed .side plus a measured float spacer. ResizeObserver runs before paint, so the spacer never flashes.',
 		'The header float spacer covers only the first title line (card-inset + 1lh), so a question whose touch-sized side is 44px tall still wraps its second line at full width. Question cards use one vertical gap, var(--card-inset), between header, quote, option rows and the bottom edge, and every body row (quote included) starts at the title x; the chosen option focus ring is flush (offset 0). Invariant restored after the trust question rendered with a short second line, a blank band under the title, an indented path and a jutting ring (24-ali, 390px probe).',
-		'Terminal question quotes start at the title column like the web (no 4-column indent), for open and answered questions; the user asked the terminal question to match the web.'
+		'Terminal question quotes start at the title column like the web (no 4-column indent), for open and answered questions; the user asked the terminal question to match the web.',
+		'Answered question cards (web and terminal): header, blank row, quote rows indented 2 spaces, blank row, the chosen labels flush left. The user replaced the earlier title-column quote and 2-space answer indent for past cards (24-nab); the open form keeps its layout.'
 	],
 	needs: ['4v'],
 	foldInto: ['4v']

@@ -298,7 +298,7 @@ function itemLines(
 		case 'question': {
 			// Headed by its time and text, wrapped (never clipped), then
 			// the quote and the answer, as the open form draws them.
-			let quote = itemView.quoteLines(item.form.quote, width)
+			let quote = itemView.quoteLines(item.form.quote, width - 2).map((row) => `  ${row}`)
 			let said = item.canceled
 				? ['(canceled)']
 				: item.answers
@@ -311,7 +311,7 @@ function itemLines(
 				'',
 				...quote,
 				...(quote.length ? [''] : []),
-				...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`)),
+				...said.flatMap((l) => ansi.wrap(l, width)),
 			]
 		}
 		// Another session's: drawn as the prompt it was sent as. The

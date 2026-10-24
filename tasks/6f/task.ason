@@ -8,7 +8,8 @@
 		"Flow: runTurn asks for the first undecided dangerous call of a round (question record `call`), one question at a time, before any call of that round runs. The re-run turn finds the calls held (approval.held: the last round's calls, asked about, no results, and no `continue` after all questions were answered, since then they may have run) and the decisions from the answers, and runs them (declined ones get an error result) before its next round.",
 		'A pause at an approval then continue asks again; replay (toMessages) keeps held calls pending across that `continue` instead of giving them "may or may not have run" results, as held() runs them. Answered-then-crash is treated as maybe-run: never run twice.',
 		"Usage across a question (fixed for every question, not only approval): history.park returns the turn's usage so far, host.ask keeps it in the question record (`usage`), runTurn starts with history.carry(host.parkedUsage(records)), and host.stop of a parked turn ends it with that usage. So the turn end counts every round, even across a restart.",
-		'Web <mark> keeps color inherited and sets -webkit-text-fill-color to the canvas, like the pressed button: color: var(--canvas) makes the currentColor background canvas too, hiding the marked text.'
+		'Web <mark> keeps color inherited and sets -webkit-text-fill-color to the canvas, like the pressed button: color: var(--canvas) makes the currentColor background canvas too, hiding the marked text.',
+		'Web answered quote indent is now 2 spaces (see 77f); Card.parts slices by that indent.'
 	],
 	needs: ['w4', '1r', 'pc']
 }
