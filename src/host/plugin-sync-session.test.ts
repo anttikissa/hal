@@ -33,8 +33,8 @@ test('/sync focuses one review tab, relays answers, and Escape asks nothing', as
 	let local = client()
 	let other = created(local)
 	local.conn.send({ type: 'submit', sessionId: other, text: '/sync' })
-	await until(() => local.of('output').some((e: any) => e.error))
-	expect(local.of('output').find((e: any) => e.error).text).toContain('./run -r')
+	await until(() => local.of('output').some((e: any) => e.text?.includes('hal -r')))
+	expect(local.of('output').some((e: any) => e.error)).toBe(false)
 
 	a.conn.send({ type: 'sync', op: 'inventory', home, names: [], id: 'inv' })
 	a.conn.send({ type: 'submit', sessionId: first, text: '/sync' })

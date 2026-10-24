@@ -110,10 +110,7 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 	let client = [...host.state.clients].find((c) => c.record === rec)
 	let home = client && pluginSync.state.followers.get(client)
 	if (!client || home === undefined)
-		return {
-			error:
-				'/sync reviews USER.md and portable plugins from a terminal started with ./run -r <host> on another Hal home; this client compares none with this host.',
-		}
+		return { say: "/sync compares this home's files with a server. Run hal -r <host> and use /sync there." }
 	if (home === pluginSync.home())
 		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
 	let id = find(nameFor(home), from, cwd)
