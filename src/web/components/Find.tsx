@@ -111,7 +111,7 @@ function Heading(props: { name: string; count: number }) {
 	)
 }
 
-function Row(props: { r: FindResult; tabs: string[]; query: string; onOpen: (e: MouseEvent) => void }) {
+function Row(props: { r: FindResult; title: string; tabs: string[]; query: string; onOpen: (e: MouseEvent) => void }) {
 	let r = () => props.r
 	let id = () => (r().card && !r().count ? `${r().sessionId}/${r().card}` : r().sessionId)
 	let text = () => (r().count && r().why === 'title' ? r().cwd : findDialog.snippet(r(), props.query, 6))
@@ -120,6 +120,7 @@ function Row(props: { r: FindResult; tabs: string[]; query: string; onOpen: (e: 
 			class={`find-row ${rowStyle(r())}`}
 			style={r().count ? tabColor(r()) : undefined}
 			href={r().href}
+			title={props.title}
 			tabindex={-1}
 			onClick={props.onOpen}
 		>

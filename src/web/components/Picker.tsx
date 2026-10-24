@@ -307,6 +307,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 												{(r) => (
 													<findView.Row
 														r={r()}
+														title={item}
 														tabs={props.modal?.find?.tabs ?? []}
 														query={props.modal?.query ?? ''}
 														onOpen={(e) => {
