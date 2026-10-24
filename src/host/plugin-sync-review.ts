@@ -17,7 +17,7 @@ import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError, type Choice, type Discrepancy, type SideInfo } from './plugin-sync-client.ts'
 
-type Asked = { file: string; client?: string; server?: string }
+type Asked = { file: string; client?: string; server?: string; labels: [string, string] }
 
 const CLIENT = 'Use client version'
 const SERVER = 'Use server version'
@@ -41,6 +41,14 @@ const host = () => pluginSyncClient.state.name
 const key = (d: Discrepancy) => `${d.file} ${d.client.id ?? ''} ${d.server.id ?? ''}`
 const where = (file: string) => (pluginSyncWire.isPlugin(file) ? `plugins/${file}` : file)
 const when = (ts?: string) => (ts ? `${ts.slice(0, 16).replace('T', ' ')} UTC` : 'no date')
+const absent = (s: SideInfo) => s.status === 'missing' || s.status === 'deleted'
+const oneSided = (d: Discrepancy) => absent(d.client) !== absent(d.server)
+
+// What choosing the client's, then the server's, version does to `d`.
+function labels(d: Discrepancy): [string, string] {
+	if (!oneSided(d)) return [CLIENT, SERVER]
+	return absent(d.server) ? [`Copy to ${host()}`, 'Delete here'] : [`Delete on ${host()}`, 'Copy here']
+}
 
 // Starts comparing with host `name`; `show` puts the indicator (or
 // nothing) in the status row.
@@ -85,10 +93,27 @@ function effect(from: SideInfo, where: string): string {
 			: `replaces ${where}`
 }
 
+// When only one side has the file, the question is whether to copy or
+// delete it: a diff of every line adds nothing, and deletion is never
+// preselected.
+function presence(d: Discrepancy): string {
+	let mine = absent(d.server)
+	let [has, lacks] = mine ? [d.client, d.server] : [d.server, d.client]
+	let [hasWho, lacksWho] = mine ? ['This client', host()] : [host(), 'this client']
+	let gone = lacks.status === 'deleted' ? `deleted it (${when(lacks.ts)})` : 'never had it'
+	return `**${d.file}**: ${hasWho} has it (recorded ${when(has.ts)}); ${lacksWho} ${gone}. Deleting keeps its text in plugin history. Keep separate writes nothing to either side.`
+}
+
 // The question about `d`, with everything needed to answer it.
 function describe(d: Discrepancy, diff: string): { say: string; ask: Form } {
 	let file = d.file,
-		fence = '`'.repeat(Math.max(3, ...[...diff.matchAll(/`+/g)].map((m) => m[0].length + 1)))
+		options = labels(d)
+	let ask = (initial: number): Form => ({
+		text: `${file}: which version should both homes keep?`,
+		fields: [{ type: 'choice', name: 'choice', options: [...options, keep(file)], initial }],
+	})
+	if (oneSided(d)) return { say: presence(d), ask: ask(absent(d.server) ? 0 : 1) }
+	let fence = '`'.repeat(Math.max(3, ...[...diff.matchAll(/`+/g)].map((m) => m[0].length + 1)))
 	let lines = [
 		`**${file}** differs between this client and ${host()}: ${RELATION[d.relation]}.`,
 		[side("Client (this terminal's home)", d.client), side(`Server (${host()})`, d.server)].join('\n'),
@@ -103,14 +128,7 @@ function describe(d: Discrepancy, diff: string): { say: string; ask: Form } {
 			? `Diff from the server's version (-) to the client's (+):\n\n${fence}diff\n${diff}\n${fence}`
 			: 'The texts are equal; only their history differs.',
 	)
-	let initial = d.suggest === 'client' ? 0 : d.suggest === 'server' ? 1 : 2
-	return {
-		say: lines.join('\n\n'),
-		ask: {
-			text: `${file}: which version should both homes keep?`,
-			fields: [{ type: 'choice', name: 'choice', options: [CLIENT, SERVER, keep(file)], initial }],
-		},
-	}
+	return { say: lines.join('\n\n'), ask: ask(d.suggest === 'client' ? 0 : d.suggest === 'server' ? 1 : 2) }
 }
 
 // Carries out answer `value` to `asked`; what happened, to say.
@@ -120,15 +138,14 @@ async function act(asked: Asked, value: string): Promise<string> {
 		await pluginSyncClient.ignore(file)
 		return `Keeping ${file} separate: ${join(pluginSync.dir(), '.syncignore')} on this client now lists it, and neither file changed. Remove that line to compare it again.`
 	}
-	let choice: Choice | undefined = value === CLIENT ? 'client' : value === SERVER ? 'server' : undefined
+	let choice: Choice | undefined =
+		value === asked.labels[0] ? 'client' : value === asked.labels[1] ? 'server' : undefined
 	if (!choice) return `"${value}" is not one of the choices for ${file}; nothing was written.`
 	await pluginSyncClient.apply(file, choice, {
 		...(asked.client ? { client: asked.client } : {}),
 		...(asked.server ? { server: asked.server } : {}),
 	})
-	return choice === 'client'
-		? `Used the client version of ${file}: ${host()} applied it.`
-		: `Used the server version of ${file}: this client applied it.`
+	return `${value} for ${file}: ${choice === 'client' ? host() : 'this client'} applied it.`
 }
 
 // One step of session `session`: apply `answers` if they answer what
@@ -163,6 +180,7 @@ async function review(session: string, answers?: Answers): Promise<void> {
 				file: d.file,
 				...(d.client.id ? { client: d.client.id } : {}),
 				...(d.server.id ? { server: d.server.id } : {}),
+				labels: labels(d),
 			})
 		} else if (!st.error) {
 			let ex = st.excluded.map((x) => `${x.file} (ignored by ${x.by === 'both' ? 'both sides' : `the ${x.by}`})`)

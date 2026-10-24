@@ -152,11 +152,13 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 
 	let first = await step()
 	expect(first.ask.fields[0].options).toEqual([
-		'Use client version',
-		'Use server version',
+		'Copy to example.com',
+		'Delete here',
 		'Keep separate — ignore sync for keys.ts on this client',
 	])
-	expect(first.say).toContain('missing (no history of this file)')
+	expect(first.ask.fields[0].initial).toBe(0)
+	expect(first.say).toContain('example.com never had it')
+	expect(first.say).not.toContain('```diff')
 	let next = await step({ choice: 'Keep separate — ignore sync for keys.ts on this client' })
 	expect(next.say).toContain('Keeping keys.ts separate')
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
@@ -179,7 +181,7 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	expect(again.ask.text).toStartWith('theme.ts')
 
 	let done = await step({ choice: 'Use server version' })
-	expect(done.say).toStartWith('Used the server version of theme.ts: this client applied it.')
+	expect(done.say).toStartWith('Use server version for theme.ts: this client applied it.')
 	expect(read(client, 'theme.ts')).toBe('export const portable = true // solarized')
 	expect(done.say).toContain('Synced files match example.com.')
 	expect(done.ask).toBeUndefined()
