@@ -6,7 +6,8 @@
 		'Kind classes from host/web-page.ts set color, background and --fg globally; Find overrides background and text, and reads var(--fg). Never use the .log theme class here: .Picker .log is the footer. Tool calls are colored by name only when the snippet starts with it; tool output rows have no tool name (the index stores none) and use .tool. Checked by headless Chrome screenshots at 1470x956 and 390x800 with themes/hal.ts applied.',
 		'Tool-call find rows and preview cards take their theme class (tool-read green, tool-bash purple) from the command verb. The index stores calls as tool { cmd: ...}, and snippets are windowed around the match, so the host labels why with the verb (find-worker label()); the client must not parse snippets for it. Output cards share the call id and take the call look.',
 		'An open tab mark sits at the left edge of the age column (flex, margin-right: auto), so marks align whatever the age width.',
-		'Changing the query or a filter keeps the previous rows (find.stale) until the new search sends its first batch; a done batch with nothing clears them. Invariant: the list never blanks between searches. Probed in headless Chrome: rows and preview stayed through a filter toggle.'
+		'Changing the query or a filter keeps the previous rows (find.stale) until the new search sends its first batch; a done batch with nothing clears them. Invariant: the list never blanks between searches. Probed in headless Chrome: rows and preview stayed through a filter toggle.',
+		'Find searches at every keypress (no debounce; the worker cancels the previous search). A new search holds its partial tier-by-tier rankings for up to 250 ms (findDialog holdMs) so its ranking lands once, whole, over the old rows; a slower search or an index scan shows progress. Invariant: typing never shows intermediate rankings of a quick search. Probed in headless Chrome: f, fi, fin, find... changed the rendered list once.'
 	],
 	needs: ['w17'],
 	foldInto: ['6m']

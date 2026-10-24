@@ -43,7 +43,9 @@ changes that are usually brief start after a delay; no motion under
 prefers-reduced-motion.
 Toggles never flash: press feedback is for buttons that act. A
 re-render never flashes, blanks or fades what is still the same: old
-content stays until its replacement is ready.
+content stays until its replacement is ready. Lists filtered as the
+user types (Find, completions, pickers) never animate and answer
+every keypress as soon as they can, with the whole result at once.
 
 ## Readable text (invariant, terminal and web)
 

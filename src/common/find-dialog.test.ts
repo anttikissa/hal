@@ -26,6 +26,8 @@ const batch = (results: FindResult[], tier: FindKind = 'user', done = false) => 
 test('batches replace the ranking until the selection moves, then preserve rows and ignore stale/done batches', () => {
 	let m = findDialog.input(findDialog.open([...findDialog.filters]), 'needle')
 	m.find!.request = 'a'
+	// A slow search shows its progress.
+	m.find!.since = 0
 	m = findDialog.batch(m, batch([hit('1', 1)]))
 	m = findDialog.batch(m, batch([hit('2', 5), hit('1', 1)]))
 	expect(m.find!.results.map((r) => r.blockId)).toEqual(['2', '1'])
@@ -47,14 +49,22 @@ test('batches replace the ranking until the selection moves, then preserve rows 
 	expect(m.find!.focus).toBe(2)
 	expect(m.find!.request).toBeUndefined()
 	// The old rows stay until the new search answers, even with nothing.
+	// A quick one lands its ranking once, whole.
 	expect(m.items.length).toBe(4)
 	m.find!.request = 'b'
+	m = findDialog.batch(m, { ...batch([hit('5', 1)]), request: 'b' })
+	expect(m.items.length).toBe(4)
 	m = findDialog.batch(m, { ...batch([], 'other', true), request: 'b' })
+	expect(m.find!.results.map((r) => r.blockId)).toEqual(['5'])
+	m = findDialog.input(m, 'nothing')
+	m.find!.request = 'c'
+	m = findDialog.batch(m, { ...batch([], 'other', true), request: 'c' })
 	expect(m.items).toEqual([])
 })
 test('Right lists a tab row as cards, keeping kind values; Left restores the query', () => {
 	let m = findDialog.input(findDialog.open([...findDialog.filters]), 'blink in:tools,10-19')
 	m.find!.request = 'a'
+	m.find!.since = 0
 	m = findDialog.batch(m, batch([hit('7', 5, 'user', 3)]))
 	m = findDialog.focus(m, findDialog.resultsFocus)
 	m = findDialog.step(m, { key: 'right' }).state

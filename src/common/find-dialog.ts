@@ -26,12 +26,17 @@ export type FindDialog = {
 	// The results belong to the previous query: they stay on screen until
 	// the new search answers, so the list never blanks between them.
 	stale?: true
+	// When the query changed, and the newest ranking held back meanwhile.
+	since?: number
+	pending?: FindResult[]
 }
 const filters = findQuery.filters
 const labels = ['user', 'Hal', 'reasoning', 'tools', 'commits', 'other']
 // The results' focus stop, after the field and the filters.
 const resultsFocus = filters.length + 1
 const examples = 'compact in:here · "live file" · rebase -conflict · since:24h'
+// How long a new search may hold its partial rankings back.
+const holdMs = 250
 const question = `Find anything: tab names, requests, commits, tool output\nExamples: ${examples} · /help find for more`
 const page = 50
 const recent = 'recent tabs'
@@ -79,6 +84,8 @@ function input(m: ModalState, text: string): ModalState {
 			...m.find!,
 			request: undefined,
 			stale: true,
+			since: Date.now(),
+			pending: undefined,
 			moved: false,
 			done: false,
 			failed: undefined,
@@ -248,10 +255,15 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 function batch(m: ModalState, b: FindBatch): ModalState {
 	let f = m.find!
 	if (b.request !== f.request) return m
-	let results = f.stale ? [] : f.results
+	// A new search's partial rankings reorder and grow its rows tier by
+	// tier. While they arrive quickly, the old rows stay and the ranking
+	// lands once, whole; a slow search shows its progress.
+	if (f.stale && !b.done && !b.scanning && Date.now() - (f.since ?? 0) < holdMs)
+		return { ...m, find: { ...f, pending: b.results } }
+	let results = f.pending ?? (f.stale ? [] : f.results)
 	if (!b.done) {
 		let key = (r: FindResult) => (r.count ? r.sessionId : `${r.href} ${r.kind}`)
-		if (f.moved) {
+		if (f.moved && !f.stale) {
 			let seen = new Set(results.map(key))
 			results = [...results, ...b.results.filter((r) => !seen.has(key(r)))]
 		} else results = b.results
@@ -281,6 +293,7 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 			...f,
 			results,
 			stale: undefined,
+			pending: undefined,
 			done: b.done,
 			status,
 			...(b.error ? { failed: true as const } : { failed: undefined }),

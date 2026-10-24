@@ -1,6 +1,5 @@
-// Runs find requests for one client: it waits for typing to pause before
-// it searches, and cancels the previous search. No timers run until find
-// opens.
+// Runs find requests for one client: it searches at every keypress, and
+// cancels the previous search. No timers run until find opens.
 import { findDialog } from './find-dialog.ts'
 import type { FindBatch, FindFilter, FindPreview } from './find.ts'
 import type { ModalState } from './modals.ts'
@@ -33,7 +32,7 @@ function update(st: FindController, h: Hooks, m: ModalState): void {
 		m = { ...m, find: { ...m.find, request: h.id() } }
 		h.set(m)
 		h.send(findController.command(m))
-	}, 80)
+	}, 0)
 }
 // Asks for the next page when `near` the end of a full result list.
 function more(h: Hooks, near: boolean): void {
