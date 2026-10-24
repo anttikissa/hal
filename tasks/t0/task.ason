@@ -9,7 +9,8 @@
 		"Fork copies the parent's history records (not its inbox records) and blobs, then answers the parent's in-flight round's tool calls with a 'this is a fork' result and ends that turn completed, so the copy is a valid, finished conversation before the child's prompt. mode defaults to fork as in the old tool, also for interactive; ask for fresh to get a blank one.",
 		'Auto-close is subagents.finished after every completed turn (turns.ts): only kind subagent, idle, empty inbox and no running subagents of its own (a subagent parked in wait stays). A human submit or amend promotes subagent to subagent-leave-open.',
 		'Task mt replaced the send handoff with host reports (including errors and pauses) and made mode default to fresh.',
-		'The task field description says the session already loads its AGENTS.md and skills, so parents state only the goal and constraints. Invariant restored: subagent prompts no longer tell the child to re-read files Hal already loaded (seen in 24-ali asking 24-man to read AGENTS.md).'
+		'The task field description says the session already loads its AGENTS.md and skills, so parents state only the goal and constraints. Invariant restored: subagent prompts no longer tell the child to re-read files Hal already loaded (seen in 24-ali asking 24-man to read AGENTS.md).',
+		'SYSTEM.md Spawn budget section repeats the rule where every spawning model sees it: subagents load AGENTS.md and skills themselves, so prompts carry only the goal and constraints, never Read AGENTS.md.'
 	],
 	needs: ['rj']
 }

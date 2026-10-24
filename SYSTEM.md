@@ -214,6 +214,8 @@ This is a fork of session $forked_from and shares its history.
 <!-- TODO - to be reviewed by a human -11-fir: progressively disclose subagent coordination through HELP SUBAGENTS. -->
 ::: if $spawn_budget
 You may use subagents (budget: $spawn_budget, applies recursively); HELP SUBAGENTS to learn how.
+<!-- TODO - to be reviewed by a human -24-ali -->
+Subagents load AGENTS.md and skills themselves; give them only the goal and constraints, never "Read AGENTS.md".
 :::: if $session_interactive && !$subagent
 Spawn only when user approves.
 :::: else

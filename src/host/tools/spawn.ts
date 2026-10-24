@@ -35,7 +35,7 @@ export const tool: Tool = {
 			task: {
 				type: 'string',
 				description:
-					'The goal and constraints only. The session already loads its AGENTS.md and skills; do not repeat them or prescribe steps. Required unless kind is interactive.',
+					'The goal and constraints, without redundant instructions: the session already has its AGENTS.md, skills and system prompt, so never write "Read AGENTS.md". Required unless kind is interactive.',
 			},
 			kind: { type: 'string', enum: kinds, description: 'Default subagent.' },
 			mode: {
