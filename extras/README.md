@@ -24,3 +24,5 @@ extra itself take effect when the host restarts.
   each commit shows in the foreground.
 - `codex-hooks.ts` and `claude-hooks.ts`: explicitly trusted command hooks
   and hooks bundled in local plugin packages. See [setup and coverage](hooks.md).
+- `pi-compat.ts`: command-only Pi extensions, including unmodified `pi-simplify`.
+  See [setup and supported APIs](pi-compat.md).
