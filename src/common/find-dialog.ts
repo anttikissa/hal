@@ -28,8 +28,8 @@ const filters = findQuery.filters
 const labels = ['user', 'Hal', 'reasoning', 'tools', 'commits', 'other']
 // The results' focus stop, after the field and the filters.
 const resultsFocus = filters.length + 1
-const question =
-	'Find anything: tab names, requests, commits, tool output\nExamples: compact in:here · "live file" · rebase -conflict · since:24h · /help find for more'
+const examples = 'compact in:here · "live file" · rebase -conflict · since:24h'
+const question = `Find anything: tab names, requests, commits, tool output\nExamples: ${examples} · /help find for more`
 const page = 50
 const recent = 'recent tabs'
 // The title carries the status; a failure has its own row instead.
@@ -188,6 +188,15 @@ function age(ms: number): string {
 				? `${Math.floor(ms / 3600000)}h`
 				: `${Math.floor(ms / 86400000)}d`
 }
+// `r`'s snippet with at most `leadWidth` characters before its first
+// match, padded so matches line up across rows.
+function snippet(r: FindResult, query: string, leadWidth: number): string {
+	let at = findDialog.marks(r.snippet, query)[0]?.[0]
+	if (at === undefined) return r.snippet.trimStart()
+	let lead = r.snippet.slice(0, at).trimStart()
+	if (lead.length > leadWidth) lead = leadWidth > 1 ? '…' + lead.slice(-(leadWidth - 1)) : '…'.slice(0, leadWidth)
+	return lead.padStart(leadWidth) + r.snippet.slice(at)
+}
 // Result rows as aligned columns: tab number (blank for a closed
 // session), session id (card rows: session/card), name, age, why label,
 // snippet. A narrow list (beside the preview) keeps up to 32 columns of
@@ -217,13 +226,6 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 	)
 	let textWidth = Math.max(1, columns - fixed - (w.name ? w.name + 2 : 0))
 	let leadWidth = Math.min(21, Math.max(0, Math.floor(textWidth / 4)))
-	let snippet = (r: FindResult) => {
-		let at = findDialog.marks(r.snippet, query)[0]?.[0]
-		if (at === undefined) return r.snippet.trimStart()
-		let lead = r.snippet.slice(0, at).trimStart()
-		if (lead.length > leadWidth) lead = leadWidth > 1 ? '…' + lead.slice(-(leadWidth - 1)) : '…'.slice(0, leadWidth)
-		return lead.padStart(leadWidth) + r.snippet.slice(at)
-	}
 	let cells = (r: FindResult) => [
 		w.tab && tab(r).padStart(w.tab),
 		id(r).padEnd(w.id),
@@ -231,7 +233,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 		w.dir && dir(r).padEnd(w.dir),
 		age(r.age).padStart(w.age),
 		w.why && r.why.padEnd(w.why),
-		snippet(r),
+		findDialog.snippet(r, query, leadWidth),
 	]
 	return results.map((r) =>
 		cells(r)
@@ -293,6 +295,7 @@ function marks(text: string, query: string): [number, number][] {
 export const findDialog = {
 	filters,
 	labels,
+	examples,
 	resultsFocus,
 	question,
 	open,
@@ -306,6 +309,8 @@ export const findDialog = {
 	scoped,
 	requery,
 	rows,
+	snippet,
+	age,
 	batch,
 	marks,
 }

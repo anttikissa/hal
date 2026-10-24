@@ -2289,11 +2289,6 @@
 				color: inherit;
 				text-decoration: none;
 			}
-			.Picker.find li a {
-				white-space: pre;
-				overflow: hidden;
-				text-overflow: ellipsis;
-			}
 			.Picker li :focus-visible,
 			.Picker li:focus-visible {
 				outline-offset: -1px;
@@ -2302,12 +2297,170 @@
 			.Picker ul:focus-visible {
 				outline: none;
 			}
-			/* Find: question, field, filters, results and keys equally apart. */
+			/* Find (tasks 6m, w17): the field in the header bar, kind filters,
+   rows grouped by kind under section rules, a preview pane when wide
+   and key caps. Rows, filters and preview cards take their kind's
+   theme class (.user, .assistant, .tool-read...): its fg is the bar,
+   the label and the match highlight, as on the transcript's cards. */
 			.Picker.find[open] {
-				gap: 0.5lh;
+				gap: 0;
+				padding: 0;
 			}
-			.Picker.find :is(.question, .filters) {
-				margin-bottom: 0;
+			.Picker.find > .top {
+				margin: 0;
+				padding-left: 2ch;
+			}
+			.Picker.find > .top .slash {
+				color: var(--quiet);
+			}
+			.Picker.find > .top:focus-within .slash {
+				color: var(--accent);
+			}
+			.Picker.find > .top .input {
+				flex: 1;
+				min-width: 0;
+				border: 0;
+				background: none;
+				padding-inline: 0;
+			}
+			.Picker.find > .top .input::placeholder {
+				color: var(--border);
+			}
+			.Picker.find > .top .title {
+				flex: none;
+				color: var(--quiet);
+				font-weight: normal;
+			}
+			.Picker.find > .refused {
+				padding: 0.25lh 2ch;
+			}
+			.Picker.find .filters {
+				align-items: center;
+				gap: 0 1ch;
+				margin: 0;
+				padding: 0 2ch 0 1ch;
+				border-bottom: 1px solid var(--line);
+			}
+			.Picker.find .filters .in {
+				padding-left: 1ch;
+				color: var(--quiet);
+			}
+			.Picker.find .filters button {
+				display: inline-flex;
+				align-items: center;
+				gap: 1ch;
+				background: none;
+				color: var(--text);
+			}
+			.Picker.find .filters button:hover {
+				background: var(--pick);
+			}
+			.Picker.find .filters .box {
+				width: 1ch;
+				height: 1ch;
+				border: 1px solid var(--fg);
+				background: none;
+			}
+			.Picker.find .filters [aria-pressed='true'] .box {
+				background: var(--fg);
+			}
+			.Picker.find .filters [aria-pressed='false'] .label {
+				color: var(--quiet);
+			}
+			.Picker.find .filters .syntax {
+				margin-left: auto;
+				color: var(--quiet);
+			}
+			.Picker.find ul {
+				display: grid;
+				grid-template-columns: auto auto auto minmax(0, 28ch) minmax(0, 1fr) auto;
+				align-content: start;
+				column-gap: 2ch;
+				padding-block: 0.25lh;
+			}
+			.Picker.find li {
+				grid-column: 1 / -1;
+				display: grid;
+				grid-template-columns: subgrid;
+				padding: 0;
+			}
+			.Picker.find li[aria-selected='true'] {
+				background: none;
+			}
+			.Picker.find .heading {
+				grid-column: 1 / -1;
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				padding: 0.5lh 2ch 0.25lh;
+				color: var(--quiet);
+			}
+			.Picker.find .heading .rule {
+				flex: 1;
+				border-top: 1px solid var(--line);
+			}
+			.Picker.find a.find-row {
+				grid-column: 1 / -1;
+				display: grid;
+				grid-template-columns: subgrid;
+				padding: 0.25lh 2ch 0.25lh calc(2ch - 3px);
+				border-left: 3px solid var(--fg);
+				background: none;
+				color: var(--text);
+				white-space: pre;
+			}
+			.Picker.find .find-tab {
+				--fg: var(--accent);
+			}
+			.Picker.find li[aria-selected='true'] a.find-row {
+				background: color-mix(in oklab, var(--fg) 22%, transparent);
+				color: var(--title-fg);
+			}
+			.Picker.find li:hover a.find-row {
+				background: color-mix(in oklab, var(--fg) 12%, transparent);
+			}
+			.Picker.find .find-row > span {
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.Picker.find .find-row :is(.tab, .age) {
+				text-align: right;
+			}
+			.Picker.find .find-row :is(.id, .age) {
+				color: var(--quiet);
+			}
+			.Picker.find .find-row .who {
+				color: var(--fg);
+			}
+			.Picker.find .match {
+				background: var(--fg);
+				color: var(--canvas);
+				font-weight: normal;
+			}
+			@media (max-width: 40rem) {
+				.Picker.find ul {
+					grid-template-columns: auto auto minmax(0, 12ch) minmax(0, 1fr) auto;
+				}
+				.Picker.find .find-row .id,
+				.Picker.find .filters .syntax {
+					display: none;
+				}
+			}
+			.Picker.find .log {
+				display: flex;
+				flex-wrap: wrap;
+				justify-content: flex-end;
+				gap: 0 2ch;
+				padding: 0.5lh 2ch;
+				border-top: 1px solid var(--line);
+				color: var(--quiet);
+			}
+			.Picker.find kbd {
+				font: inherit;
+				padding: 0 0.5ch;
+				border: 1px solid var(--line);
+				color: var(--text);
 			}
 			/* Find's preview pane beside the results when wide (task w17). */
 			.Picker .body {
@@ -2330,21 +2483,30 @@
 					overflow-y: auto;
 					overscroll-behavior: contain;
 					border-left: 1px solid var(--line);
-					padding: 0 2ch;
+					padding: 0.5lh 2ch;
 				}
+			}
+			.Picker .preview .head {
+				display: flex;
+				gap: 2ch;
+				margin-bottom: 0.5lh;
+				color: var(--title-fg);
+			}
+			.Picker .preview .head span {
+				color: var(--quiet);
 			}
 			.Picker .preview .card {
 				white-space: pre-wrap;
 				overflow-wrap: anywhere;
-				padding: 0 1ch;
+				padding: 0.25lh 1ch 0.25lh calc(1ch - 3px);
 				margin-bottom: 0.5lh;
+				border-left: 3px solid var(--fg);
+			}
+			.Picker .preview .card .label {
+				color: var(--quiet);
 			}
 			.Picker .preview .hit {
-				background: var(--pick);
-			}
-			.Picker .preview .match {
-				color: var(--title-fg);
-				font-weight: bold;
+				background: color-mix(in oklab, var(--fg) 16%, var(--card-bg, transparent));
 			}
 			/* Ctrl-O (task v8y): as tall as its field, hint and help. */
 			.Picker.compact,

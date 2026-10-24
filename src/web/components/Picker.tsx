@@ -3,7 +3,7 @@
 // /config, whose rows add a value column, a faint note shown on the
 // selected, hovered or focused row, an in-place edit field and the
 // selected row's details below (common/modals.ts).
-import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import { blocksDialog } from '../../common/blocks-dialog.ts'
@@ -15,8 +15,9 @@ import { find } from '../find.ts'
 import { folds } from '../folds.ts'
 import { forms } from '../../common/forms.ts'
 import { Icon } from './Icon.tsx'
+import { findView } from './Find.tsx'
 
-function marked(text: string, query: string | undefined, literal = false) {
+export function marked(text: string, query: string | undefined, literal = false) {
 	let out: (string | ReturnType<typeof Match>)[] = [],
 		at = 0
 	for (let [from, to] of query ? (literal ? findDialog.marks(text, query) : fuzzy.marks(text, query)) : []) {
@@ -34,26 +35,8 @@ export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement, search: HTMLInputElement | undefined, list!: HTMLUListElement
 	let edit: HTMLInputElement | undefined
 	let pane: HTMLDivElement | undefined
-	let [findColumns, setColumns] = createSignal(120)
-	onSettled(() => {
-		let measure = document.createElement('span')
-		measure.textContent = '0'
-		measure.style.cssText = 'position:absolute;visibility:hidden'
-		box.append(measure)
-		let observer = new ResizeObserver(() => {
-			let ch = measure.getBoundingClientRect().width
-			if (ch) setColumns(Math.max(1, Math.floor(list.clientWidth / ch) - 2))
-		})
-		observer.observe(list)
-		return () => {
-			observer.disconnect()
-			measure.remove()
-		}
-	})
-	let items = createMemo(() => {
-		let m = props.modal
-		return m?.find ? findDialog.rows(m.find.results, m.find.tabs, findColumns(), m.query) : (m?.items ?? [])
-	})
+	let items = () => props.modal?.items ?? []
+	let headings = createMemo(() => findView.headings(props.modal?.find?.results ?? []))
 	// An edit starting takes the focus; one ending gives it back.
 	createEffect(
 		createMemo(() => props.modal?.edit?.index),
@@ -127,6 +110,26 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom))
 			cancel(e)
 	}
+	let field = () => (
+		<input
+			ref={(e) => (search = e)}
+			class="input"
+			type="text"
+			aria-label={props.modal?.find ? 'Find' : (props.modal?.question ?? 'Search')}
+			autocomplete="off"
+			aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
+			placeholder={
+				props.modal?.find
+					? findDialog.examples
+					: props.modal?.form && (props.modal.compact || props.modal.tree)
+						? forms.example(props.modal.form, 0, 0).text
+						: undefined
+			}
+			value={props.modal?.form?.values[0] ?? ''}
+			onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))}
+			onFocus={() => find.focus(0)}
+		/>
+	)
 	return (
 		<dialog
 			ref={(e) => (box = e)}
@@ -135,35 +138,34 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			onCancel={cancel}
 			onClick={outside}
 		>
-			<div class="top">
-				<div class="title" role={props.modal?.find ? 'status' : undefined}>
-					{props.modal?.title ?? ''}
-				</div>
-				<button type="button" class="close" aria-label="Close" onClick={cancel}>
-					<Icon name="close" />
-				</button>
-			</div>
-			<Show when={props.modal?.question}>{(q) => <p class="question">{q()}</p>}</Show>
-			<Show when={props.modal?.form}>
-				<input
-					ref={(e) => (search = e)}
-					class="input"
-					type="text"
-					aria-label={props.modal?.question ?? 'Search'}
-					autocomplete="off"
-					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-					placeholder={
-						props.modal?.form && (props.modal.compact || props.modal.tree)
-							? forms.example(props.modal.form, 0, 0).text
-							: undefined
-					}
-					value={props.modal?.form?.values[0] ?? ''}
-					onInput={(e) =>
-						props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value)
-					}
-					onFocus={() => find.focus(0)}
-				/>
+			<Show
+				when={props.modal?.find}
+				fallback={
+					<div class="top">
+						<div class="title">{props.modal?.title ?? ''}</div>
+						<button type="button" class="close" aria-label="Close" onClick={cancel}>
+							<Icon name="close" />
+						</button>
+					</div>
+				}
+			>
+				{(f) => (
+					<div class="top">
+						<span class="slash" aria-hidden="true">
+							/
+						</span>
+						{field()}
+						<div class="title" role="status">
+							{f().failed ? '' : f().status}
+						</div>
+						<button type="button" class="close" aria-label="Close" onClick={cancel}>
+							<Icon name="close" />
+						</button>
+					</div>
+				)}
 			</Show>
+			<Show when={!props.modal?.find && props.modal?.question}>{(q) => <p class="question">{q()}</p>}</Show>
+			<Show when={!props.modal?.find && props.modal?.form}>{field()}</Show>
 			<Show when={props.modal?.find?.failed && props.modal.find}>
 				{(f) => (
 					<div class="blocks-hint refused" role="alert">
@@ -241,6 +243,9 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			</Show>
 			<Show when={props.modal?.find}>
 				<div class="filters" role="group" aria-label="Search kinds">
+					<span class="in" aria-hidden="true">
+						in
+					</span>
 					<For each={findDialog.labels}>
 						{(label, i) => (
 							<button
@@ -250,11 +255,11 @@ export function Picker(props: { modal: ModalState | undefined }) {
 								onFocus={() => find.focus(i() + 1)}
 								onClick={() => find.toggle(i())}
 							>
-								{props.modal?.find?.filters.includes(findDialog.filters[i()]!) ? '[x] ' : '[ ] '}
-								{label}
+								<findView.FilterBox filter={findDialog.filters[i()]!} label={label} />
 							</button>
 						)}
 					</For>
+					<span class="syntax">/help find for syntax</span>
 				</div>
 			</Show>
 			<div class="body">
@@ -295,15 +300,21 @@ export function Picker(props: { modal: ModalState | undefined }) {
 									when={props.modal?.values}
 									fallback={
 										<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
-											<a
-												href={props.modal?.find?.results[i()]?.href}
-												tabindex={-1}
-												onClick={(e) => {
-													if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.button === 0) find.close()
-												}}
-											>
-												{marked(item, props.modal?.query, true)}
-											</a>
+											<Show when={headings()[i()]}>
+												{(h) => <findView.Heading name={h().name} count={h().count} />}
+											</Show>
+											<Show when={props.modal?.find?.results[i()]}>
+												{(r) => (
+													<findView.Row
+														r={r()}
+														tabs={props.modal?.find?.tabs ?? []}
+														query={props.modal?.query ?? ''}
+														onOpen={(e) => {
+															if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.button === 0) find.close()
+														}}
+													/>
+												)}
+											</Show>
 										</Show>
 									}
 								>
@@ -350,19 +361,13 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				</ul>
 				<Show when={props.modal?.items.length ? props.modal.find?.preview : undefined}>
 					{(p) => (
-						<div class="preview" ref={(e) => (pane = e)} aria-label="Preview">
-							<Show when={p().error}>{(e) => <div class="refused">{e()}</div>}</Show>
-							<For each={p().cards}>
-								{(c) => (
-									<div class={c.hit ? 'card hit' : 'card'}>
-										<div class="label">
-											{c.card} {c.why}
-										</div>
-										{marked(c.text, props.modal?.query, true)}
-									</div>
-								)}
-							</For>
-						</div>
+						<findView.Preview
+							preview={p()}
+							result={props.modal?.find?.results[props.modal.selected]}
+							tabs={props.modal?.find?.tabs ?? []}
+							query={props.modal?.query ?? ''}
+							ref={(e) => (pane = e)}
+						/>
 					)}
 				</Show>
 			</div>
@@ -395,7 +400,9 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				</div>
 			</Show>
 			<div class="log" role="status">
-				{props.modal?.hint ?? ''}
+				<Show when={props.modal?.find} fallback={props.modal?.hint ?? ''}>
+					<findView.Keys hint={props.modal?.hint ?? ''} />
+				</Show>
 			</div>
 		</dialog>
 	)

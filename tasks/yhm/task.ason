@@ -15,7 +15,8 @@ The filter toggles are user, Hal, reasoning, tools, commits, other (user request
 		'Rows show the tab current cwd (session.ason, reloaded after each history catch-up so /cd shows); a cwd match is evidence ranked like the title.',
 		'The rename/projection regression prepares a fully caught-up stale index before starting the worker. It must recover old titles from immutable history without modifying it; corrupting SQLite immediately after worker termination races the worker connection and produces database-is-locked failures.',
 		'The host fills in the open tab order for in: ranges (tabs.ason); clients send only here. Renames are ordinary indexed text: no former-title tier.',
-		'Bug fix: searching rename buried the actual /rename command under 50 requests, replies and tool cards, since everything else ranked last. Invariant: a slash command record outranks requests and tool calls that mention it.'
+		'Bug fix: searching rename buried the actual /rename command under 50 requests, replies and tool cards, since everything else ranked last. Invariant: a slash command record outranks requests and tool calls that mention it.',
+		'The web dialog shows the examples as the field placeholder and no question lines (task sy3); the terminal keeps both lines.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']
