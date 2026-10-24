@@ -2418,11 +2418,17 @@
 			.Picker.find li:hover:not([aria-selected='true']) a.find-row {
 				background: var(--pick);
 			}
+			.Picker.find .find-row .age {
+				display: flex;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 2ch;
+			}
 			.Picker.find .find-row .mark {
-				display: inline-block;
 				width: 1ch;
 				height: 1ch;
-				margin-right: 2ch;
+				margin-right: auto;
+				flex: none;
 			}
 			.Picker.find .find-row > span {
 				min-width: 0;

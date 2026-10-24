@@ -19,6 +19,10 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
   ch across. Small text is fine where space is scarce.
 - Never use ✗ (U+2717, ballot X): the user finds it ugly. The failure
   mark is × (U+00D7), on the terminal and the web.
+- Hover hints look like Hal, never like the browser's gray `title`
+  box: themed colors and Hal's font, as in the composer button
+  captions ("Sent after this turn ends."). Add a hint only where it
+  says something the screen doesn't.
 - Propose color changes to the user with options before they land.
 
 Task gn holds the rest of the user's choices (selection, focus, tabs).

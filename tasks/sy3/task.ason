@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Kind classes from host/web-page.ts set color, background and --fg globally; Find overrides background and text, and reads var(--fg). Never use the .log theme class here: .Picker .log is the footer. Tool calls are colored by name only when the snippet starts with it; tool output rows have no tool name (the index stores none) and use .tool. Checked by headless Chrome screenshots at 1470x956 and 390x800 with themes/hal.ts applied.',
-		'Tool-call find rows and preview cards take their theme class (tool-read green, tool-bash purple) from the command verb. The index stores calls as tool { cmd: ...}, and snippets are windowed around the match, so the host labels why with the verb (find-worker label()); the client must not parse snippets for it. Output cards share the call id and take the call look.'
+		'Tool-call find rows and preview cards take their theme class (tool-read green, tool-bash purple) from the command verb. The index stores calls as tool { cmd: ...}, and snippets are windowed around the match, so the host labels why with the verb (find-worker label()); the client must not parse snippets for it. Output cards share the call id and take the call look.',
+		'An open tab mark sits at the left edge of the age column (flex, margin-right: auto), so marks align whatever the age width.'
 	],
 	needs: ['w17'],
 	foldInto: ['6m']
