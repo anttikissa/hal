@@ -158,13 +158,14 @@ CentOS and Caddy.
 
 # Plugins
 
-Hal has a wide and shallow plugin surface: a plugin can basically wrap
-around any function in the codebase, or override any value. Write
-custom tools, providers, commands, themes, or pretty much anything as a
-plugin.
+A Hal plugin can wrap any function in the codebase or override any
+value. Write custom tools, providers, commands, themes, or pretty much
+anything as a plugin.
 
-Note: the plugin surface is subject to change while Hal is under
-development. A plugin written against 0.0.1 might not work on 0.0.2.
+The plugin API changes during development. Its integer version and
+change history live in `plugin-api.ason`; see
+[API versioning](tasks/q03/api-version.md). The loader does not yet use
+this ledger to adapt older plugins.
 
 Drop a plugin into ~/.hal/plugins (or wherever your $hal_home is) and
 it will be automatically loaded.

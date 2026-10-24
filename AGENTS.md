@@ -18,6 +18,11 @@ Rebase only when that checkout is clean and no other agent is editing it.
 Work is not done until its commit lands on main in the Hal source directory.
 Commits in a worktree do not count.
 
+<!-- TODO - to be reviewed by a human -24-ali -->
+Every commit declares `Plugin-API: none` or its API changes in the message.
+Classify semantics yourself; the hook records the declaration and advances
+`plugin-api.ason`. See [API versioning](tasks/q03/api-version.md).
+
 # Tasks
 
 Use `tsk`. Trace every behavior and quality requirement to its

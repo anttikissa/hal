@@ -1,0 +1,3 @@
+#!/bin/sh
+# Records the implementing agent's plugin API declaration in the commit.
+exec bun "$(git rev-parse --show-toplevel)/scripts/plugin-api-commit.ts" "$1"
