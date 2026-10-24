@@ -41,6 +41,9 @@ itself changes at once. Motion is CSS; script it only when CSS cannot.
 Nothing that happens in milliseconds (a round trip) may show, so state
 changes that are usually brief start after a delay; no motion under
 prefers-reduced-motion.
+Toggles never flash: press feedback is for buttons that act. A
+re-render never flashes, blanks or fades what is still the same: old
+content stays until its replacement is ready.
 
 ## Readable text (invariant, terminal and web)
 

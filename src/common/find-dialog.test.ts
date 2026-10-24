@@ -46,6 +46,10 @@ test('batches replace the ranking until the selection moves, then preserve rows 
 	expect(m.find!.filters).not.toContain('hal')
 	expect(m.find!.focus).toBe(2)
 	expect(m.find!.request).toBeUndefined()
+	// The old rows stay until the new search answers, even with nothing.
+	expect(m.items.length).toBe(4)
+	m.find!.request = 'b'
+	m = findDialog.batch(m, { ...batch([], 'other', true), request: 'b' })
 	expect(m.items).toEqual([])
 })
 test('Right lists a tab row as cards, keeping kind values; Left restores the query', () => {

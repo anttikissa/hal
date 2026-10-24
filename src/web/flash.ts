@@ -24,9 +24,10 @@ function on(el: Element, ms: number): void {
 	el.animate(frames, { duration: ms })
 }
 
+// Action buttons only: toggles and disclosures change state, not act.
 const button = (e: Event) => {
 	let b = e.target instanceof Element ? e.target.closest('button') : null
-	return b?.hasAttribute('aria-expanded') ? null : b
+	return b?.hasAttribute('aria-expanded') || b?.hasAttribute('aria-pressed') ? null : b
 }
 
 // Flashes action buttons as they are pressed: a mouse on pointerdown; a

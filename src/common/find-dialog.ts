@@ -23,6 +23,9 @@ export type FindDialog = {
 	limit: number
 	// The last preview that arrived; it stays until the next (task w17).
 	preview?: FindPreview
+	// The results belong to the previous query: they stay on screen until
+	// the new search answers, so the list never blanks between them.
+	stale?: true
 }
 const filters = findQuery.filters
 const labels = ['user', 'Hal', 'reasoning', 'tools', 'commits', 'other']
@@ -71,12 +74,11 @@ function input(m: ModalState, text: string): ModalState {
 		query: findDialog.words(text),
 		selected: 0,
 		scroll: 0,
-		items: [],
 		error: undefined,
 		find: {
 			...m.find!,
 			request: undefined,
-			results: [],
+			stale: true,
 			moved: false,
 			done: false,
 			failed: undefined,
@@ -246,7 +248,7 @@ function rows(results: FindResult[], tabs: string[], columns = 120, query = ''):
 function batch(m: ModalState, b: FindBatch): ModalState {
 	let f = m.find!
 	if (b.request !== f.request) return m
-	let results = f.results
+	let results = f.stale ? [] : f.results
 	if (!b.done) {
 		let key = (r: FindResult) => (r.count ? r.sessionId : `${r.href} ${r.kind}`)
 		if (f.moved) {
@@ -275,7 +277,14 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 		...findDialog.focus(m, f.focus),
 		title: title(status, !!b.error),
 		items: findDialog.rows(results, f.tabs),
-		find: { ...f, results, done: b.done, status, ...(b.error ? { failed: true as const } : { failed: undefined }) },
+		find: {
+			...f,
+			results,
+			stale: undefined,
+			done: b.done,
+			status,
+			...(b.error ? { failed: true as const } : { failed: undefined }),
+		},
 	}
 }
 function marks(text: string, query: string): [number, number][] {
