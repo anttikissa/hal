@@ -41,7 +41,7 @@ async function announce(): Promise<void> {
 		await new Promise((resolve) => setImmediate(resolve))
 		try {
 			sessions.open(id)
-			let last = pages.page(id, undefined, 1).records.at(-1)
+			let last = pages.findLast(id, () => true)
 			if ((history.unfinished(id) && last?.type !== 'question') || (last?.type === 'notice' && last.text === modelText))
 				continue
 			history.append(id, { type: 'notice', text: modelText })

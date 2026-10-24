@@ -15,6 +15,8 @@ export interface SessionMeta {
 	// ISO timestamp.
 	createdAt: string
 	startingState?: { cwd: string; model: string; autoclose: boolean }
+	// History offset of the last rebase whose settings this holds.
+	settledRebase?: number
 	// Last tab closure, retained after reopening.
 	closedAt?: string
 	name?: string

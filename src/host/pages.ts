@@ -132,6 +132,29 @@ function lineAt(path: string, offset: number): Line {
 	}
 }
 
+// The newest whole record matching `pred`, read backwards a chunk at a
+// time, so it costs what lies after that record, not the whole history.
+function findLast(id: string, pred: (r: HistoryRecord) => boolean): HistoryRecord | undefined {
+	let path = history.file(id)
+	if (!existsSync(path)) return undefined
+	let end = statSync(path).size
+	let carry = Buffer.alloc(0)
+	while (end > 0) {
+		let from = Math.max(0, end - 65536)
+		let buf = Buffer.concat([pages.readBytes(path, from, end), carry])
+		// Bytes before the first newline belong to a line starting earlier.
+		let start = from === 0 ? 0 : buf.indexOf(NL) + 1
+		let whole = from > 0 && start === 0 ? [] : [...pages.raw(buf.subarray(start), from + start)]
+		for (let i = whole.length - 1; i >= 0; i--) {
+			let r = pages.parse(path, whole[i]!.text, whole[i]!.offset)
+			if (pred(r)) return r
+		}
+		carry = start === 0 ? buf : buf.subarray(0, start)
+		end = from
+	}
+	return undefined
+}
+
 function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
 	if (r.type === 'rebase' || (r.type === 'user' && r.replaces)) m.rebase = offset
 	if (r.type === 'output' && r.transition) m.transitions = [offset]
@@ -440,6 +463,7 @@ export const pages = {
 	raw,
 	lines,
 	lineAt,
+	findLast,
 	apply,
 	marksPath,
 	load,

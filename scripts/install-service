@@ -49,7 +49,7 @@ Environment=$(quote "PATH=$PATH")
 ExecStart=$(quote "${bun//\$/\$\$}") $(quote "${checkout//\$/\$\$}/src/main.ts") serve
 Restart=on-failure
 RestartForceExitStatus=100
-RestartSec=2
+RestartSec=100ms
 KillMode=control-group
 OOMPolicy=continue
 TimeoutStopSec=30

@@ -7,6 +7,7 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
 import { states } from '../common/states.ts'
 import { history } from './history.ts'
+import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { models } from './models.ts'
 import { liveFiles } from './live-file.ts'
@@ -80,6 +81,8 @@ function apply(
 			sessionSettings.assign(meta, settings)
 			liveFiles.save(meta)
 		}
+		meta.settledRebase = pages.marks(id).rebase
+		liveFiles.save(meta)
 		if (contextChanged) promptCache.rebased(id)
 		host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 	} catch (error) {

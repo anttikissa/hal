@@ -38,13 +38,16 @@ function assign(meta: SessionMeta, settings: SessionSettings): void {
 	else meta.effort = selection.effort
 }
 
+// Reads the whole history only once per rebase: meta.settledRebase
+// keeps the marks' rebase offset whose settings the metadata holds.
 function recover(meta: SessionMeta): boolean {
 	let { pages } = require('./pages.ts') as typeof import('./pages.ts')
-	// The marks note every rebase: without one, nothing can need recovering.
-	if (pages.marks(meta.id).rebase === undefined) return false
+	let at = pages.marks(meta.id).rebase
+	if (at === undefined || meta.settledRebase === at) return false
 	let { history } = require('./history.ts') as typeof import('./history.ts')
 	let raw = history.readSync(meta.id)
-	if (!raw.some((r) => r.type === 'rebase' && r.contextChanged)) return false
+	meta.settledRebase = at
+	if (!raw.some((r) => r.type === 'rebase' && r.contextChanged)) return true
 	let settings = sessionSettings.project(meta, raw)
 	let changed =
 		meta.cwd !== settings.cwd ||
@@ -52,7 +55,7 @@ function recover(meta: SessionMeta): boolean {
 		meta.autoclose !== settings.autoclose ||
 		meta.previousCwd !== settings.previousCwd
 	if (changed) sessionSettings.assign(meta, settings)
-	return changed
+	return true
 }
 
 export const sessionSettings = { project, assign, recover }

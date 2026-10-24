@@ -5,9 +5,9 @@
 // host held for flagged calls (restart-ask, task ker) is unmarked; the
 // dialog's Restart anyway marks it again (app.modalKey).
 
-import type { LinkState } from '../common/connection.ts'
+import { connection, type LinkState } from '../common/connection.ts'
 
-const state: { mark?: 'marked' | 'gone' } = {}
+const state: { mark?: 'marked' | 'gone'; goneAt?: number } = {}
 
 // Typed `text`: true if it reloads the page now (the caller empties the box).
 function typed(text: string): boolean {
@@ -20,7 +20,14 @@ function typed(text: string): boolean {
 
 // True if the page is reloading.
 function linkChanged(link: LinkState): boolean {
-	if (state.mark === 'marked' && link.type !== 'connected') state.mark = 'gone'
+	if (state.mark === 'marked' && link.type !== 'connected') {
+		state.mark = 'gone'
+		state.goneAt = Date.now()
+	}
+	// A restarted host is back within a second: retry at the base pace,
+	// without backoff, for the first 30 s.
+	if (state.mark === 'gone' && link.type === 'disconnected' && Date.now() - state.goneAt! < 30_000)
+		connection.state.failures = 0
 	if (state.mark !== 'gone' || link.type !== 'connected') return false
 	restart.reload()
 	return true

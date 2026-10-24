@@ -57,6 +57,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { liveFiles } from './live-file.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
+import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt, type PromptInput } from './system-prompt.ts'
@@ -120,13 +121,13 @@ function file(id: string): Cache {
 }
 
 function interactive(id: string): boolean {
-	let records = history.readSync(id)
-	for (let i = records.length - 1; i >= 0; i--) {
-		let record = records[i]!
-		if (record.type !== 'user') continue
-		let human = record.blocks.findLast((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
-		if (human?.type === 'text') return human.interactive ?? true
-	}
+	let human = (r: HistoryRecord) =>
+		r.type === 'user'
+			? r.blocks.findLast((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
+			: undefined
+	let last = pages.findLast(id, (r) => human(r) !== undefined)
+	let block = last && human(last)
+	if (block?.type === 'text') return block.interactive ?? true
 	return sessions.open(id).interactive ?? true
 }
 

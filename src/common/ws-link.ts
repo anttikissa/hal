@@ -97,4 +97,4 @@ function start(opts: LinkOptions): void {
 	void connection.start(startOpts)
 }
 
-export const wsLink = { baseMs: 250, maxDelayMs: 1000, connectMs: 10_000, transport, start }
+export const wsLink = { baseMs: 100, maxDelayMs: 1000, connectMs: 10_000, transport, start }
