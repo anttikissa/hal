@@ -18,7 +18,6 @@ const toolIcons: Record<string, IconName> = {
 	ask: 'ask',
 	read_blob: 'blob',
 	read_entry: 'blob',
-	stop: 'stop',
 	help: 'inspect',
 }
 
@@ -36,7 +35,7 @@ function kind(item: Item): IconName | undefined {
 
 // A title without its leading mark ($, <, =>, …): the icon shows it.
 function unmark<T extends string | undefined>(title: T): T {
-	return title?.replace(/^(?:<=|=>|[$<>…!x?]) /, '') as T
+	return title?.replace(/^(?:<=|=>|[$<>…!?]) /, '') as T
 }
 
 export const cardIcons = { toolIcons, kind, unmark }

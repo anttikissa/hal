@@ -80,7 +80,7 @@ const marks: Record<string, string> = {
 	wait: '…',
 	notify: '!',
 	spawn: 'Spawn',
-	stop: 'x',
+	stop: 'Stop',
 	help: '?',
 	inspect: '?',
 }
@@ -229,7 +229,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (input.target !== undefined)
 				return typeof input.target === 'string' || typeof input.target === 'number'
 					? { text: marked(String(input.target)), key: 'target' }
-					: { text: marked('Stop') }
+					: { text: 'Stop' }
 			break
 		case 'wait': {
 			if (input.targets !== undefined) {
