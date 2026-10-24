@@ -78,9 +78,6 @@ const weights: Record<string, number> = {
 	tool: 3,
 	other: 2,
 }
-const scopeHelp =
-	'in: takes here, a tab id (181-ibm), tab numbers (10-19), . (this directory), a path (~/x) or user, hal, reasoning, tools, commits, other'
-
 function scopeValue(v: string): boolean {
 	return /^(here|\.|\d+-[a-z]{3}|\d+(-\d+)?|[~/].*)$/i.test(v)
 }
@@ -105,18 +102,17 @@ function parse(text: string, enabled?: FindFilter[]): FindQuery {
 			else q.words.push(word!.toLocaleLowerCase())
 			continue
 		}
+		// A value being typed (in:he, since:3) filters nothing yet.
 		let value = m[2]!
 		if (m[1]!.toLowerCase() === 'in') {
 			for (let v of value.split(',').filter(Boolean)) {
 				let group = groups[v.toLowerCase() as FindFilter]
 				if (group) kinds.push(...group)
 				else if (scopeValue(v)) q.scope.push(v)
-				else throw new Error(`unknown in: value ${v}. ${scopeHelp}`)
 			}
 		} else {
 			let age = /^(\d+(?:\.\d+)?)(m|h|d|w)$/i.exec(value)
-			if (!age) throw new Error('since: use an age such as 30m, 12h, 3d or 2w')
-			q.since = Number(age[1]) * { m: 60000, h: 3600000, d: 86400000, w: 604800000 }[age[2]!.toLowerCase()]!
+			if (age) q.since = Number(age[1]) * { m: 60000, h: 3600000, d: 86400000, w: 604800000 }[age[2]!.toLowerCase()]!
 		}
 	}
 	if (kinds.length) q.kinds = q.kinds.filter((k) => kinds.includes(k))
@@ -183,4 +179,4 @@ function match(
 	return { quality, snippet: lead.padStart(21) + flat(text.slice(at, to)) + (to < text.length ? '…' : '') }
 }
 
-export const findQuery = { tiers, filters, groups, weights, scopeHelp, parse, bounded, match }
+export const findQuery = { tiers, filters, groups, weights, parse, bounded, match }

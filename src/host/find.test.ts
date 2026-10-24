@@ -75,7 +75,8 @@ test('match requires every word and phrase, and ranks word over prefix over subs
 		['tool-call', 'tool-output'],
 		86400000,
 	])
-	expect(() => findQuery.parse('in:nowhere')).toThrow('unknown in: value nowhere')
+	// Values still being typed filter nothing.
+	expect(findQuery.parse('x in:he since:3')).toEqual(findQuery.parse('x'))
 })
 
 test('tab rows rank authorship over mentions; inherited fork history is not evidence', async () => {
