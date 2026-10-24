@@ -400,12 +400,13 @@ function ref(item: Keyed, session: string | undefined): { text: string; href: st
 	return href ? { text: id, href } : undefined
 }
 
-// Rows of a question's quote, indented, its marked parts in inverse.
+// Rows of a question's quote at the title's column, as on the web, its
+// marked parts in inverse.
 // Each row closes what it opens and reopens what it continues, so a
 // repaint of one row never leaks inverse into another.
 function quoteLines(quote: Quote | undefined, width: number): string[] {
 	if (!quote) return []
-	let indent = '    '
+	let indent = ''
 	let text = forms
 		.quoteParts(quote)
 		.map((p) => {

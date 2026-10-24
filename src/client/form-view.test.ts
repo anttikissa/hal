@@ -88,11 +88,13 @@ test('a quote shows under the question with its marked part highlighted on every
 	let open = frame.build({ ...view([item]), form: forms.start('q1', form) }, 30).lines
 	let answered = frame.build(view([{ ...item, answers: { run: 'no' } }]), 30).lines
 	for (let lines of [open, answered]) {
-		// Quote rows are indented past the answer rows.
-		let rows = lines.filter(
-			(l) => strip(l).startsWith(' '.repeat(5)) && strip(l).trim() !== '' && !strip(l).includes('/keys'),
-		)
-		expect(rows.length).toBe(3)
+		// The quote rows: from its first word up to the blank row after it.
+		let first = lines.findIndex((l) => strip(l).includes('cd build'))
+		let end = lines.findIndex((l, i) => i > first && strip(l).trim() === '')
+		let rows = lines.slice(first, end)
+		// They start at the question's column, as on the web.
+		expect(strip(rows[0]!).indexOf('cd')).toBe(strip(lines.find((l) => strip(l).includes('Run this?'))!).indexOf('Run'))
+		expect(rows.length).toBe(2)
 		expect(
 			rows
 				.map((r) => strip(r).trim())
