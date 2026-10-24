@@ -1,0 +1,7 @@
+{
+	title: 'Hal-initiated pauses keep their reason in history and the transcript',
+	spec: 'Restore invariant: when Hal, not the user, pauses a running turn (turns.stop with a reason: critical resources, a closed tab, a recursive stop, the round cap), the turn_end record stores that reason as pauseReason, the turn-end event carries it, and both clients show it in the transcript row as "Paused: <reason>." (terminal wraps it). The reason survives a host restart and reload. A user pause stays plain "Paused.". The turn loop reads the reason from the session state, which turns.stop sets before aborting (turnPolicy.pauseReason); the turn-end event is built by turnPolicy.endEvent. Test: turns.test.ts restarts after turns.stop with a reason.',
+	status: 'done',
+	needs: ['js6', 'fwk'],
+	foldInto: ['js6']
+}

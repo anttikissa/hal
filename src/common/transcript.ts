@@ -69,7 +69,7 @@ export type Shown = { originSession?: string } &
 				interrupted?: 'canceled' | 'stopped'
 				ts?: string
 		  })
-		| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
+		| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; pauseReason?: string; ts?: string }
 		// A durable question; with `answers` once answered (secrets only named).
 		// `canceled`: dismissed (Escape, or a newer question replaced it).
 		// `command`: a slash command asked; open in any session state.
@@ -298,11 +298,12 @@ function recordShown(r: HistoryRecord): Shown[] {
 		)
 	return [transcript.endItem(r)]
 }
-function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
+function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; pauseReason?: string; ts?: string }): Shown {
 	let item: Shown = { type: 'turn-end', status: end.status }
 	if (end.ts !== undefined) item.ts = end.ts
 	if (end.usage && Object.keys(end.usage).length) item.usage = end.usage
 	if (end.error !== undefined) item.error = end.error
+	if (end.pauseReason !== undefined) item.pauseReason = end.pauseReason
 	return item
 }
 function answered(

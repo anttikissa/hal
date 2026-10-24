@@ -281,6 +281,8 @@ export type Event =
 			status: TurnStatus
 			usage?: Usage
 			error?: string
+			// Why Hal, not the user, paused it.
+			pauseReason?: string
 			n?: number
 			ts?: string
 			stats?: Stats

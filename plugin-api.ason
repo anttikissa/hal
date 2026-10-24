@@ -1,5 +1,5 @@
 {
-	version: 6,
+	version: 7,
 	changes: [
 		{
 			version: 2,
@@ -98,6 +98,16 @@
 					kind: 'compatible',
 					target: 'host/tools.run',
 					description: "Errors thrown by a plugin tool's run reach the model with their stack."
+				}
+			]
+		},
+		{
+			version: 7,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Event',
+					description: 'turn-end adds optional pauseReason'
 				}
 			]
 		}

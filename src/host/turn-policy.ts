@@ -1,5 +1,6 @@
 // Turn completion and retry policy, shared by the turn loop (task jf).
 import type { DoneEvent, ErrorEvent, ToolResultBlock, Usage } from '../common/blocks.ts'
+import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
@@ -7,6 +8,7 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
 import { sessions } from './sessions.ts'
+import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
 import { turns } from './turns.ts'
@@ -19,6 +21,27 @@ function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
 	if (done.reason === 'refusal')
 		return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
 	return done
+}
+
+// Why Hal, not the user, paused a turn: the round cap, or turns.stop's
+// reason (resources, a closed tab), which the state holds until the turn
+// records its end.
+function pauseReason(id: string, capped: string | undefined): string | undefined {
+	let state = status.stateOf(id)
+	return capped ?? (state.type === 'paused' ? state.reason : undefined)
+}
+
+// What clients hear of the turn end just `recorded`, or why none was.
+function endEvent(id: string, recorded: HistoryRecord | undefined, failure?: string): Event & { type: 'turn-end' } {
+	if (recorded?.type !== 'turn_end')
+		return { type: 'turn-end', sessionId: id, status: 'error', error: failure ?? 'turn end was not recorded' }
+	let end: Event & { type: 'turn-end' } = { type: 'turn-end', sessionId: id, status: recorded.status, ts: recorded.ts }
+	if (recorded.n !== undefined) end.n = recorded.n
+	if (Object.keys(recorded.usage).length) end.usage = recorded.usage
+	if (recorded.error !== undefined) end.error = recorded.error
+	if (recorded.pauseReason !== undefined) end.pauseReason = recorded.pauseReason
+	end.stats = stats.ended(id, recorded)
+	return end
 }
 
 // Steering canceled or stopped a call (task ker): not a failure, but
@@ -126,4 +149,15 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
-export const turnPolicy = { stopped, canceled, stoppedBy, parkedUsage, waitOut, waitFor, retryNotice, backoffMs }
+export const turnPolicy = {
+	stopped,
+	pauseReason,
+	endEvent,
+	canceled,
+	stoppedBy,
+	parkedUsage,
+	waitOut,
+	waitFor,
+	retryNotice,
+	backoffMs,
+}

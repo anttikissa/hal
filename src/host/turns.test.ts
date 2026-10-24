@@ -304,6 +304,18 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 	}
 })
 
+test("Hal's reason for pausing a running turn is recorded, so it survives a restart", async () => {
+	let a = client(),
+		id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	turns.stop(id, 'memory 0.4 GB available')
+	await until(() => a.of('turn-end').length)
+	expect(a.of('turn-end')[0]).toMatchObject({ status: 'paused', pauseReason: 'memory 0.4 GB available' })
+	restartHost()
+	expect((await fresh(id)).state).toEqual({ type: 'paused', reason: 'memory 0.4 GB available' })
+})
+
 test('a forced stop aborts even when history cannot be read', () => {
 	let read = history.readSync,
 		controller = new AbortController()

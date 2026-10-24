@@ -294,7 +294,7 @@ function itemLines(
 			if (item.status === 'error')
 				return ansi.wrap(titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`), width)
 			if (item.status === 'completed') return []
-			return [titles.ended(item.ts, item.status)]
+			return ansi.wrap(titles.ended(item.ts, item.status, item.pauseReason), width)
 		case 'question': {
 			// Headed by its time and text, wrapped (never clipped), then
 			// the quote and the answer, as the open form draws them.

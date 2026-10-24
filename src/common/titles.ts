@@ -71,9 +71,10 @@ function stamp(ts: string | undefined, text: string): string {
 	return t ? `${t} ${text}` : text
 }
 
-// A turn end's row: '10:52 Paused.', '10:52 Interrupted.'.
-function ended(ts: string | undefined, status: string): string {
-	return stamp(ts, `${status[0]!.toUpperCase()}${status.slice(1)}.`)
+// A turn end's row: '10:52 Paused.', '10:52 Paused: tab closed.'.
+function ended(ts: string | undefined, status: string, reason?: string): string {
+	let why = reason ? `: ${reason.replace(/\.$/, '')}` : ''
+	return stamp(ts, `${status[0]!.toUpperCase()}${status.slice(1)}${why}.`)
 }
 
 // 'who (a, b)': a sender and its tags, or the sender alone.

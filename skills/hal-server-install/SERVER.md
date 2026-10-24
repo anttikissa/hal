@@ -151,6 +151,7 @@ user unit for that same home. Substitute your own generic paths/account:
       RestartForceExitStatus = [ 100 ];
       RestartSec = 2;
       KillMode = "control-group";
+      OOMPolicy = "continue";
       TimeoutStopSec = 30;
       UMask = "0077";
     };

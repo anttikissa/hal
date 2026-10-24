@@ -78,7 +78,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
 	'turn-stats': { sessionId: 's', stats: 'o' },
-	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
+	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', pauseReason: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
 	command: { sessionId: 's', text: 's', from: 's?', label: 's?', origin: 's?', command: 's?' },

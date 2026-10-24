@@ -428,31 +428,19 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	// A reset host has forgotten this turn; don't write into its successor.
 	if (turns.state.running.get(id) !== running) return
 	turns.state.running.delete(id)
+	let pauseReason = turnPolicy.pauseReason(id, capped)
 	let recorded: ReturnType<typeof history.readSync>[number] | undefined
 	try {
 		if (contextTransitions.pending(id)?.kind === 'clear') contextTransitions.settle(id)
-		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last, capped)
+		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last, pauseReason)
 		recorded = history.readSync(id).at(-1)
 	} catch (e: any) {
 		failure ??= String(e?.message ?? e)
 	}
-	let end: Event & { type: 'turn-end' } = {
-		type: 'turn-end',
-		sessionId: id,
-		status: 'error',
-		error: failure ?? 'turn end was not recorded',
-	}
-	if (recorded?.type === 'turn_end') {
-		end = { type: 'turn-end', sessionId: id, status: recorded.status, ts: recorded.ts }
-		if (recorded.n !== undefined) end.n = recorded.n
-		if (Object.keys(recorded.usage).length) end.usage = recorded.usage
-		if (recorded.error !== undefined) end.error = recorded.error
-		end.stats = stats.ended(id, recorded)
-	}
+	let end = turnPolicy.endEvent(id, recorded, failure)
 	host.broadcast(id, end)
 	// Paused already, unless something other than the user aborted it.
-	if (end.status === 'paused')
-		status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
+	if (end.status === 'paused') status.transition(id, { type: 'pause', reason: pauseReason })
 	else
 		status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	// After the turn's own records, so what it starts lands below them.

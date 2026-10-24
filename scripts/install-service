@@ -51,6 +51,7 @@ Restart=on-failure
 RestartForceExitStatus=100
 RestartSec=2
 KillMode=control-group
+OOMPolicy=continue
 TimeoutStopSec=30
 UMask=0077
 
