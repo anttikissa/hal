@@ -105,13 +105,10 @@ function more(m: ModalState, near: boolean): ModalState | undefined {
 function near(m: ModalState): boolean {
 	return m.find!.focus === resultsFocus && m.selected >= m.items.length - 10
 }
+// The terms to highlight; phrases keep their quotes so they mark whole.
 function words(text: string): string {
-	try {
-		let q = findQuery.parse(text)
-		return [...q.words, ...q.phrases].join(' ')
-	} catch {
-		return ''
-	}
+	let q = findQuery.parse(text)
+	return [...q.words, ...q.phrases.map((p) => `"${p}"`)].join(' ')
 }
 function toggle(m: ModalState, i: number): ModalState {
 	let f = filters[i]!,
@@ -303,8 +300,14 @@ function batch(m: ModalState, b: FindBatch): ModalState {
 function marks(text: string, query: string): [number, number][] {
 	let lower = text.toLocaleLowerCase(),
 		ranges: [number, number][] = []
-	for (let word of query.split(/\s+/).filter(Boolean)) {
-		for (let at = lower.indexOf(word); at >= 0; at = lower.indexOf(word, at + 1)) ranges.push([at, at + word.length])
+	let terms = [...query.matchAll(/"([^"]+)"|(\S+)/g)].map(([, phrase, word]) => phrase ?? word!)
+	let letter = (c: string | undefined) => !!c && /[\p{L}\p{N}_]/u.test(c)
+	for (let term of terms) {
+		// A single character beside other terms ("I should") marks only
+		// where it stands alone; searched by itself, it marks everywhere.
+		let alone = terms.length > 1 && [...term].length === 1
+		for (let at = lower.indexOf(term); at >= 0; at = lower.indexOf(term, at + 1))
+			if (!alone || (!letter(lower[at - 1]) && !letter(lower[at + term.length]))) ranges.push([at, at + term.length])
 	}
 	let out: [number, number][] = []
 	for (let r of ranges.sort((a, b) => a[0] - b[0])) {
