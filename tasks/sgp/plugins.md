@@ -21,9 +21,11 @@ use Bun, Node, and the running Hal. Other dependencies must exist on both
 machines. Portable means eligible to sync, not guaranteed compatible with
 every Hal version or operating system.
 
-Both host and terminal processes load plugins. Choose targets or runtime
-checks appropriate to the process; avoid starting the same background
-service in both. No project plugins are automatically discovered yet.
+Both host and terminal processes load Hal-home plugins. Choose targets or
+runtime checks appropriate to the process; avoid starting the same
+background service in both. Trusted project plugins in `.agents/plugins/hal`
+load in the host while an open tab needs their directory. See
+[project trust and lifetimes](../tzr/project-context.md).
 
 A load error leaves the source unchanged and removes its hooks. Repeated
 filesystem events for the same failed bytes do not rerun setup. An edit or

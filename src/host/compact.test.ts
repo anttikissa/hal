@@ -13,8 +13,9 @@ type C = ReturnType<typeof client>
 // A prompt answered with `answer`; waits for its turn end.
 async function ask(c: C, id: string, text: string, answer = `re ${text}`): Promise<void> {
 	let ends = c.of('turn-end').length
+	let before = calls.length
 	c.conn.send({ type: 'submit', sessionId: id, text })
-	await until(() => calls.length && c.of('turn-start').length > ends)
+	await until(() => calls.length > before)
 	calls.at(-1)!.push({ type: 'text', text: answer }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length > ends)
 }

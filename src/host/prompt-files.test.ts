@@ -7,6 +7,7 @@ import { history } from './history.ts'
 import { replay } from '../common/replay.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { promptCache } from './prompt-cache.ts'
+import { projectContext } from './project-context.ts'
 
 useHost()
 
@@ -20,6 +21,7 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 	writeFileSync(system, 'v1\n@inc.md\n')
 	writeFileSync(`${testHome()}/inc.md`, 'i1')
 	writeFileSync(`${root}/AGENTS.md`, 'v1')
+	projectContext.decide(root, true)
 	let file = systemPrompt.file
 	systemPrompt.file = () => system
 	try {
@@ -65,6 +67,7 @@ test('an AGENTS.md edit leaves one trail record the model reads on its next requ
 	let root = `${testHome()}/trail`
 	mkdirSync(`${root}/.git`, { recursive: true })
 	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\n')
+	projectContext.decide(root, true)
 	let id = created(client(), root)
 	promptTrail.check(id) // first sight: remembered
 	promptCache.prepare(id)

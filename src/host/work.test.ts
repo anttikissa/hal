@@ -134,6 +134,7 @@ test('STOP a recorded SPAWN call cancels its child, not siblings, and WAIT expos
 	let root = toolSession(client())
 	let spawned = invoke(root, 'SPAWN { task: "first child", kind: "subagent-leave-open" }')
 	expect((await spawned.promise).isError).toBeUndefined()
+	await until(() => calls.length === 1)
 	let child = sessions.openIds().find((id) => sessions.open(id).parentCall === Number(spawned.ref.slice(1)))!
 	let sibling = owned(root, 'sibling')
 	let waiting = invoke(root, `WAIT ${child}`).promise

@@ -12,6 +12,7 @@ import type { ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { until } from './host-fixture.test.ts'
 import { paths } from './paths.ts'
+import { projectContext } from './project-context.ts'
 
 const savedHome = paths.state.home
 const origOnError = liveFiles.onError
@@ -27,6 +28,8 @@ beforeEach(() => {
 	writeFileSync(`${work}/AGENTS.md`, 'WORK RULE')
 	writeFileSync(`${work}/sub/AGENTS.md`, 'SUB RULE')
 	paths.state.home = home
+	projectContext.decide(work, true)
+	projectContext.decide(`${work}/sub`, true)
 	liveFiles.onError = () => {}
 	requests = []
 	turns.stream = (_model, input) => {

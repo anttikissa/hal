@@ -16,6 +16,7 @@ import { promptCache } from './prompt-cache.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tabs } from './tabs.ts'
+import { projectContext } from './project-context.ts'
 
 // `shown`: the tab a client shows even while its window lacks focus, so
 // a notice waits on screen for the user coming back from the editor.
@@ -35,9 +36,11 @@ function read(path: string): string | null {
 // CLAUDE.md candidates for its cwd, present or not.
 function files(id: string): Set<string> {
 	let meta = sessions.open(id)
-	let local = systemPrompt
-		.candidates(meta.cwd)
-		.flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
+	let local = projectContext.allowed(meta.cwd)
+		? systemPrompt
+				.candidates(meta.cwd)
+				.flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))
+		: []
 	let used: string[] = [systemPrompt.file()]
 	try {
 		used = systemPrompt.inspect(promptCache.input(id)).sources.map((s) => s.path)

@@ -42,6 +42,7 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { toolOutput } from './tool-output.ts'
+import { projectContext } from './project-context.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
@@ -231,6 +232,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let rounds = 0
 	let capped: string | undefined
 	try {
+		await projectContext.refresh()
 		while (true) {
 			let transition = contextTransitions.pending(id)
 			if (transition?.kind === 'clear') {
@@ -255,6 +257,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (running.controller.signal.aborted) break
 				signal = running.controller.signal
 			}
+			let ask = projectContext.question(sessions.open(id).cwd)
+			if (ask) return turns.ask(id, ask)
+			await projectContext.ready()
+			if (signal.aborted) continue
 			let calls: ToolCallBlock[]
 			let decided = held?.decided ?? new Map<string, boolean>()
 			if (held) {

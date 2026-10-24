@@ -51,6 +51,7 @@ import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
 import { eventCheck } from './common/event-check.ts'
+import { projectContext } from './host/project-context.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -191,6 +192,7 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
 	perf.mark('host')
+	await projectContext.refresh()
 	restartNote.announce()
 	main.later(() => {
 		find.init()

@@ -5,6 +5,7 @@
 import { mkdirSync, readdirSync, statSync } from 'fs'
 import { commands, type Context, type SlashCommand } from '../commands.ts'
 import { paths } from '../paths.ts'
+import { projectContext } from '../project-context.ts'
 
 function isDir(path: string): boolean {
 	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
@@ -42,6 +43,8 @@ export const command: SlashCommand = {
 			if (answers.create !== 'yes') return { say: `still in ${ctx.cwd}` }
 			mkdirSync(path, { recursive: true })
 		}
+		let ask = projectContext.question(path)
+		if (ask) return { ask, askArgs: path }
 		let previous = ctx.cwd
 		ctx.setCwd(path)
 		return { say: `${previous} → ${path}` }

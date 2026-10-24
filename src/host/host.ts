@@ -18,6 +18,7 @@ import { pages, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
 import { noticeHistory } from './notice-history.ts'
 import { pluginSync } from './plugin-sync.ts'
+import { projectContext } from './project-context.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { snapshots } from './snapshots.ts'
@@ -332,8 +333,10 @@ function follow(client: Client, id: string, tail?: Tail): void {
 }
 
 function broadcast(id: string, event: Event): void {
-	if (event.type === 'meta')
+	if (event.type === 'meta') {
+		projectContext.changed()
 		event = { ...event, meta: { ...event.meta, slots: event.meta.slots ?? settings.subagentSlots() } }
+	}
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
 	if (event.type === 'turn-end') void recap.prepare(id)
@@ -379,6 +382,7 @@ function reset(): void {
 	for (let map of [history.state.cache, history.state.next]) map.clear()
 	host.state.done.clear()
 	tabs.reset()
+	projectContext.reset()
 	push.reset()
 	noticeHistory.reset()
 	busy.reset()

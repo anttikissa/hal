@@ -3,7 +3,7 @@
 // in for the tty (stdin in, frames out) and points anthropic at the fake,
 // so neither the real auth.ason nor the real API is touched.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from './common/ason.ts'
 
@@ -134,6 +134,10 @@ beforeEach(() => {
 		}) + '\n',
 	)
 	writeFileSync(`${home}/state/tabs.ason`, ason.stringify({ open: ['1-ready'], closed: [], attention: [] }) + '\n')
+	writeFileSync(
+		`${home}/state/project-trust.ason`,
+		ason.stringify({ projects: { [realpathSync(`${import.meta.dir}/..`)]: true } }),
+	)
 	writeFileSync(
 		`${home}/local.ts`,
 		`import { terminal } from ${JSON.stringify(`${import.meta.dir}/client/terminal.ts`)}

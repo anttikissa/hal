@@ -41,6 +41,7 @@ import { tabs } from './tabs.ts'
 import { notify } from './notify.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
+import { projectContext } from './project-context.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
 // client's id for it, kept with the prompt (or inbox message) so a
@@ -369,6 +370,7 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 		problem = commands.all().get(open.from.command)?.checkAnswers?.(open.from.args, answers)
 		if (problem) return problem
 	}
+	let trust = projectContext.answer(open.form, answers)
 	let kept = forms.redact(open.form, answers)
 	if (open.from) {
 		// Beside the turn: its state stays as it is.
@@ -381,7 +383,7 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 	if (refused) return refused
 	history.append(id, { type: 'answer', question, ...kept })
 	host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
-	turns.start(id, undefined, answers)
+	turns.start(id, undefined, trust ? undefined : answers)
 }
 
 export const prompts = {

@@ -7,6 +7,7 @@ import { settings } from '../common/settings.ts'
 import { clients } from './clients.ts'
 import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
+import { projectContext } from './project-context.ts'
 import { promptLang, type PromptRender, type PromptSource } from './prompt-lang.ts'
 export type { PromptSource } from './prompt-lang.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
@@ -48,7 +49,8 @@ function candidates(cwd: string): string[] {
 function skills(cwd: string): string {
 	let subs = ['.agents/skills', '.claude/skills']
 	let dirs = [`${paths.repoRoot()}/skills`, ...subs.map((sub) => `${paths.userHome()}/${sub}`)]
-	for (let dir of candidates(cwd)) for (let sub of subs) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
+	if (projectContext.allowed(cwd))
+		for (let dir of candidates(cwd)) for (let sub of subs) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
 	let groups: string[] = []
 	for (let dir of new Set(dirs)) {
 		let names: string[] = []
@@ -74,6 +76,7 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 	}
 	let global = `${paths.userHome()}/.agents`
 	if (existsSync(`${global}/AGENTS.md`)) include(`${global}/AGENTS.md`, global)
+	if (!projectContext.allowed(cwd)) return parts.join('\n\n')
 	let dirs = systemPrompt.candidates(cwd),
 		root = dirs[0]!
 	try {

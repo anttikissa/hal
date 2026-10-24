@@ -4,13 +4,18 @@ import { tmpdir } from 'os'
 import { systemPrompt } from './system-prompt.ts'
 import { clients } from './clients.ts'
 import { paths } from './paths.ts'
+import { projectContext } from './project-context.ts'
+let savedHome = paths.state.home
 let root = ''
 
 beforeEach(() => {
 	root = mkdtempSync(`${tmpdir()}/hal-system-`)
+	paths.state.home = root
 })
 
 afterEach(() => {
+	projectContext.reset()
+	paths.state.home = savedHome
 	rmSync(root, { recursive: true, force: true })
 })
 
@@ -76,6 +81,7 @@ test('in Git, one file per directory from the repo root down to the cwd, outermo
 	writeFileSync(`${root}/repo/b/CLAUDE.md`, 'MIDDLE CLAUDE')
 	writeFileSync(`${root}/repo/b/c/AGENTS.md`, 'INNER RULE')
 	writeFileSync(`${root}/repo/b/c/CLAUDE.md`, 'INNER CLAUDE')
+	projectContext.decide(`${root}/repo`, true)
 	let text = systemPrompt.build({ cwd: `${root}/repo/b/c`, model: 'm/x', now: at })
 	let outer = text.indexOf('OUTER RULE'),
 		middle = text.indexOf('MIDDLE CLAUDE'),
@@ -94,6 +100,7 @@ test('outside Git only the cwd itself is read', () => {
 	mkdirSync(`${root}/a/b`, { recursive: true })
 	writeFileSync(`${root}/a/AGENTS.md`, 'PARENT RULE')
 	writeFileSync(`${root}/a/b/CLAUDE.md`, 'HERE RULE')
+	projectContext.decide(`${root}/a/b`, true)
 	let text = systemPrompt.build({ cwd: `${root}/a/b`, model: 'm/x', now: at })
 	expect(text).toContain('HERE RULE')
 	expect(text).not.toContain('PARENT RULE')
@@ -105,6 +112,7 @@ test('@path imports never read outside the project, even through a symlink', () 
 	symlinkSync(`${root}/SECRET`, `${root}/repo/link`)
 	writeFileSync(`${root}/repo/inside.md`, 'INSIDE TEXT')
 	writeFileSync(`${root}/repo/AGENTS.md`, '@inside.md\n@../SECRET\n@link')
+	projectContext.decide(`${root}/repo`, true)
 	let text = systemPrompt.build({ cwd: `${root}/repo`, model: 'm/x', now: at })
 	expect(text).toContain('INSIDE TEXT\n@../SECRET\n@link')
 	expect(text).not.toContain('SECRET TEXT')
@@ -144,6 +152,7 @@ test('the Session section uses the client zone and follows zone changes on a UTC
 test('the same inputs give the same text; a changed input changes it', () => {
 	mkdirSync(`${root}/work`)
 	let input = { cwd: `${root}/work`, model: 'm/x', now: at }
+	projectContext.decide(`${root}/work`, true)
 	let first = systemPrompt.build(input)
 	expect(systemPrompt.build({ ...input, now: at + 60_000 })).toBe(first)
 	writeFileSync(`${root}/work/AGENTS.md`, 'NEW RULE')
@@ -182,6 +191,7 @@ test('SYSTEM preprocessing removes comments and selects every matching condition
 			'You are Hal.<!-- secret\non another line -->\n::: if $session_model like "anthropic/*"\nCLAUDE ONLY\n:::\n::: if $session_model like "openai/*"\nOPENAI ONLY\n:::\n${session_model} ${unknown}\n$agents',
 		)
 		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if $session_model like "openai/*"')
+		projectContext.decide(root, true)
 		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
 		expect(text).toContain('CLAUDE ONLY')
 		expect(text).not.toContain('OPENAI ONLY')
@@ -284,6 +294,7 @@ test('skills are listed by name: Hal and user skills always, project skills only
 		skill(`${root}/repo/other/.agents/skills/elsewhere`)
 		mkdirSync(`${root}/repo/sub/deep`, { recursive: true })
 		writeFileSync(`${root}/repo/AGENTS.md`, 'PROJECT RULE')
+		projectContext.decide(`${root}/repo`, true)
 		let rendered = systemPrompt.inspect({ cwd: `${root}/repo/sub/deep`, model: 'm/x', now: at })
 		let text = rendered.sections.find((s) => s.title === 'Skills')!.body
 		let instructions = rendered.sections.find((s) => s.title === 'Local instructions')!.body

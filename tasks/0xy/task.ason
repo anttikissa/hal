@@ -1,0 +1,7 @@
+{
+	title: 'Personal native plugin directory and reviewed sync',
+	spec: 'Personal native Hal plugins live in ~/.agents/plugins/hal. Preserve existing Hal-home plugin source and history while integrating personal discovery. Portable personal plugins synchronize through the reviewed client/server protocol with hash checks and explicit choices. Project plugin lifetimes and trust remain separate; unrelated project namespaces and nonportable files are never swept into personal sync. Discovery works in the host and terminal processes without executing untrusted remote project paths.',
+	status: 'planned',
+	needs: ['tzr', 'zh7'],
+	foldInto: ['an']
+}

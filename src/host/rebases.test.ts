@@ -17,6 +17,7 @@ import { promptCache } from './prompt-cache.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { slash } from './slash.ts'
 import { liveFiles } from './live-file.ts'
+import { projectContext } from './project-context.ts'
 
 let savedHome = paths.state.home,
 	home = '',
@@ -137,6 +138,8 @@ test('dropping a cwd transition and its update restores historical project instr
 	mkdirSync(b)
 	writeFileSync(`${a}/AGENTS.md`, 'Original project A rules')
 	writeFileSync(`${b}/AGENTS.md`, 'Project B rules')
+	projectContext.decide(a, true)
+	projectContext.decide(b, true)
 	writeFileSync(
 		file,
 		'Static instructions\n:: section "Cwd" update="diff"\n$cwd\n::\n:: section "Local instructions" update="diff"\n$agents\n::',

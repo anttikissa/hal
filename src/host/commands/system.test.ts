@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { client, created, testHome, until, useHost } from '../host-fixture.test.ts'
 import { clock } from '../clock.ts'
 import { systemPrompt } from '../system-prompt.ts'
+import { projectContext } from '../project-context.ts'
 
 useHost()
 
@@ -10,6 +11,7 @@ test('/system names included source files and prints the same assembled prompt a
 	let c = client()
 	mkdirSync(`${testHome()}/repo/.git`, { recursive: true })
 	writeFileSync(`${testHome()}/repo/AGENTS.md`, 'Stay in scope. <!-- hidden -->')
+	projectContext.decide(`${testHome()}/repo`, true)
 	writeFileSync(`${testHome()}/extra.md`, 'Included text: ${session_model}')
 	let orig = systemPrompt.file
 	let now = clock.now

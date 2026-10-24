@@ -20,9 +20,10 @@ async function turn(
 	...rounds: { input: number; cacheRead?: number; output: number }[]
 ) {
 	let before = c.of('turn-end').length
+	let requests = calls.length
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	for (let [i, u] of rounds.entries()) {
-		await until(() => calls.length > i + before)
+		await until(() => calls.length > requests + i)
 		let last = i === rounds.length - 1
 		let call = calls[calls.length - 1]!
 		if (!last) call.push({ type: 'tool_call', id: `t${i}`, name: 'nope', input: {} })

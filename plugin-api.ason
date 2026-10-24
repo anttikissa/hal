@@ -1,5 +1,5 @@
 {
-	version: 3,
+	version: 4,
 	changes: [
 		{
 			version: 2,
@@ -46,6 +46,28 @@
 					target: 'host/plugins.Loaded.hooks.file',
 					description: 'Stores the full path; equal basenames compose by path then sequence',
 					port: 'Use basename(hook.file) when a display basename is needed'
+				}
+			]
+		},
+		{
+			version: 4,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/project-context',
+					description: 'Adds trust and tab lifetimes'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/system-prompt',
+					description: 'Project context requires trust',
+					port: 'Obtain user approval before expecting project instructions or skills'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/commands/cd.command.run',
+					description: 'May return a trust form',
+					port: 'Handle ask and resume with user answers before changing cwd'
 				}
 			]
 		}

@@ -18,6 +18,7 @@ let home = '',
 	id = ''
 const savedHome = paths.state.home
 beforeEach(async () => {
+	commits.state.seen = []
 	home = mkdtempSync(`${process.cwd()}/.hal-file-changes-`)
 	paths.state.home = home
 	cwd = `${home}/repo`
@@ -359,8 +360,9 @@ test('commit hook lines follow the result of the call that made the commit', asy
 	try {
 		let git = 'git -c user.name=t -c user.email=t@example.com'
 		let plain = await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
-		expect(plain.output).not.toContain('hooked')
-		expect(plain.commits).toBeUndefined()
+		expect(plain.output).toContain('hooked')
+		expect(plain.commits).toMatchObject([{ subject: 'untrailed' }])
+		expect(seen.splice(0)).toMatchObject([{ sessionId: id, subject: 'untrailed' }])
 		let made = await bash(`printf 'a\\nb\\n' > a && ${git} add a && ${git} commit -qm first -m 'Session: ${id}'`)
 		let short = (await fileChanges.git(cwd, ['rev-parse', '--short', 'HEAD'])).text.trim()
 		expect(made.output).toEndWith(`\n\nhooked ${short}`)

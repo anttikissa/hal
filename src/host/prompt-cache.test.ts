@@ -12,6 +12,7 @@ import { compact } from './compact.ts'
 import { tools } from './tools.ts'
 import { warnings } from './warnings.ts'
 import { rebases } from './rebases.ts'
+import { projectContext } from './project-context.ts'
 
 useHost()
 let original = systemPrompt.file,
@@ -223,6 +224,7 @@ test('local instruction edits arrive only in their diff section and output imita
 	let root = `${testHome()}/project`
 	mkdirSync(root)
 	writeFileSync(`${root}/AGENTS.md`, 'first instruction')
+	projectContext.decide(root, true)
 	let c = client(),
 		id = created(c, root),
 		initial = prepare(id).system

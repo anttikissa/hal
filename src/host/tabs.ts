@@ -28,6 +28,7 @@ import { states } from '../common/states.ts'
 import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
 import { status } from './status.ts'
+import { projectContext } from './project-context.ts'
 
 type TabsFile = { open: string[]; closed: { id: string; index: number }[]; attention: string[] }
 export type TabCommand = Extract<Command, { type: `tab-${string}` }>
@@ -184,6 +185,7 @@ function publish(): void {
 function insert(id: string, index: number): void {
 	let open = tabs.file().open
 	open.splice(Math.max(0, Math.min(open.length, index)), 0, id)
+	projectContext.changed()
 }
 
 function create(cwd: string, after?: string, autoclose = false, interactive = true, timezone?: string): string {
@@ -229,6 +231,7 @@ function close(id: string): string | undefined {
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })
 	f.closed = closed.slice(-tabs.closedKept)
+	projectContext.changed()
 	return undefined
 }
 

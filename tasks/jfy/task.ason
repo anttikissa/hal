@@ -2,6 +2,9 @@
 	title: 'Commits without a Session trailer belong to the call that ran git commit',
 	spec: 'Only Hal commits carry Session trailers; other projects commit without them. A commit with no trailer naming a session of this home belongs to the session whose Bash call made it, when that call command runs git ... commit (no ; & | between). That session gets the commit card, the commit hook (task sg0) and a notice attributed to its tab; no trailer cross-check runs. Other trailerless commits still name no session. Invariant restored: every commit an agent makes with git commit in any repository shows as a commit card in its transcript and in /find commits.',
 	status: 'done',
+	notes: [
+		'The commit-hook integration test covers untrailed commits as owned by the Bash caller. Reset its seen-hash cache between fixture repositories: identical commit bytes created in the same second otherwise hid stale expectations through cross-test deduplication.'
+	],
 	needs: ['pdw'],
 	foldInto: ['hy']
 }

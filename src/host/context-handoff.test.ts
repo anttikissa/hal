@@ -7,6 +7,7 @@ import { history } from './history.ts'
 import { slash } from './slash.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
+import { projectContext } from './project-context.ts'
 
 useHost()
 
@@ -17,6 +18,7 @@ for (let delivery of ['soft-steer', 'steer'] as const)
 			id = created(c, home)
 		mkdirSync(`${home}/sub`)
 		writeFileSync(`${home}/sub/AGENTS.md`, 'Respond in Finnish.')
+		projectContext.decide(`${home}/sub`, true)
 		c.conn.send({ type: 'submit', sessionId: id, text: 'Write a poem.' })
 		await until(() => calls.length === 1)
 		calls[0]!.push({ type: 'text', text: 'Summer light' })
