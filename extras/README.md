@@ -22,3 +22,5 @@ extra itself take effect when the host restarts.
   removed per file on commit cards, totals them over source files as
   LOC, and rejects background Bash calls containing `git commit` so
   each commit shows in the foreground.
+- `codex-hooks.ts` and `claude-hooks.ts`: explicitly trusted command hooks
+  and hooks bundled in local plugin packages. See [setup and coverage](hooks.md).
