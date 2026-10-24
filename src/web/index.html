@@ -1532,13 +1532,6 @@
 					0 -12px 32px -8px color-mix(in oklab, var(--overlay-bg) 70%, transparent);
 				scrollbar-width: thin;
 				scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent;
-				animation: completions-in 140ms var(--ease-out);
-			}
-			@keyframes completions-in {
-				from {
-					opacity: 0;
-					transform: translateY(4px);
-				}
 			}
 			.Composer .completions button {
 				display: flex;
@@ -1550,7 +1543,6 @@
 				text-align: left;
 				background: transparent;
 				color: inherit;
-				transition: background 80ms;
 			}
 			@media (pointer: coarse) {
 				.Composer .completions button {
@@ -1578,11 +1570,6 @@
 				white-space: nowrap;
 				color: var(--quiet);
 				font-size: 0.85em;
-			}
-			@media (prefers-reduced-motion: reduce) {
-				.Composer .completions {
-					animation: none;
-				}
 			}
 			.status .busy {
 				color: var(--highlight);

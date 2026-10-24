@@ -7,7 +7,8 @@
 		'Tool-call find rows and preview cards take their theme class (tool-read green, tool-bash purple) from the command verb. The index stores calls as tool { cmd: ...}, and snippets are windowed around the match, so the host labels why with the verb (find-worker label()); the client must not parse snippets for it. Output cards share the call id and take the call look.',
 		'An open tab mark sits at the left edge of the age column (flex, margin-right: auto), so marks align whatever the age width.',
 		'Changing the query or a filter keeps the previous rows (find.stale) until the new search sends its first batch; a done batch with nothing clears them. Invariant: the list never blanks between searches. Probed in headless Chrome: rows and preview stayed through a filter toggle.',
-		'Find searches at every keypress (no debounce; the worker cancels the previous search). A new search holds its partial tier-by-tier rankings for up to 250 ms (findDialog holdMs) so its ranking lands once, whole, over the old rows; a slower search or an index scan shows progress. Invariant: typing never shows intermediate rankings of a quick search. Probed in headless Chrome: f, fi, fin, find... changed the rendered list once.'
+		'Find searches at every keypress (no debounce; the worker cancels the previous search). A new search holds its partial tier-by-tier rankings for up to 250 ms (findDialog holdMs) so its ranking lands once, whole, over the old rows; a slower search or an index scan shows progress. Invariant: typing never shows intermediate rankings of a quick search. Probed in headless Chrome: f, fi, fin, find... changed the rendered list once.',
+		'Composer completions no longer fade in (completions-in) or ease the selection background: the menu opens and filters as the user types, and typing-driven lists never animate (STYLE.md).'
 	],
 	needs: ['w17'],
 	foldInto: ['6m']
