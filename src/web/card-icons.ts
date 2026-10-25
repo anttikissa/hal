@@ -14,7 +14,6 @@ const toolIcons: Record<string, IconName> = {
 	wait: 'wait',
 	command: 'command',
 	inspect: 'inspect',
-	notify: 'notify',
 	ask: 'ask',
 	read_blob: 'blob',
 	read_entry: 'blob',

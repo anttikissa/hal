@@ -17,7 +17,7 @@ test('bash reads like the terminal; odd arguments show once, plumbing never', ()
 	])
 	expect(toolDetails.limit('bash', { command: 'ls', timeout: 900 })).toBe('900s')
 	expect(toolDetails.limit('bash', { command: 'ls', timeout: 600, background: true })).toBeUndefined()
-	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: '! Done', key: 'text', mark: '!' })
+	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: 'Notify Done', key: 'text', mark: 'Notify' })
 	expect(toolDetails.lines('notify', { text: 'Done' })).toEqual([])
 })
 

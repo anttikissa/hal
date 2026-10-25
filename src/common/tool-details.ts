@@ -49,7 +49,7 @@ let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
 // A card's title: its tool's mark, then what the call works on (tasks
 // jz, b3k): $ <description> for bash (its command opens below), < <paths>,
-// > <files>, => <target>, … Waiting for <targets>, ! <text>, * <id> <name>,
+// > <files>, => <target>, … Waiting for <targets>, Notify <text>, * <id> <name>,
 // x <target>, ? Help <tool>, ? Inspect <target>. A model-run slash command
 // reads as typed, "/rename …" (task 9g); other tools keep their name,
 // Google <query>. `output`: the call's result, when known, adds what only
@@ -78,7 +78,7 @@ const marks: Record<string, string> = {
 	edit: '>',
 	send: 'To',
 	wait: '…',
-	notify: '!',
+	notify: 'Notify',
 	spawn: 'Spawn',
 	stop: 'Stop',
 	help: '?',
