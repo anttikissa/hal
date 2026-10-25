@@ -26,6 +26,9 @@ export interface SessionMeta {
 	// Close after a successful final turn once no work remains (task p87).
 	autoclose?: boolean
 	interactive?: boolean
+	// hal -p's trust override, from tab-new's trust (task tzr): the project
+	// root -d trusts, or false for --no-trust. Never in project-trust.ason.
+	projectTrust?: string | false
 	parent?: string
 	parentCall?: number
 	forkedFrom?: string

@@ -36,7 +36,7 @@ function read(path: string): string | null {
 // CLAUDE.md candidates for its cwd, present or not.
 function files(id: string): Set<string> {
 	let meta = sessions.open(id)
-	let local = projectContext.allowed(meta.cwd)
+	let local = projectContext.allowed(meta.cwd, meta.projectTrust)
 		? systemPrompt
 				.candidates(meta.cwd)
 				.flatMap((d) => ['AGENTS.md', 'CLAUDE.md'].map((n) => `${d === '/' ? '' : d}/${n}`))

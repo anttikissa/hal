@@ -43,7 +43,7 @@ export const command: SlashCommand = {
 			if (answers.create !== 'yes') return { say: `still in ${ctx.cwd}` }
 			mkdirSync(path, { recursive: true })
 		}
-		let ask = projectContext.question(path)
+		let ask = projectContext.question(path, ctx.sessionId)
 		if (ask) return { ask, askArgs: path }
 		let previous = ctx.cwd
 		ctx.setCwd(path)

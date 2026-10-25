@@ -257,7 +257,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (running.controller.signal.aborted) break
 				signal = running.controller.signal
 			}
-			let ask = projectContext.question(sessions.open(id).cwd)
+			let ask = projectContext.question(sessions.open(id).cwd, id)
 			if (ask) return turns.ask(id, ask)
 			await projectContext.ready()
 			if (signal.aborted) continue

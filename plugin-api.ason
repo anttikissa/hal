@@ -1,5 +1,5 @@
 {
-	version: 9,
+	version: 10,
 	changes: [
 		{
 			version: 2,
@@ -140,6 +140,37 @@
 					target: 'client/frame-layout.Past',
 					description: 'Removes formCursor',
 					port: 'Use client/frame.frame.build().cursor for active forms'
+				}
+			]
+		},
+		{
+			version: 10,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/project-context.relevant',
+					description: 'Removed',
+					port: 'Use projectContext.contents(cwd).length > 0'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/project-context.allowed',
+					description: 'Adds optional session override argument'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/project-context.question',
+					description: 'Adds optional session id; unattended sessions never ask'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/session.SessionMeta',
+					description: 'Adds projectTrust'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Command',
+					description: 'tab-new adds trust'
 				}
 			]
 		}

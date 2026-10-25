@@ -1,6 +1,7 @@
 // Keeps project instructions and plugins behind one remembered trust decision.
+// A session may override it: hal -p -d trusts its project, --no-trust none.
 import { existsSync, mkdirSync, readdirSync, realpathSync } from 'fs'
-import { resolve } from 'path'
+import { relative, resolve } from 'path'
 import type { Answers, Form } from '../common/forms.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
@@ -38,8 +39,10 @@ function root(cwd: string): string {
 	}
 }
 
-function allowed(cwd: string): boolean {
-	return projectContext.file().projects[projectContext.root(cwd)] === true
+// `own`: the session's override (SessionMeta.projectTrust).
+function allowed(cwd: string, own?: string | false): boolean {
+	let root = projectContext.root(cwd)
+	return own !== false && (own === root || projectContext.file().projects[root] === true)
 }
 
 function decide(cwd: string, trust: boolean): void {
@@ -58,22 +61,33 @@ function names(dir: string): string[] {
 	}
 }
 
-function relevant(cwd: string): boolean {
-	return systemPrompt
-		.candidates(cwd)
-		.some(
-			(dir) =>
-				['AGENTS.md', 'CLAUDE.md'].some((name) => existsSync(`${dir}/${name}`)) ||
-				['.agents/skills', '.claude/skills'].some((sub) =>
-					names(`${dir}/${sub}`).some((name) => existsSync(`${dir}/${sub}/${name}/SKILL.md`)),
-				) ||
-				names(`${dir}/.agents/plugins/hal`).some((name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
-		)
+// What trust covers, outermost first: each directory's AGENTS.md or
+// CLAUDE.md, project skills and native plugins.
+function contents(cwd: string): string[] {
+	return systemPrompt.candidates(cwd).flatMap((dir) => {
+		let base = dir === '/' ? '' : dir
+		let found = (sub: string, keep: (name: string) => boolean) =>
+			names(`${base}/${sub}`)
+				.filter(keep)
+				.map((name) => `${base}/${sub}/${name}`)
+		return [
+			...['AGENTS.md', 'CLAUDE.md']
+				.map((name) => `${base}/${name}`)
+				.filter((p) => existsSync(p))
+				.slice(0, 1),
+			...['.agents/skills', '.claude/skills'].flatMap((sub) =>
+				found(sub, (name) => existsSync(`${base}/${sub}/${name}/SKILL.md`)),
+			),
+			...found('.agents/plugins/hal', (name) => name.endsWith('.ts') && !name.endsWith('.d.ts')),
+		]
+	})
 }
 
-function question(cwd: string): Form | undefined {
+// Unattended sessions (hal -p) have nobody to answer, so they never ask.
+function question(cwd: string, id?: string): Form | undefined {
+	if (id !== undefined && sessions.open(id).interactive === false) return
 	let root = projectContext.root(cwd)
-	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.relevant(cwd)) return
+	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.contents(cwd).length) return
 	return {
 		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions.',
 		quote: { text: root },
@@ -96,18 +110,34 @@ function answer(form: Form, answers: Answers): boolean {
 	return true
 }
 
+// What a hal -p run tells stderr: the project files it reads or skips,
+// and why. `trust` is the run's override: -d (true) or --no-trust.
+function report(id: string, trust?: boolean): string | undefined {
+	let cwd = sessions.open(id).cwd
+	let base = systemPrompt.candidates(cwd)[0]!
+	let files = projectContext.contents(cwd).map((path) => relative(base, path))
+	if (!files.length) return
+	let root = projectContext.root(cwd),
+		list = files.join(', ')
+	if (trust === false) return `--no-trust, skipping ${root}: ${list}`
+	if (trust) return `-d given, trusting ${root}: ${list}`
+	return projectContext.allowed(cwd)
+		? `trusted ${root}: reading ${list}`
+		: `${root} is not trusted; skipping ${list} (pass -d to trust it)`
+}
+
 async function refresh(): Promise<void> {
 	let wanted = new Set<string>()
-	let cwds = new Set<string>()
 	for (let id of tabs.file().open) {
+		let meta
 		try {
-			cwds.add(sessions.open(id).cwd)
+			meta = sessions.open(id)
 		} catch (e: any) {
 			plugins.report(`project plugins for ${id}: ${e?.stack ?? e}`)
+			continue
 		}
-	}
-	for (let cwd of cwds) {
-		if (!projectContext.allowed(cwd)) continue
+		let cwd = meta.cwd
+		if (!projectContext.allowed(cwd, meta.projectTrust)) continue
 		for (let dir of systemPrompt.candidates(cwd)) {
 			let path = `${dir}/.agents/plugins/hal`
 			if (existsSync(path)) {
@@ -143,9 +173,10 @@ export const projectContext = {
 	root,
 	allowed,
 	decide,
-	relevant,
+	contents,
 	question,
 	answer,
+	report,
 	refresh,
 	ready,
 	changed,

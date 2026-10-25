@@ -9,6 +9,11 @@ The scope is the nearest Git root through the session's working directory.
 Outside Git, only that directory applies. Personal instructions and skills
 remain available regardless of the project decision.
 
+`hal -p` never asks. `-d` trusts that project for the run without saving
+the decision; `--no-trust` leaves project content out. Without either,
+only a remembered decision applies. Each run names on stderr the project
+files it reads or skips.
+
 Place native plugins in `.agents/plugins/hal/*.ts`. They run in the host
 with its full permissions, using the ordinary plugin API. Return cleanup
 from setup to release resources. Applicable directories load after trust

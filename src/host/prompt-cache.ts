@@ -146,6 +146,7 @@ function input(id: string, selected?: PromptInput): PromptInput {
 		forkedFrom: meta.forkedFrom,
 		slots: meta.slots,
 		autoclose: meta.autoclose,
+		projectTrust: meta.projectTrust,
 		...selected,
 	}
 }

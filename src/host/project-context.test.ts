@@ -150,3 +150,37 @@ test('trusted repo ancestors apply to nested cwd, not nested Git projects or unr
 	mkdirSync(`${testHome()}/outside`)
 	expect(projectContext.allowed(`${testHome()}/outside`)).toBe(false)
 })
+
+test('hal -p: -d trusts for its session only, --no-trust skips, and unattended tabs never ask', async () => {
+	let root = project(),
+		c = client(),
+		n = 0
+	let open = async (trust?: boolean) => {
+		let id = `p${++n}`
+		c.conn.send({ type: 'tab-new', cwd: `${root}/sub`, interactive: false, trust, id })
+		await until(() => c.events.some((e: any) => e.type === 'ack' && e.id === id))
+		let tab = (c.events.find((e: any) => e.type === 'ack' && e.id === id) as any).tab as string
+		c.conn.send({ type: 'open', sessionId: tab })
+		sessions.open(tab).model = 'fake/m1'
+		return tab
+	}
+	let system = async (id: string) => {
+		let before = calls.length
+		c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
+		await until(() => calls.length === before + 1)
+		calls.at(-1)!.push({ type: 'done', reason: 'end' })
+		return calls.at(-1)!.input.system as string
+	}
+	let warning = () => c.of('warning').at(-1)?.text
+	let real = projectContext.root(root),
+		files = 'AGENTS.md, .agents/plugins/hal/test.ts'
+	expect(await system(await open(true))).toContain('PROJECT INSTRUCTION')
+	expect(warning()).toBe(`-d given, trusting ${real}: ${files}`)
+	expect(projectContext.file().projects).toEqual({})
+	expect(await system(await open())).not.toContain('PROJECT INSTRUCTION')
+	expect(warning()).toBe(`${real} is not trusted; skipping ${files} (pass -d to trust it)`)
+	projectContext.decide(root, true)
+	expect(await system(await open(false))).not.toContain('PROJECT INSTRUCTION')
+	expect(warning()).toBe(`--no-trust, skipping ${real}: ${files}`)
+	expect(c.of('question')).toHaveLength(0)
+})

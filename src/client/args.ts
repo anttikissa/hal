@@ -19,6 +19,7 @@ export type Args = (
 			session?: string
 			keep?: true
 			noUser?: true
+			noTrust?: true
 			delivery?: Delivery
 	  }
 	| { kind: 'error'; message: string }
@@ -27,7 +28,9 @@ export type Args = (
 const help = `Usage:
   hal                         start the terminal client
   hal -p <prompt>             run one prompt, print the reply
-    -d, --dir <dir>           working directory for the new tab
+    -d, --dir <dir>           working directory for the new tab; trusts its project
+                              (instructions, skills, plugins) for this run
+    --no-trust                leave project instructions, skills and plugins out
     -m, --model <model>       model to use
     -s, --session <id|tab>    send to an existing session instead
     --steer | --soft-steer | --queue
@@ -51,6 +54,7 @@ type Out = {
 	kind: Kind
 	home?: string
 	noUser?: true
+	noTrust?: true
 	port?: number
 	count?: number
 	prompt?: string
@@ -108,6 +112,9 @@ command('-p, --print <prompt>', 'print', () => {
 	arg('--queue', deliver('queue'))
 	arg('--keep', (out) => {
 		out.keep = true
+	})
+	arg('--no-trust', (out) => {
+		out.noTrust = true
 	})
 })
 command('-r [host]', 'remote')
@@ -168,6 +175,7 @@ function parse(argv: string[]): Args {
 		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind))
 			fail('--no-user applies only to hal, hal serve and hal -p')
 		if (out.session && out.keep) fail('--keep cannot be used with --session')
+		if (out.session && out.noTrust) fail('--no-trust cannot be used with --session')
 		if (out.session && out.dir) fail('--dir cannot be used with --session; use /cd to change its directory')
 		return out as Args
 	} catch (e) {

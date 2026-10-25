@@ -48,6 +48,8 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
 	if (data.interactive !== undefined && typeof data.interactive !== 'boolean')
 		throw new Error(`${path}: invalid interactive`)
+	if (data.projectTrust !== undefined && data.projectTrust !== false && typeof data.projectTrust !== 'string')
+		throw new Error(`${path}: invalid projectTrust`)
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string')
 		throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
@@ -146,6 +148,7 @@ function create(init: {
 	name?: string
 	autoclose?: boolean
 	interactive?: boolean
+	projectTrust?: string | false
 }): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
@@ -163,6 +166,7 @@ function create(init: {
 		autoclose: init.autoclose ?? false,
 		slots: settings.subagentSlots(),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
+		...(init.projectTrust !== undefined && { projectTrust: init.projectTrust }),
 		...(selection.id === 'hal/tool' && { blocks: { ...toolBlocks } }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)

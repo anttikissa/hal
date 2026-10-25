@@ -69,6 +69,7 @@ function spawn(parent: string, s: Spawn): string {
 		name: s.name,
 		autoclose: s.kind === 'subagent',
 		interactive: promptCache.interactive(parent),
+		projectTrust: meta.projectTrust,
 	})
 	Object.assign(child, {
 		...(s.kind !== 'interactive' && { parent, slots: s.limit }),
@@ -112,6 +113,7 @@ function fork(from: string, child: string): void {
 		target = sessions.open(child)
 	target.forkedFrom = from
 	target.interactive = promptCache.interactive(from)
+	if (source.projectTrust !== undefined) target.projectTrust = source.projectTrust
 	if (source.startingState) target.startingState = { ...source.startingState }
 	liveFiles.save(target)
 	promptCache.inherit(from, child)

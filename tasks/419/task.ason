@@ -1,0 +1,10 @@
+{
+	title: 'hal -p project trust: -d trusts, --no-trust skips, never asks',
+	spec: 'hal -p never shows the project trust question: an unattended session (interactive false) has nobody to answer, so it skips project content it is not allowed. -d is an explicit user choice and trusts its project (instructions, skills, native plugins) for that session and its subagents and forks, overriding a remembered refusal; it is never written to project-trust.ason. Without -d only a remembered trust applies. --no-trust leaves project content out even when trusted; it cannot be used with --session. Each run whose cwd has project content names on stderr the project root and every file it reads or skips (root-relative), and why. --session into an existing session keeps that session behavior. hal --help says -d trusts its project.',
+	status: 'done',
+	notes: [
+		'Bug fix (session 25-map): a cron hal -p -d run hung on the trust question until its tab closed. Invariant: an unattended session never waits on project trust. The override travels as tab-new trust into SessionMeta.projectTrust and as a PromptInput field, so prompt assembly stays a function of its inputs. protocol.ts is near the 20 KB size limit; its comment lives in session.ts.'
+	],
+	needs: ['tzr', 'gw'],
+	foldInto: ['tzr', 'gw']
+}

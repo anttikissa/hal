@@ -46,10 +46,10 @@ function candidates(cwd: string): string[] {
 // like SYSTEM.md; a project's .agents/skills (or .claude/skills) only
 // where its AGENTS.md would. Only folders holding a
 // SKILL.md count; names are sorted so the text stays cache-stable.
-function skills(cwd: string): string {
+function skills(cwd: string, trust?: string | false): string {
 	let subs = ['.agents/skills', '.claude/skills']
 	let dirs = [`${paths.repoRoot()}/skills`, ...subs.map((sub) => `${paths.userHome()}/${sub}`)]
-	if (projectContext.allowed(cwd))
+	if (projectContext.allowed(cwd, trust))
 		for (let dir of candidates(cwd)) for (let sub of subs) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
 	let groups: string[] = []
 	for (let dir of new Set(dirs)) {
@@ -67,7 +67,7 @@ function skills(cwd: string): string {
 
 // The global ~/.agents/AGENTS.md first, then project files outermost first.
 // Each file's imports stay inside its own root.
-function agents(cwd: string, sources?: PromptSource[]): string {
+function agents(cwd: string, sources?: PromptSource[], trust?: string | false): string {
 	let parts: string[] = []
 	let include = (path: string, root: string) => {
 		let missing: string[] = [],
@@ -76,7 +76,7 @@ function agents(cwd: string, sources?: PromptSource[]): string {
 	}
 	let global = `${paths.userHome()}/.agents`
 	if (existsSync(`${global}/AGENTS.md`)) include(`${global}/AGENTS.md`, global)
-	if (!projectContext.allowed(cwd)) return parts.join('\n\n')
+	if (!projectContext.allowed(cwd, trust)) return parts.join('\n\n')
 	let dirs = systemPrompt.candidates(cwd),
 		root = dirs[0]!
 	try {
@@ -112,8 +112,8 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		forked_from: input.forkedFrom ?? '',
 		user_notes: input.noUser ? 'false' : 'true',
 		other_tools: nativeTool.summary(),
-		skills: systemPrompt.skills(input.cwd),
-		agents: systemPrompt.agents(input.cwd, sources),
+		skills: systemPrompt.skills(input.cwd, input.projectTrust),
+		agents: systemPrompt.agents(input.cwd, sources, input.projectTrust),
 	}
 	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
 }
@@ -129,6 +129,7 @@ export type PromptInput = {
 	forkedFrom?: string
 	slots?: number
 	autoclose?: boolean
+	projectTrust?: string | false
 	rendered?: PromptRender
 }
 function build(input: PromptInput, problems?: string[]): string {

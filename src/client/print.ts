@@ -11,10 +11,12 @@ import { summary } from '../common/summary.ts'
 type Job = {
 	prompt: string
 	cwd: string
+	dir?: string
 	model?: string
 	session?: string
 	keep?: true
 	noUser?: true
+	noTrust?: true
 	delivery?: Delivery
 }
 type Out = { out(text: string): void; err(text: string): void }
@@ -80,7 +82,9 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		if (job.noUser && !noUser) return
 		if (job.session) return target()
 		id = connection.nextId()
-		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, id })
+		// -d trusts its project for this run; --no-trust overrides (task tzr).
+		let trust = job.noTrust ? false : job.dir !== undefined || undefined
+		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, trust, id })
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return
