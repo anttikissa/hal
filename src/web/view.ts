@@ -335,6 +335,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
 			if (bashResult.background(item)) return { kind: 'tool tool-bash background-result', text: card.text(item) }
+			if (item.from === undefined && item.origin === 'model') return { kind: 'assistant prompt', text: card.text(item) }
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
 			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: card.text(item) }

@@ -80,6 +80,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	switch (item.type) {
 		case 'prompt':
 			if (bashResult.background(item)) return itemView.toolStyle('bash')
+			if (item.from === undefined && item.origin === 'model') return colors.assistant()
 			return titles.letter(item) === 'm' ? colors.message() : colors.user()
 		// The human's command reads like its output (joined).
 		case 'command':
