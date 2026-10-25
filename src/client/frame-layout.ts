@@ -12,8 +12,7 @@ import { toolDetails } from '../common/tool-details.ts'
 import type { Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { batchOrder, type Ordering } from './batch-order.ts'
-import { formView } from './form-view.ts'
-import { frame, type Frame, type View } from './frame.ts'
+import { frame, type View } from './frame.ts'
 import { itemView, type Look } from './item-view.ts'
 import { toolView } from './tool-view.ts'
 import { water } from './water.ts'
@@ -24,7 +23,6 @@ export type Past = {
 	lines: string[]
 	items?: Item[]
 	ends?: number[]
-	formCursor?: Frame['cursor']
 	tick?: { row: number; labeled: string; plain: string }
 }
 
@@ -53,7 +51,6 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let toolCalls = new Map<string, NonNullable<Look['call']>>()
 	let backgroundCalls: Map<string, Item & { type: 'tool' }> | undefined
 	let callFolds = new Map<string, Verbosity>()
-	let formCursor: Frame['cursor'] | undefined
 	let tick: Past['tick']
 	// The call whose card is being laid out: its first row and fold key.
 	let callCard: { id: string; key: string; start: number } | undefined
@@ -146,16 +143,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			)
 			look.background = backgroundCalls.get(background.replace(/^t/, ''))
 		}
-		if (item.type === 'question' && view.form?.id === item.id) {
-			let { inner, mark } = itemView.place(item, cols, session, itemView.itemStyle(item)) // its id, like every block's
-			let f = formView.formLines(view.form, inner, item.ts)
-			let rows = f.rows.length ? ['', ...f.rows, ''] : [] // padded like itemRows
-			mark(rows, 1)
-			if (rows.length && lines.length) lines.push('')
-			for (let r of rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
-			// Counted from the end: the question above may flow on.
-			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
-		} else {
+		if (item.type !== 'question' || view.form?.id !== item.id) {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			// Adjacent results continue their call's card without a reference or gap.
 			let tool: string | undefined
@@ -271,7 +259,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		ends.push(lines.length)
 	}
 	keep()
-	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(tick ? { tick } : {}) }
+	return { lines, items, ends, ...(tick ? { tick } : {}) }
 }
 
 // The unchanged transcript prefix, including originating tool identities.

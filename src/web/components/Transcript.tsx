@@ -22,7 +22,6 @@ import { target } from '../target.ts'
 import { view, type ViewState } from '../view.ts'
 import { transcriptRows, type Row } from '../transcript-rows.ts'
 import { Card } from './Card.tsx'
-import { Question } from './Question.tsx'
 
 const none: Item[] = []
 
@@ -166,24 +165,19 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-						<Show
-							when={open(row())}
-							fallback={
-								<Card
-									row={row()}
-									session={session()}
-									blocks={blocks()}
-									running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
-									cursor={cursorKey() === row().key}
-									target={hit() === row().key}
-									job={jobs().has(row().item.key) ? row().item.key : undefined}
-									edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
-									discard={row().note !== undefined && row().key !== queueHold()}
-									waiting={waiting}
-								/>
-							}
-						>
-							{(q) => <Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />}
+						<Show when={!open(row())}>
+							<Card
+								row={row()}
+								session={session()}
+								blocks={blocks()}
+								running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
+								cursor={cursorKey() === row().key}
+								target={hit() === row().key}
+								job={jobs().has(row().item.key) ? row().item.key : undefined}
+								edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
+								discard={row().note !== undefined && row().key !== queueHold()}
+								waiting={waiting}
+							/>
 						</Show>
 						<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
 					</>

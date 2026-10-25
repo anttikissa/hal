@@ -1,5 +1,5 @@
 {
-	version: 8,
+	version: 9,
 	changes: [
 		{
 			version: 2,
@@ -129,6 +129,17 @@
 					kind: 'compatible',
 					target: 'host/plugin-history.pluginHistory',
 					description: 'init takes home files; seen returns the recorded version'
+				}
+			]
+		},
+		{
+			version: 9,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'client/frame-layout.Past',
+					description: 'Removes formCursor',
+					port: 'Use client/frame.frame.build().cursor for active forms'
 				}
 			]
 		}

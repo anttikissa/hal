@@ -29,6 +29,7 @@ import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
 import { settings } from '../common/settings.ts'
 import { toolView } from './tool-view.ts'
+import { formView } from './form-view.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -192,11 +193,11 @@ function build(
 		lines.push('')
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
-	let formCursor = view.form ? past.formCursor : undefined
+	let formCursor: Frame['cursor'] | undefined
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.
 	// It is the work now, so it comes before waiting messages (the future).
-	if (view.hal?.at === 'idle' && !formCursor) {
+	if (view.hal?.at === 'idle' && !view.form) {
 		lines.push('')
 		lines.push(ansi.PAD + halCursor.glyph(view.hal))
 	}
@@ -262,6 +263,16 @@ function build(
 	let anchor = lines.length
 	if (view.tabs?.list.length)
 		lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
+	let question = view.transcript?.items.findLast((item) => item.type === 'question' && item.id === view.form?.id)
+	if (view.form && question) {
+		let style = itemView.itemStyle(question)
+		let { inner, mark } = itemView.place(question, cols, session, style)
+		let f = formView.formLines(view.form, inner, question.ts)
+		let rows = ['', ...f.rows, '']
+		mark(rows, 1)
+		formCursor = { row: lines.length + 1 + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
+		for (let row of rows) lines.push(...ansi.paintRows(row, style, cols))
+	}
 	lines.push(rule(join(p.above ? `↑${p.above}` : '', s.topLeft()), s.topCenter(view.activity), s.topRight()))
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
@@ -279,6 +290,7 @@ function build(
 	let tick = past.tick
 	if (tick && lines.length - tick.row > rows && lines[tick.row] === tick.labeled) lines[tick.row] = tick.plain
 	top += history.length + pad + grown
+	if (formCursor) formCursor.row += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
 	let out = {
 		lines,
