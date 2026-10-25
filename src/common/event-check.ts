@@ -13,7 +13,7 @@ import { findQuery } from './find.ts'
 const eventFields: Record<EventType, Record<string, string>> = {
 	'subscription-usage': { accounts: 'o', replace: 'b?' },
 	'find-results': { request: 's', tier: 's', results: 'a', done: 'b', scanning: 'i?', error: 's?' },
-	'find-preview': { sessionId: 's', blockId: 's', kind: 's', query: 's', cards: 'a', error: 's?' },
+	'find-preview': { sessionId: 's', blockId: 's', kind: 's', query: 's', records: 'a', error: 's?' },
 	'rebase-result': { sessionId: 's', command: 's?', ok: 'b', text: 's' },
 	'rebase-plan': {
 		sessionId: 's',
@@ -216,14 +216,8 @@ function invalidEvent(value: unknown): string | undefined {
 	)
 		return 'tabs: invalid question kind'
 	if (value.type === 'sync') return pluginSyncWire.invalidEvent(value)
-	if (
-		value.type === 'find-preview' &&
-		!(value.cards as unknown[]).every(
-			(c) =>
-				isObject(c) && ['card', 'why', 'text'].every((k) => typeof c[k] === 'string') && typeof c.hit === 'boolean',
-		)
-	)
-		return 'find-preview: invalid card'
+	if (value.type === 'find-preview' && !(value.records as unknown[]).every(isObject))
+		return 'find-preview: invalid record'
 	if (value.type === 'find-results') {
 		let tiers: string[] = findQuery.tiers
 		if (!tiers.includes(value.tier as string)) return 'find-results: invalid tier'

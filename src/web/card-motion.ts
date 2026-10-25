@@ -13,7 +13,8 @@ import { scroll } from './scroll.ts'
 // document, whose animations never run.
 let fade: KeyframeAnimationOptions | undefined
 function enter(el: HTMLElement): void {
-	if (scroll.state.quiet) return
+	// Find's preview redraws cards as you move: they never fade (STYLE.md).
+	if (scroll.state.quiet || el.closest('dialog')) return
 	if (!fade) {
 		let css = getComputedStyle(document.documentElement)
 		fade = {

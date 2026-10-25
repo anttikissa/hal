@@ -87,7 +87,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		() => props.modal?.find?.preview,
 		() =>
 			untrack(() => {
-				let hit = pane?.querySelector<HTMLElement>('.hit')
+				let hit = pane?.querySelector<HTMLElement>('.target')
 				if (pane) pane.scrollTop = hit ? hit.offsetTop - pane.clientHeight / 3 : 0
 			}),
 	)
@@ -262,7 +262,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					<span class="syntax">/help find for syntax</span>
 				</div>
 			</Show>
-			<div class="body">
+			<div class="split">
 				<ul
 					ref={(e) => (list = e)}
 					hidden={props.modal?.compact}

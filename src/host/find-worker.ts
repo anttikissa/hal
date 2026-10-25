@@ -16,6 +16,7 @@ import {
 } from '../common/find.ts'
 import { history } from './history.ts'
 import { paths } from './paths.ts'
+import { pages } from './pages.ts'
 import { findIndex, type FindRow } from './find-index.ts'
 import { replay } from '../common/replay.ts'
 import type { SessionMeta } from './sessions.ts'
@@ -266,7 +267,7 @@ async function search(c: Search): Promise<void> {
 		for (tier of q.kinds) {
 			if (tier === 'metadata') {
 				for (let m of findIndex.state.meta.values()) {
-					let row = { sessionId: m.id, card: '', kind: tier, ts: Date.parse(m.createdAt) }
+					let row = { sessionId: m.id, card: '', kind: tier, ts: Date.parse(m.createdAt), at: 0 }
 					take({ ...row, blockId: '', text: `${m.id} ${m.name ?? ''}` })
 					take({ ...row, blockId: 'cwd', text: m.cwd })
 				}
@@ -319,71 +320,34 @@ async function search(c: Search): Promise<void> {
 	}
 }
 
-// `text` cut for the preview: a neighbor's start, or with `terms` the hit
-// from a few lines above its first match (task w17).
-function clip(text: string, terms?: string[]): string {
-	let lines = 6,
-		chars = 400,
-		start = 0
-	if (terms) {
-		lines = 30
-		chars = 1600
-		let lower = text.toLocaleLowerCase()
-		let found = terms.map((t) => lower.indexOf(t)).filter((i) => i >= 0)
-		let at = found.length ? Math.min(...found) : 0
-		start = at
-		for (let n = 0; n < 4 && start > 0; n++) start = text.lastIndexOf('\n', start - 2) + 1
-		// A long line starts just before the match.
-		if (at - start > 800) start = at - 200
-	}
-	let out = text.slice(start).split('\n').slice(0, lines).join('\n')
-	let more = start + out.length < text.length || out.length > chars
-	return (start ? '…' : '') + out.slice(0, chars) + (more ? '…' : '')
-}
-
-// The card `c` names among its neighbors, or the tab's last cards when it
-// names none (task w17).
-async function preview(c: Omit<FindPreview, 'type' | 'cards' | 'error'> & { channel: string }): Promise<void> {
+// The records of the card `c` names and its neighbors, or of the tab's
+// last cards when it names none, for clients to draw as their
+// transcripts do (task w17). Each is read at its offset: a preview costs
+// its records, not the history.
+async function preview(c: Omit<FindPreview, 'type' | 'records' | 'error'> & { channel: string }): Promise<void> {
 	let reply: FindPreview = {
 		type: 'find-preview',
 		sessionId: c.sessionId,
 		blockId: c.blockId,
 		kind: c.kind,
 		query: c.query,
-		cards: [],
+		records: [],
 	}
 	try {
 		await findWorker.state.ready
 		let db = findIndex.state.db!
-		type Row = FindRow & { id: number }
 		let hit = c.blockId
 			? (db
 					.query('SELECT id FROM docs WHERE sessionId=? AND blockId=? AND kind=?')
 					.get(c.sessionId, c.blockId, c.kind) as { id: number } | null)
 			: null
-		let rows = hit
-			? [
-					...(
-						db
-							.query('SELECT * FROM docs WHERE sessionId=? AND id<? ORDER BY id DESC LIMIT 3')
-							.all(c.sessionId, hit.id) as Row[]
-					).reverse(),
-					...(db
-						.query('SELECT * FROM docs WHERE sessionId=? AND id>=? ORDER BY id LIMIT 4')
-						.all(c.sessionId, hit.id) as Row[]),
-				]
-			: (db.query('SELECT * FROM docs WHERE sessionId=? ORDER BY id DESC LIMIT 6').all(c.sessionId) as Row[]).reverse()
-		let terms: string[] = []
-		try {
-			let q = findQuery.parse(c.query)
-			terms = [...q.words, ...q.phrases]
-		} catch {}
-		reply.cards = rows.map((r) => ({
-			card: r.card + r.blockId,
-			why: findWorker.label(r.kind, r.text),
-			text: findWorker.clip(r.text, r.id === hit?.id ? terms : undefined),
-			hit: r.id === hit?.id,
-		}))
+		let near = (op: string, order: string, n: number) =>
+			db
+				.query(`SELECT at FROM docs WHERE sessionId=? AND id${op}? ORDER BY id ${order} LIMIT ${n}`)
+				.all(c.sessionId, hit?.id ?? Number.MAX_SAFE_INTEGER) as { at: number }[]
+		let rows = hit ? [...near('<', 'DESC', 3), ...near('>=', '', 4)] : near('<', 'DESC', 6)
+		let path = history.file(c.sessionId)
+		reply.records = [...new Set(rows.map((r) => r.at))].sort((a, b) => a - b).map((at) => pages.lineAt(path, at).record)
 	} catch (e: any) {
 		reply.error = String(e?.message ?? e)
 	}
@@ -434,7 +398,6 @@ export const findWorker = {
 	group,
 	candidates,
 	search,
-	clip,
 	preview,
 	drain,
 	init,

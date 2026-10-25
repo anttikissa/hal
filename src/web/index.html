@@ -2470,14 +2470,14 @@
 				color: var(--text);
 			}
 			/* Find's preview pane beside the results when wide (task w17). */
-			.Picker .body {
+			.Picker .split {
 				display: contents;
 			}
 			.Picker .preview {
 				display: none;
 			}
 			@media (min-width: 1200px) {
-				.Picker.find .body {
+				.Picker.find .split {
 					flex: 1;
 					min-height: 0;
 					display: grid;
@@ -2502,18 +2502,16 @@
 			.Picker .preview .head span {
 				color: var(--quiet);
 			}
-			.Picker .preview .card {
-				white-space: pre-wrap;
-				overflow-wrap: anywhere;
-				padding: 0.25lh 1ch 0.25lh calc(1ch - 3px);
-				margin-bottom: 0.5lh;
-				border-left: 3px solid var(--fg);
+			.Picker .preview .target {
+				outline: 1px solid var(--quiet);
 			}
-			.Picker .preview .card .label {
-				color: var(--quiet);
+			.Picker .preview :is(.CardHeader, .CardHeader .stamp) {
+				position: static;
+				background: none;
 			}
-			.Picker .preview .hit {
-				background: color-mix(in oklab, var(--fg) 16%, var(--card-bg, transparent));
+			::highlight(find) {
+				background: var(--pick);
+				color: var(--title-fg);
 			}
 			/* Ctrl-O (task v8y): as tall as its field, hint and help. */
 			.Picker.compact,

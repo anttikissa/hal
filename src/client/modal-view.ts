@@ -10,6 +10,8 @@ import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { findDialog } from '../common/find-dialog.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
+import { transcript } from '../common/transcript.ts'
+import { itemView } from './item-view.ts'
 
 type Cursor = { row: number; col: number }
 
@@ -162,7 +164,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	while (content.length < height - 2 - below.length) content.push('')
 	if (pane) {
 		let line = ansi.sgr({ fg: colors.popup().neutralFg! })
-		let preview = modalView.previewLines(m, pane, visible, current)
+		let preview = modalView.previewLines(m, pane, visible)
 		for (let r = 0; r < visible; r++) {
 			let row = content[top + r]!
 			content[top + r] =
@@ -254,25 +256,19 @@ function blocksLines(m: ModalState, width: number): string[] {
 	return [...hint, '', ...rows.map((r) => strings.clipVisual(r, width))]
 }
 
-// Find's preview pane, `width` × `height`: each card's label (the hit's
-// lit like the selection), then its text with the matches marked,
-// scrolled so the hit sits a third down (task w17).
-function previewLines(m: ModalState, width: number, height: number, current: Style): string[] {
+// Find's preview pane, `width` × `height`: the cards as the transcript
+// draws them, scrolled so the hit sits a third down (task w17).
+function previewLines(m: ModalState, width: number, height: number): string[] {
 	let p = m.find!.preview
 	if (!p) return []
 	if (p.error)
 		return strings.wordWrap(p.error, width).map((r) => ansi.sgr({ fg: colors.error().fg! }) + r + ansi.UNCOLOR)
-	let note = ansi.mono() ? '' : ansi.sgr({ fg: colors.popupNote().fg! })
-	let lit = ansi.sgr(current) || ansi.INVERSE
 	let rows: string[] = [],
 		hit = 0
-	for (let c of p.cards) {
+	for (let item of p.records.flatMap((r, i) => transcript.recordItems(r, i))) {
 		if (rows.length) rows.push('')
-		if (c.hit) hit = rows.length
-		let label = strings.clipVisual(`${c.card} ${c.why}`, width)
-		rows.push(c.hit ? lit + label.padEnd(width) + ansi.UNCOLOR + ansi.UNINVERSE : note + label + ansi.UNCOLOR)
-		for (let r of strings.wordWrap(strings.expandTabs(ansi.clean(c.text)), width))
-			rows.push(m.query ? modalView.highlight(r, m.query, undefined, true) : r)
+		if (item.key === p.blockId) hit = rows.length
+		rows.push(...itemView.itemLines(item, width, false, p.sessionId))
 	}
 	let from = Math.max(0, Math.min(hit - Math.floor(height / 3), rows.length - height))
 	return rows.slice(from, from + height)

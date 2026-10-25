@@ -2,10 +2,13 @@
 // Find's web look: rows grouped by kind under section rules, each row,
 // filter and preview card wearing its kind's theme colors (user, Hal,
 // tools...) as the transcript's cards do, and key caps in the footer.
-import { For, Show } from 'solid-js'
+import { createEffect, createMemo, For, onCleanup, Show } from 'solid-js'
 import type { FindFilter, FindKind, FindPreview, FindResult } from '../../common/find.ts'
 import { findDialog } from '../../common/find-dialog.ts'
+import { transcript } from '../../common/transcript.ts'
 import { app } from '../app.ts'
+import { transcriptRows } from '../transcript-rows.ts'
+import { Card } from './Card.tsx'
 import { marked } from './Picker.tsx'
 
 const sections: Record<FindKind, string> = {
@@ -46,15 +49,6 @@ const filterStyles: Record<FindFilter, string> = {
 	tools: 'tool-read',
 	commits: 'commit-card',
 	other: 'plain',
-}
-// Preview card ids start with the transcript's card letter.
-const letters: Record<string, string> = {
-	u: 'user',
-	a: 'assistant',
-	r: 'thinking',
-	t: 'tool',
-	m: 'message',
-	q: 'question',
 }
 
 // Tool-call rows and cards are labeled by their command verb, such as READ.
@@ -135,6 +129,8 @@ function FilterBox(props: { filter: FindFilter; label: string }) {
 	)
 }
 
+// The hit and its neighbors as the transcript's own cards, the query's
+// matches lit by a CSS highlight over their text.
 function Preview(props: {
 	preview: FindPreview
 	result?: FindResult
@@ -142,13 +138,35 @@ function Preview(props: {
 	query: string
 	ref: (e: HTMLDivElement) => void
 }) {
-	// A tool output card shares its call's id, so it takes the call's look.
-	let cardStyle = (c: FindPreview['cards'][number]) =>
-		c.card[0] === 't'
-			? toolStyle(props.preview.cards.find((o) => o.card === c.card && o.why !== 'tool')?.why)
-			: (letters[c.card[0] ?? ''] ?? 'plain')
+	let pane: HTMLDivElement | undefined
+	let rows = createMemo(() =>
+		transcriptRows.rows(props.preview.records.flatMap((r, i) => transcript.recordItems(r, i))),
+	)
+	createEffect(
+		() => [rows(), props.query] as const,
+		([, query]) => {
+			let ranges: Range[] = []
+			let walk = document.createTreeWalker(pane!, NodeFilter.SHOW_TEXT)
+			for (let n = walk.nextNode(); n; n = walk.nextNode())
+				for (let [a, b] of findDialog.marks(n.textContent ?? '', findDialog.words(query))) {
+					let r = new Range()
+					r.setStart(n, a)
+					r.setEnd(n, b)
+					ranges.push(r)
+				}
+			CSS.highlights.set('find', new Highlight(...ranges))
+		},
+	)
+	onCleanup(() => CSS.highlights.delete('find'))
 	return (
-		<div class="preview" ref={props.ref} aria-label="Preview">
+		<div
+			class="preview"
+			ref={(e) => {
+				pane = e
+				props.ref(e)
+			}}
+			aria-label="Preview"
+		>
 			<Show when={props.result}>
 				{(r) => (
 					<div class="head">
@@ -159,15 +177,8 @@ function Preview(props: {
 				)}
 			</Show>
 			<Show when={props.preview.error}>{(e) => <div class="refused">{e()}</div>}</Show>
-			<For each={props.preview.cards}>
-				{(c) => (
-					<div class={`card ${cardStyle(c)}${c.hit ? ' hit' : ''}`}>
-						<div class="label">
-							{c.card} {c.why}
-						</div>
-						{marked(c.text, props.query, true)}
-					</div>
-				)}
+			<For each={rows()}>
+				{(row) => <Card row={row} session={props.preview.sessionId} target={row.key === props.preview.blockId} />}
 			</For>
 		</div>
 	)

@@ -14,7 +14,16 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 
-export type FindRow = { sessionId: string; blockId: string; card: string; kind: FindKind; ts: number; text: string }
+// `at`: the byte offset of the history line holding the row's record.
+export type FindRow = {
+	sessionId: string
+	blockId: string
+	card: string
+	kind: FindKind
+	ts: number
+	text: string
+	at: number
+}
 type Mark = { offset: number; size: number; mtime: number }
 
 function init(): void {
@@ -22,14 +31,14 @@ function init(): void {
 	let db = new Database(`${paths.stateDir()}/find.sqlite`, { create: true })
 	findIndex.state.db = db
 	// The projection is disposable; version changes reindex immutable history.
-	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 6) {
+	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 7) {
 		db.exec(
-			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=6;',
+			'DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=7;',
 		)
 	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
-		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId,kind));
+		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, at INTEGER, UNIQUE(sessionId,blockId,kind));
 		CREATE INDEX IF NOT EXISTS doc_kind ON docs(kind);
 		CREATE VIRTUAL TABLE IF NOT EXISTS words USING fts5(text, content='docs', content_rowid='id', tokenize='unicode61');
 		CREATE VIRTUAL TABLE IF NOT EXISTS grams USING fts5(text, content='docs', content_rowid='id', tokenize='trigram');
@@ -73,7 +82,7 @@ async function text(sessionId: string, value: string): Promise<string> {
 	return Buffer.from(parts.join('\n')).subarray(0, 65536).toString('utf8')
 }
 
-async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
+async function rows(sessionId: string, r: HistoryRecord, at = 0): Promise<FindRow[]> {
 	let out: FindRow[] = [],
 		ts = Date.parse(r.ts)
 	// The card id's letter, as titles.letter gives it in the transcript.
@@ -104,6 +113,7 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 			kind,
 			ts,
 			text: await findIndex.text(sessionId, value),
+			at,
 		})
 	}
 	if (r.type === 'user' || r.type === 'assistant') {
@@ -145,7 +155,10 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 	return out
 }
 
-async function* records(sessionId: string, offset: number): AsyncGenerator<{ record: HistoryRecord; end: number }> {
+async function* records(
+	sessionId: string,
+	offset: number,
+): AsyncGenerator<{ record: HistoryRecord; start: number; end: number }> {
 	let path = history.file(sessionId)
 	if (!existsSync(path)) return
 	let pending = Buffer.alloc(0),
@@ -161,7 +174,7 @@ async function* records(sessionId: string, offset: number): AsyncGenerator<{ rec
 				try {
 					let record = history.check(ason.parse(line))
 					record.n ??= at + from + 1
-					yield { record, end: at + end + 1 }
+					yield { record, start: at + from, end: at + end + 1 }
 				} catch (e: any) {
 					throw new Error(`${path}:${at + from}: ${e?.message ?? e}`)
 				}
@@ -200,13 +213,14 @@ async function catchup(sessionId: string): Promise<void> {
 	let flush = () =>
 		db.transaction(() => {
 			for (let row of batch)
-				db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,card,kind,ts,text) VALUES(?,?,?,?,?,?)').run(
+				db.query('INSERT OR IGNORE INTO docs(sessionId,blockId,card,kind,ts,text,at) VALUES(?,?,?,?,?,?,?)').run(
 					row.sessionId,
 					row.blockId,
 					row.card,
 					row.kind,
 					row.ts,
 					row.text,
+					row.at,
 				)
 			let stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
 			db.query('INSERT OR REPLACE INTO marks VALUES(?,?,?,?)').run(sessionId, end, stat?.size ?? 0, stat?.mtimeMs ?? 0)
@@ -227,10 +241,13 @@ async function catchup(sessionId: string): Promise<void> {
 		for await (let item of findIndex.records(sessionId, 0)) items.push(item)
 		db.query('DELETE FROM docs WHERE sessionId=?').run(sessionId)
 		end = items.at(-1)?.end ?? 0
-		items = replay.current(items.map((i) => i.record)).map((record) => ({ record, end }))
+		let starts = new Map(items.map((i) => [i.record.n, i.start]))
+		items = replay
+			.current(items.map((i) => i.record))
+			.map((record) => ({ record, start: starts.get(record.n) ?? 0, end }))
 	}
 	for (let item of items) {
-		batch.push(...(await findIndex.rows(sessionId, item.record)))
+		batch.push(...(await findIndex.rows(sessionId, item.record, item.start)))
 		end = item.end
 		if (batch.length >= 16) {
 			flush()

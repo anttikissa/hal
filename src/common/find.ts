@@ -1,5 +1,6 @@
 // Find messages and ranking, shared so host and clients agree on what
 // matches. Find results are transient: never stored.
+import type { HistoryRecord } from './replay.ts'
 export type FindKind = 'metadata' | 'user' | 'assistant' | 'thinking' | 'tool-call' | 'tool-output' | 'commit' | 'other'
 export type FindFilter = 'user' | 'hal' | 'reasoning' | 'tools' | 'commits' | 'other'
 export type FindResult = {
@@ -29,22 +30,22 @@ export type FindBatch = {
 	scanning?: number
 	error?: string
 }
-// The selected row's card among its neighbors (task w17). An empty blockId
-// asks for the tab's last cards.
+// The selected row's card among its neighbors, as their history records
+// (task w17). An empty blockId asks for the tab's last cards.
 export type FindPreview = {
 	type: 'find-preview'
 	sessionId: string
 	blockId: string
 	kind: FindKind
 	query: string
-	cards: { card: string; why: string; text: string; hit: boolean }[]
+	records: HistoryRecord[]
 	error?: string
 }
 // The commands clients send for Find; protocol.ts includes them.
 export type FindCommand =
 	| { type: 'find'; request: string; query: string; kinds?: FindFilter[]; here?: string; limit?: number }
 	| { type: 'find-cancel' }
-	| Omit<FindPreview, 'cards' | 'error'>
+	| Omit<FindPreview, 'records' | 'error'>
 export type FindQuery = {
 	words: string[]
 	// "Quoted words": whole-word phrases.
