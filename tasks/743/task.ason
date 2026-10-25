@@ -1,0 +1,7 @@
+{
+	title: 'Equal answered question gaps',
+	spec: 'Answered web question cards leave one blank line between the header and body, equal to the blank line between quote and answer. Account for header bottom padding rather than adding the generic content inset. This restores the equal-gap invariant and matches existing terminal spacing.',
+	status: 'done',
+	needs: ['w4'],
+	foldInto: ['w4']
+}
