@@ -46,7 +46,7 @@ browserTest(
 					window: 100000,
 					files: 4,
 					effort: 'medium',
-					plan: { account: 1, accounts: 1, key: 'test' },
+					plan: { account: 'a1', accounts: 1, key: 'test' },
 				},
 			})
 			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })

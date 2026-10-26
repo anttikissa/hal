@@ -11,10 +11,10 @@ test('master usage replaces omitted data and isolates accounts', () => {
 			b: { '5h': { used: 95 } },
 		})
 		subscriptions.apply({ a: { '5h': { used: 52 } } })
-		expect(subscriptions.plan({ account: 1, accounts: 2, key: 'a' })).toEqual({ windows: { '5h': 52 }, resets: {} })
+		expect(subscriptions.plan({ account: 'a1', accounts: 2, key: 'a' })).toEqual({ windows: { '5h': 52 }, resets: {} })
 		expect(subscriptions.state.b!['5h']!.used).toBe(95)
 		subscriptions.apply({ b: { '5h': { used: 0 } } }, true)
-		expect(subscriptions.plan({ account: 1, accounts: 2, key: 'a' }).windows).toEqual({})
+		expect(subscriptions.plan({ account: 'a1', accounts: 2, key: 'a' }).windows).toEqual({})
 	} finally {
 		subscriptions.state = before
 	}

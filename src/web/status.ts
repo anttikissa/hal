@@ -81,7 +81,7 @@ function groups(st: ViewState): StatusGroup[] {
 	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
 	if (stats?.plan) {
 		let plan = stats.plan
-		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
+		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}` : ''}` }]
 		for (let [name, percent] of Object.entries(subscriptions.plan(plan).windows))
 			parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: clamp(percent) })
 		out.push({ parts })

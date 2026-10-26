@@ -39,7 +39,11 @@ function plan(id: string, model: string): Plan | undefined {
 			.pickAccount(kind as Kind, list, { session: id })
 			.find((a) => !auth.skipped(kind as Kind, a, parsed!.model))
 		if (!next || !subs.includes(next)) return undefined
-		return { account: subs.indexOf(next) + 1, accounts: subs.length, key: subscriptions.key(kind, next.name) }
+		return {
+			account: auth.slot(kind as Kind, list.indexOf(next)),
+			accounts: subs.length,
+			key: subscriptions.key(kind, next.name),
+		}
 	} catch {
 		// No login yet, or a broken credentials file: a turn says why.
 		return undefined

@@ -22,7 +22,7 @@ const info: StatusInfo = {
 	home: '/Users/me',
 	model: 'anthropic/claude-opus-5-5',
 	role: 'host',
-	stats: { effort: 'high', context: 87_000, window: 1_000_000, plan: { account: 1, accounts: 2, key: 'test' } },
+	stats: { effort: 'high', context: 87_000, window: 1_000_000, plan: { account: 'a1', accounts: 2, key: 'test' } },
 }
 
 const text = (i: StatusInfo, cols: number) =>
@@ -35,7 +35,7 @@ const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high ⣄ �
 test('a wide row shows every part, the right side flush right', () => {
 	let row = text(info, 140)
 	expect(row.startsWith(LEFT)).toBe(true)
-	expect(row.endsWith('host · Sub 1/2: 5h 18%, 7d 57%')).toBe(true)
+	expect(row.endsWith('host · Sub a1: 5h 18%, 7d 57%')).toBe(true)
 	expect(strings.visLen(row)).toBe(140)
 })
 

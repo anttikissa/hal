@@ -1,5 +1,5 @@
 {
-	version: 11,
+	version: 12,
 	changes: [
 		{
 			version: 2,
@@ -193,6 +193,17 @@
 					target: 'host/status-usage.UsageRow.slot',
 					description: 'Holds the account id (o1) instead of i/n',
 					port: 'Read it as an id'
+				}
+			]
+		},
+		{
+			version: 12,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'common/snapshot.Plan',
+					description: 'account is the /status id (o3), a string, instead of a 1-based number',
+					port: 'Show it as text'
 				}
 			]
 		}

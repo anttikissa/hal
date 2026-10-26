@@ -106,7 +106,7 @@ test('the plan is the subscription account the next request takes, with its wind
 		usage.observe('anthropic', 'two', h('0.18', '0.574'))
 		// A key, however unused, waits behind the least-used subscription.
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({
-			account: 2,
+			account: 'a2',
 			accounts: 2,
 			key: subscriptions.key('anthropic', 'two'),
 		})

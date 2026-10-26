@@ -41,7 +41,7 @@ test('details show all session facts and heat percentages from pushed Stats, inc
 				stats: {
 					context: 87000,
 					window: 1000000,
-					plan: { account: 2, accounts: 3, ...planData({ '5h': 18, '7d': 92 }) },
+					plan: { account: 'a2', accounts: 3, ...planData({ '5h': 18, '7d': 92 }) },
 				},
 			},
 		},
@@ -54,7 +54,7 @@ test('details show all session facts and heat percentages from pushed Stats, inc
 		'/w/project',
 		'Claude Opus 5.5',
 		'87k/1000k (9%)',
-		'Sub 2/3: 5h 18%, 7d 92%',
+		'Sub a2: 5h 18%, 7d 92%',
 	])
 	expect(groups.flatMap((g) => g.parts).filter((p) => p.heat !== undefined)).toEqual([
 		{ text: '9%', heat: 9 },
@@ -77,7 +77,7 @@ test('details show all session facts and heat percentages from pushed Stats, inc
 
 test('the model name fills by the shortest window, not the most used, ignoring model-specific ones', () => {
 	let plan = {
-		account: 1,
+		account: 'a1',
 		accounts: 1,
 		...planData({ '7d': 95, '7d_sonnet': 99, '5h': 30 }, { '5h': '2026-09-26T05:00:00Z' }),
 	}
@@ -90,7 +90,7 @@ test('the model name fills by the shortest window, not the most used, ignoring m
 
 test('a full 7d hides the 5h, and the name fills by the 7d', () => {
 	let plan = {
-		account: 1,
+		account: 'a1',
 		accounts: 1,
 		...planData({ '5h': 12, '7d': 100 }, { '5h': '2026-10-02T10:10:00Z', '7d': '2026-10-05T21:00:00Z' }),
 	}
@@ -108,5 +108,5 @@ test('without quota data the name stays neutral and no windows show', () => {
 	let none = withStats({})
 	expect(status.quota(none)).toBeUndefined()
 	expect(status.windows(none)).toEqual([])
-	expect(status.quota(withStats({ plan: { account: 1, accounts: 1, key: 'absent' } }))).toBeUndefined()
+	expect(status.quota(withStats({ plan: { account: 'a1', accounts: 1, key: 'absent' } }))).toBeUndefined()
 })

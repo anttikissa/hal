@@ -51,7 +51,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 	// Which subscription the windows belong to, as /status numbers its slots.
 	let slot = () => {
 		let p = props.view.transcript?.stats?.plan
-		return p && p.accounts > 1 ? `${p.account}/${p.accounts} ` : ''
+		return p && p.accounts > 1 ? `${p.account} ` : ''
 	}
 	let cwd = () => home.short(meta()?.cwd.replace(/(.)\/+$/, '$1') ?? '')
 	let outside = (e: MouseEvent) => {

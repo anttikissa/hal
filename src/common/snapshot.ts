@@ -69,7 +69,7 @@ export type Snapshot = {
 // `window`: the model's context window, when known. `sent`, `received`:
 // input and output tokens of the session's turns since this host
 // started. `plan`: the subscription account the session's next request
-// goes to: its place among the provider's subscription accounts
-// (1-based), the key into the client-wide subscription usage store.
+// goes to: its /status id (o3), how many subscriptions the provider
+// has, the key into the client-wide subscription usage store.
 export type Stats = { context?: number; window?: number; files?: number; plan?: Plan; effort?: string }
-export type Plan = { account: number; accounts: number; key: string }
+export type Plan = { account: string; accounts: number; key: string }

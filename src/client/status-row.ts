@@ -93,7 +93,7 @@ function right(info: StatusInfo): Part[][] {
 	let s = info.stats
 	let plan = s?.plan && { ...s.plan, ...subscriptions.plan(s.plan) }
 	if (plan) {
-		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
+		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}` : ''}` }]
 		let moot = usageWindows.moot(
 			Object.entries(plan.windows).map(([name, used]) => ({ name, used, resets: plan.resets?.[name] })),
 		)
