@@ -115,6 +115,15 @@ describe('full mode', () => {
 		expect(term.written).not.toContain('\x1b[3J')
 		expect(term.content()).toEqual(['$ hal', ...frameText()])
 	})
+
+	test('a cursor row in scrollback stays on the screen, so later rows land in place', () => {
+		// A question taller than the screen puts its cursor in scrollback.
+		setup(4, 30)
+		let frame = (lines: string[]) => ({ lines, cursor: { row: 0, col: 0 }, history: lines.length })
+		term.write(render.paint(frame(['a', 'b', 'c', 'd', 'e', 'f']), 4))
+		term.write(render.paint(frame(['a', 'b', 'c', 'D', 'e', 'f']), 4))
+		expect(term.screen()).toEqual(['c', 'D', 'e', 'f'])
+	})
 })
 
 describe('resize', () => {

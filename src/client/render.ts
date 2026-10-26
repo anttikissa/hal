@@ -265,8 +265,9 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 		while (first > 0 && first < lines.length && flows(lines[first - 1])) first--
 		if (same) {
 			// Nothing changed but the cursor.
-			let out = move(st.cursorRow, next.cursor.row) + render.column(next.cursor.col)
-			st.cursorRow = next.cursor.row
+			let to = onScreen(next.cursor.row, lines.length, rows)
+			let out = move(st.cursorRow, to) + render.column(next.cursor.col)
+			st.cursorRow = to
 			if (lines.length > rows) st.fullscreen = true
 			st.shape = shape
 			return [out]
@@ -361,12 +362,19 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 	if (lines.length > rows) st.fullscreen = true
 	st.prev = lines
 	st.shape = shape
-	st.cursorRow = next.cursor.row
+	st.cursorRow = onScreen(next.cursor.row, lines.length, rows)
 	return [
 		SYNC_ON + HIDE_CURSOR,
 		...body,
-		move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF,
+		move(row, st.cursorRow) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF,
 	]
+}
+
+// The cursor row clamped to the screen: cursor-up stops at its top, so
+// a row in scrollback (a form taller than the screen) would leave
+// cursorRow wrong and later rows written that far below their place.
+function onScreen(row: number, length: number, rows: number): number {
+	return Math.max(row, length - rows)
 }
 
 function column(col: number): string {
