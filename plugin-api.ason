@@ -1,5 +1,5 @@
 {
-	version: 17,
+	version: 18,
 	changes: [
 		{
 			version: 2,
@@ -271,6 +271,16 @@
 					target: 'common/schedule-time',
 					description: 'Removes unused format',
 					port: 'Keep the original timing text for display'
+				}
+			]
+		},
+		{
+			version: 18,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/models-dev',
+					description: 'Optional strict refresh errors'
 				}
 			]
 		}

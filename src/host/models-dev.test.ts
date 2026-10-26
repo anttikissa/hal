@@ -92,6 +92,7 @@ test('a failed fetch keeps the old cache and is noted only in diagnostics', asyn
 	]) {
 		answer = fail
 		expect(await modelsDev.refresh(['anthropic/claude-big-2'])).toEqual([])
+		await expect(modelsDev.refresh([], true)).rejects.toThrow()
 	}
 	expect(readFileSync(modelsDev.file(), 'utf-8')).toBe(before)
 	expect(modelsDev.contextWindow('anthropic/claude-big-2')).toBe(1_000_000)

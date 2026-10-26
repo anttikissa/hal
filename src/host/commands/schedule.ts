@@ -9,7 +9,7 @@ import { scheduler, type Job } from '../scheduler.ts'
 import { tabs } from '../tabs.ts'
 import { models } from '../models.ts'
 
-const operations = ['list', 'add', 'pause', 'resume', 'remove']
+const operations = ['list', 'show', 'add', 'pause', 'resume', 'remove']
 function show(j: Job): string {
 	let id = j.run?.session,
 		tab = id ? tabs.file().open.indexOf(id) : -1
@@ -17,14 +17,13 @@ function show(j: Job): string {
 		? `[${tab < 0 ? id + ' (closed)' : `tab ${tab + 1}`}](${settings.webUrl().replace(/\/$/, '')}/${id})`
 		: 'none'
 	let next = new Date(j.next).toLocaleString('en-GB', { timeZone: j.timezone })
-	return `${j.id}. ${j.paused ? 'Paused' : scheduler.active(j) ? 'Running' : 'Waiting'} - ${j.prompt}
+	return `${j.id}. ${j.paused ? 'Paused' : scheduler.active(j) ? 'Running' : 'Waiting'} - ${j.prompt.split('\n')[0].slice(0, 100)}
 ${j.when} | Next: ${j.paused ? 'none' : next} | ${j.timezone}
-Last run: ${link}${j.run?.result ? ` - ${j.run.result}` : ''}
-${ason.stringify(Object.fromEntries(scheduler.keys.map((key) => [key, j[key]])))}`
+Last run: ${link}${j.run?.result ? ` - ${j.run.result}` : ''}`
 }
 export const command: SlashCommand = {
 	help: () => `/schedule lists jobs. /schedule add {when: "30m", prompt: "Check tests"}
-/schedule pause|resume|remove ID. To change settings, remove and add again. Stop current work in its session.
+/schedule show|pause|resume|remove ID. To change settings, remove and add again. Stop current work in its session.
 Options: cwd (current), timezone (client IANA zone), model (default or model/alias). Runs open fresh tabs that stay open.
 Times: 30m, hourly at :20, monday at 12:00, daily at 09:00, 09:00..19:00 every 1h. DST repeats run twice; missing minutes skip.
 Active runs skip occurrences. Downtime catches up once. Interrupted work is not retried. Pause affects future runs only.`,
@@ -44,7 +43,7 @@ Active runs skip occurrences. Downtime catches up once. Interrupted work is not 
 	run(args, _answers, ctx) {
 		let store = scheduler.file()
 		if (!args || args === 'list') return { say: store.jobs.map(show).join('\n\n') || 'No scheduled jobs.' }
-		let match = /^(add|pause|resume|remove)(?:\s+(\d+))?(?:\s+([\s\S]+))?$/.exec(args)
+		let match = /^(show|add|pause|resume|remove)(?:\s+(\d+))?(?:\s+([\s\S]+))?$/.exec(args)
 		if (!match) return { error: command.help!('') }
 		let [, op, id, text] = match
 		let j = store.jobs.find((job) => job.id === Number(id))
@@ -62,6 +61,7 @@ Active runs skip occurrences. Downtime catches up once. Interrupted work is not 
 			j = store.jobs.at(-1)!
 		} else {
 			if (text) return { error: `Usage: /schedule ${op} ID` }
+			if (op === 'show') return { say: ason.stringify(j) }
 			if (op === 'remove') {
 				if (scheduler.active(j!)) return { error: 'Stop the active run in its session before removing this job.' }
 				store.jobs = store.jobs.filter((job) => job !== j)

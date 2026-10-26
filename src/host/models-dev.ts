@@ -111,12 +111,12 @@ function parse(data: unknown): Catalog {
 
 // Fetches the catalog and replaces the cache (in a worker: task 7j).
 // Returns the ids ("provider/model") among `picked` the old cache
-// listed and the new one does not; failures go to diagnostics only.
-async function refresh(picked: string[] = []): Promise<string[]> {
+// listed and the new one does not; strict callers receive failures.
+async function refresh(picked: string[] = [], strict = false): Promise<string[]> {
 	if (modelsDev.offline()) return []
 	try {
 		let res = await provider.fetch(modelsDev.url, { signal: AbortSignal.timeout(modelsDev.timeoutMs) })
-		if (!res.ok) throw new Error(`HTTP ${res.status}`)
+		if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
 		let body = await res.arrayBuffer()
 		let before = picked.filter((id) => modelsDev.info(id))
 		let reply = await modelsDevWorker.run({
@@ -129,6 +129,7 @@ async function refresh(picked: string[] = []): Promise<string[]> {
 		modelsDev.state.path = modelsDev.file()
 		return before.filter((id) => !modelsDev.info(id))
 	} catch (e: any) {
+		if (strict) throw e
 		diag.log(`models.dev: ${e?.message ?? e}`)
 		return []
 	}
