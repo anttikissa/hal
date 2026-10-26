@@ -15,7 +15,8 @@
 		"Selected item color (2026-10-05, user chose option G of eight): colors.popupCurrent(around) is a derived color, a lighter tint (L 0.42, C 0.11) of the surrounding fg's hue, neutral gray when that fg has no chroma. The old fixed orange read as brown on the green question. The web already reverses the block's own color (task gn), so only the terminal changed.",
 		"Question blocks are headed by titles.title: time and form text. Terminal: itemView question case and formView.formLines(st, width, ts) wrap it; frame.layout marks the open form's #q<n> through frame.ref. Web: Card's who() and Question's CardHeader label render it with URL links; view.show's body is the quote and the answer.",
 		'User 2026-10-14: the in-block hint row (Enter: answer · Escape: skip) starts at column 0, aligned with the question text; fields keep their 2-column indent.',
-		'Active questions render inline at their history position, above the tab bar, in both clients. Task 9am moved them between the tab bar and the composer; the user rejected that (2026-10-26) and it was reverted: nothing renders between the tab bar and the prompt box.'
+		'Active questions render inline at their history position, above the tab bar, in both clients. Task 9am moved them between the tab bar and the composer; the user rejected that (2026-10-26) and it was reverted: nothing renders between the tab bar and the prompt box.',
+		'Bug fix invariant: a choice field whose initial is out of range starts on its first option instead of crashing the terminal.'
 	],
 	needs: ['j1']
 }

@@ -216,6 +216,12 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	expect(read(client, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
 	expect(read(server, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
 
+	// Changes on one side only start on taking them; there is no merge.
+	put(client, 'notes.ts', 'A\nB\nc\nd\nE\n')
+	let ff = await step()
+	expect(ff.ask.fields[0].options[ff.ask.fields[0].initial]).toEndWith("'s changes")
+	await step({ choice: 'Not now' })
+
 	put(client, 'notes.ts', 'mine\nb\nc\nd\nE\n')
 	put(server, 'notes.ts', 'theirs\nb\nc\nd\nE\n')
 	q = await step()

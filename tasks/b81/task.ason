@@ -17,7 +17,8 @@ This is a terminal feature. Web gets a discrepancy indicator only if existing sh
 		'Each /sync replaces the review tab with a new session (user: a reused tab showed a long transcript of old reviews and stale warnings). This supersedes the wiring note: no tab is focused or reopened.',
 		'Simplest first (user): one git diff -c view replaced per-choice diffs and the config.ason per-setting merge. git diff --cc was rejected: it hides hunks where the result equals one side, so a one-sided change would not show. Known cost: adjacent insertions (common in sorted config.ason) and copies without shared history conflict.',
 		'Bug fix invariant: /sync typed in the review tab itself follows to its replacement. The host sends the go before closing the old tab; a terminal whose tab closes first moves to a neighbor and ignores the go.',
-		'Bug fix invariant: combining config.ason keeps a comment changed on one side only. combine built its result into the parsed client object, overwriting the client comments it then compared, so the client edited comments were silently lost.'
+		'Bug fix invariant: combining config.ason keeps a comment changed on one side only. combine built its result into the parsed client object, overwriting the client comments it then compared, so the client edited comments were silently lost.',
+		'Bug fix invariant: a sync question starts on an option it offers. A fast-forward offered no merge, yet initial named merge; findIndex gave -1 and the terminal crashed in forms.start.'
 	],
 	needs: ['zh7', '4c1', 'b66', 'ty', 'w4'],
 	foldInto: ['an']

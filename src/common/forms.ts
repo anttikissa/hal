@@ -195,7 +195,7 @@ function summary(form: Form, answers: Answers, secrets: string[] = []): string[]
 function start(id: string, form: Form): FormState {
 	let values = form.fields.map((f) =>
 		f.type === 'choice'
-			? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]!
+			? f.options[Math.max(0, Math.min(f.initial ?? 0, f.options.length - 1))]!
 			: f.type === 'secret'
 				? ''
 				: (f.initial ?? ''),

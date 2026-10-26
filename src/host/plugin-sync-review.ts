@@ -230,7 +230,8 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 				`**${host()}** gets the copy on **${me()}**. ${kept}${shows.client}`,
 			])
 		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
-		initial = m.conflicts ? 'later' : 'merge'
+		// The merge, or the one copy that already holds both, leads.
+		initial = m.conflicts ? 'later' : options[0]![1]
 	}
 	options.push(
 		[LATER, 'later', 'Nothing changes. /sync asks again next time.'],
