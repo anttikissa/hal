@@ -154,23 +154,22 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		let { client = '', server = '', base } = texts
 		let m = (merged =
 			file === 'config.ason' ? configSync.combine(base, client, server) : textDiff.merge(base ?? '', client, server))
-		// What answering gives: its result against both copies, under a
-		// legend of the marks it shows, each line in its mark's color.
-		let preview = (result: string) => {
-			let view = textDiff.combined(result, client, server)
-			let rows = view.split('\n')
-			let marks = (col: number, name: string) =>
-				[
-					['+', 'gets'],
-					['-', 'loses'],
-				].flatMap(([m, verb]) =>
-					rows.some((r) => r[col] === m)
-						? [`${' '.repeat(col)}${m}${' '.repeat(2 - col)}${name} ${verb} this line`]
-						: [],
-				)
-			let legend = [...marks(0, me()), ...marks(1, host())]
-			return `\n\n${diffs.fence([...legend, '', view].join('\n'), 'combined-diff')}`
-		}
+		// Each computer's changes since the version both share, under a
+		// legend of the marks shown: git diff -c of the base against both
+		// copies, its signs flipped so + is what that computer added.
+		let flip = (row: string) => row.replace(/^[-+ ]{2}/, (m) => m.replace(/[-+]/g, (c) => (c === '+' ? '-' : '+')))
+		let rows = textDiff
+			.combined(base ?? '', client, server)
+			.split('\n')
+			.map(flip)
+		let marks = (col: number, name: string) =>
+			[
+				['+', 'added'],
+				['-', 'deleted'],
+			].flatMap(([mark, verb]) =>
+				rows.some((r) => r[col] === mark) ? [`${' '.repeat(col)}${mark}${' '.repeat(2 - col)}${name} ${verb}`] : [],
+			)
+		let changes = diffs.fence([...marks(0, me()), ...marks(1, host()), '', ...rows].join('\n'), 'combined-diff')
 		if (m.conflicts)
 			options.push([
 				'I merged it myself',
@@ -185,21 +184,13 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 					: ff === 'server'
 						? [`Use ${host()}'s changes`, `**${me()}** gets the changes on **${host()}**.`]
 						: [`Use ${me()}'s changes`, `**${host()}** gets the changes on **${me()}**.`]
-			options.push([label, ff, `${outcome} ${kept}${preview(m.text)}`])
+			options.push([label, ff, `${outcome} ${kept}`])
 		}
 		if (m.conflicts || m.text !== server)
-			options.push([
-				`Use ${host()}'s copy`,
-				'server',
-				`**${me()}** gets the copy on **${host()}**. ${kept}${preview(server)}`,
-			])
+			options.push([`Use ${host()}'s copy`, 'server', `**${me()}** gets the copy on **${host()}**. ${kept}`])
 		if (m.conflicts || m.text !== client)
-			options.push([
-				`Use ${me()}'s copy`,
-				'client',
-				`**${host()}** gets the copy on **${me()}**. ${kept}${preview(client)}`,
-			])
-		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
+			options.push([`Use ${me()}'s copy`, 'client', `**${host()}** gets the copy on **${me()}**. ${kept}`])
+		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n'), changes].join('\n\n')
 		initial = m.conflicts ? 'later' : 'merge'
 	}
 	options.push(
