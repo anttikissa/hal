@@ -182,15 +182,31 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			})
 			return shown
 		}
-		// A choice's preview: the changes it keeps, under a legend of the
-		// marks shown, each in the colors of the computer that made them.
-		let preview = (shown: string[]) => {
+		// Taking one copy undoes the other computer's changes: its column's
+		// marks flip, so a line it added shows as deleted. Lines both made
+		// stay as they are.
+		let undo = (col: number) =>
+			rows.map((r) =>
+				r === '…' || r[col] === ' ' || r[col] === r[1 - col]
+					? r
+					: Object.assign([...r], { [col]: r[col] === '+' ? '-' : '+' }).join(''),
+			)
+		let changed = (col: number) => rows.some((r) => r !== '…' && r[col] !== ' ')
+		// A choice's preview under a legend of the marks shown, each in the
+		// colors of the computer that made the change.
+		let preview = (shown: string[], undone?: number) => {
 			let marks = (col: number, name: string) =>
-				[
-					['+', 'added'],
-					['-', 'deleted'],
-				].flatMap(([mark, verb]) =>
-					shown.some((r) => r[col] === mark) ? [`${' '.repeat(col)}${mark}${' '.repeat(2 - col)}${name} ${verb}`] : [],
+				(col === undone
+					? [
+							['-', `${name}'s addition, discarded`],
+							['+', `${name}'s deletion, undone`],
+						]
+					: [
+							['+', `${name} added`],
+							['-', `${name} deleted`],
+						]
+				).flatMap(([mark, text]) =>
+					shown.some((r) => r[col] === mark) ? [`${' '.repeat(col)}${mark}${' '.repeat(2 - col)}${text}`] : [],
 				)
 			let legend = [...marks(0, me()), ...marks(1, host())]
 			return legend.length ? `\n\n${diffs.fence([...legend, '', ...shown].join('\n'), 'combined-diff')}` : ''
@@ -201,6 +217,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			client: preview(only(0)),
 			server: preview(only(1)),
 		}
+		let discards = (col: number, name: string) => (changed(col) ? ` **${name}**'s changes are discarded.` : '')
 		if (m.conflicts)
 			options.push([
 				'I merged it myself',
@@ -221,13 +238,13 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			options.push([
 				`Use ${host()}'s copy`,
 				'server',
-				`**${me()}** gets the copy on **${host()}**. ${kept}${shows.server}`,
+				`**${me()}** gets the copy on **${host()}**.${discards(0, me())} ${kept}${preview(undo(0), 0)}`,
 			])
 		if (m.conflicts || m.text !== client)
 			options.push([
 				`Use ${me()}'s copy`,
 				'client',
-				`**${host()}** gets the copy on **${me()}**. ${kept}${shows.client}`,
+				`**${host()}** gets the copy on **${me()}**.${discards(1, host())} ${kept}${preview(undo(1), 1)}`,
 			])
 		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
 		// The merge, or the one copy that already holds both, leads.

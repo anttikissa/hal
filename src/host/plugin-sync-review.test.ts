@@ -186,13 +186,13 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	let again = await step({ choice: "Use example.com's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// Taking the server's copy previews only the server's changes, in its
-	// column, under a legend of only the marks shown.
+	// Taking the server's copy previews its changes and this computer's
+	// discarded ones as deleted rows, under a legend of only the marks shown.
 	let field = again.ask.fields[0]
 	let preview = field.outcomes[field.options.indexOf("Use example.com's copy")]
-	expect(preview).toContain('```combined-diff\n + example.com added\n\n')
-	expect(preview).not.toContain('deleted')
-	expect(preview).toContain('\n +export const portable = true // solarized')
+	expect(preview).toContain("'s changes are discarded.")
+	expect(preview).toContain("'s addition, discarded\n + example.com added\n\n")
+	expect(preview).toContain('\n- export const portable = true // dark\n +export const portable = true // solarized')
 
 	let done = await step({ choice: "Use example.com's copy" })
 	expect(done.say).toContain('for theme.ts:')
