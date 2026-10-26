@@ -170,6 +170,7 @@ export const colors = {
 		removeFg: gray(0.62),
 		add2Fg: [0.78, 0.12, 245],
 		remove2Fg: [0.78, 0.13, 55],
+		contextFg: gray(0.78),
 	}),
 	// The web page's own surfaces (custom properties on .page), taken from
 	// the terminal's fields so both match: fields and the focus accent are

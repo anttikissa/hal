@@ -24,6 +24,10 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
   captions ("Sent after this turn ends."). Add a hint only where it
   says something the screen doesn't.
 - Propose color changes to the user with options before they land.
+- One meaning, one color, everywhere: the same meaning never gets
+  different colors in different places (an EDIT diff and a sync diff
+  share every tone). Derive a color from the theme field that names
+  its meaning, never from whatever text surrounds it.
 
 Task gn holds the rest of the user's choices (selection, focus, tabs).
 Readable text (below) still applies.
