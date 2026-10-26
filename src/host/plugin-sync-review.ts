@@ -215,7 +215,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		],
 	)
 	let ask: Form = {
-		text: `Sync ${file}?${file === 'config.ason' ? '\nOnly portable settings and their comments sync. Local settings and the file itself stay put.' : ''}`,
+		text: `Sync ${file}?`,
 		fields: [
 			{
 				type: 'choice',

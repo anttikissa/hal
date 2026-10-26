@@ -21,7 +21,12 @@ function text(data: ason.AsonObject): string {
 
 function view(bytes?: Uint8Array): Buffer | undefined {
 	let data = configSync.parse(bytes)
-	for (let key of Object.keys(data)) if (!configSync.portable(key)) delete data[key]
+	// Re-adding keys in sorted order makes a moved setting no change
+	for (let key of Object.keys(data).sort()) {
+		let value = data[key]!
+		delete data[key]
+		if (configSync.portable(key)) data[key] = value
+	}
 	let result = text(data)
 	return result === '{}\n' ? undefined : Buffer.from(result)
 }
