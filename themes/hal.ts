@@ -168,8 +168,14 @@ export const look: Look = {
 	// Exit 1 is neutral; other nonzero statuses use the error red (tasks wm0, j92).
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
 	// Edit diffs: soft pastels, easy on the eyes. Errors and exit
-	// statuses share the removal red.
-	diff: (): Style => ({ addFg: [0.8, 0.16, 146], removeFg: [0.72, 0.16, 28] }),
+	// statuses share the removal red. A combined diff's second column
+	// (add2, remove2) is blue and orange.
+	diff: (): Style => ({
+		addFg: [0.8, 0.16, 146],
+		removeFg: [0.72, 0.16, 28],
+		add2Fg: [0.78, 0.13, 245],
+		remove2Fg: [0.8, 0.14, 65],
+	}),
 	// The web page's own surfaces (custom properties on .page), taken from
 	// the terminal's fields so both match: fields and the focus accent are
 	// the prompt's colors, text and buttons plain's, borders the terminal

@@ -1,5 +1,5 @@
 // On-demand text diff generation, independent of its consumers (task k8y).
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { paths } from './paths.ts'
 
 // `numbered`: each row keeps its sign and the line's number, the old
@@ -63,37 +63,53 @@ function hunks(out: string): string[] | undefined {
 	return start < 0 ? undefined : lines.slice(start).filter((line) => line !== '')
 }
 
-// A three-way merge of `ours` and `theirs` from `base`: the merged text,
-// with conflict markers when `conflicts` (their count) is above 0, and
-// `view`, git's combined diff of it against ours (first column) and
-// theirs (second).
-function merge(base: string, ours: string, theirs: string): { text: string; conflicts: number; view: string } {
+// Runs `fn` with a private scratch directory holding `files`; `git`
+// runs there, failing loudly unless `ok` accepts the exit code.
+function scratch<T>(
+	files: Record<string, string>,
+	fn: (git: (args: string[], stdin?: string, ok?: (code: number) => boolean) => { out: string; code: number }) => T,
+): T {
 	let root = paths.tmpDir()
 	mkdirSync(root, { recursive: true })
 	let dir = mkdtempSync(`${root}/merge-`)
-	let git = (args: string[], stdin?: string) => {
-		let r = Bun.spawnSync(['git', '-C', dir, ...args], { stdin: stdin === undefined ? 'ignore' : Buffer.from(stdin) })
-		if (r.exitCode < 0 || r.exitCode > 127 || (r.exitCode && args[0] !== 'merge-file'))
-			throw new Error(`git ${args[0]} failed (${r.exitCode}) at ${dir}:\n${r.stderr.toString()}`)
-		return { out: r.stdout.toString(), code: r.exitCode }
-	}
 	try {
-		writeFileSync(`${dir}/base`, base, { mode: 0o600 })
-		writeFileSync(`${dir}/f`, ours, { mode: 0o600 })
-		writeFileSync(`${dir}/server`, theirs, { mode: 0o600 })
-		git(['init', '-q'])
-		// The three versions as merge stages, so git diff shows the merge.
-		let ids = git(['hash-object', '-w', 'base', 'f', 'server']).out.trim().split('\n')
-		git(['update-index', '--index-info'], ids.map((id, i) => `100644 ${id} ${i + 1}\tf\n`).join(''))
-		let names = ['-L', 'local', '-L', 'base', '-L', 'server']
-		let conflicts = git(['merge-file', ...names, 'f', 'base', 'server']).code
-		let view = git(['diff', '-c', '-U1', '--no-color', '--no-ext-diff', '--text', 'f']).out
-		let rows = (hunks(view) ?? []).map((line) => (line.startsWith('@@') ? '…' : line))
-		if (rows[0] === '…') rows.shift()
-		return { text: readFileSync(`${dir}/f`, 'utf8'), conflicts, view: rows.join('\n') }
+		for (let [name, text] of Object.entries(files)) writeFileSync(`${dir}/${name}`, text, { mode: 0o600 })
+		return fn((args, stdin, ok = (code) => code === 0) => {
+			let r = Bun.spawnSync(['git', '-C', dir, ...args], { stdin: stdin === undefined ? 'ignore' : Buffer.from(stdin) })
+			if (!ok(r.exitCode)) throw new Error(`git ${args[0]} failed (${r.exitCode}) at ${dir}:\n${r.stderr.toString()}`)
+			return { out: r.stdout.toString(), code: r.exitCode }
+		})
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
 }
 
-export const textDiff = { text, merge }
+// A three-way merge of `ours` and `theirs` from `base`: the merged text,
+// with conflict markers when `conflicts` (their count) is above 0.
+function merge(base: string, ours: string, theirs: string): { text: string; conflicts: number } {
+	return scratch({ base, ours, theirs }, (git) => {
+		let r = git(
+			['merge-file', '-p', '-L', 'local', '-L', 'base', '-L', 'server', 'ours', 'base', 'theirs'],
+			undefined,
+			(code) => code >= 0 && code < 128,
+		)
+		return { text: r.out, conflicts: r.code }
+	})
+}
+
+// Git's combined diff (git diff -c) of `result` against `ours` (first
+// column) and `theirs` (second): what each side gains and loses.
+function combined(result: string, ours: string, theirs: string): string {
+	return scratch({ f: result, ours, theirs }, (git) => {
+		git(['init', '-q'])
+		// The two sides as merge stages 2 and 3 of f, so git diff compares f with both.
+		let ids = git(['hash-object', '-w', 'ours', 'theirs']).out.trim().split('\n')
+		git(['update-index', '--index-info'], ids.map((id, i) => `100644 ${id} ${i + 2}\tf\n`).join(''))
+		let view = git(['diff', '-c', '-U1', '--no-color', '--no-ext-diff', '--text', 'f']).out
+		let rows = (hunks(view) ?? []).map((line) => (line.startsWith('@@') ? '…' : line))
+		if (rows[0] === '…') rows.shift()
+		return rows.join('\n')
+	})
+}
+
+export const textDiff = { text, merge, combined }

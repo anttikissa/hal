@@ -17,6 +17,7 @@ import { diff as diffs } from '../common/diff.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
 import { titles } from '../common/titles.ts'
+import { configSync } from './config-sync.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
@@ -36,7 +37,7 @@ type Asked = {
 	key?: string
 }
 type Texts = { client?: string; server?: string; base?: string }
-type Merged = { text: string; conflicts: number; view: string }
+type Merged = { text: string; conflicts: number }
 
 const LATER = 'Not now'
 const DONE = 'Done'
@@ -150,8 +151,11 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		say = presence(d)
 		initial = absent(d.server) ? 'client' : 'server'
 	} else {
-		let { client = '', server = '', base = '' } = texts
-		let m = (merged = textDiff.merge(base, client, server))
+		let { client = '', server = '', base } = texts
+		let m = (merged =
+			file === 'config.ason' ? configSync.combine(base, client, server) : textDiff.merge(base ?? '', client, server))
+		// What answering gives: its result against both copies.
+		let preview = (result: string) => `\n\n${diffs.fence(textDiff.combined(result, client, server), 'combined-diff')}`
 		if (m.conflicts)
 			options.push([
 				'I merged it myself',
@@ -160,17 +164,30 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			])
 		else {
 			let ff: Action = m.text === server ? 'server' : m.text === client ? 'client' : 'merge'
-			options.push(['Apply the changes above', ff, `Both computers get the result above. ${kept}`])
+			let [label, outcome] =
+				ff === 'merge'
+					? ['Use both changes', 'Both computers get both changes.']
+					: ff === 'server'
+						? [`Use ${host()}'s changes`, `**${me()}** gets the changes on **${host()}**.`]
+						: [`Use ${me()}'s changes`, `**${host()}** gets the changes on **${me()}**.`]
+			options.push([label, ff, `${outcome} ${kept}${preview(m.text)}`])
 		}
 		if (m.conflicts || m.text !== server)
-			options.push([`Use ${host()}'s copy`, 'server', `**${me()}** gets the copy on **${host()}**. ${kept}`])
+			options.push([
+				`Use ${host()}'s copy`,
+				'server',
+				`**${me()}** gets the copy on **${host()}**. ${kept}${preview(server)}`,
+			])
 		if (m.conflicts || m.text !== client)
-			options.push([`Use ${me()}'s copy`, 'client', `**${host()}** gets the copy on **${me()}**. ${kept}`])
+			options.push([
+				`Use ${me()}'s copy`,
+				'client',
+				`**${host()}** gets the copy on **${me()}**. ${kept}${preview(client)}`,
+			])
 		say = [
 			intro(d, texts, m),
 			[side(d, 'client'), side(d, 'server')].join('\n'),
-			`First column: changes to **${me()}**; second column: changes to **${host()}**.`,
-			diffs.fence(m.view, 'combined-diff'),
+			`Each choice previews its result: the first column marks changes to **${me()}**, the second changes to **${host()}**.`,
 		].join('\n\n')
 		initial = m.conflicts ? 'later' : 'merge'
 	}

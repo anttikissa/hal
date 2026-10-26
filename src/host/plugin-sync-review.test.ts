@@ -164,7 +164,7 @@ test('startup shows a count and one notice, never focus; Never sync drops a file
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
 	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
-	expect(next.say).toContain('```combined-diff\n')
+	expect(next.ask.fields[0].outcomes!.find((o: string) => o.includes('```combined-diff\n'))).toBeDefined()
 	expect(next.ask.text).toBe('Sync theme.ts?')
 
 	// Escape (no answer) is Not now: the file waits for the next /sync,
@@ -186,8 +186,12 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	let again = await step({ choice: "Use example.com's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// One combined view: copies with no shared history conflict as a whole.
-	expect(again.say).toContain('++<<<<<<< local\n++export const portable = true // dark\n')
+	// Each copy choice previews its result against both copies.
+	expect(again.ask!.fields[0].outcomes).toContainEqual(
+		expect.stringContaining(
+			'```combined-diff\n- export const portable = true // dark\n+ export const portable = true // solarized',
+		),
+	)
 
 	let done = await step({ choice: "Use example.com's copy" })
 	expect(done.say).toContain('for theme.ts:')
@@ -205,7 +209,7 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	put(server, 'notes.ts', 'a\nb\nc\nd\nE\n')
 	let q = await step()
 	expect(q.say).toContain('Both have changes to **notes.ts**; they merge cleanly.')
-	expect(q.ask.fields[0].options[0]).toBe('Apply the changes above')
+	expect(q.ask.fields[0].options[0]).toBe('Use both changes')
 	expect(q.ask.fields[0].initial).toBe(0)
 	await step({ choice: q.ask.fields[0].options[0] })
 	expect(read(client, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
