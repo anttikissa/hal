@@ -1,5 +1,5 @@
 // On-demand text diff generation, independent of its consumers (task k8y).
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { paths } from './paths.ts'
 
 // `numbered`: each row keeps its sign and the line's number, the old
@@ -29,11 +29,8 @@ function text(before: string, after: string, limit = Infinity, numbered = false)
 			throw new Error(
 				`git diff failed (${result.exitCode}) at ${dir}:\n${result.stderr.toString()}${result.stdout.toString()}`,
 			)
-		// Strip file headers only, not content lines beginning with --- or +++.
-		let lines = result.stdout.toString().split('\n'),
-			start = lines.findIndex((line) => line.startsWith('@@'))
-		if (start < 0) return result.stdout.toString().trimEnd()
-		lines = lines.slice(start).filter((line) => line !== '')
+		let lines = hunks(result.stdout.toString())
+		if (!lines) return result.stdout.toString().trimEnd()
 		if (numbered) {
 			let width = String(Math.max(before.split('\n').length, after.split('\n').length)).length,
 				old = 0,
@@ -58,21 +55,42 @@ function text(before: string, after: string, limit = Infinity, numbered = false)
 	}
 }
 
+// Git output's hunk rows, file headers stripped (not content lines
+// beginning with --- or +++); undefined without hunks.
+function hunks(out: string): string[] | undefined {
+	let lines = out.split('\n'),
+		start = lines.findIndex((line) => line.startsWith('@@'))
+	return start < 0 ? undefined : lines.slice(start).filter((line) => line !== '')
+}
+
 // A three-way merge of `ours` and `theirs` from `base`: the merged text,
-// with conflict markers when `conflicts` (their count) is above 0.
-function merge(base: string, ours: string, theirs: string): { text: string; conflicts: number } {
+// with conflict markers when `conflicts` (their count) is above 0, and
+// `view`, git's combined diff of it against ours (first column) and
+// theirs (second).
+function merge(base: string, ours: string, theirs: string): { text: string; conflicts: number; view: string } {
 	let root = paths.tmpDir()
 	mkdirSync(root, { recursive: true })
 	let dir = mkdtempSync(`${root}/merge-`)
+	let git = (args: string[], stdin?: string) => {
+		let r = Bun.spawnSync(['git', '-C', dir, ...args], { stdin: stdin === undefined ? 'ignore' : Buffer.from(stdin) })
+		if (r.exitCode < 0 || r.exitCode > 127 || (r.exitCode && args[0] !== 'merge-file'))
+			throw new Error(`git ${args[0]} failed (${r.exitCode}) at ${dir}:\n${r.stderr.toString()}`)
+		return { out: r.stdout.toString(), code: r.exitCode }
+	}
 	try {
-		writeFileSync(`${dir}/local`, ours, { mode: 0o600 })
 		writeFileSync(`${dir}/base`, base, { mode: 0o600 })
+		writeFileSync(`${dir}/f`, ours, { mode: 0o600 })
 		writeFileSync(`${dir}/server`, theirs, { mode: 0o600 })
+		git(['init', '-q'])
+		// The three versions as merge stages, so git diff shows the merge.
+		let ids = git(['hash-object', '-w', 'base', 'f', 'server']).out.trim().split('\n')
+		git(['update-index', '--index-info'], ids.map((id, i) => `100644 ${id} ${i + 1}\tf\n`).join(''))
 		let names = ['-L', 'local', '-L', 'base', '-L', 'server']
-		let result = Bun.spawnSync(['git', 'merge-file', '-p', ...names, `${dir}/local`, `${dir}/base`, `${dir}/server`])
-		if (result.exitCode < 0 || result.exitCode > 127)
-			throw new Error(`git merge-file failed (${result.exitCode}) at ${dir}:\n${result.stderr.toString()}`)
-		return { text: result.stdout.toString(), conflicts: result.exitCode }
+		let conflicts = git(['merge-file', ...names, 'f', 'base', 'server']).code
+		let view = git(['diff', '-c', '-U1', '--no-color', '--no-ext-diff', '--text', 'f']).out
+		let rows = (hunks(view) ?? []).map((line) => (line.startsWith('@@') ? '…' : line))
+		if (rows[0] === '…') rows.shift()
+		return { text: readFileSync(`${dir}/f`, 'utf8'), conflicts, view: rows.join('\n') }
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}

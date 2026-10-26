@@ -125,7 +125,11 @@ function block(b: Block, width: number, style?: Style): string[] {
 			...b.lines.flatMap((l) =>
 				ansi
 					.wrap(l, width)
-					.map((r) => (b.lang === 'diff' ? diffView.paint(r, diff.tone(l), style) : markdownView.code(r, style))),
+					.map((r) =>
+						diff.fenced(b.lang)
+							? diffView.paint(r, diff.tone(l, b.lang !== 'diff'), style)
+							: markdownView.code(r, style),
+					),
 			),
 			...close,
 		]

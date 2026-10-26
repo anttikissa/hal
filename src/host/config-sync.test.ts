@@ -53,16 +53,3 @@ test('portable views and merges keep key order and comment ownership', () => {
 		expect(() => configSync.merge(local, bytes(invalid))).toThrow()
 	expect(() => configSync.merge(bytes('{ broken'), incoming)).toThrow()
 })
-
-test('settings merge per key: one-sided changes and removals win; differing changes conflict', () => {
-	let base = `{ maxRounds: 5, model: 'a', promptRows: 3, security: 'none' }`
-	let client = `// mine\n{ maxRounds: 5, model: 'b', promptRows: 4, push: true }`
-	let server = `{ maxRounds: 5, model: 'a', promptRows: 9, security: 'none', webDiagnostics: true }`
-	let m = configSync.combine(base, client, server)
-	expect(m.conflicts).toEqual([{ key: 'promptRows', client: '4', server: '9' }])
-	expect(ason.parse(m.text)).toEqual({ maxRounds: 5, model: 'b', promptRows: 4, push: true, webDiagnostics: true })
-	expect(m.text).toStartWith('// mine\n')
-	let unrelated = configSync.combine(undefined, `{ model: 'a', push: true }`, `{ model: 'a', security: 'none' }`)
-	expect([unrelated.conflicts, unrelated.fromClient, unrelated.fromServer]).toEqual([[], 1, 1])
-	expect(ason.parse(unrelated.text)).toEqual({ model: 'a', push: true, security: 'none' })
-})

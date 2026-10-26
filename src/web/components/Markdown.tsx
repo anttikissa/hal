@@ -145,13 +145,13 @@ export function Markdown(props: {
 								</div>
 							</Match>
 							<Match when={b().type === 'code'}>
-								<pre class={c().lang === 'diff' ? 'diff' : undefined} data-lang={c().lang || undefined}>
+								<pre class={diff.fenced(c().lang) ? 'diff' : undefined} data-lang={c().lang || undefined}>
 									<code>
-										<Show when={c().lang === 'diff'} fallback={<Text value={c().lines.join('\n')} />}>
+										<Show when={diff.fenced(c().lang)} fallback={<Text value={c().lines.join('\n')} />}>
 											{/* A diff fence takes the diff colors, in both clients. */}
 											<For each={c().lines} keyed={false}>
 												{(l, i) => (
-													<span class={diff.tone(l())}>
+													<span class={diff.tone(l(), c().lang !== 'diff')}>
 														<Text value={(i ? '\n' : '') + l()} />
 													</span>
 												)}

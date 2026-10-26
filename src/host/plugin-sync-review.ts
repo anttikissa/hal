@@ -17,7 +17,6 @@ import { diff as diffs } from '../common/diff.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
 import { titles } from '../common/titles.ts'
-import { configSync } from './config-sync.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
@@ -37,8 +36,7 @@ type Asked = {
 	key?: string
 }
 type Texts = { client?: string; server?: string; base?: string }
-// A merge of both sides; `settings` names config.ason's conflicting settings.
-type Merged = { text: string; conflicts: number; settings?: { key: string; client: string; server: string }[] }
+type Merged = { text: string; conflicts: number; view: string }
 
 const LATER = 'Not now'
 const DONE = 'Done'
@@ -63,16 +61,6 @@ const copies = (file: string) => [`${pluginHistory.filePath(file)}.local`, `${pl
 const kept = 'The old copy stays in history.'
 
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
-
-// Lines added and removed from `from` to `to`: '+4 -3', '' if none.
-function tally(from = '', to = ''): string {
-	let rows = textDiff.text(from, to).split('\n')
-	return (['+', '-'] as const)
-		.map((c) => [c, rows.filter((r) => r[0] === c).length] as const)
-		.filter(([, n]) => n)
-		.map(([c, n]) => `${c}${n}`)
-		.join(' ')
-}
 
 // Starts comparing with host `name`; `show` puts the indicator (or
 // nothing) in the status row.
@@ -110,17 +98,6 @@ function side(d: Discrepancy, who: Choice): string {
 	return `- ${name}: ${STATUS[s.status]}changed ${when(s.ts)}`
 }
 
-// What replacing `name`'s copy with text `to` (from text `from`) shows.
-function change(name: string, file: string, from = '', to = ''): string {
-	if (from === to) return `${file} on **${name}** keeps its text; only its history changes.`
-	return [
-		`${where(file)} on **${name}** changes:`,
-		`\`+\` line added on ${name} · \`-\` line removed from ${name}`,
-		diffs.fence(textDiff.text(from, to)),
-		kept,
-	].join('\n\n')
-}
-
 // When only one side has the file, the question is whether to copy or
 // delete it: a diff of every line adds nothing, and deletion is never
 // preselected.
@@ -135,25 +112,17 @@ function presence(d: Discrepancy): string {
 	return `${subject} ${d.file === 'config.ason' ? 'are' : 'is'} only on the ${hasWho}, changed ${when(has.ts)}. The ${lacksWho} ${gone}.`
 }
 
-// How the two copies relate, first: who has news, or whether both do.
-function intro(d: Discrepancy, merged?: Merged): string {
-	let file = `**${d.file}**`
-	if (d.relation === 'client-ahead')
-		return `**${me()}** has a newer ${file}; **${host()}** has not changed it since they last matched.`
-	if (d.relation === 'server-ahead')
-		return `**${host()}** has a newer ${file}; **${me()}** has not changed it since they last matched.`
-	if (!merged) return `${file} differs on the two computers, and the copies share no history.`
-	let head =
-		d.relation === 'unrelated'
-			? `${file} differs on the two computers`
-			: `${file} changed on both computers since they last matched`
-	if (!merged.conflicts)
-		return `${head}. ${merged.settings ? "The settings don't conflict." : 'The changes merge cleanly.'}`
-	let what = merged.settings
-		? `Both changed ${merged.settings.map((c) => `\`${c.key}\` (${me()} \`${c.client}\`, ${host()} \`${c.server}\`)`).join(', ')}`
-		: `The changes conflict in ${count(merged.conflicts, 'place')}`
-	let [local, server] = copies(d.file)
-	return `${head}. ${what}. Both copies are beside it to merge by hand: ${local} and ${server}.`
+// How the two copies relate, in one line: who has changes, and whether
+// they merge.
+function intro(d: Discrepancy, texts: Texts, m: Merged): string {
+	let [mine, theirs] = [`**${me()}**`, `**${host()}**`]
+	if (m.conflicts) {
+		let [local, server] = copies(d.file)
+		return `${mine} and ${theirs} have incompatible changes to **${d.file}** in ${count(m.conflicts, 'place')}; choose how to resolve. Both copies are beside it to merge by hand: ${local} and ${server}.`
+	}
+	if (m.text === texts.client) return `${mine} has changes to **${d.file}**; ${theirs} can fast-forward.`
+	if (m.text === texts.server) return `${theirs} has changes to **${d.file}**; ${mine} can fast-forward.`
+	return `Both have changes to **${d.file}**; they merge cleanly.`
 }
 
 // The question about `d`, with everything needed to answer it and what
@@ -181,49 +150,29 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		say = presence(d)
 		initial = absent(d.server) ? 'client' : 'server'
 	} else {
-		let { client = '', server = '', base } = texts
-		let local = tally(base ?? server, client),
-			remote = tally(base ?? client, server)
-		let both = [local, remote]
-		if (file === 'config.ason' && (d.relation === 'divergent' || d.relation === 'unrelated')) {
-			let m = configSync.combine(base, client, server)
-			merged = { text: m.text, conflicts: m.conflicts.length, settings: m.conflicts }
-			both = [m.fromClient, m.fromServer].map((n) => (n ? count(n, 'setting') : ''))
-		} else if (d.relation === 'divergent') merged = textDiff.merge(base ?? '', client, server)
-		let parts = [both[0] && `local ${both[0]}`, both[1] && `server ${both[1]}`].filter(Boolean)
-		if (merged && !merged.conflicts)
-			options.push([
-				`Use both changes${parts.length ? ` (${parts.join(', ')})` : ''}`,
-				'merge',
-				[change(me(), file, client, merged.text), change(host(), file, server, merged.text)].join('\n\n'),
-			])
-		options.push(
-			[
-				`Use server${remote ? ` (${remote})` : ''}${local ? `, drop local changes (${local})` : ''}`,
-				'server',
-				change(me(), file, client, server),
-			],
-			[
-				`Use local${local ? ` (${local})` : ''}${remote ? `, drop server changes (${remote})` : ''}`,
-				'client',
-				change(host(), file, server, client),
-			],
-		)
-		if (merged?.conflicts)
+		let { client = '', server = '', base = '' } = texts
+		let m = (merged = textDiff.merge(base, client, server))
+		if (m.conflicts)
 			options.push([
 				'I merged it myself',
 				'mine',
 				`${where(file)} on **${me()}**, as it is when you answer, goes to **${host()}**. ${kept}`,
 			])
-		say = [intro(d, merged), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
-		initial =
-			merged && !merged.conflicts
-				? 'merge'
-				: d.relation === 'client-ahead'
-					? 'client'
-					: d.relation === 'server-ahead'
-						? 'server'
-						: 'later'
+		else {
+			let ff: Action = m.text === server ? 'server' : m.text === client ? 'client' : 'merge'
+			options.push(['Apply the changes above', ff, `Both computers get the result above. ${kept}`])
+		}
+		if (m.conflicts || m.text !== server)
+			options.push([`Use ${host()}'s copy`, 'server', `**${me()}** gets the copy on **${host()}**. ${kept}`])
+		if (m.conflicts || m.text !== client)
+			options.push([`Use ${me()}'s copy`, 'client', `**${host()}** gets the copy on **${me()}**. ${kept}`])
+		say = [
+			intro(d, texts, m),
+			[side(d, 'client'), side(d, 'server')].join('\n'),
+			`First column: changes to **${me()}**; second column: changes to **${host()}**.`,
+			diffs.fence(m.view, 'combined-diff'),
+		].join('\n\n')
+		initial = m.conflicts ? 'later' : 'merge'
 	}
 	options.push(
 		[LATER, 'later', 'Nothing changes. /sync asks again next time.'],

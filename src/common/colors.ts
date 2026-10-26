@@ -163,8 +163,14 @@ export const colors = {
 	popupModelCurrent: (): Style => ({ fg: gray(0.88), bg: gray(0.28) }),
 	// Exit 1 is neutral; other nonzero statuses use the error color (tasks wm0, j92).
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
-	// Edit diffs: additions bright, removals dim.
-	diff: (): Style => ({ addFg: gray(0.92), removeFg: gray(0.62) }),
+	// Edit diffs: additions bright, removals dim. A combined diff's second
+	// column (add2, remove2) is blue and orange.
+	diff: (): Style => ({
+		addFg: gray(0.92),
+		removeFg: gray(0.62),
+		add2Fg: [0.78, 0.12, 245],
+		remove2Fg: [0.78, 0.13, 55],
+	}),
 	// The web page's own surfaces (custom properties on .page), taken from
 	// the terminal's fields so both match: fields and the focus accent are
 	// the prompt's colors, text and buttons plain's, borders the terminal

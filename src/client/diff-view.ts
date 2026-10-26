@@ -7,7 +7,8 @@ import { ansi } from './ansi.ts'
 function paint(text: string, tone: DiffTone | 'head', style?: Style, strike = false): string {
 	if (tone === 'head' || ansi.mono()) return text
 	if (tone === 'dim') return ansi.quiet(text, style)
-	let fg = tone === 'add' ? colors.diff().addFg! : colors.diff().removeFg!
+	let d = colors.diff()
+	let fg = { add: d.addFg, del: d.removeFg, add2: d.add2Fg, del2: d.remove2Fg }[tone]!
 	return (
 		ansi.sgr({ fg }) +
 		(strike && tone === 'del' ? `\x1b[9m${text}\x1b[29m` : text) +

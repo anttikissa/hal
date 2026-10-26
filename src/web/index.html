@@ -419,20 +419,28 @@
 			.Card .change .add,
 			.Card .edit-diff .add,
 			.CardHeader .status .add,
-			.Markdown pre[data-lang='diff'] .add {
+			.Markdown pre.diff .add {
 				color: var(--add-fg);
 				--sel-back: var(--add-fg);
 			}
 			.Card .change .del,
 			.Card .edit-diff .del,
 			.CardHeader .status .del,
-			.Markdown pre[data-lang='diff'] .del {
+			.Markdown pre.diff .del {
 				color: var(--remove-fg);
 				--sel-back: var(--remove-fg);
 			}
+			.Markdown pre.diff .add2 {
+				color: var(--add2-fg);
+				--sel-back: var(--add2-fg);
+			}
+			.Markdown pre.diff .del2 {
+				color: var(--remove2-fg);
+				--sel-back: var(--remove2-fg);
+			}
 			.Card .change .dim,
 			.Card .edit-diff .dim,
-			.Markdown pre[data-lang='diff'] .dim {
+			.Markdown pre.diff .dim {
 				color: var(--quiet);
 				--sel-back: var(--quiet);
 			}

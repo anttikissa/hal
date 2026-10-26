@@ -36,7 +36,7 @@ export function palette(p: Palette): Look {
 		error: () => card(red),
 		warning: () => card(yellow),
 		exit: () => ({ fg: red, neutralFg: gray }),
-		diff: () => ({ addFg: green, removeFg: red }),
+		diff: (base) => ({ ...base(), addFg: green, removeFg: red }),
 		log: () => text(gray),
 		fork: () => card(p.accent),
 		commitCard: () => card(p.edit),

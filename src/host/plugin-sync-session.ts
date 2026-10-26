@@ -118,26 +118,6 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 	return {}
 }
 
-// /sync typed in session `from`: binds the review tab to the
-// typing terminal's home, focuses it there and starts it unless a turn
-// or question is under way.
-function open(from: string, cwd: string): { error?: string; say?: string } {
-	let rec = clients.state.senders.get(from)
-	let client = [...host.state.clients].find((c) => c.record === rec)
-	let home = client && pluginSync.state.followers.get(client)
-	if (!client || home === undefined)
-		return { say: "/sync compares this home's files with a server. Run hal -r <host> and use /sync there." }
-	if (home === pluginSync.home())
-		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
-	let id = find(nameFor(home), from, cwd)
-	pluginSyncSession.state.bound.set(id, { home, client })
-	let state = status.stateOf(id).type
-	if ((state === 'idle' || state === 'paused' || state === 'error') && !status.transition(id, { type: 'submit' }))
-		turns.start(id)
-	if (id !== from) host.broadcast(from, { type: 'go', sessionId: from, tab: id })
-	return {}
-}
-
 export const pluginSyncSession = {
 	// `bound`: the home (and terminal) each review session serves;
 	// `waiting`: settles a session's pending step.

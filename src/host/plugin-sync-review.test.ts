@@ -164,7 +164,7 @@ test('startup shows a count and one notice, never focus; Never sync drops a file
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
 	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
-	expect(next.ask.fields[0].outcomes[0]).toContain('```diff\n')
+	expect(next.say).toContain('```combined-diff\n')
 	expect(next.ask.text).toBe('Sync theme.ts?')
 
 	// Escape (no answer) is Not now: the file waits for the next /sync,
@@ -183,16 +183,13 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	await pluginSyncClient.compare()
 	await step()
 	put(server, 'theme.ts', 'export const portable = true // solarized')
-	let again = await step({ choice: 'Use local (+1 -1), drop server changes (+1 -1)' })
+	let again = await step({ choice: "Use example.com's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// Each choice previews the change it makes: the client gains the server's line, and the reverse.
-	let [toClient, toServer] = again.ask.fields[0].outcomes
-	expect(toServer).toContain('on **example.com** changes')
-	expect(toServer).toContain('+export const portable = true // dark')
-	expect(toClient).toContain('+export const portable = true // solarized')
+	// One combined view: copies with no shared history conflict as a whole.
+	expect(again.say).toContain('++<<<<<<< local\n++export const portable = true // dark\n')
 
-	let done = await step({ choice: again.ask.fields[0].options[0] })
+	let done = await step({ choice: "Use example.com's copy" })
 	expect(done.say).toContain('for theme.ts:')
 	expect(read(client, 'theme.ts')).toBe('export const portable = true // solarized')
 	expect(done.say).toContain('Synced files match example.com.')
@@ -207,8 +204,8 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	put(client, 'notes.ts', 'A\nb\nc\nd\ne\n')
 	put(server, 'notes.ts', 'a\nb\nc\nd\nE\n')
 	let q = await step()
-	expect(q.say).toContain('changed on both computers since they last matched. The changes merge cleanly.')
-	expect(q.ask.fields[0].options[0]).toBe('Use both changes (local +1 -1, server +1 -1)')
+	expect(q.say).toContain('Both have changes to **notes.ts**; they merge cleanly.')
+	expect(q.ask.fields[0].options[0]).toBe('Apply the changes above')
 	expect(q.ask.fields[0].initial).toBe(0)
 	await step({ choice: q.ask.fields[0].options[0] })
 	expect(read(client, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
@@ -217,7 +214,7 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	put(client, 'notes.ts', 'mine\nb\nc\nd\nE\n')
 	put(server, 'notes.ts', 'theirs\nb\nc\nd\nE\n')
 	q = await step()
-	expect(q.say).toContain('The changes conflict in 1 place')
+	expect(q.say).toContain('incompatible changes to **notes.ts** in 1 place')
 	expect(read(client, 'notes.ts.server')).toBe('theirs\nb\nc\nd\nE\n')
 	expect(q.ask.fields[0].options).toContain('I merged it myself')
 	put(client, 'notes.ts', 'both\nb\nc\nd\nE\n')
