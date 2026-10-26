@@ -53,6 +53,17 @@ Before changing code, read tasks/README.md for architecture, module
 conventions and invariants, including emergency keys.
 Before changing UI, read STYLE.md.
 
+## Designing features
+
+When designing features, do:
+1. Failure-mode analysis: how will this hurt real users? Data loss,
+   silent wrong behavior, surprising results, breaking existing
+   behavior/data.
+2. Skeptical triage: drop findings that are wrong, already handled,
+   very rare, out of scope, or based on features the user didn't ask
+   for. Rank the rest by likelihood × impact (silent > loud).
+   Report only survivors.
+
 ## Writing specs and system prompts / AGENTS.md
 
 Apply Strunk & White: omit needless words. Use plain technical English;
