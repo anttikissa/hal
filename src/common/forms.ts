@@ -21,6 +21,8 @@ export type Field = { help?: string } &
 		// move between fields. `cards`: a card kind (card.kinds) whose cards
 		// start as the chosen option while the form is open: a live preview.
 		// `preview: 'theme'`: the terminal shows the chosen theme meanwhile.
+		// `outcomes`: Markdown per option, what choosing it does, shown
+		// under the options for the chosen one.
 		| {
 				type: 'choice'
 				name: string
@@ -30,6 +32,7 @@ export type Field = { help?: string } &
 				inline?: true
 				cards?: string
 				preview?: 'theme'
+				outcomes?: string[]
 		  }
 	)
 
@@ -89,6 +92,13 @@ function invalid(value: unknown): string | undefined {
 			if (field.cards !== undefined && typeof field.cards !== 'string')
 				return `${field.name}: cards must be a card kind`
 			if (field.preview !== undefined && field.preview !== 'theme') return `${field.name}: preview must be 'theme'`
+			if (
+				field.outcomes !== undefined &&
+				(!Array.isArray(field.outcomes) ||
+					field.outcomes.length !== field.options.length ||
+					field.outcomes.some((o) => typeof o !== 'string'))
+			)
+				return `${field.name}: outcomes need one text per option`
 		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer')
 			return `${(field as Field).name}: unknown field type`
 		if (

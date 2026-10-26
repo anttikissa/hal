@@ -154,17 +154,17 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 	expect(first.ask.fields[0].options).toEqual([
 		'Copy to example.com',
 		'Delete here',
-		'Keep separate — ignore sync for keys.ts on this client',
+		"Don't sync keys.ts on this client",
 	])
 	expect(first.ask.fields[0].initial).toBe(0)
-	expect(first.say).toContain('example.com never had it')
+	expect(first.say).toContain('example.com**) never had it')
 	expect(first.say).not.toContain('```diff')
-	let next = await step({ choice: 'Keep separate — ignore sync for keys.ts on this client' })
+	let next = await step({ choice: "Don't sync keys.ts on this client" })
 	expect(next.say).toContain('Keeping keys.ts separate')
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
 	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
-	expect(next.say).toContain('```diff\n')
+	expect(next.ask.fields[0].outcomes[0]).toContain('```diff\n')
 	expect(next.ask.text).toStartWith('theme.ts')
 })
 
@@ -174,14 +174,18 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	await pluginSyncClient.compare()
 	await step()
 	put(server, 'theme.ts', 'export const portable = true // solarized')
-	let again = await step({ choice: 'Use client version' })
+	let again = await step({ choice: "Keep client's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	expect(again.say).toContain('+export const portable = true // dark')
+	// Each choice previews the change it makes: the server gains the client's line, and the reverse.
+	let [toServer, toClient] = again.ask.fields[0].outcomes
+	expect(toServer).toContain('on **example.com** changes')
+	expect(toServer).toContain('+export const portable = true // dark')
+	expect(toClient).toContain('+export const portable = true // solarized')
 	expect(again.ask.text).toStartWith('theme.ts')
 
-	let done = await step({ choice: 'Use server version' })
-	expect(done.say).toStartWith('Use server version for theme.ts: this client applied it.')
+	let done = await step({ choice: "Keep server's copy" })
+	expect(done.say).toStartWith("Keep server's copy for theme.ts: this client applied it.")
 	expect(read(client, 'theme.ts')).toBe('export const portable = true // solarized')
 	expect(done.say).toContain('Synced files match example.com.')
 	expect(done.ask).toBeUndefined()

@@ -289,6 +289,9 @@ lighter tint of its hue, gray around neutral text; inverse on
 monochrome). Up and down move
 through them, left and right alike, without wrapping round; past the
 first or last option they move to the field above or below.
+A choice may carry `outcomes`, Markdown per option saying what choosing
+it does; the chosen option's outcome shows under the options and
+follows the selection as it moves.
 On the web an open question is a card like the others (square, lit bar
 on the left, its style's tint behind) with a ✕ at its top right that
 dismisses it exactly as Escape does; tapping outside does not. Choice

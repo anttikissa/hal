@@ -8,6 +8,7 @@ import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
 import { ansi } from './ansi.ts'
 import { itemView } from './item-view.ts'
+import { markdownView } from './markdown-view.ts'
 import { promptView } from './prompt-view.ts'
 
 /**
@@ -82,6 +83,8 @@ function fieldLines(
 				if (o === value && focused) cursor = { row: rows.length, col: indent.length + 2 }
 				rows.push(strings.clipVisual(indent + mark(o), width))
 			}
+			let outcome = field.outcomes?.[field.options.indexOf(value)]
+			if (outcome) rows.push('', ...markdownView.lines(outcome, width, false, style))
 			return
 		}
 		// A secret shows one dot per character typed, never the text.

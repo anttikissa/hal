@@ -10,39 +10,42 @@
 // turn, so nothing reaches here and nothing is written.
 // Tasks: b81.
 
+import { hostname } from 'os'
 import { join } from 'path'
+import { diff as diffs } from '../common/diff.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError, type Choice, type Discrepancy, type SideInfo } from './plugin-sync-client.ts'
+import { textDiff } from './text-diff.ts'
 
 type Asked = { file: string; client?: string; server?: string; labels: [string, string] }
 
-const CLIENT = 'Use client version'
-const SERVER = 'Use server version'
-const keep = (file: string) => `Keep separate — ignore sync for ${file} on this client`
+const CLIENT = "Keep client's copy"
+const SERVER = "Keep server's copy"
+const keep = (file: string) => `Don't sync ${file} on this client`
 
-const RELATION: Record<Discrepancy['relation'], string> = {
-	'client-ahead': "the client is ahead: its version descends from the server's",
-	'server-ahead': "the server is ahead: its version descends from the client's",
-	divergent:
-		"divergent: both changed since a shared version, so either choice drops the other side's changes from the file",
-	unrelated: 'unrelated: the two versions share no history',
+const RELATION: Partial<Record<Discrepancy['relation'], string>> = {
+	divergent: "Both changed it since they last matched, so either choice loses the other's changes.",
+	unrelated: 'The two copies share no history.',
 }
 const STATUS: Record<SideInfo['status'], string> = {
-	present: 'present',
-	empty: 'empty file (0 bytes)',
-	deleted: 'deleted',
-	missing: 'missing (no history of this file)',
+	present: '',
+	empty: 'empty file, ',
+	deleted: 'deleted, ',
+	missing: 'missing, ',
 }
 
 const host = () => pluginSyncClient.state.name
+// This computer's name: its hostname without the domain.
+const me = () => hostname().split('.')[0] || 'this computer'
 const key = (d: Discrepancy) => `${d.file} ${d.client.id ?? ''} ${d.server.id ?? ''}`
 const where = (file: string) => (pluginSyncWire.isPlugin(file) ? `plugins/${file}` : file)
 const when = (ts?: string) => (ts ? `${ts.slice(0, 16).replace('T', ' ')} UTC` : 'no date')
 const absent = (s: SideInfo) => s.status === 'missing' || s.status === 'deleted'
 const oneSided = (d: Discrepancy) => absent(d.client) !== absent(d.server)
+const kept = 'The old copy stays in history.'
 
 // What choosing the client's, then the server's, version does to `d`.
 function labels(d: Discrepancy): [string, string] {
@@ -80,17 +83,21 @@ function changed(): void {
 		})
 }
 
-function side(who: string, s: SideInfo): string {
-	return `- ${who}: ${STATUS[s.status]}${s.id ? `, version ${s.id}` : ''}, recorded ${when(s.ts)}${s.offline ? ' (while offline)' : ''}`
+function side(d: Discrepancy, who: Choice): string {
+	let s = d[who]
+	let name = who === 'client' ? `**${me()}** (here)` : `**${host()}**`
+	return `- ${who === 'client' ? 'Client' : 'Server'}: ${name}, ${STATUS[s.status]}edited ${when(s.ts)}${s.offline ? ' (offline)' : ''}${d.suggest === who ? ' ← newer' : ''}`
 }
 
-// What replacing `to`'s file with `from`'s version does.
-function effect(from: SideInfo, where: string): string {
-	return from.status === 'missing' || from.status === 'deleted'
-		? `deletes ${where}`
-		: from.status === 'empty'
-			? `replaces ${where} with an empty file`
-			: `replaces ${where}`
+// What replacing `name`'s copy with text `to` (from text `from`) shows.
+function change(name: string, file: string, from = '', to = ''): string {
+	if (from === to) return `${file} on **${name}** keeps its text; only its history changes.`
+	return [
+		`${where(file)} on **${name}** changes:`,
+		`\`+\` line added on ${name} · \`-\` line removed from ${name}`,
+		diffs.fence(textDiff.text(from, to)),
+		kept,
+	].join('\n\n')
 }
 
 // When only one side has the file, the question is whether to copy or
@@ -99,36 +106,49 @@ function effect(from: SideInfo, where: string): string {
 function presence(d: Discrepancy): string {
 	let mine = absent(d.server)
 	let [has, lacks] = mine ? [d.client, d.server] : [d.server, d.client]
-	let [hasWho, lacksWho] = mine ? ['This client', host()] : [host(), 'this client']
+	let [hasWho, lacksWho] = mine
+		? [`client (**${me()}**, here)`, `server (**${host()}**)`]
+		: [`server (**${host()}**)`, `client (**${me()}**, here)`]
 	let gone = lacks.status === 'deleted' ? `deleted it (${when(lacks.ts)})` : 'never had it'
-	return `**${d.file}**: ${hasWho} has it (recorded ${when(has.ts)}); ${lacksWho} ${gone}. Deleting keeps its text in plugin history. Keep separate writes nothing to either side.`
+	return `**${d.file}** is only on the ${hasWho}, edited ${when(has.ts)}. The ${lacksWho} ${gone}.`
 }
 
-// The question about `d`, with everything needed to answer it.
-function describe(d: Discrepancy, diff: string): { say: string; ask: Form } {
-	let file = d.file,
-		options = labels(d)
-	let ask = (initial: number): Form => ({
-		text: `${file}: which version should both homes keep?`,
-		fields: [{ type: 'choice', name: 'choice', options: [...options, keep(file)], initial }],
+// The question about `d`, with everything needed to answer it and what
+// each answer does.
+function describe(d: Discrepancy, texts: { client?: string; server?: string }): { say: string; ask: Form } {
+	let file = d.file
+	let nothing = `Nothing changes on either computer. This client stops comparing ${file}.`
+	let ask = (initial: number, outcomes: [string, string]): Form => ({
+		text: `${file}: which copy should both keep?`,
+		fields: [
+			{
+				type: 'choice',
+				name: 'choice',
+				options: [...labels(d), keep(file)],
+				initial,
+				outcomes: [...outcomes, nothing],
+			},
+		],
 	})
-	if (oneSided(d)) return { say: presence(d), ask: ask(absent(d.server) ? 0 : 1) }
-	let fence = '`'.repeat(Math.max(3, ...[...diff.matchAll(/`+/g)].map((m) => m[0].length + 1)))
+	if (oneSided(d)) {
+		let [copy, gone] = [`${file} is copied to`, `${file} is deleted on`]
+		let outcomes: [string, string] = absent(d.server)
+			? [`${copy} **${host()}**.`, `${gone} **${me()}**. ${kept}`]
+			: [`${gone} **${host()}**. ${kept}`, `${copy} **${me()}**.`]
+		return { say: presence(d), ask: ask(absent(d.server) ? 0 : 1, outcomes) }
+	}
 	let lines = [
-		`**${file}** differs between this client and ${host()}: ${RELATION[d.relation]}.`,
-		[side("Client (this terminal's home)", d.client), side(`Server (${host()})`, d.server)].join('\n'),
-		`${CLIENT} ${effect(d.client, `the server's ${where(file)}`)}; ${SERVER} ${effect(d.server, `this client's ${where(file)}`)}. The replaced version stays in plugin history. Keep separate writes nothing to either file.`,
+		`**${file}** is different on the client and the server.`,
+		[side(d, 'client'), side(d, 'server')].join('\n'),
 	]
-	if (d.suggest)
-		lines.push(
-			`The ${d.suggest}'s version was recorded later, so it is preselected${d.relation === 'divergent' || d.relation === 'unrelated' ? ", but a later time does not make overwriting the other side's changes safe" : ''}.`,
-		)
-	lines.push(
-		diff
-			? `Diff from the server's version (-) to the client's (+):\n\n${fence}diff\n${diff}\n${fence}`
-			: 'The texts are equal; only their history differs.',
-	)
-	return { say: lines.join('\n\n'), ask: ask(d.suggest === 'client' ? 0 : d.suggest === 'server' ? 1 : 2) }
+	if (RELATION[d.relation]) lines.push(RELATION[d.relation]!)
+	return {
+		say: lines.join('\n\n'),
+		ask: ask(d.suggest === 'client' ? 0 : d.suggest === 'server' ? 1 : 2, [
+			change(host(), file, texts.server, texts.client),
+			change(me(), file, texts.client, texts.server),
+		]),
+	}
 }
 
 // Carries out answer `value` to `asked`; what happened, to say.
@@ -173,7 +193,7 @@ async function review(session: string, answers?: Answers): Promise<void> {
 			d = st.discrepancies[0]
 		if (st.error) said.push(`The last comparison failed: ${st.error}`)
 		if (d) {
-			let q = pluginSyncReview.describe(d, (await pluginSyncClient.diff(d.file)).diff)
+			let q = pluginSyncReview.describe(d, await pluginSyncClient.diff(d.file))
 			said.push(q.say)
 			ask = q.ask
 			rs.asked.set(session, {
