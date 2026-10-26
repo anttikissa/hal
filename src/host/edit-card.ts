@@ -12,7 +12,7 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 	const counts = result && !result.isError ? diff.stats(result.output) : undefined
 	const suffix = counts ? `${counts.added ? `+${counts.added}` : ''}${counts.removed ? `-${counts.removed}` : ''}` : ''
 	return {
-		title: `> ${description || names.join(', ') + (suffix ? ` ${suffix}` : '') || 'files'}`,
+		title: `edit ${description || names.join(', ') + (suffix ? ` ${suffix}` : '') || 'files'}`,
 		blocks: !result
 			? []
 			: result.isError

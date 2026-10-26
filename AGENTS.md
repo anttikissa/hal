@@ -320,7 +320,8 @@ Show everything relevant once: identifiers users act on, file paths,
 failures and complete output. Omit what nobody reads, such as tool call
 IDs, argument types and restated defaults; session files keep them.
 A closed tool says concisely what it does; opening it shows the detail
-and the whole output. Bash reads like a terminal: `$ command` (`&` when
-backgrounded), declared files as "Edits a.ts, src/*.ts", then streaming
+and the whole output. A tool title starts with its lowercase name:
+`bash <description>` (`&` when backgrounded), then the command,
+declared files as "Edits a.ts, src/*.ts", then streaming
 output. Show non-default controls, invalid or unfamiliar arguments and
 why Hal rejected a call. Use readable text, not JSON/ASON.

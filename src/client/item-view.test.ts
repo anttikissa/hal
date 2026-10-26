@@ -74,7 +74,7 @@ test('expanded tool cards preserve wrapped headlines, complete arguments and mul
 		modifies: ['a.ts'],
 		timeout: 5,
 	})
-	expect(bash).toContain('$ Two commands\necho first\necho second')
+	expect(bash).toContain('bash Two commands\necho first\necho second')
 	expect(bash).toContain('Edits a.ts')
 	expect(bash).not.toContain('Timeout')
 	expect(render('tool', { cmd: 'READ { broken:' })).toContain('cmd: READ { broken:')
@@ -106,10 +106,10 @@ test('A short Bash card shows its command in its rows, with stable live and fini
 	// A short one-line command goes after the title; a long one scrolls
 	// from its start to its end, then stays there.
 	expect(
-		toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 40, 'short', {}).map(Bun.stripANSI),
+		toolView.call({ ...item, input: { command: 'ls', description: 'List' } }, 44, 'short', {}).map(Bun.stripANSI),
 	).toEqual([expect.stringMatching(/List: ls$/)])
 	expect(toolView.call({ ...item, input: { command: 'ls' } }, 40, 'short', {}).map(Bun.stripANSI)).toEqual([
-		expect.stringMatching(/\$ ls$/),
+		expect.stringMatching(/bash ls$/),
 	])
 	let long = { ...item, input: { command: 'echo ' + 'x'.repeat(60) + ' end', description: 'Echo' } }
 	let at = (ms: number) => Bun.stripANSI(toolView.call(long, 20, 'short', { now: Date.parse(ts) + ms })[1]!)

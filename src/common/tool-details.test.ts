@@ -17,26 +17,26 @@ test('bash reads like the terminal; odd arguments show once, plumbing never', ()
 	])
 	expect(toolDetails.limit('bash', { command: 'ls', timeout: 900 })).toBe('900s')
 	expect(toolDetails.limit('bash', { command: 'ls', timeout: 600, background: true })).toBeUndefined()
-	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: 'Notify Done', key: 'text', mark: 'Notify' })
+	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: 'notify Done', key: 'text', mark: 'notify' })
 	expect(toolDetails.lines('notify', { text: 'Done' })).toEqual([])
 })
 
 test('rejected tool calls recover display-only purpose and task names without hiding raw input', () => {
 	let malformed = { cmd: 'BASH /* Diagnose tool failures */ "rg "unreadable" fixture.ts"' }
-	expect(toolDetails.headline('tool', malformed)).toMatchObject({ text: '$ Diagnose tool failures', mark: '$' })
+	expect(toolDetails.headline('tool', malformed)).toMatchObject({ text: 'bash Diagnose tool failures', mark: 'bash' })
 	expect(toolDetails.lines('tool', malformed).join('\n')).toContain(malformed.cmd)
 	let spawn = { cmd: 'SPAWN [{ name: "Clean oversized histories", task: "Work" }]' }
-	expect(toolDetails.headline('tool', spawn).text).toBe('Spawn Clean oversized histories (autoclose ↧)')
+	expect(toolDetails.headline('tool', spawn).text).toBe('spawn Clean oversized histories (autoclose ↧)')
 	expect(toolDetails.lines('tool', spawn).join('\n')).toContain(spawn.cmd)
-	expect(toolDetails.headline('tool', { cmd: 'SPAWN [{ name:' }).text).toBe('Spawn Subagent (autoclose ↧)')
-	expect(toolDetails.headline('tool', { cmd: {} }).text).toBe('Tool')
+	expect(toolDetails.headline('tool', { cmd: 'SPAWN [{ name:' }).text).toBe('spawn Subagent (autoclose ↧)')
+	expect(toolDetails.headline('tool', { cmd: {} }).text).toBe('tool')
 })
 
 test('inspect heads with every argument once; unknown ones still show', () => {
 	expect(toolDetails.headline('inspect', { scope: 'self', fields: 'id,model,context' }).text).toBe(
-		'? Inspect self (id, model, context)',
+		'inspect self (id, model, context)',
 	)
-	expect(toolDetails.headline('inspect', { what: 'host' }).text).toBe('? Inspect host')
+	expect(toolDetails.headline('inspect', { what: 'host' }).text).toBe('inspect host')
 	expect(toolDetails.lines('inspect', { scope: 'all', fields: 'tab', extra: 1 })).toEqual(['extra: 1'])
 })
 
@@ -48,42 +48,42 @@ test('spawn and wait name the sessions their result reports', () => {
 			{ name: 'v3 UI craft pass', task: 't' },
 			'Started tab 3 · 31-swe · v3 UI craft pass. Its last message comes back here',
 		),
-	).toBe('Spawn 31-swe (tab 3): v3 UI craft pass (autoclose ↧)')
+	).toBe('spawn 31-swe (tab 3): v3 UI craft pass (autoclose ↧)')
 	expect(h('spawn', { kind: 'interactive' }, 'Opened tab 4 · 31-sit for the user.')).toBe(
-		'Spawn 31-sit (tab 4) (interactive)',
+		'spawn 31-sit (tab 4) (interactive)',
 	)
 	expect(h('wait', {}, 'Waiting for tab 3 · 31-swe · Pass, one, tab 5 · 31-bux. This turn ends here')).toBe(
-		'… Waiting for 31-swe, 31-bux',
+		'wait for 31-swe, 31-bux',
 	)
-	expect(h('bash', { command: 'serve', description: 'Start server', background: true })).toBe('$ Start server')
+	expect(h('bash', { command: 'serve', description: 'Start server', background: true })).toBe('bash Start server')
 })
 
 test('send headers distinguish requested destinations from host-resolved ones', () => {
 	let input = { to: '2', description: 'Report completion', text: 'Done', queue: true }
-	expect(toolDetails.headline('send', input).text).toBe('To tab 2: Report completion')
+	expect(toolDetails.headline('send', input).text).toBe('send tab 2: Report completion')
 	expect(toolDetails.headline('send', input, 'Sent to tab 2 · 157-cms · Review').text).toBe(
-		'To 157-cms (tab 2): Report completion',
+		'send 157-cms (tab 2): Report completion',
 	)
 	expect(toolDetails.headline('send', { ...input, to: '157-cms' }, 'no session 157-cms').text).toBe(
-		'To 157-cms: Report completion',
+		'send 157-cms: Report completion',
 	)
-	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('To 157-cms: Report completion')
+	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('send 157-cms: Report completion')
 	expect(toolDetails.lines('send', input)).toEqual(['Done', 'queue: true'])
 	for (let outcome of ['Sent to', 'Queued in', 'Waiting in', 'Interrupted']) {
 		let output = `${outcome} tab 2 · 157-cms · Review: it reads this before its next request`
-		expect(toolDetails.headline('send', input, output).text).toBe('To 157-cms (tab 2): Report completion')
+		expect(toolDetails.headline('send', input, output).text).toBe('send 157-cms (tab 2): Report completion')
 	}
 })
 
 test('SEND without a description previews the first nonempty line and keeps the full expanded message', () => {
 	let input = { to: '176-ict', text: '\nIndex available.\nPlease commit now.' }
-	expect(toolDetails.headline('send', input).text).toBe('To 176-ict: Index available.')
+	expect(toolDetails.headline('send', input).text).toBe('send 176-ict: Index available.')
 	expect(toolDetails.lines('send', input)).toEqual(['', 'Index available.', 'Please commit now.'])
 })
 
 test('SEND exposes slash commands before destinations even with a purpose', () => {
 	let input = { to: '2', text: '/close', description: 'Finish session' }
-	expect(toolDetails.headline('send', input).text).toBe('To tab 2 /close: Finish session')
+	expect(toolDetails.headline('send', input).text).toBe('send tab 2 /close: Finish session')
 	expect(toolDetails.lines('send', input)).toEqual([])
 	let multiline = { ...input, text: '/close\nnot discarded' }
 	expect(toolDetails.lines('send', multiline)).toEqual(['/close', 'not discarded'])
@@ -104,9 +104,9 @@ test('command labels remain literal for discovery, sparse plans and other comman
 
 test('stored-output reads are distinguishable from file reads without repeating their reference', () => {
 	let input = { id: '10-zap#1969', offset: 2, limit: 10 }
-	expect(toolDetails.headline('read_blob', input).text).toBe('< 10-zap#1969')
+	expect(toolDetails.headline('read_blob', input).text).toBe('read_blob 10-zap#1969')
 	expect(toolDetails.lines('read_blob', input)).toEqual(['offset: 2', 'limit: 10'])
-	expect(toolDetails.headline('read', { path: 'example.txt' }).text).toBe('< example.txt')
+	expect(toolDetails.headline('read', { path: 'example.txt' }).text).toBe('read example.txt')
 })
 
 test('multi-file reads retain every range and unknown argument under its file', () => {
@@ -116,12 +116,12 @@ test('multi-file reads retain every range and unknown argument under its file', 
 			{ path: 'second.ts', offset: 30, extra: 'keep me' },
 		],
 	}
-	expect(toolDetails.headline('read', input).text).toBe('< first.ts, second.ts')
+	expect(toolDetails.headline('read', input).text).toBe('read first.ts, second.ts')
 	expect(toolDetails.lines('read', input)).toEqual([
-		'< first.ts',
+		'read first.ts',
 		'offset: 10',
 		'limit: 5',
-		'< second.ts',
+		'read second.ts',
 		'offset: 30',
 		'extra: keep me',
 	])
@@ -139,7 +139,7 @@ test('read lists keep URLs, mixed targets and readable invalid input', () => {
 		},
 	]) {
 		let targets = input.paths.map((p) => ('path' in p ? p.path : p.url))
-		expect(toolDetails.headline('read', input).text).toBe(`< ${targets.join(', ')}`)
+		expect(toolDetails.headline('read', input).text).toBe(`read ${targets.join(', ')}`)
 		for (let target of targets) expect(toolDetails.lines('read', input).join('\n')).toContain(target!)
 	}
 	for (let [name, key] of [
@@ -152,24 +152,24 @@ test('read lists keep URLs, mixed targets and readable invalid input', () => {
 			[[null], '1. (null)'],
 			[[{ unknown: 'target' }], '1. unknown: target'],
 		] as const) {
-			expect(toolDetails.headline(name, { [key]: many }).text).toBe(`< ${key}: ${detail}`)
+			expect(toolDetails.headline(name, { [key]: many }).text).toBe(`${name} ${key}: ${detail}`)
 		}
 	}
-	expect(toolDetails.headline('read_entry', { ids: ['t1', { id: 't2' }] }).text).toBe('< t1, t2')
+	expect(toolDetails.headline('read_entry', { ids: ['t1', { id: 't2' }] }).text).toBe('read_entry t1, t2')
 })
 
 test('wait headers follow background-work result contracts and preserve invalid targets', () => {
-	expect(toolDetails.headline('wait', {}).text).toBe('… Waiting for background work')
+	expect(toolDetails.headline('wait', {}).text).toBe('wait for background work')
 	expect(
 		toolDetails.headline(
 			'wait',
 			{},
 			'Work needs attention: t72, 12-xyz. Inspect the targets; available reports follow through their usual delivery.',
 		).text,
-	).toBe('… Waiting for t72, 12-xyz')
+	).toBe('wait for t72, 12-xyz')
 	expect(
 		toolDetails.headline('wait', {}, 'No owned background command or subagent is running. Go on without waiting.').text,
-	).toBe('… Waiting (no background work running)')
+	).toBe('wait (no background work running)')
 	expect(toolDetails.lines('wait', { targets: ['#t72', 123] })).toEqual([])
 	for (let name of ['wait', 'inspect', 'stop']) {
 		let input = name === 'wait' ? { targets: [{ nested: 'bad' }] } : { target: { nested: 'bad' } }

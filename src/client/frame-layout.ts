@@ -188,7 +188,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (item.type === 'tool' && res?.type === 'tool-result' && res.id === item.id) look.result = res
 			if (item.type === 'tool' && !item.presentation && !look.result?.presentation) {
 				let h = toolDetails.headline(item.name, item.input, look.result?.output)
-				if (h.mark === '…') look.wait = toolDetails.waiting(h.text, session ?? '', src, view.tabs?.list)
+				if (h.mark === 'wait') look.wait = toolDetails.waiting(h.text, session ?? '', src, view.tabs?.list)
 			}
 			let limit = item.type === 'tool' ? toolDetails.limit(item.name, item.input) : undefined
 			if (live) look.status = toolView.status(undefined, view.tick!.label, itemView.itemStyle(item), limit)

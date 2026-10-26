@@ -47,15 +47,15 @@ function value(input: unknown): string[] {
 
 let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-// A card's title: its tool's mark, then what the call works on (tasks
-// jz, b3k): $ <description> for bash (its command opens below), < <paths>,
-// > <files>, => <target>, … Waiting for <targets>, Notify <text>, * <id> <name>,
-// x <target>, ? Help <tool>, ? Inspect <target>. A model-run slash command
-// reads as typed, "/rename …" (task 9g); other tools keep their name,
-// Google <query>. `output`: the call's result, when known, adds what only
-// the host knew (the id spawn opened, whom wait waits for). `mark` is the
-// mark the text starts with, which the web draws as an icon; `key` and
-// `keys` name the arguments shown, which lines() then leaves out.
+// A card's title: its tool's name, then what the call works on (tasks
+// jz, b3k): bash <description> (its command opens below), read <paths>,
+// edit <files>, send <target>, wait for <targets>, help <tool>, inspect
+// <target>, google <query>. A model-run slash command reads as typed,
+// "/rename …" (task 9g). `output`: the call's result, when known, adds
+// what only the host knew (the id spawn opened, whom wait waits for).
+// `mark` is the tool name the text starts with, which the web draws as
+// an icon; `key` and `keys` name the arguments shown, which lines() then
+// leaves out.
 type Headline = { text: string; mark?: string; key?: string; keys?: string[] }
 function headline(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let head = titled(name, input, output)
@@ -64,32 +64,15 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 		try {
 			tool = callText.parse(input.cmd).name
 		} catch {}
-	let mark = marks[tool] && head.text.startsWith(`${marks[tool]} `) ? marks[tool] : undefined
+	let mark = head.text === tool || head.text.startsWith(`${tool} `) ? tool : undefined
 	return { ...head, text: home.short(head.text), ...(mark ? { mark } : {}) }
-}
-
-// Each tool's mark (task b3k); tools without one show their name.
-const marks: Record<string, string> = {
-	bash: '$',
-	read: '<',
-	read_url: '<',
-	read_blob: '<',
-	read_entry: '<',
-	edit: '>',
-	send: 'To',
-	wait: '…',
-	notify: 'Notify',
-	spawn: 'Spawn',
-	stop: 'Stop',
-	help: '?',
-	inspect: '?',
 }
 
 function titled(name: string, input: Record<string, unknown>, output?: string): Headline {
 	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
 	// [tab, id] of each session the result names (tabs.label).
 	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)
-	let marked = (text: string) => `${marks[name]} ${text}`
+	let marked = (text: string) => `${name} ${text}`
 	switch (name) {
 		case 'tool': {
 			try {
@@ -104,9 +87,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 					if (first && typeof first === 'object' && !Array.isArray(first)) fields = first as Record<string, unknown>
 				} catch {}
 				return {
-					text: purpose
-						? `${marks[parsed.name] ?? verb(parsed.name)} ${oneLine(purpose)}`
-						: titled(parsed.name, fields).text,
+					text: purpose ? `${parsed.name} ${oneLine(purpose)}` : titled(parsed.name, fields).text,
 				}
 			} catch {
 				break
@@ -140,21 +121,21 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (str('command')) return { text: str('command')!, key: 'command' }
 			break
 		case 'google':
-			if (str('query')) return { text: `Google ${str('query')}`, key: 'query' }
+			if (str('query')) return { text: marked(str('query')!), key: 'query' }
 			break
 		case 'grep': {
 			let paths = [input.in ?? []].flat().filter((p): p is string => typeof p === 'string')
 			if (str('pattern'))
 				return {
-					text: `Grep ${JSON.stringify(input.pattern)}${paths.length ? ` in ${paths.join(', ')}` : ''}`,
+					text: marked(`${JSON.stringify(input.pattern)}${paths.length ? ` in ${paths.join(', ')}` : ''}`),
 					keys: ['pattern', 'in'],
 				}
 			break
 		}
 		case 'web_search':
-			if (str('query')) return { text: `Web search ${str('query')}`, key: 'query' }
+			if (str('query')) return { text: marked(str('query')!), key: 'query' }
 			if (str('url'))
-				return { text: `Web search ${str('pattern') ? `"${str('pattern')}" in ` : ''}${str('url')}`, key: 'url' }
+				return { text: marked(`${str('pattern') ? `"${str('pattern')}" in ` : ''}${str('url')}`), key: 'url' }
 			break
 		case 'read':
 		case 'read_url':
@@ -198,12 +179,12 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			break
 		}
 		case 'help':
-			return { text: marked(`Help${str('name') ? ` ${str('name')}` : ''}`), key: 'name' }
+			return { text: str('name') ? marked(str('name')!) : 'help', key: 'name' }
 		case 'inspect': {
 			if (input.target !== undefined)
 				return typeof input.target === 'string' || typeof input.target === 'number'
-					? { text: marked(`Inspect ${String(input.target)}`), key: 'target' }
-					: { text: marked('Inspect') }
+					? { text: marked(String(input.target)), key: 'target' }
+					: { text: 'inspect' }
 			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
 			let what = (input.what as string | undefined) ?? 'sessions'
 			let target = what === 'sessions' ? ((input.scope as string | undefined) ?? 'self') : what
@@ -211,7 +192,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 				?.split(',')
 				.map((f) => f.trim())
 				.filter(Boolean)
-			let text = `Inspect ${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
+			let text = `${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
 			return { text: marked(text), keys: ['what', 'scope', 'fields'] }
 		}
 		// Spawn <id> (tab N): <name>, then how it ends: a subagent closes
@@ -229,35 +210,28 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 			if (input.target !== undefined)
 				return typeof input.target === 'string' || typeof input.target === 'number'
 					? { text: marked(String(input.target)), key: 'target' }
-					: { text: 'Stop' }
+					: { text: 'stop' }
 			break
 		case 'wait': {
 			if (input.targets !== undefined) {
 				let targets = Array.isArray(input.targets) ? input.targets : [input.targets]
 				if (!targets.every((v) => typeof v === 'string' || typeof v === 'number'))
-					return { text: marked('Waiting for background work') }
+					return { text: marked('for background work') }
 				return {
-					text: marked(`Waiting for ${targets.length ? targets.join(', ') : 'background work'}`),
+					text: marked(`for ${targets.length ? targets.join(', ') : 'background work'}`),
 					key: 'targets',
 				}
 			}
 			if (output?.startsWith('No owned background command or subagent') || output?.startsWith('No subagent'))
-				return { text: marked('Waiting (no background work running)') }
+				return { text: marked('(no background work running)') }
 			let ready = output?.match(/^Work needs attention: (.+?)\. Inspect the targets;/)?.[1]
 			let who = ids(/(?:^Waiting for |, )(?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)
-			return { text: marked(`Waiting for ${ready ?? (who.length ? who.join(', ') : 'background work')}`) }
+			return { text: marked(`for ${ready ?? (who.length ? who.join(', ') : 'background work')}`) }
 		}
 	}
-	if (str('description')) return { text: `${marks[name] ?? verb(name)} ${str('description')}`, key: 'description' }
+	if (str('description')) return { text: marked(str('description')!), key: 'description' }
 	let first = Object.entries(input).find(([, v]) => typeof v === 'string' && oneLine(v))
-	return first
-		? { text: `${marks[name] ?? verb(name)} ${oneLine(first[1] as string)}`, key: first[0] }
-		: { text: marks[name] ? marked(verb(name)) : verb(name) }
-}
-
-// A tool's name as its title word (task hyt): 'Google', 'Web search'.
-function verb(name: string): string {
-	return (name.charAt(0).toUpperCase() + name.slice(1)).replaceAll('_', ' ')
+	return first ? { text: marked(oneLine(first[1] as string)), key: first[0] } : { text: name }
 }
 
 function lines(name: string, input: Record<string, unknown>): string[] {
@@ -366,7 +340,7 @@ function waiting(
 	items: readonly Item[],
 	tabs: readonly { id: string; name: string }[] = [],
 ): Part[] | undefined {
-	let lead = /^(?:… )?Waiting for /.exec(title)?.[0]
+	let lead = /^(?:wait )?for /.exec(title)?.[0]
 	if (!lead) return undefined
 	let parts: Part[] = [lead]
 	title

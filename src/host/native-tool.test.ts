@@ -85,12 +85,12 @@ test('trailing first-line comments work for EDIT, BASH and READ without changing
 
 test('resolved READ titles retain single, multiple and mixed URL targets', () => {
 	for (let [cmd, title] of [
-		['READ "https://example.com/pricing"', '< https://example.com/pricing'],
+		['READ "https://example.com/pricing"', 'read https://example.com/pricing'],
 		[
 			'READ "https://example.com/pricing" "https://example.com/payments"',
-			'< https://example.com/pricing, https://example.com/payments',
+			'read https://example.com/pricing, https://example.com/payments',
 		],
-		['READ "local.ts:3-4" "https://example.com/pricing"', '< local.ts, https://example.com/pricing'],
+		['READ "local.ts:3-4" "https://example.com/pricing"', 'read local.ts, https://example.com/pricing'],
 	] as const) {
 		let call = nativeTool.arrived({ type: 'tool_call', id: 'read-title', name: 'tool', input: { cmd } })
 		expect(toolDetails.headline(call.name, call.input).text).toBe(title)
@@ -105,7 +105,7 @@ test('EDIT descriptions title both the call and its result', () => {
 		input: { cmd: 'EDIT /* TESTING */ test.ts write\n!!NEW\nebar\nzot\n!!END' },
 	})
 	expect(call.input.description).toBe('TESTING')
-	expect(call.presentation?.title).toBe('> TESTING')
+	expect(call.presentation?.title).toBe('edit TESTING')
 	for (let result of [
 		{ output: '== test.ts@abcde verified ==\n== diff ==\n-1 bar\n+1 ebar\n 2 zot\n' },
 		{ output: 'Unchanged; nothing written.' },
@@ -114,7 +114,7 @@ test('EDIT descriptions title both the call and its result', () => {
 		expect(
 			toolPresentations.attach<ToolResultBlock>(call, { type: 'tool_result', id: call.id, ...result }).presentation
 				?.title,
-		).toBe('> TESTING')
+		).toBe('edit TESTING')
 })
 
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {

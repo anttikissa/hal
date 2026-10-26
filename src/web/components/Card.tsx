@@ -80,7 +80,14 @@ export function Card(props: {
 	// Short or long (task hyt): as the session starts its kind, until a
 	// click, /toggle or Ctrl-O switches it; a call fails with its result.
 	let level = () =>
-		folds.level(id(), folds.start(props.session, props.row.item, card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash()))))
+		folds.level(
+			id(),
+			folds.start(
+				props.session,
+				props.row.item,
+				card.initial(props.row.item, props.blocks, card.failed(props.row.result, bash())),
+			),
+		)
 	let open = () => level() === 'long'
 	// The setters may run in an effect: they read the state as of the call.
 	let setLevel = (fold: Verbosity) =>
@@ -203,6 +210,7 @@ export function Card(props: {
 		return item.type === 'tool'
 			? cardIcons.unmark(
 					presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text,
+					item.name,
 				)
 			: lines()[0]
 	}
@@ -210,7 +218,7 @@ export function Card(props: {
 	// A wait links what it waits for (task zd8).
 	let waitParts = () => {
 		let item = props.row.item
-		return item.type === 'tool' && !presentation()?.title && toolDetails.headline(item.name, item.input).mark === '…'
+		return item.type === 'tool' && !presentation()?.title && toolDetails.headline(item.name, item.input).mark === 'wait'
 			? props.waiting?.(head() ?? '')
 			: undefined
 	}

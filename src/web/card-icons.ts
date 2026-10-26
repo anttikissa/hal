@@ -1,5 +1,5 @@
 // The icon a folded card's header names its kind with (Card.tsx), and
-// titles without the leading mark the icon replaces.
+// titles without the leading mark or tool name the icon replaces.
 
 import type { Item } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
@@ -32,9 +32,12 @@ function kind(item: Item): IconName | undefined {
 	return cardIcons.toolIcons[item.name] ?? (named === undefined ? undefined : icons.has(named) ? named : 'sparkle')
 }
 
-// A title without its leading mark ($, <, =>, …): the icon shows it.
-function unmark<T extends string | undefined>(title: T): T {
-	return title?.replace(/^(?:<=|=>|[$<>…!?]) /, '') as T
+// A title without what its icon, or bash's `$ `, shows instead: a
+// message's <= or =>, or the tool's name.
+function unmark<T extends string | undefined>(title: T, tool?: string): T {
+	if (tool && (cardIcons.toolIcons[tool] || tool === 'bash') && title?.startsWith(`${tool} `))
+		return title.slice(tool.length + 1) as T
+	return title?.replace(/^(?:<=|=>) /, '') as T
 }
 
 export const cardIcons = { toolIcons, kind, unmark }

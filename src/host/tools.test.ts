@@ -316,7 +316,7 @@ test('read_blob fetches a numbered tool call and its result from history', async
 			type: 'user',
 			blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }],
 		})
-		expect((await blobRun(`t${call.n}`)).output).toBe('< example.txt\n\nResult:\nfile contents')
+		expect((await blobRun(`t${call.n}`)).output).toBe('read example.txt\n\nResult:\nfile contents')
 		expect((await blobRun(`t${call.n}.1`)).output).toBe('file contents')
 		expect((await blobRun(`s/${call.n}-${result.n}`)).output).toContain('file contents')
 		let spawn = history.append('s', {
@@ -329,7 +329,7 @@ test('read_blob fetches a numbered tool call and its result from history', async
 			},
 		})
 		expect((await blobRun(`s/${spawn.n}`)).output).toBe(
-			'Spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true\n\nNo result recorded.',
+			'spawn Benchmark search (autoclose ↧)\ntask: Find tasks\n  Preserve results\nextra:\n  enabled: true\n\nNo result recorded.',
 		)
 		expect((await blobRun(`s/${result.n}`)).output).toContain('file contents')
 		expect((await blobRun('t999999')).isError).toBe(true)

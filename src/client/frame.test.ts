@@ -50,8 +50,8 @@ test('EDIT line lists cannot consume the title or block reference', () => {
 	let status = '(+5 −6, lines 6, 25, 28, 31, 37, 42, 59, 71, 100, 120)'
 	for (let cols of [40, 60, 100]) {
 		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
-		let header = rows.find((r) => r.includes('> '))!
-		expect(header).toContain('> src/')
+		let header = rows.find((r) => r.includes('edit '))!
+		expect(header).toContain('edit src/')
 		expect(header).toContain(' t62')
 		expect(header).toContain('…')
 		expect(strings.visLen(header)).toBeLessThanOrEqual(cols)
@@ -234,8 +234,8 @@ test('tool and command-output timestamps match prose while machine output stays 
 	expect(lines[ordinary + 1]).toBe('')
 	expect(lines[ordinary + 2]).toBe('Message body')
 	expect(lines[output + 1]).toBe('Command body')
-	expect(lines.some((line) => line.startsWith('08:50 $ Inspect files'))).toBe(true)
-	expect(lines.some((line) => line.startsWith('08:50 < example.txt'))).toBe(true)
+	expect(lines.some((line) => line.startsWith('08:50 bash Inspect files'))).toBe(true)
+	expect(lines.some((line) => line.startsWith('08:50 read example.txt'))).toBe(true)
 })
 
 test('finished thinking with no readable text draws nothing, not a bare header', () => {
@@ -285,7 +285,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	let detached = plain(frame.build(apart, 70).lines).find((line) => line.includes('M notes.md'))!
 	expect(detached).toBe('M notes.md')
 	expect(plain(frame.build(apart, 70).lines).find((line) => line.includes('Result of:'))).toMatch(
-		/^Result of: \$ Check files +t1813/,
+		/^Result of: bash Check files +t1813/,
 	)
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	expect(printed).not.toContain('Background command finished')
@@ -324,7 +324,7 @@ test('long streaming tool cards keep a bounded tail, then expand on completion',
 	])
 	parallel.transcript!.meta.blocks = { tool: 'long' }
 	let split = plain(frame.build(parallel, 80, 60).lines).join('\n')
-	expect(split).toContain('Result of: $ ./test')
+	expect(split).toContain('Result of: bash ./test')
 	expect(split).toContain('output 99')
 	expect(split).not.toContain('output 0\n')
 })

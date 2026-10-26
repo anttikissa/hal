@@ -181,7 +181,7 @@ for (let escape of [false, true]) {
 			await until(() => a.of('restart-ask').length)
 			expect(a.of('restart-ask')[0]).toMatchObject({
 				scope: 'host',
-				calls: [{ block: expect.stringMatching(/^t\d+$/), title: '$ Migrate' }],
+				calls: [{ block: expect.stringMatching(/^t\d+$/), title: 'bash Migrate' }],
 			})
 			if (escape) {
 				a.conn.send({ type: 'pause', sessionId: id })
