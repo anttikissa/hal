@@ -123,11 +123,15 @@ function init(): void {
 	}
 	restartProcess.run = restartNow
 	terminal.restart = () => restart.ask({ scope: 'local', calls: restartGuard.flagged() }, app.open, restartNow)
-	// Which code this process runs (task n1), found after the first
-	// frame; the host tells its clients, a new commit offers ctrl-r.
+	main.trackVersion((loaded) => host.announce(loaded))
+}
+
+// Which code this terminal runs (task n1), found after the first frame:
+// the host learns it (task jjr), a new commit offers ctrl-r.
+function trackVersion(found?: (loaded: string) => void): void {
 	version.found = (loaded) => {
 		versions.state.own = loaded
-		host.announce(loaded)
+		found?.(loaded)
 		versions.report(app.send)
 		app.show()
 	}
@@ -320,6 +324,7 @@ async function remote(typed: string | undefined): Promise<void> {
 	// portable ones are compared with the host's (tasks zh7, b81).
 	pluginReports.deliver = (event) => main.onEvent(event)
 	pluginSyncReview.start(new URL(origin).host, (text) => ((appView.state.plugins = text), app.show()))
+	main.trackVersion()
 	remoteClient.start({
 		origin,
 		token,
@@ -451,6 +456,7 @@ export const main = {
 	initHost: lifecycle.initHost,
 	init,
 	initTerminal,
+	trackVersion,
 	onEvent,
 	becomeHost,
 	settle,

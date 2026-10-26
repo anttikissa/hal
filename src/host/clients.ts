@@ -47,13 +47,15 @@ function join(open: Set<string>, info: ClientInfo = { kind: 'own' }): ClientReco
 	return rec
 }
 
-// A peer says which process it is (the `hello` command). Only sockets
-// carry peers: a browser cannot name a pid.
+// A terminal says which code it runs (the `hello` command); a peer also
+// names its pid. A remote terminal's pid is another machine's, so the
+// host keeps only its version.
 function hello(rec: ClientRecord, pid: number, version?: string, newCode?: true): Record<string, never> {
-	if (rec.kind !== 'peer') return {}
-	rec.pid = pid
+	if (rec.kind !== 'peer' && rec.kind !== 'remote') return {}
 	if (version) rec.version = version
 	if (newCode) rec.newCode = newCode
+	if (rec.kind === 'remote') return {}
+	rec.pid = pid
 	for (let old of clients.state.records)
 		if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
 	serverLog.hello(rec)
@@ -194,9 +196,9 @@ function draw(): string {
 	let rows = rest.map((r) => {
 		let who =
 			r.kind === 'peer'
-				? ['peer', r.pid, r.pid === undefined ? undefined : clients.tty(r.pid)]
+				? ['peer', r.pid, r.pid === undefined ? undefined : clients.tty(r.pid), r.version]
 				: r.kind === 'remote'
-					? ['remote terminal', r.hostname, r.address]
+					? ['remote terminal', r.hostname, r.address, r.version]
 					: ['web', r.address, clients.shortAgent(r.userAgent)]
 		let seen = ago(now - r.lastAt) + (r.goneAt === undefined ? '' : ' (gone)')
 		return [

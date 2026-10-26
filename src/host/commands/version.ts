@@ -18,14 +18,14 @@ function hint(hostNew: boolean, peerNew: boolean, peer: boolean): string {
 
 export const command: SlashCommand = {
 	help: () =>
-		"/version shows the version and commit the host started from, plus a short hash of the uncommitted diff when there was one, and how many commits followed the last release. Asked from a terminal peer (a separate process), it shows the peer's too. When a newer commit is checked out, it says which restart loads it: Ctrl-R restarts only the client it is pressed in, /restart the host and every client.",
+		"/version shows the version and commit the host started from, plus a short hash of the uncommitted diff when there was one, and how many commits followed the last release. Asked from a terminal peer (a separate process) or a remote terminal, it shows that terminal's too. When a newer commit is checked out, it says which restart loads it: Ctrl-R restarts only the client it is pressed in, /restart the host and every client.",
 	run: async (_args, _answers, ctx) => {
 		let st = version.state
 		if (!st.loaded) return { say: 'version: still looking it up' }
 		let rec = clients.state.senders.get(ctx.sessionId)
-		let peer = rec?.kind === 'peer' && rec.goneAt === undefined && rec.version ? rec : undefined
+		let peer = rec && ['peer', 'remote'].includes(rec.kind) && rec.goneAt === undefined && rec.version ? rec : undefined
 		let lines = peer
-			? [`host version: ${await release.line(st.loaded)}`, `peer version: ${await release.line(peer.version!)}`]
+			? [`host version: ${await release.line(st.loaded)}`, `${peer.kind} version: ${await release.line(peer.version!)}`]
 			: [await release.line(st.loaded)]
 		let since = await release.since(st.loaded)
 		let note = hint(st.newCode, !!peer?.newCode, !!peer)
