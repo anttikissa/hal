@@ -7,6 +7,7 @@
 // (src/client/tabs.ts); each tab keeps its own client state meanwhile.
 // Tasks: b3, tr, p0, rqq.
 
+import { hostname } from 'os'
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { amend, type Editing } from '../common/amend.ts'
@@ -415,7 +416,8 @@ function init(): void {
 	app.show()
 }
 
-// The terminal's size and kind, for the host's inspect tool.
+// The terminal's size, kind and computer, for the host's inspect tool
+// and /clients.
 function sendScreen(): void {
 	let size = terminal.state.io?.size()
 	if (!size) return
@@ -424,7 +426,14 @@ function sendScreen(): void {
 		.filter(Boolean)
 		.join(', ')
 		.slice(0, 200)
-	app.send({ type: 'screen', cols: size.cols, rows: size.rows, ...(term ? { term } : {}) })
+	let host = hostname()
+	app.send({
+		type: 'screen',
+		cols: size.cols,
+		rows: size.rows,
+		...(term ? { term } : {}),
+		...(/^[A-Za-z0-9._-]{1,255}$/.test(host) ? { hostname: host } : {}),
+	})
 }
 
 function reset(): void {

@@ -87,6 +87,8 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'screen') {
 		let size = (n: unknown) => Number.isInteger(n) && (n as number) > 0 && (n as number) <= 10000
 		if (!size(c.cols) || !size(c.rows)) return 'screen: cols and rows must be integers from 1 to 10000'
+		if (c.hostname !== undefined && !(typeof c.hostname === 'string' && /^[A-Za-z0-9._-]{1,255}$/.test(c.hostname)))
+			return 'screen: hostname must be 1 to 255 letters, digits, dots, hyphens or underscores'
 		return (
 			str('term', true) ??
 			(((c.term as string | undefined)?.length ?? 0) > 200 ? 'screen: term exceeds 200 characters' : undefined)

@@ -24,6 +24,7 @@ export type ClientRecord = ClientInfo & {
 	followed?: string[]
 	timezone?: string
 	screen?: { cols: number; rows: number; term?: string }
+	hostname?: string
 }
 
 const goneMs = 24 * 60 * 60 * 1000
@@ -59,9 +60,14 @@ function hello(rec: ClientRecord, pid: number, version?: string, newCode?: true)
 	return {}
 }
 
-// A terminal client reports its size and terminal (validated by the protocol).
-function screen(rec: ClientRecord, s: { cols: number; rows: number; term?: string }): Record<string, never> {
+// A terminal client reports its size, terminal and hostname (validated
+// by the protocol).
+function screen(
+	rec: ClientRecord,
+	s: { cols: number; rows: number; term?: string; hostname?: string },
+): Record<string, never> {
 	rec.screen = { cols: s.cols, rows: s.rows, ...(s.term ? { term: s.term } : {}) }
+	if (s.hostname) rec.hostname = s.hostname
 	return {}
 }
 
@@ -190,7 +196,7 @@ function draw(): string {
 			r.kind === 'peer'
 				? ['peer', r.pid, r.pid === undefined ? undefined : clients.tty(r.pid)]
 				: r.kind === 'remote'
-					? ['remote terminal', r.address]
+					? ['remote terminal', r.hostname, r.address]
 					: ['web', r.address, clients.shortAgent(r.userAgent)]
 		let seen = ago(now - r.lastAt) + (r.goneAt === undefined ? '' : ' (gone)')
 		return [

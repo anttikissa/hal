@@ -165,9 +165,9 @@ export type Command = (
 	| { type: 'hello'; pid: number; version?: string; newCode?: true }
 	// hal serve asks a peer host to restart and leave it the home (task kp0).
 	| { type: 'handover' }
-	// A terminal client's size and terminal (TERM, program, color depth),
-	// on connecting and on every resize, for the inspect tool; untrusted.
-	| { type: 'screen'; cols: number; rows: number; term?: string }
+	// A terminal client's size, terminal (TERM, program, color depth) and
+	// hostname, on connecting and resizing, for inspect and /clients; untrusted.
+	| { type: 'screen'; cols: number; rows: number; term?: string; hostname?: string }
 	// A terminal client could not write to its terminal (task wr8); the
 	// host appends `text` to state/diag.log. Untrusted.
 	| { type: 'terminal-error'; text: string }

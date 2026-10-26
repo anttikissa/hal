@@ -77,6 +77,7 @@ const CLIENT: Record<string, (c: ClientRecord, self: string) => string> = {
 					? 'remote terminal'
 					: 'web',
 	pid: (c) => (c.pid === undefined ? 'none' : String(c.pid)),
+	hostname: (c) => c.hostname ?? 'unknown',
 	size: (c) => (c.screen ? `${c.screen.cols}x${c.screen.rows}` : 'unknown'),
 	term: (c) => c.screen?.term ?? 'unknown',
 	follows: (c, self) => (c.open.has(self) ? 'yes' : 'no'),
