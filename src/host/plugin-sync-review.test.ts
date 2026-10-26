@@ -219,6 +219,8 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	// Changes on one side only start on taking them; there is no merge.
 	put(client, 'notes.ts', 'A\nB\nc\nd\nE\n')
 	let ff = await step()
+	expect(ff.say).toMatch(/Both last shared \*\*[^*]+\*\*'s version from/)
+	expect(ff.say).toContain('(server): no changes since')
 	expect(ff.ask.fields[0].options[ff.ask.fields[0].initial]).toEndWith("'s changes")
 	await step({ choice: 'Not now' })
 

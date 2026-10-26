@@ -245,22 +245,34 @@ async function contents(hashes: string[]): Promise<Record<string, string>> {
 
 // Both texts of a differing file (undefined: missing or deleted), the
 // text of the nearest version both descend from ('' when it was deleted;
-// undefined when they share none) and a diff from the server's version
-// (-) to the client's (+).
-async function diff(file: string): Promise<{ client?: string; server?: string; base?: string; diff: string }> {
+// undefined when they share none), when and where that version was
+// made, and a diff from the server's version (-) to the client's (+).
+async function diff(file: string): Promise<{
+	client?: string
+	server?: string
+	base?: string
+	shared?: { ts: string; by: Choice }
+	diff: string
+}> {
 	let d = pluginSyncClient.find(file)
 	let versions = known(pluginSyncClient.state.server.get(file) ?? [])
 	let parents = new Map([...versions].map(([id, v]) => [id, v.parent]))
 	let theirs = new Set(d.server.id ? lineage(d.server.id, parents) : [])
 	let common = d.client.id && lineage(d.client.id, parents).find((id) => theirs.has(id))
 	let base = common ? versions.get(common) : undefined
+	let mine = common ? pluginHistory.state.versions.get(common) : undefined
 	let texts = await contents([d.client.hash, d.server.hash, base?.hash].filter((h): h is string => !!h))
 	let client = d.client.hash ? texts[d.client.hash] : undefined
 	let server = d.server.hash ? texts[d.server.hash] : undefined
 	return {
 		...(client !== undefined ? { client } : {}),
 		...(server !== undefined ? { server } : {}),
-		...(base ? { base: base.hash ? texts[base.hash]! : '' } : {}),
+		...(base
+			? {
+					base: base.hash ? texts[base.hash]! : '',
+					shared: { ts: base.ts, by: mine && !mine.received ? 'client' : 'server' },
+				}
+			: {}),
 		diff: textDiff.text(server ?? '', client ?? ''),
 	}
 }

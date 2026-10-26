@@ -36,7 +36,7 @@ type Asked = {
 	merged?: string
 	key?: string
 }
-type Texts = { client?: string; server?: string; base?: string }
+type Texts = { client?: string; server?: string; base?: string; shared?: { ts: string; by: Choice } }
 type Merged = { text: string; conflicts: number }
 
 const LATER = 'Not now'
@@ -93,10 +93,20 @@ function changed(): void {
 		})
 }
 
-function side(d: Discrepancy, who: Choice): string {
+// A computer's line: when it changed the file, or that it has not since
+// the version both last shared.
+function side(d: Discrepancy, who: Choice, texts: Texts): string {
 	let s = d[who]
 	let name = who === 'client' ? `**${me()}** (this computer)` : `**${host()}** (server)`
+	if (texts.shared && texts[who] === texts.base) return `- ${name}: no changes since`
 	return `- ${name}: ${STATUS[s.status]}changed ${when(s.ts)}`
+}
+
+// The version both computers last shared: whose, and when it was made.
+function shared(texts: Texts): string {
+	if (!texts.shared) return 'The two copies share no earlier version.'
+	let by = texts.shared.by === 'client' ? me() : host()
+	return `Both last shared **${by}**'s version from ${when(texts.shared.ts)}.`
 }
 
 // When only one side has the file, the question is whether to copy or
@@ -215,7 +225,9 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 				'client',
 				`**${host()}** gets the copy on **${me()}**.${discards(1, host())} ${kept}${preview(undo(1), 1)}`,
 			])
-		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
+		say = [intro(d, texts, m), [shared(texts), side(d, 'client', texts), side(d, 'server', texts)].join('\n')].join(
+			'\n\n',
+		)
 		// The merge, or the one copy that already holds both, leads.
 		initial = m.conflicts ? 'later' : options[0]![1]
 	}
