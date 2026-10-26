@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Implementation uses one host controller over existing open tabs, not reference counters or timers. Trust gates prompt assembly, inspection and change tracking as well as plugin execution. Unreadable tabs retain their visible error without preventing other projects from activating. Provider fixture helpers wait for a new request rather than turn-start, which precedes asynchronous trust and activation work. End-to-end subprocess fixtures explicitly trust their known repository root.',
-		'Verified the project trust and shared-tab unload behavior through host integration tests, plus the complete normal suite and TypeScript check. Loader cancellation remains covered by task 95y tests. The controller scans unique open-tab working directories on navigation, startup and turn entry; provider rounds only await existing directory activations. No timer or history-sized state is added.'
+		'Verified the project trust and shared-tab unload behavior through host integration tests, plus the complete normal suite and TypeScript check. Loader cancellation remains covered by task 95y tests. The controller scans unique open-tab working directories on navigation, startup and turn entry; provider rounds only await existing directory activations. No timer or history-sized state is added.',
+		'Escape on the trust question skips it as Not now (form skip; turns.pause records the answer through projectContext.answer), and the hint reads Escape: skip question.'
 	],
 	needs: ['95y', 'q5g', '074', 'zh7'],
 	foldInto: ['an', 'q5g']

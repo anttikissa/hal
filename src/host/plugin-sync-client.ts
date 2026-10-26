@@ -4,9 +4,9 @@
 // It asks for the host's heads, then history only for files whose
 // contents differ, and works out from ancestry whether each differing
 // file is client-ahead, server-ahead, divergent or unrelated. Nothing
-// is written until apply() gets a confirmed choice; timestamps only
-// suggest one. /sync (task b81) reads state and calls compare,
-// diff, apply and ignore; onChange tells it the comparison changed,
+// is written until apply() or settle() gets a confirmed choice. /sync
+// (task b81) reads state and calls compare, diff, apply, settle, ignore
+// and unignore; onChange tells it the comparison changed,
 // and onReview hands it the host's review turns.
 //
 // Comparisons never overlap: one asked for while another runs follows
@@ -39,16 +39,12 @@ export type SideInfo = {
 	hash?: string
 	ts?: string
 	status: 'present' | 'empty' | 'deleted' | 'missing'
-	offline?: true
 }
-// `suggest`: the side with the later recorded time, when both have one
-// and they differ.
 export type Discrepancy = {
 	file: string
 	relation: Relation
 	client: SideInfo
 	server: SideInfo
-	suggest?: 'client' | 'server'
 }
 export type Excluded = { file: string; by: 'client' | 'server' | 'both' }
 export type Choice = 'client' | 'server'
@@ -153,31 +149,30 @@ async function compare(): Promise<void> {
 function side(h: SyncHead | undefined): SideInfo {
 	if (!h?.id) return { status: 'missing' }
 	let status: SideInfo['status'] = h.deleted ? 'deleted' : h.hash === pluginSync.sha('') ? 'empty' : 'present'
-	return {
-		id: h.id,
-		ts: h.ts!,
-		status,
-		...(h.hash ? { hash: h.hash } : {}),
-		...(h.offline ? { offline: true as const } : {}),
-	}
+	return { id: h.id, ts: h.ts!, status, ...(h.hash ? { hash: h.hash } : {}) }
 }
 
 const absent = (h: SyncHead) => !h.id || !!h.deleted
+
+// `id` and its ancestors, nearest first.
+function lineage(id: string, parents: Map<string, string | undefined>): string[] {
+	let seen = new Set<string>()
+	for (let at: string | undefined = id; at && !seen.has(at); at = parents.get(at)) seen.add(at)
+	return [...seen]
+}
+
+// Versions known here or sent by the host for `file`'s comparison, by id.
+function known(theirs: SyncVersion[]): Map<string, SyncVersion> {
+	return new Map([...pluginHistory.state.versions.values(), ...theirs].map((v) => [v.id, v]))
+}
 
 // How the two heads of a differing file relate through ancestry.
 function relation(c: SyncHead, s: SyncHead, theirs: SyncVersion[]): Relation {
 	if (!s.id) return 'client-ahead'
 	if (!c.id) return 'server-ahead'
-	let parents = new Map<string, string | undefined>()
-	for (let v of pluginHistory.state.versions.values()) parents.set(v.id, v.parent)
-	for (let v of theirs) parents.set(v.id, v.parent)
-	let line = (id: string) => {
-		let seen = new Set<string>()
-		for (let at: string | undefined = id; at && !seen.has(at); at = parents.get(at)) seen.add(at)
-		return seen
-	}
-	let mine = line(c.id),
-		other = line(s.id)
+	let parents = new Map([...known(theirs)].map(([id, v]) => [id, v.parent]))
+	let mine = new Set(lineage(c.id, parents)),
+		other = new Set(lineage(s.id, parents))
 	if (mine.has(s.id)) return 'client-ahead'
 	if (other.has(c.id)) return 'server-ahead'
 	return [...mine].some((id) => other.has(id)) ? 'divergent' : 'unrelated'
@@ -217,14 +212,12 @@ async function run(): Promise<void> {
 	st.discrepancies = differ.map((file) => {
 		let c = pluginSync.headOf(file),
 			s = theirs.get(file) ?? { file }
-		let d: Discrepancy = {
+		return {
 			file,
 			relation: pluginSyncClient.relation(c, s, st.server.get(file)!),
 			client: side(c),
 			server: side(s),
 		}
-		if (c.ts && s.ts && c.ts !== s.ts) d.suggest = c.ts > s.ts ? 'client' : 'server'
-		return d
 	})
 }
 
@@ -234,23 +227,40 @@ function find(file: string): Discrepancy {
 	return d
 }
 
-// Both texts of a differing file (undefined: missing or deleted) and a
-// diff from the server's version (-) to the client's (+).
-async function diff(file: string): Promise<{ client?: string; server?: string; diff: string }> {
-	let d = pluginSyncClient.find(file)
-	let client = d.client.hash ? pluginHistory.content(d.client.hash).toString('utf8') : undefined
-	let server: string | undefined
-	if (d.server.hash) {
-		let got = (await pluginSyncClient.request({ type: 'sync', op: 'content', hashes: [d.server.hash] })).contents?.[
-			d.server.hash
-		]
-		if (got === undefined)
-			throw new Error(`plugin sync: ${pluginSyncClient.state.name} did not send ${file} (${d.server.hash})`)
-		server = Buffer.from(got, 'base64').toString('utf8')
+// Contents of `hashes`: this home's, else the host's.
+async function contents(hashes: string[]): Promise<Record<string, string>> {
+	let here = new Set([...pluginHistory.state.versions.values()].map((v) => v.hash))
+	let out = Object.fromEntries(
+		hashes.filter((h) => here.has(h)).map((h) => [h, pluginHistory.content(h).toString('utf8')]),
+	)
+	let missing = hashes.filter((h) => !(h in out))
+	if (!missing.length) return out
+	let got = (await pluginSyncClient.request({ type: 'sync', op: 'content', hashes: missing })).contents ?? {}
+	for (let h of missing) {
+		if (got[h] === undefined) throw new Error(`plugin sync: ${pluginSyncClient.state.name} did not send ${h}`)
+		out[h] = Buffer.from(got[h], 'base64').toString('utf8')
 	}
+	return out
+}
+
+// Both texts of a differing file (undefined: missing or deleted), the
+// text of the nearest version both descend from ('' when it was deleted;
+// undefined when they share none) and a diff from the server's version
+// (-) to the client's (+).
+async function diff(file: string): Promise<{ client?: string; server?: string; base?: string; diff: string }> {
+	let d = pluginSyncClient.find(file)
+	let versions = known(pluginSyncClient.state.server.get(file) ?? [])
+	let parents = new Map([...versions].map(([id, v]) => [id, v.parent]))
+	let theirs = new Set(d.server.id ? lineage(d.server.id, parents) : [])
+	let common = d.client.id && lineage(d.client.id, parents).find((id) => theirs.has(id))
+	let base = common ? versions.get(common) : undefined
+	let texts = await contents([d.client.hash, d.server.hash, base?.hash].filter((h): h is string => !!h))
+	let client = d.client.hash ? texts[d.client.hash] : undefined
+	let server = d.server.hash ? texts[d.server.hash] : undefined
 	return {
 		...(client !== undefined ? { client } : {}),
 		...(server !== undefined ? { server } : {}),
+		...(base ? { base: base.hash ? texts[base.hash]! : '' } : {}),
 		diff: textDiff.text(server ?? '', client ?? ''),
 	}
 }
@@ -305,17 +315,51 @@ async function apply(file: string, choice: Choice, expected: Expected): Promise<
 	await pluginSyncClient.compare()
 }
 
+// Makes this client's `file` the host's too: `text` (a merge) replaces it
+// first if the client's head is still `expected.client`; without `text`
+// the file is taken as it is now (merged by hand).
+async function settle(file: string, text: string | undefined, expected: Expected): Promise<void> {
+	if (text !== undefined) {
+		if (pluginSync.headOf(file).id !== expected.client) return pluginSyncClient.stale(file, 'client')
+		pluginHistory.write(file, Buffer.from(text))
+	}
+	pluginHistory.seen(pluginHistory.filePath(file), true)
+	let id = pluginSync.headOf(file).id
+	await pluginSyncClient.apply(file, 'client', {
+		...(id ? { client: id } : {}),
+		...(expected.server ? { server: expected.server } : {}),
+	})
+}
+
+const ignorePath = () => join(pluginSync.dir(), '.syncignore')
+
 // Keep separate: this client's plugins/.syncignore gains `file`; no
 // plugin file changes.
 async function ignore(file: string): Promise<void> {
 	if (!pluginSyncWire.isName(file)) throw new Error(`plugin sync: not a plugin filename: ${file}`)
-	let path = join(pluginSync.dir(), '.syncignore')
+	let path = ignorePath()
 	let text = existsSync(path) ? readFileSync(path, 'utf8') : ''
 	if (!pluginSyncWire.ignoreList(text).includes(file)) {
 		let tmp = `${path}.tmp.${process.pid}`
 		writeFileSync(tmp, `${text}${text && !text.endsWith('\n') ? '\n' : ''}${file}\n`)
 		renameSync(tmp, path)
 	}
+	await pluginSyncClient.compare()
+}
+
+// Syncs `file` again: its lines leave this client's plugins/.syncignore.
+async function unignore(file: string): Promise<void> {
+	let path = ignorePath()
+	let text = existsSync(path) ? readFileSync(path, 'utf8') : ''
+	let tmp = `${path}.tmp.${process.pid}`
+	writeFileSync(
+		tmp,
+		text
+			.split('\n')
+			.filter((l) => l.trim() !== file)
+			.join('\n'),
+	)
+	renameSync(tmp, path)
 	await pluginSyncClient.compare()
 }
 
@@ -339,5 +383,7 @@ export const pluginSyncClient = {
 	diff,
 	stale,
 	apply,
+	settle,
 	ignore,
+	unignore,
 }

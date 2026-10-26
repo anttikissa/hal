@@ -57,4 +57,25 @@ function text(before: string, after: string, limit = Infinity, numbered = false)
 		rmSync(dir, { recursive: true, force: true })
 	}
 }
-export const textDiff = { text }
+
+// A three-way merge of `ours` and `theirs` from `base`: the merged text,
+// with conflict markers when `conflicts` (their count) is above 0.
+function merge(base: string, ours: string, theirs: string): { text: string; conflicts: number } {
+	let root = paths.tmpDir()
+	mkdirSync(root, { recursive: true })
+	let dir = mkdtempSync(`${root}/merge-`)
+	try {
+		writeFileSync(`${dir}/local`, ours, { mode: 0o600 })
+		writeFileSync(`${dir}/base`, base, { mode: 0o600 })
+		writeFileSync(`${dir}/server`, theirs, { mode: 0o600 })
+		let names = ['-L', 'local', '-L', 'base', '-L', 'server']
+		let result = Bun.spawnSync(['git', 'merge-file', '-p', ...names, `${dir}/local`, `${dir}/base`, `${dir}/server`])
+		if (result.exitCode < 0 || result.exitCode > 127)
+			throw new Error(`git merge-file failed (${result.exitCode}) at ${dir}:\n${result.stderr.toString()}`)
+		return { text: result.stdout.toString(), conflicts: result.exitCode }
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+}
+
+export const textDiff = { text, merge }

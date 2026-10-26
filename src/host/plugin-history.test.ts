@@ -26,7 +26,7 @@ afterEach(() => {
 	rmSync(dir, { recursive: true, force: true })
 })
 
-test('repeated events and restarts add no duplicate versions; edits while stopped are found and marked', () => {
+test('repeated events and restarts add no duplicate versions; edits while stopped are found', () => {
 	write('one')
 	seen()
 	seen()
@@ -35,8 +35,7 @@ test('repeated events and restarts add no duplicate versions; edits while stoppe
 	write('two')
 	pluginHistory.init(dir)
 	let [first, second] = versions()
-	expect(second).toMatchObject({ parent: first!.id, offline: true })
-	expect(first!.offline).toBeUndefined()
+	expect(second).toMatchObject({ parent: first!.id })
 	expect(pluginHistory.content(first!.hash!).toString()).toBe('one')
 })
 

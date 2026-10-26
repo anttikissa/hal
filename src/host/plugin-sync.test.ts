@@ -295,7 +295,7 @@ test('reviewed personal transfers stay in their namespace and reject nonportable
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('personal/same.ts\n')
 })
 
-test('reports each relation, sends only heads for equal files, and suggests the later time', async () => {
+test('reports each relation and sends only heads for equal files', async () => {
 	put(server, 'same.ts', 'x')
 	put(client, 'same.ts', 'x')
 	put(server, 'base.ts', 'v1')
@@ -317,7 +317,7 @@ test('reports each relation, sends only heads for equal files, and suggests the 
 	expect(one('base.ts')).toBeUndefined()
 	put(client, 'base.ts', 'v2')
 	await pluginSyncClient.compare()
-	expect(one('base.ts')).toMatchObject({ relation: 'client-ahead', suggest: 'client' })
+	expect(one('base.ts')).toMatchObject({ relation: 'client-ahead' })
 	put(server, 'base.ts', 'v2 elsewhere')
 	await pluginSyncClient.compare()
 	expect(one('base.ts')!.relation).toBe('divergent')

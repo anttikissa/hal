@@ -20,10 +20,9 @@ export type SyncVersion = {
 	parent?: string
 	ts: string
 	deleted?: true
-	offline?: true
 }
 // A file's current version on one home; no id: it has no history there.
-export type SyncHead = { file: string; id?: string; hash?: string; ts?: string; deleted?: true; offline?: true }
+export type SyncHead = { file: string; id?: string; hash?: string; ts?: string; deleted?: true }
 
 // inventory: the host's portable heads plus heads for `names` (the
 // client's portable files); the host's .syncignore names are left out

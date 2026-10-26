@@ -6,30 +6,41 @@
 // plugins differ, and each newly found discrepancy gets one notice.
 // A step applies the answer to the question it last asked in that
 // session (only after the destination applied it does it say so), then
-// asks about the first file still differing. Escape pauses the host's
-// turn, so nothing reaches here and nothing is written.
+// asks about the first file still differing. Escape answers Not now
+// (or Done).
 // Tasks: b81.
 
+import { rmSync, writeFileSync } from 'fs'
 import { hostname } from 'os'
 import { join } from 'path'
 import { diff as diffs } from '../common/diff.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
+import { titles } from '../common/titles.ts'
+import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { pluginSyncClient, StaleError, type Choice, type Discrepancy, type SideInfo } from './plugin-sync-client.ts'
 import { textDiff } from './text-diff.ts'
 
-type Asked = { file: string; client?: string; server?: string; labels: [string, string] }
-
-const CLIENT = "Keep client's copy"
-const SERVER = "Keep server's copy"
-const keep = (file: string) => `Don't sync ${file} on this client`
-
-const RELATION: Partial<Record<Discrepancy['relation'], string>> = {
-	divergent: "Both changed it since they last matched, so either choice loses the other's changes.",
-	unrelated: 'The two copies share no history.',
+// What an answer does: copy one side's version, use the merge, send the
+// file as merged by hand, ask later, stop or resume syncing, or end.
+type Action = Choice | 'merge' | 'mine' | 'later' | 'never' | 'again' | 'done'
+type Asked = {
+	acts: Record<string, { do: Action; file: string }>
+	// What Escape answers.
+	skip: string
+	client?: string
+	server?: string
+	merged?: string
+	key?: string
 }
+type Texts = { client?: string; server?: string; base?: string }
+
+const LATER = 'Not now'
+const DONE = 'Done'
+const never = (file: string) => `Never sync ${file} on ${me()}`
+
 const STATUS: Record<SideInfo['status'], string> = {
 	present: '',
 	empty: 'empty file, ',
@@ -42,16 +53,20 @@ const host = () => pluginSyncClient.state.name
 const me = () => hostname().split('.')[0] || 'this computer'
 const key = (d: Discrepancy) => `${d.file} ${d.client.id ?? ''} ${d.server.id ?? ''}`
 const where = (file: string) => (pluginSyncWire.isPlugin(file) ? `plugins/${file}` : file)
-const when = (ts?: string) => (ts ? `${ts.slice(0, 16).replace('T', ' ')} UTC` : 'no date')
+const when = (ts?: string) => (ts ? titles.time(ts).replace(/^Yesterday/, 'yesterday') : 'at no recorded time')
 const absent = (s: SideInfo) => s.status === 'missing' || s.status === 'deleted'
 const oneSided = (d: Discrepancy) => absent(d.client) !== absent(d.server)
+const copies = (file: string) => [`${pluginHistory.filePath(file)}.local`, `${pluginHistory.filePath(file)}.server`]
 const kept = 'The old copy stays in history.'
 
-// What choosing the client's, then the server's, version does to `d`.
-function labels(d: Discrepancy): [string, string] {
-	if (!oneSided(d)) return [CLIENT, SERVER]
-	let remove = d.file === 'config.ason' ? 'Clear portable settings' : 'Delete'
-	return absent(d.server) ? [`Copy to ${host()}`, `${remove} here`] : [`${remove} on ${host()}`, 'Copy here']
+// Lines added and removed from `from` to `to`: '+4 -3', '' if none.
+function tally(from = '', to = ''): string {
+	let rows = textDiff.text(from, to).split('\n')
+	return (['+', '-'] as const)
+		.map((c) => [c, rows.filter((r) => r[0] === c).length] as const)
+		.filter(([, n]) => n)
+		.map(([c, n]) => `${c}${n}`)
+		.join(' ')
 }
 
 // Starts comparing with host `name`; `show` puts the indicator (or
@@ -86,8 +101,8 @@ function changed(): void {
 
 function side(d: Discrepancy, who: Choice): string {
 	let s = d[who]
-	let name = who === 'client' ? `**${me()}** (here)` : `**${host()}**`
-	return `- ${who === 'client' ? 'Client' : 'Server'}: ${name}, ${STATUS[s.status]}edited ${when(s.ts)}${s.offline ? ' (offline)' : ''}${d.suggest === who ? ' ← newer' : ''}`
+	let name = who === 'client' ? `**${me()}** (this computer)` : `**${host()}** (server)`
+	return `- ${name}: ${STATUS[s.status]}changed ${when(s.ts)}`
 }
 
 // What replacing `name`'s copy with text `to` (from text `from`) shows.
@@ -108,86 +123,189 @@ function presence(d: Discrepancy): string {
 	let mine = absent(d.server)
 	let [has, lacks] = mine ? [d.client, d.server] : [d.server, d.client]
 	let [hasWho, lacksWho] = mine
-		? [`client (**${me()}**, here)`, `server (**${host()}**)`]
-		: [`server (**${host()}**)`, `client (**${me()}**, here)`]
+		? [`client (**${me()}**, this computer)`, `server (**${host()}**)`]
+		: [`server (**${host()}**)`, `client (**${me()}**, this computer)`]
 	let gone = lacks.status === 'deleted' ? `deleted it (${when(lacks.ts)})` : 'never had it'
 	let subject = d.file === 'config.ason' ? 'Portable settings in **config.ason**' : `**${d.file}**`
-	return `${subject} ${d.file === 'config.ason' ? 'are' : 'is'} only on the ${hasWho}, edited ${when(has.ts)}. The ${lacksWho} ${gone}.`
+	return `${subject} ${d.file === 'config.ason' ? 'are' : 'is'} only on the ${hasWho}, changed ${when(has.ts)}. The ${lacksWho} ${gone}.`
+}
+
+// How the two copies relate, first: who has news, or whether both do.
+function intro(d: Discrepancy, conflicts?: number): string {
+	let file = `**${d.file}**`
+	if (d.relation === 'client-ahead')
+		return `**${me()}** has a newer ${file}; **${host()}** has not changed it since they last matched.`
+	if (d.relation === 'server-ahead')
+		return `**${host()}** has a newer ${file}; **${me()}** has not changed it since they last matched.`
+	if (d.relation === 'unrelated') return `${file} differs on the two computers, and the copies share no history.`
+	if (!conflicts) return `${file} changed on both computers since they last matched. The changes merge cleanly.`
+	let [local, server] = copies(d.file)
+	return `${file} changed on both computers since they last matched, and the changes conflict. Both copies are beside it to merge by hand: ${local} and ${server}.`
 }
 
 // The question about `d`, with everything needed to answer it and what
 // each answer does.
-function describe(d: Discrepancy, texts: { client?: string; server?: string }): { say: string; ask: Form } {
+function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked: Asked; conflicts?: number } {
 	let file = d.file
-	let nothing = `Nothing changes on either computer. This client stops comparing ${file}.`
-	let ask = (initial: number, outcomes: [string, string]): Form => ({
-		text: `${file}: which copy should both keep?${file === 'config.ason' ? '\nOnly portable settings and their comments sync. Local settings and the file itself stay put.' : ''}`,
+	let options: [string, Action, string][] = []
+	let say: string,
+		merged: { text: string; conflicts: number } | undefined,
+		initial: Action = 'later'
+	if (oneSided(d)) {
+		let gone = file === 'config.ason' ? 'Portable settings are cleared on' : `${file} is deleted on`
+		let copy = file === 'config.ason' ? 'Portable settings are copied to' : `${file} is copied to`
+		let remove = file === 'config.ason' ? 'Clear portable settings' : 'Delete'
+		if (absent(d.server))
+			options.push(
+				[`Copy to ${host()}`, 'client', `${copy} **${host()}**.`],
+				[`${remove} here`, 'server', `${gone} **${me()}**. ${kept}`],
+			)
+		else
+			options.push(
+				[`${remove} on ${host()}`, 'client', `${gone} **${host()}**. ${kept}`],
+				['Copy here', 'server', `${copy} **${me()}**.`],
+			)
+		say = presence(d)
+		initial = absent(d.server) ? 'client' : 'server'
+	} else {
+		let { client = '', server = '', base } = texts
+		let local = tally(base ?? server, client),
+			remote = tally(base ?? client, server)
+		if (d.relation === 'divergent') merged = textDiff.merge(base ?? '', client, server)
+		if (merged && !merged.conflicts)
+			options.push([
+				`Use both changes (local ${local}, server ${remote})`,
+				'merge',
+				[change(me(), file, client, merged.text), change(host(), file, server, merged.text)].join('\n\n'),
+			])
+		options.push(
+			[
+				`Use server${remote ? ` (${remote})` : ''}${local ? `, drop local changes (${local})` : ''}`,
+				'server',
+				change(me(), file, client, server),
+			],
+			[
+				`Use local${local ? ` (${local})` : ''}${remote ? `, drop server changes (${remote})` : ''}`,
+				'client',
+				change(host(), file, server, client),
+			],
+		)
+		if (merged?.conflicts)
+			options.push([
+				'I merged it myself',
+				'mine',
+				`${where(file)} on **${me()}**, as it is when you answer, goes to **${host()}**. ${kept}`,
+			])
+		say = [intro(d, merged?.conflicts), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
+		initial =
+			merged && !merged.conflicts
+				? 'merge'
+				: d.relation === 'client-ahead'
+					? 'client'
+					: d.relation === 'server-ahead'
+						? 'server'
+						: 'later'
+	}
+	options.push(
+		[LATER, 'later', 'Nothing changes. /sync asks again next time.'],
+		[
+			never(file),
+			'never',
+			`Nothing changes on either computer. **${me()}** stops syncing ${file}; /sync lists it so you can sync it again.`,
+		],
+	)
+	let ask: Form = {
+		text: `Sync ${file}?${file === 'config.ason' ? '\nOnly portable settings and their comments sync. Local settings and the file itself stay put.' : ''}`,
 		fields: [
 			{
 				type: 'choice',
 				name: 'choice',
-				options: [...labels(d), keep(file)],
-				initial,
-				outcomes: [...outcomes, nothing],
+				options: options.map((o) => o[0]),
+				initial: options.findIndex((o) => o[1] === initial),
+				outcomes: options.map((o) => o[2]),
 			},
 		],
-	})
-	if (oneSided(d)) {
-		let [copy, gone] =
-			file === 'config.ason'
-				? ['Portable settings are copied to', 'Portable settings are cleared on']
-				: [`${file} is copied to`, `${file} is deleted on`]
-		let outcomes: [string, string] = absent(d.server)
-			? [`${copy} **${host()}**.`, `${gone} **${me()}**. ${kept}`]
-			: [`${gone} **${host()}**. ${kept}`, `${copy} **${me()}**.`]
-		return { say: presence(d), ask: ask(absent(d.server) ? 0 : 1, outcomes) }
+		skip: true,
 	}
-	let lines = [
-		`**${file}** is different on the client and the server.`,
-		[side(d, 'client'), side(d, 'server')].join('\n'),
-	]
-	if (RELATION[d.relation]) lines.push(RELATION[d.relation]!)
+	let asked: Asked = {
+		acts: Object.fromEntries(options.map(([label, action]) => [label, { do: action, file }])),
+		skip: LATER,
+		key: key(d),
+		...(d.client.id ? { client: d.client.id } : {}),
+		...(d.server.id ? { server: d.server.id } : {}),
+		...(merged && !merged.conflicts ? { merged: merged.text } : {}),
+	}
+	return { say, ask, asked, ...(merged?.conflicts ? { conflicts: merged.conflicts } : {}) }
+}
+
+// The last question: files this client never syncs, to sync one again.
+function resume(files: string[]): { ask: Form; asked: Asked } {
+	let options = files.map((f) => `Sync ${f} again`)
 	return {
-		say: lines.join('\n\n'),
-		ask: ask(d.suggest === 'client' ? 0 : d.suggest === 'server' ? 1 : 2, [
-			change(host(), file, texts.server, texts.client),
-			change(me(), file, texts.client, texts.server),
-		]),
+		ask: {
+			text: `**${me()}** never syncs ${files.join(', ')}. Sync one again?`,
+			fields: [{ type: 'choice', name: 'choice', options: [...options, DONE], initial: options.length }],
+			skip: true,
+		},
+		asked: {
+			acts: Object.fromEntries([
+				...files.map((f, i) => [options[i]!, { do: 'again' as const, file: f }]),
+				[DONE, { do: 'done' as const, file: '' }],
+			]),
+			skip: DONE,
+		},
 	}
 }
 
-// Carries out answer `value` to `asked`; what happened, to say.
-async function act(asked: Asked, value: string): Promise<string> {
-	let { file } = asked
-	if (value === keep(file)) {
-		await pluginSyncClient.ignore(file)
-		return `Keeping ${file} separate: ${join(pluginSync.dir(), '.syncignore')} on this client now lists it, and neither file changed. Remove that line to compare it again.`
-	}
-	let choice: Choice | undefined =
-		value === asked.labels[0] ? 'client' : value === asked.labels[1] ? 'server' : undefined
-	if (!choice) return `"${value}" is not one of the choices for ${file}; nothing was written.`
-	await pluginSyncClient.apply(file, choice, {
+// Carries out answer `value` to `asked` in session `session`; what
+// happened, to say.
+async function act(asked: Asked, value: string, session: string): Promise<string> {
+	let a = asked.acts[value]
+	if (!a) return `"${value}" is not one of the choices; nothing was written.`
+	let { file } = a
+	let expected = {
 		...(asked.client ? { client: asked.client } : {}),
 		...(asked.server ? { server: asked.server } : {}),
-	})
-	return `${value} for ${file}: ${choice === 'client' ? host() : 'this client'} applied it.`
+	}
+	if (a.do === 'done') return ''
+	if (a.do === 'later') {
+		pluginSyncReview.state.later.get(session)?.add(asked.key!)
+		return `Skipped ${file} for now.`
+	}
+	if (a.do === 'never') {
+		await pluginSyncClient.ignore(file)
+		return `**${me()}** no longer syncs ${file}: ${join(pluginSync.dir(), '.syncignore')} lists it. /sync offers to sync it again.`
+	}
+	if (a.do === 'again') {
+		await pluginSyncClient.unignore(file)
+		return `**${me()}** syncs ${file} again.`
+	}
+	if (a.do === 'merge' || a.do === 'mine') await pluginSyncClient.settle(file, asked.merged, expected)
+	else await pluginSyncClient.apply(file, a.do, expected)
+	for (let path of copies(file)) rmSync(path, { force: true })
+	let done = a.do === 'server' ? me() : a.do === 'client' ? host() : 'both computers'
+	return `${value} for ${file}: ${done} applied it.`
 }
 
 // One step of session `session`: apply `answers` if they answer what
-// it last asked, then ask about the next differing file.
+// it last asked (none: Escape skipped it), then ask about the next
+// differing file not skipped for now.
 async function review(session: string, answers?: Answers): Promise<void> {
 	let rs = pluginSyncReview.state,
 		said: string[] = [],
 		ask: Form | undefined
 	let asked = rs.asked.get(session)
 	rs.asked.delete(session)
+	let later = rs.later.get(session) ?? new Set<string>()
+	rs.later.set(session, later)
 	try {
-		if (answers?.choice !== undefined && asked) said.push(await pluginSyncReview.act(asked, answers.choice))
+		if (asked) said.push(await pluginSyncReview.act(asked, answers?.choice ?? asked.skip, session))
 		else {
 			if (answers?.choice !== undefined)
 				said.push(
 					'This terminal restarted since it asked, so it no longer knows which comparison that answer was for; nothing was written. Here is the current one.',
 				)
+			else later.clear()
 			await pluginSyncClient.compare()
 		}
 	} catch (e: any) {
@@ -195,32 +313,50 @@ async function review(session: string, answers?: Answers): Promise<void> {
 	}
 	try {
 		let st = pluginSyncClient.state,
-			d = st.discrepancies[0]
+			d = st.discrepancies.find((x) => !later.has(key(x)))
 		if (st.error) said.push(`The last comparison failed: ${st.error}`)
 		if (d) {
-			let q = pluginSyncReview.describe(d, await pluginSyncClient.diff(d.file))
+			let texts = await pluginSyncClient.diff(d.file)
+			let q = pluginSyncReview.describe(d, texts)
+			if (q.conflicts) {
+				let [local, server] = copies(d.file)
+				writeFileSync(local!, texts.client ?? '')
+				writeFileSync(server!, texts.server ?? '')
+			}
 			said.push(q.say)
 			ask = q.ask
-			rs.asked.set(session, {
-				file: d.file,
-				...(d.client.id ? { client: d.client.id } : {}),
-				...(d.server.id ? { server: d.server.id } : {}),
-				labels: labels(d),
-			})
+			rs.asked.set(session, q.asked)
 		} else if (!st.error) {
-			let ex = st.excluded.map((x) => `${x.file} (ignored by ${x.by === 'both' ? 'both sides' : `the ${x.by}`})`)
-			said.push(`Synced files match ${host()}.${ex.length ? ` Not compared: ${ex.join(', ')}.` : ''}`)
+			let skipped = st.discrepancies.map((x) => x.file)
+			said.push(
+				skipped.length ? `Skipped for now: ${skipped.join(', ')}. /sync asks again.` : `Synced files match ${host()}.`,
+			)
+			let theirs = st.excluded.filter((x) => x.by !== 'client').map((x) => x.file)
+			if (theirs.length) said.push(`**${host()}** never syncs ${theirs.join(', ')}.`)
+			let mine = st.excluded.filter((x) => x.by !== 'server').map((x) => x.file)
+			if (mine.length && asked?.skip !== DONE) {
+				let q = resume(mine)
+				ask = q.ask
+				rs.asked.set(session, q.asked)
+			}
 		}
 	} catch (e: any) {
 		said.push(`Could not prepare the next comparison: ${e?.message ?? e}`)
 	}
-	pluginSyncClient.send({ type: 'sync', op: 'step', session, say: said.join('\n\n'), ...(ask ? { ask } : {}) })
+	pluginSyncClient.send({
+		type: 'sync',
+		op: 'step',
+		session,
+		say: said.filter(Boolean).join('\n\n'),
+		...(ask ? { ask } : {}),
+	})
 }
 
 export const pluginSyncReview = {
-	// `asked`: per review session, the file and versions it last asked
-	// about; `announced`: discrepancies already given a notice.
-	state: { asked: new Map<string, Asked>(), announced: new Set<string>() },
+	// `asked`: per review session, what it last asked; `later`: per
+	// session, discrepancies skipped until the next /sync; `announced`:
+	// discrepancies already given a notice.
+	state: { asked: new Map<string, Asked>(), later: new Map<string, Set<string>>(), announced: new Set<string>() },
 	show: (_text?: string): void => {},
 	start,
 	changed,

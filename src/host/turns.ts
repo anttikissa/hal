@@ -132,6 +132,7 @@ function pause(id: string, reason?: string, closing = false): string | undefined
 	if (!transition && !closing && open && !open.from && open.form.skip) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
+		projectContext.answer(id, open.form, {})
 		history.append(id, { type: 'answer', question: open.id, answers: {}, canceled: true })
 		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, canceled: true })
 		turns.start(id)

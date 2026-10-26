@@ -29,7 +29,7 @@ function formLines(
 		...(quote.length ? ['', ...quote] : []),
 	]
 	let f = formView.fieldLines(st, width)
-	let escape = st.form.skip ? 'Escape: skip' : 'Escape: pause'
+	let escape = st.form.skip ? 'Escape: skip question' : 'Escape: pause'
 	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`
 	// The fields stand apart: a blank row above and below them.
 	let cursor = { row: rows.length + 1 + f.cursor.row, col: f.cursor.col }

@@ -59,7 +59,14 @@ test('headers: time and who wrote the block, the short model name (else its id) 
 
 test('a header from another day puts the date before the time', () => {
 	expect(titles.title({ type: 'prompt', text: 'hi', ts: new Date(2020, 9, 2, 8, 5).toISOString() })).toBe(
-		'2 Oct 08:05 You',
+		'Oct 2, 2020, 08:05 You',
+	)
+	let now = new Date()
+	let yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 8, 5)
+	let months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+	let year = yesterday.getFullYear() === now.getFullYear() ? '' : `, ${yesterday.getFullYear()}`
+	expect(titles.time(yesterday.toISOString())).toBe(
+		`Yesterday, ${months[yesterday.getMonth()]} ${yesterday.getDate()}${year}, 08:05`,
 	)
 })
 

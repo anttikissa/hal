@@ -93,7 +93,6 @@ function headOf(file: string): SyncHead {
 		ts: v.ts,
 		...(v.hash ? { hash: v.hash } : {}),
 		...(v.deleted ? { deleted: true as const } : {}),
-		...(v.offline ? { offline: true as const } : {}),
 	}
 }
 

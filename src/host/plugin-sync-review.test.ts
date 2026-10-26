@@ -1,7 +1,8 @@
 // The remote terminal's plugin review (task b81) between two homes in
 // one process, as in plugin-sync.test.ts: the indicator and notices
-// follow the comparison without moving focus, Keep separate drops a
-// file from the count, and a stale answer writes nothing and asks again.
+// follow the comparison without moving focus, Never sync drops a file
+// from the count, a stale answer writes nothing and asks again, and
+// changes on both sides merge or are left to merge by hand.
 import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -114,7 +115,7 @@ beforeEach(() => {
 	notices = []
 	shown = []
 	pluginReports.deliver = (e) => void notices.push(e)
-	pluginSyncReview.state = { asked: new Map(), announced: new Set() }
+	pluginSyncReview.state = { asked: new Map(), later: new Map(), announced: new Set() }
 	pluginSyncReview.start('example.com', (text) => void shown.push(text))
 	pluginSyncClient.state.connected = true
 	pluginSyncClient.send = (c) => (sent.push(c), answer(c))
@@ -138,7 +139,7 @@ afterAll(() => {
 	plugins.report = saved.report
 })
 
-test('startup shows a count and one notice, never focus; Keep separate drops a file from the count', async () => {
+test('startup shows a count and one notice, never focus; Never sync drops a file until synced again', async () => {
 	put(client, 'theme.ts', 'export const portable = true // dark')
 	put(server, 'theme.ts', 'export const portable = true // light')
 	put(client, 'keys.ts', 'export const portable = true // mine')
@@ -151,21 +152,29 @@ test('startup shows a count and one notice, never focus; Keep separate drops a f
 	expect(notices).toHaveLength(1)
 
 	let first = await step()
-	expect(first.ask.fields[0].options).toEqual([
-		'Copy to example.com',
-		'Delete here',
-		"Don't sync keys.ts on this client",
-	])
+	let never = first.ask.fields[0].options.at(-1)
+	expect(first.ask.fields[0].options).toEqual(['Copy to example.com', 'Delete here', 'Not now', never])
+	expect(never).toStartWith('Never sync keys.ts on ')
 	expect(first.ask.fields[0].initial).toBe(0)
+	expect(first.ask.skip).toBe(true)
 	expect(first.say).toContain('example.com**) never had it')
 	expect(first.say).not.toContain('```diff')
-	let next = await step({ choice: "Don't sync keys.ts on this client" })
-	expect(next.say).toContain('Keeping keys.ts separate')
+	let next = await step({ choice: never })
+	expect(next.say).toContain('no longer syncs keys.ts')
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
 	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
 	expect(next.ask.fields[0].outcomes[0]).toContain('```diff\n')
-	expect(next.ask.text).toStartWith('theme.ts')
+	expect(next.ask.text).toBe('Sync theme.ts?')
+
+	// Escape (no answer) is Not now: the file waits for the next /sync,
+	// and the never-synced file can be synced again.
+	let last = await step()
+	expect(last.say).toContain('Skipped for now: theme.ts.')
+	expect(last.ask.fields[0].options).toEqual(['Sync keys.ts again', 'Done'])
+	let again = await step({ choice: 'Sync keys.ts again' })
+	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('')
+	expect(again.ask.text).toBe('Sync keys.ts?')
 })
 
 test('a stale answer writes nothing and asks about the revised versions', async () => {
@@ -174,20 +183,45 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	await pluginSyncClient.compare()
 	await step()
 	put(server, 'theme.ts', 'export const portable = true // solarized')
-	let again = await step({ choice: "Keep client's copy" })
+	let again = await step({ choice: 'Use local (+1 -1), drop server changes (+1 -1)' })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// Each choice previews the change it makes: the server gains the client's line, and the reverse.
-	let [toServer, toClient] = again.ask.fields[0].outcomes
+	// Each choice previews the change it makes: the client gains the server's line, and the reverse.
+	let [toClient, toServer] = again.ask.fields[0].outcomes
 	expect(toServer).toContain('on **example.com** changes')
 	expect(toServer).toContain('+export const portable = true // dark')
 	expect(toClient).toContain('+export const portable = true // solarized')
-	expect(again.ask.text).toStartWith('theme.ts')
 
-	let done = await step({ choice: "Keep server's copy" })
-	expect(done.say).toStartWith("Keep server's copy for theme.ts: this client applied it.")
+	let done = await step({ choice: again.ask.fields[0].options[0] })
+	expect(done.say).toContain('for theme.ts:')
 	expect(read(client, 'theme.ts')).toBe('export const portable = true // solarized')
 	expect(done.say).toContain('Synced files match example.com.')
 	expect(done.ask).toBeUndefined()
 	expect(shown.at(-1)).toBeUndefined()
+})
+
+test('changes on both sides merge, or wait beside the file to be merged by hand', async () => {
+	put(client, 'notes.ts', 'a\nb\nc\nd\ne\n')
+	await pluginSyncClient.compare()
+	await step({ choice: (await step()).ask.fields[0].options[0] })
+	put(client, 'notes.ts', 'A\nb\nc\nd\ne\n')
+	put(server, 'notes.ts', 'a\nb\nc\nd\nE\n')
+	let q = await step()
+	expect(q.say).toContain('changed on both computers since they last matched. The changes merge cleanly.')
+	expect(q.ask.fields[0].options[0]).toBe('Use both changes (local +1 -1, server +1 -1)')
+	expect(q.ask.fields[0].initial).toBe(0)
+	await step({ choice: q.ask.fields[0].options[0] })
+	expect(read(client, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
+	expect(read(server, 'notes.ts')).toBe('A\nb\nc\nd\nE\n')
+
+	put(client, 'notes.ts', 'mine\nb\nc\nd\nE\n')
+	put(server, 'notes.ts', 'theirs\nb\nc\nd\nE\n')
+	q = await step()
+	expect(q.say).toContain('the changes conflict')
+	expect(read(client, 'notes.ts.server')).toBe('theirs\nb\nc\nd\nE\n')
+	expect(q.ask.fields[0].options).toContain('I merged it myself')
+	put(client, 'notes.ts', 'both\nb\nc\nd\nE\n')
+	await step({ choice: 'I merged it myself' })
+	expect(read(server, 'notes.ts')).toBe('both\nb\nc\nd\nE\n')
+	expect(read(client, 'notes.ts.server')).toBeUndefined()
 })

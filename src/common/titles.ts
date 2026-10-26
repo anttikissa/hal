@@ -38,8 +38,9 @@ function learn(event: { names: Record<string, string>; defaults?: Record<string,
 	Object.assign(titles.defaults, event.defaults)
 }
 
-// Local HH:MM of an ISO time, as '2 Oct HH:MM' if not today (local);
-// '' without one. Memoized per minute string for the process: a header
+// Local HH:MM of an ISO time: 'Yesterday, Oct 2, HH:MM' yesterday,
+// 'Oct 2, HH:MM' before, 'Oct 2, 2025, HH:MM' in another year; '' without
+// one. Memoized per minute string for the process: a header
 // keeps its first text, so midnight rewrites no scrollback (which would
 // clear the terminal); a restart dates it. A long history's headers
 // share few parses (the startup budget, kn).
@@ -47,15 +48,20 @@ const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const times = new Map<string, string>()
 function time(ts: string | undefined): string {
 	if (ts === undefined) return ''
-	let today = new Date().toDateString()
 	let key = ts.endsWith('Z') ? ts.slice(0, 16) : ts
 	let hit = times.get(key)
 	if (hit !== undefined) return hit
+	let now = new Date()
 	let d = new Date(ts)
 	let t = Number.isNaN(d.getTime())
 		? ''
 		: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-	if (t && d.toDateString() !== today) t = `${d.getDate()} ${months[d.getMonth()]} ${t}`
+	if (t && d.toDateString() !== now.toDateString()) {
+		let day = `${months[d.getMonth()]} ${d.getDate()}`
+		if (d.getFullYear() !== now.getFullYear()) day += `, ${d.getFullYear()}`
+		let yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString()
+		t = `${d.toDateString() === yesterday ? 'Yesterday, ' : ''}${day}, ${t}`
+	}
 	times.set(key, t)
 	return t
 }

@@ -6,8 +6,7 @@
 //
 // A version is { id, file, hash, parent, ts }; a deletion has `deleted`
 // and no hash, so an empty file (the empty hash) differs from absence.
-// `ts` is when this home observed it; `offline` marks one found by the
-// startup scan, made at some unknown time while Hal was stopped. The id
+// `ts` is when this home observed it. The id
 // hashes file, hash, parent and ts, so a revert to earlier bytes is a
 // new version, not the old one. A received version keeps its id, ts and
 // parent; { file, checkout: id, ts } makes a known version the file's
@@ -51,7 +50,6 @@ export type Version = {
 	parent?: string
 	ts: string
 	deleted?: true
-	offline?: true
 	received?: true
 }
 type Checkout = { file: string; checkout: string; ts: string }
@@ -123,7 +121,7 @@ function head(file: string): Version | undefined {
 }
 
 // Records `file`'s bytes (undefined: absent) if they differ from its head.
-function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean): Version | undefined {
+function observe(file: string, bytes: Uint8Array | undefined): Version | undefined {
 	let st = pluginHistory.state
 	if (!st.dir || st.error) return
 	if (file === 'config.ason') bytes = configSync.view(bytes)
@@ -137,7 +135,7 @@ function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean)
 		...(prev ? { parent: prev.id } : {}),
 		ts: new Date().toISOString(),
 	}
-	let v: Version = { id: idOf(base), ...base, ...(offline ? { offline: true as const } : {}) }
+	let v: Version = { id: idOf(base), ...base }
 	append(v)
 	return v
 }
@@ -185,7 +183,6 @@ function receive(list: Version[], bytes: Map<string, Uint8Array>): void {
 			...(parent ? { parent } : {}),
 			ts,
 			...(deleted ? { deleted } : {}),
-			...(v.offline ? { offline: true } : {}),
 		}
 		let data = hash ? bytes.get(hash) : undefined
 		if (
@@ -265,7 +262,7 @@ function init(dir: string, personal?: string, home: Record<string, string> = {})
 		try {
 			if (file.startsWith('personal/') && !st.personal) continue
 			if (pluginSyncWire.HOME_FILES.includes(file) && !st.home.has(file)) continue
-			pluginHistory.observe(file, names.has(file) ? readFileSync(pluginHistory.filePath(file)) : undefined, true)
+			pluginHistory.observe(file, names.has(file) ? readFileSync(pluginHistory.filePath(file)) : undefined)
 		} catch (e: any) {
 			plugins.report(`plugin history ${path}: recording ${file} failed: ${e?.stack ?? e}`)
 		}
