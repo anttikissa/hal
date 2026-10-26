@@ -93,6 +93,7 @@ const list: CommandInfo[] = [
 		defaultArgs: 'all',
 	},
 	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t', keyArgs: 'last' },
+	{ name: 'schedule', description: 'manage scheduled unattended jobs', category: 'app' },
 	{ name: 'revoke', description: 'revoke a web login or all web logins', category: 'app' },
 	{ name: 'send', description: 'send a message or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },

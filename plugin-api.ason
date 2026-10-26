@@ -1,5 +1,5 @@
 {
-	version: 15,
+	version: 16,
 	changes: [
 		{
 			version: 2,
@@ -239,6 +239,21 @@
 					kind: 'compatible',
 					target: 'host/config-sync',
 					description: 'Adds portable config projection and merge'
+				}
+			]
+		},
+		{
+			version: 16,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/scheduler',
+					description: 'Adds persistent scheduled jobs'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/schedule-time',
+					description: 'Adds timezone-aware timing'
 				}
 			]
 		}

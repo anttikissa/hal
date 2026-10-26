@@ -16,6 +16,7 @@ import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
+import { scheduler } from './scheduler.ts'
 
 type Watcher = {
 	deliver: (event: Event) => void
@@ -93,6 +94,7 @@ function line(id: string, event: Event): string {
 function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let k = notify.kind(event, id)
 	if (!k) return
+	if (k === 'done' && scheduler.owned(id)) return
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'

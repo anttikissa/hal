@@ -8,6 +8,7 @@ import { clients } from './clients.ts'
 import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
 import { projectContext } from './project-context.ts'
+import { scheduler } from './scheduler.ts'
 import { promptLang, type PromptRender, type PromptSource } from './prompt-lang.ts'
 export type { PromptSource } from './prompt-lang.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
@@ -91,6 +92,7 @@ function agents(cwd: string, sources?: PromptSource[], trust?: string | false): 
 
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
 	let timezone =
+		(input.sessionId ? scheduler.owned(input.sessionId)?.timezone : undefined) ??
 		(input.sessionId ? clients.timezone(input.sessionId) : undefined) ??
 		Intl.DateTimeFormat().resolvedOptions().timeZone
 	let vars = {

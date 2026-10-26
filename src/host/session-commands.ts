@@ -21,12 +21,20 @@ import { slash } from './slash.ts'
 import { status } from './status.ts'
 import { turns } from './turns.ts'
 import { work } from './work.ts'
+import { scheduler } from './scheduler.ts'
 
 // Carries out a valid command on an open session: what it did (a
 // promise if that takes slices), or undefined if it will answer later.
 function act(client: Client, c: Command & { sessionId: string }): Outcome | Promise<Outcome> | undefined {
 	let queueEdit = queueEdits.intercept(client, c)
 	if (queueEdit) return queueEdit
+	if (
+		(c.type === 'submit' && c.interactive !== false) ||
+		c.type === 'continue' ||
+		c.type === 'answer' ||
+		c.type === 'pause'
+	)
+		scheduler.takeover(c.sessionId)
 	// Delivered-prompt edits wait for stopped work, then recheck dedup.
 	// /edit undo drops the running turn anyway, so it pauses it first.
 	let parsed = c.type === 'submit' ? commands.parse(c.text) : undefined

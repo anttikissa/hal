@@ -23,6 +23,7 @@ import { paths } from './paths.ts'
 import { promptFiles } from './prompt-files.ts'
 import { secrets } from './secrets.ts'
 import { web } from './web.ts'
+import { scheduler } from './scheduler.ts'
 
 const LOCK_EX = 2
 const LOCK_NB = 4
@@ -130,6 +131,7 @@ function accept(socket: Socket): void {
 // Stops serving and releases the lock, so another process can take over.
 async function stop(): Promise<void> {
 	let { listener, lockFd } = server.state
+	scheduler.reset()
 	promptFiles.stop()
 	server.state.listener = null
 	server.state.lockFd = null

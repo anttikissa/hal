@@ -72,7 +72,14 @@ function submit(
 ): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
-	if (!call && delivery !== 'queue' && sender?.from === undefined && sender?.origin !== 'model') autoclose.promote(id)
+	if (
+		!call &&
+		delivery !== 'queue' &&
+		sender?.interactive !== false &&
+		sender?.from === undefined &&
+		sender?.origin !== 'model'
+	)
+		autoclose.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	text = literal.strip(text)
 	let state = status.stateOf(id)

@@ -13,6 +13,7 @@ import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
+import { scheduler } from './scheduler.ts'
 
 // `typed`: by /autoclose, whose card already names the setting.
 function set(id: string, value: boolean, typed = false): void {
@@ -48,6 +49,7 @@ function finished(id: string): void {
 	let before = tabs.list()
 	if (tabs.close(id) !== undefined) return
 	tabs.publish()
+	if (scheduler.owned(id)) return
 	let result = notify.replyLine(id).slice(0, 200)
 	notify.closed(host.state.clients, id, result ? `Result: ${result}` : 'Result: none', before)
 }

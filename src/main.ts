@@ -52,6 +52,7 @@ import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
 import { eventCheck } from './common/event-check.ts'
 import { projectContext } from './host/project-context.ts'
+import { scheduler } from './host/scheduler.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -205,7 +206,7 @@ async function becomeHost(): Promise<boolean> {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
 			app.show()
 		}
-		void main.settle()
+		void main.settle().catch((e) => warnings.set('startup', `Host startup: ${e?.stack ?? e}`))
 		// Old marks of sessions not open yet convert off this thread too.
 		if (existsSync(paths.sessionsDir())) void marksWorker.upgrade(readdirSync(paths.sessionsDir()))
 		void main.refreshModels()
@@ -218,6 +219,7 @@ async function becomeHost(): Promise<boolean> {
 async function settle(): Promise<void> {
 	await restartNote.announce()
 	await projectContext.refresh().catch((e) => plugins.report(`project plugins: ${e?.stack ?? e}`))
+	scheduler.init()
 	turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
 	jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
 }

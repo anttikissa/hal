@@ -45,6 +45,7 @@ import { usage } from './usage.ts'
 import { commandCheck } from '../common/command-check.ts'
 import { userQuit } from '../common/user-quit.ts'
 import { server } from './server.ts'
+import { scheduler } from './scheduler.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -364,6 +365,7 @@ function init(): void {
 }
 // Forgets every client and turn (tests).
 function reset(): void {
+	scheduler.reset()
 	history.stop(false)
 	queueEdits.state.clear()
 	find.reset()

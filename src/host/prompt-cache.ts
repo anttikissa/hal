@@ -64,6 +64,7 @@ import { systemPrompt, type PromptInput } from './system-prompt.ts'
 import type { PromptSection } from './prompt-lang.ts'
 import { textDiff } from './text-diff.ts'
 import { warnings } from './warnings.ts'
+import { projectContext } from './project-context.ts'
 
 type Rendering = { text: string; sections: PromptSection[] }
 type Cache = {
@@ -80,6 +81,7 @@ type Cache = {
 	baseline?: Rendering
 	input?: PromptInput
 	fault?: string
+	projectAllowed?: boolean
 }
 
 function file(id: string): Cache {
@@ -111,6 +113,8 @@ function file(id: string): Cache {
 		)
 			throw new Error(`${path}: invalid ${key} rendering`)
 	}
+	if (data.projectAllowed !== undefined && typeof data.projectAllowed !== 'boolean')
+		throw new Error(`${path}: invalid projectAllowed`)
 	for (let key of ['boundary', 'omitted', 'lastRebase', 'epoch'] as const)
 		if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key]! < 0))
 			throw new Error(`${path}: invalid ${key}`)
@@ -227,8 +231,10 @@ function prepare(id: string, selected?: PromptInput): { system: string; cacheId:
 	if (family.lastRequest !== undefined && snapshot.now - family.lastRequest >= promptCache.inactivityMs)
 		family.epoch = (family.epoch ?? 0) + 1
 	let expired = (data.epoch ?? 0) !== (family.epoch ?? 0)
+	let projectAllowed = projectContext.allowed(snapshot.cwd, snapshot.projectTrust)
 	let rebuild =
 		!data.latest ||
+		(data.projectAllowed === true && !projectAllowed && data.input?.cwd === snapshot.cwd) ||
 		(data.input?.interactive ?? true) !== snapshot.interactive ||
 		data.boundary !== boundary ||
 		(!data.rebased && data.model !== models.selection(snapshot.model).id) ||
@@ -289,6 +295,7 @@ function prepare(id: string, selected?: PromptInput): { system: string; cacheId:
 	let storedInput = { ...stableInput, now: 0 }
 	if (JSON.stringify(data.input) !== JSON.stringify(storedInput)) data.input = storedInput
 	data.model = models.selection(snapshot.model).id
+	data.projectAllowed = projectAllowed
 	data.family = familyId
 	data.boundary = boundary
 	liveFiles.save(data)
