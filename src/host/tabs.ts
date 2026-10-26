@@ -202,7 +202,7 @@ function create(
 	let open = tabs.file().open
 	let at = after === undefined ? -1 : open.indexOf(after)
 	let parent = at < 0 ? undefined : sessions.open(after!)
-	// A hal/sync review is bound to one terminal, so a tab opened from it takes the default model.
+	// A new tab opened from a hal/sync tab uses the default model.
 	// Tested once, then the tests were deleted. If you change this code, first write tests for: Ctrl-T from a hal/sync tab.
 	let model = parent && parent.model !== 'hal/sync' ? models.qualified(parent.model, parent.effort) : undefined
 	let intro = interactive && (model ?? models.defaultModel()) === 'hal/intro'
