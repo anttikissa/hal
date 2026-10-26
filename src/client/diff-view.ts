@@ -6,10 +6,8 @@ import { ansi } from './ansi.ts'
 
 function paint(text: string, tone: DiffTone | 'head', style?: Style, strike = false): string {
 	if (tone === 'head' || ansi.mono()) return text
-	if (tone === 'dim') {
-		let grey = colors.quiet(colors.log().fg!, style?.bg ?? colors.screen)
-		return ansi.sgr({ fg: grey }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
-	}
+	if (tone === 'dim')
+		return ansi.sgr({ fg: colors.plain().fg }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 	let d = colors.diff()
 	let fg = { add: d.addFg, del: d.removeFg, add2: d.add2Fg, del2: d.remove2Fg }[tone]!
 	return (
