@@ -162,26 +162,6 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			.combined(base ?? '', client, server)
 			.split('\n')
 			.map(flip)
-		// One computer's changes alone, in its column: the other's additions
-		// drop out, its deletions become context, and one line of context
-		// stays around each change, … marking the gaps.
-		let only = (col: number) => {
-			let lines = rows.flatMap((r) => {
-				if (r === '…' || r[col] !== ' ')
-					return [r === '…' ? r : col ? ` ${r[1]}${r.slice(2)}` : `${r[0]} ${r.slice(2)}`]
-				return r[1 - col] === '+' ? [] : [`  ${r.slice(2)}`]
-			})
-			let changed = (i: number) => lines[i] !== undefined && lines[i] !== '…' && !lines[i]!.startsWith('  ')
-			let shown: string[] = []
-			let last = -1
-			lines.forEach((r, i) => {
-				if (r === '…' || !(changed(i - 1) || changed(i) || changed(i + 1))) return
-				if (shown.length && i > last + 1) shown.push('…')
-				shown.push(r)
-				last = i
-			})
-			return shown
-		}
 		// Taking one copy undoes the other computer's changes: its column's
 		// marks flip, so a line it added shows as deleted. Lines both made
 		// stay as they are.
@@ -191,38 +171,27 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 					? r
 					: Object.assign([...r], { [col]: r[col] === '+' ? '-' : '+' }).join(''),
 			)
-		let changed = (col: number) => rows.some((r) => r !== '…' && r[col] !== ' ')
 		// A choice's preview under a legend of the marks shown, each in the
 		// colors of the computer that made the change.
 		let preview = (shown: string[], undone?: number) => {
-			let marks = (col: number, name: string) =>
-				(col === undone
-					? [
-							['-', `${name}'s addition, discarded`],
-							['+', `${name}'s deletion, undone`],
-						]
-					: [
-							['+', `${name} added`],
-							['-', `${name} deleted`],
-						]
-				).flatMap(([mark, text]) =>
-					shown.some((r) => r[col] === mark) ? [`${' '.repeat(col)}${mark}${' '.repeat(2 - col)}${text}`] : [],
-				)
-			let legend = [...marks(0, me()), ...marks(1, host())]
+			let legend = [me(), host()].flatMap((name, col) =>
+				(['+', '-'] as const).flatMap((mark) => {
+					let text =
+						col !== undone
+							? `${name} ${mark === '+' ? 'added' : 'deleted'}`
+							: `${name}'s ${mark === '+' ? 'deletion, undone' : 'addition, discarded'}`
+					return shown.some((r) => r[col] === mark) ? [`${' '.repeat(col)}${mark}${' '.repeat(2 - col)}${text}`] : []
+				}),
+			)
 			return legend.length ? `\n\n${diffs.fence([...legend, '', ...shown].join('\n'), 'combined-diff')}` : ''
 		}
-		let shows: Partial<Record<Action, string>> = {
-			merge: preview(rows),
-			mine: preview(rows),
-			client: preview(only(0)),
-			server: preview(only(1)),
-		}
-		let discards = (col: number, name: string) => (changed(col) ? ` **${name}**'s changes are discarded.` : '')
+		let discards = (col: number, name: string) =>
+			rows.some((r) => r !== '…' && r[col] !== ' ') ? ` **${name}**'s changes are discarded.` : ''
 		if (m.conflicts)
 			options.push([
 				'I merged it myself',
 				'mine',
-				`${where(file)} on **${me()}**, as it is when you answer, goes to **${host()}**. ${kept}${shows.mine}`,
+				`${where(file)} on **${me()}**, as it is when you answer, goes to **${host()}**. ${kept}${preview(rows)}`,
 			])
 		else {
 			let ff: Action = m.text === server ? 'server' : m.text === client ? 'client' : 'merge'
@@ -232,7 +201,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 					: ff === 'server'
 						? [`Use ${host()}'s changes`, `**${me()}** gets the changes on **${host()}**.`]
 						: [`Use ${me()}'s changes`, `**${host()}** gets the changes on **${me()}**.`]
-			options.push([label, ff, `${outcome} ${kept}${shows[ff]}`])
+			options.push([label, ff, `${outcome} ${kept}${preview(rows)}`])
 		}
 		if (m.conflicts || m.text !== server)
 			options.push([
