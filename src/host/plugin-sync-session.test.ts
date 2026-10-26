@@ -1,6 +1,6 @@
-// The hal/sync review session on the host (task b81): /sync
-// opens one review tab per client home, relays turns to that terminal,
-// and Escape or a repeat never makes it ask the terminal twice.
+// The hal/sync review session on the host (task b81): each /sync
+// replaces the client home's review tab with a fresh session, relays
+// turns to that terminal, and Escape asks it nothing.
 import { expect, test } from 'bun:test'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
@@ -25,7 +25,7 @@ const ask = {
 	],
 }
 
-test('/sync focuses one review tab, relays answers, and Escape asks nothing', async () => {
+test('/sync opens a fresh review tab each time, relays answers, and Escape asks nothing', async () => {
 	mkdirSync(join(testHome(), 'plugins'))
 	pluginHistory.init(join(testHome(), 'plugins'))
 	let a = client()
@@ -39,48 +39,54 @@ test('/sync focuses one review tab, relays answers, and Escape asks nothing', as
 	a.conn.send({ type: 'sync', op: 'inventory', home, names: [], id: 'inv' })
 	a.conn.send({ type: 'submit', sessionId: first, text: '/sync' })
 	await until(() => a.of('sync').some((e: any) => e.review))
-	let review = a.of('sync').find((e: any) => e.review).review
-	expect(a.of('go').at(-1)).toMatchObject({ sessionId: first, tab: review })
-	expect(sessions.open(review)).toMatchObject({ model: 'hal/sync', name: `Sync ${home.slice(0, 6)}` })
-	a.conn.send({ type: 'open', sessionId: review })
-	a.conn.send({ type: 'sync', op: 'step', session: review, say: 'theme.ts differs.', ask, id: 's1' })
+	let old = a.of('sync').find((e: any) => e.review).review
+	expect(a.of('go').at(-1)).toMatchObject({ sessionId: first, tab: old })
+	expect(sessions.open(old)).toMatchObject({ model: 'hal/sync', name: `Sync ${home.slice(0, 6)}` })
+	a.conn.send({ type: 'open', sessionId: old })
+	a.conn.send({ type: 'sync', op: 'step', session: old, say: 'theme.ts differs.', ask, id: 's1' })
 	await until(() => a.of('question').length === 1)
-	expect(status.stateOf(review).type).toBe('blocked')
 
-	// A repeat focuses the same tab and asks the terminal nothing new.
+	// A repeat replaces the tab with a fresh session that asks afresh.
 	let open = tabs.file().open.length
 	a.conn.send({ type: 'submit', sessionId: first, text: '/sync' })
-	await until(() => a.of('go').length === 2)
+	await until(() => a.of('sync').filter((e: any) => e.review).length === 2)
+	let review = a.of('sync').at(-1).review
+	expect(review).not.toBe(old)
 	expect(a.of('go').at(-1).tab).toBe(review)
 	expect(tabs.file().open.length).toBe(open)
-	expect(a.of('sync').filter((e: any) => e.review)).toHaveLength(1)
+	expect(tabs.file().open.filter((id) => sessions.open(id).model === 'hal/sync')).toEqual([review])
+	a.conn.send({ type: 'open', sessionId: review })
 
 	// Escape defers: the turn pauses and the terminal hears nothing.
+	a.conn.send({ type: 'sync', op: 'step', session: review, say: 'theme.ts differs.', ask, id: 's2' })
+	await until(() => status.stateOf(review).type === 'blocked')
 	a.conn.send({ type: 'pause', sessionId: review })
 	await until(() => status.stateOf(review).type === 'paused')
 	await Bun.sleep(20)
-	expect(a.of('sync').filter((e: any) => e.review)).toHaveLength(1)
+	expect(a.of('sync').filter((e: any) => e.review)).toHaveLength(2)
 
-	// Reopening asks afresh; an answer reaches the terminal.
+	// An answer reaches the terminal.
 	a.conn.send({ type: 'submit', sessionId: first, text: '/sync' })
-	await until(() => a.of('sync').filter((e: any) => e.review).length === 2)
+	await until(() => a.of('sync').filter((e: any) => e.review).length === 3)
+	review = a.of('sync').at(-1).review
 	expect(a.of('sync').at(-1).answers).toBeUndefined()
-	a.conn.send({ type: 'sync', op: 'step', session: review, say: 'theme.ts differs.', ask, id: 's2' })
-	await until(() => a.of('question').length === 2)
+	a.conn.send({ type: 'open', sessionId: review })
+	a.conn.send({ type: 'sync', op: 'step', session: review, say: 'theme.ts differs.', ask, id: 's3' })
+	await until(() => a.of('question').some((q: any) => q.sessionId === review))
 	a.conn.send({
 		type: 'answer',
 		sessionId: review,
-		question: a.of('question')[1].id,
+		question: a.of('question').at(-1).id,
 		answers: { choice: 'Use client version' },
 	})
-	await until(() => a.of('sync').filter((e: any) => e.review).length === 3)
+	await until(() => a.of('sync').filter((e: any) => e.review).length === 4)
 	expect(a.of('sync').at(-1).answers).toEqual({ choice: 'Use client version' })
 	a.conn.send({
 		type: 'sync',
 		op: 'step',
 		session: review,
 		say: 'Used the client version of theme.ts.',
-		id: 's3',
+		id: 's4',
 	})
 	await until(() => status.stateOf(review).type === 'idle')
 	expect(tabs.file().open.filter((id) => sessions.open(id).model === 'hal/sync')).toEqual([review])

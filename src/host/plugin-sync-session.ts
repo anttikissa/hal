@@ -1,5 +1,5 @@
-// The hal/sync review session (task b81), host side. /sync
-// opens or focuses one review tab per client home and starts its turn.
+// The hal/sync review session (task b81), host side. Each /sync
+// replaces the client home's review tab with a fresh session and starts its turn.
 // The scripted model relays each turn to that home's remote terminal,
 // which holds the comparison (plugin-sync-client.ts): the terminal
 // applies an answer, then sends a step saying what happened and what to
@@ -78,28 +78,44 @@ function step(c: { session: string; say: string; ask?: Form }): void {
 	settle({ say: c.say, ...(c.ask ? { ask: c.ask } : {}) })
 }
 
-// The review tab for `name`: open, else reopened, else new after `after`.
+// A new review session for `name`, in place of an open one, else after
+// `after`: each /sync starts from a clean slate.
 function find(name: string, after: string, cwd: string): string {
-	let ours = (id: string) => {
+	let f = tabs.file()
+	let old = f.open.find((id) => {
 		try {
 			let m = sessions.open(id)
 			return m.model === MODEL && m.name === name
 		} catch {
 			return false
 		}
-	}
-	let f = tabs.file()
-	let id = f.open.find(ours)
-	if (id) return id
-	let closed = f.closed.find((c) => ours(c.id))?.id
-	if (closed) tabs.resume(closed)
-	else {
-		id = sessions.create({ cwd, model: MODEL, name }).id
-		let at = f.open.indexOf(after)
-		tabs.insert(id, at < 0 ? f.open.length : at + 1)
+	})
+	let id = sessions.create({ cwd, model: MODEL, name }).id
+	let at = f.open.indexOf(old ?? after)
+	tabs.insert(id, at < 0 ? f.open.length : at + 1)
+	if (old) {
+		tabs.close(old)
+		pluginSyncSession.state.bound.delete(old)
 	}
 	tabs.publish()
-	return closed ?? id!
+	return id
+}
+
+// /sync typed in session `from`: opens a fresh review tab bound to the
+// typing terminal's home, focuses it there and starts it.
+function open(from: string, cwd: string): { error?: string; say?: string } {
+	let rec = clients.state.senders.get(from)
+	let client = [...host.state.clients].find((c) => c.record === rec)
+	let home = client && pluginSync.state.followers.get(client)
+	if (!client || home === undefined)
+		return { say: "/sync compares this home's files with a server. Run hal -r <host> and use /sync there." }
+	if (home === pluginSync.home())
+		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
+	let id = find(nameFor(home), from, cwd)
+	pluginSyncSession.state.bound.set(id, { home, client })
+	if (!status.transition(id, { type: 'submit' })) turns.start(id)
+	if (id !== from) host.broadcast(from, { type: 'go', sessionId: from, tab: id })
+	return {}
 }
 
 // /sync typed in session `from`: binds the review tab to the
