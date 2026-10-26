@@ -184,7 +184,7 @@ test('subscriptions refresh plans and windows, mark the caller and report quota 
 		expect(result.isError).toBeUndefined()
 		expect(result.output).toContain('plan: max')
 		expect(result.output).toContain('plan: free')
-		expect(result.output).toContain('slot: 1/2 *')
+		expect(result.output).toContain('slot: o1 *')
 		expect(result.output).toContain('5h: 18% used; resets 2099-01-01T00:00:00.000Z; observed ')
 		expect(result.output).toContain('7d_sonnet: 72% used')
 		expect(result.output).toContain('status: quota exhausted')

@@ -270,7 +270,7 @@ async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 			let plan = kind === 'openai' ? subscriptionPlan : undefined
 			rows.push({
 				provider: kind,
-				slot: `${i + 1}/${list.length}${account.name === selected || name === selected ? ' *' : ''}`,
+				slot: `${auth.slot(kind, i)}${account.name === selected || name === selected ? ' *' : ''}`,
 				account: name,
 				plan,
 				subscriptionPlan,

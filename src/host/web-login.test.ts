@@ -124,7 +124,7 @@ test('an expired or revoked token is refused, and revoking closes open pages', a
 	}
 })
 
-test('/logout targets every socket of one login, persists refusal, and leaves other logins connected', async () => {
+test('/revoke targets every socket of one login, persists refusal, and leaves other logins connected', async () => {
 	await server.serve()
 	web.start()
 	let first = await cookie()
@@ -135,7 +135,7 @@ test('/logout targets every socket of one login, persists refusal, and leaves ot
 		other = await dial(second)
 	await until(() => [a, b, other].every((w) => w.events.some((e) => e.type === 'tabs')))
 	let caller = sessions.create({ cwd: testHome(), model: 'hal/intro' }).id
-	let { command } = await import('./commands/logout.ts')
+	let { command } = await import('./commands/revoke.ts')
 	expect(
 		command.run(id, undefined, {
 			sessionId: caller,

@@ -7,12 +7,12 @@ import { clients } from '../clients.ts'
 
 export const command: SlashCommand = {
 	help: () =>
-		'/clients draws the host with the peers on this machine beside it, and below them the remote terminals and browsers: address, what they follow and when they last spoke. Ones that left in the last 24 hours stay, marked gone. Web logins show stable ids for /logout, device/browser, and first/last seen, including disconnected logins.',
+		'/clients draws the host with the peers on this machine beside it, and below them the remote terminals and browsers: address, what they follow and when they last spoke. Ones that left in the last 24 hours stay, marked gone. Web logins show stable ids for /revoke, device/browser, and first/last seen, including disconnected logins.',
 	run: (args) =>
 		args
 			? { error: 'usage: /clients' }
 			: {
-					say: `\`\`\`\n${clients.draw()}\n\nWeb logins (use /logout <id>):\n${
+					say: `\`\`\`\n${clients.draw()}\n\nWeb logins (use /revoke <id>):\n${
 						webAuth
 							.list()
 							.map(

@@ -403,6 +403,9 @@ export const auth = {
 	accounts,
 	accountName,
 	pickAccount,
+	// The id /status shows and /logout takes: the provider's letter and
+	// the account's position in all() (a1, o3, g2).
+	slot: (kind: Kind, i: number): string => `${{ anthropic: 'a', openai: 'o', 'opencode-go': 'g' }[kind]}${i + 1}`,
 	skipped,
 	limitedUntil,
 	pick,

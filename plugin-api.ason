@@ -1,5 +1,5 @@
 {
-	version: 10,
+	version: 11,
 	changes: [
 		{
 			version: 2,
@@ -171,6 +171,28 @@
 					kind: 'compatible',
 					target: 'common/protocol.Command',
 					description: 'tab-new adds trust'
+				}
+			]
+		},
+		{
+			version: 11,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/auth.slot',
+					description: 'Adds the /status account id'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/commands/logout.command',
+					description: 'Removes provider accounts instead of web logins',
+					port: 'Use host/commands/revoke for web logins'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/status-usage.UsageRow.slot',
+					description: 'Holds the account id (o1) instead of i/n',
+					port: 'Read it as an id'
 				}
 			]
 		}
