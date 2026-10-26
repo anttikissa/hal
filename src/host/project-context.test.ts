@@ -53,7 +53,7 @@ test('a durable trust answer gates instructions and plugins; two tabs share one 
 	let q = c.of('question')[0]!
 	projectContext.reset()
 	expect(forms.open(history.readSync(a))?.id).toBe(q.id)
-	c.conn.send({ type: 'answer', sessionId: a, question: q.id, answers: { project_trust: 'Trust project' } })
+	c.conn.send({ type: 'answer', sessionId: a, question: q.id, answers: { project_trust: 'Trust' } })
 	await until(() => calls.length === 1)
 	expect(calls[0]!.input.system).toContain('PROJECT INSTRUCTION')
 	expect((globalThis as any).projectStarts).toBe(1)
@@ -104,21 +104,25 @@ test('an unreadable open tab does not block another project activation', async (
 	expect(tabs.list().find((tab) => tab.id === '999-missing')?.state.type).toBe('error')
 })
 
-test('/cd asks before changing cwd; declining is remembered, shown and changeable with /trust', async () => {
+test('/cd asks before changing cwd; Not now asks again on the next /cd, Never trust is remembered and changeable with /trust', async () => {
 	let root = project(),
 		c = client(),
 		id = tab(c, testHome())
-	c.conn.send({ type: 'submit', sessionId: id, text: `/cd ${root}` })
-	await until(() => c.of('question').length === 1)
-	expect(sessions.open(id).cwd).toBe(testHome())
-	let q = c.of('question')[0]!
-	c.conn.send({
-		type: 'answer',
-		sessionId: id,
-		question: q.id,
-		answers: { project_trust: 'Continue without project content' },
-	})
-	await until(() => sessions.open(id).cwd === root)
+	let cd = async (dir: string, answer?: string) => {
+		let asked = c.of('question').length
+		c.conn.send({ type: 'submit', sessionId: id, text: `/cd ${dir}` })
+		if (!answer) return until(() => sessions.open(id).cwd === dir)
+		await until(() => c.of('question').length === asked + 1)
+		expect(sessions.open(id).cwd).not.toBe(dir)
+		let q = c.of('question').at(-1)!
+		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { project_trust: answer } })
+		await until(() => sessions.open(id).cwd === dir)
+	}
+	await cd(root, 'Not now')
+	expect(Object.hasOwn(projectContext.file().projects, root)).toBe(false)
+	expect(projectContext.question(root, id)).toBeUndefined()
+	await cd(testHome())
+	await cd(root, 'Never trust')
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	await until(() => calls.length === 1)
 	expect(calls[0]!.input.system).not.toContain('PROJECT INSTRUCTION')

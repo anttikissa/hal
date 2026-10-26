@@ -21,7 +21,7 @@ function overview(cwd: string, own?: string | false): string {
 			: own === root
 				? 'trusted (-d)'
 				: decided === undefined
-					? 'not asked yet'
+					? 'undecided'
 					: decided
 						? 'trusted'
 						: 'not trusted'

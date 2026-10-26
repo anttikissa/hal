@@ -370,7 +370,7 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 		problem = commands.all().get(open.from.command)?.checkAnswers?.(open.from.args, answers)
 		if (problem) return problem
 	}
-	let trust = projectContext.answer(open.form, answers)
+	let trust = projectContext.answer(id, open.form, answers)
 	let kept = forms.redact(open.form, answers)
 	if (open.from) {
 		// Beside the turn: its state stays as it is.

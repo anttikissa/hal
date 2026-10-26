@@ -96,29 +96,25 @@ function contents(cwd: string): string[] {
 }
 
 // Unattended sessions (hal -p) have nobody to answer, so they never ask.
+// A tab that answered "Not now" is not asked again until its next /cd.
 function question(cwd: string, id?: string): Form | undefined {
 	if (id !== undefined && sessions.open(id).interactive === false) return
 	let root = projectContext.root(cwd)
+	if (id !== undefined && projectContext.state.later.get(id) === root) return
 	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.contents(cwd).length) return
 	return {
 		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions. You can change this later with /trust.',
 		quote: { text: root },
-		fields: [
-			{
-				type: 'choice',
-				name: 'project_trust',
-				options: ['Trust project', 'Continue without project content'],
-				initial: 1,
-			},
-		],
+		fields: [{ type: 'choice', name: 'project_trust', options: ['Trust', 'Not now', 'Never trust'], initial: 1 }],
 	}
 }
 
-function answer(form: Form, answers: Answers): boolean {
+function answer(id: string, form: Form, answers: Answers): boolean {
 	if (form.fields[0]?.name !== 'project_trust' || !form.quote) return false
 	if (projectContext.root(form.quote.text) !== form.quote.text)
 		throw new Error(`Project root changed since the trust question: ${form.quote.text}`)
-	projectContext.decide(form.quote.text, answers.project_trust === 'Trust project')
+	if (answers.project_trust === 'Not now') projectContext.state.later.set(id, form.quote.text)
+	else projectContext.decide(form.quote.text, answers.project_trust === 'Trust')
 	return true
 }
 
@@ -177,10 +173,16 @@ function reset(): void {
 	projectContext.state.active.clear()
 	if (projectContext.state.file) liveFiles.close(projectContext.state.file)
 	projectContext.state.file = undefined
+	projectContext.state.later.clear()
 }
 
 export const projectContext = {
-	state: { file: undefined as Decisions | undefined, active: new Set<string>() },
+	state: {
+		file: undefined as Decisions | undefined,
+		active: new Set<string>(),
+		// Session id → project root the tab answered "Not now" for.
+		later: new Map<string, string>(),
+	},
 	file,
 	root,
 	allowed,

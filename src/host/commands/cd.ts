@@ -45,6 +45,7 @@ export const command: SlashCommand = {
 			if (answers.create !== 'yes') return { say: `still in ${ctx.cwd}` }
 			mkdirSync(path, { recursive: true })
 		}
+		if (answers?.project_trust === undefined) projectContext.state.later.delete(ctx.sessionId)
 		let ask = projectContext.question(path, ctx.sessionId)
 		if (ask) return { ask, askArgs: path }
 		let previous = ctx.cwd
