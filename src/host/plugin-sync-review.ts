@@ -154,8 +154,21 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		let { client = '', server = '', base } = texts
 		let m = (merged =
 			file === 'config.ason' ? configSync.combine(base, client, server) : textDiff.merge(base ?? '', client, server))
-		// What answering gives: its result against both copies.
-		let preview = (result: string) => `\n\n${diffs.fence(textDiff.combined(result, client, server), 'combined-diff')}`
+		// What answering gives: its result against both copies, under a
+		// legend of the marks it shows, each line in its mark's color.
+		let preview = (result: string) => {
+			let view = textDiff.combined(result, client, server)
+			let rows = view.split('\n')
+			let marks = (col: number, name: string) =>
+				[
+					['+', 'added'],
+					['-', 'removed'],
+				].flatMap(([m, verb]) =>
+					rows.some((r) => r[col] === m) ? [`${' '.repeat(col)}${m}${' '.repeat(2 - col)}${verb} on ${name}`] : [],
+				)
+			let legend = [...marks(0, me()), ...marks(1, host())]
+			return `\n\n${diffs.fence([...legend, '', view].join('\n'), 'combined-diff')}`
+		}
 		if (m.conflicts)
 			options.push([
 				'I merged it myself',
@@ -184,11 +197,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 				'client',
 				`**${host()}** gets the copy on **${me()}**. ${kept}${preview(client)}`,
 			])
-		say = [
-			intro(d, texts, m),
-			[side(d, 'client'), side(d, 'server')].join('\n'),
-			`Each choice previews its result: the first column marks changes to **${me()}**, the second changes to **${host()}**.`,
-		].join('\n\n')
+		say = [intro(d, texts, m), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
 		initial = m.conflicts ? 'later' : 'merge'
 	}
 	options.push(

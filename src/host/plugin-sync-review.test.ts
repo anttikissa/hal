@@ -186,10 +186,11 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	let again = await step({ choice: "Use example.com's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// Each copy choice previews its result against both copies.
+	// Each copy choice previews its result against both copies, under a
+	// legend of only the marks shown.
 	expect(again.ask!.fields[0].outcomes).toContainEqual(
 		expect.stringContaining(
-			'```combined-diff\n- export const portable = true // dark\n+ export const portable = true // solarized',
+			'```combined-diff\n + added on example.com\n - removed on example.com\n\n -export const portable = true // solarized',
 		),
 	)
 
