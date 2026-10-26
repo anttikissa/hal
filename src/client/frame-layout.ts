@@ -258,8 +258,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 				if (lines.length > natural) frame.state.padded = true
 				callCard = undefined
 			}
-			if (ticks) {
-				let plain = frame.itemRows(item, cols, session, undefined, calls, tool, images, ' ', look)
+			if (live) {
+				let plain = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, '', look)
 				let k = rows.findIndex((r, j) => r !== plain[j])
 				if (k >= 0 && rows.length === plain.length)
 					tick = { row: lines.length - rows.length + k, labeled: rows[k]!, plain: plain[k]! }

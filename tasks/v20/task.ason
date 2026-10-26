@@ -1,0 +1,10 @@
+{
+	title: 'Keep streaming headers out of immutable scrollback',
+	spec: 'Terminal reply and thinking headers stop showing elapsed time and spinner before entering scrollback, just as running tool headers do. Header ticks, appended text and stream completion must not clear scrollback or move the reader viewport. Preserve all transcript rows and the live tail cursor. Regression coverage grows a streaming block across the writable-screen boundary, changes its tick, and completes it without a canonical repaint.',
+	status: 'done',
+	notes: [
+		'Reproduced canonical clears while growing text and thinking cards across a 20-row screen. frame-layout protected only tool ticks, not other live headers. The same off-screen substitution now covers all live headers, retains the streaming tail cursor, and uses the completed empty status. The regression checks growth, changing elapsed time and spinner, completion, and exact terminal contents. Terminal tests: 345 passed, 1 skipped. Also supplied the existing renderer fixture with its required promptScroll field exposed by typecheck.'
+	],
+	needs: ['hyt'],
+	foldInto: ['hyt']
+}

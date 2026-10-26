@@ -62,6 +62,39 @@ describe('grow mode', () => {
 })
 
 describe('full mode', () => {
+	test('streaming headers stop ticking before entering scrollback', () => {
+		for (let type of ['text', 'thinking'] as const) {
+			setup(20, 80)
+			let t = transcript([{ type, text: 'line 0' }])
+			let v = {
+				transcript: t,
+				prompt: { text: '', cursor: 0 },
+				hal: { at: 'stream' as const, lit: true, color: colors.assistant().fg! },
+				tick: { label: '1s', spin: '⠁' },
+				folds: { states: new Map([[t.items[0]!.key, 'long' as const]]), sig: 'long' },
+			}
+			render.state.view = v
+			render.draw()
+			term.written = ''
+			for (let n = 1; n < 35; n++) {
+				t.items = [
+					{
+						...t.items[0]!,
+						text: Array.from({ length: n + 1 }, (_, i) => `line ${i}`).join('\n'),
+					} as (typeof t.items)[number],
+				]
+				v.tick = { label: `${n}s`, spin: n % 2 ? '⠈' : '⠁' }
+				render.draw()
+			}
+			expect(term.written).not.toContain('[3J')
+			render.state.view = { ...v, hal: undefined, tick: undefined }
+			render.draw()
+			expect(term.written).not.toContain('[3J')
+			expect(term.content()).toEqual(frameText())
+			render.reset()
+		}
+	})
+
 	test('a frame taller than the screen scrolls into scrollback with nothing lost or repeated', () => {
 		setup(8, 30, ['$ hal'])
 		for (let n = 1; n <= 12; n++) show(items(n))
@@ -119,7 +152,7 @@ describe('full mode', () => {
 	test('a cursor row in scrollback stays on the screen, so later rows land in place', () => {
 		// A question taller than the screen puts its cursor in scrollback.
 		setup(4, 30)
-		let frame = (lines: string[]) => ({ lines, cursor: { row: 0, col: 0 }, history: lines.length })
+		let frame = (lines: string[]) => ({ lines, cursor: { row: 0, col: 0 }, history: lines.length, promptScroll: 0 })
 		term.write(render.paint(frame(['a', 'b', 'c', 'd', 'e', 'f']), 4))
 		term.write(render.paint(frame(['a', 'b', 'c', 'D', 'e', 'f']), 4))
 		expect(term.screen()).toEqual(['c', 'D', 'e', 'f'])
