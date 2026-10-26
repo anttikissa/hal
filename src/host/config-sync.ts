@@ -67,7 +67,8 @@ function combine(base: string | undefined, client: string, server: string): { te
 		let [x, y, z] = [b!, c!, s!].map(get)
 		return { from: y === x ? s! : c!, conflict: y !== z && y !== x && z !== x }
 	}
-	let result = build(c!, weave(Object.keys(c!), Object.keys(s!)), (key) => {
+	// Into a copy: the comments below compare against the client's own.
+	let result = build({ ...c! }, weave(Object.keys(c!), Object.keys(s!)), (key) => {
 		let p = pick((o) => (Object.hasOwn(o, key) ? ason.stringify(o[key]) : undefined))
 		if (p.conflict) conflicts++
 		return p.from

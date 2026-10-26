@@ -70,4 +70,12 @@ test('settings merge one by one, from {} without shared history', () => {
 	let both = configSync.combine(base, view(`{ model: 'a' }`), view(`{ model: 'b', security: 'none' }`))
 	expect(both.conflicts).toBe(1)
 	expect(ason.parse(both.text)).toEqual({ model: 'a' })
+	// A comment changed on one side only keeps that change, beside a
+	// value changed on the other.
+	let shared = view(`{ // long\n cardVerbosityPrompt: 'short', security: 'none' }`)
+	let mine = view(`{ // Ok bro\n cardVerbosityPrompt: 'short', security: 'none' }`)
+	let theirs = view(`{ // long\n cardVerbosityPrompt: 'short', security: 'yolo' }`)
+	let kept = configSync.combine(shared, mine, theirs)
+	expect(kept.text).toContain('// Ok bro')
+	expect(ason.parse(kept.text)).toEqual({ cardVerbosityPrompt: 'short', security: 'yolo' })
 })
