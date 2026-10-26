@@ -1,0 +1,6 @@
+{
+	title: 'Show and change project trust decisions',
+	spec: 'Invariant: every remembered user choice stays visible and editable (AGENTS.md design checks). Project trust (state/project-trust.ason) violates it today: once answered, no status, command or UI shows or changes it. The user sees whether the current project is trusted and can trust or untrust any remembered project from a command and the web UI.',
+	status: 'planned',
+	needs: ['419']
+}

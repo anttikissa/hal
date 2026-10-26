@@ -225,6 +225,9 @@ with an explanation and the canonical syntax.
   it replaces once, then do it and update that rule. Plugins may do
   anything the user wants, even what Hal's rules forbid (unreadable
   text, dim, fades): the rules bind Hal's defaults, not the user.
+- Every choice the user makes (answers, trust, opt-ins, "don't ask
+  again") stays visible and editable: in settings, a command or the
+  UI. A remembered answer the user cannot see or undo is a bug.
 - Do not invent requirements. Trace each requirement and its rationale
   to the user's request or a concrete constraint; distinguish design
   choices from requirements. Current behavior is not a requirement.
