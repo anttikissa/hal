@@ -80,6 +80,7 @@ function list(): Tab[] {
 		if (f.attention.includes(id)) tab.attention = true
 		if (meta.background?.length) tab.jobs = meta.background.length
 		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
+		if (projectContext.skipped(meta.cwd, meta.projectTrust).length) tab.untrusted = true
 		return tab
 	})
 	projects.paint(list)

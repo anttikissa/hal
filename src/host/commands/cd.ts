@@ -3,9 +3,11 @@
 // Tasks: et, 6eq.
 
 import { mkdirSync, readdirSync, statSync } from 'fs'
+import { relative } from 'path'
 import { commands, type Context, type SlashCommand } from '../commands.ts'
 import { paths } from '../paths.ts'
 import { projectContext } from '../project-context.ts'
+import { sessions } from '../sessions.ts'
 
 function isDir(path: string): boolean {
 	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
@@ -47,6 +49,11 @@ export const command: SlashCommand = {
 		if (ask) return { ask, askArgs: path }
 		let previous = ctx.cwd
 		ctx.setCwd(path)
-		return { say: `${previous} → ${path}` }
+		let skipped = projectContext.skipped(path, sessions.open(ctx.sessionId).projectTrust)
+		let root = projectContext.root(path)
+		let note = skipped.length
+			? ` (not trusted: skipping ${skipped.map((p) => relative(root, p)).join(', ')}; /trust to change)`
+			: ''
+		return { say: `${previous} → ${path}${note}` }
 	},
 }

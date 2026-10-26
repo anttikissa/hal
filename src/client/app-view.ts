@@ -85,6 +85,7 @@ function status(t: Transcript): StatusInfo {
 	let s: StatusInfo = { id, cwd, model, autoclose: t.meta.autoclose, slots: t.meta.slots }
 	if (name) s.name = name
 	if (app.focusedTab()?.hal) s.hal = true
+	if (app.focusedTab()?.untrusted) s.untrusted = true
 	let color = app.focusedTab()?.color
 	if (color !== undefined) s.color = colors.project()[`p${color}`]
 	if (process.env.HOME) s.home = process.env.HOME

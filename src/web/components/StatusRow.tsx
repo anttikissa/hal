@@ -37,7 +37,13 @@ function Parts(props: { group: StatusGroup }) {
 	)
 }
 
-export function StatusRow(props: { view: ViewState; connected: boolean; color?: number; hal?: boolean }) {
+export function StatusRow(props: {
+	view: ViewState
+	connected: boolean
+	color?: number
+	hal?: boolean
+	untrusted?: boolean
+}) {
 	let details!: HTMLDialogElement
 	let meta = () => props.view.transcript?.meta
 	let line = () => view.line(props.view, props.connected)
@@ -103,6 +109,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 					>
 						<bdi>{cwd()}</bdi>
 					</span>
+					{props.untrusted && <span class="untrusted">untrusted</span>}
 					<span
 						class={['model', quota() && 'quota', heat(quota()?.used)]}
 						style={{ '--fill': `${quota()?.remaining ?? 0}%` }}

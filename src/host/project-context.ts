@@ -52,6 +52,18 @@ function decide(cwd: string, trust: boolean): void {
 	liveFiles.save(data)
 }
 
+// Forgets the decision, so Hal asks again.
+function forget(cwd: string): void {
+	let data = projectContext.file()
+	delete data.projects[projectContext.root(cwd)]
+	liveFiles.save(data)
+}
+
+// The project content Hal skips in `cwd`: none when trusted.
+function skipped(cwd: string, own?: string | false): string[] {
+	return projectContext.allowed(cwd, own) ? [] : projectContext.contents(cwd)
+}
+
 function names(dir: string): string[] {
 	try {
 		return readdirSync(dir)
@@ -89,7 +101,7 @@ function question(cwd: string, id?: string): Form | undefined {
 	let root = projectContext.root(cwd)
 	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.contents(cwd).length) return
 	return {
-		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions.',
+		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions. You can change this later with /trust.',
 		quote: { text: root },
 		fields: [
 			{
@@ -173,6 +185,8 @@ export const projectContext = {
 	root,
 	allowed,
 	decide,
+	forget,
+	skipped,
 	contents,
 	question,
 	answer,

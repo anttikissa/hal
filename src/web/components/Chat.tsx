@@ -256,6 +256,7 @@ export function Chat() {
 				connected={connected()}
 				color={tabs().find((t) => t.id === shown())?.color}
 				hal={!!tabs().find((t) => t.id === shown())?.hal}
+				untrusted={!!tabs().find((t) => t.id === shown())?.untrusted}
 			/>
 			<EditBar view={view()} />
 			<Composer

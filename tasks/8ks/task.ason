@@ -1,6 +1,6 @@
 {
 	title: 'Show and change project trust decisions',
-	spec: 'Invariant: every remembered user choice stays visible and editable (AGENTS.md design checks). Project trust (state/project-trust.ason) violates it today: once answered, no status, command or UI shows or changes it. The user sees whether the current project is trusted and can trust or untrust any remembered project from a command and the web UI.',
-	status: 'planned',
+	spec: 'Invariant: every remembered user choice stays visible and editable (AGENTS.md design checks). Project trust decisions (state/project-trust.ason) are shown and changed with /trust: /trust shows this project root, its state (trusted, not trusted, not asked yet, nothing to trust, or the hal -p override) with the content involved, and every remembered decision; /trust yes|no|forget [dir] (default: this project) changes or forgets one, taking effect at once (plugins load or unload, tabs republish; the next request rebuilds its system prompt). Completion offers the actions and remembered roots. A tab whose project content Hal skips carries Tab.untrusted, and both status rows show "untrusted" beside the cwd (terminal: linked to /trust). The trust question says it can be changed later with /trust, and /cd into an untrusted project says what it skips. Escape on the question pauses: nothing is saved and the cwd stays.',
+	status: 'done',
 	needs: ['419']
 }

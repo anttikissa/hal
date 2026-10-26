@@ -1,5 +1,5 @@
 {
-	version: 13,
+	version: 14,
 	changes: [
 		{
 			version: 2,
@@ -214,6 +214,16 @@
 					kind: 'compatible',
 					target: 'client/frame-layout.Past',
 					description: 'Adds optional field formCursor'
+				}
+			]
+		},
+		{
+			version: 14,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Tab',
+					description: 'Adds optional field untrusted'
 				}
 			]
 		}

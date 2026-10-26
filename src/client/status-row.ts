@@ -32,6 +32,7 @@ export type StatusInfo = {
 	stats?: Stats
 	home?: string
 	plugins?: string
+	untrusted?: boolean
 }
 
 type Part = { text: string; fg?: Oklch; href?: string }
@@ -57,7 +58,10 @@ function left(info: StatusInfo, full = true): Part[][] {
 	let home = info.home
 	let cwd =
 		home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
-	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.halHome().fg! : (info.color ?? hi) }])
+	out.push([
+		{ text: ansi.clean(cwd), fg: info.hal ? colors.halHome().fg! : (info.color ?? hi) },
+		...(info.untrusted ? [{ text: ' untrusted', href: '/trust' }] : []),
+	])
 	out.push([
 		{
 			text: ansi.clean(

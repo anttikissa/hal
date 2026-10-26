@@ -179,10 +179,10 @@ export type CommandType = Command['type']
 
 // One tab as the tab bar needs it, without opening the session.
 // `attention`: its turn ended, failed or asked since a client showed it.
-// `hal`: its cwd is the Hal repo, which has its own prompt placeholders.
-// `color`: the project color index (colors.project, task 22), only while
-// open tabs span two or more projects.
+// `hal`: its cwd is the Hal repo (own prompt placeholders).
+// `color`: the project color index (task 22) when tabs span 2+ projects.
 // `jobs`: background commands still running.
+// `untrusted`: Hal skips its project's content.
 export type Tab = {
 	id: string
 	name: string
@@ -194,6 +194,7 @@ export type Tab = {
 	hal?: true
 	color?: number
 	jobs?: number
+	untrusted?: true
 }
 
 // ── Events (host → client) ──

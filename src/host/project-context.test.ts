@@ -104,7 +104,7 @@ test('an unreadable open tab does not block another project activation', async (
 	expect(tabs.list().find((tab) => tab.id === '999-missing')?.state.type).toBe('error')
 })
 
-test('/cd asks before changing cwd; declining leaves project content inactive and remembers the decision', async () => {
+test('/cd asks before changing cwd; declining is remembered, shown and changeable with /trust', async () => {
 	let root = project(),
 		c = client(),
 		id = tab(c, testHome())
@@ -124,6 +124,13 @@ test('/cd asks before changing cwd; declining leaves project content inactive an
 	expect(calls[0]!.input.system).not.toContain('PROJECT INSTRUCTION')
 	expect((globalThis as any).projectStarts).toBe(0)
 	expect(projectContext.question(root)).toBeUndefined()
+	expect(tabs.list().find((t) => t.id === id)?.untrusted).toBe(true)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/trust yes' })
+	await until(() => (globalThis as any).projectStarts === 1)
+	expect(tabs.list().find((t) => t.id === id)?.untrusted).toBeUndefined()
+	c.conn.send({ type: 'submit', sessionId: id, text: '/trust forget' })
+	await until(() => !Object.hasOwn(projectContext.file().projects, root))
+	expect(projectContext.question(root)?.quote?.text).toBe(root)
 })
 
 test('empty projects ask nothing; new instructions, skills, or plugins ask, but trusted future changes do not', () => {
