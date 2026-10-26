@@ -394,10 +394,11 @@ function itemLines(
 // The id `item` shows, `t35` (its kind letter, task 9p), and where it
 // links: the same block on the web, /<session>#t35 (tasks wc, 0z). Every block with a block
 // id has one, except a tool result, which the web shows in its call's
-// block; an item whose key is no block id has none.
-function ref(item: Keyed, session: string | undefined): { text: string; href: string } | undefined {
-	let id = titles.blockId(item)
-	let href = session && item.type !== 'tool-result' ? transcript.href(session, id) : undefined
+// block: apart from its call, it links that block (`call`, its key); an
+// item whose key is no block id has none.
+function ref(item: Keyed, session: string | undefined, call?: string): { text: string; href: string } | undefined {
+	let id = call ? `t${call}` : titles.blockId(item)
+	let href = session && (call || item.type !== 'tool-result') ? transcript.href(session, id) : undefined
 	return href ? { text: id, href } : undefined
 }
 
@@ -448,10 +449,11 @@ function place(
 	session: string | undefined,
 	style: Style | undefined,
 	status = '',
+	call?: string,
 ): { inner: number; head: number; mark: (lines: string[], at: number) => void } {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	status = [status, itemView.receipt(item, style)].filter(Boolean).join(' ')
-	let ref = itemView.ref(item, session)
+	let ref = itemView.ref(item, session, call)
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width

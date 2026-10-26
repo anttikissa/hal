@@ -146,24 +146,11 @@ function result(
 			.map((row, i) => (stamp ? (i ? ' '.repeat(inset) : `${stamp} `) : '') + row)
 	}
 	// Apart from its call, a result leads with a "Result of:" row, which
-	// counts toward its short rows like a call's title.
+	// counts toward its short rows like a call's title; frame.itemRows
+	// puts its status and its call's link there.
 	let title = !tool && look.call?.title ? `Result of: ${ansi.clean(look.call.title)}` : undefined
-	let status = tool && !stamp ? '' : toolView.resultStatus(item, !!call, style)
-	let key = look.call?.key ?? call
-	if (!tool && key && transcript.addressable(key) && width >= 4 * strings.visLen(`t${key}`)) {
-		let ref = session && transcript.href(session, `t${key}`)
-		let text = `t${key}`
-		let link = ansi.quiet(ref ? `\x1b]8;;${ansi.webUrl(ref)}\x07${text}${ansi.LINK_OFF}` : text, style)
-		status = status ? `${status} ${link}` : link
-	}
-	let head =
-		title &&
-		itemView.right(
-			ansi.heading(strings.clipVisual(titles.stamp(item.ts, title), look.headerWidth ?? width), style),
-			status,
-			width,
-		)
-	// Under its short call, a result fills the rows the call leaves.
+	let status = stamp ? toolView.resultStatus(item, !!call, style) : ''
+	let head = title && ansi.heading(strings.clipVisual(titles.stamp(item.ts, title), look.headerWidth ?? width), style)
 	let max = look.full
 		? Infinity
 		: fold === 'long'
@@ -205,7 +192,7 @@ function result(
 		if (!i && !tool && !title) prefix = titles.stamp(item.ts, prefix)
 		let text = strings.clipVisual(prefix + l, width)
 		let line = painted ? diffView.paint(text, tones[i]!, style) : tool || look.call ? text : ansi.quiet(text, style)
-		return !i && status && !head ? itemView.right(line, status, width) : line
+		return !i && status ? itemView.right(line, status, width) : line
 	})
 	if (more) {
 		let marker = ansi.quiet(
@@ -215,7 +202,7 @@ function result(
 		let last = res.at(-1)!
 		// A short card keeps its rows: the marker cuts its last row, unless
 		// that row holds the status.
-		let short = fold === 'short' && !(res.length === 1 && status && !head)
+		let short = fold === 'short' && !(res.length === 1 && (status || (!head && (look.headerWidth ?? width) < width)))
 		if (short || strings.visLen(last) + 2 + strings.visLen(marker) <= width)
 			res[res.length - 1] = itemView.right(last, marker, width)
 		else res.push(marker)

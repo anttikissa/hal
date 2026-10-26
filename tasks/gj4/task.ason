@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Screen height participates in layout and live-region cache identities; otherwise resizing reused the old high-water height. Live output is cropped to its wrapped tail, retaining the title. Focused frame/item-view/render tests pass (73); full typecheck blocked only by unrelated untracked test.ts (undefined foo). No browser behavior changes.',
-		'Bug fix (2026-10-26, session 26-mhz): the Result of: heading drew in the card body color. Invariant: every card heading, including a separate result heading, uses the bright title color (ansi.heading).'
+		'Bug fix (2026-10-26, session 26-mhz): the Result of: heading drew in the card body color. Invariant: every card heading, including a separate result heading, uses the bright title color (ansi.heading).',
+		'A separate result gets its status and its call link from itemView.place (frame.itemRows passes the call key), so its link is bright like every card id; result() keeps only its heading.'
 	],
 	needs: ['5gn'],
 	foldInto: ['5gn']

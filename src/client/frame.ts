@@ -121,13 +121,16 @@ function itemRows(
 	let style = look.style ?? itemView.itemStyle(item, tool)
 	if (item.type === 'prompt' && bashResult.background(item))
 		status = toolView.status(bashResult.exit(item.text), undefined, style)
+	// Apart from its call, a result shows its status and its call's id.
+	let call = item.type === 'tool-result' && !tool ? (look.call?.key ?? calls?.get(item.id)) : undefined
+	if (item.type === 'tool-result' && !tool) status = toolView.resultStatus(item, !!calls?.get(item.id), style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
 	let scroll = frame.scrolls(item, look.now) ? look.now : ''
 	let key = `${cols} ${settings.shortRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}${look.call?.key ?? ''}${look.call?.ts ?? ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''} ${look.pad ?? ''} ${look.result?.key ?? ''} ${look.lines ? 'own' : ''} ${look.head ?? ''} ${look.streamRows ?? ''} ${look.call?.title ?? ''} ${look.background?.input.command ?? ''} ${look.wait?.map((p) => (typeof p === 'string' ? p : p.text)).join('') ?? ''} ${scroll}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
-	let { inner, head, mark } = itemView.place(item, cols, session, style, status)
+	let { inner, head, mark } = itemView.place(item, cols, session, style, status, call)
 	let lines =
 		look.lines?.(inner) ??
 		itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: head })
