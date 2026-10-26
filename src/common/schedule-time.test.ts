@@ -2,22 +2,16 @@
 import { expect, test } from 'bun:test'
 import { scheduleTime } from './schedule-time.ts'
 
-test('normalizes durations, hourly, weekday, lists and inclusive ellipsis ranges', () => {
-	for (let value of [
-		'30m',
-		'every hour',
-		'hourly at :20',
-		'every :30',
-		'every hour at :30',
-		'monday at 12:00',
-		'Mon–Fri at 09:00',
-		'daily at 09:00, 17:00',
-		'09:00...19:00 every 1h',
-	]) {
-		let timing = scheduleTime.parse(value)
-		expect(scheduleTime.parse(scheduleTime.format(timing))).toEqual(timing)
-	}
-	expect(scheduleTime.parse('09:00…19:00')).toEqual({ minutes: Array.from({ length: 11 }, (_, i) => (9 + i) * 60) })
+test('parses durations, hourly, weekday, lists and inclusive ellipsis ranges', () => {
+	for (let value of ['30m', 'every 30 minutes']) expect(scheduleTime.parse(value)).toEqual({ every: 1800000 })
+	expect(scheduleTime.parse('every hour')).toEqual({ every: 3600000 })
+	for (let value of ['hourly at :30', 'every :30', 'every hour at :30'])
+		expect(scheduleTime.parse(value)).toEqual({ minutes: Array.from({ length: 24 }, (_, h) => h * 60 + 30) })
+	expect(scheduleTime.parse('monday at 12:00')).toEqual({ minutes: [720], weekdays: [1] })
+	expect(scheduleTime.parse('Mon–Fri at 09:00')).toEqual({ minutes: [540], weekdays: [1, 2, 3, 4, 5] })
+	expect(scheduleTime.parse('daily at 09:00, 17:00')).toEqual({ minutes: [540, 1020] })
+	for (let value of ['09:00…19:00', '09:00...19:00 every 1h'])
+		expect(scheduleTime.parse(value)).toEqual({ minutes: Array.from({ length: 11 }, (_, i) => (9 + i) * 60) })
 	for (let bad of ['0m', '-1h', '25:00', '12:60', '19:00..09:00', 'every :60', 'nonsense'])
 		expect(() => scheduleTime.parse(bad)).toThrow()
 })

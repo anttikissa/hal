@@ -1,5 +1,5 @@
 {
-	version: 16,
+	version: 17,
 	changes: [
 		{
 			version: 2,
@@ -254,6 +254,23 @@
 					kind: 'compatible',
 					target: 'common/schedule-time',
 					description: 'Adds timezone-aware timing'
+				}
+			]
+		},
+		{
+			version: 17,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/scheduler',
+					description: 'Smaller fresh-session job schema',
+					port: 'Use job.run, tick(true) for recovery, and supported v1 settings'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/schedule-time',
+					description: 'Removes unused format',
+					port: 'Keep the original timing text for display'
 				}
 			]
 		}

@@ -51,27 +51,6 @@ function parse(text: string): Timing {
 	return { minutes: [...new Set(minutes)].sort((a, b) => a - b), ...(weekdays === undefined ? {} : { weekdays }) }
 }
 
-function format(timing: Timing): string {
-	if ('every' in timing)
-		return `every ${timing.every % 3600000 === 0 ? timing.every / 3600000 + 'h' : timing.every / 60000 + 'm'}`
-	if (
-		!timing.weekdays &&
-		timing.minutes.length === 24 &&
-		timing.minutes.every((n, h) => n === h * 60 + timing.minutes[0]!)
-	)
-		return `hourly at :${String(timing.minutes[0]).padStart(2, '0')}`
-	let times = timing.minutes.map(
-		(n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`,
-	)
-	let days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-	let prefix = timing.weekdays
-		? days[timing.weekdays[0]!] + (timing.weekdays.length > 1 ? `-${days[timing.weekdays.at(-1)!]}` : '')
-		: 'daily'
-	let step = timing.minutes[1]! - timing.minutes[0]!
-	let range = timing.minutes.length > 2 && timing.minutes.every((n, i) => n === timing.minutes[0]! + i * step)
-	return `${prefix} at ${range ? `${times[0]}..${times.at(-1)} every ${step}m` : times.join(', ')}`
-}
-
 function next(timing: Timing, after: number, zone: string): number {
 	if ('every' in timing) return after + timing.every
 	let fmt = new Intl.DateTimeFormat('en-US', {
@@ -96,4 +75,4 @@ function next(timing: Timing, after: number, zone: string): number {
 	throw new Error('No schedule occurrence within sixteen days.')
 }
 
-export const scheduleTime = { duration, minute, parse, format, next }
+export const scheduleTime = { duration, minute, parse, next }
