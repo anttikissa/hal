@@ -217,7 +217,7 @@ test('changes on both sides merge, or wait beside the file to be merged by hand'
 	put(client, 'notes.ts', 'mine\nb\nc\nd\nE\n')
 	put(server, 'notes.ts', 'theirs\nb\nc\nd\nE\n')
 	q = await step()
-	expect(q.say).toContain('the changes conflict')
+	expect(q.say).toContain('The changes conflict in 1 place')
 	expect(read(client, 'notes.ts.server')).toBe('theirs\nb\nc\nd\nE\n')
 	expect(q.ask.fields[0].options).toContain('I merged it myself')
 	put(client, 'notes.ts', 'both\nb\nc\nd\nE\n')

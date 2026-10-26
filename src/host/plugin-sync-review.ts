@@ -17,6 +17,7 @@ import { diff as diffs } from '../common/diff.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import { pluginSyncWire, type PluginSyncEvent } from '../common/plugin-sync.ts'
 import { titles } from '../common/titles.ts'
+import { configSync } from './config-sync.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
@@ -36,6 +37,8 @@ type Asked = {
 	key?: string
 }
 type Texts = { client?: string; server?: string; base?: string }
+// A merge of both sides; `settings` names config.ason's conflicting settings.
+type Merged = { text: string; conflicts: number; settings?: { key: string; client: string; server: string }[] }
 
 const LATER = 'Not now'
 const DONE = 'Done'
@@ -58,6 +61,8 @@ const absent = (s: SideInfo) => s.status === 'missing' || s.status === 'deleted'
 const oneSided = (d: Discrepancy) => absent(d.client) !== absent(d.server)
 const copies = (file: string) => [`${pluginHistory.filePath(file)}.local`, `${pluginHistory.filePath(file)}.server`]
 const kept = 'The old copy stays in history.'
+
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
 
 // Lines added and removed from `from` to `to`: '+4 -3', '' if none.
 function tally(from = '', to = ''): string {
@@ -131,16 +136,24 @@ function presence(d: Discrepancy): string {
 }
 
 // How the two copies relate, first: who has news, or whether both do.
-function intro(d: Discrepancy, conflicts?: number): string {
+function intro(d: Discrepancy, merged?: Merged): string {
 	let file = `**${d.file}**`
 	if (d.relation === 'client-ahead')
 		return `**${me()}** has a newer ${file}; **${host()}** has not changed it since they last matched.`
 	if (d.relation === 'server-ahead')
 		return `**${host()}** has a newer ${file}; **${me()}** has not changed it since they last matched.`
-	if (d.relation === 'unrelated') return `${file} differs on the two computers, and the copies share no history.`
-	if (!conflicts) return `${file} changed on both computers since they last matched. The changes merge cleanly.`
+	if (!merged) return `${file} differs on the two computers, and the copies share no history.`
+	let head =
+		d.relation === 'unrelated'
+			? `${file} differs on the two computers`
+			: `${file} changed on both computers since they last matched`
+	if (!merged.conflicts)
+		return `${head}. ${merged.settings ? "The settings don't conflict." : 'The changes merge cleanly.'}`
+	let what = merged.settings
+		? `Both changed ${merged.settings.map((c) => `\`${c.key}\` (${me()} \`${c.client}\`, ${host()} \`${c.server}\`)`).join(', ')}`
+		: `The changes conflict in ${count(merged.conflicts, 'place')}`
 	let [local, server] = copies(d.file)
-	return `${file} changed on both computers since they last matched, and the changes conflict. Both copies are beside it to merge by hand: ${local} and ${server}.`
+	return `${head}. ${what}. Both copies are beside it to merge by hand: ${local} and ${server}.`
 }
 
 // The question about `d`, with everything needed to answer it and what
@@ -149,7 +162,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 	let file = d.file
 	let options: [string, Action, string][] = []
 	let say: string,
-		merged: { text: string; conflicts: number } | undefined,
+		merged: Merged | undefined,
 		initial: Action = 'later'
 	if (oneSided(d)) {
 		let gone = file === 'config.ason' ? 'Portable settings are cleared on' : `${file} is deleted on`
@@ -171,10 +184,16 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 		let { client = '', server = '', base } = texts
 		let local = tally(base ?? server, client),
 			remote = tally(base ?? client, server)
-		if (d.relation === 'divergent') merged = textDiff.merge(base ?? '', client, server)
+		let both = [local, remote]
+		if (file === 'config.ason' && (d.relation === 'divergent' || d.relation === 'unrelated')) {
+			let m = configSync.combine(base, client, server)
+			merged = { text: m.text, conflicts: m.conflicts.length, settings: m.conflicts }
+			both = [m.fromClient, m.fromServer].map((n) => (n ? count(n, 'setting') : ''))
+		} else if (d.relation === 'divergent') merged = textDiff.merge(base ?? '', client, server)
+		let parts = [both[0] && `local ${both[0]}`, both[1] && `server ${both[1]}`].filter(Boolean)
 		if (merged && !merged.conflicts)
 			options.push([
-				`Use both changes (local ${local}, server ${remote})`,
+				`Use both changes${parts.length ? ` (${parts.join(', ')})` : ''}`,
 				'merge',
 				[change(me(), file, client, merged.text), change(host(), file, server, merged.text)].join('\n\n'),
 			])
@@ -196,7 +215,7 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 				'mine',
 				`${where(file)} on **${me()}**, as it is when you answer, goes to **${host()}**. ${kept}`,
 			])
-		say = [intro(d, merged?.conflicts), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
+		say = [intro(d, merged), [side(d, 'client'), side(d, 'server')].join('\n')].join('\n\n')
 		initial =
 			merged && !merged.conflicts
 				? 'merge'

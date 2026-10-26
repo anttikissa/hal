@@ -43,4 +43,35 @@ function merge(local: Uint8Array | undefined, incoming: Uint8Array | undefined):
 	return Buffer.from(text(result))
 }
 
-export const configSync = { portable, parse, view, merge }
+// A three-way merge of portable views per setting: a setting changed on
+// one side only takes that change (no `base`: as if it had none), so a
+// setting on one side only is kept. Settings both changed differently
+// conflict; the merged text keeps the client's value for them.
+function combine(base: string | undefined, client: string, server: string) {
+	let read = (t?: string) => (t?.trim() ? configSync.parse(Buffer.from(t)) : ({} as ason.AsonObject))
+	let [b, c, s] = [read(base), read(client), read(server)]
+	let show = (v: unknown) => (v === undefined ? 'unset' : ason.stringify(v, 'short'))
+	let same = (x: unknown, y: unknown) => show(x) === show(y)
+	// The client's object without its settings keeps its root comment
+	let result = read(client)
+	for (let key of Object.keys(result)) delete result[key]
+	let comments: Record<string, string> = {},
+		conflicts: { key: string; client: string; server: string }[] = [],
+		fromClient = 0,
+		fromServer = 0
+	for (let key of [...new Set([...Object.keys(c), ...Object.keys(s)])].sort()) {
+		let side = same(s[key], b[key]) || same(c[key], s[key]) ? c : same(c[key], b[key]) ? s : undefined
+		if (!side) conflicts.push({ key, client: show(c[key]), server: show(s[key]) })
+		else if (side === c && !same(c[key], s[key])) fromClient++
+		else if (side === s) fromServer++
+		side ??= c
+		if (side[key] === undefined) continue
+		result[key] = side[key]
+		let note = side[ason.COMMENTS]?.[key]
+		if (note !== undefined) comments[key] = note
+	}
+	result[ason.COMMENTS] = comments
+	return { text: text(result), conflicts, fromClient, fromServer }
+}
+
+export const configSync = { portable, parse, view, merge, combine }

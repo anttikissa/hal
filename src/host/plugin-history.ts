@@ -6,7 +6,8 @@
 //
 // A version is { id, file, hash, parent, ts }; a deletion has `deleted`
 // and no hash, so an empty file (the empty hash) differs from absence.
-// `ts` is when this home observed it. The id
+// `ts` is the file's mtime when this home observed it (a deletion: when
+// it was observed), so a version recorded late keeps its edit time. The id
 // hashes file, hash, parent and ts, so a revert to earlier bytes is a
 // new version, not the old one. A received version keeps its id, ts and
 // parent; { file, checkout: id, ts } makes a known version the file's
@@ -30,6 +31,7 @@ import {
 	truncateSync,
 	unlinkSync,
 	watch,
+	statSync,
 	writeFileSync,
 	type FSWatcher,
 } from 'fs'
@@ -133,7 +135,7 @@ function observe(file: string, bytes: Uint8Array | undefined): Version | undefin
 		file,
 		...(hash ? { hash } : { deleted: true as const }),
 		...(prev ? { parent: prev.id } : {}),
-		ts: new Date().toISOString(),
+		ts: (bytes ? statSync(filePath(file)).mtime : new Date()).toISOString(),
 	}
 	let v: Version = { id: idOf(base), ...base }
 	append(v)
