@@ -24,6 +24,7 @@ export type Setting = {
 	default: unknown
 	description: string
 	browser?: true
+	portable?: boolean
 }
 
 const table: Setting[] = [
@@ -76,6 +77,7 @@ const table: Setting[] = [
 	},
 	{
 		name: 'webPort',
+		portable: false,
 		label: 'Web port',
 		type: { kind: 'integer', min: 1, max: 65535 },
 		default: 9001,
@@ -83,6 +85,7 @@ const table: Setting[] = [
 	},
 	{
 		name: 'webUrl',
+		portable: false,
 		label: 'Web address',
 		type: { kind: 'text', url: true },
 		default: '',

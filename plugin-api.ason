@@ -1,5 +1,5 @@
 {
-	version: 14,
+	version: 15,
 	changes: [
 		{
 			version: 2,
@@ -224,6 +224,21 @@
 					kind: 'compatible',
 					target: 'common/protocol.Tab',
 					description: 'Adds optional field untrusted'
+				}
+			]
+		},
+		{
+			version: 15,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/settings.Setting',
+					description: 'Adds portable flag for config sync; declared settings default true'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/config-sync',
+					description: 'Adds portable config projection and merge'
 				}
 			]
 		}

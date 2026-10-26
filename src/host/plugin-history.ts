@@ -42,6 +42,7 @@ import { history } from './history.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { pluginSync } from './plugin-sync.ts'
 import { plugins } from './plugins.ts'
+import { configSync } from './config-sync.ts'
 
 export type Version = {
 	id: string
@@ -125,6 +126,7 @@ function head(file: string): Version | undefined {
 function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean): Version | undefined {
 	let st = pluginHistory.state
 	if (!st.dir || st.error) return
+	if (file === 'config.ason') bytes = configSync.view(bytes)
 	let prev = head(file)
 	let hash = bytes && sha(bytes)
 	if (hash ? prev?.hash === hash : !prev || prev.deleted) return
@@ -142,7 +144,7 @@ function observe(file: string, bytes: Uint8Array | undefined, offline?: boolean)
 
 // The loader saw `path` change (watcher or startup); a failure is
 // reported. Returns the version recorded, if any.
-function seen(path: string): Version | undefined {
+function seen(path: string, strict = false): Version | undefined {
 	let st = pluginHistory.state
 	let file = pluginHistory.fileName(path)
 	if (!st.dir || !file) return
@@ -155,6 +157,7 @@ function seen(path: string): Version | undefined {
 		}
 		return pluginHistory.observe(file, bytes)
 	} catch (e: any) {
+		if (strict) throw new Error(`${path}: ${e?.message ?? e}`, { cause: e })
 		plugins.report(`plugin history ${ledger()}: recording ${path} failed: ${e?.stack ?? e}`)
 	}
 }
@@ -195,9 +198,17 @@ function receive(list: Version[], bytes: Map<string, Uint8Array>): void {
 			throw new Error(
 				`plugin history: received version is invalid or lacks its contents: ${ason.stringify(v, 'short')}`,
 			)
+		if (file === 'config.ason' && data) configSync.parse(data, true)
 		if (hash) pluginHistory.store(hash, data!)
 		append({ ...clean, received: true })
 	}
+}
+
+function write(file: string, bytes?: Uint8Array): void {
+	let path = pluginHistory.filePath(file)
+	if (file === 'config.ason') bytes = configSync.merge(existsSync(path) ? readFileSync(path) : undefined, bytes)
+	if (bytes !== undefined) writeAtomic(path, bytes)
+	else if (existsSync(path)) unlinkSync(path)
 }
 
 // Makes known version `id` its file's content and head. Unrecorded
@@ -208,10 +219,8 @@ function checkout(id: string): void {
 	if (!v || !st.dir || st.error)
 		throw new Error(`plugin history: cannot check out ${id}: ${st.error ?? 'unknown version'}`)
 	let path = pluginHistory.filePath(v.file)
-	pluginHistory.seen(path)
-	if (v.deleted) {
-		if (existsSync(path)) unlinkSync(path)
-	} else writeAtomic(path, pluginHistory.content(v.hash!))
+	pluginHistory.seen(path, v.file === 'config.ason')
+	pluginHistory.write(v.file, v.deleted ? undefined : pluginHistory.content(v.hash!))
 	append({ file: v.file, checkout: id, ts: new Date().toISOString() })
 }
 
@@ -303,6 +312,7 @@ export const pluginHistory = {
 	homeChanged,
 	receive,
 	checkout,
+	write,
 	init,
 	close,
 }

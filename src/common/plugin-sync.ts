@@ -72,7 +72,7 @@ const HASH = /^[0-9a-f]{64}$/
 const OPS = ['inventory', 'history', 'content', 'fetch', 'apply', 'step']
 
 // Home files synced beside plugins, by name relative to the Hal home.
-const HOME_FILES = ['USER.md']
+const HOME_FILES = ['USER.md', 'config.ason']
 
 // Personal names have one fixed namespace; neither namespace accepts paths.
 function isPlugin(name: unknown): name is string {

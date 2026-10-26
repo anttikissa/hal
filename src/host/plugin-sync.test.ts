@@ -12,6 +12,8 @@ import { pluginSyncClient, StaleError } from './plugin-sync-client.ts'
 import { plugins, type Loaded } from './plugins.ts'
 import { paths } from './paths.ts'
 import { commandCheck } from '../common/command-check.ts'
+import { ason } from '../common/ason.ts'
+import { pluginSyncWire } from '../common/plugin-sync.ts'
 
 type Side = { home: string; dir: string; hist: typeof pluginHistory.state; files: Map<string, Loaded> }
 
@@ -49,7 +51,11 @@ function makeSide(name: string, home = join(root, name)): Side {
 		files: new Map(),
 	}
 	use(s)
-	pluginHistory.init(dir, personal, { 'USER.md': join(home, 'USER.md') })
+	pluginHistory.init(
+		dir,
+		personal,
+		Object.fromEntries(pluginSyncWire.HOME_FILES.map((file) => [file, join(home, file)])),
+	)
 	return s
 }
 
@@ -185,6 +191,69 @@ test('USER.md is compared without being a plugin and replaced on review', async 
 	await pluginSyncClient.apply('USER.md', 'client', expected('USER.md'))
 	expect(read(server, 'USER.md')).toBe('client notes')
 	expect(one('USER.md')).toBeUndefined()
+})
+
+test('config sync transfers portable comments in both directions and preserves current local-only edits', async () => {
+	let file = 'config.ason'
+	put(client, file, '{\n// shared\nmodel: "one",\n// client port\nwebPort: 9002\n}', false)
+	put(server, file, '{\n// server port\nwebPort: 9003, model: "two"\n}', false)
+	await pluginSyncClient.compare()
+	let compared = expected(file)
+	let diff = await pluginSyncClient.diff(file)
+	expect(diff.diff).toContain('// shared')
+	expect(diff.diff).not.toContain('webPort')
+	// No watcher notification: the merge must read the current disk contents.
+	writeFileSync(join(server.home, file), '{\n// newly edited port\nwebPort: 9004, model: "two"\n}')
+	await pluginSyncClient.apply(file, 'client', compared)
+	expect(ason.parse(read(server, file)!)).toEqual({ model: 'one', webPort: 9004 })
+	expect(read(server, file)).toContain('// newly edited port')
+	expect(read(server, file)).toContain('// shared')
+	expect(one(file)).toBeUndefined()
+	let old = on(server, () => pluginHistory.head(file)!.id)
+	put(server, file, read(server, file)!.replace('newly edited port', 'local comment only'), false)
+	await pluginSyncClient.compare()
+	expect(one(file)).toBeUndefined()
+	expect(on(server, () => pluginHistory.head(file)!.id)).toBe(old)
+	put(server, file, read(server, file)!.replace('// shared', '// revised shared'), false)
+	await pluginSyncClient.compare()
+	await pluginSyncClient.apply(file, 'server', expected(file))
+	expect(read(client, file)).toContain('// revised shared')
+	expect(read(client, file)).toContain('// client port')
+	expect(one(file)).toBeUndefined()
+	on(server, () => {
+		let home = Object.fromEntries(pluginHistory.state.home)
+		pluginHistory.close()
+		pluginHistory.init(server.dir, undefined, home)
+	})
+	await pluginSyncClient.compare()
+	expect(one(file)).toBeUndefined()
+})
+
+test('config deletion keeps the file and local keys; stale or broken config blocks sync', async () => {
+	let file = 'config.ason'
+	put(client, file, '{ model: "one" }', false)
+	await pluginSyncClient.compare()
+	let compared = expected(file)
+	writeFileSync(join(server.home, file), '{ model: "edited before watcher" }')
+	await expect(pluginSyncClient.apply(file, 'client', compared)).rejects.toBeInstanceOf(StaleError)
+	expect(ason.parse(read(server, file)!)).toEqual({ model: 'edited before watcher' })
+	compared = expected(file)
+	writeFileSync(join(server.home, file), '{ broken')
+	await expect(pluginSyncClient.apply(file, 'client', compared)).rejects.toThrow()
+	expect(read(server, file)).toBe('{ broken')
+	put(server, file, '{ webPort: 9003 }', false)
+	await pluginSyncClient.compare()
+	await pluginSyncClient.apply(file, 'server', expected(file))
+	expect(read(client, file)).toBe('{}\n')
+	expect(one(file)).toBeUndefined()
+	put(client, file, '{ model: "again" }', false)
+	await pluginSyncClient.compare()
+	await pluginSyncClient.apply(file, 'client', expected(file))
+	put(client, file, undefined, false)
+	await pluginSyncClient.compare()
+	await pluginSyncClient.apply(file, 'client', expected(file))
+	expect(ason.parse(read(server, file)!)).toEqual({ webPort: 9003 })
+	expect(one(file)).toBeUndefined()
 })
 
 test('reviewed personal transfers stay in their namespace and reject nonportable collisions', async () => {

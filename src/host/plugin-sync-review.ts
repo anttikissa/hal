@@ -50,7 +50,8 @@ const kept = 'The old copy stays in history.'
 // What choosing the client's, then the server's, version does to `d`.
 function labels(d: Discrepancy): [string, string] {
 	if (!oneSided(d)) return [CLIENT, SERVER]
-	return absent(d.server) ? [`Copy to ${host()}`, 'Delete here'] : [`Delete on ${host()}`, 'Copy here']
+	let remove = d.file === 'config.ason' ? 'Clear portable settings' : 'Delete'
+	return absent(d.server) ? [`Copy to ${host()}`, `${remove} here`] : [`${remove} on ${host()}`, 'Copy here']
 }
 
 // Starts comparing with host `name`; `show` puts the indicator (or
@@ -110,7 +111,8 @@ function presence(d: Discrepancy): string {
 		? [`client (**${me()}**, here)`, `server (**${host()}**)`]
 		: [`server (**${host()}**)`, `client (**${me()}**, here)`]
 	let gone = lacks.status === 'deleted' ? `deleted it (${when(lacks.ts)})` : 'never had it'
-	return `**${d.file}** is only on the ${hasWho}, edited ${when(has.ts)}. The ${lacksWho} ${gone}.`
+	let subject = d.file === 'config.ason' ? 'Portable settings in **config.ason**' : `**${d.file}**`
+	return `${subject} ${d.file === 'config.ason' ? 'are' : 'is'} only on the ${hasWho}, edited ${when(has.ts)}. The ${lacksWho} ${gone}.`
 }
 
 // The question about `d`, with everything needed to answer it and what
@@ -119,7 +121,7 @@ function describe(d: Discrepancy, texts: { client?: string; server?: string }): 
 	let file = d.file
 	let nothing = `Nothing changes on either computer. This client stops comparing ${file}.`
 	let ask = (initial: number, outcomes: [string, string]): Form => ({
-		text: `${file}: which copy should both keep?`,
+		text: `${file}: which copy should both keep?${file === 'config.ason' ? '\nOnly portable settings and their comments sync. Local settings and the file itself stay put.' : ''}`,
 		fields: [
 			{
 				type: 'choice',
@@ -131,7 +133,10 @@ function describe(d: Discrepancy, texts: { client?: string; server?: string }): 
 		],
 	})
 	if (oneSided(d)) {
-		let [copy, gone] = [`${file} is copied to`, `${file} is deleted on`]
+		let [copy, gone] =
+			file === 'config.ason'
+				? ['Portable settings are copied to', 'Portable settings are cleared on']
+				: [`${file} is copied to`, `${file} is deleted on`]
 		let outcomes: [string, string] = absent(d.server)
 			? [`${copy} **${host()}**.`, `${gone} **${me()}**. ${kept}`]
 			: [`${gone} **${host()}**. ${kept}`, `${copy} **${me()}**.`]

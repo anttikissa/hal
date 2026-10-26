@@ -16,7 +16,7 @@
 // A review step (task b81) goes to plugin-sync-session.ts.
 // Tasks: zh7, b81.
 
-import { existsSync, readFileSync, realpathSync, unlinkSync } from 'fs'
+import { existsSync, readFileSync, realpathSync } from 'fs'
 import { hostname } from 'os'
 import { join } from 'path'
 import type { Command, Event } from '../common/protocol.ts'
@@ -84,6 +84,7 @@ function portable(): string[] {
 }
 
 function headOf(file: string): SyncHead {
+	if (file === 'config.ason') pluginHistory.seen(pluginHistory.filePath(file), true)
 	let v = pluginHistory.head(file)
 	if (!v) return { file }
 	return {
@@ -137,7 +138,7 @@ function install(
 	}
 	if (!existsSync(path)) return
 	pluginReports.via(path, source, side)
-	unlinkSync(path)
+	pluginHistory.write(file)
 	pluginHistory.seen(path)
 }
 
