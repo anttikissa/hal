@@ -1,0 +1,10 @@
+{
+	title: 'Consistent compact thinking and tool gaps',
+	spec: 'Web thinking paragraph separators occupy half a line, matching ordinary reply and human prose separators. Tool presentation sections and the raw-call disclosure use half-line gaps, matching command-to-output spacing. Restore the invariant that equivalent prose and tool section boundaries use compact spacing. Preserve code, raw logs, diffs, answered-question quote formatting and terminal typography. This supersedes the thinking spacing exception in task 043.',
+	status: 'done',
+	notes: [
+		'Chromium geometry check at 390px and 1200px measured thinking/reply paragraph gaps and tool section/raw disclosure margins at 10px and 11px respectively, half their 20px/22px leading. Code and raw-log blank lines remained full-height and text was unchanged. Browser client build succeeded. Answered-question quote formatting remains unchanged; compacting it needs a separate rendering decision.'
+	],
+	needs: ['043', 'zw9'],
+	foldInto: ['043', 'zw9']
+}
