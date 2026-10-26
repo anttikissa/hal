@@ -190,7 +190,7 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	// legend of only the marks shown.
 	expect(again.ask!.fields[0].outcomes).toContainEqual(
 		expect.stringContaining(
-			'```combined-diff\n + added on example.com\n - removed on example.com\n\n -export const portable = true // solarized',
+			'```combined-diff\n + example.com gets this line\n - example.com loses this line\n\n -export const portable = true // solarized',
 		),
 	)
 

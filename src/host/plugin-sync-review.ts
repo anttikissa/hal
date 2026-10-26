@@ -161,10 +161,12 @@ function describe(d: Discrepancy, texts: Texts): { say: string; ask: Form; asked
 			let rows = view.split('\n')
 			let marks = (col: number, name: string) =>
 				[
-					['+', 'added'],
-					['-', 'removed'],
+					['+', 'gets'],
+					['-', 'loses'],
 				].flatMap(([m, verb]) =>
-					rows.some((r) => r[col] === m) ? [`${' '.repeat(col)}${m}${' '.repeat(2 - col)}${verb} on ${name}`] : [],
+					rows.some((r) => r[col] === m)
+						? [`${' '.repeat(col)}${m}${' '.repeat(2 - col)}${name} ${verb} this line`]
+						: [],
 				)
 			let legend = [...marks(0, me()), ...marks(1, host())]
 			return `\n\n${diffs.fence([...legend, '', view].join('\n'), 'combined-diff')}`
