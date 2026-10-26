@@ -151,9 +151,18 @@ export function Markdown(props: {
 											{/* A diff fence takes the diff colors, in both clients. */}
 											<For each={c().lines} keyed={false}>
 												{(l, i) => (
-													<span class={diff.tone(l(), c().lang !== 'diff')}>
-														<Text value={(i ? '\n' : '') + l()} />
-													</span>
+													<>
+														<Show when={i}>
+															<Text value={'\n'} />
+														</Show>
+														<For each={diff.parts(l(), c().lang !== 'diff')} keyed={false}>
+															{(p) => (
+																<span class={p()[1]}>
+																	<Text value={p()[0]} />
+																</span>
+															)}
+														</For>
+													</>
 												)}
 											</For>
 										</Show>

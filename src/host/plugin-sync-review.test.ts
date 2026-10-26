@@ -164,7 +164,7 @@ test('startup shows a count and one notice, never focus; Never sync drops a file
 	expect(readFileSync(join(client.dir, '.syncignore'), 'utf8')).toBe('keys.ts\n')
 	expect(read(server, 'keys.ts')).toBeUndefined()
 	expect(shown.at(-1)).toBe('Files differ (1) — /sync')
-	expect(next.say).toContain('```combined-diff\n')
+	expect(next.ask.fields[0].outcomes.join('\n')).toContain('```combined-diff\n')
 	expect(next.ask.text).toBe('Sync theme.ts?')
 
 	// Escape (no answer) is Not now: the file waits for the next /sync,
@@ -186,11 +186,13 @@ test('a stale answer writes nothing and asks about the revised versions', async 
 	let again = await step({ choice: "Use example.com's copy" })
 	expect(again.say).toContain('changed on the server since it was compared; nothing was written')
 	expect(read(server, 'theme.ts')).toBe('export const portable = true // solarized')
-	// The message shows each computer's changes, under a legend of only
-	// the marks shown: + added on the client, then on the server.
-	expect(again.say).toContain(' + example.com added\n\n')
-	expect(again.say).not.toContain('deleted')
-	expect(again.say).toContain('\n +export const portable = true // solarized')
+	// Taking the server's copy previews only the server's changes, in its
+	// column, under a legend of only the marks shown.
+	let field = again.ask.fields[0]
+	let preview = field.outcomes[field.options.indexOf("Use example.com's copy")]
+	expect(preview).toContain('```combined-diff\n + example.com added\n\n')
+	expect(preview).not.toContain('deleted')
+	expect(preview).toContain('\n +export const portable = true // solarized')
 
 	let done = await step({ choice: "Use example.com's copy" })
 	expect(done.say).toContain('for theme.ts:')

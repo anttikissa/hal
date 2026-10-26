@@ -441,8 +441,8 @@
 			.Card .change .dim,
 			.Card .edit-diff .dim,
 			.Markdown pre.diff .dim {
-				color: var(--quiet);
-				--sel-back: var(--quiet);
+				color: var(--context-fg);
+				--sel-back: var(--context-fg);
 			}
 			/* Removed text in the rows is struck through, as in the terminal. */
 			.Card .change .row.del,
@@ -2588,6 +2588,10 @@
 				}
 				.Picker li a {
 					min-height: 44px;
+				}
+				.Picker.find a.find-row {
+					min-height: 0;
+					padding-block: calc((44px - 1lh) / 2);
 				}
 				.Picker .close {
 					min-width: 44px;

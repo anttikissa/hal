@@ -9,6 +9,17 @@ function tone(line: string, combined = false): DiffTone {
 	let t: DiffTone = mark === '+' ? 'add' : mark === '-' ? 'del' : 'dim'
 	return second && t !== 'dim' ? (`${t}2` as DiffTone) : t
 }
+// A line's parts and their tones: a combined line marked in both
+// columns gives its first mark the first column's tone and the rest the
+// second's, so both marks show.
+function parts(line: string, combined = false): [string, DiffTone][] {
+	if (combined && /^[-+][-+]/.test(line))
+		return [
+			[line[0]!, tone(line, true)],
+			[line.slice(1), tone(` ${line[1]}`, true)],
+		]
+	return [[line, tone(line, combined)]]
+}
 function fence(text: string, lang = 'diff'): string {
 	let length = 3
 	for (let match of text.matchAll(/`+/g)) length = Math.max(length, match[0].length + 1)
@@ -53,4 +64,4 @@ function stats(text: string): { added: number; removed: number; lines: string } 
 	}
 	return { added, removed, lines: `${marks.length > 1 ? 'lines' : 'line'} ${runs.join(', ')}` }
 }
-export const diff = { tone, fence, fenced, stats }
+export const diff = { tone, parts, fence, fenced, stats }

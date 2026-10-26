@@ -123,13 +123,15 @@ function block(b: Block, width: number, style?: Style): string[] {
 		return [
 			...lang,
 			...b.lines.flatMap((l) =>
-				ansi
-					.wrap(l, width)
-					.map((r) =>
-						diff.fenced(b.lang)
-							? diffView.paint(r, diff.tone(l, b.lang !== 'diff'), style)
-							: markdownView.code(r, style),
-					),
+				ansi.wrap(l, width).map((r, i) => {
+					if (!diff.fenced(b.lang)) return markdownView.code(r, style)
+					let combined = b.lang !== 'diff'
+					if (i) return diffView.paint(r, diff.tone(l, combined), style)
+					return diff
+						.parts(r, combined)
+						.map(([text, tone]) => diffView.paint(text, tone, style))
+						.join('')
+				}),
 			),
 			...close,
 		]
