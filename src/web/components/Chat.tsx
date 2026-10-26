@@ -10,7 +10,6 @@ import { createMemo, createSignal, flush, Show, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import type { Sending } from '../../common/drafts.ts'
 import { notices } from '../../common/notices.ts'
-import { transcript } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
@@ -28,7 +27,6 @@ import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 import { Icon } from './Icon.tsx'
-import { Question } from './Question.tsx'
 
 const snap = () => ({
 	target: app.state.target?.found && app.state.target.key,
@@ -94,10 +92,9 @@ function reveal(): void {
 	let t = app.state.target
 	if (!t?.found || t.shown) return
 	flush()
-	let card = document.querySelector('.Chat > .Question.target, .Transcript > .target')
+	let card = document.querySelector('.Transcript > .target')
 	if (!card) return
 	t.shown = true
-	if (card.classList.contains('Question')) return flash.card(card)
 	card.scrollIntoView({ block: 'start' })
 	scroll.hold(card)
 	scroll.moved()
@@ -185,7 +182,6 @@ export function Chat() {
 	let stack = field('notices')
 	let updateAvailable = field('updateAvailable')
 	let pending = createMemo(() => state().pending, { equals: same })
-	let question = createMemo(() => transcript.question(view().transcript))
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
 	onSettled(() => {
@@ -262,11 +258,6 @@ export function Chat() {
 				hal={!!tabs().find((t) => t.id === shown())?.hal}
 			/>
 			<EditBar view={view()} />
-			<Show when={view().form && question()}>
-				{(q) => (
-					<Question item={q()} form={view().form!} session={view().transcript!.meta.id} target={linked() === q().key} />
-				)}
-			</Show>
 			<Composer
 				update={!!updateAvailable()}
 				view={view()}

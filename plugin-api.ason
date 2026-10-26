@@ -1,5 +1,5 @@
 {
-	version: 12,
+	version: 13,
 	changes: [
 		{
 			version: 2,
@@ -204,6 +204,16 @@
 					target: 'common/snapshot.Plan',
 					description: 'account is the /status id (o3), a string, instead of a 1-based number',
 					port: 'Show it as text'
+				}
+			]
+		},
+		{
+			version: 13,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'client/frame-layout.Past',
+					description: 'Adds optional field formCursor'
 				}
 			]
 		}

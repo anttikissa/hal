@@ -45,13 +45,16 @@ test('an open question shows its fields and takes the cursor into the focused te
 	let st = forms.step(forms.start('q1', item.form), { key: 'D', text: 'D' }).state
 	let f = frame.build({ ...v, form: st }, 40)
 	let rows = plain(f.lines)
-	let at = rows.indexOf('Name: D')
-	expect(rows.slice(at - 2, at + 2)).toEqual(['How should I call you?', '', 'Name: D', ''])
-	expect(at).toBeGreaterThanOrEqual(f.history)
-	expect(f.cursor).toEqual({ row: at, col: strip(f.lines[at]!).indexOf('D') + 1 })
+	expect(rows[1]).toBe('How should I call you?')
+	// Blank rows set the field apart from the question and the hint.
+	expect(rows[2]).toBe('')
+	expect(rows[3]).toBe('Name: D')
+	expect(rows[4]).toBe('')
+	// The cursor is just after the typed D, on the frame's row for it.
+	expect(f.cursor).toEqual({ row: 3, col: strip(f.lines[3]!).indexOf('D') + 1 })
 	// An empty text shows its placeholder; the prompt stays below.
 	let empty = frame.build({ ...v, form: forms.start('q1', item.form) }, 40)
-	expect(plain(empty.lines)).toContain('Name: leave empty')
+	expect(plain(empty.lines)[3]).toBe('Name: leave empty')
 	expect(plain(empty.lines)).toContain('draft')
 })
 
@@ -61,9 +64,9 @@ test('a secret is never on screen; the chosen option is marked', () => {
 	for (let c of 'sk-éé') st = forms.step(st, { key: c, text: c }).state
 	let f = frame.build({ ...view([item]), form: st }, 40)
 	expect(f.lines.join('\n')).not.toContain('sk-')
-	let rows = plain(f.lines)
-	let at = rows.indexOf('Key: •••••')
-	expect(rows.slice(at, at + 3)).toEqual(['Key: •••••', '→ yes', 'no'])
+	expect(plain(f.lines)[3]).toBe('Key: •••••')
+	expect(plain(f.lines)[4]).toBe('→ yes')
+	expect(plain(f.lines)[5]).toBe('no')
 })
 
 test('an answered question shows its answers, secrets only as given; one not answered says so', () => {
@@ -126,28 +129,4 @@ test('a cached question gains visible choices when its blocked state arrives', (
 	let moved = frame.build({ ...v, form: st }, 40)
 	expect(plain(moved.lines)[moved.cursor.row]).toBe('→ No')
 	frameLayout.state.history = undefined
-})
-
-test('a command question stays below later output with its cursor on screen', () => {
-	let form = {
-		text: 'Trust this project?',
-		fields: [{ type: 'choice' as const, name: 'trust', options: ['Trust', 'No'], initial: 1 }],
-	}
-	let v = view(
-		[
-			{ type: 'question', id: 'q1', command: true, form },
-			{ type: 'text', text: 'Later output\n'.repeat(80) },
-		],
-		'kept draft',
-	)
-	v.form = forms.start('q1', form)
-	for (let cols of [40, 100]) {
-		let f = frame.build(v, cols, 24, true)
-		let rows = plain(f.lines)
-		expect(rows.filter((r) => r === 'Trust this project?')).toHaveLength(1)
-		expect(rows.indexOf('Trust this project?')).toBeGreaterThanOrEqual(f.history)
-		expect(f.cursor.row).toBeGreaterThanOrEqual(f.lines.length - 24)
-		expect(rows[f.cursor.row]).toBe('→ No')
-		expect(rows).toContain('kept draft')
-	}
 })

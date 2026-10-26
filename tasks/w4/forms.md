@@ -53,11 +53,6 @@ login, a turn streaming), like the inbox, and never changes the state
 or ends the turn. One question is open at a time; a newer one replaces
 a command's.
 
-The active form stays above the composer in both clients, outside scrolling
-history, until answered or canceled (task 9am). Later output never hides the
-controls that own keyboard input. Its durable record stays in its original
-history position; the answered or canceled card appears there afterward.
-
 Nothing waits in memory for an answer: whoever asked is re-run with the
 answer (a command gets `run(args, answers)`; a tool batch continues).
 
