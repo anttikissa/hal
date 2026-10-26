@@ -78,9 +78,9 @@ function step(c: { session: string; say: string; ask?: Form }): void {
 	settle({ say: c.say, ...(c.ask ? { ask: c.ask } : {}) })
 }
 
-// A new review session for `name`, in place of an open one, else after
-// `after`: each /sync starts from a clean slate.
-function find(name: string, after: string, cwd: string): string {
+// A new review session for `name`, in place of an open one (returned as
+// `old`, still open), else after `after`: each /sync starts from a clean slate.
+function find(name: string, after: string, cwd: string): { id: string; old?: string } {
 	let f = tabs.file()
 	let old = f.open.find((id) => {
 		try {
@@ -93,12 +93,8 @@ function find(name: string, after: string, cwd: string): string {
 	let id = sessions.create({ cwd, model: MODEL, name }).id
 	let at = f.open.indexOf(old ?? after)
 	tabs.insert(id, at < 0 ? f.open.length : at + 1)
-	if (old) {
-		tabs.close(old)
-		pluginSyncSession.state.bound.delete(old)
-	}
 	tabs.publish()
-	return id
+	return { id, old }
 }
 
 // /sync typed in session `from`: opens a fresh review tab bound to the
@@ -111,10 +107,17 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 		return { say: "/sync compares this home's files with a server. Run hal -r <host> and use /sync there." }
 	if (home === pluginSync.home())
 		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
-	let id = find(nameFor(home), from, cwd)
+	let { id, old } = find(nameFor(home), from, cwd)
 	pluginSyncSession.state.bound.set(id, { home, client })
 	if (!status.transition(id, { type: 'submit' })) turns.start(id)
-	if (id !== from) host.broadcast(from, { type: 'go', sessionId: from, tab: id })
+	// Go before closing: a terminal on the old tab would leave it first
+	// and ignore the go.
+	host.broadcast(from, { type: 'go', sessionId: from, tab: id })
+	if (old) {
+		tabs.close(old)
+		pluginSyncSession.state.bound.delete(old)
+		tabs.publish()
+	}
 	return {}
 }
 

@@ -65,9 +65,15 @@ test('/sync opens a fresh review tab each time, relays answers, and Escape asks 
 	await Bun.sleep(20)
 	expect(a.of('sync').filter((e: any) => e.review)).toHaveLength(2)
 
-	// An answer reaches the terminal.
-	a.conn.send({ type: 'submit', sessionId: first, text: '/sync' })
+	// An answer reaches the terminal. /sync typed in the review tab
+	// itself follows to its replacement: the go arrives while that tab
+	// is still open, or the terminal would leave it first and ignore it.
+	a.conn.send({ type: 'submit', sessionId: review, text: '/sync' })
 	await until(() => a.of('sync').filter((e: any) => e.review).length === 3)
+	let go = a.of('go').at(-1)
+	expect(go).toMatchObject({ sessionId: review, tab: a.of('sync').at(-1).review })
+	let before = a.events.slice(0, a.events.indexOf(go)).filter((e: any) => e.type === 'tabs')
+	expect(before.at(-1).tabs.map((t: any) => t.id)).toContain(review)
 	review = a.of('sync').at(-1).review
 	expect(a.of('sync').at(-1).answers).toBeUndefined()
 	a.conn.send({ type: 'open', sessionId: review })
