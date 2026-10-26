@@ -121,6 +121,20 @@ test('A short Bash card shows its command in its rows, with stable live and fini
 	expect(toolView.call(item, 20, 'long', {}).join('\n')).toContain('echo later')
 })
 
+test('a short result card never exceeds the short rows, title included', () => {
+	settings.state.raw = { cardVerbosityShortRows: 2 }
+	let output = ['x'.repeat(100), ...Array.from({ length: 10 }, (_, i) => `line ${i}`)].join('\n')
+	let result = { type: 'tool-result' as const, id: 'g', output }
+	let call = { key: '1', name: 'grep', title: 'Grep "x"' }
+	let attached = toolView.result(result, 40, 'short', { head: 1 }, undefined, undefined, 'grep')
+	let apart = toolView.result(result, 40, 'short', { call }, undefined, undefined, undefined)
+	expect(attached).toHaveLength(1)
+	expect(apart).toHaveLength(2)
+	for (let row of [...attached, ...apart]) expect(Bun.stringWidth(row)).toBeLessThanOrEqual(40)
+	expect(Bun.stripANSI(attached[0]!)).toEndWith('… 12 more lines')
+	settings.state.raw = {}
+})
+
 test('background successes collapse, failures stay open, and thinking and SEND keep their controls', () => {
 	for (let label of ['bash #t19', 'bash b123abc']) {
 		let item = {
