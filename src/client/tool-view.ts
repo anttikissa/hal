@@ -157,7 +157,12 @@ function result(
 		status = status ? `${status} ${link}` : link
 	}
 	let head =
-		title && itemView.right(strings.clipVisual(titles.stamp(item.ts, title), look.headerWidth ?? width), status, width)
+		title &&
+		itemView.right(
+			ansi.heading(strings.clipVisual(titles.stamp(item.ts, title), look.headerWidth ?? width), style),
+			status,
+			width,
+		)
 	// Under its short call, a result fills the rows the call leaves.
 	let max = look.full
 		? Infinity
