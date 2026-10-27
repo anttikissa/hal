@@ -24,7 +24,7 @@ Last run: ${link}${j.run?.result ? ` - ${j.run.result}` : ''}`
 export const command: SlashCommand = {
 	help: () => `/schedule lists jobs. /schedule add {when: "30m", prompt: "Check tests"}
 /schedule show|pause|resume|remove ID. To change settings, remove and add again. Stop current work in its session.
-Options: cwd (current), timezone (client IANA zone), model (default or model/alias). Runs open fresh tabs that stay open.
+Options: cwd (current), timezone (client IANA zone), model (default or model/alias). Completed runs close their tabs.
 Times: 30m, hourly at :20, monday at 12:00, daily at 09:00, 09:00..19:00 every 1h. DST repeats run twice; missing minutes skip.
 Active runs skip occurrences. Downtime catches up once. Interrupted work is not retried. Pause affects future runs only.`,
 	complete(args) {

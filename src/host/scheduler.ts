@@ -99,7 +99,12 @@ export const scheduler = {
 		scheduler.save()
 		try {
 			if (!statSync(j.cwd).isDirectory()) throw new Error(`Not a directory: ${j.cwd}`)
-			let meta = sessions.create({ cwd: j.cwd, model: j.model === 'default' ? undefined : j.model, interactive: false })
+			let meta = sessions.create({
+				cwd: j.cwd,
+				model: j.model === 'default' ? undefined : j.model,
+				interactive: false,
+				autoclose: true,
+			})
 			j.run!.session = meta.id
 			scheduler.save()
 			tabs.resume(meta.id)

@@ -11,6 +11,7 @@ import { sessions } from './sessions.ts'
 import { turns } from './turns.ts'
 import { projectContext } from './project-context.ts'
 import { promptCache } from './prompt-cache.ts'
+import { tabs } from './tabs.ts'
 import { config } from './config.ts'
 import { providers } from './providers.ts'
 import { ason } from '../common/ason.ts'
@@ -68,6 +69,7 @@ test('fresh runs resolve defaults again and respect revoked project trust', asyn
 	mkdirSync(`${testHome()}/.git`)
 	writeFileSync(`${testHome()}/AGENTS.md`, 'SCHEDULE_TRUST_MARKER')
 	projectContext.decide(testHome(), true)
+	tabs.insert(owner, 0)
 	let job = add()
 	scheduler.run(job)
 	await until(() => calls.length === 1)
@@ -75,8 +77,9 @@ test('fresh runs resolve defaults again and respect revoked project trust', asyn
 	expect(calls[0]!.input.system).toContain('SCHEDULE_TRUST_MARKER')
 	expect(calls[0]!.input.system).toContain('Timezone: Europe/Helsinki')
 	expect(promptCache.interactive(first)).toBe(false)
-	expect(sessions.open(first).autoclose).toBe(false)
+	expect(sessions.open(first).autoclose).toBe(true)
 	await done()
+	expect(tabs.file().open).not.toContain(first)
 	projectContext.decide(testHome(), false)
 	config.state.data!.model = 'openai/gpt-6-astra'
 	scheduler.run(job)
