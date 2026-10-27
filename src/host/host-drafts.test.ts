@@ -231,6 +231,22 @@ test('a prompt sent after offline edits clears the older host draft it replaced'
 	await until(() => drafts.text(id) === '')
 })
 
+test('own draft edits resent before the prompt do not keep the sent draft', async () => {
+	await client()
+	drafts.edit(id, 'solution - "play')
+	await until(() => !drafts.local(id).dirty)
+	up = false
+	cut!()
+	await tick()
+	drafts.edit(id, 'solution - "pla')
+	drafts.edit(id, 'solution - tap')
+	drafts.submit(id, 'solution - tap')
+	up = true
+	retries.shift()!()
+	await until(() => drafts.pending(id).length === 0)
+	await until(() => drafts.text(id) === '' && phone().draft?.text === '')
+})
+
 test('a refused prompt goes back into the editor, before text typed since', async () => {
 	await client()
 	let origSubmit = prompts.submit

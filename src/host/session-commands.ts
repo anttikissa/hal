@@ -100,7 +100,7 @@ function act(client: Client, c: Command & { sessionId: string }): Outcome | Prom
 		else refused = prompts.submit(c.sessionId, c.text, c.id, delivery, { interactive: c.interactive ?? true })
 		if (refused === undefined && !c.aside) prompts.sent(c.sessionId, c.text, c.id, c.base)
 	} else if (c.type === 'draft') {
-		let changed = drafts.set(c.sessionId, c.text, c.base)
+		let changed = drafts.set(c.sessionId, c.text, c.base, c.id)
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
 		else
 			return {

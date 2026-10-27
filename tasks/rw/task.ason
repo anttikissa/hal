@@ -10,7 +10,8 @@
 		"Stores: terminal src/client/draft-file.ts, state/drafts/<id>.ason (dir set in main.ts); page localStorage `hal-draft:<id>`. Several terminals on one machine write the same file (temp file per pid); their content comes from the same host draft, but one terminal's unacknowledged prompt can be overwritten by another's save before a crash. Rare; per-process files would fix it.",
 		'transcript.fold must ignore `draft` events (else they fall through to the turn-end branch); new event types need adding there.',
 		"Web drafts, from the old Hal (commit ae57750, docs/web.md 'Drafts are sacred', artifact tasks/1b/old-web.md): write localStorage synchronously on every input event and again on pagehide and visibilitychange (iOS evicts backgrounded pages without warning); if a write throws (quota, private mode) keep the text in memory and show it is not saved; after a send clears only when the box still holds exactly what was sent.",
-		'Invariant (bug fix): a submit that emptied the local draft carries base, the draft rev it was typed from; the host clears its draft when still at that rev even if the text does not contain it. Before, offline edits of a synced draft then a send made the reconnect restore the stale host draft beside the sent prompt.'
+		'Invariant (bug fix): a submit that emptied the local draft carries base, the draft rev it was typed from; the host clears its draft when still at that rev even if the text does not contain it. Before, offline edits of a synced draft then a send made the reconnect restore the stale host draft beside the sent prompt.',
+		'Invariant (bug fix): a submit clears the host draft when only its sender (the client in command ids, <client>.<n>) changed it since the submit base; draft.ason keeps by/since for this. Before, a reconnect resent the sender own stale draft edit just before the prompt, advancing rev, so the sent draft stayed and came back into the editor.'
 	],
 	needs: ['r6']
 }

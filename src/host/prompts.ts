@@ -332,7 +332,7 @@ function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>)
 // (drafts.sent), and followers hear it with the submit's id.
 function sent(id: string, text: string, command?: string, base?: number): void {
 	try {
-		prompts.draft(id, drafts.sent(id, text, base), command)
+		prompts.draft(id, drafts.sent(id, text, base, command), command)
 	} catch (e: any) {
 		diag.log(`draft ${id}: ${e?.message ?? e}`)
 	}
