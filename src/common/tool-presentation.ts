@@ -55,4 +55,27 @@ function text(block: PresentationBlock, output = ''): string {
 	return typeof block.text === 'string' ? block.text : output.slice(block.text.from, block.text.to)
 }
 
-export const toolPresentation = { check, text }
+// Replaces `old` in `output` with `next`, moving the presentation's
+// output ranges with the text so they still cover the same output.
+function replace(
+	output: string,
+	presentation: ToolPresentation | undefined,
+	old: string,
+	next: string,
+): { output: string; presentation?: ToolPresentation } {
+	let at = output.indexOf(old)
+	if (at < 0) return { output, presentation }
+	let move = (p: number) =>
+		p <= at ? p : p >= at + old.length ? p + next.length - old.length : Math.min(p, at + next.length)
+	return {
+		output: output.slice(0, at) + next + output.slice(at + old.length),
+		presentation: presentation && {
+			...presentation,
+			blocks: presentation.blocks.map((b) =>
+				typeof b.text === 'string' ? b : { ...b, text: { from: move(b.text.from), to: move(b.text.to) } },
+			),
+		},
+	}
+}
+
+export const toolPresentation = { check, text, replace }

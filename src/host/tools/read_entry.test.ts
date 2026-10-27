@@ -86,6 +86,23 @@ test('history addresses recover complete output and match each displayed image s
 		expect((await read(ref)).isError).toBe(true)
 })
 
+// 27 Oct 2026: append shortened a capped EDIT result's tail (blob id to
+// entry ref), leaving its diff range past the end; the session no longer
+// opened. Ranges move with the rewritten text.
+test('a capped result keeps its presentation ranges valid when history names its entry', () => {
+	let saved: ToolResultBlock = { type: 'tool_result', id: 'edit', output: '' }
+	saved.output = tools.cap('line\n'.repeat(500), 'source', 900, Infinity, (blob) => {
+		saved.outputBlob = blob
+	})
+	let length = saved.output.length
+	saved.presentation = { title: 'edit', blocks: [{ kind: 'diff', text: { from: 0, to: length } }] }
+	let record = history.append('source', { type: 'user', blocks: [saved] })
+	let read = history.readSync('source').find((r) => r.n === record.n) as any
+	let block = read.blocks[0]
+	expect(block.output.length).not.toBe(length)
+	expect(block.presentation.blocks[0].text).toEqual({ from: 0, to: block.output.length })
+})
+
 test('legacy capped history records recover their full blob without metadata', async () => {
 	let whole = 'unbroken'.repeat(2000)
 	let preview = tools.cap(whole, 'source', 900)

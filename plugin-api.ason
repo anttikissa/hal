@@ -1,5 +1,5 @@
 {
-	version: 18,
+	version: 19,
 	changes: [
 		{
 			version: 2,
@@ -281,6 +281,16 @@
 					kind: 'compatible',
 					target: 'host/models-dev',
 					description: 'Optional strict refresh errors'
+				}
+			]
+		},
+		{
+			version: 19,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/tool-presentation.toolPresentation.replace',
+					description: 'Adds a range-preserving output replace'
 				}
 			]
 		}

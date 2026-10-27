@@ -10,6 +10,7 @@ import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, st
 import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
+import { toolPresentation } from '../common/tool-presentation.ts'
 import {
 	blocks,
 	type DoneEvent,
@@ -113,10 +114,14 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 			if (b.type === 'tool_result') {
 				if (b.outputBlob) {
 					let ref = `${id}/${full.n}${many ? `.${slot}` : ''}`
-					b.output = b.output.replace(
+					let { output, presentation } = toolPresentation.replace(
+						b.output,
+						b.presentation,
 						`whole output in blob ${b.outputBlob}. Page it with READ_ENTRY "${b.outputBlob}"`,
 						`whole output in entry ${ref}. Page it with READ_ENTRY "${ref}"`,
 					)
+					b.output = output
+					if (presentation) b.presentation = presentation
 				}
 				slot += blocks.resultImages(b).length
 			}
