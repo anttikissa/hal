@@ -3,7 +3,8 @@
 	spec: 'A provider HTTP error from a subscription account names it and its plan: "HTTP 400 from openai (bob@example.com, free): ..." (email, else the account name; never a token). When an OpenAI account\'s request is rejected (400 or 403), Hal re-reads its plan from the usage endpoint; if the plan changed since last seen, the error adds "plan changed plus → free". /status shows the same change as the account\'s error line ("plan changed: plus → free"). A 400/403 saying the model "is not supported when using Codex with a ChatGPT account" sets that account aside for that model only (limits.ts, provider.planLimitMs, one hour) and retries at once, so rotation picks the next account; other models stay usable on it. Invariants restored: a model refused because one account lost its plan never surfaces as an anonymous provider error, and never stops a turn while another account can run the model. Tests: refresh reports plus → free; a plan refusal limits only that account and model and retries at once.',
 	status: 'done',
 	notes: [
-		'The first version only named the plan change in the error; failed() never rotated on a 400, so the turn stayed on the lapsed account. Detection uses the refusal text, not the plan, because which models a plan offers is not known locally.'
+		'The first version only named the plan change in the error; failed() never rotated on a 400, so the turn stayed on the lapsed account. Detection uses the refusal text, not the plan, because which models a plan offers is not known locally.',
+		'Bug fix: an OpenAI stream (SSE or WebSocket) error event carries no HTTP status, so a plan refusal (invalid_request_error, model_not_found) was not recognized; the account stayed first and the status row colored the model by its unused quota. Invariant: openai.ts maps invalid_request_error to 400, so stream refusals set the account aside like HTTP ones.'
 	],
 	needs: ['ab'],
 	foldInto: ['ne', 'ab']

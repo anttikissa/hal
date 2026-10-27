@@ -158,6 +158,7 @@ async function request(req: ProviderRequest) {
 const errorStatus: Record<string, number> = {
 	rate_limit_exceeded: 429,
 	usage_limit_reached: 429,
+	invalid_request_error: 400,
 	server_error: 500,
 	server_is_overloaded: 503,
 }
