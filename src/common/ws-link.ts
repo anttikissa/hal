@@ -8,7 +8,9 @@
 // client out. Either way reload() runs: the page reloads, the terminal
 // quits. A socket refused before it opens may mean the login expired or
 // was revoked while the client was away. If the host then says the token
-// is no good, reload() runs too, instead of retrying forever.
+// is no good, reload() runs too, instead of retrying forever. An event
+// whose seq skips a number means events were lost: the client closes
+// with 4002, which the host logs, and reconnects to fresh snapshots.
 
 import { ason } from './ason.ts'
 import { connection, type Conn, type LinkState, type Transport } from './connection.ts'
@@ -17,7 +19,7 @@ import type { Event } from './protocol.ts'
 // The part of a WebSocket this uses, so tests can pass a fake.
 export type Socket = {
 	send(data: string): void
-	close(): void
+	close(code?: number, reason?: string): void
 	onopen: ((ev?: any) => void) | null
 	onmessage: ((m: any) => void) | null
 	onclose: ((ev?: any) => void) | null
@@ -53,6 +55,7 @@ function transport(
 					send: (command) => socket.send(ason.stringify(command, 'short')),
 					close: () => socket.close(),
 				}
+				let seq = 0
 				socket.onopen = () => {
 					open = true
 					clearTimeout(timer)
@@ -60,13 +63,14 @@ function transport(
 				}
 				socket.onmessage = (m) => {
 					let start = onMessage ? performance.now() : 0
-					let event: Event
+					let event: Event, got: number | undefined
 					try {
-						event = ason.parse(String(m.data)) as Event
+						;({ seq: got, ...event } = ason.parse(String(m.data)) as Event & { seq?: number })
 					} catch (e: any) {
 						let text = `the host sent a message this client can't parse (${e?.message ?? e}): ${String(m.data).slice(0, 500)}`
 						return on.event({ type: 'warning', text })
 					}
+					if (got !== undefined && got !== ++seq) return socket.close(4002, `expected event ${seq}, got ${got}`)
 					if (event.type === 'snapshot')
 						onMessage?.(performance.now() - start, new TextEncoder().encode(String(m.data)).byteLength, event)
 					on.event(event)

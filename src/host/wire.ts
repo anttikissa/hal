@@ -27,16 +27,18 @@ function event(e: Event): Event {
 
 // One transport connection (a socket, a WebSocket) as a host
 // connection: each message received is one ASON command, and each event
-// goes to `write` as one short ASON message. Unreadable messages are
+// goes to `write` as one short ASON message. Events carry seq 1, 2, ...
+// so a client can tell it missed one (task p2p). Unreadable messages are
 // answered with `rejected`, never thrown.
 function adapt(
 	write: (message: string) => void,
 	info?: ClientInfo,
 ): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
+	let seq = 0
 	let send = (event: Event) => {
 		let measured = info?.kind === 'web' && settings.webDiagnostics() && event.type === 'snapshot'
 		let start = measured ? performance.now() : 0
-		let message = ason.stringify(event, 'short')
+		let message = ason.stringify({ ...event, seq: ++seq }, 'short')
 		if (measured && event.type === 'snapshot')
 			webDiagnostics.load(tabs.file().open.indexOf(event.sessionId) + 1, 'encoded', start, Buffer.byteLength(message))
 		write(message)

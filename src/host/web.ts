@@ -289,18 +289,23 @@ const websocket = {
 		webAuth.touch(ws.data.loginHash)
 		ws.data.conn?.receive(String(message))
 	},
-	close(ws: Socket) {
+	close(ws: Socket, code: number, reason: string) {
+		if (code === 4002) diag.log(`web: ${web.client(ws)} missed events (${reason}); it resyncs`)
 		web.state.sockets.delete(ws)
 		ws.data.conn?.close()
 	},
+}
+
+function client(ws: Socket): string {
+	return [ws.data.info?.kind, ws.data.info?.address, ws.data.info?.userAgent].filter(Boolean).join(' ')
 }
 
 // The first dropped send on a socket; the Bun close follows.
 function dropped(ws: Socket): void {
 	if (ws.data.dropped) return
 	ws.data.dropped = true
-	let who = [ws.data.info?.kind, ws.data.info?.address, ws.data.info?.userAgent].filter(Boolean).join(' ')
-	diag.log(`web: dropped events to ${who}: send buffer full (${ws.getBufferedAmount()} bytes); closing so it resyncs`)
+	let buffered = ws.getBufferedAmount()
+	diag.log(`web: dropped events to ${web.client(ws)}: send buffer full (${buffered} bytes); closing so it resyncs`)
 }
 
 // Try the preferred port and the next free port through 9100. Other
@@ -378,5 +383,6 @@ export const web = {
 	fetch,
 	start,
 	dropped,
+	client,
 	stop,
 }

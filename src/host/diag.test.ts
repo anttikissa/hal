@@ -29,10 +29,10 @@ test('diagnostics land redacted in owner-only state/, not in sessions/', () => {
 	expect(readdirSync(paths.sessionsDir())).toEqual([])
 })
 
-// Timebomb, task p2p: web.dropped logs to learn how often phones fall
-// behind. Do not just move the date.
-test('review the dropped-events logging by 2026-12-01', () => {
+// Timebomb, task p2p: web.dropped and the event seq were added to learn
+// how often web clients miss events. Do not just move the date.
+test('review dropped-event logging and the event seq by 2026-12-01', () => {
 	let why =
-		'grep "dropped events" state/diag.log: if drops are rare, delete web.dropped and this test; if not, find why clients fall behind. Keep closeOnBackpressureLimit.'
+		'grep -E "dropped events|missed events" state/diag.log. No "missed events" lines: delete the seq (wire.ts, ws-link.ts, the 4002 log in web.ts). Rare "dropped events": delete web.dropped. Then delete this test. Frequent: find why clients fall behind. Keep closeOnBackpressureLimit.'
 	expect(Date.now() < Date.parse('2026-12-01'), why).toBe(true)
 })

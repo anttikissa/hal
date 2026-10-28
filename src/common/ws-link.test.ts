@@ -12,8 +12,10 @@ class FakeSocket implements Socket {
 	send(data: string) {
 		this.sent.push(ason.parse(data))
 	}
-	close() {
-		this.onclose?.()
+	closes: (number | undefined)[] = []
+	close(code?: number) {
+		this.closes.push(code)
+		this.onclose?.(code === undefined ? undefined : { code })
 	}
 }
 
@@ -101,6 +103,17 @@ test('a socket that never opens is a failed attempt; one that closes redials and
 	sockets[2]!.onopen!()
 	await Bun.sleep(0)
 	expect(sockets[2]!.sent).toEqual(sockets[1]!.sent)
+})
+
+test('a skipped event seq closes the socket with 4002 and redials to resync', async () => {
+	let { sockets, events } = setup()
+	sockets[0]!.onopen!()
+	await Bun.sleep(0)
+	sockets[0]!.onmessage!({ data: ason.stringify({ type: 'ack', id: 'a', seq: 1 }) })
+	sockets[0]!.onmessage!({ data: ason.stringify({ type: 'ack', id: 'b', seq: 3 }) })
+	expect(events).toEqual([{ type: 'ack', id: 'a' }])
+	expect(sockets[0]!.closes).toEqual([4002])
+	expect(sockets).toHaveLength(2)
 })
 
 test('a host on other code (4000) or a logout (4001) reloads the page; other closes only redial', async () => {

@@ -141,7 +141,8 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => pushes.length === 1)
 	pushes[0]!({ type: 'text', text: 'hello' }, { type: 'done', reason: 'end' })
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
-	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
+	let seen = (events: any[]) =>
+		events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type)).map(({ seq, ...e }) => e)
 	expect(seen(w.events)).toEqual(seen(local))
 	expect(seen(w.events).map((e) => e.type)).toEqual([
 		'home',
