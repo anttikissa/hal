@@ -1,0 +1,6 @@
+{
+	title: 'Context graph window line matches its label',
+	spec: 'The context graph draws its dashed context-window line at the window its legend states. Seen 2026-10-28: legend said 1000k, line was drawn at 600k.',
+	status: 'planned',
+	needs: []
+}

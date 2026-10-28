@@ -1,5 +1,5 @@
 {
-	version: 20,
+	version: 21,
 	changes: [
 		{
 			version: 2,
@@ -301,6 +301,16 @@
 					kind: 'compatible',
 					target: 'common/colors.colors',
 					description: 'Adds shared values green and red'
+				}
+			]
+		},
+		{
+			version: 21,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/colors.colors',
+					description: 'Adds shared value yellow'
 				}
 			]
 		}

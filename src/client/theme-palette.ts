@@ -1,4 +1,5 @@
-// Complete experimental palettes shared by the cinematic theme plugins.
+// Building blocks for theme plugins: themePlugin applies a look of field
+// overrides on the base; palette builds a full look from seven colors.
 import { colors, type Look, type Style } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import { render } from './render.ts'
@@ -16,9 +17,6 @@ type Palette = {
 export function palette(p: Palette): Look {
 	const surface: Oklch = [0.2, p.screen[1], p.screen[2]]
 	const gray: Oklch = [0.74, 0.01, p.screen[2]]
-	const red: Oklch = [0.72, 0.16, 28],
-		green: Oklch = [0.8, 0.12, 150],
-		yellow: Oklch = [0.86, 0.1, 90]
 	const card = (fg: Oklch, bg = surface): Style => ({ fg, bg, code: fg, linkFg: fg, linkBg: bg })
 	const text = (fg: Oklch): Style => ({ fg, bold: [0.94, 0.025, fg[2]], code: fg, linkFg: p.accent, linkBg: surface })
 	return {
@@ -33,10 +31,9 @@ export function palette(p: Palette): Look {
 		message: () => card(p.accent),
 		question: () => card(p.accent),
 		info: () => card(gray),
-		error: () => card(red),
-		warning: () => card(yellow),
-		exit: () => ({ fg: red, neutralFg: gray }),
-		diff: (base) => ({ ...base(), addFg: green, removeFg: red }),
+		error: () => card(colors.red),
+		warning: () => card(colors.yellow),
+		exit: () => ({ fg: colors.red, neutralFg: gray }),
 		log: () => text(gray),
 		fork: () => card(p.accent),
 		commitCard: () => card(p.edit),
@@ -44,21 +41,10 @@ export function palette(p: Palette): Look {
 		toolRead: () => card(p.read),
 		toolBash: () => card(p.bash),
 		status: () => ({ fg: gray, highlight: p.accent }),
-		statusCool: () => ({ fg: p.read }),
-		statusWarm: () => ({ fg: yellow }),
-		statusHot: () => ({ fg: red }),
-		tab: () => ({
-			activeFg: p.accent,
-			inactiveFg: gray,
-			doneFg: green,
-			warningFg: yellow,
-			errorFg: red,
-			pausedFg: gray,
-			jobsFg: p.bash,
-		}),
-		help: () => ({ key: p.accent, description: gray, update: yellow }),
-		popup: () => ({ neutralFg: gray, dangerFg: red }),
-		popupMatch: () => ({ fg: yellow }),
+		tab: (base) => ({ ...base(), activeFg: p.accent, inactiveFg: gray, pausedFg: gray, jobsFg: p.bash }),
+		help: () => ({ key: p.accent, description: gray, update: colors.yellow }),
+		popup: () => ({ neutralFg: gray, dangerFg: colors.red }),
+		popupMatch: () => ({ fg: colors.yellow }),
 		popupNote: () => ({ fg: gray }),
 		popupModelCurrent: () => card(p.accent),
 		page: () => ({
@@ -68,7 +54,7 @@ export function palette(p: Palette): Look {
 			field: surface,
 			border: gray,
 			button: surface,
-			match: yellow,
+			match: colors.yellow,
 			flash: [1, 0, 0],
 		}),
 	}

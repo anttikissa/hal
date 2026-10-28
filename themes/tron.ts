@@ -1,8 +1,7 @@
 // Tron (1982): cyan light lines on black, orange for Hal (the other
 // side of the grid), cards barely tinted: lines on black.
-import { render } from '../src/client/render.ts'
+import { themePlugin } from '../src/client/theme-palette.ts'
 import { colors, type Look } from '../src/common/colors.ts'
-import type { Plugin } from '../src/host/plugins.ts'
 
 export const look: Look = {
 	screen: [0.12, 0, 0],
@@ -47,12 +46,4 @@ export const look: Look = {
 }
 
 // A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.
-export default (plugin: Plugin) => {
-	for (let [key, v] of Object.entries(look)) {
-		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
-		else plugin.set(colors, key as never, v as never)
-	}
-	// Repaint in these colors now, and in the remaining ones once removed.
-	render.request('theme applied')
-	return () => render.request('theme removed')
-}
+export default themePlugin(look)

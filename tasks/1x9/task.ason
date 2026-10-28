@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Where the Find field blue came from: Picker.tsx gives its search input class input, and host/web-page.ts turns colors.input() into a .input rule (user cyan on dark blue) that beat the generic input { background: var(--field) } rule, while the focus border stayed the page accent green. A .Picker input.input rule restores the page colors.',
-		'Intro side effect: a rerun after choosing <none> preselects hal again, since <none> and no answer look the same on disk.'
+		'Intro side effect: a rerun after choosing <none> preselects hal again, since <none> and no answer look the same on disk.',
+		'Task c47 lets the built-in look use shared green, red and yellow for success, failure and warnings, and has themes/hal.ts list only fields that differ from it.'
 	],
 	needs: ['4c1', '9pa'],
 	foldInto: ['d3', '4c1', '9pa']

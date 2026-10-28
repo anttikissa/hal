@@ -1,8 +1,9 @@
 // One source of colors for the terminal and the web: the built-in,
 // nameless look, as code. It is grayscale, so a user who changes one
-// field sees where it is used; the shared green and red mark success and
-// failure, and Hal amber marks only the Hal home and percentages. Themes
-// are plugins that replace fields (themes/, task d3).
+// field sees where it is used. The exceptions: the shared green, red and
+// yellow mark success, failure and warnings; a combined diff's second
+// column is blue and orange; Hal amber marks the Hal home and
+// percentages. Themes are plugins that replace fields (themes/, task d3).
 //
 // The shared values (fgL, screen, mix) are plain values. Every other
 // top-level field is a function, read at call time, that computes styles
@@ -56,10 +57,12 @@ export const colors = {
 	fgC: 0,
 	bgL: 0.2,
 	bgC: 0,
-	// Generic green and red for any theme: success and addition, failure
-	// and removal. One lightness and chroma, so they read equally strong.
+	// Generic colors for any theme: green for success and addition, red
+	// for failure and removal, yellow for warnings. One chroma, so they
+	// read equally strong.
 	green: [0.79, 0.145, 145.5] as Oklch,
 	red: [0.73, 0.145, 26.5] as Oklch,
+	yellow: [0.86, 0.145, 95] as Oklch,
 
 	// Derived colors: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
@@ -120,14 +123,14 @@ export const colors = {
 	halHome: (): Style => ({ fg: amber }),
 	// The context graph's token kinds: three readable steps.
 	statusCool: (): Style => ({ fg: colors.green }),
-	statusWarm: (): Style => ({ fg: gray(0.78) }),
+	statusWarm: (): Style => ({ fg: colors.yellow }),
 	statusHot: (): Style => ({ fg: colors.red }),
 	// Tab labels.
 	tab: (): Style => ({
 		activeFg: gray(0.95),
 		inactiveFg: gray(0.68),
 		doneFg: colors.green,
-		warningFg: gray(0.95),
+		warningFg: colors.yellow,
 		errorFg: colors.red,
 		pausedFg: colors.log().fg!,
 		jobsFg: gray(colors.fgL),
@@ -169,13 +172,15 @@ export const colors = {
 	// Exit 1 is neutral; other nonzero statuses use the error color (tasks wm0, j92).
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
 	// Edit diffs: the shared green and red. A combined diff's second
-	// column (add2, remove2) is blue and orange.
+	// column (add2, remove2) is blue and orange at the same chroma; orange
+	// keeps away from Hal amber. Unchanged lines are grey at the marks'
+	// lightness.
 	diff: (): Style => ({
 		addFg: colors.green,
 		removeFg: colors.red,
-		add2Fg: [0.78, 0.12, 245],
-		remove2Fg: [0.78, 0.13, 55],
-		contextFg: gray(0.78),
+		add2Fg: [0.78, 0.145, 245],
+		remove2Fg: [0.8, 0.145, 50],
+		contextFg: gray(0.8),
 	}),
 	// The web page's own surfaces (custom properties on .page), taken from
 	// the terminal's fields so both match: fields and the focus accent are

@@ -1,15 +1,15 @@
 // Hal's own colors: amber replies, cyan input and tinted tool cards on
-// brown-black, every colors field written out (task d3). Copy it to
-// themes/<name>.ts, change what you like, then /theme <name>. Every
-// color is OKLCH [lightness, chroma, hue]; a style can read another
-// through colors (colors.fgL), which sees this theme's values.
-// Derived colors (quiet, blinkDim) are functions given the field they
-// replace first; every color Hal draws comes from a field here.
+// brown-black (task d3). Copy it to themes/<name>.ts, change what you
+// like, then /theme <name>. A field not listed here comes from the base
+// look (src/common/colors.ts), such as the shared green, red and yellow
+// and the diff colors. Every color is OKLCH [lightness, chroma, hue]; a
+// style can read another through colors (colors.fgL), which sees this
+// theme's values. Derived colors (quiet, blinkDim) are functions given
+// the field they replace first.
 
-import { render } from '../src/client/render.ts'
+import { themePlugin } from '../src/client/theme-palette.ts'
 import { colors, type Look, type Style } from '../src/common/colors.ts'
 import { oklch, type Oklch } from '../src/common/oklch.ts'
-import type { Plugin } from '../src/host/plugins.ts'
 
 export const look: Look = {
 	// The lightest dark background we design for: where a style has no
@@ -107,17 +107,11 @@ export const look: Look = {
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
 	// Status line: neutral, with a highlight for what matters.
 	status: (): Style => ({ fg: [0.68, 0, 0], highlight: [0.9, 0.01, 250] }),
-	// Three distinct readable steps: the context graph's token kinds.
-	statusCool: (): Style => ({ fg: colors.green }),
-	statusWarm: (): Style => ({ fg: [0.86, 0.16, 95] }),
-	statusHot: (): Style => ({ fg: colors.red }),
 	// Tab labels.
-	tab: (): Style => ({
+	tab: (base): Style => ({
+		...base(),
 		activeFg: [0.87, 0.2, 145],
 		inactiveFg: [0.68, 0, 0],
-		doneFg: colors.green,
-		warningFg: [0.86, 0.16, 95],
-		errorFg: colors.red,
 		pausedFg: colors.log().fg!,
 		// Background jobs running: bash's magenta.
 		jobsFg: [colors.fgL, colors.fgC, 320],
@@ -165,19 +159,6 @@ export const look: Look = {
 	// selected row's popupCurrent background (L 0.42).
 	popupNote: (): Style => ({ fg: [0.8, 0, 0] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
-	// Exit 1 is neutral; other nonzero statuses use the error red (tasks wm0, j92).
-	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
-	// Edit diffs: the shared green and red. Errors and exit statuses
-	// share the removal red. A combined diff's second column (add2,
-	// remove2) is blue and orange at the same chroma; unchanged lines are
-	// grey at the marks' lightness.
-	diff: (): Style => ({
-		addFg: colors.green,
-		removeFg: colors.red,
-		add2Fg: [0.78, 0.145, 245],
-		remove2Fg: [0.8, 0.145, 50],
-		contextFg: [0.8, 0, 0],
-	}),
 	// The web page's own surfaces (custom properties on .page), taken from
 	// the terminal's fields so both match: fields and the focus accent are
 	// the prompt's colors, text and buttons plain's, borders the terminal
@@ -224,12 +205,4 @@ export const look: Look = {
 }
 
 // A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.
-export default (plugin: Plugin) => {
-	for (let [key, v] of Object.entries(look)) {
-		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
-		else plugin.set(colors, key as never, v as never)
-	}
-	// Repaint in these colors now, and in the remaining ones once removed.
-	render.request('theme applied')
-	return () => render.request('theme removed')
-}
+export default themePlugin(look)

@@ -1,8 +1,7 @@
 // WarGames (1983): one green phosphor in several brightnesses on
 // black, like a VT100. Only errors get another color.
-import { render } from '../src/client/render.ts'
+import { themePlugin } from '../src/client/theme-palette.ts'
 import { colors, type Look } from '../src/common/colors.ts'
-import type { Plugin } from '../src/host/plugins.ts'
 
 const green = (l: number, c = 0.18): [number, number, number] => [l, c, 145]
 const tool = () => ({ fg: green(colors.fgL, colors.fgC), bg: green(colors.bgL, colors.bgC) })
@@ -64,12 +63,4 @@ export const look: Look = {
 }
 
 // A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.
-export default (plugin: Plugin) => {
-	for (let [key, v] of Object.entries(look)) {
-		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
-		else plugin.set(colors, key as never, v as never)
-	}
-	// Repaint in these colors now, and in the remaining ones once removed.
-	render.request('theme applied')
-	return () => render.request('theme removed')
-}
+export default themePlugin(look)
