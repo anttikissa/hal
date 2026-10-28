@@ -1,0 +1,7 @@
+{
+	title: 'Shorten the held-queue notice',
+	spec: 'The notice under the transcript, shown while queued messages wait for the answer to an asking turn (inbox.heldNotice), reads: Queued messages wait for your answer. "/queue next" to send now. It fits on two narrow phone lines; the earlier four-line text crowded the mobile composer.',
+	status: 'done',
+	needs: [],
+	foldInto: ['nd6']
+}

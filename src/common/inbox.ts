@@ -79,7 +79,7 @@ function heldNotice(t: Transcript): string | undefined {
 	if (!t.inbox.some((m) => m.delivery === 'after-turn')) return undefined
 	let last = t.items.findLast((i) => i.type === 'prompt' || i.type === 'text')
 	if (last?.type !== 'text' || !summary.asks(last.text)) return undefined
-	return 'The last assistant message was a question; queued messages, including those from other sessions, run after you answer it. /queue next sends the oldest now.'
+	return 'Queued messages wait for your answer. "/queue next" to send now.'
 }
 
 export const inbox = { pending, sender, provenance, note, heldNotice }
