@@ -1,0 +1,7 @@
+{
+	title: 'Shared green and red for success and failure',
+	spec: 'src/common/colors.ts holds two shared values, colors.green [0.79, 0.145, 145.5] and colors.red [0.73, 0.145, 26.5]: one lightness and chroma, so they read equally strong. Any theme may use or replace them. The built-in look stays grayscale except these two: diff additions and removals, tab done and error marks, and the context graph cache read (statusCool) and uncached input (statusHot) use them. themes/hal.ts reads them for the same fields, so its diff and tab colors match (this replaces the separate stronger tab red of kx2; out of sRGB it looked like the diff red anyway). Its second diff column shares chroma 0.145: add2 [0.78, 0.145, 245], remove2 [0.8, 0.145, 50]; hue 50 keeps remove2 apart from Hal amber replies. Other shipped themes keep their own colors for now. User approved in session 26-ess on 2026-10-28.',
+	status: 'done',
+	needs: [],
+	foldInto: ['1x9', 'kx2', 'k8y']
+}

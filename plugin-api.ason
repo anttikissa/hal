@@ -1,5 +1,5 @@
 {
-	version: 19,
+	version: 20,
 	changes: [
 		{
 			version: 2,
@@ -291,6 +291,16 @@
 					kind: 'compatible',
 					target: 'common/tool-presentation.toolPresentation.replace',
 					description: 'Adds a range-preserving output replace'
+				}
+			]
+		},
+		{
+			version: 20,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/colors.colors',
+					description: 'Adds shared values green and red'
 				}
 			]
 		}

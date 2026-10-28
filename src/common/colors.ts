@@ -1,7 +1,8 @@
 // One source of colors for the terminal and the web: the built-in,
 // nameless look, as code. It is grayscale, so a user who changes one
-// field sees where it is used; Hal amber marks only the Hal home and
-// percentages. Themes are plugins that replace fields (themes/, task d3).
+// field sees where it is used; the shared green and red mark success and
+// failure, and Hal amber marks only the Hal home and percentages. Themes
+// are plugins that replace fields (themes/, task d3).
 //
 // The shared values (fgL, screen, mix) are plain values. Every other
 // top-level field is a function, read at call time, that computes styles
@@ -55,6 +56,10 @@ export const colors = {
 	fgC: 0,
 	bgL: 0.2,
 	bgC: 0,
+	// Generic green and red for any theme: success and addition, failure
+	// and removal. One lightness and chroma, so they read equally strong.
+	green: [0.79, 0.145, 145.5] as Oklch,
+	red: [0.73, 0.145, 26.5] as Oklch,
 
 	// Derived colors: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
@@ -114,16 +119,16 @@ export const colors = {
 	// The Hal home's path in the status row.
 	halHome: (): Style => ({ fg: amber }),
 	// The context graph's token kinds: three readable steps.
-	statusCool: (): Style => ({ fg: gray(0.6) }),
+	statusCool: (): Style => ({ fg: colors.green }),
 	statusWarm: (): Style => ({ fg: gray(0.78) }),
-	statusHot: (): Style => ({ fg: gray(0.95) }),
+	statusHot: (): Style => ({ fg: colors.red }),
 	// Tab labels.
 	tab: (): Style => ({
 		activeFg: gray(0.95),
 		inactiveFg: gray(0.68),
-		doneFg: gray(0.85),
+		doneFg: colors.green,
 		warningFg: gray(0.95),
-		errorFg: gray(0.95),
+		errorFg: colors.red,
 		pausedFg: colors.log().fg!,
 		jobsFg: gray(colors.fgL),
 	}),
@@ -163,11 +168,11 @@ export const colors = {
 	popupModelCurrent: (): Style => ({ fg: gray(0.88), bg: gray(0.28) }),
 	// Exit 1 is neutral; other nonzero statuses use the error color (tasks wm0, j92).
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
-	// Edit diffs: additions bright, removals dim. A combined diff's second
+	// Edit diffs: the shared green and red. A combined diff's second
 	// column (add2, remove2) is blue and orange.
 	diff: (): Style => ({
-		addFg: gray(0.92),
-		removeFg: gray(0.62),
+		addFg: colors.green,
+		removeFg: colors.red,
 		add2Fg: [0.78, 0.12, 245],
 		remove2Fg: [0.78, 0.13, 55],
 		contextFg: gray(0.78),

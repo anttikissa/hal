@@ -108,16 +108,16 @@ export const look: Look = {
 	// Status line: neutral, with a highlight for what matters.
 	status: (): Style => ({ fg: [0.68, 0, 0], highlight: [0.9, 0.01, 250] }),
 	// Three distinct readable steps: the context graph's token kinds.
-	statusCool: (): Style => ({ fg: [0.78, 0.14, 145] }),
+	statusCool: (): Style => ({ fg: colors.green }),
 	statusWarm: (): Style => ({ fg: [0.86, 0.16, 95] }),
-	statusHot: (): Style => ({ fg: [0.76, 0.16, 25] }),
+	statusHot: (): Style => ({ fg: colors.red }),
 	// Tab labels.
 	tab: (): Style => ({
 		activeFg: [0.87, 0.2, 145],
 		inactiveFg: [0.68, 0, 0],
-		doneFg: [0.78, 0.14, 145],
+		doneFg: colors.green,
 		warningFg: [0.86, 0.16, 95],
-		errorFg: [0.76, 0.16, 25],
+		errorFg: colors.red,
 		pausedFg: colors.log().fg!,
 		// Background jobs running: bash's magenta.
 		jobsFg: [colors.fgL, colors.fgC, 320],
@@ -167,15 +167,15 @@ export const look: Look = {
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Exit 1 is neutral; other nonzero statuses use the error red (tasks wm0, j92).
 	exit: (): Style => ({ fg: colors.diff().removeFg!, neutralFg: colors.log().fg! }),
-	// Edit diffs: soft pastels, easy on the eyes. Errors and exit
-	// statuses share the removal red. A combined diff's second column
-	// (add2, remove2) is blue and orange; unchanged lines are grey at the
-	// marks' lightness.
+	// Edit diffs: the shared green and red. Errors and exit statuses
+	// share the removal red. A combined diff's second column (add2,
+	// remove2) is blue and orange at the same chroma; unchanged lines are
+	// grey at the marks' lightness.
 	diff: (): Style => ({
-		addFg: [0.8, 0.16, 146],
-		removeFg: [0.72, 0.16, 28],
-		add2Fg: [0.78, 0.13, 245],
-		remove2Fg: [0.8, 0.14, 65],
+		addFg: colors.green,
+		removeFg: colors.red,
+		add2Fg: [0.78, 0.145, 245],
+		remove2Fg: [0.8, 0.145, 50],
 		contextFg: [0.8, 0, 0],
 	}),
 	// The web page's own surfaces (custom properties on .page), taken from
