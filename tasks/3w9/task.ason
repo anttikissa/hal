@@ -1,0 +1,7 @@
+{
+	title: 'Prompt-file changes show and send one net diff',
+	spec: 'A run of changes to system-prompt files keeps its summary rows (time, file, +/- counts, word-level gist per change), but the open card then shows one total diff per file from before the run to now, not one diff per change. The model receives only that net diff, computed at its next request: an idle tab does not collect a diff per edit, and a tab returning after weeks gets one diff per file.',
+	status: 'planned',
+	needs: ['ar'],
+	foldInto: ['ar']
+}

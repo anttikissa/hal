@@ -1,0 +1,7 @@
+{
+	title: 'Settings changes reach each model as one net notice',
+	spec: 'Before each request, history.messages compares the effective config.ason settings with those the session last told its model (session.ason settings). If any differ, it appends one notice: "Settings changed: security yolo → best-effort, maxRounds 200 → 9." Every setting counts; no filtering. The note is the net change since the last request, so an idle tab hears one line however often the file changed, and a change undone before the next request gives none. A session\'s first request only records the values. Invariant restored: a model is never unaware that the user changed a setting, such as security, through /config or a hand edit.',
+	status: 'done',
+	needs: ['nvm', 'pc'],
+	foldInto: ['nvm']
+}

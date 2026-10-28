@@ -96,6 +96,34 @@ function explain(data: Record<string, unknown>, s: Setting): void {
 	}
 }
 
+// One line naming each setting that differs from what session `id`'s
+// model last heard of (its settings.ason), or nothing; records the
+// current values. The net change only: an idle tab hears once, however
+// often the file changed. A session's first request just records them.
+// Tested once, then the tests were deleted. If you change this code, first
+// write tests for: first request silent; several edits give one net line;
+// a change and its undo give none.
+function told(id: string): string | undefined {
+	config.init()
+	let now = settings.check(settings.state.raw).values
+	let file = liveFiles.liveFile<{ told?: Record<string, unknown> }>(
+		`${paths.sessionDir(id)}/settings.ason`,
+		{},
+		{ watch: false },
+	)
+	try {
+		let before = file.told
+		let changed = settings.table.filter((s) => !Object.is(before?.[s.name] ?? s.default, now[s.name]))
+		if (before && !changed.length) return
+		file.told = now
+		if (!before) return
+		let show = (v: unknown) => (typeof v === 'string' ? v : ason.stringify(v, 'short'))
+		return `Settings changed: ${changed.map((s) => `${s.name} ${show(before[s.name] ?? s.default)} → ${show(now[s.name])}`).join(', ')}.`
+	} finally {
+		liveFiles.close(file)
+	}
+}
+
 // The /config modal's content (protocol `settings`): every setting's
 // effective value as text and what config.ason holds for it.
 function event(): Event & { type: 'settings' } {
@@ -127,5 +155,6 @@ export const config = {
 	point,
 	explain,
 	event,
+	told,
 	reset,
 }

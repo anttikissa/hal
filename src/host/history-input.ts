@@ -5,6 +5,7 @@ import { modelNotices } from '../common/model-notices.ts'
 import { replay } from '../common/replay.ts'
 import { cacheMarker } from '../common/cache-marker.ts'
 import { blobs } from './blobs.ts'
+import { config } from './config.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
 import { neighbors } from './neighbors.ts'
@@ -17,6 +18,8 @@ import { sessions } from './sessions.ts'
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
 	for (let text of neighbors.notes(id, sessions.open(id).cwd)) history.append(id, { type: 'notice', text })
+	let settingsNote = config.told(id)
+	if (settingsNote) history.append(id, { type: 'notice', text: settingsNote })
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({
 		...b,
