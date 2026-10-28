@@ -72,7 +72,7 @@ test('optional snapshot parsing diagnostics report UTF-8 size before delivery', 
 	expect(order).toEqual(['parsed', 'delivered', 'delivered'])
 })
 
-test('commands go out as ASON once open; events arrive parsed, junk is dropped', async () => {
+test('commands go out as ASON once open; events arrive parsed, junk becomes a warning', async () => {
 	let { sockets, events } = setup()
 	connection.send({ type: 'open-newest' })
 	sockets[0]!.onopen!()
@@ -80,7 +80,10 @@ test('commands go out as ASON once open; events arrive parsed, junk is dropped',
 	expect(sockets[0]!.sent).toMatchObject([{ type: 'open-newest', id: expect.any(String) }])
 	sockets[0]!.onmessage!({ data: 'not ason {' })
 	sockets[0]!.onmessage!({ data: ason.stringify({ type: 'rejected', command: 'x', reason: 'y' }, 'short') })
-	expect(events).toEqual([{ type: 'rejected', command: 'x', reason: 'y' }])
+	expect(events).toMatchObject([
+		{ type: 'warning', text: expect.stringContaining('not ason {') },
+		{ type: 'rejected', command: 'x', reason: 'y' },
+	])
 })
 
 test('a socket that never opens is a failed attempt; one that closes redials and resends', async () => {

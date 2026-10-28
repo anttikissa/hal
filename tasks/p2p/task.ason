@@ -1,0 +1,12 @@
+{
+	title: 'Web clients resync after dropped events',
+	spec: 'Invariant restored: a web client never silently misses host events. The host serves /ws with closeOnBackpressureLimit: Bun drops a send past its 16 MB backpressure limit, so the host closes that socket and the client reconnects, reopening its sessions from fresh snapshots and resending pending commands. The first dropped send on a socket writes one diag.log line naming the client and buffered bytes. A host message the client cannot parse reaches the user as a warning with the parse error and the start of the raw message, never a silent drop. A timebomb test in src/host/diag.test.ts (normal suite) fails on 2026-12-01: it says to review the drop lines (grep dropped state/diag.log) and either delete the logging when drops are rare or find why clients fall behind; the backpressure close stays either way.',
+	status: 'done',
+	notes: [
+		'Cause (22-lid, 2026-10-28): an iPhone page woke from the background; for about 25 s it showed a running session as idle and missed a whole turn, plus the ack of its pending prompt, so the stale pending copy stayed below newer messages. The socket never closed, so nothing resynced. Bun 1.4.4 ws.send returns 0 and discards the message past backpressureLimit (default 16 MB) while the socket stays open; with closeOnBackpressureLimit the sends after the limit return -1 then 0 and Bun closes with 1006. A one-off test (paused raw TCP client, 40 MB of deliveries) logged one line and closed the socket; it was not kept.',
+		'Considered: a per-connection event counter so the client detects gaps. TCP loses nothing on its own; the only observed drop point is the Bun send, now closed at the host, so the counter would detect nothing extra. Replay from a counter was rejected: it needs per-connection host buffers, largest exactly when the client is slow. Add the counter only if drops appear that diag.log does not show.',
+		'User likes timebomb tests for temporary instrumentation. A review date in task notes was missed before (s37 composer-debug review 2026-10-15 still open on 2026-10-28). Put a timebomb in the normal suite; web tests run only under ./test-expensive.'
+	],
+	needs: ['6'],
+	foldInto: ['6']
+}

@@ -28,3 +28,11 @@ test('diagnostics land redacted in owner-only state/, not in sessions/', () => {
 	expect(statSync(diag.file()).mode & 0o077).toBe(0)
 	expect(readdirSync(paths.sessionsDir())).toEqual([])
 })
+
+// Timebomb, task p2p: web.dropped logs to learn how often phones fall
+// behind. Do not just move the date.
+test('review the dropped-events logging by 2026-12-01', () => {
+	let why =
+		'grep "dropped events" state/diag.log: if drops are rare, delete web.dropped and this test; if not, find why clients fall behind. Keep closeOnBackpressureLimit.'
+	expect(Date.now() < Date.parse('2026-12-01'), why).toBe(true)
+})

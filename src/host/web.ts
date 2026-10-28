@@ -63,6 +63,7 @@ type Data = {
 	manualUpdates?: boolean
 	page?: string
 	info?: ClientInfo
+	dropped?: boolean
 }
 type Socket = ServerWebSocket<Data>
 
@@ -270,14 +271,18 @@ function blob(pathname: string): Response {
 	})
 }
 
+// Bun drops a send past its 16 MB backpressure limit; closing the socket
+// then makes the client reconnect and resync from fresh snapshots
+// instead of silently missing events (task p2p).
 const websocket = {
+	closeOnBackpressureLimit: true,
 	open(ws: Socket) {
 		if (!webAuth.validHash(ws.data.loginHash)) return ws.close(4001, 'logged out')
 		webAuth.touch(ws.data.loginHash)
 		if (ws.data.stale && !ws.data.manualUpdates) return ws.close(4000, 'reload')
 		if (ws.data.stale) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
 		web.state.sockets.add(ws)
-		ws.data.conn = host.adapt((message) => ws.send(message), ws.data.info)
+		ws.data.conn = host.adapt((message) => ws.send(message) || web.dropped(ws), ws.data.info)
 	},
 	message(ws: Socket, message: string | Buffer) {
 		if (!webAuth.validHash(ws.data.loginHash)) return ws.close(4001, 'logged out')
@@ -289,6 +294,15 @@ const websocket = {
 		ws.data.conn?.close()
 	},
 }
+
+// The first dropped send on a socket; the Bun close follows.
+function dropped(ws: Socket): void {
+	if (ws.data.dropped) return
+	ws.data.dropped = true
+	let who = [ws.data.info?.kind, ws.data.info?.address, ws.data.info?.userAgent].filter(Boolean).join(' ')
+	diag.log(`web: dropped events to ${who}: send buffer full (${ws.getBufferedAmount()} bytes); closing so it resyncs`)
+}
+
 // Try the preferred port and the next free port through 9100. Other
 // failures (and an exhausted range) leave socket clients available.
 // `hal serve --port` (web.state.fixedPort) tries only that port.
@@ -363,5 +377,6 @@ export const web = {
 	blob,
 	fetch,
 	start,
+	dropped,
 	stop,
 }

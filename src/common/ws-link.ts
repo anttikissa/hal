@@ -63,8 +63,9 @@ function transport(
 					let event: Event
 					try {
 						event = ason.parse(String(m.data)) as Event
-					} catch {
-						return
+					} catch (e: any) {
+						let text = `the host sent a message this client can't parse (${e?.message ?? e}): ${String(m.data).slice(0, 500)}`
+						return on.event({ type: 'warning', text })
 					}
 					if (event.type === 'snapshot')
 						onMessage?.(performance.now() - start, new TextEncoder().encode(String(m.data)).byteLength, event)
