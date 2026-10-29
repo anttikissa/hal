@@ -14,7 +14,7 @@ Hal asks about:
   Reading secret files (READ refuses them)
   ps -E, ps e, /proc/*/environ (env variables)
 
-Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*, auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets. Public keys (*.pub) are not secret.
+Secret files: .env*, .ssh/, .aws/, .gnupg/, secrets/, credentials*, auth.ason, private keys (*.pem, *.key, *.p12, *.pfx), crypto wallets. Public keys (*.pub) and .env.example are not secret.
 
 Settings (/config security):
   best-effort: The default. Catches mistakes, not a determined attacker, such as a man-in-the-middle at the provider.

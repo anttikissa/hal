@@ -238,9 +238,9 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 }
 
 // Shared best-effort sensitive-path policy for READ, shell approval and
-// snapshots. Public keys (*.pub) are meant to be shared, even in .ssh/.
+// snapshots. Public keys (*.pub) and .env.example are meant to be shared.
 function sensitive(path: string): boolean {
-	if (/\.pub$/i.test(path)) return false
+	if (/\.pub$|(?:^|\/)\.env\.example$/i.test(path)) return false
 	const secretPaths =
 		/(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|secrets|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519))(?:\/|$)/i
 	const processEnv = /(?:^|\/)proc\/[^/]+\/environ$/

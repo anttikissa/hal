@@ -107,6 +107,7 @@ test('secret-printing approvals are narrow, use the shared path policy and honor
 		['ssh -i ~/.ssh/id_rsa example.invalid', []],
 		// Public keys are meant to be shared.
 		['cat ~/.ssh/id_ed25519.pub', []],
+		['cat .env.example', []],
 		['echo "cat ~/.ssh/id_rsa"', []],
 		['k=$(cat .env)', ['cat .env)']],
 		['A=1 head .env', ['head .env']],
