@@ -88,6 +88,9 @@ interface RenderState {
 	past: { session: string | undefined; past: Past; tail: boolean } | undefined
 	/** The next slice of that layout. */
 	slicing: ReturnType<typeof setTimeout> | null
+	/** Wall clock minus monotonic clock at the last draw; grows by the
+	 * time asleep. */
+	skew: number | undefined
 }
 
 const CSI = '\x1b['
@@ -112,6 +115,7 @@ function createState(): RenderState {
 		full: undefined,
 		past: undefined,
 		slicing: null,
+		skew: undefined,
 	}
 }
 

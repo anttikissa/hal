@@ -20,6 +20,14 @@ function draw(force = false, trigger?: string): void {
 	if (terminal.state.external || terminal.state.suspended || !st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
+	// After sleep the terminal may have shifted its rows under us, with no
+	// resize. The monotonic clock stops in sleep; the wall clock does not.
+	let skew = Date.now() - performance.now()
+	if (st.skew !== undefined && skew - st.skew > 5000) {
+		force = true
+		trigger = 'a wake from sleep'
+	}
+	st.skew = skew
 	if (!st.fullscreen && (st.view.tabs?.list.length ?? render.startTabs) > 1) {
 		st.fullscreen = force = true
 		trigger = 'the first paint with two or more tabs'
