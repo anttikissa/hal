@@ -93,6 +93,7 @@ export const tool: Tool<ToolOutput> = {
 			// Lines from commits.committed follow the output (task sg0).
 			let done = run.done.then(
 				async (out) => {
+					if (observation.commits) observation.commits.output = out
 					let { lines, commits } = await fileChanges.finish(observation)
 					found = commits
 					return lines.length ? `${out}${out.endsWith('\n') ? '' : '\n'}\n${lines.join('\n')}` : out

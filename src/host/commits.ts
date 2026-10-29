@@ -29,6 +29,7 @@ type Watch = {
 	size: number
 	start: number
 	command?: string
+	output?: string
 }
 // What commits.committed gets: one commit a Bash call of `sessionId` made
 // (its Session trailer names that session). Paths are absolute; a binary
@@ -58,6 +59,7 @@ async function begin(sessionId: string, cwd: string, log: string, callId?: strin
 		},
 	)
 	let watch = { sessionId, ...(callId && { callId }), cwd, log, size, start: Date.now() }
+	commits.state.active.add(watch)
 	return watch
 }
 
@@ -98,6 +100,10 @@ function trailer(body: string): string {
 // The session a Session trailer names, if it is one of this home; else none.
 function attribute(trailer: string): string | undefined {
 	if (/^[\w-]+$/.test(trailer) && existsSync(`${paths.sessionDir(trailer)}/session.ason`)) return trailer
+}
+
+function committing(command = ''): boolean {
+	return /\bgit\b[^;&|]*\bcommit\b/.test(command)
 }
 
 // Whether `records` (the claimed session's history) back its claim to
@@ -211,8 +217,17 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 			let c = info.get(e.hash)
 			if (!c) continue
 			let id = commits.attribute(c.trailer)
-			// No trailer: the call that ran `git commit` made it.
-			let own = !id && /\bgit\b[^;&|]*\bcommit\b/.test(watch.command ?? '')
+			// No trailer: the call that ran `git commit` made it if its output
+			// prints the hash, or if no other call committing in this
+			// repository was running then. Else that call claims it on finish.
+			let rival = [...commits.state.active].some(
+				(w) => w !== watch && w.log === watch.log && w.start < (e.time + 1) * 1000 && committing(w.command),
+			)
+			let own = !id && committing(watch.command) && (!!watch.output?.includes(c.short) || !rival)
+			if (!id && !own && rival) {
+				commits.state.seen = commits.state.seen.filter((h) => h !== e.hash)
+				continue
+			}
 			if (own) id = watch.sessionId
 			commits.announce(id, e.hash, c.short, c.subject, e.amend, basename(watch.cwd))
 			if (id && !own) commits.verify(id, c.short, c.subject, e.time)
@@ -298,7 +313,7 @@ function announce(
 }
 
 export const commits = {
-	state: { seen: [] as string[] },
+	state: { seen: [] as string[], active: new Set<Watch>() },
 	remember: 500,
 	begin,
 	parse,

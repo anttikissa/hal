@@ -229,6 +229,7 @@ async function begin(ctx: ToolContext, patterns: string[], literal = false): Pro
 			commits: watch,
 			release: () => {
 				release()
+				if (watch) commits.state.active.delete(watch)
 				if (declared) neighbors.end(declared)
 			},
 		}

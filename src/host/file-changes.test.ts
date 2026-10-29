@@ -388,3 +388,20 @@ test('commit hook lines follow the result of the call that made the commit', asy
 		commits.committed = original
 	}
 })
+
+// Task jfy: a trailerless commit another session's call made while this
+// call ran stays with the call whose output printed its hash.
+test('a concurrent trailerless commit goes to the call that printed its hash', async () => {
+	let other = sessions.create({ cwd, model: 'fake/m' }).id
+	let git = 'git -c user.name=t -c user.email=t@example.com'
+	let wait = (f: string) => `until [ -f ${f} ]; do sleep 0.01; done`
+	let mine = bash(`printf m > m && ${git} add m && ${git} commit -m mine && touch go && ${wait('theirs')}`)
+	let theirs = bash(
+		`${wait('go')}; printf t > t && ${git} add t && ${git} commit -m theirs && touch theirs && ${wait('end')}`,
+		undefined,
+		context(other),
+	)
+	expect((await mine).commits).toMatchObject([{ subject: 'mine' }])
+	writeFileSync(`${cwd}/end`, '')
+	expect((await theirs).commits).toMatchObject([{ subject: 'theirs' }])
+})
