@@ -126,7 +126,9 @@ function values(raw: string): Values {
 	return { values: out, ...(purpose && { purpose }), ...(unclosed && { unclosed: true as const }) }
 }
 
-function split(text: string): string[] {
+// The calls in `text`. A line starts a new call only when its first word
+// is a tool name; any other line continues the call above it.
+function split(text: string, isTool: (name: string) => boolean): string[] {
 	callText.parse(text)
 	if (!text.includes('\n')) return [text]
 	let starts = [0],
@@ -160,6 +162,7 @@ function split(text: string): string[] {
 			continue
 		}
 		let name = lineStart ? /^[A-Za-z_]+(?=\s|$|\/\*)/.exec(text.slice(i))?.[0] : undefined
+		if (name && !first && !isTool(name.toLowerCase())) name = undefined
 		if (name) {
 			if (!first) starts.push(i)
 			edit = name.toLowerCase() === 'edit'

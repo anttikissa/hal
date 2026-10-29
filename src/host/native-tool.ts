@@ -128,15 +128,19 @@ function arrived(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock {
 	return toolPresentations.attach(call, call)
 }
 
+function isTool(name: string): boolean {
+	return tools.all().some((t) => t.name === name)
+}
+
 function multiple(text: string, ctx?: CallContext) {
-	return callText.split(text).map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
+	return callText.split(text, isTool).map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
 }
 
 function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string')
 		return [nativeTool.arrived(call, ctx)]
 	try {
-		let commands = callText.split(call.input.cmd)
+		let commands = callText.split(call.input.cmd, isTool)
 		if (commands.length < 2) return [nativeTool.arrived(call, ctx)]
 		let resolved = commands.map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
 		return resolved.map((resolved, i) => {

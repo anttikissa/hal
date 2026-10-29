@@ -23,7 +23,8 @@
 		'Provider calls named for a Hal tool (COMMAND { cmd } instead of tool { cmd }) stay unknown-tool errors: seen once in 15,836 calls, too rare for code (user, 15 Oct).',
 		'A provider call to an unknown tool name fails with an error teaching tool { cmd: "<TOOL> <args...>" }, so the model corrects itself in the same turn (tools.ts run).',
 		'Unknown-tool errors name their level: a top-level provider call (COMMAND { cmd }) says it is not a provider tool and shows tool { cmd: "COMMAND <args...>" }; an unknown NAME inside the cmd text says so. The user then sees which side erred, not a correct-looking COMMAND failing.',
-		'SYSTEM.md scopes testing to affected behavior: Test the behavior your change affects. Use broader tests for changes to shared code. User approved 19 Oct; edited files alone are not the test boundary.'
+		'SYSTEM.md scopes testing to affected behavior: Test the behavior your change affects. Use broader tests for changes to shared code. User approved 19 Oct; edited files alone are not the test boundary.',
+		'Bug fix: a line inside one cmd starts a new call only when its first word is a tool name (callText.split takes isTool from the host). Models treat newlines as whitespace, so a bare EDIT header path (deploy create) was split off as a call named deploy, leaving an empty EDIT.'
 	],
 	needs: ['gr', 'asp']
 }
