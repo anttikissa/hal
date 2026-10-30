@@ -9,7 +9,7 @@ import { promptChanges } from '../common/prompt-changes.ts'
 import { settings } from '../common/settings.ts'
 import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
-import type { Item } from '../common/transcript.ts'
+import { transcript, type Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { batchOrder, type Ordering } from './batch-order.ts'
 import { formView } from './form-view.ts'
@@ -39,7 +39,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let session = view.transcript?.meta.id
 	// Ordered once per transcript (updates replace its items), in slices
 	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
-	let src = view.transcript?.items ?? [],
+	let src = view.transcript ? transcript.shown(view.transcript) : [],
 		memo = frameLayout.state.ordered,
 		how = `${session} ${src.length}`
 	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src)) } }
@@ -49,6 +49,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	if (save) frameLayout.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
 	let items = memo.at.out
+	// The item that streams: the last but the open question below it.
+	let streaming = items.findLast((item) => item.type !== 'question' || item.id !== view.form?.id)
 	let calls = new Map<string, string>()
 	let toolCalls = new Map<string, NonNullable<Look['call']>>()
 	let backgroundCalls: Map<string, Item & { type: 'tool' }> | undefined
@@ -156,7 +158,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			// Counted from the end: the question above may flow on.
 			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
-			let streams = i === items.length - 1 && view.hal?.at === 'stream'
+			let streams = item === streaming && view.hal?.at === 'stream'
 			// Adjacent results continue their call's card without a reference or gap.
 			let tool: string | undefined
 			if (item.type === 'tool-result')

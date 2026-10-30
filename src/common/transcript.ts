@@ -332,6 +332,18 @@ function question(t: Transcript | undefined): (Item & { type: 'question' }) | un
 	return last.command || (t?.state.type === 'blocked' && t.state.reason === 'question') ? last : undefined
 }
 
+// `t`'s items as shown: the open question last, where the user looks,
+// even while a turn goes on below a command's question.
+function shown(t: Transcript): Item[] {
+	let open = transcript.question(t)
+	if (!open || t.items.at(-1) === open) return t.items
+	let cached = transcript.state.shown.get(t.items)
+	if (cached) return cached
+	let items = [...t.items.filter((item) => item !== open), open]
+	transcript.state.shown.set(t.items, items)
+	return items
+}
+
 // Earlier records (a snapshot's `earlier`) to show before the tail
 // until the history before it is loaded: the open question, and the
 // prompt of a turn the tail starts in the middle of.
@@ -424,6 +436,7 @@ function prepend(t: Transcript, loaded: HistoryRecord[], page: HistoryRecord[], 
 }
 
 export const transcript = {
+	state: { shown: new WeakMap<Item[], Item[]>() },
 	blockItems,
 	promptItem,
 	waitingItem,
@@ -441,6 +454,7 @@ export const transcript = {
 	boundary,
 	answered,
 	question,
+	shown,
 	standIns,
 	fromSnapshot,
 	prepend,

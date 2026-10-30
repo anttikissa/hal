@@ -14,7 +14,7 @@ import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
 import { forms } from '../../common/forms.ts'
 import { toolDetails } from '../../common/tool-details.ts'
-import type { Item } from '../../common/transcript.ts'
+import { transcript, type Item } from '../../common/transcript.ts'
 import { transcriptLive } from '../../common/transcript-live.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
@@ -88,7 +88,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	})
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
-	let items = createMemo(() => props.view.transcript?.items ?? none)
+	let items = createMemo(() => (props.view.transcript ? transcript.shown(props.view.transcript) : none))
 	let rows = createMemo<Row[]>((before) => transcriptRows.rows(items(), props.view.sent, before))
 	let tabIds = createMemo(() => props.tabs?.map((t) => t.id), {
 		equals: (a, b) => a?.length === b?.length && (a?.every((id, i) => id === b?.[i]) ?? true),
