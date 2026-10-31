@@ -4,6 +4,9 @@
 // lives in app.state (tabs, focus, asked, hidden).
 
 import { backfill } from '../common/backfill.ts'
+import { follow } from '../common/follow.ts'
+import { ansi } from './ansi.ts'
+import { tabBar } from './tab-bar.ts'
 import { markdown } from '../common/markdown.ts'
 import { connection } from '../common/connection.ts'
 import { queueEdit } from '../common/queue-edit.ts'
@@ -26,7 +29,7 @@ const tabFields = ['transcript', 'prompt', 'notice', 'form', 'editing'] as const
 function hiddenEvent(event: Event): void {
 	let st = app.state
 	if (!('sessionId' in event) || !event.sessionId) return
-	if (st.tabs.some((tab) => tab.id === event.sessionId)) {
+	if (st.background.has(event.sessionId)) {
 		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 		let kept = st.hidden.get(event.sessionId) ?? { prompt: prompt.empty() }
 		kept.transcript = transcriptLive.fold(kept.transcript, event)
@@ -42,17 +45,25 @@ function hiddenEvent(event: Event): void {
 	}
 }
 
-// Open one tail per event-loop slice, after the focused snapshot has
-// painted. The next tail starts after the previous snapshot arrives.
+// After the focused snapshot has painted, follow the tabs it may show
+// next (common/follow.ts), one open per event-loop slice upon the
+// previous snapshot, and close the others unless busy.
 function backgroundStep(): void {
 	let st = app.state
-	if (!st.painted || st.loading || st.timer || !connection.connected()) return
-	let id = backfill
-		.nearby(
-			st.tabs.map((tab) => tab.id),
-			st.focus.tab ?? '',
-		)
-		.find((id) => !st.background.has(id))
+	let shown = st.focus.tab
+	if (!st.painted || st.loading || st.timer || !connection.connected() || shown === undefined) return
+	let ids = st.tabs.map((tab) => tab.id)
+	let page = tabBar.page(st.tabs, ids.indexOf(shown), app.cols() - 2 * ansi.PAD.length - 6)
+	let wanted = follow.wanted(ids, shown, page)
+	for (let id of st.background) {
+		let kept = st.hidden.get(id)
+		if (id === shown || wanted.includes(id) || follow.busy(id) || kept?.editing || kept?.form) continue
+		st.background.delete(id)
+		st.hidden.delete(id)
+		st.older.delete(id)
+		app.send({ type: 'close', sessionId: id })
+	}
+	let id = wanted.find((id) => !st.background.has(id))
 	if (!id) return
 	st.timer = setTimeout(() => {
 		delete st.timer
@@ -137,6 +148,7 @@ function focusOn(focus: Focus): void {
 	if (tab) app.focused(tab)
 	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
 	tabSwitch.watch()
+	tabSwitch.backgroundStep()
 }
 
 // Tells the host which tab this terminal watches (task qm): the one

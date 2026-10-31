@@ -173,7 +173,9 @@ function receive(event: Event): void {
 	}
 	if (event.type === 'subscription-usage') subscriptions.apply(event.accounts, event.replace)
 	if (event.type === 'tabs' && event.subscriptions) subscriptions.apply(event.subscriptions, true)
-	if (event.type === 'snapshot') st.followed.add(event.sessionId)
+	// A snapshot sent before the host read this client's close does not
+	// follow the session again.
+	if (event.type === 'snapshot' && !connection.closing(event.sessionId)) st.followed.add(event.sessionId)
 	if (event.type === 'home') home.state.path = event.path
 	if (event.type === 'ack') st.pending.delete(event.id)
 	if (event.type === 'rejected' && event.id !== undefined) {
@@ -207,6 +209,11 @@ function connected(): boolean {
 	return connection.state.link.type === 'connected'
 }
 
+function closing(sessionId: string): boolean {
+	for (let c of connection.state.pending.values()) if (c.type === 'close' && c.sessionId === sessionId) return true
+	return false
+}
+
 function stop(): void {
 	let st = connection.state
 	st.stopped = true
@@ -232,5 +239,6 @@ export const connection = {
 	nextId,
 	send,
 	connected,
+	closing,
 	stop,
 }

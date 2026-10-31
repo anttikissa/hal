@@ -1,0 +1,10 @@
+{
+	title: 'Clients follow a bounded set of sessions',
+	spec: 'With 1000 open tabs, no client follows them all. A client follows at most 8 sessions: the shown tab and the ones it may show next, in this order: a tab pressed in the web strip (on pointer down, before the click lands), the Ctrl-N/Ctrl-P neighbors (wrapping), then tabs visible in the strip (web) or tab bar page (terminal), nearest the shown one first. After the first paint each client opens them one at a time; a followed tab that leaves the set is closed and its cached view dropped, unless it is busy: a queue edit, prompt edit or form in progress, a command pending for its session, or (web) a reading position away from the bottom. Busy tabs stay followed, so closing never releases a queue edit and a reconnect never sends a command for a session it did not reopen. Terminal and web share the rules (src/common/follow.ts). Invariant restored: reconnecting reopens a bounded set of sessions, so it never overflows the 16 MB socket send limit (task p2p) and loops reconnecting. Design and measurements: lean-tabs.md.',
+	status: 'done',
+	notes: [
+		'Reconnect order was left as is: connection.attach reopens followed sessions before resending pending commands, which already covers sessions with pending commands, and the followed set is now small. A snapshot that arrives while a close is pending no longer re-adds its session to connection.followed (connection.closing). Hidden-tab caches take events only for tabs in background, so a late snapshot after a close does not resurrect a view.'
+	],
+	needs: [],
+	foldInto: ['a7']
+}

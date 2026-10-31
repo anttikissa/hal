@@ -1,0 +1,6 @@
+{
+	title: 'First paint loads one screen of tab metadata',
+	spec: 'With 1000 tabs, a client shows its selected tab within 0.1 s on a phone: the host greets with the shown tab and the strip window first and the rest of the tab list after paint; the web strip and tab sheet render only rows on screen; tab changes go out as deltas, not the whole list; the greeting sends no session id list (clients link ids by pattern; the host answers an unknown id with no such session); the web socket uses permessage-deflate. New events need a protocol version check, since manual-update pages are not closed on deploy. Design: tasks/qrd/lean-tabs.md, phase 2.',
+	status: 'planned',
+	needs: ['qrd']
+}

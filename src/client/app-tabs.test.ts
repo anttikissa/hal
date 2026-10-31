@@ -32,23 +32,24 @@ import {
 
 useApp()
 
-test('after the focused paint, nearby tabs load in slices and switching uses their cached tails', async () => {
-	startOn(['a', 'b', 'c', 'd'], 'c')
+test('after the focused paint, at most 8 tabs load in slices, neighbors first; switching closes the ones left behind', async () => {
+	let ids = [...'abcdefghijkl']
+	startOn(ids, 'f')
 	// Starting does not hold up the focused snapshot for background work.
 	expect(sent).toEqual([])
-	await Bun.sleep(5)
-	expect(sent).toEqual([{ type: 'open', sessionId: 'b' }])
-	app.onEvent(snapshot('b'))
-	await Bun.sleep(5)
-	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'd' })
-	app.onEvent(snapshot('d'))
-	await Bun.sleep(5)
-	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'a' })
-	app.onEvent(snapshot('a'))
+	for (let i = 0; i < 10; i++) {
+		await Bun.sleep(5)
+		let last = sent.at(-1)
+		if (last?.type === 'open' && !app.state.hidden.has(last.sessionId)) app.onEvent(snapshot(last.sessionId))
+	}
+	let opened = () => sent.filter((c) => c.type === 'open').map((c) => c.sessionId)
+	expect(opened()).toEqual(['g', 'e', 'd', 'h', 'c', 'i', 'b'])
 	app.onKeys([alt('2')])
 	expect(shown()).toBe('b')
 	expect(appView.view().transcript?.meta.id).toBe('b')
-	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['b', 'd', 'a'])
+	await Bun.sleep(5)
+	expect(sent.filter((c) => c.type === 'close').map((c) => c.sessionId)).toEqual(['i'])
+	expect(opened().slice(7)).toEqual(['a'])
 })
 
 test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {

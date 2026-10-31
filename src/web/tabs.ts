@@ -6,6 +6,7 @@
 // The state lives in app.state (tabs, shown, asked).
 
 import { backfill } from '../common/backfill.ts'
+import { follow } from '../common/follow.ts'
 import { commandList } from '../common/commands/list.ts'
 import { markdown } from '../common/markdown.ts'
 import { connection } from '../common/connection.ts'
@@ -28,7 +29,7 @@ import { view } from './view.ts'
 function hiddenEvent(event: Event): void {
 	let st = app.state
 	if (!('sessionId' in event) || !event.sessionId) return
-	if (st.tabs.some((tab) => tab.id === event.sessionId)) {
+	if (st.background.has(event.sessionId)) {
 		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 		st.cached.set(event.sessionId, view.onEvent(st.cached.get(event.sessionId) ?? {}, event))
 	}
@@ -38,17 +39,16 @@ function hiddenEvent(event: Event): void {
 	}
 }
 
-// After first paint, open the nearest neighbor, then the next upon its
-// snapshot. Never poll or cap the pace after startup.
+// After first paint, follow the tabs it may show next (common/follow.ts),
+// one open at a time upon the previous snapshot, and close the others
+// unless busy.
 function backgroundStep(): void {
 	let st = app.state
-	if (!st.painted || st.loading || st.timer || !connection.connected()) return
-	let id = backfill
-		.nearby(
-			st.tabs.map((tab) => tab.id),
-			st.shown ?? '',
-		)
-		.find((id) => !st.background.has(id))
+	if (!st.painted || st.loading || st.timer || !connection.connected() || !st.shown) return
+	let ids = st.tabs.map((tab) => tab.id)
+	let wanted = follow.wanted(ids, st.shown, st.strip ?? { start: 0, end: 0 }, st.pressed)
+	for (let id of st.background) if (id !== st.shown && !wanted.includes(id) && !tabs.busy(id)) tabs.unfollow(id)
+	let id = wanted.find((id) => !st.background.has(id))
 	if (!id) return
 	st.timer = setTimeout(() => {
 		delete st.timer
@@ -57,6 +57,41 @@ function backgroundStep(): void {
 		st.loading = id
 		connection.send({ type: 'open', sessionId: id })
 	}, 0)
+}
+
+// A tab that stays followed: what closing it would lose, or a reader
+// away from its bottom, whose place a fresh tail would not hold.
+function busy(id: string): boolean {
+	let view = app.state.cached.get(id)
+	let place = scroll.state.places.get(id)
+	return follow.busy(id) || !!view?.editing || !!view?.form || (!!place && 'top' in place)
+}
+
+function unfollow(id: string): void {
+	let st = app.state
+	st.background.delete(id)
+	st.cached.delete(id)
+	st.older.delete(id)
+	connection.send({ type: 'close', sessionId: id })
+}
+
+// A tab under the pointer opens before the click lands.
+function press(id: string): void {
+	let st = app.state
+	st.pressed = id
+	if (id !== st.shown && !st.background.has(id) && connection.connected()) {
+		st.background.add(id)
+		connection.send({ type: 'open', sessionId: id })
+	}
+	tabs.backgroundStep()
+}
+
+// The strip's tabs start..end-1 are on screen.
+function onScreen(start: number, end: number): void {
+	let st = app.state
+	if (st.strip?.start === start && st.strip.end === end) return
+	st.strip = { start, end }
+	tabs.backgroundStep()
 }
 
 // Tab events, and a late snapshot of a tab shown before: handled here
@@ -229,6 +264,10 @@ function resume(): void {
 export const tabs = {
 	hiddenEvent,
 	backgroundStep,
+	busy,
+	unfollow,
+	press,
+	onScreen,
 	onEvent,
 	connected,
 	key,

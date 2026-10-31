@@ -74,6 +74,7 @@ function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; dir?:
 			style={props.tab.color === undefined ? undefined : { '--project': `var(--p${props.tab.color})` }}
 			aria-current={props.shown ? 'page' : undefined}
 			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}`}
+			onPointerDown={() => tabs.press(props.tab.id)}
 			onClick={(e) => click(e, props.tab.id, props.onPick)}
 		>
 			<span class="n">{props.n}</span>
@@ -159,6 +160,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let markStart = Math.max(0, Math.ceil(track.scrollLeft / cell - 0.9))
 		let markEnd = Math.max(end, Math.min(n, Math.floor(right / cell - 0.1) + 1))
 		setVisible({ start, end, markStart: Math.min(start, markStart), markEnd })
+		tabs.onScreen(start, end)
 	}
 	let center = (smooth: boolean) => {
 		if (!track) return

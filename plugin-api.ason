@@ -1,5 +1,5 @@
 {
-	version: 21,
+	version: 22,
 	changes: [
 		{
 			version: 2,
@@ -311,6 +311,32 @@
 					kind: 'compatible',
 					target: 'common/colors.colors',
 					description: 'Adds shared value yellow'
+				}
+			]
+		},
+		{
+			version: 22,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'common/backfill.nearby',
+					description: 'Removed; tabs to follow come from common/follow.wanted',
+					port: 'Call follow.wanted(ids, shown, onScreen) instead'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/follow',
+					description: 'New module: wanted, busy, limit'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/connection.closing',
+					description: 'Adds closing(id)'
+				},
+				{
+					kind: 'compatible',
+					target: 'client/tab-bar.page',
+					description: 'Now exported'
 				}
 			]
 		}

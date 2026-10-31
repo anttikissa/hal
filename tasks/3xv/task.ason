@@ -1,0 +1,6 @@
+{
+	title: 'Snapshots hold one screen, not 256 KB',
+	spec: 'A snapshot holds about two screens of display records within a byte cap that covers the whole serialized snapshot (earlier, inbox, draft, live turn, tool output, rebase data). Finished records are clipped to previews; editing, copying and long cards fetch the full record first (record command), and Find stays on the host. A per-session preview index written at append time lets the host build a snapshot without parsing whole records. Reopening an evicted tab loads around its saved record anchor. Design: tasks/qrd/lean-tabs.md, phase 3.',
+	status: 'planned',
+	needs: ['qrd']
+}

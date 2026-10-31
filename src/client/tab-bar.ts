@@ -204,4 +204,4 @@ function overRow(list: Tab[], focused: string | undefined, cols: number): string
 	return ansi.PAD + out.join('')
 }
 
-export const tabBar = { indicator, markPart, blinks, hints, fit, row, overRow }
+export const tabBar = { indicator, markPart, blinks, hints, page, fit, row, overRow }

@@ -57,6 +57,9 @@ export type AppState = {
 	updateAvailable?: boolean
 	loading?: string
 	timer?: ReturnType<typeof setTimeout>
+	// The strip's tabs on screen, and the tab last pressed (web/tabs.ts).
+	strip?: { start: number; end: number }
+	pressed?: string
 }
 
 function createState(): AppState {
