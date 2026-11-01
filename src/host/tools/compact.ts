@@ -1,6 +1,7 @@
 // Hands working state to the next context without deleting session history.
 import { contextTransitions } from '../context-transitions.ts'
 import { history } from '../history.ts'
+import { nativeTool } from '../native-tool.ts'
 import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
@@ -8,6 +9,12 @@ export const tool: Tool = {
 	syntax: {
 		summary: 'replace active context with your working-state checkpoint; full history stays',
 		usage: ['COMPACT { summary: "..." }'],
+		// Unquoted text after leading /* comments is the summary as written.
+		resolve(raw) {
+			let text = raw.replace(/^(\s*\/\*[\s\S]*?\*\/)*\s*/, '')
+			if (!text || '{["\'`'.includes(text[0]!)) return { name: 'compact', input: nativeTool.generic(tool, raw) }
+			return { name: 'compact', input: { summary: text.trimEnd() } }
+		},
 	},
 	description:
 		'Compact at a task boundary after a large investigation or before context gets too large. Call alone, after receiving all other tool results. Write a concise handoff: user goals, unresolved requests and constraints; decisions and findings (facts versus hypotheses); changes, actual verification and blockers; a next action consistent with that state; file and READ_ENTRY references. Reconcile any previous checkpoint with newer evidence. Do not restate system or project instructions. The current requests stay verbatim. After this exchange settles, the checkpoint replaces earlier model context and you continue in the same session. Full history and undo remain available.',

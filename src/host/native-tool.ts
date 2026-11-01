@@ -153,7 +153,7 @@ function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 			return toolPresentations.attach(member, member)
 		})
 	} catch {
-		return [toolPresentations.attach(call, call)]
+		return [nativeTool.arrived(call, ctx)]
 	}
 }
 

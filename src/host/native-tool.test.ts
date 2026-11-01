@@ -134,6 +134,10 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 		name: 'command',
 		input: { command: '/rename Fix it' },
 	})
+	expect(nativeTool.resolve('COMPACT /* Handoff */\n## State\nREAD "a.ts" next')).toEqual({
+		name: 'compact',
+		input: { summary: '## State\nREAD "a.ts" next' },
+	})
 	expect(nativeTool.resolve('HELP edit')).toEqual({ name: 'help', input: { name: 'edit' } })
 	// An unclosed comment ends at its line, but never stands in for arguments.
 	expect(nativeTool.resolve('BASH "ls" /* list')).toEqual({
