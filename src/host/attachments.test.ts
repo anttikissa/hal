@@ -54,7 +54,7 @@ test('an attached png reaches both providers as an image; history keeps only its
 	expect(file).toContain(attached.blob)
 })
 
-test.if(process.platform === 'darwin')('a png wider than 2576 px reaches Anthropic shrunk; the blob stays', async () => {
+test('a png wider than 2576 px reaches Anthropic shrunk; the blob stays', async () => {
 	let { crc32, deflateSync } = await import('zlib')
 	let chunk = (type: string, data: Buffer) => {
 		let body = Buffer.concat([Buffer.from(type, 'latin1'), data])
@@ -76,7 +76,9 @@ test.if(process.platform === 'darwin')('a png wider than 2576 px reaches Anthrop
 	let stored = blobs.store(id, 'image/png', wide.toString('base64'))
 	let req = {
 		model: 'm',
-		messages: [{ role: 'user' as const, blocks: [{ type: 'image' as const, blob: stored.blob, mediaType: 'image/png' }] }],
+		messages: [
+			{ role: 'user' as const, blocks: [{ type: 'image' as const, blob: stored.blob, mediaType: 'image/png' }] },
+		],
 		image: (blob: string, maxEdge?: number) => blobs.base64(id, blob, maxEdge),
 	}
 	let sent = Buffer.from(anthropic.toMessages(req).at(-1).content[0].source.data, 'base64')

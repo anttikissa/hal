@@ -17,7 +17,8 @@ Tests: an attached png reaches both providers' request bodies as an image; histo
 		'Blob ids are 12 lowercase hex digits; blobs.find tries each known extension, so the id is never joined to anything taken from a request. Stored bytes are checked against the media type (magic numbers, or valid UTF-8 for text/plain).',
 		'The terminal image label links via itemView.itemLines when the session is known; without one it stays plain text.',
 		'Image items keep their own keys (#26.1); frame.layout draws them in the preceding prompt card and draws nothing for them alone; a link to one scrolls to that card.',
-		'UI exception (user, 2026-10-03): the web keeps one card per image, showing the image itself; only the terminal groups image labels inside the prompt card.'
+		'UI exception (user, 2026-10-03): the web keeps one card per image, showing the image itself; only the terminal groups image labels inside the prompt card.',
+		'Invariant: an image over 2576 px reaches Anthropic shrunk on every platform. Shrinking used macOS sips only, so on Linux a session with a large screenshot failed every request with HTTP 400 (many-image requests reject sides over 3000 px). blobs.shrunk() now runs scripts/shrink-image.ts (Bun.Image, in a child process because request building is synchronous); a result that would change format (GIF to PNG) is dropped and the original goes.'
 	],
 	needs: ['yq', '1b']
 }

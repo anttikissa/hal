@@ -135,9 +135,9 @@ function text(sessionId: string, blob: string): string {
 }
 
 // An image's bytes as base64, for a provider request. An image with a
-// side over `maxEdge` goes as a copy shrunk by macOS sips, kept in
-// sessions/<id>/shrunk/ so every request sends the same bytes. Without
-// sips, or if it fails, the original goes.
+// side over `maxEdge` goes as a copy shrunk by scripts/shrink-image.ts,
+// kept in sessions/<id>/shrunk/ so every request sends the same bytes.
+// If shrinking fails, the original goes.
 function base64(sessionId: string, blob: string, maxEdge?: number): string | undefined {
 	let found = blobs.find(sessionId, blob)
 	if (!found) return undefined
@@ -149,12 +149,12 @@ function base64(sessionId: string, blob: string, maxEdge?: number): string | und
 }
 
 function shrunk(sessionId: string, path: string, maxEdge: number): Buffer | undefined {
-	if (process.platform !== 'darwin') return undefined
 	let dir = `${paths.sessionDir(sessionId)}/shrunk`
 	let name = `${maxEdge}-${path.split('/').pop()}`
 	if (!existsSync(`${dir}/${name}`)) {
 		mkdirSync(dir, { recursive: true, mode: 0o700 })
-		let r = Bun.spawnSync(['sips', '-Z', String(maxEdge), path, '--out', `${dir}/.${name}`], {
+		let script = `${import.meta.dir}/../../scripts/shrink-image.ts`
+		let r = Bun.spawnSync([process.execPath, script, path, String(maxEdge), `${dir}/.${name}`], {
 			stdout: 'ignore',
 			stderr: 'ignore',
 		})
