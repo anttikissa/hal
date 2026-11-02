@@ -10,15 +10,15 @@
 // documented skip value, so history from other models stays valid.
 
 import { blocks, type ReplayBlock, type StopReason, type StreamEvent, type Usage } from '../common/blocks.ts'
-import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { provider, type ProviderImage, type ProviderRequest, type SseMessage } from './provider.ts'
 
 const PREFIX = 'gemini:'
 const SKIP = 'skip_thought_signature_validator'
 
-function image(mediaType: string, data: string | undefined): unknown {
-	return data === undefined
-		? { text: provider.imageNote('its file is gone') }
-		: { inlineData: { mimeType: mediaType, data } }
+function image(sent: ProviderImage | undefined): unknown {
+	return sent
+		? { inlineData: { mimeType: sent.mediaType, data: sent.data } }
+		: { text: provider.imageNote('its file is gone') }
 }
 
 function modelParts(list: ReplayBlock[]): any[] {
@@ -56,11 +56,11 @@ function contents(req: ProviderRequest): unknown[] {
 		let images: unknown[] = []
 		for (let b of m.blocks) {
 			if (b.type === 'text') parts.push({ text: b.text })
-			else if (b.type === 'image') parts.push(image(b.mediaType, req.image?.(b.blob)))
+			else if (b.type === 'image') parts.push(image(req.image?.(b.blob)))
 			else {
 				let output = b.isError ? `Error: ${b.output}` : b.output
 				parts.push({ functionResponse: { id: b.id, name: names.get(b.id) ?? '', response: { output } } })
-				for (let i of blocks.resultImages(b)) images.push(image(i.mediaType, req.image?.(i.blob)))
+				for (let i of blocks.resultImages(b)) images.push(image(req.image?.(i.blob)))
 			}
 		}
 		parts.push(...images)

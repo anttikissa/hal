@@ -112,7 +112,7 @@ test('image is a stored image result replayable to Anthropic, not base64 history
 			{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read', input: {} }] },
 			{ role: 'user', blocks: [result] },
 		],
-		image: (id) => blobs.base64('s', id),
+		image: (id) => blobs.image('s', id),
 	})
 	expect(messages[1].content[0].content[1].source.data).toBe(png.toString('base64'))
 	response = () => new Response(Buffer.alloc(attachments.maxBytes + 1), { headers: { 'content-type': 'image/png' } })

@@ -68,7 +68,7 @@ async function* turn(
 			window: models.contextWindow(modelId),
 			model: modelId,
 		}),
-		image: (blob: string, maxEdge?: number) => blobs.base64(id, blob, maxEdge),
+		image: (blob: string, maxEdge?: number) => blobs.image(id, blob, maxEdge),
 	}
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined

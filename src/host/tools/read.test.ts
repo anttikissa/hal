@@ -51,7 +51,7 @@ test('local images are detected by bytes and stored for replay after source dele
 		expect(result.image).toMatchObject({ type: 'image', mediaType, bytes: bytes.length })
 		expect(result.output).toContain(path)
 		rmSync(path)
-		expect(blobs.base64('s', result.image!.blob)).toBe(bytes.toString('base64'))
+		expect(blobs.image('s', result.image!.blob)?.data).toBe(bytes.toString('base64'))
 	}
 })
 
@@ -188,7 +188,7 @@ test('mixed batches retain every durable image, error and file version across hi
 	let record = history.append('s', { type: 'user', blocks: [result] })
 	let records = await history.read('s')
 	let messages = replay.toMessages(records)
-	let req = { model: 'test', messages, image: (blob: string) => blobs.base64('s', blob) }
+	let req = { model: 'test', messages, image: (blob: string) => blobs.image('s', blob) }
 	let expected = [png, gif].map((bytes) => bytes.toString('base64'))
 	let content: any[] = anthropic.toMessages(req).at(-1).content
 	expect(content[0].is_error).toBe(true)
@@ -206,7 +206,7 @@ test('mixed batches retain every durable image, error and file version across hi
 		{ type: 'tool_call', id: 'recover', name: 'read_entry', input: { id: `t${record.n}` } },
 		ctx(),
 	)
-	expect(blocks.resultImages(recovered).map((b) => blobs.base64('s', b.blob))).toEqual(expected)
+	expect(blocks.resultImages(recovered).map((b) => blobs.image('s', b.blob)?.data)).toEqual(expected)
 	let shown = transcript.recordItems(record, 0)
 	expect(shown.filter((b) => b.type === 'image').map((b) => b.blob)).toEqual(
 		blocks.resultImages(result).map((b) => b.blob),
@@ -234,7 +234,7 @@ test('mixed batches retain every durable image, error and file version across hi
 	)
 	expect(partial.isError).toBe(true)
 	expect(partial.output).toContain(`image blob s/${missing.blob} not found`)
-	expect(blocks.resultImages(partial).map((b) => blobs.base64('s', b.blob))).toEqual([expected[1]])
+	expect(blocks.resultImages(partial).map((b) => blobs.image('s', b.blob)?.data)).toEqual([expected[1]])
 })
 
 test('successful image batches and legacy single-image records share replay and display behavior', async () => {

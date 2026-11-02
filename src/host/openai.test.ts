@@ -101,7 +101,7 @@ test('history maps to Responses input, replaying only its own reasoning', async 
 		{ role: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: 'boom', isError: true }] },
 	]
 	await run(messages, {
-		image: (blob: string) => (blob === 'b1' ? 'AAAA' : undefined),
+		image: (blob: string) => (blob === 'b1' ? { mediaType: 'image/png', data: 'AAAA' } : undefined),
 		tools: [{ name: 'bash', description: 'run', inputSchema: { type: 'object' } }],
 	})
 	let body = fake.seen[0]!.body

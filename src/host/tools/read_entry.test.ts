@@ -71,7 +71,7 @@ test('history addresses recover complete output and match each displayed image s
 		[2, gif],
 	] as const) {
 		let result = await read(`source/${record.n}.${slot}`)
-		expect(blobs.base64('reader', blocks.resultImages(result)[0]!.blob)).toBe(expected)
+		expect(blobs.image('reader', blocks.resultImages(result)[0]!.blob)?.data).toBe(expected)
 	}
 	expect((await read(`source/${record.n}.0`)).output).toBe('two images')
 	expect((await read(`source/${record.n}.3`, { offset: 151, limit: 1 })).output).toStartWith('payload 150\n')

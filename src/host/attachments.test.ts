@@ -79,7 +79,7 @@ test('a png wider than 2576 px reaches Anthropic shrunk; the blob stays', async 
 		messages: [
 			{ role: 'user' as const, blocks: [{ type: 'image' as const, blob: stored.blob, mediaType: 'image/png' }] },
 		],
-		image: (blob: string, maxEdge?: number) => blobs.base64(id, blob, maxEdge),
+		image: (blob: string, maxEdge?: number) => blobs.image(id, blob, maxEdge),
 	}
 	let sent = Buffer.from(anthropic.toMessages(req).at(-1).content[0].source.data, 'base64')
 	expect(sent.readUInt32BE(16)).toBe(2576)
@@ -195,7 +195,7 @@ test('a named image waits in /tmp under its name; its prompt copies it into the 
 	c.conn.send({ type: 'submit', sessionId: id, text: amending(id, `and now? [image/${name}]`) })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(blocks[1])
-	expect(calls[1]!.input.image(blocks[1].blob)).toBe(png64)
+	expect(calls[1]!.input.image(blocks[1].blob).data).toBe(png64)
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 2)
 	c.conn.send({ type: 'submit', sessionId: id, text: amending(id, 'never mind') })

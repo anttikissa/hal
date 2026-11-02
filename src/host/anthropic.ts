@@ -47,9 +47,9 @@ function redactedData(signature: string): string | undefined {
 function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
 	if (b.type === 'image') {
-		let data = req.image?.(b.blob, 2576)
-		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
-		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
+		let image = req.image?.(b.blob, 2576)
+		if (!image) return { type: 'text', text: provider.imageNote('Hal cannot read or shrink it') }
+		return { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }
 	}
 	let images = b.isError ? [] : blocks.resultImages(b)
 	let content = images.length

@@ -12,7 +12,7 @@
 // never the bytes; providers read them through base64() per request.
 
 import type { Event } from '../common/protocol.ts'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { attachments, type Marker } from '../common/attachments.ts'
 import type { ImageBlock, UserBlock } from '../common/blocks.ts'
 import { imageDimensions } from '../common/image-dimensions.ts'
@@ -134,34 +134,28 @@ function text(sessionId: string, blob: string): string {
 	return found.bytes.toString('utf8')
 }
 
-// An image's bytes as base64, for a provider request. An image with a
-// side over `maxEdge` goes as a copy shrunk by scripts/shrink-image.ts,
-// kept in sessions/<id>/shrunk/ so every request sends the same bytes.
-// If shrinking fails, the original goes.
-function base64(sessionId: string, blob: string, maxEdge?: number): string | undefined {
+// An image as a provider request sends it. An image with a side over
+// `maxEdge` goes as a copy shrunk by scripts/shrink-image.ts (a GIF's is
+// a PNG), kept in sessions/<id>/shrunk/ so every request sends the same
+// bytes. Undefined if the file is gone or cannot be shrunk.
+function image(sessionId: string, blob: string, maxEdge = Infinity): { mediaType: string; data: string } | undefined {
 	let found = blobs.find(sessionId, blob)
 	if (!found) return undefined
-	let bytes: Buffer = readFileSync(found.path)
-	let size = maxEdge ? imageDimensions.read(bytes, found.mediaType) : undefined
-	if (maxEdge && size && Math.max(size.width, size.height) > maxEdge)
-		bytes = blobs.shrunk(sessionId, found.path, maxEdge) ?? bytes
-	return bytes.toString('base64')
-}
-
-function shrunk(sessionId: string, path: string, maxEdge: number): Buffer | undefined {
-	let dir = `${paths.sessionDir(sessionId)}/shrunk`
-	let name = `${maxEdge}-${path.split('/').pop()}`
-	if (!existsSync(`${dir}/${name}`)) {
-		mkdirSync(dir, { recursive: true, mode: 0o700 })
+	let bytes = readFileSync(found.path)
+	let size = imageDimensions.read(bytes, found.mediaType)
+	if (!size || Math.max(size.width, size.height) <= maxEdge)
+		return { mediaType: found.mediaType, data: bytes.toString('base64') }
+	let path = `${paths.sessionDir(sessionId)}/shrunk/${maxEdge}-${found.path.split('/').pop()}`
+	if (!existsSync(path)) {
 		let script = `${import.meta.dir}/../../scripts/shrink-image.ts`
-		let r = Bun.spawnSync([process.execPath, script, path, String(maxEdge), `${dir}/.${name}`], {
-			stdout: 'ignore',
-			stderr: 'ignore',
-		})
-		if (r.exitCode !== 0) return void rmSync(`${dir}/.${name}`, { force: true })
-		renameSync(`${dir}/.${name}`, `${dir}/${name}`)
+		let r = Bun.spawnSync([process.execPath, script, found.path, String(maxEdge)], { stderr: 'ignore' })
+		if (r.exitCode !== 0) return undefined
+		mkdirSync(`${paths.sessionDir(sessionId)}/shrunk`, { recursive: true, mode: 0o700 })
+		writeFileSync(`${path}.tmp`, r.stdout)
+		renameSync(`${path}.tmp`, path)
 	}
-	return readFileSync(`${dir}/${name}`)
+	let mediaType = found.mediaType === 'image/gif' ? 'image/png' : found.mediaType
+	return { mediaType, data: readFileSync(path).toString('base64') }
 }
 
 // The blob a marker names, if it is this session's and of its kind. A
@@ -279,7 +273,6 @@ function pasteText(sessionId: string, name: string): Event & { type: 'paste-text
 
 export const blobs = {
 	pasteMax: 1_000_000,
-	shrunk,
 	pasteText,
 	dir,
 	looksLike,
@@ -292,7 +285,7 @@ export const blobs = {
 	find,
 	read,
 	text,
-	base64,
+	image,
 	named,
 	unknown,
 	resolve,

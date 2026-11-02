@@ -14,12 +14,18 @@ import { auth } from './auth.ts'
 import { provider as catalog } from './providers/openai.ts'
 import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
-import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { provider, type ProviderImage, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
 import { openaiWs } from './openai-ws.ts'
 import { tools } from './tools.ts'
 
 const claims = (token: string) => catalog.claims(token)
+
+function imagePart(image: ProviderImage | undefined): unknown {
+	return image
+		? { type: 'input_image', detail: 'auto', image_url: `data:${image.mediaType};base64,${image.data}` }
+		: { type: 'input_text', text: provider.imageNote('its file is gone') }
+}
 
 function input(req: ProviderRequest): unknown[] {
 	let out: unknown[] = []
@@ -29,23 +35,9 @@ function input(req: ProviderRequest): unknown[] {
 			for (let b of m.blocks) {
 				if (b.type === 'tool_result') {
 					out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
-					for (let image of blocks.resultImages(b)) {
-						let data = req.image?.(image.blob)
-						parts.push(
-							data === undefined
-								? { type: 'input_text', text: provider.imageNote('its file is gone') }
-								: { type: 'input_image', detail: 'auto', image_url: `data:${image.mediaType};base64,${data}` },
-						)
-					}
+					for (let i of blocks.resultImages(b)) parts.push(imagePart(req.image?.(i.blob)))
 				} else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })
-				else {
-					let data = req.image?.(b.blob)
-					parts.push(
-						data === undefined
-							? { type: 'input_text', text: provider.imageNote('its file is gone') }
-							: { type: 'input_image', detail: 'auto', image_url: `data:${b.mediaType};base64,${data}` },
-					)
-				}
+				else parts.push(imagePart(req.image?.(b.blob)))
 			}
 			if (parts.length) out.push({ role: 'user', content: parts })
 			continue

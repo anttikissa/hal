@@ -24,22 +24,17 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 			// Tool results must directly follow the assistant's tool_calls.
 			let texts: string[] = []
 			let parts: unknown[] = []
+			let addImage = (blob: string) => {
+				let image = images ? req.image?.(blob) : undefined
+				if (image) parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.data}` } })
+				else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
+			}
 			for (let b of msg.blocks) {
 				if (b.type === 'text') texts.push(b.text)
 				else if (b.type === 'tool_result') {
 					out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
-					for (let image of blocks.resultImages(b)) {
-						let data = images ? req.image?.(image.blob) : undefined
-						if (data !== undefined)
-							parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${data}` } })
-						else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
-					}
-				} else {
-					let data = images ? req.image?.(b.blob) : undefined
-					if (data !== undefined)
-						parts.push({ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${data}` } })
-					else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
-				}
+					for (let i of blocks.resultImages(b)) addImage(i.blob)
+				} else addImage(b.blob)
 			}
 			let text = texts.join('\n\n')
 			if (parts.length) out.push({ role: 'user', content: [...(text ? [{ type: 'text', text }] : []), ...parts] })

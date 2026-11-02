@@ -23,10 +23,10 @@ export type ProviderRequest = {
 	messages: Message[]
 	tools?: ToolDef[]
 	maxTokens?: number
-	// An image block's bytes as base64 (the session's blob, task 2a),
-	// read as the request is built; undefined if they are gone. With
-	// `maxEdge`, a larger image is shrunk to fit where possible.
-	image?: (blob: string, maxEdge?: number) => string | undefined
+	// An image block as sent (the session's blob, task 2a), read as the
+	// request is built. With `maxEdge`, a larger image is shrunk to fit.
+	// Undefined if it is gone or cannot be shrunk.
+	image?: (blob: string, maxEdge?: number) => ProviderImage | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
 	cacheId?: string
@@ -428,6 +428,8 @@ async function* stream(
 function register(name: string, p: Provider): void {
 	provider.state.providers[name] = p
 }
+
+export type ProviderImage = { mediaType: string; data: string }
 
 export const provider = {
 	// Told to the model in place of an image a request cannot carry.

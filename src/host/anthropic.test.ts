@@ -235,7 +235,7 @@ test('failed tool results keep text and move all images after sibling results', 
 	let content = anthropic.toMessages({
 		model: 'claude-test',
 		messages,
-		image: (blob) => (blob === 'gone' ? undefined : blob),
+		image: (blob) => (blob === 'gone' ? undefined : { mediaType: 'image/png', data: blob }),
 	})[0].content
 	expect(content.slice(0, 3)).toEqual([
 		{ type: 'tool_result', tool_use_id: 'failed', content: 'complete failure\n/path/missing', is_error: true },
@@ -252,7 +252,7 @@ test('failed tool results keep text and move all images after sibling results', 
 	expect(content.slice(3)).toEqual([
 		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'one' } },
 		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'two' } },
-		{ type: 'text', text: provider.imageNote('its file is gone'), cache_control: { type: 'ephemeral' } },
+		{ type: 'text', text: provider.imageNote('Hal cannot read or shrink it'), cache_control: { type: 'ephemeral' } },
 	])
 })
 

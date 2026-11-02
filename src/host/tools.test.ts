@@ -260,7 +260,7 @@ test('read_blob resolves text and images and rejects unknown or escaping referen
 		let image = blobs.store('s', 'image/png', Buffer.from('89504e470d0a1a0a0000', 'hex').toString('base64'))
 		let r = await blobRun(image.blob)
 		expect(r.image?.mediaType).toBe('image/png')
-		expect(blobs.base64('s', r.image!.blob)).toBe(blobs.base64('s', image.blob))
+		expect(blobs.image('s', r.image!.blob)?.data).toBe(blobs.image('s', image.blob)?.data)
 		for (let id of [
 			'unknown',
 			' ../etc/passwd ',
