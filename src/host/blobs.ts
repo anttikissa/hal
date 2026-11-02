@@ -134,10 +134,18 @@ function text(sessionId: string, blob: string): string {
 	return found.bytes.toString('utf8')
 }
 
+// Shrinks the image at argv[1] to fit a square of side argv[2] and writes
+// it to stdout. A child process, because Bun.Image is async and provider
+// requests are built synchronously. Its source lives here, not in a
+// script file, so a running host never pairs with a newer script.
+// Bun.Image writes a GIF as PNG.
+const SHRINK = `let [path, side] = process.argv.slice(1)
+await Bun.write(Bun.stdout, await new Bun.Image(path).resize(+side, +side, { fit: 'inside' }).bytes())`
+
 // An image as a provider request sends it. An image with a side over
-// `maxEdge` goes as a copy shrunk by scripts/shrink-image.ts (a GIF's is
-// a PNG), kept in sessions/<id>/shrunk/ so every request sends the same
-// bytes. Undefined if the file is gone or cannot be shrunk.
+// `maxEdge` goes as a copy shrunk by SHRINK (a GIF's is a PNG), kept in
+// sessions/<id>/shrunk/ so every request sends the same bytes. Undefined
+// if the file is gone or cannot be shrunk.
 function image(sessionId: string, blob: string, maxEdge = Infinity): { mediaType: string; data: string } | undefined {
 	let found = blobs.find(sessionId, blob)
 	if (!found) return undefined
@@ -147,8 +155,7 @@ function image(sessionId: string, blob: string, maxEdge = Infinity): { mediaType
 		return { mediaType: found.mediaType, data: bytes.toString('base64') }
 	let path = `${paths.sessionDir(sessionId)}/shrunk/${maxEdge}-${found.path.split('/').pop()}`
 	if (!existsSync(path)) {
-		let script = `${import.meta.dir}/../../scripts/shrink-image.ts`
-		let r = Bun.spawnSync([process.execPath, script, found.path, String(maxEdge)], { stderr: 'ignore' })
+		let r = Bun.spawnSync([process.execPath, '-e', SHRINK, found.path, String(maxEdge)], { stderr: 'ignore' })
 		if (r.exitCode !== 0) return undefined
 		mkdirSync(`${paths.sessionDir(sessionId)}/shrunk`, { recursive: true, mode: 0o700 })
 		writeFileSync(`${path}.tmp`, r.stdout)
