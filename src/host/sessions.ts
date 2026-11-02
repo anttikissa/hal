@@ -53,6 +53,7 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string')
 		throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
+	if (data.timezone !== undefined && typeof data.timezone !== 'string') throw new Error(`${path}: invalid timezone`)
 	if (
 		data.startingState !== undefined &&
 		(!data.startingState ||

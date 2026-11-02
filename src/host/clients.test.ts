@@ -1,9 +1,12 @@
-import { afterEach, expect, test } from 'bun:test'
+import { expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
 import { clients } from './clients.ts'
 import { host } from './host.ts'
+import { useHost } from './host-fixture.test.ts'
+import { sessions } from './sessions.ts'
+import { tabs } from './tabs.ts'
 
-afterEach(() => host.reset())
+useHost()
 
 test('the diagram lists live peers beside the host and others below, gone ones marked, and forgets after a day', () => {
 	let now = Date.now()
@@ -55,4 +58,18 @@ test('a reported timezone is kept only when valid, and a session hears its lates
 	clients.input(a, { type: 'answer', sessionId: 's1' })
 	expect(clients.timezone('s1')).toBe('Europe/Helsinki')
 	expect(clients.timezone('s2')).toBeUndefined()
+})
+
+test('a session keeps its last sender zone when no client is connected, as after a host restart', () => {
+	let id = tabs.create('/tmp')
+	let a = clients.join(new Set([id]))
+	clients.input(a, { type: 'tab-start', timezone: 'Europe/Helsinki' })
+	clients.input(a, { type: 'submit', sessionId: id })
+	clients.reset()
+	sessions.close(id)
+	sessions.open(id)
+	expect(clients.timezone(id)).toBe('Europe/Helsinki')
+	let b = clients.join(new Set([id]))
+	clients.input(b, { type: 'tab-start', timezone: 'Asia/Tokyo' })
+	expect(clients.timezone(id)).toBe('Asia/Tokyo')
 })

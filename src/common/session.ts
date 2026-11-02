@@ -12,6 +12,8 @@ export interface SessionMeta {
 	model: string
 	// Explicit request override; omitted uses provider policy.
 	effort?: string
+	// IANA zone of the client that last gave input (task wq).
+	timezone?: string
 	// ISO timestamp.
 	createdAt: string
 	startingState?: { cwd: string; model: string; autoclose: boolean }

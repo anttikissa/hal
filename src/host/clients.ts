@@ -5,14 +5,16 @@
 // /clients draws them (src/host/commands/clients.ts).
 
 import { hostname } from 'os'
+import { liveFiles } from './live-file.ts'
 import { serverLog } from './server-log.ts'
+import { sessions } from './sessions.ts'
 
 export type Kind = 'own' | 'peer' | 'remote' | 'web'
 export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
 // `open`: the sessions the connection follows, live; `followed`: what
 // it followed when it left.
 // `timezone`: the IANA zone the client reported on connecting (task wq),
-// for this connection only: never persisted or logged.
+// never logged. A sender's zone is also saved in its session (meta.timezone).
 export type ClientRecord = ClientInfo & {
 	connectedAt: number
 	lastAt: number
@@ -93,17 +95,25 @@ function input(rec: ClientRecord, c: { type: string; sessionId?: string; timezon
 		if (tz) rec.timezone = tz
 		else delete rec.timezone
 	}
-	if ((c.type === 'submit' || c.type === 'answer') && c.sessionId) clients.state.senders.set(c.sessionId, rec)
+	if ((c.type === 'submit' || c.type === 'answer') && c.sessionId) {
+		clients.state.senders.set(c.sessionId, rec)
+		let meta = sessions.state.open.get(c.sessionId)
+		if (meta && rec.timezone && meta.timezone !== rec.timezone) {
+			meta.timezone = rec.timezone
+			liveFiles.save(meta)
+		}
+	}
 }
 
 // The zone of the client that last gave session `id` input, else of a
-// connected one following it.
+// connected one following it, else the zone its last sender saved, which
+// outlives a host restart.
 function timezone(id: string): string | undefined {
 	let sender = clients.state.senders.get(id)?.timezone
 	if (sender) return sender
 	for (let rec of clients.state.records)
 		if (rec.goneAt === undefined && rec.open.has(id) && rec.timezone) return rec.timezone
-	return undefined
+	return clients.zone(sessions.state.open.get(id)?.timezone)
 }
 
 function touch(rec: ClientRecord): void {
