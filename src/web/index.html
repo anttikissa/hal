@@ -2932,6 +2932,10 @@
 			.Tabs .track .tab {
 				scroll-snap-align: start;
 			}
+			/* Snap would undo the small steps that scroll a dragged tab along. */
+			.Tabs .strip.dragging .track {
+				scroll-snap-type: none;
+			}
 			.Tabs .track:not(:has(.name)) .tab {
 				flex-grow: 1;
 			}
@@ -2984,6 +2988,20 @@
 				right: 20%;
 				height: 3px;
 				background: var(--project);
+			}
+			.Tabs .strip .tab[data-drop]::after {
+				content: '';
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				width: 3px;
+				background: var(--active-fg);
+			}
+			.Tabs .strip .tab[data-drop='before']::after {
+				left: 0;
+			}
+			.Tabs .strip .tab[data-drop='after']::after {
+				right: 0;
 			}
 			.Tabs .strip .tab[aria-current] {
 				background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent);

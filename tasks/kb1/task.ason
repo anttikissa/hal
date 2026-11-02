@@ -1,0 +1,9 @@
+{
+	title: 'Drag web strip tabs to reorder them',
+	spec: 'On desktop web, dragging a tab in the strip and dropping it on the strip moves it there through the host tab-move command, so every client sees the new order. The page does not reorder optimistically; it shows the host broadcast. While a drag is over the strip, a 3px active-color bar marks the gap it would drop into, found from the cell centers; none shows where a drop would change nothing. A drop anywhere on the strip counts, so left of the first tab means first and right of the last means last. Tab links keep native link drags, so a tab can still be dragged into another window or the bookmarks. Near or over an edge of an overflowing strip, the drag scrolls it 8 cells a second, with scroll snap off during the drag. A drag records nothing in the transcript (task yg9). Touch reordering (long press) and the All tabs sheet are not covered.',
+	status: 'done',
+	notes: [
+		'Chrome cancels a drop unless the target cancels dragenter as well as dragover: without dragenter, a release on an element just entered (the menu icon) was lost. Chrome does not autoscroll the strip during a drag, and proximity snap pulled small programmatic steps back to 0, hence the dragging class. track.scrollWidth / n overstates the cell when few tabs leave the track wider than its cells; gaps use cell rects. Checked once in headless Chromium with real CDP mouse drags (move right, move to first via a drop on the menu button, 40-tab overflow scroll to last); the throwaway test was deleted.'
+	],
+	needs: ['s3', 'ce']
+}

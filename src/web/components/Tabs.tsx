@@ -3,7 +3,8 @@
 // scrolls independently of selection (task ce); terminal paging stays in
 // common/tab-pages.ts.
 // Native horizontal momentum scrolling; edge buttons provide secondary paging.
-// Tab links retain native Cmd- and middle-click behavior.
+// Tab links retain native Cmd- and middle-click behavior, and native link
+// drags; a drag dropped on the strip reorders the tabs.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
 import { home } from '../../common/home.ts'
@@ -66,11 +67,21 @@ function click(e: MouseEvent, id: string, then?: () => void): void {
 	then?.()
 }
 
-function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; dir?: boolean; onPick?: () => void }) {
+function Link(props: {
+	tab: Tab
+	n: number
+	shown: boolean
+	name: boolean
+	dir?: boolean
+	drop?: 'before' | 'after'
+	onPick?: () => void
+}) {
 	return (
 		<a
 			href={router.format(props.tab.id)}
 			class="tab"
+			data-id={props.tab.id}
+			data-drop={props.drop}
 			style={props.tab.color === undefined ? undefined : { '--project': `var(--p${props.tab.color})` }}
 			aria-current={props.shown ? 'page' : undefined}
 			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}`}
@@ -213,12 +224,63 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		setOpen(false)
 		tabs.newTab()
 	}
+	// The strip tab being dragged, and the gap (0..n) it would drop into.
+	let dragged: string | undefined
+	let [gap, setGap] = createSignal<number>()
+	let lastOver = 0
+	let gapAt = (e: DragEvent) =>
+		[...track.children].filter((t) => {
+			let r = t.getBoundingClientRect()
+			return r.left + r.width / 2 < e.clientX
+		}).length
+	let drop = (i: number): 'before' | 'after' | undefined => {
+		let g = gap()
+		let from = props.tabs.findIndex((t) => t.id === dragged)
+		if (g === undefined || g === from || g === from + 1) return undefined
+		if (g === i) return 'before'
+		if (g === props.tabs.length && i === g - 1) return 'after'
+	}
+	let over = (e: DragEvent) => {
+		if (!dragged) return
+		e.preventDefault()
+		e.dataTransfer!.dropEffect = 'move'
+		// Browsers do not autoscroll the strip; dragover repeats while the pointer
+		// rests. It scrolls 8 cells a second, however often dragover fires.
+		let now = performance.now()
+		let step = (Math.min(100, now - lastOver) * layout().cell * 8) / 1000
+		lastOver = now
+		let { left, right } = track.getBoundingClientRect()
+		if (e.clientX < left + layout().edge) track.scrollLeft -= step
+		else if (e.clientX > right - layout().edge) track.scrollLeft += step
+		setGap(gapAt(e))
+	}
+	let endDrag = () => {
+		dragged = undefined
+		setGap(undefined)
+	}
 	return (
 		<header
 			class="Tabs tab"
 			style={{ '--digits': layout().d, '--cell': `${layout().cell}px`, '--edge': `${layout().edge}px` }}
 		>
-			<nav class="strip" aria-label="Tabs">
+			<nav
+				class={['strip', ...(gap() === undefined ? [] : ['dragging'])]}
+				aria-label="Tabs"
+				onDragStart={(e) => (dragged = (e.target as HTMLElement).closest<HTMLElement>('.track .tab')?.dataset.id)}
+				onDragEnter={over}
+				onDragOver={over}
+				onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setGap(undefined)}
+				onDrop={(e) => {
+					if (!dragged) return
+					e.preventDefault()
+					let from = props.tabs.findIndex((t) => t.id === dragged)
+					let to = gapAt(e)
+					if (to > from) to--
+					if (from >= 0 && to !== from) tabs.move(dragged, to)
+					endDrag()
+				}}
+				onDragEnd={endDrag}
+			>
 				<button
 					type="button"
 					class="menu"
@@ -251,6 +313,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 										n={i() + 1}
 										shown={id === props.shown}
 										name={layout().names}
+										drop={drop(i())}
 										onPick={() => requestAnimationFrame(() => center(true))}
 									/>
 								)

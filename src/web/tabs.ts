@@ -254,6 +254,11 @@ function closeTab(id: string): void {
 	connection.send({ type: 'tab-close', sessionId: id })
 }
 
+// Moves tab `id` to `index`; the host broadcasts the new order.
+function move(id: string, index: number): void {
+	connection.send({ type: 'tab-move', sessionId: id, index })
+}
+
 // Reopens the last closed tab; it shows once reopened.
 function resume(): void {
 	let id = connection.nextId()
@@ -277,6 +282,7 @@ export const tabs = {
 	seen,
 	newTab,
 	closeTab,
+	move,
 	resume,
 	// Whether the browser gives Ctrl-T and the like to the page.
 	mac: (): boolean => /Mac|iPhone|iPad/.test(navigator.platform),
