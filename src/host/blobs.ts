@@ -9,7 +9,7 @@
 // checked against its fixed form before it names a file, and is looked
 // up only in that session's directory, so nothing from a client ever
 // becomes a path of its own. History holds references (ImageBlock),
-// never the bytes; providers read them through base64() per request.
+// never the bytes; providers read them through image() per request.
 
 import type { Event } from '../common/protocol.ts'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
