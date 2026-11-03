@@ -19,6 +19,7 @@ import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
 import { diagnostics } from '../diagnostics.ts'
 import { touchDebug } from '../touch-debug.ts'
+import { find } from '../find.ts'
 import { Icon } from './Icon.tsx'
 
 // Characters a name gets in a cell.
@@ -193,11 +194,11 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	let centered = ''
 	// Only a tab switch in an already laid-out strip animates; first paint and resizes jump.
 	createEffect(
-		() => `${props.shown}:${room().width}:${layout().cell}:${props.tabs.length}`,
+		() => `${props.shown}/${current()}:${room().width}:${layout().cell}:${props.tabs.length}`,
 		(key) => {
 			if (key === centered) return
 			let [was, ...rest] = centered.split(':')
-			let smooth = !!was && was !== 'undefined' && rest.join(':') === key.slice(key.indexOf(':') + 1)
+			let smooth = !!was && !was.startsWith('undefined/') && rest.join(':') === key.slice(key.indexOf(':') + 1)
 			centered = key
 			let frame = requestAnimationFrame(() => center(smooth))
 			return () => cancelAnimationFrame(frame)
@@ -371,6 +372,16 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<button type="button" class="new" onClick={newTab}>
 					<Icon name="plus" />
 					New tab
+				</button>
+				<button
+					type="button"
+					onClick={() => {
+						setOpen(false)
+						requestAnimationFrame(() => find.open())
+					}}
+				>
+					<Icon name="google" />
+					Find
 				</button>
 				<button
 					type="button"
