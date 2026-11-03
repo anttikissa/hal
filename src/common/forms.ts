@@ -53,8 +53,17 @@ export type Key = { key: string; text?: string; shift?: boolean; ctrl?: boolean;
 // A form being filled in: one value per field, the focused field and
 // the cursor (a UTF-16 offset on a grapheme boundary) in its text.
 // `opened`: when this client showed it (Date.now()), the clock of
-// rotating placeholders.
-export type FormState = { id: string; form: Form; values: string[]; focus: number; cursor: number; opened?: number }
+// rotating placeholders. `settling`: the last key typed while it waits
+// for typing to stop (forms.settleIn).
+export type FormState = {
+	id: string
+	form: Form
+	values: string[]
+	focus: number
+	cursor: number
+	opened?: number
+	settling?: number
+}
 
 export type FormAction = { type: 'submit'; answers: Answers } | { type: 'cancel' }
 
@@ -176,12 +185,15 @@ function quoteParts(q: Quote): { text: string; marked: boolean }[] {
 	return out
 }
 
-// A question's title is its text's first line; the rest is body text.
+// A question's title is its text's first line; the rest is body text,
+// without the blank lines that separate it from the title.
 function title(form: Form): string {
 	return form.text.split('\n')[0]!
 }
 function details(form: Form): string[] {
-	return form.text.split('\n').slice(1)
+	let lines = form.text.split('\n').slice(1)
+	while (lines[0]?.trim() === '') lines.shift()
+	return lines
 }
 
 // A question answered, in one line per field: "Dave", "API key: (given)".
@@ -213,11 +225,34 @@ function example(st: FormState, index: number, now: number): Shown {
 		: { cut: '', text: p ?? '', next: Infinity }
 }
 
+// A question that opens while the user types would take a stray Enter,
+// Escape or letter as its answer (task qs7). It ignores keys until
+// typing stops for SETTLE_MS. A plain Enter (a submit) ends typing, so
+// a question the user's own command asked (/cd) takes keys at once.
+const SETTLE_MS = 500
+
+// When this client last got a key other than a plain Enter; 0 after one.
+const state = { typed: 0 }
+
+function keyed(key: Key, now = Date.now()): void {
+	let enter = key.key === 'enter' && !key.shift && !key.ctrl && !key.alt && !key.cmd
+	forms.state.typed = enter ? 0 : now
+}
+
+// Ms until the form takes keys; 0 once it does.
+function settleIn(st: FormState, now = Date.now()): number {
+	return st.settling === undefined ? 0 : Math.max(0, st.settling + SETTLE_MS - now)
+}
+
 // The form state for question `open` (the transcript's open one): the
-// one being filled in if it is for that question, else a fresh one.
+// one being filled in if it is for that question, else a fresh one,
+// settling if the user is typing.
 function follow(st: FormState | undefined, open: { id: string; form: Form } | undefined): FormState | undefined {
 	if (!open) return undefined
-	return st?.id === open.id ? st : forms.start(open.id, open.form)
+	if (st?.id === open.id) return st
+	let fresh = forms.start(open.id, open.form)
+	let typed = forms.state.typed
+	return typed && fresh.opened! - typed < SETTLE_MS ? { ...fresh, settling: typed } : fresh
 }
 
 // The value of a text or secret field set from outside (a browser input).
@@ -250,7 +285,8 @@ function focusOn(st: FormState, focus: number): FormState {
 // through them and past its ends to the field above or below. A typed
 // initial picks an option, which on a one-field form also submits (y on
 // y/N).
-function step(st: FormState, key: Key): { state: FormState; action?: FormAction } {
+function step(st: FormState, key: Key, now = Date.now()): { state: FormState; action?: FormAction } {
+	if (forms.settleIn(st, now)) return { state: { ...st, settling: now } }
 	let field = st.form.fields[st.focus]!
 	let last = st.focus === st.form.fields.length - 1
 	let plain = !key.ctrl && !key.alt && !key.cmd
@@ -360,6 +396,9 @@ export const forms = {
 	title,
 	details,
 	start,
+	state,
+	keyed,
+	settleIn,
 	follow,
 	example,
 	set,
