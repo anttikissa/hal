@@ -9,6 +9,7 @@ import type { NoticeEvent, NoticeKind } from '../common/notices.ts'
 import type { Event } from '../common/protocol.ts'
 import { clients as clientInfo } from './clients.ts'
 import { diag } from './diag.ts'
+import { history } from './history.ts'
 import { noticeHistory } from './notice-history.ts'
 import { pages } from './pages.ts'
 import { push } from './push.ts'
@@ -43,6 +44,11 @@ function kind(event: Event, id?: string): NoticeKind | undefined {
 // Whether the latest turn's reply ends with a <question> tag: derived
 // from history, so a restart, a reload and every client agree.
 function asked(id: string): boolean {
+	let m = pages.marks(id)
+	if (m.rebase === undefined) {
+		let r = m.reply === undefined ? undefined : pages.lineAt(history.file(id), m.reply).record
+		return r?.type === 'assistant' && r.block.type === 'text' && summary.asks(r.block.text)
+	}
 	return pages.kept(id, 'asked', () => {
 		let records = pages.page(id).records
 		for (let i = records.length - 1; i >= 0; i--) {

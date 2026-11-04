@@ -4,7 +4,8 @@
 // in two) plus the few earlier records its state needs; clients page
 // back through the rest by byte offsets from the end.
 //
-// marks.ason caches offsets needed for state, caught up with each append.
+// marks.ason caches offsets needed for state, caught up with each append,
+// and the ranges of lines amendments leave out, which are never read.
 //
 // Reading is written as steps: generators that pause before decoding
 // each record, yielding its size in bytes, so one code path serves both
@@ -20,7 +21,9 @@ import { ason } from '../common/ason.ts'
 import type { Snapshot } from '../common/snapshot.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { amendments } from './amendments.ts'
 import { changedFiles } from './changed-files.ts'
+import { turnMarks } from './turn-marks.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
@@ -28,8 +31,14 @@ import { pageSlices } from './page-slices.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
 // `file`: the history file covered; absent, history.asonl.
-type Marks = {
-	rebaseVersion?: 2
+// `rebase`: the latest rewrite that readers replay the whole history
+// for: a rebase other than an amendment, or a legacy `replaces` prompt;
+// once there is one, every later rebase.
+// `reply`: the latest assistant text, unless a user record followed it.
+// `inactive`: the byte ranges of the lines amendments leave out (task
+// e4z), and `dropped` the numbers of their records.
+export type Marks = {
+	version?: 3
 	file?: string
 	rebase?: number
 	transitions?: number[]
@@ -41,12 +50,16 @@ type Marks = {
 	turn?: number
 	ended?: number
 	prompt?: number
+	reply?: number
 	inbox: Record<string, number | number[]>
 	changes?: number[]
 	files?: number
+	inactive?: Range[]
+	dropped?: number[]
 	// Values derived from a rebased history (kept()), for its size.
 	kept?: { size: number; values: Record<string, unknown> }
 }
+export type Range = [start: number, end: number]
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -142,6 +155,7 @@ function lineAt(path: string, offset: number): Line {
 function findLast(id: string, pred: (r: HistoryRecord) => boolean): HistoryRecord | undefined {
 	let path = history.file(id)
 	if (!existsSync(path)) return undefined
+	let m = pages.marks(id)
 	let end = statSync(path).size
 	let carry = Buffer.alloc(0)
 	while (end > 0) {
@@ -151,6 +165,7 @@ function findLast(id: string, pred: (r: HistoryRecord) => boolean): HistoryRecor
 		let start = from === 0 ? 0 : buf.indexOf(NL) + 1
 		let whole = from > 0 && start === 0 ? [] : [...pages.raw(buf.subarray(start), from + start)]
 		for (let i = whole.length - 1; i >= 0; i--) {
+			if (amendments.inactiveAt(m, whole[i]!.offset)) continue
 			let r = pages.parse(path, whole[i]!.text, whole[i]!.offset)
 			if (pred(r)) return r
 		}
@@ -161,36 +176,20 @@ function findLast(id: string, pred: (r: HistoryRecord) => boolean): HistoryRecor
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
-	if (r.type === 'rebase' || (r.type === 'user' && r.replaces)) m.rebase = offset
-	if (r.type === 'output' && r.transition) m.transitions = [offset]
-	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
-	if (r.type === 'output' && r.transitionDone) m.transitions = []
+	if ((r.type === 'rebase' && (m.rebase !== undefined || !amendments.is(r))) || (r.type === 'user' && r.replaces))
+		m.rebase = offset
 	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
 	changedFiles.apply(m, r, offset, path)
-	if (r.type === 'question') {
-		m.question = offset
-		if (!r.from) {
-			m.turnQuestion = r.id
-			m.turn = offset
-		}
-	} else if (r.type === 'answer' || r.type === 'turn_end') {
-		// A turn end is the turn's last record; it closes only a turn's
-		// question (forms.open), so the last answer is kept apart.
-		if (r.type === 'answer') m.answer = offset
-		if (r.type === 'turn_end') m.ended = offset
-		if (r.type === 'turn_end' || r.question === m.turnQuestion) m.turn = offset
-	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
-	// Every record of a message: an edit keeps the place of the first.
-	else if (r.type === 'inbox') m.inbox[r.id] = [...[m.inbox[r.id] ?? []].flat(), offset]
-	else if (
-		(r.type === 'user' && (r.notices === undefined || r.blocks.length)) ||
-		r.type === 'assistant' ||
-		r.type === 'continue'
-	) {
-		m.turn = offset
-		if (replay.isPrompt(r)) m.prompt = offset
-		if (r.type === 'user') for (let id of r.inbox ?? []) delete m.inbox[id]
-	}
+	turnMarks.follow(m, r, offset)
+}
+
+// Where each non-blank line of `buf`, read from file offset `base`,
+// starts and ends.
+function bounds(buf: Buffer, base: number): Range[] {
+	let out: Range[] = []
+	for (let at = 0, nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1)
+		if (buf.subarray(at, nl).some((b) => b > 32)) out.push([base + at, base + nl + 1])
+	return out
 }
 
 function marksPath(id: string): string {
@@ -224,31 +223,29 @@ function marks(id: string): Marks {
 function* catchUp(id: string): Steps<Marks> {
 	let path = history.file(id)
 	let m = pages.load(id)
+	// Amendments caught up with: the turn state is found again at the end.
+	let amended = false
+	let done = () => {
+		if (amended && m.rebase === undefined) amendments.apply(id, m, path, m.size)
+		return m
+	}
 	for (;;) {
 		let size = existsSync(path) ? statSync(path).size : 0
 		let file = basename(path)
-		// Marks from before `next`, or with `close` (an answer or a turn
-		// end, before answers were kept apart), or of another history file
-		// (task e4z), are rebuilt.
+		// Marks of another version or history file (task e4z) are rebuilt.
 		changedFiles.upgrade(m)
-		if (
-			m.size < 0 ||
-			m.size > size ||
-			(m.file ?? 'history.asonl') !== file ||
-			(m.size > 0 && (m.next === undefined || m.changes === undefined || m.rebaseVersion !== 2)) ||
-			'close' in m
-		) {
+		if (m.size < 0 || m.size > size || (m.file ?? 'history.asonl') !== file || (m.size > 0 && m.version !== 3)) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 2 }, file !== 'history.asonl' && { file })
+			Object.assign(m, { size: 0, inbox: {}, version: 3 }, file !== 'history.asonl' && { file })
 			changedFiles.reset(m)
 		}
-		if (m.size >= size) return m
+		if (m.size >= size) return done()
 		let base = m.size
 		let buf = pages.readBytes(path, base, Math.min(size, base + pages.chunk))
 		for (let n = pages.chunk * 2; buf.indexOf(NL) < 0 && base + buf.length < size; n *= 2)
 			buf = pages.readBytes(path, base, Math.min(size, base + n))
 		// Only a torn last line is left.
-		if (buf.indexOf(NL) < 0) return m
+		if (buf.indexOf(NL) < 0) return done()
 		let at = base
 		for (let r of pages.raw(buf, base)) {
 			yield r.bytes
@@ -256,6 +253,7 @@ function* catchUp(id: string): Steps<Marks> {
 			let line = decode(path, r)
 			pages.apply(m, line.record, line.offset, path)
 			m.size = at = line.offset + line.bytes
+			if (amendments.is(line.record)) amended = true
 		}
 		// Blank lines after the last record: the marks cover them too.
 		if (m.size === at) m.size = base + buf.lastIndexOf(NL) + 1
@@ -269,9 +267,11 @@ function note(id: string, line: string, record: HistoryRecord): void {
 	let size = statSync(history.file(id)).size
 	let m = pages.load(id)
 	if (m.size < 0 && size === bytes) m.size = 0
-	if (m.size !== size - bytes || (m.file ?? 'history.asonl') !== basename(history.file(id))) return
-	pages.apply(m, record, m.size, history.file(id))
+	let path = history.file(id)
+	if (m.size !== size - bytes || (m.file ?? 'history.asonl') !== basename(path)) return
+	pages.apply(m, record, m.size, path)
 	m.size = size
+	if (amendments.is(record) && m.rebase === undefined) amendments.apply(id, m, path, size)
 }
 
 function marked(id: string): Line[] {
@@ -282,28 +282,11 @@ function* markedSteps(id: string): Steps<Line[]> {
 	let m = yield* pages.catchUp(id)
 	let path = history.file(id)
 	let out: Line[] = []
-	for (let o of pages.picked(m)) {
+	for (let o of turnMarks.picked(m)) {
 		yield 0
 		out.push(pages.lineAt(path, o))
 	}
 	return out
-}
-
-// The positions of the records the state needs, ascending.
-function picked(m: Marks): number[] {
-	return [
-		...new Set(
-			[
-				m.question,
-				m.answer,
-				m.ended,
-				m.turn,
-				m.prompt,
-				...Object.values(m.inbox).flat(),
-				...(m.transitions ?? []),
-			].filter((o) => o !== undefined),
-		),
-	].sort((a, b) => a - b)
 }
 
 // `compute`d from the history; a rebased history's value is kept with
@@ -326,9 +309,9 @@ function essentials(id: string): HistoryRecord[] {
 	if (pages.marks(id).rebase === undefined) return pages.marked(id).map((l) => l.record)
 	return pages.kept(id, 'essentials', () => {
 		let current = [...pages.rebased(id).current.values()]
-		let virtual: Marks = { size: 0, inbox: {}, changes: [] }
-		current.forEach((r, i) => r.type !== 'file_changes' && pages.apply(virtual, r, i, ''))
-		return pages.picked(virtual).map((i) => current[i]!)
+		let virtual: Marks = { size: 0, inbox: {} }
+		current.forEach((r, i) => turnMarks.follow(virtual, r, i))
+		return turnMarks.picked(virtual).map((i) => current[i]!)
 	})
 }
 
@@ -343,11 +326,9 @@ function rebased(id: string): Rebased {
 	let c = pages.state.rebased.get(id)
 	if (!c || c.scanned > size)
 		c = { scanned: 0, offsets: [], size: -1, records: [], list: [], shown: new Map(), current: new Map() }
-	let buf = pages.readBytes(path, c.scanned, size),
-		at = 0
-	for (let nl; (nl = buf.indexOf(NL, at)) >= 0; at = nl + 1)
-		if (buf.subarray(at, nl).some((b) => b > 32)) c.offsets.push(c.scanned + at)
-	c.scanned += at
+	let buf = pages.readBytes(path, c.scanned, size)
+	for (let [start] of pages.bounds(buf, c.scanned)) c.offsets.push(start)
+	c.scanned += buf.lastIndexOf(NL) + 1
 	if (c.size !== c.scanned) {
 		c.records = records.slice(0, c.offsets.length)
 		c.list = rebaseDisplay.current(c.records)
@@ -380,10 +361,10 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	// Rebase undo and cross-page groups need the audit trail, unless the
 	// page lies wholly after the last rebase: replaying the whole history
 	// for each tab's latest reply cost a new host seconds and gigabytes.
-	let rebase = pages.marks(id).rebase
-	if (rebase !== undefined) {
+	let m = pages.marks(id)
+	if (m.rebase !== undefined) {
 		let linear = yield* pages.linearSteps(path, end, budget)
-		if (linear.start > rebase) return linear
+		if (linear.start > m.rebase) return linear
 		let { records, offsets, shown: current } = pages.rebased(id)
 		let found = records
 			.map((record, i) => ({ offset: offsets[i]!, record }))
@@ -395,17 +376,24 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 		found = found.slice(at)
 		return { records: found.map((l) => current.get(l.record.n)!), start: found[0]?.offset ?? 0, end }
 	}
-	return yield* pages.linearSteps(path, end, budget)
+	return yield* pages.linearSteps(path, end, budget, m.inactive)
 }
 
-function* linearSteps(path: string, end: number, budget: number): Steps<Page> {
-	for (let n = Math.min(Math.max(budget, 1), end); ; n = Math.min(n * 2, end)) {
-		let from = end - n
-		let buf = pages.readBytes(path, from, end)
-		let skip = from === 0 ? 0 : buf.indexOf(NL) + 1
+// Reads back from `end` about `budget` bytes of the lines outside the
+// `inactive` ranges, which are never read.
+function* linearSteps(path: string, end: number, budget: number, inactive: Range[] = []): Steps<Page> {
+	let total = amendments.spans(inactive, 0, end).reduce((sum, [s, e]) => sum + e - s, 0)
+	for (let n = Math.min(Math.max(budget, 1), total); ; n = Math.min(n * 2, total)) {
+		let from = amendments.back(inactive, end, n, total)
+		// Lines start at 0 and where inactive ranges end; elsewhere the
+		// first line read may have started earlier.
+		let cut = from > 0 && !inactive.some(([, e]) => e === from)
 		let found: Line[] = []
-		if (skip > 0 || from === 0) {
-			for (let r of pages.raw(buf.subarray(skip), from + skip)) {
+		for (let [s, e] of amendments.spans(inactive, from, end)) {
+			let buf = pages.readBytes(path, s, e)
+			let skip = s === from && cut ? buf.indexOf(NL) + 1 : 0
+			if (s === from && cut && !skip) continue
+			for (let r of pages.raw(buf.subarray(skip), s + skip)) {
 				yield r.bytes
 				found.push(decode(path, r))
 			}
@@ -449,7 +437,9 @@ function since(id: string, tail: Tail): Tail {
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
 	if (size <= tail.end) return tail
-	let more = pages.lines(path, pages.readBytes(path, tail.end, size), tail.end)
+	let m = pages.marks(id)
+	let read = [...pages.raw(pages.readBytes(path, tail.end, size), tail.end)]
+	let more = read.filter((r) => !amendments.inactiveAt(m, r.offset)).map((r) => decode(path, r))
 	let start = tail.older ?? 0
 	let earlier =
 		tail.older === undefined
@@ -462,7 +452,7 @@ function since(id: string, tail: Tail): Tail {
 		...tail,
 		history: [...tail.history, ...more.map((l) => l.record)],
 		earlier,
-		end: more.length ? more.at(-1)!.offset + more.at(-1)!.bytes : tail.end,
+		end: read.length ? read.at(-1)!.offset + read.at(-1)!.bytes : tail.end,
 	}
 }
 
@@ -506,6 +496,7 @@ export const pages = {
 	lineAt,
 	findLast,
 	apply,
+	bounds,
 	marksPath,
 	load,
 	marks,
@@ -513,7 +504,6 @@ export const pages = {
 	note,
 	marked,
 	markedSteps,
-	picked,
 	kept,
 	linearSteps,
 	essentials,

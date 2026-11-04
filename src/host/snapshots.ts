@@ -26,7 +26,9 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 		inbox: status.inboxOf(id, records),
 		stats: stats.of(id, records),
 	}
-	if (pages.marks(id).rebase !== undefined) {
+	let m = pages.marks(id)
+	if (m.rebase === undefined && m.dropped?.length) snap.dropped = [...m.dropped]
+	if (m.rebase !== undefined) {
 		let c = pages.rebased(id)
 		c.display ??= {
 			rewrites: rebaseDisplay.dividers(c.records),

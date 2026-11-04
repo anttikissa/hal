@@ -5,7 +5,7 @@ import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { forms } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
-import type { HistoryRecord } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -14,6 +14,7 @@ import { marksWorker } from './marks-worker.ts'
 import { paths } from './paths.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
+import { snapshots } from './snapshots.ts'
 
 const savedHome = paths.state.home
 const origOnError = liveFiles.onError
@@ -61,6 +62,44 @@ test('older amendments drop the replaced turn from pages and keep state active',
 	let older = pages.page(id, tail.older, 10000)
 	expect(older.records.some((r) => r.n === target)).toBe(false)
 	expect(pages.essentials(id).filter((r) => r.type === 'user')).toHaveLength(1)
+})
+
+test('an amendment stays in the file: readers never read what it left out, and its undo brings it back', () => {
+	let id = newSession()
+	for (let i = 0; i < 3; i++) turn(id, i, 1000)
+	history.append(id, { type: 'inbox', id: 'a', text: 'later', delivery: 'after-turn' })
+	let at = history.readSync(id).length
+	turn(id, 3, 100_000)
+	let gone = history.readSync(id).slice(at)
+	let base = gone.at(-1)!.n!
+	let quiet = { type: 'rebase' as const, base, edit: [], quiet: true as const }
+	history.append(id, { ...quiet, drop: gone.map((r) => r.n!) })
+	let edited = history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'edited' }], amends: gone[0]!.n! })
+	// Read back page by page, as a client scrolling up.
+	let all = () => {
+		let tail = pages.snapshot(id, 100)
+		let records = tail.history
+		for (let before = tail.older; before;) {
+			let page = pages.page(id, before, 100)
+			records = [...page.records, ...records]
+			before = page.start || undefined
+		}
+		return records
+	}
+	let { value, bytes } = counted(all)
+	expect(value).toEqual(replay.current(history.readSync(id)))
+	expect(bytes).toBeLessThan(100_000)
+	expect(snapshots.build(id).dropped).toEqual(gone.map((r) => r.n!))
+	expect(inbox.pending(pages.essentials(id)).map((m) => m.id)).toEqual(['a'])
+	// The marks rebuilt from the file alone are the same.
+	let marks = JSON.parse(JSON.stringify(pages.marks(id)))
+	pages.reset()
+	rmSync(`${paths.sessionDir(id)}/marks.ason`)
+	expect(JSON.parse(JSON.stringify(pages.marks(id)))).toEqual(marks)
+	history.append(id, { ...quiet, drop: [edited.n!] })
+	expect(all()).toEqual(replay.current(history.readSync(id)))
+	expect(all().some((r) => r.n === gone[0]!.n)).toBe(true)
+	expect(snapshots.build(id).dropped).toEqual([edited.n!])
 })
 
 test('a snapshot of a 20 MB history reads at most the budget and keeps an open question from far back', () => {
@@ -172,7 +211,7 @@ test('what the state needs from earlier stays right as history grows and without
 	let marks = `${paths.sessionDir(id)}/marks.ason`
 	expect(existsSync(marks)).toBe(true)
 	// Marks kept before the turn end was marked are rebuilt.
-	let old = readFileSync(marks, 'utf8').replace('rebaseVersion: 2', 'rebaseVersion: 1')
+	let old = readFileSync(marks, 'utf8').replace('version: 3', 'version: 2')
 	writeFileSync(marks, old.replace(/\n\s*ended: \d+,/, ''))
 	check()
 	pages.reset()
