@@ -2447,10 +2447,15 @@
 				color: var(--canvas);
 				font-weight: normal;
 			}
-			/* Phones: name on the first line, the snippet below it. */
+			/* Phones: name on the first line, the snippet below it. Each row
+   is its own grid: iOS Safari broke a two-line row inside the subgrid. */
 			@media (max-width: 40rem) {
-				.Picker.find ul {
-					grid-template-columns: auto auto minmax(0, 1fr) auto;
+				.Picker.find :is(ul, li) {
+					display: block;
+				}
+				.Picker.find a.find-row {
+					grid-template-columns: 3ch auto minmax(0, 1fr) auto;
+					column-gap: 2ch;
 				}
 				.Picker.find .find-row .text {
 					grid-area: 2 / 3 / 3 / -1;
