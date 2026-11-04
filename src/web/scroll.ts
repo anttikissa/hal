@@ -121,7 +121,9 @@ function moved(): void {
 // content: a scroll event, a DOM change, the tab shown again. `why`
 // names the trigger for diagnostics. A scroll event alone never pulls:
 // the content and size observers pull for growth, and pulling against
-// iOS's own settling made the view shake (task 981).
+// iOS's own settling made the view shake (task 981). Speculative fix:
+// the shaking was seen once on an iPhone and never reproduced. It was
+// annoying enough to justify one condition.
 function check(why: string): void {
 	let st = scroll.state,
 		el = st.el
