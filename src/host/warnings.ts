@@ -40,10 +40,20 @@ function set(key: string, text?: string): void {
 	for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 }
 
+// An error nothing caught (a plugin's timer, a forgotten promise) used to
+// stop the host and every turn with it; now each client hears of it once.
+function uncaught(e: unknown): void {
+	let text = `Hal kept running after an uncaught error: ${e instanceof Error ? e.stack : e}`
+	if (warnings.state.uncaught === text) return
+	warnings.state.uncaught = text
+	warnings.tell({ type: 'warning', text })
+}
+
 export const warnings = {
-	state: { standing: new Map<string, string>(), held: [] as Event[] },
+	state: { standing: new Map<string, string>(), held: [] as Event[], uncaught: '' },
 	send,
 	tell,
 	all,
 	set,
+	uncaught,
 }
