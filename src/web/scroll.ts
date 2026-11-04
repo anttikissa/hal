@@ -119,7 +119,9 @@ function moved(): void {
 
 // Runs after anything that may have moved the view or grown the
 // content: a scroll event, a DOM change, the tab shown again. `why`
-// names the trigger for diagnostics.
+// names the trigger for diagnostics. A scroll event alone never pulls:
+// the content and size observers pull for growth, and pulling against
+// iOS's own settling made the view shake (task 981).
 function check(why: string): void {
 	let st = scroll.state,
 		el = st.el
@@ -130,7 +132,7 @@ function check(why: string): void {
 		return
 	}
 	let g = scroll.gap(el)
-	if (g <= atBottom) return
+	if (g <= atBottom || why === 'scroll') return
 	scroll.onTrace(why, g)
 	scroll.put(el, scroll.target(el, 0))
 }
