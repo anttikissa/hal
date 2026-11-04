@@ -19,7 +19,8 @@ Result block navigation uses v8's stable block ids and hrefs. Browser result row
 		'Web Find rows have no link title: the native tooltip showed the padded terminal row in a gray browser box, which the user rejected (STYLE.md hover hints). Clipped text stays readable in the preview. This supersedes the earlier full-row link title note.',
 		'Find displays a working directory under the Unix user home with ~, never relative to Hal data home; in:~ resolves against the same Unix home. Other paths stay absolute.',
 		'Phone Find rows (40rem or narrower) use two lines: tab number, kind, title (all free width) and age, then the snippet below; a row without snippet stays one line. The fixed 12ch title column cut tab titles short and left rows mostly blank. This supersedes one-line rows on phones only. Checked in headless Chromium at 390px, recent tabs and a cwd query.',
-		'Phone Find rows are each their own grid (3ch tab, kind, title, age; snippet on line 2), not subgrid rows: iOS Safari drew a two-line row inside the subgrid at one-line height, overlapping and clipping the text, while Chromium drew it right. Check phone layout on the iPhone.'
+		'Phone Find rows are each their own grid (3ch tab, kind, title, age; snippet on line 2), not subgrid rows: iOS Safari drew a two-line row inside the subgrid at one-line height, overlapping and clipping the text, while Chromium drew it right. Check phone layout on the iPhone.',
+		'Web results keep the reader scroll position when rows arrive: the picker scrolls the selection into view only when the selection or query changes. Tracking items alone pulled the list back to the selected row on every loaded page or streamed tier.'
 	],
 	needs: ['v8', 'w4']
 }

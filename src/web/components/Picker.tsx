@@ -60,14 +60,16 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		return `${label + 1}ch ${m ? picker.effortWidth(m) : 0}ch ${cell(1)}ch auto`
 	}
 	// A new query reorders the list, so scroll from the top as the TUI
-	// does: the rows above the selection stay in view.
-	let query: string | undefined
+	// does: the rows above the selection stay in view. More rows arriving
+	// leave the reader's scroll position alone.
+	let query: string | undefined, shown: number | undefined
 	createEffect(
 		() => ({ selected: props.modal?.selected, query: props.modal?.query, items: props.modal?.items }),
 		({ selected, query: q }) => {
 			// Moving focus runs focus handlers here; they read state untracked.
 			if (selected === undefined) {
 				if (box.open) untrack(() => box.close())
+				shown = undefined
 				return
 			}
 			if (!box.open)
@@ -78,7 +80,8 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			if (q !== query) {
 				query = q
 				list.scrollTop = 0
-			}
+			} else if (selected === shown) return
+			shown = selected
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
 	)
