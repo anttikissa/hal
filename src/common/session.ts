@@ -42,6 +42,21 @@ export interface SessionMeta {
 	background?: string[]
 	// How kinds of blocks start, over the client's settings (task hyt).
 	blocks?: Partial<Record<Kind, Verbosity>>
+	// History files after history.asonl, oldest first; the last is the one
+	// written (task e4z).
+	generations?: Generation[]
+}
+
+// `replaces`: the file this one supersedes. `continues`: where the
+// readable conversation before this file ends, in this session or
+// `session`. `next`: record numbers below it were given out already.
+export type Generation = {
+	file: string
+	reason: 'rebase' | 'undo' | 'clear' | 'compact' | 'fork' | 'migrate'
+	replaces?: string
+	continues?: { session?: string; file: string; end: number }
+	next: number
+	ts: string
 }
 
 export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'

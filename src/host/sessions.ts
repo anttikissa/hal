@@ -70,6 +70,34 @@ function validate(id: string, data: Record<string, any>): void {
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string')))
 		throw new Error(`${path}: background must be a list of ids`)
+	if (data.generations !== undefined) validateGenerations(path, data.generations)
+}
+
+const historyFile = /^history(\d+)?\.asonl$/
+
+// Throws unless `list` is a valid generations list: its files lie in the
+// session directory, so a hand-edited one never points elsewhere.
+function validateGenerations(path: string, list: unknown): void {
+	let bad = (what: string) => new Error(`${path}: invalid generations: ${what}`)
+	if (!Array.isArray(list)) throw bad('not a list')
+	for (let g of list) {
+		if (!g || typeof g !== 'object' || typeof g.file !== 'string' || !historyFile.test(g.file)) throw bad('file')
+		if (!['rebase', 'undo', 'clear', 'compact', 'fork', 'migrate'].includes(g.reason)) throw bad('reason')
+		if (g.replaces !== undefined && (typeof g.replaces !== 'string' || !historyFile.test(g.replaces)))
+			throw bad('replaces')
+		let c = g.continues
+		if (
+			c !== undefined &&
+			(!c ||
+				typeof c.file !== 'string' ||
+				!historyFile.test(c.file) ||
+				!Number.isSafeInteger(c.end) ||
+				c.end < 0 ||
+				(c.session !== undefined && (typeof c.session !== 'string' || !session.isId(c.session))))
+		)
+			throw bad('continues')
+		if (!Number.isSafeInteger(g.next) || g.next < 1 || typeof g.ts !== 'string') throw bad('next or ts')
+	}
 }
 
 // Loads and validates metadata as a liveFile. Throws if missing/invalid.
@@ -297,6 +325,7 @@ export const sessions = {
 	ids,
 	state: { open: new Map<string, SessionMeta>() },
 	validate,
+	validateGenerations,
 	load,
 	claimId,
 	create,

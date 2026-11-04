@@ -18,7 +18,18 @@
 // on the parsed objects (ason COMMENTS) and are written back on save,
 // so a hand-written comment survives every change Hal makes.
 
-import { chmodSync, renameSync, unlinkSync, watch, writeFileSync, readFileSync, type FSWatcher } from 'fs'
+import {
+	chmodSync,
+	closeSync,
+	fsyncSync,
+	openSync,
+	renameSync,
+	unlinkSync,
+	watch,
+	writeFileSync,
+	readFileSync,
+	type FSWatcher,
+} from 'fs'
 import { basename, dirname } from 'path'
 import { ason } from '../common/ason.ts'
 import { diag } from './diag.ts'
@@ -75,7 +86,9 @@ function read(path: string): Data | null {
 	return value as Data
 }
 
-function flush(state: LiveState): void {
+// `durable`: the new content and its directory entry reach the disk
+// before this returns, so a crash leaves the old file or the new one.
+function flush(state: LiveState, durable = false): void {
 	if (!state.dirty) return
 	if (state.broken) throw fail(state.path, `not saving over malformed file (${state.broken.message})`)
 	let text = ason.stringify(state.data)
@@ -89,7 +102,9 @@ function flush(state: LiveState): void {
 		// chmod too, since writeFileSync ignores mode for an existing file.
 		writeFileSync(tmp, text + '\n', state.mode === undefined ? undefined : { mode: state.mode })
 		if (state.mode !== undefined) chmodSync(tmp, state.mode)
+		if (durable) fsync(tmp)
 		renameSync(tmp, state.path)
+		if (durable) fsync(dirname(state.path))
 	} catch (e: any) {
 		try {
 			unlinkSync(tmp)
@@ -232,9 +247,18 @@ function stateOf(data: object): LiveState {
 	return state
 }
 
+function fsync(path: string): void {
+	let fd = openSync(path, 'r')
+	try {
+		fsyncSync(fd)
+	} finally {
+		closeSync(fd)
+	}
+}
+
 // Write pending changes now. Throws if the write fails.
-function save(data: object): void {
-	flush(stateOf(data))
+function save(data: object, options: { durable?: boolean } = {}): void {
+	flush(stateOf(data), options.durable)
 }
 
 // Why the file on disk is unusable (malformed), or null.
@@ -264,4 +288,4 @@ function onError(error: Error): void {
 	} catch {}
 }
 
-export const liveFiles = { liveFile, save, close, brokenError, onError }
+export const liveFiles = { liveFile, save, close, brokenError, onError, fsync }

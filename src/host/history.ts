@@ -25,8 +25,8 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
 import { busy } from './busy.ts'
 import { diag } from './diag.ts'
+import { generations } from './generations.ts'
 import { pages } from './pages.ts'
-import { paths } from './paths.ts'
 import { pruning } from './pruning.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { naming } from './naming.ts'
@@ -84,15 +84,15 @@ function addUsage(a: Usage, b: Usage): Usage {
 	return sum
 }
 function file(id: string): string {
-	return `${paths.sessionDir(id)}/history.asonl`
+	return generations.file(id)
 }
 
 // The session's next record number (HistoryRecord `n`), taken: past
-// every record in the file and every number given out meanwhile (a
-// block still streaming holds one).
+// every record in the file, every number given out meanwhile (a block
+// still streaming holds one) and every earlier generation's.
 function number(id: string): number {
 	let path = history.file(id)
-	let n = Math.max(history.state.next.get(path) ?? 1, pages.marks(id).next ?? 1)
+	let n = Math.max(history.state.next.get(path) ?? 1, pages.marks(id).next ?? 1, generations.next(id))
 	history.state.next.set(path, n + 1)
 	return n
 }

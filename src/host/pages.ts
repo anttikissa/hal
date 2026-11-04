@@ -15,6 +15,7 @@
 // synchronously either way.
 
 import { closeSync, existsSync, openSync, readSync as readFd, statSync } from 'fs'
+import { basename } from 'path'
 import { ason } from '../common/ason.ts'
 import type { Snapshot } from '../common/snapshot.ts'
 import { rebaseDisplay } from '../common/rebase-display.ts'
@@ -26,8 +27,10 @@ import { paths } from './paths.ts'
 import { pageSlices } from './page-slices.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
+// `file`: the history file covered; absent, history.asonl.
 type Marks = {
 	rebaseVersion?: 2
+	file?: string
 	rebase?: number
 	transitions?: number[]
 	size: number
@@ -223,17 +226,20 @@ function* catchUp(id: string): Steps<Marks> {
 	let m = pages.load(id)
 	for (;;) {
 		let size = existsSync(path) ? statSync(path).size : 0
+		let file = basename(path)
 		// Marks from before `next`, or with `close` (an answer or a turn
-		// end, before answers were kept apart), are rebuilt.
+		// end, before answers were kept apart), or of another history file
+		// (task e4z), are rebuilt.
 		changedFiles.upgrade(m)
 		if (
 			m.size < 0 ||
 			m.size > size ||
+			(m.file ?? 'history.asonl') !== file ||
 			(m.size > 0 && (m.next === undefined || m.changes === undefined || m.rebaseVersion !== 2)) ||
 			'close' in m
 		) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 2 })
+			Object.assign(m, { size: 0, inbox: {}, rebaseVersion: 2 }, file !== 'history.asonl' && { file })
 			changedFiles.reset(m)
 		}
 		if (m.size >= size) return m
@@ -263,7 +269,7 @@ function note(id: string, line: string, record: HistoryRecord): void {
 	let size = statSync(history.file(id)).size
 	let m = pages.load(id)
 	if (m.size < 0 && size === bytes) m.size = 0
-	if (m.size !== size - bytes) return
+	if (m.size !== size - bytes || (m.file ?? 'history.asonl') !== basename(history.file(id))) return
 	pages.apply(m, record, m.size, history.file(id))
 	m.size = size
 }
