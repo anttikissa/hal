@@ -43,13 +43,15 @@ function kind(event: Event, id?: string): NoticeKind | undefined {
 // Whether the latest turn's reply ends with a <question> tag: derived
 // from history, so a restart, a reload and every client agree.
 function asked(id: string): boolean {
-	let records = pages.page(id).records
-	for (let i = records.length - 1; i >= 0; i--) {
-		let r = records[i]!
-		if (r.type === 'user') return false
-		if (r.type === 'assistant' && r.block.type === 'text') return summary.asks(r.block.text)
-	}
-	return false
+	return pages.kept(id, 'asked', () => {
+		let records = pages.page(id).records
+		for (let i = records.length - 1; i >= 0; i--) {
+			let r = records[i]!
+			if (r.type === 'user') return false
+			if (r.type === 'assistant' && r.block.type === 'text') return summary.asks(r.block.text)
+		}
+		return false
+	})
 }
 
 // What the latest turn replied: its <summary> (common/summary.ts), else

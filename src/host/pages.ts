@@ -41,6 +41,8 @@ type Marks = {
 	inbox: Record<string, number | number[]>
 	changes?: number[]
 	files?: number
+	// Values derived from a rebased history (kept()), for its size.
+	kept?: { size: number; values: Record<string, unknown> }
 }
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
@@ -272,32 +274,56 @@ function marked(id: string): Line[] {
 
 function* markedSteps(id: string): Steps<Line[]> {
 	let m = yield* pages.catchUp(id)
-	let offsets = new Set(
-		[
-			m.question,
-			m.answer,
-			m.ended,
-			m.turn,
-			m.prompt,
-			...Object.values(m.inbox).flat(),
-			...(m.transitions ?? []),
-		].filter((o) => o !== undefined),
-	)
 	let path = history.file(id)
 	let out: Line[] = []
-	for (let o of [...offsets].sort((a, b) => a - b)) {
+	for (let o of pages.picked(m)) {
 		yield 0
 		out.push(pages.lineAt(path, o))
 	}
 	return out
 }
 
+// The positions of the records the state needs, ascending.
+function picked(m: Marks): number[] {
+	return [
+		...new Set(
+			[
+				m.question,
+				m.answer,
+				m.ended,
+				m.turn,
+				m.prompt,
+				...Object.values(m.inbox).flat(),
+				...(m.transitions ?? []),
+			].filter((o) => o !== undefined),
+		),
+	].sort((a, b) => a - b)
+}
+
+// `compute`d from the history; a rebased history's value is kept with
+// its marks for their size: replaying every rebased tab's whole history
+// made a new host spend seconds and gigabytes before it served the tabs.
+function kept<T>(id: string, key: string, compute: () => T): T {
+	let m = pages.marks(id)
+	if (m.rebase === undefined) return compute()
+	if (m.kept?.size !== m.size) m.kept = { size: m.size, values: {} }
+	if (!(key in m.kept.values)) m.kept.values[key] = compute()
+	// A copy: the marks are a live file, saved when changed.
+	return JSON.parse(JSON.stringify(m.kept.values[key]))
+}
+
 // The few records the session's state needs, oldest first: from them
 // alone, states.fromHistory, inbox.pending and forms.open answer as
-// they would from the whole history.
+// they would from the whole history. A rebased history's are picked from
+// its current records, as marks over them would.
 function essentials(id: string): HistoryRecord[] {
-	if (pages.marks(id).rebase !== undefined) return [...pages.rebased(id).current.values()]
-	return pages.marked(id).map((l) => l.record)
+	if (pages.marks(id).rebase === undefined) return pages.marked(id).map((l) => l.record)
+	return pages.kept(id, 'essentials', () => {
+		let current = [...pages.rebased(id).current.values()]
+		let virtual: Marks = { size: 0, inbox: {}, changes: [] }
+		current.forEach((r, i) => r.type !== 'file_changes' && pages.apply(virtual, r, i, ''))
+		return pages.picked(virtual).map((i) => current[i]!)
+	})
 }
 
 // A rebased session's records (history.readSync, cached while open), the
@@ -345,8 +371,13 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	let end = before ?? size
 	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL))
 		throw new Error(`${path}: ${before} is not a record boundary`)
-	// Rebase undo and cross-page groups need the audit trail.
-	if (pages.marks(id).rebase !== undefined) {
+	// Rebase undo and cross-page groups need the audit trail, unless the
+	// page lies wholly after the last rebase: replaying the whole history
+	// for each tab's latest reply cost a new host seconds and gigabytes.
+	let rebase = pages.marks(id).rebase
+	if (rebase !== undefined) {
+		let linear = yield* pages.linearSteps(path, end, budget)
+		if (linear.start > rebase) return linear
 		let { records, offsets, shown: current } = pages.rebased(id)
 		let found = records
 			.map((record, i) => ({ offset: offsets[i]!, record }))
@@ -358,6 +389,10 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 		found = found.slice(at)
 		return { records: found.map((l) => current.get(l.record.n)!), start: found[0]?.offset ?? 0, end }
 	}
+	return yield* pages.linearSteps(path, end, budget)
+}
+
+function* linearSteps(path: string, end: number, budget: number): Steps<Page> {
 	for (let n = Math.min(Math.max(budget, 1), end); ; n = Math.min(n * 2, end)) {
 		let from = end - n
 		let buf = pages.readBytes(path, from, end)
@@ -472,6 +507,9 @@ export const pages = {
 	note,
 	marked,
 	markedSteps,
+	picked,
+	kept,
+	linearSteps,
 	essentials,
 	rebased,
 	page,
