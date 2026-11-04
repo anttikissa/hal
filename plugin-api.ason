@@ -1,5 +1,5 @@
 {
-	version: 22,
+	version: 23,
 	changes: [
 		{
 			version: 2,
@@ -337,6 +337,17 @@
 					kind: 'compatible',
 					target: 'client/tab-bar.page',
 					description: 'Now exported'
+				}
+			]
+		},
+		{
+			version: 23,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/warnings.uncaught',
+					description: 'Removes uncaught and state.uncaught',
+					port: 'Catch recoverable failures at their operation boundary'
 				}
 			]
 		}

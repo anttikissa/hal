@@ -196,8 +196,6 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 // the web and continues every turn the previous host left unfinished.
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
-	process.on('uncaughtException', (e) => warnings.uncaught(e))
-	process.on('unhandledRejection', (e) => warnings.uncaught(e))
 	perf.mark('host')
 	main.later(() => {
 		find.init()
