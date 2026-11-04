@@ -16,7 +16,9 @@ Result block navigation uses v8's stable block ids and hrefs. Browser result row
 		'Session-name (metadata) matches show only while every filter is on; narrowing the filters to, say, commits alone shows only those kinds.',
 		'Rows show the card id as session/card, e.g. 181-csv/a1313. The index stores each row card letter (titles.letter rules) because clients cannot derive it for sessions they have not loaded.',
 		'Web Find rows remain one line: subgrid columns, each clipping overflow with an ellipsis like terminal rows. The linked card remains accessible. Selection and long snippets do not change row height. This supersedes wrapping Find rows; other picker rows retain wrapping. ANSI-looking fragments in the initial screenshot were absent from the later completed results; no ANSI cleanup or terminal change was made.',
-		'Web Find rows have no link title: the native tooltip showed the padded terminal row in a gray browser box, which the user rejected (STYLE.md hover hints). Clipped text stays readable in the preview. This supersedes the earlier full-row link title note.'
+		'Web Find rows have no link title: the native tooltip showed the padded terminal row in a gray browser box, which the user rejected (STYLE.md hover hints). Clipped text stays readable in the preview. This supersedes the earlier full-row link title note.',
+		'Find displays a working directory under the Unix user home with ~, never relative to Hal data home; in:~ resolves against the same Unix home. Other paths stay absolute.',
+		'Phone Find rows (40rem or narrower) use two lines: tab number, kind, title (all free width) and age, then the snippet below; a row without snippet stays one line. The fixed 12ch title column cut tab titles short and left rows mostly blank. This supersedes one-line rows on phones only. Checked in headless Chromium at 390px, recent tabs and a cwd query.'
 	],
 	needs: ['v8', 'w4']
 }

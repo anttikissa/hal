@@ -2447,11 +2447,15 @@
 				color: var(--canvas);
 				font-weight: normal;
 			}
+			/* Phones: name on the first line, the snippet below it. */
 			@media (max-width: 40rem) {
 				.Picker.find ul {
-					grid-template-columns: auto auto minmax(0, 12ch) minmax(0, 1fr) auto;
+					grid-template-columns: auto auto minmax(0, 1fr) auto;
 				}
-				.Picker.find .find-row .id,
+				.Picker.find .find-row .text {
+					grid-area: 2 / 3 / 3 / -1;
+				}
+				.Picker.find .find-row :is(.id, .text:empty),
 				.Picker.find .filters .syntax {
 					display: none;
 				}
