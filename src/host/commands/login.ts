@@ -21,7 +21,11 @@ const ALIASES: Record<string, string> = {
 	opencode: 'opencode',
 	'opencode-go': 'opencode',
 	'claude-key': 'anthropic-key',
+	'anthropic-key': 'anthropic-key',
 	'chatgpt-key': 'openai-key',
+	'openai-key': 'openai-key',
+	'opencode-go-key': 'opencode-go-key',
+	'openrouter-key': 'openrouter-key',
 }
 const METHODS: Record<string, string> = {
 	'Claude subscription': 'claude',
@@ -36,7 +40,7 @@ const KEYS = 'API keys: set ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY 
 export const command: SlashCommand = {
 	help: () =>
 		'/login: choose a Claude or ChatGPT subscription login, or paste an API key for Claude, ChatGPT, OpenCode or OpenRouter.\n/login claude | chatgpt | opencode also work directly.\n\nKeys may instead be set in environment variables.',
-	complete: (args) => PROVIDERS.filter((p) => p.startsWith(args)),
+	complete: (args) => Object.keys(ALIASES).filter((p) => p.startsWith(args)),
 	async run(args, answers, ctx) {
 		let selected = args.trim()
 		if (!selected && !answers)
@@ -49,12 +53,8 @@ export const command: SlashCommand = {
 				},
 			}
 		if (!selected) selected = METHODS[answers?.method ?? ''] ?? ''
-		let which = ALIASES[selected] ?? selected
-		if (
-			!['claude', 'chatgpt', 'opencode', 'anthropic-key', 'openai-key', 'opencode-go-key', 'openrouter-key'].includes(
-				which,
-			)
-		) {
+		let which = ALIASES[selected]
+		if (!which) {
 			return {
 				error: `${selected || 'unknown method'}: no such login method; /login ${PROVIDERS.join(' | ')} (${KEYS})`,
 			}
