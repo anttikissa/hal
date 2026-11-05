@@ -451,7 +451,7 @@ function place(
 	status = '',
 	call?: string,
 ): { inner: number; head: number; mark: (lines: string[], at: number) => void } {
-	let width = ansi.inner(cols)
+	let width = ansi.inner(cols, ansi.side())
 	status = [status, itemView.receipt(item, style)].filter(Boolean).join(' ')
 	let ref = itemView.ref(item, session, call)
 	// On a very narrow terminal the text needs every column.

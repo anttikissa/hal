@@ -19,13 +19,25 @@ function sgr(style: Style): string {
 	return parts.length ? `\x1b[${parts.join(';')}m` : ''
 }
 
+// The transcript's side column; /gutter (Ctrl-G) drops it, so text
+// copied from the transcript reaches both edges. The chrome keeps PAD.
+function side(): string {
+	return ansi.gutter ? ansi.PAD : ''
+}
+
+// The text width between the side columns `pad`.
+function inner(cols: number, pad: string = ansi.PAD): number {
+	return Math.max(1, cols - 2 * pad.length)
+}
+
 // A padded row in a style. With a background it is a card filling all
-// `cols` columns; color always ends with the row.
-function paint(row: string, style: Style | undefined, cols: number): string {
+// `cols` columns; color always ends with the row. `pad`: the transcript's
+// side column by default; the chrome passes ansi.PAD.
+function paint(row: string, style: Style | undefined, cols: number, pad: string = ansi.side()): string {
 	let on = style ? ansi.sgr(style) : ''
-	if (!on) return ansi.PAD + row
-	let fill = style!.bg ? ' '.repeat(Math.max(0, cols - ansi.PAD.length - strings.visLen(row))) : ''
-	return on + ansi.PAD + row + fill + ansi.UNCOLOR
+	if (!on) return pad + row
+	let fill = style!.bg ? ' '.repeat(Math.max(0, cols - pad.length - strings.visLen(row))) : ''
+	return on + pad + row + fill + ansi.UNCOLOR
 }
 
 // Text wrapped to `width`; a word wider than that keeps a row of its
@@ -41,9 +53,9 @@ function wrap(text: string, width: number, keepLong = true): string[] {
 // (nothing else pads them), so the renderer writes them in one go and
 // the terminal soft-wraps them into one line: a URL there opens and
 // copies whole. Color ends only after the last one.
-function paintRows(row: string, style: Style | undefined, cols: number): string[] {
-	let full = ansi.PAD + row
-	if (strings.visLen(full) <= cols) return [ansi.paint(row, style, cols)]
+function paintRows(row: string, style: Style | undefined, cols: number, pad: string = ansi.side()): string[] {
+	let full = pad + row
+	if (strings.visLen(full) <= cols) return [ansi.paint(row, style, cols, pad)]
 	let on = style ? ansi.sgr(style) : ''
 	let out: string[] = []
 	let start = 0
@@ -101,10 +113,11 @@ export const ansi = {
 	// The host's web address and this client's link code, from its
 	// latest `auth` event (task e3); empty until one came.
 	state: { web: { url: '', code: '' } },
-	// The left blank column of every row; /gutter (Ctrl-G) toggles it.
-	// The right blank column stays: the cursor needs it at a full row.
+	// One blank column on each side of every row.
 	PAD: ' ',
-	inner: (cols: number): number => Math.max(1, cols - ansi.PAD.length - 1),
+	gutter: true,
+	side,
+	inner,
 	BOLD: '\x1b[1m',
 	UNBOLD: '\x1b[22m',
 	INVERSE: '\x1b[7m',

@@ -156,7 +156,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
 			// Counted from the end: the question above may flow on.
-			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
+			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.side().length + f.cursor.col }
 		} else {
 			let streams = item === streaming && view.hal?.at === 'stream'
 			// Adjacent results continue their call's card without a reference or gap.

@@ -1,5 +1,5 @@
-// /gutter (Ctrl-G): toggles the blank column at each side, so text
-// copied from the terminal starts at the edge.
+// /gutter (Ctrl-G): toggles the transcript's blank side columns, so
+// text copied from it reaches both edges.
 
 import { ansi } from '../ansi.ts'
 import { frame } from '../frame.ts'
@@ -8,7 +8,7 @@ import { render } from '../render.ts'
 
 export const command = {
 	run: (): void => {
-		ansi.PAD = ansi.PAD ? '' : ' '
+		ansi.gutter = !ansi.gutter
 		frame.state.rows = new WeakMap()
 		frame.state.peaks.clear()
 		frameLayout.state.history = undefined

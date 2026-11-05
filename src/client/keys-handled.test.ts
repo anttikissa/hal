@@ -49,7 +49,7 @@ afterEach(() => {
 	terminal.quit = saved.quit
 	render.request = saved.request
 	Object.assign(clipboard, saved.clipboard)
-	ansi.PAD = ' '
+	ansi.gutter = true
 	app.reset()
 })
 

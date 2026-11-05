@@ -193,7 +193,7 @@ function build(
 	let block = (rows: string[], style: Style | undefined) => {
 		if (!rows.length) return
 		lines.push('')
-		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
+		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols, ansi.PAD))
 	}
 	let formCursor = view.form ? past.formCursor : undefined
 	// The idle Hal cursor: a blank row, its row, and the blank row that
@@ -201,7 +201,7 @@ function build(
 	// It is the work now, so it comes before waiting messages (the future).
 	if (view.hal?.at === 'idle' && !formCursor) {
 		lines.push('')
-		lines.push(ansi.PAD + halCursor.glyph(view.hal))
+		lines.push(ansi.side() + halCursor.glyph(view.hal))
 	}
 	// Running background jobs stream here (task 6nn), then unsent and
 	// waiting messages use the normal prompt renderer; queued ones stack
@@ -267,7 +267,7 @@ function build(
 		lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
 	lines.push(rule(join(p.above ? `↑${p.above}` : '', s.topLeft()), s.topCenter(view.activity), s.topRight()))
 	let top = lines.length
-	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
+	for (let r of p.rows) lines.push(ansi.paint(r, input, cols, ansi.PAD))
 	lines.push(rule(join(p.below ? `↓${p.below}` : '', s.bottomLeft()), s.bottomCenter(), s.bottomRight()))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
