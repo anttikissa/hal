@@ -180,7 +180,7 @@ const UNUNDER = '\x1b[24m'
 
 // The painted row for a terminal `cols` wide.
 function row(list: Tab[], focused: string | undefined, cols: number, lit = true, alt = false): string {
-	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let width = ansi.inner(cols)
 	// A tab's number links to its web page (task e3).
 	let out = fit(list, focused, width, lit, alt).map((p) => {
 		let text = p.link ? `\x1b]8;;${ansi.webUrl(p.link)}\x07${p.text}${ansi.LINK_OFF}` : p.text
@@ -196,7 +196,7 @@ function row(list: Tab[], focused: string | undefined, cols: number, lit = true,
 // number and marker slot; none when no tab has a color.
 function overRow(list: Tab[], focused: string | undefined, cols: number): string | undefined {
 	if (!list.some((t) => t.color !== undefined)) return undefined
-	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let width = ansi.inner(cols)
 	let out = fit(list, focused, width).map((p) => {
 		let n = strings.visLen(p.text)
 		return p.over ? ansi.sgr({ fg: p.over }) + '▁'.repeat(n) + ansi.UNCOLOR : ' '.repeat(n)

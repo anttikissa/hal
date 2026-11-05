@@ -4,6 +4,7 @@ import { keyHelp, type Binding } from '../common/key-help.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import type { Snapshot } from '../common/snapshot.ts'
 import type { SessionState } from '../common/states.ts'
+import { ansi } from './ansi.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { clipboard } from './clipboard.ts'
@@ -48,6 +49,7 @@ afterEach(() => {
 	terminal.quit = saved.quit
 	render.request = saved.request
 	Object.assign(clipboard, saved.clipboard)
+	ansi.PAD = ' '
 	app.reset()
 })
 

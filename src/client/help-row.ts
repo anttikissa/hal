@@ -52,7 +52,7 @@ function paint(hints: Hint[]): string {
 // The painted row for a terminal `cols` wide; `resize` puts the prompt
 // resize keys first among the state's hints (task 0nj).
 function row(v: HelpInput, cols: number, resize = false): string {
-	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let width = ansi.inner(cols)
 	let h = colors.help()
 	let line = (text: string, fg = h.description!) =>
 		ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR

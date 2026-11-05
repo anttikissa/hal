@@ -1,0 +1,6 @@
+{
+	title: 'Ctrl-G toggles the terminal gutter',
+	spec: 'The client-only command /gutter, bound to Ctrl-G and listed in /keys under Clipboard, toggles the blank left column of every terminal row (transcript, prompt, tab, status and help rows), so text copied from the terminal starts at column 0. The right blank column stays, so the prompt cursor fits at a full row. One helper, ansi.inner(cols), gives every row width. Toggling clears the cached row layouts and repaints in full. The setting lasts for the client run; the old Hal had the same key (tasks/cc/terminal.md).',
+	status: 'done',
+	needs: ['cc']
+}

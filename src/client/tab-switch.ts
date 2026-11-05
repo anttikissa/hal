@@ -53,7 +53,7 @@ function backgroundStep(): void {
 	let shown = st.focus.tab
 	if (!st.painted || st.loading || st.timer || !connection.connected() || shown === undefined) return
 	let ids = st.tabs.map((tab) => tab.id)
-	let page = tabBar.page(st.tabs, ids.indexOf(shown), app.cols() - 2 * ansi.PAD.length - 6)
+	let page = tabBar.page(st.tabs, ids.indexOf(shown), ansi.inner(app.cols()) - 6)
 	let wanted = follow.wanted(ids, shown, page)
 	for (let id of st.background) {
 		let kept = st.hidden.get(id)

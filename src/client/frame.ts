@@ -92,7 +92,7 @@ export interface Frame {
 // The prompt's content width on a terminal `cols` wide: what Up/Down
 // move through.
 function promptWidth(cols: number): number {
-	return Math.max(1, cols - 2 * ansi.PAD.length)
+	return ansi.inner(cols)
 }
 
 // An item's painted rows on a terminal `cols` wide. An item with a
@@ -188,7 +188,7 @@ function build(
 	past: Past = frameLayout.layout(view, cols, Infinity, true, rows)!,
 	floor = 0,
 ): Frame {
-	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let width = ansi.inner(cols)
 	let lines: string[] = past.lines.slice()
 	let block = (rows: string[], style: Style | undefined) => {
 		if (!rows.length) return

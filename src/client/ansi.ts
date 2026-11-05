@@ -101,8 +101,10 @@ export const ansi = {
 	// The host's web address and this client's link code, from its
 	// latest `auth` event (task e3); empty until one came.
 	state: { web: { url: '', code: '' } },
-	// One blank column on each side of every row.
+	// The left blank column of every row; /gutter (Ctrl-G) toggles it.
+	// The right blank column stays: the cursor needs it at a full row.
 	PAD: ' ',
+	inner: (cols: number): number => Math.max(1, cols - ansi.PAD.length - 1),
 	BOLD: '\x1b[1m',
 	UNBOLD: '\x1b[22m',
 	INVERSE: '\x1b[7m',

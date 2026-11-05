@@ -11,6 +11,7 @@ import { drafts } from '../common/drafts.ts'
 import { app } from './app.ts'
 import type { KeyEvent } from './keys.ts'
 import { command as close } from './commands/close.ts'
+import { command as gutter } from './commands/gutter.ts'
 import { command as newTab } from './commands/new.ts'
 import { command as quit } from './commands/quit.ts'
 import { command as redraw } from './commands/redraw.ts'
@@ -23,7 +24,7 @@ import type { Event } from '../common/protocol.ts'
 
 export type ClientCommand = { run(): void }
 
-const all: Record<string, ClientCommand> = { close, new: newTab, quit, redraw, restart, resume, suspend }
+const all: Record<string, ClientCommand> = { close, gutter, new: newTab, quit, redraw, restart, resume, suspend }
 
 // Runs a command. Ctrl-M only asks for the model picker, to
 // this client alone and unrecorded (tasks/w4/forms.md, Provenance).

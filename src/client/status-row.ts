@@ -161,7 +161,7 @@ function fit(info: StatusInfo, cols: number): Part[] {
 // The painted row for a terminal `cols` wide.
 function row(info: StatusInfo, cols: number): string {
 	let base = ansi.sgr({ fg: colors.status().fg! })
-	let parts = statusRow.fit(info, Math.max(1, cols - 2 * ansi.PAD.length))
+	let parts = statusRow.fit(info, ansi.inner(cols))
 	// Neighboring parts with one href share a single link.
 	let link: string | undefined
 	let out = parts
