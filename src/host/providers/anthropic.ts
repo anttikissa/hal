@@ -15,7 +15,7 @@ export const provider: Provider & { knownModels: string[]; webSearchModels: stri
 		'claude-fable-5',
 		'claude-sonnet-5',
 	],
-	// Models offered Anthropic's web_search when Serper is unavailable (task a0z).
+	// Models offered Anthropic's web_search beside BRAVE (task a0z).
 	webSearchModels: [
 		'claude-opus-5-5',
 		'claude-sonnet-5-5',

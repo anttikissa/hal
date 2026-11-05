@@ -24,7 +24,7 @@ const origOnError = liveFiles.onError
 const origModels = synthetic.models
 const origPause = synthetic.pauseMs
 const originalKnown = models.known
-const keyNames = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENCODE_API_KEY', 'SERPER_API_KEY'] as const
+const keyNames = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENCODE_API_KEY'] as const
 const savedKeys = keyNames.map((key) => process.env[key])
 let home = ''
 
@@ -211,7 +211,7 @@ test('intro resumes through profile, save, model and secret search setup', async
 	expect(options.join()).not.toContain('/')
 	await reply(c, id, 'model', options[0]!, 'search')
 	await reply(c, id, 'search', 'Yes', 'key')
-	await reply(c, id, 'key', 'secret-SERPER-123', 'toolCards')
+	await reply(c, id, 'key', 'secret-BRAVE-123', 'toolCards')
 	// Sample cards come first: a thinking card and a real ls -l.
 	expect(
 		c.views.get(id)!.items.some((i) => i.type === 'thinking') && c.views.get(id)!.items.some((i) => i.type === 'tool'),
@@ -225,19 +225,19 @@ test('intro resumes through profile, save, model and secret search setup', async
 	// Language comes last; it joins the saved profile.
 	await reply(c, id, 'language', 'US English')
 	await until(() => c.of('turn-end').length > 0)
-	expect(apiKeys.get('serper')).toBe('secret-SERPER-123')
+	expect(apiKeys.get('brave')).toBe('secret-BRAVE-123')
 	expect(statSync(paths.authFile()).mode & 0o777).toBe(0o600)
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(
 		'<!-- This is a .gitignored file for any personal preferences, appended to system prompt. -->\n# User\n\nName: Rowan\nLanguage and tone: US English\n',
 	)
-	expect(readFileSync(history.file(id), 'utf8')).not.toContain('secret-SERPER-123')
-	expect(JSON.stringify(c.events)).not.toContain('secret-SERPER-123')
+	expect(readFileSync(history.file(id), 'utf8')).not.toContain('secret-BRAVE-123')
+	expect(JSON.stringify(c.events)).not.toContain('secret-BRAVE-123')
 	expect(sessions.open(id).model).toStartWith('anthropic/')
 	expect(readFileSync(paths.configFile(), 'utf8')).toContain(sessions.open(id).model)
 })
 
 test('with no credential the intro offers /login, pauses for it and goes on once signed in', async () => {
-	apiKeys.save('serper', 'existing-key')
+	apiKeys.save('brave', 'existing-key')
 	let c = client(),
 		id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
@@ -271,7 +271,7 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	expect(sessions.open(id).model).toBe('hal/intro')
 })
 
-test('the Serper step never traps: Maybe later, an empty key or Escape moves on and says how to set it up later', async () => {
+test('the Brave step never traps: Maybe later, an empty key or Escape moves on and says how to set it up later', async () => {
 	for (let skip of ['later', 'empty', 'escape']) {
 		let c = client(),
 			id = created(c)
@@ -288,15 +288,15 @@ test('the Serper step never traps: Maybe later, an empty key or Escape moves on 
 		await reply(c, id, 'theme', 'hal')
 		await reply(c, id, 'language', '')
 		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
-		expect(texts(c.views.get(id)!).join('\n').split('run /intro again to set up Serper')).toHaveLength(2)
+		expect(texts(c.views.get(id)!).join('\n').split('run /intro again to set up Brave Search')).toHaveLength(2)
 		// Login was skipped: the close points to /login.
 		expect(texts(c.views.get(id)!).at(-1)).toContain('/login')
-		expect(apiKeys.get('serper')).toBeUndefined()
+		expect(apiKeys.get('brave')).toBeUndefined()
 	}
 })
 
 test('/intro switches a tab back to hal/intro and greets again at once', async () => {
-	apiKeys.save('serper', 'existing-key')
+	apiKeys.save('brave', 'existing-key')
 	synthetic.models.asker = () => ({ say: 'ok' })
 	let c = client(),
 		id = created(c, 'hal/asker')

@@ -24,7 +24,7 @@ beforeEach(() => {
 		ason.stringify({
 			anthropic: { accessToken: 'a1', email: 'a@example.com' },
 			openai: [{ accessToken: 'o1' }, { accessToken: 'o2' }, { accessToken: 'o3' }, { apiKey: 'o4' }],
-			serper: { apiKey: 's' },
+			brave: { apiKey: 's' },
 		}),
 	)
 })
@@ -43,7 +43,7 @@ test('removes the named accounts across providers and keeps the rest', () => {
 	expect(command.run('o2 o4 a1', undefined, ctx)).toEqual({
 		say: 'logged out of a1 a@example.com, o2 account 2, o4 account 4',
 	})
-	expect(disk()).toEqual({ openai: [{ accessToken: 'o1' }, { accessToken: 'o3' }], serper: { apiKey: 's' } })
+	expect(disk()).toEqual({ openai: [{ accessToken: 'o1' }, { accessToken: 'o3' }], brave: { apiKey: 's' } })
 })
 
 test('refuses unknown ids and environment keys, changing nothing', () => {

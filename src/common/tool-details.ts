@@ -120,6 +120,7 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'command':
 			if (str('command')) return { text: str('command')!, key: 'command' }
 			break
+		case 'brave':
 		case 'google':
 			if (str('query')) return { text: marked(str('query')!), key: 'query' }
 			break
@@ -319,7 +320,7 @@ function limit(name: string, input: Record<string, unknown>): string | undefined
 
 // Built-in tools that change nothing (host tools.readOnly): an edit of
 // a prompt before them leaves the world as it was.
-const readOnly: ReadonlySet<string> = new Set(['read', 'grep', 'inspect', 'google', 'wait', 'help'])
+const readOnly: ReadonlySet<string> = new Set(['read', 'grep', 'inspect', 'brave', 'wait', 'help'])
 
 // Discovery and history commands open directly to their complete output (18n).
 const fullCommand = (name: string, input: Record<string, unknown>): boolean =>

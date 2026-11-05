@@ -8,7 +8,7 @@ Layout:
 - tasks/README.md states the invariant: credentials, tokens and private keys live only in secrets/; logs, diagnostics, caches and transcripts never hold them.
 
 Secret files (move into secrets/):
-- auth.ason (now home root): Anthropic and OpenAI OAuth access and refresh tokens, provider API keys, the Serper key; also account emails and plans. Written by /login and refreshed in place by auth.ts; nobody copies it between hosts any more, since a copy breaks token refresh.
+- auth.ason (now home root): Anthropic and OpenAI OAuth access and refresh tokens, provider API keys, the Brave Search key; also account emails and plans. Written by /login and refreshed in place by auth.ts; nobody copies it between hosts any more, since a copy breaks token refresh.
 - state/remote.ason (client side, task tr): the last remote host and a plaintext web session token per host. Each token is a working hal= cookie for that host and lasts tokenMs() (10 years).
 - state/push-vapid.ason (task m1): the VAPID private key; it lets anyone send push messages as this host.
 - state/push-subscriptions.ason (task m1): each browser's push endpoint with its auth and p256dh keys; together they let anyone push to that device.

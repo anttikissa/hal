@@ -9,6 +9,7 @@ import { icons, type IconName } from './icons.ts'
 const toolIcons: Record<string, IconName> = {
 	read: 'read',
 	edit: 'scissors',
+	brave: 'web',
 	google: 'google',
 	send: 'message',
 	wait: 'wait',

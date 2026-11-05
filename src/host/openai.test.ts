@@ -9,7 +9,6 @@ import { auth } from './auth.ts'
 import { limits } from './limits.ts'
 import { models } from './models.ts'
 import { openai } from './openai.ts'
-import { tools } from './tools.ts'
 import { nativeTool } from './native-tool.ts'
 import {
 	completed,
@@ -127,24 +126,11 @@ test('history maps to Responses input, replaying only its own reasoning', async 
 	expect(body.include).toEqual(['reasoning.encrypted_content'])
 })
 
-test('native search requires an allowlisted model, Hal tools, and absent or disabled Serper', () => {
+test('native search requires an allowlisted model and Hal tools', () => {
 	let req = { model: 'gpt-6.1-sol', messages: hi, tools: [nativeTool.def()] }
 	for (let codex of [false, true]) expect(openai.body(req, codex).tools).toContainEqual({ type: 'web_search' })
 	expect(openai.body({ ...req, tools: [] }, true).tools).toBeUndefined()
 	expect(openai.body({ ...req, model: 'gpt-4o-mini' }, true).tools).not.toContainEqual({ type: 'web_search' })
-	writeAuth({ serper: { apiKey: 'serper-test' } })
-	expect(openai.body(req, true).tools).not.toContainEqual({ type: 'web_search' })
-	let all = tools.all
-	try {
-		tools.all = () => all().filter((t) => t.name !== 'google')
-		expect(openai.body(req, true).tools).toContainEqual({ type: 'web_search' })
-	} finally {
-		tools.all = all
-	}
-	process.env.SERPER_API_KEY = 'env-serper-test'
-	rmSync(`${fake.home}/secrets/auth.ason`)
-	auth.close()
-	expect(openai.body(req, false).tools).not.toContainEqual({ type: 'web_search' })
 })
 
 test('recorded native search becomes readable history without a local tool round or duplicate citations', async () => {

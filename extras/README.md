@@ -24,5 +24,8 @@ extra itself take effect when the host restarts.
   each commit shows in the foreground.
 - `codex-hooks.ts` and `claude-hooks.ts`: explicitly trusted command hooks
   and hooks bundled in local plugin packages. See [setup and coverage](hooks.md).
+- `serper.ts`: the GOOGLE tool, Google results through Serper, with
+  `serper: { apiKey }` in the credentials file. Hal's built-in web
+  search is BRAVE. Also a short example of a plugin tool.
 - `pi-compat.ts`: command-only Pi extensions, including unmodified `pi-simplify`.
   See [setup and supported APIs](pi-compat.md).

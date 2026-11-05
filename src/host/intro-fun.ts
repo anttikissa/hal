@@ -54,7 +54,7 @@ function help(text: string): string | undefined {
 			/\bmodels?\b/i,
 			'/model picks a model. Built-in hal/ models need no credentials; provider models need /login or an API key.',
 		],
-		[/\b(?:search|find)\b/i, 'Ctrl-F searches your sessions. For web search, /intro can help set up a Serper key.'],
+		[/\b(?:search|find)\b/i, 'Ctrl-F searches your sessions. For web search, /intro can help set up a Brave Search key.'],
 		[/\b(?:theme|colors?|colours?)\b/i, '/theme changes the color theme.'],
 		[
 			/\b(?:browser|web client)\b/i,

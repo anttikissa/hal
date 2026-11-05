@@ -354,7 +354,7 @@ test('stop reasons map to neutral ones; a call cut off by max_tokens keeps its r
 	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
 })
 
-test('native search is offered to allowlisted models without Serper and becomes a hosted card with sources', async () => {
+test('native search is offered to allowlisted models and becomes a hosted card with sources', async () => {
 	let search = { type: 'web_search_20250305', name: 'web_search' }
 	let req = {
 		model: 'claude-opus-5-5',
@@ -363,13 +363,10 @@ test('native search is offered to allowlisted models without Serper and becomes 
 	}
 	expect(anthropic.body(req, true).tools).toContainEqual(search)
 	expect(anthropic.body({ ...req, model: 'claude-old-1' }, true).tools).not.toContainEqual(search)
-	writeFileSync(
-		`${home}/secrets/auth.ason`,
-		ason.stringify({ anthropic: { apiKey: 'sk-test' }, serper: { apiKey: 'serper-test' } }) + '\n',
-		{ mode: 0o600 },
-	)
+	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'sk-test' } }) + '\n', {
+		mode: 0o600,
+	})
 	auth.close()
-	expect(anthropic.body(req, true).tools).not.toContainEqual(search)
 	let recording = await Bun.file(`${import.meta.dir}/../fixtures/anthropic-search.sse`).text()
 	reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
 	let turn = blocks.collect(await run(), 'anthropic')

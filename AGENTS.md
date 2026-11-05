@@ -218,7 +218,7 @@ with an explanation and the canonical syntax.
 
 - Add Hal capabilities behind the native `tool`, including in plugins
   and benchmark builds. Provider-hosted search is an exception for
-  explicitly supported models when Serper is unavailable (task a0z).
+  explicitly supported models (task a0z).
   Tools disclose detail progressively (HELP) and let Hal's tool set
   change without busting the prompt cache.
 - When you add or change a slash command, its `complete` offers every

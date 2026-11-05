@@ -14,7 +14,7 @@ import { usage } from './usage.ts'
 import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
-const saved = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, SERPER_API_KEY: process.env.SERPER_API_KEY }
+const saved = { OPENAI_API_KEY: process.env.OPENAI_API_KEY }
 const orig = {
 	apiUrl: openai.apiUrl,
 	codexUrl: openai.codexUrl,
@@ -66,7 +66,6 @@ export function useFakeOpenai(): void {
 		paths.state.home = fake.home
 		mkdirSync(`${fake.home}/state`)
 		delete process.env.OPENAI_API_KEY
-		delete process.env.SERPER_API_KEY
 		fake.seen = []
 		fake.catalogReply = undefined
 		fake.reply = () => sse(completed())

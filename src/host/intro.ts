@@ -9,7 +9,6 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { settings } from '../common/settings.ts'
 import { apiKeys } from './api-keys.ts'
-import { auth } from './auth.ts'
 import { config } from './config.ts'
 import { introAccounts } from './intro-accounts.ts'
 import { liveFiles } from './live-file.ts'
@@ -246,7 +245,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		{
 			say: `${greeting}
 
-I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
+I have ${words[5 + (apiKeys.get('brave') ? 0 : 1)]} questions for you.`,
 			ask,
 		}
 	)
@@ -349,28 +348,28 @@ I have ${words[5 + (auth.serperKey() ? 0 : 1)]} questions for you.`,
 				))
 
 	let search = answered(run, 'search')
-	let later = 'If you change your mind, run /intro again to set up Serper.'
-	if (!auth.serperKey() && search === undefined)
+	let later = 'If you change your mind, run /intro again to set up Brave Search.'
+	if (!apiKeys.get('brave') && search === undefined)
 		return reply({
-			say: 'Recommended: [Serper](https://serper.dev/signup) adds uniform Google search results for all models. Its free tier goes a long way. OpenAI and Anthropic can use their native web search as a fallback.',
+			say: 'Recommended: [Brave Search](https://api-dashboard.search.brave.com/register) adds uniform web search for all models. Its $5 monthly free credit covers about 1,000 searches. OpenAI and Anthropic models also have their native web search.',
 			ask: {
-				text: 'Set up a Serper web search key?',
+				text: 'Set up a Brave Search key?',
 				fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }],
 			},
 		})
-	if (search === 'Maybe later' && !auth.serperKey() && !said(run, later)) say.push(later)
+	if (search === 'Maybe later' && !apiKeys.get('brave') && !said(run, later)) say.push(later)
 	// An empty key or Escape skips: the step must never trap the user.
-	if (search === 'Yes' && !auth.serperKey()) {
+	if (search === 'Yes' && !apiKeys.get('brave')) {
 		// Secrets stay out of history: only this turn's answers hold the key.
 		let key = answers?.key ?? (replied(run, 'key') ? '' : undefined)
 		if (key === undefined)
 			return reply({
 				ask: {
-					text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.',
-					fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }],
+					text: 'Paste your Brave Search API key (it will not be shown or saved in conversation history). Empty skips.',
+					fields: [{ type: 'secret', name: 'key', label: 'Brave Search API key' }],
 				},
 			})
-		if (key.trim()) apiKeys.save('serper', key.trim())
+		if (key.trim()) apiKeys.save('brave', key.trim())
 		else if ((answers?.key !== undefined || !replied(run, 'language')) && !said(run, later)) say.push(later)
 	}
 	// Card verbosity (task 5zq): sample cards first, then the question,

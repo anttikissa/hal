@@ -1,5 +1,5 @@
 {
-	version: 23,
+	version: 24,
 	changes: [
 		{
 			version: 2,
@@ -348,6 +348,23 @@
 					target: 'host/warnings.uncaught',
 					description: 'Removes uncaught and state.uncaught',
 					port: 'Catch recoverable failures at their operation boundary'
+				}
+			]
+		},
+		{
+			version: 24,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/tools/google',
+					description: 'Removed; built-in search is host/tools/brave',
+					port: 'Enable extras/serper.ts for the GOOGLE tool'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/auth.serperKey',
+					description: 'Removed',
+					port: "Use apiKeys.get('serper') from host/api-keys"
 				}
 			]
 		}

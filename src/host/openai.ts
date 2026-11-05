@@ -17,7 +17,6 @@ import { diag } from './diag.ts'
 import { provider, type ProviderImage, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
 import { openaiWs } from './openai-ws.ts'
-import { tools } from './tools.ts'
 
 const claims = (token: string) => catalog.claims(token)
 
@@ -93,12 +92,7 @@ function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<st
 			description: t.description,
 			parameters: t.inputSchema,
 		}))
-		if (
-			webSearch &&
-			req.tools.some((t) => t.name === 'tool') &&
-			catalog.webSearchModels.includes(req.model) &&
-			(!auth.serperKey() || !tools.all().some((t) => t.name === 'google'))
-		) {
+		if (webSearch && req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model)) {
 			;(b.tools as unknown[]).push({ type: 'web_search' })
 			b.include = ['web_search_call.action.sources']
 		}

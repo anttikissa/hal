@@ -14,7 +14,6 @@ import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
 import { provider as catalog } from './providers/anthropic.ts'
-import { tools as registry } from './tools.ts'
 
 // OAuth tokens are rejected (disguised as a 429) unless the first system
 // block is one of the Claude Code identities; this one claims least.
@@ -127,14 +126,8 @@ function body(req: ProviderRequest, oauth: boolean, webSearch = true): Record<st
 				? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } }
 				: { input_schema: t.inputSchema }),
 		}))
-	if (
-		webSearch &&
-		req.tools?.some((t) => t.name === 'tool') &&
-		catalog.webSearchModels.includes(req.model) &&
-		(!auth.serperKey() || !registry.all().some((t) => t.name === 'google'))
-	) {
-		;(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
-	}
+	if (webSearch && req.tools?.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model))
+		(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = {
