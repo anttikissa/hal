@@ -41,14 +41,15 @@ function styled(r: Run, text: string, style?: Style): string {
 // takes the styles of the runs its columns came from. `keepLong`: a
 // word wider than `width` keeps a row of its own (ansi.paintRows lets
 // the terminal soft-wrap it); table cells break it instead.
-function wrapRuns(runs: Run[], width: number, keepLong = false, style?: Style): string[] {
-	let plain = runs.map((r) => r.text).join('')
+// `lead`: columns the first row leaves free, for what its block draws there.
+function wrapRuns(runs: Run[], width: number, keepLong = false, style?: Style, lead = 0): string[] {
+	let plain = '\u00a0'.repeat(lead) + runs.map((r) => r.text).join('')
 	let at = 0
 	return strings.wordWrap(plain, width, keepLong).map((row) => {
 		let from = plain.indexOf(row, at)
 		at = from + row.length
 		let out = ''
-		let pos = 0
+		let pos = lead
 		for (let r of runs) {
 			let a = Math.max(from, pos)
 			let b = Math.min(at, pos + r.text.length)
@@ -112,7 +113,7 @@ function table(rows: Run[][][], width: number, style?: Style): string[] {
 }
 
 // `style`: the item's, whose fg the quieter rules and labels come back to.
-function block(b: Block, width: number, style?: Style): string[] {
+function block(b: Block, width: number, style?: Style, lead = 0): string[] {
 	if (b.type === 'table') return markdownView.table(b.rows, width, style)
 	if (b.type === 'code') {
 		// Fences hidden as on the web; the language, if any, shown quietly.
@@ -138,12 +139,12 @@ function block(b: Block, width: number, style?: Style): string[] {
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)
-	let rows = wrapRuns(b.runs, Math.max(1, width - indent), true, style)
+	let rows = wrapRuns(b.runs, Math.max(1, width - indent), true, style, lead)
 	return rows.map((r, i) => (i && b.kind !== 'quote' ? ' '.repeat(indent) : marker) + r)
 }
 
 // Rows of model text at `width` columns; `streaming`: it may still grow.
-function lines(text: string, width: number, streaming = false, style?: Style, links?: Links): string[] {
+function lines(text: string, width: number, streaming = false, style?: Style, links?: Links, lead = 0): string[] {
 	let source = strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n')))
 	// While streaming, hold back an unfinished last line that is empty or may
 	// still become a fence, so its row never appears and then vanishes.
@@ -151,7 +152,9 @@ function lines(text: string, width: number, streaming = false, style?: Style, li
 	let blocks = markdown.parse(source, streaming, links)
 	let gap = (b: Block | undefined) => b?.type === 'line' && b.kind === 'p' && !b.marker && !b.runs.length
 	let closed = (b: Block | undefined) => b?.type === 'code' && b.close !== undefined
-	let rows = blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
+	let rows = blocks.flatMap((b, i) =>
+		gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style, i ? 0 : lead),
+	)
 	// The closing fence's blank row is a gap before more text; at the end of the text
 	// it would vanish on completion, and the high-water mark would keep it as blank.
 	if (streaming && closed(blocks.at(-1))) rows.pop()

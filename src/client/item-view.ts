@@ -235,23 +235,28 @@ function itemLines(
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
 			let stamp = titles.time(item.ts)
+			let lead = stamp ? strings.visLen(stamp) + 1 : 0
 			let body = markdownView.lines(
 				item.text.trim(),
-				Math.max(1, width - (stamp ? strings.visLen(stamp) + 1 : 0)),
+				width,
 				streaming,
 				itemView.itemStyle(item),
 				session ? markdown.blockLinks(session, key) : undefined,
+				lead + width - hw,
 			)
 			if (fold === 'short') {
 				while (body.length > 1 && !Bun.stripANSI(body.at(-1)!).trim()) body.pop()
 				let total = body.length
 				body = body.slice(-settings.shortRows())
 				while (body.length > 1 && !Bun.stripANSI(body[0]!).trim()) body.shift()
+				// A row from the middle loses its start to fit beside the time and id.
+				let n = strings.visLen(body[0]!)
+				if (total > body.length && n > hw - lead) body[0] = '…' + strings.sliceVisual(body[0]!, n - hw + lead + 1, n)
 				if (total > body.length)
 					body[body.length - 1] = itemView.right(
 						body.at(-1) ?? '',
 						ansi.quiet(`… ${total - body.length} earlier lines`, itemView.itemStyle(item)),
-						width - (body.length === 1 && stamp ? strings.visLen(stamp) + 1 : 0),
+						body.length === 1 ? hw - lead : width,
 					)
 			}
 			body = body.map((row) => `\x1b[3m${row.replaceAll('\x1b[23m', '\x1b[3m')}\x1b[23m`)
@@ -440,9 +445,9 @@ function right(row: string, end: string, width: number): string {
 	return text + ' '.repeat(width - strings.visLen(text) - strings.visLen(end)) + end
 }
 
-// The text width beside an item's id, and how to put the id on row
-// `at`, after `status` if there is one; the row is clipped to make room.
-// `head`: the room the title row has left of them.
+// An item's text width, and how to put its status and id at the right
+// of row `at`, clipping the row to make room. `head`: the room the
+// title row has left of them.
 function place(
 	item: Keyed,
 	cols: number,
@@ -456,16 +461,13 @@ function place(
 	let ref = itemView.ref(item, session, call)
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
-	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
-	if (item.type === 'tool' && item.name === 'edit') status = strings.clipVisual(status, Math.floor(inner / 3))
+	if (item.type === 'tool' && item.name === 'edit') status = strings.clipVisual(status, Math.floor(width / 3))
+	let link = ref ? ansi.heading(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
+	let end = status && link ? `${status} ${link}` : status || link
 	let mark = (lines: string[], at: number) => {
-		if ((!ref && !status) || lines.length <= at) return
-		let link = ref ? ansi.heading(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
-		let end = status && link ? `${status} ${link}` : status || link
-		if (status) lines[at] = itemView.right(lines[at]!, end, width)
-		else lines[at] += ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref!.text))) + link
+		if (end && lines.length > at) lines[at] = itemView.right(lines[at]!, end, width)
 	}
-	return { inner, head: status ? Math.max(1, inner - strings.visLen(status) - 2) : inner, mark }
+	return { inner: width, head: end ? Math.max(1, width - strings.visLen(end) - 2) : width, mark }
 }
 
 function receipt(item: Item, style?: Style): string {
