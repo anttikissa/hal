@@ -1,0 +1,10 @@
+{
+	title: 'Web copy puts plain text only',
+	spec: 'Copying a selection from the web page outside text fields puts only text/plain, the selected text, on the clipboard: mail clients and documents paste no transcript colors, fonts or backgrounds. Text fields keep their native copy.',
+	status: 'done',
+	notes: [
+		'A one-off Chromium check dispatched a copy event over a selected status name: the clipboard held only text/plain equal to the selection; at HEAD it also held text/html.'
+	],
+	needs: ['1j'],
+	foldInto: ['1j']
+}

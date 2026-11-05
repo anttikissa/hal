@@ -199,6 +199,13 @@ export function Chat() {
 			if (e.clipboardData && keys.paste(e.clipboardData, target(e))) e.preventDefault()
 			flush()
 		}
+		// Copy plain text only: mail and documents otherwise paste the transcript's colors and font.
+		let onCopy = (e: ClipboardEvent) => {
+			let text = document.getSelection()?.toString()
+			if (!text || !e.clipboardData || (e.target as Element).closest?.('textarea, input')) return
+			e.clipboardData.setData('text/plain', text)
+			e.preventDefault()
+		}
 		let files = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
 		let onDrag = (e: DragEvent) => {
 			if (!files(e)) return
@@ -223,6 +230,7 @@ export function Chat() {
 		for (let [k, f] of drags) document.addEventListener(k, f)
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
+		document.addEventListener('copy', onCopy)
 		let stop = viewport.page()
 		let stopFlash = flash.buttons()
 		let stopTap = viewport.statusTap(() =>
@@ -232,6 +240,7 @@ export function Chat() {
 		return () => {
 			document.removeEventListener('keydown', onKey)
 			document.removeEventListener('paste', onPaste)
+			document.removeEventListener('copy', onCopy)
 			for (let [k, f] of drags) document.removeEventListener(k, f)
 			stop()
 			stopTap()
