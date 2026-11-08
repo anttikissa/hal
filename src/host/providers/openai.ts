@@ -77,7 +77,6 @@ export const provider: Provider & {
 		'gpt-5.3-codex',
 	],
 	known: (): string[] => provider.knownModels,
-	effort: (_model: string): string | undefined => undefined,
 	available: () => providers.available('openai'),
 	request: (req) => load().request(req),
 	parse: (messages) => load().parse(messages),

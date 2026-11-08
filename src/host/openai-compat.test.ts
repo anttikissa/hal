@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Message, StreamEvent } from '../common/blocks.ts'
-import { openaiCompat } from './openai-compat.ts'
+import { compatCatalog } from './compat-catalog.ts'
 import { provider } from './provider.ts'
 import { paths } from './paths.ts'
 
@@ -20,7 +20,7 @@ function sse(...chunks: unknown[]): Response {
 	return new Response(text, { headers: { 'content-type': 'text/event-stream' } })
 }
 
-const originalEndpoints = openaiCompat.endpoints
+const originalEndpoints = compatCatalog.endpoints
 const originalKey = process.env.FAKE_COMPAT_KEY
 
 beforeEach(() => {
@@ -41,12 +41,12 @@ beforeEach(() => {
 			return reply()
 		},
 	})
-	openaiCompat.endpoints = () => ({
+	compatCatalog.endpoints = () => ({
 		fake: { baseUrl: `http://localhost:${server.port}/v1/`, keyEnv: 'FAKE_COMPAT_KEY' },
 		local: { baseUrl: `http://localhost:${server.port}/v1` },
 	})
 	process.env.FAKE_COMPAT_KEY = 'sk-test'
-	openaiCompat.init()
+	for (let name of Object.keys(compatCatalog.endpoints())) provider.register(name, compatCatalog.create(name))
 })
 
 afterEach(() => {
@@ -54,7 +54,7 @@ afterEach(() => {
 	else paths.state.home = savedHome
 	rmSync(home, { recursive: true, force: true })
 	server.stop(true)
-	openaiCompat.endpoints = originalEndpoints
+	compatCatalog.endpoints = originalEndpoints
 	provider.state.providers = {}
 	if (originalKey === undefined) delete process.env.FAKE_COMPAT_KEY
 	else process.env.FAKE_COMPAT_KEY = originalKey

@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 04/10: Providers and accounts',
 	spec: 'Under task nt8, provider adapters, model/effort selection, authentication, account usage and cost have documented ownership. Review repeated caller obligations while keeping meaningful provider differences explicit and credentials protected. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed provider.ts, providers.ts, providers/*.ts, anthropic.ts, openai.ts, openai-compat.ts, compat-catalog.ts, status-usage.ts, models.ts, auth.ts (export use scan). Accepted (2dd): removed test-only anthropic.init/openai.init/openaiCompat.init second registration paths; removed getter/setter forwarders to catalog fields; removed openai effort() that always returned undefined; removed duplicate inner capability() and models deletion in openai-compat create (compatCatalog.create already does both); inlined claims and reset aliases. Tests now register the production provider objects. Source 1295 -> 1203 nonblank lines. Rejected: merging the two known/web-search model lists (identical for Anthropic today but separate decisions); auth.ts and models.ts members are each used and carry distinct policy.'
+	],
+	needs: ['2dd']
 }

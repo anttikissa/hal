@@ -14,6 +14,7 @@ import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { modelsDev } from './models-dev.ts'
+import { compatCatalog } from './compat-catalog.ts'
 import { openaiCompat } from './openai-compat.ts'
 import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -22,7 +23,7 @@ import { paths } from './paths.ts'
 
 const savedHome = paths.state.home
 const saved = { OPENCODE_API_KEY: process.env.OPENCODE_API_KEY }
-const orig = { endpoints: openaiCompat.endpoints, pollMs: auth.pollMs, onError: liveFiles.onError }
+const orig = { endpoints: compatCatalog.endpoints, pollMs: auth.pollMs, onError: liveFiles.onError }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: Headers[] = []
@@ -78,10 +79,10 @@ beforeEach(() => {
 	})
 	// The real endpoint, pointed at the fake server.
 	let real = orig.endpoints()['opencode-go']!
-	openaiCompat.endpoints = () => ({
+	compatCatalog.endpoints = () => ({
 		'opencode-go': { ...real, baseUrl: `http://127.0.0.1:${server.port}/inference/go/openai/v1` },
 	})
-	openaiCompat.init()
+	for (let name of Object.keys(compatCatalog.endpoints())) provider.register(name, compatCatalog.create(name))
 	liveFiles.onError = () => {}
 })
 

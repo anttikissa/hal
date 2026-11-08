@@ -10,6 +10,7 @@ import { limits } from './limits.ts'
 import { openai } from './openai.ts'
 import { openaiWs } from './openai-ws.ts'
 import { provider } from './provider.ts'
+import { provider as catalog } from './providers/openai.ts'
 import { usage } from './usage.ts'
 import { paths } from './paths.ts'
 
@@ -119,7 +120,7 @@ export function useFakeOpenai(): void {
 		openai.codexUrl = `http://127.0.0.1:${fake.server.port}/codex/responses`
 		openai.codexModelsUrl = `http://127.0.0.1:${fake.server.port}/codex/models`
 		auth.tokenUrl = () => `http://127.0.0.1:${fake.server.port}/token`
-		openai.init()
+		provider.register('openai', catalog)
 	})
 
 	afterEach(() => {

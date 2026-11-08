@@ -329,18 +329,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	}
 }
 
-// Registers the provider. Idempotent.
-function init(): void {
-	provider.register('anthropic', {
-		request: anthropic.request,
-		parse: anthropic.parse,
-		rejected: (account) => auth.rejected(account),
-		spent: (account) => auth.spent(account),
-		models: (signal) => anthropic.models(signal),
-		known: () => anthropic.knownModels,
-	})
-}
-
 export const anthropic = {
 	// ?beta=true is required for OAuth tokens; without it requests land
 	// on a pool that answers 529 overloaded far more often.
@@ -348,18 +336,10 @@ export const anthropic = {
 	// Current Claude models allow at least 64k output: big file writes.
 	maxTokens: 64_000,
 	thinkingBudget: 10_000,
-	// Offered when neither the account's list nor models.dev has any.
-	get knownModels() {
-		return catalog.knownModels
-	},
-	set knownModels(value: string[]) {
-		catalog.knownModels = value
-	},
 	toMessages,
 	body,
 	headers,
 	request,
 	models,
 	parse,
-	init,
 }

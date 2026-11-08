@@ -7,6 +7,7 @@ import { settings } from '../common/settings.ts'
 import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
 import { provider } from './provider.ts'
+import { provider as catalog } from './providers/anthropic.ts'
 import { tool as bash } from './tools/bash.ts'
 import { nativeTool } from './native-tool.ts'
 import { paths } from './paths.ts'
@@ -67,7 +68,7 @@ beforeEach(() => {
 	})
 	anthropic.apiUrl = `http://127.0.0.1:${server.port}/v1/messages?beta=true`
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
-	anthropic.init()
+	provider.register('anthropic', catalog)
 })
 
 afterEach(() => {

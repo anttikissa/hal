@@ -1,0 +1,6 @@
+{
+	title: 'Providers register through one catalog object each',
+	spec: 'Each built-in provider (Anthropic, OpenAI, OpenAI-compatible endpoints) has one registered Provider object: providers/*.ts for Anthropic and OpenAI, compatCatalog.create for the compatible endpoints. Implementation modules (anthropic.ts, openai.ts, openai-compat.ts) expose wire functions only; they do not re-export catalog fields through getters or keep a second registration path. Tests register the same objects production uses. status-usage.ts calls usageWindows.reset directly.',
+	status: 'done',
+	needs: []
+}

@@ -9,6 +9,7 @@ import { auth } from './auth.ts'
 import { limits } from './limits.ts'
 import { models } from './models.ts'
 import { openai } from './openai.ts'
+import { provider as catalog } from './providers/openai.ts'
 import { nativeTool } from './native-tool.ts'
 import {
 	completed,
@@ -274,11 +275,11 @@ test('a ChatGPT login lists only the models the Codex backend shows it', async (
 	expect(fake.seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	writeAuth({ openai: { apiKey: 'sk-file' } })
 	auth.close()
-	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(openai.knownModels))
+	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(catalog.knownModels))
 })
 
 test('the picker offers models.dev ids and the known GPT ids; a subscription caps input at 272k', () => {
-	expect(models.known()).toEqual(expect.arrayContaining(openai.knownModels.map((m) => `openai/${m}`)))
+	expect(models.known()).toEqual(expect.arrayContaining(catalog.knownModels.map((m) => `openai/${m}`)))
 	writeAuth({ openai: { accessToken: subscriptionToken } })
 	expect(models.contextWindow('openai/gpt-5.5')).toBe(272_000)
 	writeAuth({ openai: { apiKey: 'sk-file' } })
@@ -297,7 +298,7 @@ test('model discovery unions account catalogs rather than the request account an
 			).map((slug) => ({ slug, visibility: 'list' })),
 		})
 	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol'])
-	let key = openai.modelsKey()
+	let key = catalog.modelsKey()
 	fake.catalogReply = (req) =>
 		req.headers.get('chatgpt-account-id') === 'acct-1'
 			? new Response(null, { status: 401 })
@@ -305,7 +306,7 @@ test('model discovery unions account catalogs rather than the request account an
 	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-astra'])
 	auth.close()
 	writeAuth({ openai: { accessToken: other } })
-	expect(openai.modelsKey()).not.toBe(key)
+	expect(catalog.modelsKey()).not.toBe(key)
 	fake.catalogReply = () => new Response(null, { status: 401 })
 	await expect(openai.listModels(new AbortController().signal)).rejects.toThrow('No OpenAI model catalog available')
 })

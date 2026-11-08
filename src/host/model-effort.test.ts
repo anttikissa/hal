@@ -6,6 +6,7 @@ import { models } from './models.ts'
 import { provider } from './provider.ts'
 import { anthropic } from './anthropic.ts'
 import { openai } from './openai.ts'
+import { compatCatalog } from './compat-catalog.ts'
 import { openaiCompat } from './openai-compat.ts'
 
 useHost()
@@ -77,7 +78,7 @@ test('gateway metadata distinguishes missing/null effort values and mandatory th
 	let fetch = provider.fetch
 	let endpoint = openaiCompat.endpoint
 	let registered = provider.state.providers.openrouter
-	let p = openaiCompat.create('openrouter')
+	let p = compatCatalog.create('openrouter')
 	provider.state.providers.openrouter = p
 	openaiCompat.endpoint = () => ({ base: 'https://example.com', headers: {} })
 	provider.fetch = async () =>
@@ -98,8 +99,8 @@ test('gateway metadata distinguishes missing/null effort values and mandatory th
 		expect((await p.request({ model: 'limited', effort: 'low', messages: [] })).body).toMatchObject({
 			reasoning: { effort: 'low' },
 		})
-		openaiCompat.state.capabilities.clear()
-		openaiCompat.state.catalog = ''
+		compatCatalog.state.capabilities.clear()
+		compatCatalog.state.catalog = ''
 		provider.fetch = async () => {
 			throw new Error('No HTTP during capability restore')
 		}
@@ -112,6 +113,6 @@ test('gateway metadata distinguishes missing/null effort values and mandatory th
 		openaiCompat.endpoint = endpoint
 		if (registered) provider.state.providers.openrouter = registered
 		else delete provider.state.providers.openrouter
-		openaiCompat.state.capabilities.clear()
+		compatCatalog.state.capabilities.clear()
 	}
 })

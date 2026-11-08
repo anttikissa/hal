@@ -1,5 +1,5 @@
 {
-	version: 27,
+	version: 28,
 	changes: [
 		{
 			version: 2,
@@ -449,6 +449,53 @@
 					target: 'host/turns.leftWork',
 					description: 'Removed',
 					port: 'Use turnRecovery.leftWork'
+				}
+			]
+		},
+		{
+			version: 28,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/anthropic.init',
+					description: 'Removed',
+					port: 'Use provider.register with providers/anthropic.ts'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/anthropic.knownModels',
+					description: 'Removed',
+					port: 'Use providers/anthropic.ts provider.knownModels'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/openai.init',
+					description: 'Removed',
+					port: 'Use provider.register with providers/openai.ts'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/openai.knownModels',
+					description: 'Removed',
+					port: 'Use providers/openai.ts provider fields'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/openai-compat.init',
+					description: 'Removed',
+					port: 'Use provider.register with compatCatalog.create'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/openai-compat.endpoints',
+					description: 'Removed',
+					port: 'Use compatCatalog.endpoints'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/status-usage.reset',
+					description: 'Removed',
+					port: 'Use usageWindows.reset'
 				}
 			]
 		}

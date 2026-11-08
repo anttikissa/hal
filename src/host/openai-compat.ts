@@ -148,7 +148,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 // The endpoint's base URL and headers. Read at call time so local.ts
 // and env changes apply.
 function endpoint(name: string): { base: string; headers: Record<string, string> } {
-	let ep = openaiCompat.endpoints()[name]
+	let ep = compatCatalog.endpoints()[name]
 	if (!ep) throw new Error(`No endpoint configured for '${name}'`)
 	let headers: Record<string, string> = {}
 	if (ep.keyEnv) {
@@ -202,10 +202,11 @@ function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpReq
 	return undefined
 }
 
+// The implementation behind compatCatalog.create, which adds capability().
 function create(name: string): Provider {
-	let p: Provider = {
+	return {
 		async request(req) {
-			let ep = openaiCompat.endpoints()[name]
+			let ep = compatCatalog.endpoints()[name]
 			// OpenCode Go keys are accounts that rotate on limits (auth.ts).
 			let cred = name === 'opencode-go' ? await auth.pick(name, req.model, { session: req.sessionId }) : undefined
 			let base = ep?.baseUrl.replace(/\/+$/, '') ?? ''
@@ -227,8 +228,6 @@ function create(name: string): Provider {
 			spent: (account: string) => auth.spent(account, 'opencode-go'),
 		}),
 		parse: openaiCompat.parse,
-		capability: (model) =>
-			openaiCompat.endpoints()[name]?.capability?.(model) ?? openaiCompat.cachedCapability(name, model),
 		// GET /models, which OpenRouter, Ollama and most servers offer.
 		async models(signal) {
 			let { base, headers } = openaiCompat.endpoint(name)
@@ -241,15 +240,15 @@ function create(name: string): Provider {
 				}[]
 			}
 			if (name === 'openrouter') {
-				openaiCompat.cachedCapability(name, '')
-				openaiCompat.state.capabilities.clear()
+				compatCatalog.cachedCapability(name, '')
+				compatCatalog.state.capabilities.clear()
 			}
 			for (let m of body.data ?? []) {
 				if (name !== 'openrouter' || typeof m.id !== 'string') continue
 				let r = m.reasoning
 				let supported = r?.supported_efforts
 				if (supported === undefined) {
-					openaiCompat.state.capabilities.delete(`${name}/${m.id}`)
+					compatCatalog.state.capabilities.delete(`${name}/${m.id}`)
 					continue
 				}
 				let levels = effortLevels.levels.filter(
@@ -257,7 +256,7 @@ function create(name: string): Provider {
 						(supported === null || (Array.isArray(supported) && supported.includes(l))) &&
 						!(r?.mandatory && l === 'none'),
 				)
-				openaiCompat.state.capabilities.set(`${name}/${m.id}`, {
+				compatCatalog.state.capabilities.set(`${name}/${m.id}`, {
 					levels,
 					...(levels.includes(r?.default_effort as EffortLevel) && { default: r!.default_effort as EffortLevel }),
 					wire: (level) => ({ reasoning: { effort: level } }),
@@ -266,7 +265,7 @@ function create(name: string): Provider {
 			if (name === 'openrouter')
 				effortCatalog.save(
 					Object.fromEntries(
-						[...openaiCompat.state.capabilities].map(([id, cap]) => [
+						[...compatCatalog.state.capabilities].map(([id, cap]) => [
 							id,
 							{ levels: cap.levels, ...(cap.default && { default: cap.default }) },
 						]),
@@ -275,39 +274,13 @@ function create(name: string): Provider {
 			return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
 		},
 	}
-	if (openaiCompat.endpoints()[name]?.models === false) delete p.models
-	return p
-}
-
-// Registers one provider per configured endpoint. Idempotent.
-function init(): void {
-	for (let name of Object.keys(openaiCompat.endpoints())) provider.register(name, openaiCompat.create(name))
 }
 
 export const openaiCompat = {
-	get state() {
-		return compatCatalog.state
-	},
-	set state(value: typeof compatCatalog.state) {
-		compatCatalog.state = value
-	},
-	get cachedCapability() {
-		return compatCatalog.cachedCapability
-	},
-	set cachedCapability(value: typeof compatCatalog.cachedCapability) {
-		compatCatalog.cachedCapability = value
-	},
-	get endpoints() {
-		return compatCatalog.endpoints
-	},
-	set endpoints(value: typeof compatCatalog.endpoints) {
-		compatCatalog.endpoints = value
-	},
 	toMessages,
 	body,
 	parse,
 	endpoint,
 	opencodeRoute,
 	create,
-	init,
 }

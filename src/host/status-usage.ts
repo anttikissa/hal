@@ -47,8 +47,6 @@ const TITLES: Record<Kind, string> = {
 	'opencode-go': 'OpenCode Go accounts:',
 }
 
-const reset = (at: string, now = clock.now(), zone?: string): string => usageWindows.reset(at, now, zone)
-
 function bar(percent: number): string {
 	let eighths = Math.ceil((Math.max(0, Math.min(100, percent)) * 14 * 8) / 100)
 	let part = eighths % 8
@@ -78,11 +76,11 @@ function table(rows: UsageRow[], zone?: string): string {
 			let cells = cols.map((name) => {
 				if (row.apiKey)
 					return row.limited
-						? `API key<br>rate limited until ${statusUsage.reset(new Date(row.limited).toISOString(), clock.now(), zone)}`
+						? `API key<br>rate limited until ${usageWindows.reset(new Date(row.limited).toISOString(), clock.now(), zone)}`
 						: 'API key'
 				let w = row.windows[name]
 				return w
-					? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${statusUsage.reset(w.resets, clock.now(), zone)})` : ''}`
+					? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${usageWindows.reset(w.resets, clock.now(), zone)})` : ''}`
 					: '?'
 			})
 			lines.push(`| ${row.slot} | ${account} | ${cells.join(' | ')} |`)
@@ -326,7 +324,6 @@ function recheck(kind: string, force = false): Promise<void> {
 
 export const statusUsage = {
 	state: { checked: new Set<string>(), running: new Map<string, Promise<void>>() },
-	reset,
 	bar,
 	table,
 	payload,

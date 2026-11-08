@@ -16,9 +16,6 @@ import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
 import { provider, type ProviderImage, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
-import { openaiWs } from './openai-ws.ts'
-
-const claims = (token: string) => catalog.claims(token)
 
 function imagePart(image: ProviderImage | undefined): unknown {
 	return image
@@ -100,8 +97,7 @@ function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<st
 		b.parallel_tool_calls = true
 	}
 	if (reasons(req.model)) {
-		let effort = req.effort ?? openai.effort(req.model)
-		b.reasoning = { summary: 'auto', ...(effort && { effort }) }
+		b.reasoning = { summary: 'auto', ...(req.effort && { effort: req.effort }) }
 		b.include = [...((b.include as string[] | undefined) ?? []), 'reasoning.encrypted_content']
 	}
 	Object.assign(b, modelEffort.wire('openai', req.model, req.effort))
@@ -117,7 +113,7 @@ async function request(req: ProviderRequest) {
 	let headers: Record<string, string> = { authorization: `Bearer ${cred.value}`, accept: 'text/event-stream' }
 	let codex = false
 	if (cred.type === 'token') {
-		let c = claims(cred.value)
+		let c = catalog.claims(cred.value)
 		codex = !c.api
 		let accountId = c.accountId ?? cred.accountId
 		if (codex && !accountId)
@@ -278,14 +274,16 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 // models.dev's list and the built-in ids.
 async function listModels(signal: AbortSignal): Promise<string[]> {
 	let { data, list } = auth.all('openai')
-	let subscriptions = list.filter((a) => typeof a.entry.accessToken === 'string' && !claims(a.entry.accessToken).api)
+	let subscriptions = list.filter(
+		(a) => typeof a.entry.accessToken === 'string' && !catalog.claims(a.entry.accessToken).api,
+	)
 	if (subscriptions.length) list = subscriptions
 	let results = await Promise.allSettled(
 		list.map(async (account) => {
 			let cred = await auth.credential(data, account, 'openai')
-			if (cred.type === 'api-key' || claims(cred.value).api)
-				return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels])]
-			let accountId = claims(cred.value).accountId ?? cred.accountId
+			if (cred.type === 'api-key' || catalog.claims(cred.value).api)
+				return [...new Set([...modelsDev.ids('openai'), ...catalog.knownModels])]
+			let accountId = catalog.claims(cred.value).accountId ?? cred.accountId
 			let res = await fetch(openai.codexModelsUrl, {
 				signal,
 				headers: {
@@ -312,60 +310,13 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	return [...new Set(good.flatMap((r) => r.value))]
 }
 
-// Registers the provider. Idempotent.
-function init(): void {
-	provider.register('openai', {
-		request: openai.request,
-		parse: openai.parse,
-		open: (http, req) => openaiWs.open(http, req, openai.input),
-		rejected: (account) => auth.rejected(account, 'openai'),
-		spent: (account) => auth.spent(account, 'openai'),
-		models: (signal) => openai.listModels(signal),
-		modelsKey: () => openai.modelsKey(),
-		known: () => openai.knownModels,
-		contextWindow: (model) => openai.contextWindow(model),
-		effort: (model) => openai.effort(model),
-	})
-}
-
 export const openai = {
 	apiUrl: 'https://api.openai.com/v1/responses',
 	codexUrl: 'https://chatgpt.com/backend-api/codex/responses',
 	codexModelsUrl: 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
 	listModels,
-	get modelsKey() {
-		return catalog.modelsKey
-	},
-	set modelsKey(value: typeof catalog.modelsKey) {
-		catalog.modelsKey = value
-	},
-	get effort() {
-		return catalog.effort!
-	},
-	set effort(value: NonNullable<typeof catalog.effort>) {
-		catalog.effort = value
-	},
-	get knownModels() {
-		return catalog.knownModels
-	},
-	set knownModels(value: string[]) {
-		catalog.knownModels = value
-	},
 	input,
 	body,
 	request,
 	parse,
-	get subscription() {
-		return catalog.subscription
-	},
-	set subscription(value: typeof catalog.subscription) {
-		catalog.subscription = value
-	},
-	get contextWindow() {
-		return catalog.contextWindow
-	},
-	set contextWindow(value: typeof catalog.contextWindow) {
-		catalog.contextWindow = value
-	},
-	init,
 }
