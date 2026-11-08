@@ -35,20 +35,13 @@ function sync(): void {
 		st.text = drafts.text(id)
 	}
 }
-function cancel(): boolean {
+// Ends an active queue edit by cancelling or saving it.
+function end(how: 'cancel' | 'save'): boolean {
 	let id = app.sessionId()
 	if (!id || !queueEdit.current(id)?.active) return false
-	let notice = queueEdit.cancel(id)
+	let notice = queueEdit[how](id)
 	queuedPrompt.sync()
 	app.setNotice(notice)
 	return true
 }
-function save(): boolean {
-	let id = app.sessionId()
-	if (!id || !queueEdit.current(id)?.active) return false
-	let notice = queueEdit.save(id)
-	queuedPrompt.sync()
-	app.setNotice(notice)
-	return true
-}
-export const queuedPrompt = { begin, sync, cancel, save }
+export const queuedPrompt = { begin, sync, cancel: () => end('cancel'), save: () => end('save') }

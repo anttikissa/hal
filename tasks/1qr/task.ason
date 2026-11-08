@@ -1,0 +1,6 @@
+{
+	title: 'Web queue edit ends through one function',
+	spec: 'web/queue-edit.ts cancels and saves an active queue edit through one end(how) function; queuedPrompt.cancel and queuedPrompt.save keep their names.',
+	status: 'done',
+	needs: []
+}

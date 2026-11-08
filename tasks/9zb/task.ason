@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 08/10: Interaction',
 	spec: 'Under task nt8, composer behavior, keys, forms, pickers, search, folding and navigation have documented decision ownership across terminal, common and web. Review shared intent separately from platform mechanics; preserve emergency keys, accessibility and deliberate client differences. Rendering belongs to area 09. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed common/{prompt,picker,completion,queue-edit,toggle,send-keys,find-dialog,modals,amend,prompt-changes}.ts, client/{keys,prompt-keys,folds,queue-edit,tab-switch}.ts, web/{folds,queue-edit,router,target,completions,edit-prompt}.ts (export use scan, client/web twin diff). Accepted (1qr): merged identical web queue-edit cancel/save. Source 54 -> 47 lines. Rejected: client and web queue-edit and folds adapters differ in platform mechanics (keys vs signals), kept apart; prompt.ts key table is already one decision point. Not reviewed in depth: forms, find, keys and app files under concurrent edit by another session.'
+	],
+	needs: ['1qr']
 }
