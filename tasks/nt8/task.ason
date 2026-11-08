@@ -1,0 +1,9 @@
+{
+	title: 'Codebase simplification: ten-area progress',
+	spec: 'Ten numbered area tasks track responsibility-based simplification across host, common, terminal and web layers. Progress is completed area tasks divided by ten, weighted equally; it measures completed review scope, not code volume or estimated effort. Each area records its inspected scope, candidate list and disposition in task notes. Accepted candidates compare two ownership designs, preserve required behavior and meaningful platform/provider differences, and record caller obligations removed, production and test LOC separately, plugin API changes and verification. A separate implementing task owns each code change and links back to the area. An area is done when its bounded scope has been reviewed and every accepted change is implemented and verified; rejected candidates retain their reason. A review may conclude that no code change is justified. Do not force a reduction, broaden scope silently, launch agents without approval or rewrite the codebase in one pass.',
+	status: 'planned',
+	notes: [
+		'Numbered areas: 01 gh9, 02 1wa, 03 v7y, 04 sd9, 05 t2k, 06 e8k, 07 tr6, 08 9zb, 09 vhx, 10 23k. Area 01 completed; areas 02-10 remain planned. Next suggested pass is 05 Commands and tools, then 02 Conversation storage. Percentages are derived from area statuses, not this note.'
+	],
+	needs: ['gh9', '1wa', 'v7y', 'sd9', 't2k', 'e8k', 'tr6', '9zb', 'vhx', '23k']
+}

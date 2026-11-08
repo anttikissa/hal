@@ -1,5 +1,5 @@
 {
-	version: 24,
+	version: 25,
 	changes: [
 		{
 			version: 2,
@@ -365,6 +365,22 @@
 					target: 'host/auth.serperKey',
 					description: 'Removed',
 					port: "Use apiKeys.get('serper') from host/api-keys"
+				}
+			]
+		},
+		{
+			version: 25,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/sessions.update',
+					description: 'Save and publish updates'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/naming.save',
+					description: 'Removed naming-only save helper',
+					port: 'Use sessions.update(id, {}) to save and publish pending edits.'
 				}
 			]
 		}

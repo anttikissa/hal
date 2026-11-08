@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 03/10: Turn execution',
+	spec: 'Under task nt8, turns, streaming, interruption, recovery and message queues have documented state-transition ownership. Review repeated orchestration and invalid intermediate states; preserve tool ordering, cancellation, delivery and recovery semantics. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

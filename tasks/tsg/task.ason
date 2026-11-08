@@ -1,0 +1,12 @@
+{
+	title: 'Own plain metadata updates in sessions',
+	spec: 'sessions.update(id, fields) applies a partial metadata update, removes explicitly undefined fields, saves synchronously, then broadcasts one metadata snapshot. Save errors propagate without broadcasting. Budget, card overrides, hal/tool card defaults, and naming use this operation instead of coordinating liveFiles and host themselves. Existing validation, names, replies, persistence and event ordering remain unchanged. History-sensitive metadata paths keep their existing sequencing. The bounded refactor must reduce production source lines including callers and the shared implementation.',
+	status: 'done',
+	notes: [
+		'Compared a save-and-publish helper with an operation that owns mutation. Chose update(id, fields), restricted by TypeScript to slots, blocks and naming fields so callers cannot use it for history-backed cwd/model/autoclose changes. Explicit undefined deletes a field; omission preserves it. No timers, watchers or retained state were added; work is proportional to the supplied fields. Existing persistence still owns writes.',
+		'Measured the five changed production files against HEAD: 452 to 440 nonblank noncomment source lines (-12); 526 to 516 physical lines (-10). One durable save-before-notify regression adds 30 source lines (31 physical), so production plus tests grows by 18 source lines. Existing caller tests and shared host tests: 53 pass. Formatting and changed-file lint pass. Two convention failures and type errors remain unchanged from baseline; the type baseline was verified with these six files at HEAD. Experiment remains uncommitted pending user evaluation. Removing naming.save is a plugin-visible API change: callers can use sessions.update(id, {}); declare it and the new update API if retained.',
+		'Accepted by the user. This implements the retained metadata candidate in area gh9 of review nt8. Expanded verification passed 123 tests across 20 files, covering host/session/settings/tab boundaries and terminal tab behavior. The earlier uncommitted-evaluation note is superseded by approval to commit.'
+	],
+	needs: ['gj', 'tk', 'hyt'],
+	foldInto: ['gj']
+}

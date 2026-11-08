@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 06/10: Background work',
+	spec: 'Under task nt8, jobs, scheduling, subagents, budgets and completion notifications have documented lifecycle ownership. Review repeated coordination while preserving resource limits, cancellation, persistence and notification timing. Turn execution remains area 03; share explicit boundary contracts. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

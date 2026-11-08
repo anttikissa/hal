@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 10/10: Platform and extensions',
+	spec: 'Under task nt8, startup, installation, plugins, hooks, diagnostics and development scripts have documented lifecycle and resource ownership. Review repeated coordination while preserving plugin contracts, opt-in diagnostics, import safety and deployment behavior. Include maintained extras and performance tooling; private plugins remain outside tracked task records. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

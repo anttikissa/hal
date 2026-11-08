@@ -6,6 +6,7 @@ import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
+import { host } from './host.ts'
 
 const savedHome = paths.state.home
 const origOnError = liveFiles.onError
@@ -40,6 +41,36 @@ test('create writes metadata into its own directory and opens the session; chang
 	meta.name = 'renamed'
 	await Bun.sleep(0)
 	expect(onDisk(meta.id).name).toBe('renamed')
+})
+
+test('metadata updates remove fields and reach clients only after a successful save', () => {
+	let meta = sessions.create({ cwd: '/', name: 'before' })
+	meta.blocks = { tool: 'long' }
+	liveFiles.save(meta)
+	let broadcast = host.broadcast,
+		save = liveFiles.save,
+		sent = 0
+	try {
+		host.broadcast = (id, event) => {
+			sent++
+			expect(id).toBe(meta.id)
+			expect(event).toEqual({ type: 'meta', sessionId: id, meta: { ...meta } })
+			expect(onDisk(id).name).toBe('after')
+			expect(Object.hasOwn(onDisk(id), 'blocks')).toBe(false)
+		}
+		sessions.update(meta.id, { name: 'after', blocks: undefined })
+		expect(Object.hasOwn(meta, 'blocks')).toBe(false)
+		expect(sent).toBe(1)
+		liveFiles.save = () => {
+			throw new Error('write failed')
+		}
+		expect(() => sessions.update(meta.id, { name: 'unsaved' })).toThrow('write failed')
+		expect(sent).toBe(1)
+		expect(onDisk(meta.id).name).toBe('after')
+	} finally {
+		host.broadcast = broadcast
+		liveFiles.save = save
+	}
 })
 
 test('create defaults the model at call time', () => {

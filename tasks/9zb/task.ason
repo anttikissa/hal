@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 08/10: Interaction',
+	spec: 'Under task nt8, composer behavior, keys, forms, pickers, search, folding and navigation have documented decision ownership across terminal, common and web. Review shared intent separately from platform mechanics; preserve emergency keys, accessibility and deliberate client differences. Rendering belongs to area 09. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

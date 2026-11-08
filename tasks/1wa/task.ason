@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 02/10: Conversation storage',
+	spec: 'Under task nt8, history, replay, snapshots, paging, forks, compaction and rebasing have documented storage/reconstruction ownership. Review callers that coordinate these operations; preserve durable ordering, crash recovery, corruption reporting and transcript fidelity. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 07/10: Connections and synchronization',
+	spec: 'Under task nt8, host protocol, transports, reconnects, subscriptions and draft synchronization have documented delivery/recovery ownership. Review repeated client coordination while preserving validation, replay, deduplication and unsent text. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

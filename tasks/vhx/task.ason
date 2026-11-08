@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 09/10: Rendering',
+	spec: 'Under task nt8, transcript/card presentation, Markdown, layout, scrolling, terminal frames and web components have documented presentation ownership. Review repeated preparation and rendering coordination while preserving viewport ownership, incremental rendering, accessibility and platform differences. Interaction decisions belong to area 08. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

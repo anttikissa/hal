@@ -4,8 +4,6 @@
 import { card, type Kind, type Verbosity } from '../../common/card.ts'
 import type { SessionMeta } from '../../common/session.ts'
 import type { SlashCommand } from '../commands.ts'
-import { host } from '../host.ts'
-import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
 
 const usage = '/cards [<kind> short|long|default | reset]'
@@ -40,10 +38,7 @@ export const command: SlashCommand = {
 			return { error: `usage: ${usage}` }
 		else if (value === 'default') delete next[kind as Kind]
 		else next[kind as Kind] = value as Verbosity
-		if (Object.keys(next).length) meta.blocks = next
-		else delete meta.blocks
-		liveFiles.save(meta)
-		host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
+		sessions.update(ctx.sessionId, { blocks: Object.keys(next).length ? next : undefined })
 		return { say: describe(meta.blocks) }
 	},
 }

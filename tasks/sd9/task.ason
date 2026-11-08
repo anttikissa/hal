@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 04/10: Providers and accounts',
+	spec: 'Under task nt8, provider adapters, model/effort selection, authentication, account usage and cost have documented ownership. Review repeated caller obligations while keeping meaningful provider differences explicit and credentials protected. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

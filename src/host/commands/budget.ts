@@ -3,8 +3,6 @@
 import type { SlashCommand } from '../commands.ts'
 import { sessions } from '../sessions.ts'
 import { settings } from '../../common/settings.ts'
-import { host } from '../host.ts'
-import { liveFiles } from '../live-file.ts'
 
 export const command: SlashCommand = {
 	help: () => '/budget shows spawn slots left.\n/budget <n> sets them.\n/budget +n or -n adjusts them.',
@@ -16,9 +14,7 @@ export const command: SlashCommand = {
 		let value = Number(args)
 		let next = args.startsWith('+') || args.startsWith('-') ? current + value : value
 		if (!Number.isSafeInteger(next) || next < 0) return { error: 'usage: /budget [<n>|+n|-n] (non-negative integer)' }
-		meta.slots = next
-		liveFiles.save(meta)
-		host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
+		sessions.update(ctx.sessionId, { slots: next })
 		return { say: `${next} spawn slot${next === 1 ? '' : 's'} left` }
 	},
 }

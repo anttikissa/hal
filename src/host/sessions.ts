@@ -14,6 +14,7 @@ import { models } from './models.ts'
 import { promptCache } from './prompt-cache.ts'
 import { paths } from './paths.ts'
 import { sessionSettings } from './session-settings.ts'
+import { host } from './host.ts'
 
 export type { SessionMeta } from '../common/session.ts'
 
@@ -200,6 +201,18 @@ function open(id: string): SessionMeta {
 	return meta
 }
 
+// Plain metadata changes; history-backed settings keep their own sequencing.
+function update(
+	id: string,
+	fields: Partial<Pick<SessionMeta, 'slots' | 'blocks' | 'name' | 'nameOwner' | 'nameTurns' | 'nameVersion'>>,
+): void {
+	let meta = sessions.open(id)
+	Object.assign(meta, fields)
+	for (let key of Object.keys(fields)) if (Reflect.get(fields, key) === undefined) Reflect.deleteProperty(meta, key)
+	liveFiles.save(meta)
+	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
+}
+
 // Writes pending changes and forgets the session; it stays on disk.
 function close(id: string): void {
 	promptCache.close(id)
@@ -288,6 +301,7 @@ export const sessions = {
 	claimId,
 	create,
 	open,
+	update,
 	close,
 	closeAll,
 	openIds,

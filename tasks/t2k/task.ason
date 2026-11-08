@@ -1,0 +1,6 @@
+{
+	title: 'Simplification 05/10: Commands and tools',
+	spec: 'Under task nt8, command/tool dispatch, parsing, approvals, file operations and results have documented validation, execution and cleanup ownership. Review repeated coordination without weakening trust boundaries, changing syntax or hiding failures. Record candidate outcomes.',
+	status: 'planned',
+	needs: []
+}

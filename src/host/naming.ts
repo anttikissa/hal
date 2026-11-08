@@ -5,26 +5,16 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { names } from '../common/names.ts'
 import { sessions } from './sessions.ts'
 import { history } from './history.ts'
-import { liveFiles } from './live-file.ts'
-import { host } from './host.ts'
 import { tabs } from './tabs.ts'
 
 // Naming matters only when the user juggles tabs: interactive ones, 4 or more open.
 
-function save(id: string): void {
-	let meta = sessions.open(id)
-	liveFiles.save(meta)
-	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
-}
 function manual(id: string, text?: string): void {
-	let meta = sessions.open(id)
-	meta.name = text === undefined ? names.fallback(id) : names.validate(text)
-	delete meta.nameOwner
-	if (text === undefined) {
-		meta.nameTurns = 0
-		meta.nameVersion = (meta.nameVersion ?? 0) + 1
-	}
-	naming.save(id)
+	sessions.update(id, {
+		name: text === undefined ? names.fallback(id) : names.validate(text),
+		nameOwner: undefined,
+		...(text === undefined && { nameTurns: 0, nameVersion: (sessions.open(id).nameVersion ?? 0) + 1 }),
+	})
 }
 function prepare(id: string, record: Extract<HistoryRecord, { type: 'user' }>): void {
 	let text = record.blocks
@@ -40,7 +30,6 @@ function prepare(id: string, record: Extract<HistoryRecord, { type: 'user' }>): 
 }
 function committed(id: string, record: HistoryRecord): void {
 	if (record.type !== 'user' || !record.naming) return
-	sessions.open(id).nameTurns = record.naming.turn
-	naming.save(id)
+	sessions.update(id, { nameTurns: record.naming.turn })
 }
-export const naming = { save, manual, prepare, committed }
+export const naming = { manual, prepare, committed }

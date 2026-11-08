@@ -5,8 +5,6 @@
 import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
 import { modelEffort } from '../model-effort.ts'
-import { host } from '../host.ts'
-import { liveFiles } from '../live-file.ts'
 import { sessions } from '../sessions.ts'
 
 export const command: SlashCommand & { levels(id: string): string[] } = {
@@ -92,9 +90,7 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 		if (choice.id === 'hal/tool') {
 			welcome = (require('../tool-model.ts') as typeof import('../tool-model.ts')).toolModel.welcome
 			let meta = sessions.open(ctx.sessionId)
-			meta.blocks = { ...meta.blocks, ...sessions.toolBlocks }
-			liveFiles.save(meta)
-			host.broadcast(ctx.sessionId, { type: 'meta', sessionId: ctx.sessionId, meta: { ...meta } })
+			sessions.update(ctx.sessionId, { blocks: { ...meta.blocks, ...sessions.toolBlocks } })
 		}
 		let said = [
 			choice.note,
