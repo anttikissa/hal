@@ -94,27 +94,20 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	}
 }
 
-// Runs `command` for session `sessionId` in the background. One that
+// Runs `run` for session `sessionId` in the background. One that
 // ends within jobs.graceMs (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
 async function start(
 	sessionId: string,
-	command: string,
-	cwd: string,
-	ms?: number,
-	callId?: string,
-	prepared?: () => Run,
+	callId: string | undefined,
+	launch: () => Run,
 	unsafe?: Record<string, unknown>,
 	holdOutput?: () => () => void,
 ): Promise<string> {
-	let call = callId
-		? history
-				.readSync(sessionId)
-				.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId)
-		: undefined
-	if (call?.n === undefined) throw new Error('background Bash call has no recorded card id')
-	let id = `${sessionId}:${call.n}`
-	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
+	let n = callId ? history.callNumber(sessionId, callId) : undefined
+	if (n === undefined) throw new Error('background Bash call has no recorded card id')
+	let id = `${sessionId}:${n}`
+	let run = launch()
 	let endOutput = holdOutput?.()
 	jobs.state.running.set(id, {
 		sessionId,
@@ -126,19 +119,13 @@ async function start(
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
 	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
-	try {
-		let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
-		if (early !== undefined) {
-			endOutput?.()
-			jobs.state.running.delete(id)
-			jobs.forget(sessionId, id)
-			return early
-		}
-	} catch (e) {
-		endOutput?.()
-		jobs.state.running.delete(id)
-		jobs.forget(sessionId, id)
+	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)]).catch((e) => {
+		drop(id)
 		throw e
+	})
+	if (early !== undefined) {
+		drop(id)
+		return early
 	}
 	run.done.then(
 		(out) => jobs.finish(id, out),
@@ -161,15 +148,21 @@ function forget(sessionId: string, id: string): void {
 	host.broadcast(sessionId, { type: 'meta', sessionId, meta: { ...meta } })
 }
 
-// A background command exited: its session hears how, unless it was
-// stopped by closing the session.
-function finish(id: string, out: string): void {
+// Ends the job's output preview and takes it off every running list.
+function drop(id: string): Job | undefined {
 	let job = jobs.state.running.get(id)
-	if (!job) return
+	if (!job) return undefined
 	job.endOutput?.()
 	jobs.state.running.delete(id)
 	jobs.forget(job.sessionId, id)
-	jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId, tools.bashMaxChars, tools.bashMaxLines))
+	return job
+}
+
+// A background command exited: its session hears how, unless it was
+// stopped by closing the session.
+function finish(id: string, out: string): void {
+	let job = drop(id)
+	if (job) jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId, tools.bashMaxChars, tools.bashMaxLines))
 }
 
 // Sends `text` to the session as an advisory message from 'bash <id>'.
@@ -208,11 +201,8 @@ function running(sessionId: string): string[] {
 // closed).
 function kill(sessionId: string): void {
 	for (let id of jobs.running(sessionId)) {
-		let job = jobs.state.running.get(id)!
-		job.stop()
-		job.endOutput?.()
-		jobs.state.running.delete(id)
-		jobs.forget(sessionId, id)
+		jobs.state.running.get(id)!.stop()
+		drop(id)
 	}
 }
 

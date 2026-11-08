@@ -194,6 +194,13 @@ function readSync(id: string): HistoryRecord[] {
 	return records.slice()
 }
 
+// The record number of the session's tool call `callId`, shown as t<n>.
+function callNumber(id: string, callId: string): number | undefined {
+	return history
+		.readSync(id)
+		.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId)?.n
+}
+
 // True if the last turn has no end record. Reads the marks (pages.ts),
 // not the history, so it costs the same however long the session is.
 function unfinished(id: string): boolean {
@@ -440,6 +447,7 @@ export const history = {
 	onAppend,
 	submit,
 	readSync,
+	callNumber,
 	unfinished,
 	open,
 	record,

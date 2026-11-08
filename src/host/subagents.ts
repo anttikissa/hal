@@ -75,12 +75,8 @@ function spawn(parent: string, s: Spawn): string {
 		...(s.kind !== 'interactive' && { parent, slots: s.limit }),
 		spawn: s.kind,
 	} satisfies Partial<SessionMeta>)
-	if (child.parent && s.callId) {
-		let call = history
-			.readSync(parent)
-			.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === s.callId)
-		if (call?.n !== undefined) child.parentCall = call.n
-	}
+	let call = child.parent && s.callId ? history.callNumber(parent, s.callId) : undefined
+	if (call !== undefined) child.parentCall = call
 	if (s.fork) subagents.fork(parent, child.id)
 	liveFiles.save(child)
 	for (let ancestor of charged) {

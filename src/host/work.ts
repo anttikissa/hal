@@ -237,11 +237,8 @@ function stop(t: Target): string {
 			if (!at.call)
 				for (let [key, running] of tools.running)
 					if (key.startsWith(`${at.sessionId}:`) && !['bash', 'wait', 'stop', 'spawn'].includes(running.call.name)) {
-						let record = history
-							.readSync(at.sessionId)
-							.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === running.call.id)
 						lines.push(
-							`Warning: ${at.sessionId} t${record?.n} (${running.call.name.toUpperCase()}) has no individual STOP support and may still finish after the agent stops.`,
+							`Warning: ${at.sessionId} t${history.callNumber(at.sessionId, running.call.id)} (${running.call.name.toUpperCase()}) has no individual STOP support and may still finish after the agent stops.`,
 						)
 					}
 			if (!at.call && states.busy(status.stateOf(at.sessionId))) {

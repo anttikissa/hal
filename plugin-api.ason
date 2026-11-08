@@ -1,5 +1,5 @@
 {
-	version: 28,
+	version: 29,
 	changes: [
 		{
 			version: 2,
@@ -496,6 +496,28 @@
 					target: 'host/status-usage.reset',
 					description: 'Removed',
 					port: 'Use usageWindows.reset'
+				}
+			]
+		},
+		{
+			version: 29,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/jobs.start',
+					description: 'Takes (sessionId, callId, launch, unsafe, holdOutput)',
+					port: 'Pass a function returning jobs.exec(...)'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/notify.replyLine',
+					description: 'Removed',
+					port: 'Use notify.reply(id).line'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/history.callNumber',
+					description: 'Adds tool call id to card number lookup'
 				}
 			]
 		}

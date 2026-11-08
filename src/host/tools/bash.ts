@@ -112,9 +112,6 @@ export const tool: Tool<ToolOutput> = {
 				return withCommits(
 					await jobs.start(
 						ctx.sessionId,
-						input.command,
-						ctx.cwd,
-						given,
 						ctx.callId,
 						launch,
 						input.unsafeToStop === true ? input : undefined,

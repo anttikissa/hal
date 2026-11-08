@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 06/10: Background work',
 	spec: 'Under task nt8, jobs, scheduling, subagents, budgets and completion notifications have documented lifecycle ownership. Review repeated coordination while preserving resource limits, cancellation, persistence and notification timing. Turn execution remains area 03; share explicit boundary contracts. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		"Reviewed jobs.ts, subagents.ts, scheduler.ts, notify.ts, autoclose.ts, busy.ts, lifecycle.ts, commands/schedule.ts, tools/bash.ts, tools/wait.ts (export use scan). Accepted (n02): narrowed jobs.start to (session, callId, launch, unsafe, holdOutput); one drop() for job teardown in 4 places; history.callNumber replaces 5 copies of the tool-call card lookup; removed notify.replyLine forwarder and route's duplicate on-screen check (deliver does it). Source 1835 -> 1808 nonblank lines. Rejected: scheduler store validation (trust boundary); jobs.state.delivering and notify close paths carry distinct timing."
+	],
+	needs: ['n02']
 }

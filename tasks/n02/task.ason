@@ -1,0 +1,6 @@
+{
+	title: 'Background work shares job teardown and call-card lookup',
+	spec: 'jobs.start takes the launched Run from its one caller (tools/bash.ts) instead of unused command/cwd/timeout arguments. One local drop() ends a job preview and removes it from the running lists for early exit, failure, finish and kill. history.callNumber(session, callId) is the one lookup from a tool call id to its card number, used by jobs, subagents, file-changes, work and restart. notify.reply returns line and block; deliver alone checks whether the session is on screen.',
+	status: 'done',
+	needs: []
+}

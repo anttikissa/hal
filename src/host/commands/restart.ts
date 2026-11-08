@@ -73,9 +73,7 @@ function flagged(): FlaggedCall[] {
 	return [...turns.state.running]
 		.flatMap(([id, running]) =>
 			[...(running.unsafe ?? [])].map(([call, unsafe]) => {
-				let n = history
-					.readSync(id)
-					.findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === call)?.n
+				let n = history.callNumber(id, call)
 				let key = n === undefined ? undefined : `t${n}`
 				return {
 					block: key ?? tabs.label(id),

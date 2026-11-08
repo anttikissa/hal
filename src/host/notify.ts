@@ -55,12 +55,7 @@ function asked(id: string): boolean {
 }
 
 // What the latest turn replied: its <summary> (common/summary.ts), else
-// the last non-blank line of its text.
-function replyLine(id: string): string {
-	return notify.reply(id).line
-}
-
-// The reply line and the key of the record it came from.
+// the last non-blank line of its text; and the key of its record.
 function reply(id: string): { line: string; block?: string } {
 	let records = pages.page(id).records
 	for (let i = records.length - 1; i >= 0; i--) {
@@ -89,7 +84,7 @@ function line(id: string, event: Event): string {
 			? event.form.text
 			: event.type === 'turn-end' && event.error
 				? event.error
-				: notify.replyLine(id)
+				: notify.reply(id).line
 	return (text.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 200)
 }
 
@@ -97,13 +92,11 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let k = notify.kind(event, id)
 	if (!k) return
 	if (k === 'done' && scheduler.owned(id)) return
-	let all = [...clients]
-	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
 	let told = event.type === 'turn-end' && k !== 'failed' ? notify.reply(id) : undefined
 	let block = event.type === 'question' ? (event.n === undefined ? undefined : `${event.n}`) : told?.block
 	let source = { ...(block ? { block } : {}), ...(event.type === 'question' ? { question: event.id } : {}) }
-	notify.deliver(all, id, k, notify.line(id, event), told?.line ? `${word}: ${told.line}` : word, source)
+	notify.deliver(clients, id, k, notify.line(id, event), told?.line ? `${word}: ${told.line}` : word, source)
 }
 
 let seq = 0
@@ -181,4 +174,4 @@ function closedBy(
 	return `${tab >= 0 ? `Tab ${tab + 1} (${by})` : by} called /close`
 }
 
-export const notify = { kind, asked, replyLine, reply, line, route, deliver, closed, closedBy }
+export const notify = { kind, asked, reply, line, route, deliver, closed, closedBy }
