@@ -1,5 +1,5 @@
 {
-	version: 32,
+	version: 33,
 	changes: [
 		{
 			version: 2,
@@ -605,6 +605,77 @@
 					target: 'common/plugin-sync.pluginSyncWire.isHead',
 					description: 'Removed from exports',
 					port: 'Use pluginSyncWire.invalidEvent'
+				}
+			]
+		},
+		{
+			version: 33,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'client/app.app.backgroundStep',
+					description: 'Removed from exports',
+					port: 'Use tabSwitch.backgroundStep from client/tab-switch'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.onState',
+					description: 'Removed from exports',
+					port: 'Use linkState.onState from client/link-state'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.focusedTab',
+					description: 'Removed from exports',
+					port: 'Use tabSwitch.focusedTab from client/tab-switch'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.onTabs',
+					description: 'Removed from exports',
+					port: 'Use tabSwitch.onTabs from client/tab-switch'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.focusOn',
+					description: 'Removed from exports',
+					port: 'Use tabSwitch.focusOn from client/tab-switch'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.tabKey',
+					description: 'Removed from exports',
+					port: 'Use tabSwitch.tabKey from client/tab-switch'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.open',
+					description: 'Removed from exports',
+					port: 'Use appModals.open from client/app-modals'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.close',
+					description: 'Removed from exports',
+					port: 'Use appModals.close from client/app-modals'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.pick',
+					description: 'Removed from exports',
+					port: 'Use appModals.pick from client/app-modals'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/app.app.configure',
+					description: 'Removed from exports',
+					port: 'Use appModals.configure from client/app-modals'
+				},
+				{
+					kind: 'breaking',
+					target: 'web/app.app.backgroundStep',
+					description: 'Removed from exports',
+					port: 'Use tabs.backgroundStep from web/tabs'
 				}
 			]
 		}

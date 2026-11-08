@@ -4,7 +4,7 @@
 // marks this client to restart as soon as its host goes: the next link
 // change after the mark is the host leaving.
 //
-// The restart dialog (task ker) opens with `open` (app.open) when the
+// The restart dialog (task ker) opens with `open` (appModals.open) when the
 // host held /restart <scope> because of flagged calls (restart-ask), or,
 // with `now`, when Ctrl-R in the host's terminal found flagged calls. A
 // `both` this client typed follows the host only on Restart anyway.

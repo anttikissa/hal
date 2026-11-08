@@ -4,6 +4,8 @@
 // never frame strings or host/client identity.
 import { closeSync, constants, fchmodSync, fstatSync, openSync, writeSync } from 'fs'
 import { app } from './app.ts'
+import { linkState } from './link-state.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { ansi } from './ansi.ts'
 import { ason } from '../common/ason.ts'
 import { render } from './render.ts'
@@ -134,7 +136,9 @@ function start(path: string | URL): void {
 			st.context.pop()
 		}
 	})
-	for (let key of ['beat', 'onKeys', 'onState', 'onTabs'] as const) redrawTrace.cause(app, key, `app.${key}`)
+	for (let key of ['beat', 'onKeys'] as const) redrawTrace.cause(app, key, `app.${key}`)
+	redrawTrace.cause(linkState, 'onState', 'linkState.onState')
+	redrawTrace.cause(tabSwitch, 'onTabs', 'tabSwitch.onTabs')
 	redrawTrace.cause(terminal, 'resized', 'terminal.resized')
 	redrawTrace.hook(render, 'request', (next, ...args) => {
 		let st = redrawTrace.state

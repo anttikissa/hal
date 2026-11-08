@@ -12,6 +12,7 @@ import type { Event } from '../common/protocol.ts'
 import { toggle, type Mode } from '../common/toggle.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
+import { appModals } from './app-modals.ts'
 import { draftPastes } from '../common/draft-pastes.ts'
 import { drafts } from '../common/drafts.ts'
 import { prompt } from '../common/prompt.ts'
@@ -85,10 +86,10 @@ function open(): void {
 	if (!t) return
 	let id = t.meta.id
 	let at = folds.at(id)
-	app.close()
+	appModals.close()
 	draft = draftPastes.create(id, app.state.prompt.text)
 	requested = false
-	app.open(
+	appModals.open(
 		hinted(blocksDialog.open(), toggle.items(t), at),
 		(action) => {
 			if (action.answers.target?.trim() === 'p' && draft && app.state.transcript?.meta.id === id) {

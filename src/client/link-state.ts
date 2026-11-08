@@ -8,6 +8,7 @@
 import { connection, type LinkState } from '../common/connection.ts'
 import { queueEdit } from '../common/queue-edit.ts'
 import { app } from './app.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { command as restart } from './commands/restart.ts'
 
 function onState(state: LinkState): void {
@@ -25,7 +26,7 @@ function onState(state: LinkState): void {
 	// A new connection's host knows nothing this client watched.
 	delete st.watching
 	if (state.type === 'connected') {
-		let tab = app.focusedTab()
+		let tab = tabSwitch.focusedTab()
 		let last = tab?.id ?? st.start.last,
 			cwd = tab?.cwd ?? st.start.cwd
 		let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone

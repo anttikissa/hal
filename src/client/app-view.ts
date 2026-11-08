@@ -14,6 +14,7 @@ import { placeholders, type PromptExample } from '../common/placeholders.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { frame, type View } from './frame.ts'
 import { halCursor } from './hal-cursor.ts'
 import { pulse } from './pulse.ts'
@@ -37,7 +38,7 @@ function view(): View {
 	let t = st.transcript
 	let list =
 		t && t.meta.model !== 'hal/intro' && !st.form
-			? app.focusedTab()?.hal
+			? tabSwitch.focusedTab()?.hal
 				? placeholders.hal
 				: placeholders.general
 			: undefined
@@ -75,9 +76,9 @@ function status(t: Transcript): StatusInfo {
 	let { id, name, cwd, model } = t.meta
 	let s: StatusInfo = { id, cwd, model, autoclose: t.meta.autoclose, slots: t.meta.slots }
 	if (name) s.name = name
-	if (app.focusedTab()?.hal) s.hal = true
-	if (app.focusedTab()?.untrusted) s.untrusted = true
-	let color = app.focusedTab()?.color
+	if (tabSwitch.focusedTab()?.hal) s.hal = true
+	if (tabSwitch.focusedTab()?.untrusted) s.untrusted = true
+	let color = tabSwitch.focusedTab()?.color
 	if (color !== undefined) s.color = colors.project()[`p${color}`]
 	if (process.env.HOME) s.home = process.env.HOME
 	if (t.stats) s.stats = t.stats

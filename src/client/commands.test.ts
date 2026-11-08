@@ -5,6 +5,7 @@ import { keyHelp } from '../common/key-help.ts'
 import type { Tab } from '../common/protocol.ts'
 import type { Snapshot } from '../common/snapshot.ts'
 import { app } from './app.ts'
+import { appModals } from './app-modals.ts'
 import { clientCommands } from './commands.ts'
 import { render } from './render.ts'
 import { terminal, type TerminalIO } from './terminal.ts'
@@ -59,12 +60,12 @@ test('each command key runs its command, the prompt left alone', () => {
 		if (c.name === 'find') {
 			expect(app.state.modal?.find).toBeDefined()
 			expect(sent.filter((s) => s.type !== 'find-cancel')).toEqual([])
-			app.close()
+			appModals.close()
 			sent = []
 		} else if (c.name === 'toggle') {
 			expect(app.state.modal?.title).toBe('Expand or collapse cards')
 			expect(sent).toEqual([])
-			app.close()
+			appModals.close()
 			sent = []
 		} else if (clientCommands.all[c.name]) expect(ran).toEqual([c.name])
 		else

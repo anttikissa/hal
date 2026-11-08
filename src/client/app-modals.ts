@@ -31,7 +31,7 @@ function pick(event: Event & { type: 'models' }): void {
 	if (app.state.transcript?.meta.id !== event.sessionId) return
 	if (event.refresh && !app.state.modal?.tree) return
 	let id = event.sessionId
-	app.open(
+	appModals.open(
 		event.refresh
 			? picker.refresh(app.state.modal!, event.items, event.names, event.capabilities)
 			: picker.open(event.current, event.items, event.names, event.capabilities, event.effort),
@@ -47,7 +47,7 @@ function configure(event: Event & { type: 'settings' }): void {
 	if (event.refresh)
 		return modal?.settings ? ((app.state.modal = settingsModal.refresh(modal, event)), app.show()) : undefined
 	if (id && event.sessionId === id)
-		app.open(
+		appModals.open(
 			settingsModal.open(event),
 			() => undefined,
 			(m, key) => settingsModal.step(m, key, id),

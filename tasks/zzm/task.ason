@@ -1,0 +1,6 @@
+{
+	title: 'App objects hold no forwarders',
+	spec: 'client/app.ts and web/app.ts export only their own functions; callers use tabSwitch, linkState, appModals and web tabs directly. The redraw trace hooks linkState.onState and tabSwitch.onTabs.',
+	status: 'done',
+	needs: []
+}

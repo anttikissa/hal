@@ -5,6 +5,7 @@ import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { appView } from './app-view.ts'
 import {
 	useApp,
@@ -125,13 +126,13 @@ test('Up edits with text typed; the draft comes back after leaving or sending th
 
 test('an edit in progress keeps its text across a tab switch and a snapshot', () => {
 	app.onEvent(tabsEvent('s1', 's2'))
-	app.focusOn({ tab: 's1' })
+	tabSwitch.focusOn({ tab: 's1' })
 	working()
 	up()
 	paused()
 	type('!')
-	app.focusOn({ tab: 's2' })
-	app.focusOn({ tab: 's1' })
+	tabSwitch.focusOn({ tab: 's2' })
+	tabSwitch.focusOn({ tab: 's1' })
 	app.onEvent(snapshot('s1', { type: 'paused' }))
 	expect(appView.view().prompt.text).toBe('fix ti!')
 	expect(appView.view().editing).toContain('[editing prompt]')

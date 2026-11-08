@@ -2,10 +2,11 @@
 // the host names it (tasks/7w).
 
 import { app } from '../app.ts'
+import { tabSwitch } from '../tab-switch.ts'
 
 export const command = {
 	run(): void {
-		let tab = app.focusedTab()
+		let tab = tabSwitch.focusedTab()
 		if (tab) app.send({ type: 'tab-new', cwd: tab.cwd, after: tab.id })
 	},
 }

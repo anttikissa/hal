@@ -5,6 +5,8 @@ import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'
 import { args, type Args } from './client/args.ts'
 import { app } from './client/app.ts'
+import { appModals } from './client/app-modals.ts'
+import { linkState } from './client/link-state.ts'
 import { command as restart } from './client/commands/restart.ts'
 import { appView } from './client/app-view.ts'
 import { draftFile } from './client/draft-file.ts'
@@ -122,7 +124,7 @@ function init(): void {
 		exit()
 	}
 	restartProcess.run = restartNow
-	terminal.restart = () => restart.ask({ scope: 'local', calls: restartGuard.flagged() }, app.open, restartNow)
+	terminal.restart = () => restart.ask({ scope: 'local', calls: restartGuard.flagged() }, appModals.open, restartNow)
 	main.trackVersion((loaded) => host.announce(loaded))
 }
 
@@ -328,7 +330,7 @@ async function remote(typed: string | undefined): Promise<void> {
 		origin,
 		token,
 		onEvent: (event) => pluginSyncClient.event(event) || main.onEvent(event),
-		onState: (state) => (app.onState(state), pluginSyncClient.link(state)),
+		onState: (state) => (linkState.onState(state), pluginSyncClient.link(state)),
 		// Revoked: forget the token and say how to log in again.
 		loggedOut: () => {
 			let { [origin]: _, ...rest } = saved.tokens
@@ -426,7 +428,7 @@ async function start(): Promise<void> {
 	perf.mark('init')
 	await main.joinHost(
 		(event) => main.onEvent(event),
-		(state) => app.onState(state),
+		(state) => linkState.onState(state),
 	)
 	perf.mark('joined')
 }

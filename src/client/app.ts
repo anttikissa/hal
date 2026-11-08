@@ -46,7 +46,6 @@ import { notices } from '../common/notices.ts'
 import { find } from './find.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import { command as restart } from './commands/restart.ts'
-import { linkState } from './link-state.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -153,16 +152,9 @@ function beat(): void {
 function onEvent(event: Event): void {
 	let st = app.state
 	let queueChanged = queueEdit.onEvent(event)
-	if (event.type === 'rebase-result')
-		return rebaseEditor.result(event, (text) => {
-			st.notice = text
-			app.show()
-		})
-	if (event.type === 'rebase-plan')
-		return void rebaseEditor.open(event, app.send, (text) => {
-			st.notice = text
-			app.show()
-		})
+	let tell = (text: string) => ((st.notice = text), app.show())
+	if (event.type === 'rebase-result') return rebaseEditor.result(event, tell)
+	if (event.type === 'rebase-plan') return void rebaseEditor.open(event, app.send, tell)
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'find-preview') return find.previewed(event)
 	// A recalled entry stays on screen; the draft changes underneath.
@@ -187,12 +179,12 @@ function onEvent(event: Event): void {
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') {
 		if (event.sessions) markdown.state.sessions = new Set(event.sessions)
-		return app.onTabs(event.tabs)
+		return tabSwitch.onTabs(event.tabs)
 	}
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'host-mode') return void ((appView.state.noUser = event.noUser), app.show())
 	if (event.type === 'restart') return restart.withHost()
-	if (event.type === 'restart-ask') return restart.ask(event, app.open)
+	if (event.type === 'restart-ask') return restart.ask(event, appModals.open)
 	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text')
 		return clientCommands.event(event)
 	if (event.type === 'go') {
@@ -202,7 +194,7 @@ function onEvent(event: Event): void {
 	}
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
-		return app.onTabs(st.tabs)
+		return tabSwitch.onTabs(st.tabs)
 	}
 	let shown = st.focus.tab
 	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown)
@@ -210,8 +202,8 @@ function onEvent(event: Event): void {
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
-	else if (event.type === 'models') app.pick(event)
-	else if (event.type === 'settings') app.configure(event)
+	else if (event.type === 'models') appModals.pick(event)
+	else if (event.type === 'settings') appModals.configure(event)
 	else {
 		let t = transcriptLive.fold(st.transcript, event)
 		st.transcript = t
@@ -228,7 +220,7 @@ function onEvent(event: Event): void {
 	app.show()
 	if (event.type === 'snapshot' && event.sessionId === shown) st.painted = true
 	if (st.loading === shown && event.type === 'snapshot') delete st.loading
-	app.backgroundStep()
+	tabSwitch.backgroundStep()
 }
 
 // Earlier history is fetched in the background, shown all at once.
@@ -326,7 +318,7 @@ function onKeys(events: KeyEvent[]): void {
 			frame.state.padded = false
 		}
 		// Tab and command keys, whatever has the keys.
-		if (app.tabKey(k) || clientCommands.key(k)) continue
+		if (tabSwitch.tabKey(k) || clientCommands.key(k)) continue
 		if (st.modal) {
 			let { state, action } = st.onModalKey ? st.onModalKey(st.modal, k) : modals.step(st.modal, k)
 			st.modal = state
@@ -337,7 +329,7 @@ function onKeys(events: KeyEvent[]): void {
 				continue
 			}
 			let submit = st.onModal
-			app.close()
+			appModals.close()
 			let command = action.type === 'submit' ? submit?.(action, state) : undefined
 			if (command) app.send(command)
 			continue
@@ -464,23 +456,13 @@ export const app = {
 	preview: async (_name?: string): Promise<void> => {},
 	beat,
 	onEvent,
-	backgroundStep: tabSwitch.backgroundStep,
 	backfilled,
-	onState: linkState.onState,
-	focusedTab: tabSwitch.focusedTab,
-	onTabs: tabSwitch.onTabs,
-	focusOn: tabSwitch.focusOn,
-	tabKey: tabSwitch.tabKey,
 	// Told the tab shown after every change (main.ts keeps it for a restart).
 	focused: (_tab: Tab): void => {},
 	submit,
 	completed,
 	setPrompt,
 	onKeys,
-	open: appModals.open,
-	close: appModals.close,
-	pick: appModals.pick,
-	configure: appModals.configure,
 	pasted,
 	init,
 	reset,

@@ -195,12 +195,12 @@ function onEvent(event: Event): void {
 			let afterPaint = () => {
 				if (app.state === current) {
 					st.painted = true
-					app.backgroundStep()
+					tabs.backgroundStep()
 				}
 			}
 			if (typeof requestAnimationFrame === 'function') requestAnimationFrame(afterPaint)
 			else setTimeout(afterPaint, 0)
-		} else app.backgroundStep()
+		} else tabs.backgroundStep()
 	}
 }
 // The address changed (loaded, a card's link followed, Back): aim at
@@ -494,7 +494,6 @@ export const app = {
 		drafts.submit(id, text)
 		app.changed()
 	},
-	backgroundStep: () => tabs.backgroundStep(),
 	onEvent,
 	settled,
 	aim,

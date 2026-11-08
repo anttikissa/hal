@@ -8,6 +8,8 @@ import { modals } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
 import type { Snapshot } from '../common/snapshot.ts'
 import { app } from './app.ts'
+import { appModals } from './app-modals.ts'
+import { linkState } from './link-state.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import { keys } from './keys.ts'
@@ -226,12 +228,12 @@ test('a config warning is shown and keeps the transcript', () => {
 // Invariant (bug fix): a starting client never says the host was lost.
 test('joining says nothing before the first join; losing the host is shown, and cleared on reconnect', () => {
 	connection.state.joined = false
-	app.onState({ type: 'joining' })
+	linkState.onState({ type: 'joining' })
 	expect(appView.view().notice).toBeUndefined()
 	connection.state.joined = true
-	app.onState({ type: 'disconnected', retryAt: Date.now() + 100 })
+	linkState.onState({ type: 'disconnected', retryAt: Date.now() + 100 })
 	expect(appView.view().notice).toBe('host lost; reconnecting…')
-	app.onState({ type: 'connected', role: 'client' })
+	linkState.onState({ type: 'connected', role: 'client' })
 	expect(appView.view().notice).toBeUndefined()
 })
 
@@ -286,7 +288,7 @@ test('a modal takes the keys over everything and ends in an ordinary command', (
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
 	type('draft')
 	let search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
-	app.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({
+	appModals.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({
 		type: 'model',
 		sessionId: 's1',
 		item: action.item,
@@ -306,7 +308,7 @@ test('a modal takes the keys over everything and ends in an ordinary command', (
 
 test('Escape closes a modal and nothing else: the running turn goes on', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-	app.open(modals.open({ title: 'Models', items: ['a'] }), () => ({ type: 'never' }))
+	appModals.open(modals.open({ title: 'Models', items: ['a'] }), () => ({ type: 'never' }))
 	escape()
 	expect(sent).toEqual([])
 	expect(appView.view().modal).toBeUndefined()
@@ -378,7 +380,7 @@ test('the terminal watches the tab it shows until its window reports losing focu
 	// Focus reports are not keys: the prompt is untouched.
 	expect(app.state.prompt.text).toBe('')
 	// A new connection's host hears it again.
-	app.onState({ type: 'connected', role: 'client' })
+	linkState.onState({ type: 'connected', role: 'client' })
 	acked('b')
 	expect(watched.at(-1)).toEqual({ type: 'visibility', sessionId: 'b', visible: true })
 	expect(watched).toHaveLength(5)

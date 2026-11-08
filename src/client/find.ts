@@ -6,6 +6,8 @@ import { findController } from '../common/find-controller.ts'
 import { findDialog } from '../common/find-dialog.ts'
 import type { FindBatch, FindPreview } from '../common/find.ts'
 import { app } from './app.ts'
+import { appModals } from './app-modals.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import { tabs } from './tabs.ts'
@@ -21,8 +23,8 @@ const hooks = {
 	id: () => connection.nextId(),
 }
 function open(): void {
-	app.close()
-	app.open(
+	appModals.close()
+	appModals.open(
 		findDialog.open(
 			find.state.filters,
 			app.state.tabs.map((t) => t.id),
@@ -52,7 +54,7 @@ function open(): void {
 function go(r: NonNullable<typeof find.target>): void {
 	find.target = r
 	let ids = app.state.tabs.map((t) => t.id)
-	if (ids.includes(r.sessionId)) app.focusOn(tabs.focus(ids, ids, app.state.focus, r.sessionId))
+	if (ids.includes(r.sessionId)) tabSwitch.focusOn(tabs.focus(ids, ids, app.state.focus, r.sessionId))
 	else app.send({ type: 'tab-resume', sessionId: r.sessionId })
 	find.report()
 }

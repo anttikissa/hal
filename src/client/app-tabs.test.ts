@@ -7,6 +7,9 @@ import { modals } from '../common/modals.ts'
 import { placeholders } from '../common/placeholders.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'
+import { appModals } from './app-modals.ts'
+import { linkState } from './link-state.ts'
+import { tabSwitch } from './tab-switch.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import {
@@ -86,7 +89,7 @@ test('a saved draft shown on starting is not doubled; text typed before it follo
 
 test('connecting asks the host for the tab to show; its ack focuses and follows it', () => {
 	app.state.start = { cwd: '/w', last: 'b' }
-	app.onState({ type: 'connected', role: 'host' })
+	linkState.onState({ type: 'connected', role: 'host' })
 	// It also asks for a code for its web links.
 	expect(sent).toEqual([
 		{ type: 'tab-start', cwd: '/w', last: 'b', timezone: expect.any(String) },
@@ -98,13 +101,13 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	expect(shown()).toBe('b')
 	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'b' })
 	// A reconnect asks for the tab shown, in its own cwd.
-	app.onState({ type: 'connected', role: 'client' })
+	linkState.onState({ type: 'connected', role: 'client' })
 	expect(sent.at(-2)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b', timezone: expect.any(String) })
 })
 
 test('a remote client starts without a cwd (it names nothing there) and its status names the host', () => {
 	app.state.start = { last: 'b' }
-	app.onState({ type: 'connected', role: 'client' })
+	linkState.onState({ type: 'connected', role: 'client' })
 	expect(sent[0]).toEqual({ type: 'tab-start', last: 'b', timezone: expect.any(String) })
 	startOn(['a'])
 	let link = connection.state.link
@@ -187,7 +190,7 @@ test('each tab keeps its editor state while another is shown; a modal closes on 
 	expect(appView.view().prompt.text).toBe('')
 	app.onEvent(snapshot('b'))
 	type('x')
-	app.open(modals.open({ title: 'Models', items: ['m'] }), () => undefined)
+	appModals.open(modals.open({ title: 'Models', items: ['m'] }), () => undefined)
 	app.onKeys([ctrl('p')])
 	expect(appView.view().modal).toBeUndefined()
 	expect(appView.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
@@ -254,9 +257,9 @@ test('web links carry the latest link code only in their hidden target', () => {
 
 test('navigating to a cached tab uses the draft updated while it was hidden', () => {
 	startOn(['a', 'b'])
-	app.focusOn({ tab: 'b' })
+	tabSwitch.focusOn({ tab: 'b' })
 	app.onEvent(snapshot('b'))
-	app.focusOn({ tab: 'a' })
+	tabSwitch.focusOn({ tab: 'a' })
 	app.onEvent({ type: 'draft', sessionId: 'b', draft: { text: 'written on another client', rev: 3 } })
 	app.onEvent({ type: 'go', sessionId: 'a', tab: 'b' })
 	expect(app.state.prompt.text).toBe('written on another client')
@@ -266,9 +269,9 @@ test('navigating to a cached tab uses the draft updated while it was hidden', ()
 
 test('a synchronous navigation submit does not clear the destination editor', () => {
 	startOn(['a', 'b'])
-	app.focusOn({ tab: 'b' })
+	tabSwitch.focusOn({ tab: 'b' })
 	app.onEvent(snapshot('b', { type: 'idle' }, { text: 'destination draft', rev: 7 }))
-	app.focusOn({ tab: 'a' })
+	tabSwitch.focusOn({ tab: 'a' })
 	type('/go b')
 	drafts.send = (command: any) => {
 		record(command)
@@ -277,7 +280,7 @@ test('a synchronous navigation submit does not clear the destination editor', ()
 	enter()
 	expect(shown()).toBe('b')
 	expect(app.state.prompt.text).toBe('destination draft')
-	app.focusOn({ tab: 'a' })
+	tabSwitch.focusOn({ tab: 'a' })
 	expect(app.state.prompt.text).toBe('')
 })
 

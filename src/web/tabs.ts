@@ -225,7 +225,7 @@ function show(id: string, replace: boolean, block?: string): void {
 	push.visibility(id)
 	tabs.seen()
 	app.changed()
-	app.backgroundStep()
+	tabs.backgroundStep()
 }
 
 // Back or Forward: the tab the address names, if it is one.

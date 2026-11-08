@@ -17,6 +17,7 @@ import type { Event, Tab } from '../common/protocol.ts'
 import { transcriptLive } from '../common/transcript-live.ts'
 import { recall } from '../common/recall.ts'
 import { app, type AppState } from './app.ts'
+import { appModals } from './app-modals.ts'
 import type { KeyEvent } from './keys.ts'
 import { tabKeys } from '../common/tab-keys.ts'
 import { tabs, type Focus } from './tabs.ts'
@@ -93,9 +94,9 @@ function onTabs(list: Tab[]): void {
 			st.background.delete(id)
 			app.send({ type: 'close', sessionId: id })
 		}
-	app.focusOn(tabs.focus(old, ids, st.focus, asked))
+	tabSwitch.focusOn(tabs.focus(old, ids, st.focus, asked))
 	app.show()
-	app.backgroundStep()
+	tabSwitch.backgroundStep()
 }
 
 // Shows `focus`: the tab left keeps its client state and is no longer
@@ -121,7 +122,7 @@ function focusOn(focus: Focus): void {
 		for (let f of tabFields) delete st[f]
 		let back = focus.tab === undefined ? undefined : st.hidden.get(focus.tab)
 		Object.assign(st, { prompt: prompt.empty() }, back)
-		app.close()
+		appModals.close()
 		delete st.choices
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
@@ -144,7 +145,7 @@ function focusOn(focus: Focus): void {
 		}
 	}
 	queuedPrompt.sync(st)
-	let tab = app.focusedTab()
+	let tab = tabSwitch.focusedTab()
 	if (tab) app.focused(tab)
 	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
 	tabSwitch.watch()
@@ -161,13 +162,13 @@ function watch(): void {
 	if (now === undefined || now === st.watching) return
 	st.watching = now
 	app.send({ type: 'visibility', sessionId: tab, visible: !st.away })
-	let shown = app.focusedTab()
+	let shown = tabSwitch.focusedTab()
 	if (!st.away && shown?.attention) app.send({ type: 'tab-seen', sessionId: shown.id })
 }
 
 // Tab keys: next, previous, go to 1-10. True if handled.
 function tabKey(k: KeyEvent): boolean {
-	let tab = app.focusedTab()
+	let tab = tabSwitch.focusedTab()
 	let r =
 		tab &&
 		tabKeys.key(
@@ -176,7 +177,7 @@ function tabKey(k: KeyEvent): boolean {
 			app.state.tabs.map((t) => t.id),
 		)
 	if (!r) return false
-	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
+	if (r.focus !== undefined && r.focus !== tab!.id) tabSwitch.focusOn({ tab: r.focus })
 	return true
 }
 
