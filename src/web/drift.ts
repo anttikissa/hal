@@ -9,12 +9,7 @@ import { diagnostics } from './diagnostics.ts'
 import { scroll } from './scroll.ts'
 
 function init(): void {
-	let trace = (
-		why: string,
-		kind: 'scroll' | 'pulled' | 'drift' | 'pin' = 'scroll',
-		gap?: number,
-		extra?: { from?: number; delta?: number; up?: boolean },
-	) => {
+	let trace = (why: string, kind: 'scroll' | 'pulled' | 'drift' | 'pin' = 'scroll', gap?: number) => {
 		let st = scroll.state,
 			el = st.el
 		if (!el) return
@@ -29,19 +24,12 @@ function init(): void {
 					gap: scroll.gap(el),
 					pinned: st.pinned,
 					held: !!st.held,
-					intent: !!st.intent,
-					...extra,
+					intent: scroll.steering(),
 				},
 			} satisfies Partial<Breadcrumb>)
 		diagnostics.report()
 	}
-	scroll.onTrace = (why, gap, wheel) =>
-		trace(
-			why,
-			gap === undefined ? 'scroll' : 'pulled',
-			gap,
-			wheel === undefined ? undefined : { delta: Math.abs(wheel), up: wheel < 0 },
-		)
+	scroll.onTrace = (why, gap) => trace(why, gap === undefined ? 'scroll' : 'pulled', gap)
 	// Debug marker: green while following the bottom, red for
 	// 8 s after following ends, so the moment is noticed.
 	let mark = document.body.appendChild(document.createElement('div')),
@@ -55,8 +43,8 @@ function init(): void {
 		if (!on && why) fade = setTimeout(show, 8000)
 	}
 	show()
-	scroll.onPin = (why, from) => {
-		trace(why, 'pin', undefined, { from: Math.max(0, from) })
+	scroll.onPin = (why) => {
+		trace(why, 'pin')
 		show(why)
 	}
 	let stuck = 0,

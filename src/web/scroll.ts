@@ -1,8 +1,9 @@
 /// <reference lib="dom" />
 // Keeps a reader who is at the bottom there while content changes,
-// without animation: one pinned bottom. Navigating away releases following;
-// layout clamps do not. History, viewport and tab changes keep reading
-// anchors. Tasks: 4s, 981.
+// without animation. Following is on or off, and only the reader's own
+// scrolling sets it: scrolling up turns it off, reaching the bottom on.
+// Nothing else, not momentum nor layout, changes it. History, viewport
+// and tab changes keep reading anchors. Tasks: 4s, 981.
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
@@ -17,25 +18,24 @@ function target(el: Box, gap: number): number {
 	return Math.max(0, el.scrollHeight - el.clientHeight - gap)
 }
 
-const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
-
 // At most this far above the bottom still counts as at the bottom:
 // scroll positions can be fractional.
 const atBottom = 1
 
-// Sets following. Each change is a diagnostic transition: what caused
-// it and where the view was before (task 981).
+// A wheel or key scroll may move the view this long after its event.
+const inputMs = 300
+
+// Sets following. Each change is a diagnostic transition (task 981).
 function pin(on: boolean, why: string): void {
 	let st = scroll.state
 	if (st.pinned === on) return
 	st.pinned = on
-	scroll.onPin(why, st.top)
+	scroll.onPin(why)
 }
 
 // `why`: the reader's action that left the bottom.
 function leave(why: string): void {
 	pin(false, why)
-	scroll.state.intent = undefined
 	scroll.state.held = undefined
 }
 
@@ -44,7 +44,6 @@ function leave(why: string): void {
 function hold(card: Element): void {
 	let st = scroll.state
 	if (!st.el) return
-	st.intent = undefined
 	pin(scroll.gap(st.el) <= atBottom, 'link')
 	st.held = st.pinned ? undefined : { card, top: card.getBoundingClientRect().top }
 }
@@ -64,71 +63,51 @@ function keep(): boolean {
 	return true
 }
 
-function intent(event?: Event): void {
-	let el = scroll.state.el
-	if (el) {
-		scroll.state.intent = true
-		if (!event) scroll.state.top = el.scrollTop
-	}
-	if (event)
-		scroll.onTrace(
-			event.type === 'pointerdown' ? 'press' : event.type === 'keydown' ? 'key' : event.type,
-			undefined,
-			(event as WheelEvent).deltaY,
-		)
+// Whether the reader scrolls now: a finger or mouse button is down, or
+// a wheel or key event just came.
+function steering(): boolean {
+	let st = scroll.state
+	return st.finger || performance.now() - st.input < inputMs
 }
 
+// The reader's scrolling sets following.
 function navigate(): void {
 	let st = scroll.state,
 		el = st.el
-	if (!el) return
-	// Layout can clamp the old position; only movement beyond that is navigation.
-	if (st.intent && Math.abs(el.scrollTop - Math.min(st.top, scroll.target(el, 0))) > atBottom) {
-		pin(scroll.gap(el) <= atBottom, 'drag')
-		if (st.pinned) st.intent = undefined
-		st.held = undefined
-		scroll.onTrace(st.pinned ? 'resume' : 'drag')
-	}
+	if (!el || !steering() || el.scrollTop === st.top) return
+	let up = el.scrollTop < st.top
 	st.top = el.scrollTop
+	st.held = undefined
+	if (scroll.gap(el) <= atBottom) pin(true, 'drag')
+	else if (up) pin(false, 'drag')
 }
 
-function onKey(e: KeyboardEvent): void {
-	let t = e.target as Element | null
-	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
-	if (!e.defaultPrevented && (find || ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input'))))
-		intent(e)
-}
-
-// Sets the view's position and remembers it as ours, so the scroll
-// event it causes is not mistaken for the reader dragging.
+// Sets the view's position; the reading anchor follows it.
 function put(el: Box, top: number): void {
 	el.scrollTop = top
 	scroll.moved()
 }
 
 // The view moved by our hand (put, a linked card scrolled into view):
-// remember the position as ours and read from here. A resize seen
-// before the scroll event would otherwise restore the reading anchor
-// from before the move (task 0z).
+// read from here, and do not take the move for the reader's. A resize
+// seen before the scroll event would otherwise restore the reading
+// anchor from before the move (task 0z).
 function moved(): void {
 	let st = scroll.state
-	if (!st.el) return
-	st.top = st.el.scrollTop
+	if (st.el) st.top = st.el.scrollTop
 	st.reanchor()
 }
 
 // Runs after anything that may have moved the view or grown the
 // content: a scroll event, a DOM change, the tab shown again. `why`
-// names the trigger for diagnostics. A scroll event alone never pulls:
-// the content and size observers pull for growth, and pulling against
-// iOS's own settling made the view shake (task 981). Speculative fix:
-// the shaking was seen once on an iPhone and never reproduced. It was
-// annoying enough to justify one condition.
+// names the trigger for diagnostics. A scroll event never pulls: the
+// content and size observers pull for growth, and pulling against iOS's
+// own settling made the view shake (task 981).
 function check(why: string): void {
 	let st = scroll.state,
 		el = st.el
 	if (!el) return
-	navigate()
+	if (why === 'scroll') navigate()
 	if (!st.pinned) {
 		scroll.keep()
 		return
@@ -174,14 +153,11 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
 	scroll.state.top = el.scrollTop
 	let { stop: stopReflow, capture } = reflow.watch(el, () => {
-		navigate()
 		if (scroll.state.pinned) {
 			scroll.put(el, scroll.target(el, 0))
 			return true
 		}
-		if (scroll.keep()) return true
-		scroll.state.intent = undefined
-		return false
+		return scroll.keep()
 	})
 	scroll.state.reanchor = capture
 	let scrolled = () => {
@@ -220,20 +196,25 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		if (!document.hidden) scroll.check('shown')
 	}
 	document.addEventListener('visibilitychange', shown)
-	let wheel = (e: WheelEvent) => {
-		if (!e.ctrlKey && e.deltaY) intent(e)
-	}
-	let released = () => {
+	// The browser may scroll before it delivers the input event: judge
+	// the position again when the event comes.
+	let down = () => {
+		scroll.state.finger = true
 		navigate()
-		if (scroll.state.pinned) scroll.state.intent = undefined
 	}
-	addEventListener('pointerup', released, { passive: true })
-	addEventListener('touchend', released, { passive: true })
-	el.addEventListener('pointerdown', intent, { passive: true })
-	el.addEventListener('touchstart', intent, { passive: true })
-	el.addEventListener('touchmove', intent, { passive: true })
-	el.addEventListener('wheel', wheel, { passive: true })
-	addEventListener('keydown', onKey)
+	let up = () => void (scroll.state.finger = false)
+	let input = (e: Event) => {
+		if (e instanceof KeyboardEvent && (e.target as Element | null)?.closest?.('textarea, input')) return
+		scroll.state.input = performance.now()
+		navigate()
+	}
+	el.addEventListener('pointerdown', down, { passive: true })
+	el.addEventListener('touchstart', down, { passive: true })
+	addEventListener('pointerup', up, { passive: true })
+	addEventListener('touchend', up, { passive: true })
+	addEventListener('touchcancel', up, { passive: true })
+	el.addEventListener('wheel', input, { passive: true })
+	addEventListener('keydown', input)
 	return () => {
 		scroll.state.el = null
 		scroll.state.reanchor = () => {}
@@ -242,25 +223,22 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		content.disconnect()
 		cards.disconnect()
 		document.removeEventListener('visibilitychange', shown)
-		el.removeEventListener('pointerdown', intent)
-		el.removeEventListener('touchstart', intent)
-		el.removeEventListener('touchmove', intent)
-		el.removeEventListener('wheel', wheel)
-		removeEventListener('pointerup', released)
-		removeEventListener('touchend', released)
-		removeEventListener('keydown', onKey)
+		el.removeEventListener('pointerdown', down)
+		el.removeEventListener('touchstart', down)
+		removeEventListener('pointerup', up)
+		removeEventListener('touchend', up)
+		removeEventListener('touchcancel', up)
+		el.removeEventListener('wheel', input)
+		removeEventListener('keydown', input)
 	}
 }
 
 // Runs `change`, which must leave the DOM updated (flush() in Solid),
 // and keeps a bottom reader at the bottom.
 function follow(change: () => void, force = false): void {
-	let st = scroll.state
-	navigate()
 	if (force) {
 		pin(true, 'force')
-		st.held = undefined
-		st.intent = undefined
+		scroll.state.held = undefined
 		scroll.onTrace('force')
 	}
 	change()
@@ -282,7 +260,6 @@ function restore(id: string): void {
 	let el = scroll.state.el
 	if (!el) return
 	scroll.state.held = undefined
-	scroll.state.intent = undefined
 	let place = scroll.state.places.get(id) ?? { gap: 0 }
 	// A tab never shown here opens pinned at the bottom.
 	pin('gap' in place && place.gap <= atBottom, 'restore')
@@ -296,19 +273,23 @@ export const scroll = {
 	nearTop: 800,
 	// `reanchor`: takes reflow's reading anchor at the current view.
 	// `held`: the card hold() keeps in place, at `top` in the viewport.
+	// `top`: the position the reader or Hal last scrolled to. `finger`: a
+	// finger or mouse button is down; `input`: when the last wheel or key
+	// event came.
 	state: {
 		el: null as Box | null,
 		top: 0,
-		intent: undefined as true | undefined,
 		reanchor: (): void => {},
 		quiet: false,
+		finger: false,
+		input: -Infinity,
 		pinned: true,
 		held: undefined as { card: Element; top: number } | undefined,
 		places: new Map<string, { top: number } | { gap: number }>(),
 	},
-	onTrace: (_why: string, _pull?: number, _wheel?: number): void => {},
-	// Following changed; `from`: the last position Hal saw before.
-	onPin: (_why: string, _from: number): void => {},
+	onTrace: (_why: string, _pull?: number): void => {},
+	// Following changed.
+	onPin: (_why: string): void => {},
 	gap,
 	leave,
 	hold,
@@ -317,7 +298,7 @@ export const scroll = {
 	moved,
 	check,
 	target,
-	intent,
+	steering,
 	atTop,
 	anchor,
 	quiet,
