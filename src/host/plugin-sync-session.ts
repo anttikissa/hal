@@ -27,9 +27,6 @@ const MODEL = 'hal/sync'
 const gone =
 	'The remote terminal running this review is not connected, so nothing was written here. Type /sync in it once it is connected to continue.'
 
-// The review tab's name for client home `home`.
-const nameFor = (home: string): string => `Sync ${home.slice(0, 6)}`
-
 // A connected terminal of `home`, `client` first.
 function terminal(home: string, client?: Client): Client | undefined {
 	let live = (c: Client) => host.state.clients.has(c as any) && pluginSync.state.followers.get(c) === home
@@ -107,7 +104,7 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 		return { say: "/sync compares this home's files with a server. Run hal -r <host> and use /sync there." }
 	if (home === pluginSync.home())
 		return { say: "This terminal runs on the host's own home: there is nothing to compare." }
-	let { id, old } = find(nameFor(home), from, cwd)
+	let { id, old } = find(`Sync ${home.slice(0, 6)}`, from, cwd)
 	pluginSyncSession.state.bound.set(id, { home, client })
 	if (!status.transition(id, { type: 'submit' })) turns.start(id)
 	// Go before closing: a terminal on the old tab would leave it first
@@ -129,12 +126,7 @@ export const pluginSyncSession = {
 		waiting: new Map<string, (s: Step | undefined) => void>(),
 	},
 	checkMs: 5000,
-	MODEL,
-	nameFor,
-	terminal,
-	ask,
 	run,
 	step,
-	find,
 	open,
 }

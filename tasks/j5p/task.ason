@@ -1,0 +1,6 @@
+{
+	title: 'Connection starters pass options straight through',
+	spec: 'client/link.ts and common/ws-link.ts pass onState to connection.start in one object literal. plugin-sync-session.ts exports only its entry points (state, checkMs, run, step, open); terminal, ask and find stay module-local.',
+	status: 'done',
+	needs: []
+}

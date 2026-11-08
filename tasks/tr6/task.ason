@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 07/10: Connections and synchronization',
 	spec: 'Under task nt8, host protocol, transports, reconnects, subscriptions and draft synchronization have documented delivery/recovery ownership. Review repeated client coordination while preserving validation, replay, deduplication and unsent text. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed common/connection.ts, ws-link.ts, subscriptions.ts, drafts.ts, client/link.ts, link-state.ts, remote.ts, host/clients.ts, host.ts, server.ts, neighbors.ts, plugin-sync*.ts, drafts.ts (export use scan). Accepted (j5p): one-literal connection.start options in both transports; plugin-sync-session exports only entry points. Source 244 -> 236 nonblank lines. Rejected: drafts.valid and scheduler-like store checks (trust boundary: disk/localStorage input); connection.ts state machine has no duplicated paths; protocol.ts is being edited by another session.'
+	],
+	needs: ['j5p']
 }

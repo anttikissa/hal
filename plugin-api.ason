@@ -1,5 +1,5 @@
 {
-	version: 29,
+	version: 30,
 	changes: [
 		{
 			version: 2,
@@ -518,6 +518,17 @@
 					kind: 'compatible',
 					target: 'host/history.callNumber',
 					description: 'Adds tool call id to card number lookup'
+				}
+			]
+		},
+		{
+			version: 30,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/plugin-sync-session.find',
+					description: 'Removed from exports',
+					port: 'Use pluginSyncSession.open'
 				}
 			]
 		}

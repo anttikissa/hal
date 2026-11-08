@@ -92,14 +92,13 @@ function transport(
 
 // Connects, and reconnects with backoff whenever the socket drops.
 function start(opts: LinkOptions): void {
-	let startOpts: Parameters<typeof connection.start>[0] = {
+	void connection.start({
 		transport: wsLink.transport(opts.dial, opts.reload, opts.authorized, opts.onMessage),
 		onEvent: opts.onEvent,
+		onState: opts.onState,
 		baseMs: wsLink.baseMs,
 		maxMs: wsLink.maxDelayMs,
-	}
-	if (opts.onState) startOpts.onState = opts.onState
-	void connection.start(startOpts)
+	})
 }
 
 export const wsLink = { baseMs: 100, maxDelayMs: 1000, connectMs: 10_000, transport, start }

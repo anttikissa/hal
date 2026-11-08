@@ -62,14 +62,13 @@ function dial(path: string, on: { event(event: Event): void; dropped(): void }):
 // Joins, resolving once connected (as host or client). Losing the host
 // retries fast: another process is about to take over.
 function start(opts: LinkOptions): Promise<void> {
-	let startOpts: Parameters<typeof connection.start>[0] = {
+	return connection.start({
 		transport: link.transport(opts),
 		onEvent: opts.onEvent,
+		onState: opts.onState,
 		baseMs: link.retryMs,
 		maxMs: 1000,
-	}
-	if (opts.onState) startOpts.onState = opts.onState
-	return connection.start(startOpts)
+	})
 }
 
 export const link = {
