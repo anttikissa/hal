@@ -6,7 +6,7 @@
 // (the host died mid-write) is cut off. Any other malformed record is
 // reported and the file is left untouched. A turn with no end record is
 // unfinished, not broken: the host continues it (turns.recover).
-import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
+import { appendFileSync, existsSync, statSync, truncateSync } from 'fs'
 import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
@@ -169,38 +169,8 @@ function submit(id: string, prompt: string | UserBlock[], command?: string): His
 	return history.append(id, record)
 }
 
-async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: string }> {
-	let path = history.file(id)
-	if (!existsSync(path)) return { records: [] }
-	let records: HistoryRecord[] = []
-	let partial: string | undefined
-	try {
-		let text = await Bun.file(path).text()
-		let end = text.lastIndexOf('\n') + 1
-		for (let line of text.slice(0, end).split('\n')) if (line.trim()) records.push(history.check(ason.parse(line)))
-		// An unterminated last line that fails to parse is a torn write.
-		let tail = text.slice(end)
-		if (tail.trim()) {
-			let value: unknown
-			try {
-				value = ason.parse(tail)
-			} catch {
-				partial = tail
-			}
-			if (partial === undefined) records.push(history.check(value))
-		}
-	} catch (e: any) {
-		throw new Error(`${path}: malformed history: ${e?.message ?? e}`)
-	}
-	return { records, partial }
-}
-
-async function read(id: string): Promise<HistoryRecord[]> {
-	return (await history.load(id)).records
-}
-
-// read() for callers that must not yield, such as a snapshot taken in
-// the same step as its live events. Appends are synchronous, so within
+// Every record, for callers that must not yield, such as a snapshot taken
+// in the same step as its live events. Appends are synchronous, so within
 // this process only a crash leaves a partial line; it is skipped. An
 // open session's records stay in memory (provider input is rebuilt from
 // them every round): only what was appended since is read.
@@ -218,25 +188,10 @@ function readSync(id: string): HistoryRecord[] {
 	let last = buf.toString('utf8', end)
 	if (last.trim()) {
 		try {
-			let r = history.check(ason.parse(last))
-			r.n ??= cached.size + end + 1
-			return [...records, r]
+			return [...records, pages.parse(path, last, cached.size + end)]
 		} catch {}
 	}
 	return records.slice()
-}
-
-function lastByte(path: string): number | undefined {
-	let size = statSync(path).size
-	if (!size) return undefined
-	let fd = openSync(path, 'r')
-	try {
-		let buf = Buffer.alloc(1)
-		readFd(fd, buf, 0, 1, size - 1)
-		return buf[0]
-	} finally {
-		closeSync(fd)
-	}
 }
 
 // True if the last turn has no end record. Reads the marks (pages.ts),
@@ -253,7 +208,7 @@ async function open(id: string): Promise<SessionMeta> {
 	let meta = sessions.open(id)
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
-	if (!size || history.lastByte(path) === 10) return meta
+	if (!size || pages.readBytes(path, size - 1, size)[0] === 10) return meta
 	let from = size
 	let buf = Buffer.alloc(0)
 	while (from > 0 && buf.indexOf(10) < 0) {
@@ -427,23 +382,15 @@ function carry(id: string, providerName: string, usage: Usage): void {
 // handler, before the host lock is released to a successor.
 function stop(pause: boolean): void {
 	for (let [id, running] of history.state.running) {
-		history.state.running.delete(id)
-		if (running.ended) continue
-		running.ended = true
-		let { turn } = running
 		try {
-			for (; running.written < turn.blocks.length; running.written++)
+			for (; running.written < running.turn.blocks.length; running.written++)
 				history.append(id, history.blockRecord(id, running, running.written))
-			if (pause)
-				history.append(id, {
-					type: 'turn_end',
-					status: 'paused',
-					usage: addUsage(running.prior, turn.usage),
-					...contextOf(running),
-				})
+			if (pause) history.end(id, undefined)
 		} catch (e: any) {
 			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
 		}
+		running.ended = true
+		history.state.running.delete(id)
 	}
 }
 
@@ -492,9 +439,6 @@ export const history = {
 	write,
 	onAppend,
 	submit,
-	load,
-	lastByte,
-	read,
 	readSync,
 	unfinished,
 	open,

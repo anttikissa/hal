@@ -1,0 +1,9 @@
+{
+	title: 'One history reader; turns call turn policy directly',
+	spec: 'history.readSync is the only history file reader; open reuses pages.readBytes for its last-byte check and readSync reuses pages.parse for a complete unterminated last record. history.stop writes a paused end through history.end. turns exposes only its own operations and the stream/recover test seams; callers use turnPolicy and turnRecovery directly.',
+	status: 'done',
+	notes: [
+		'Removed async history.load/read: one production caller (synthetic scripted turns), and its partial-tail result was never read; readSync already serves 63 call sites and reports malformed records with the path. Rejected: shared Running constructor for record/carry (saves about two lines), cancel-answer helper in turns.pause (no net reduction). Kept turns.stream and turns.recover: many tests replace or call them. Counts (nonblank, non-comment): history.ts 401 -> 349, turns.ts 398 -> 388, history.test.ts 371 -> 368. Verified: 1047 pass across 146 files; tsc has only the four known baseline errors.'
+	],
+	needs: []
+}

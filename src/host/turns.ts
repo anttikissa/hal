@@ -211,7 +211,7 @@ function target(running: Running, model: string, selected?: string): string | un
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
-	history.carry(id, running.provider, turns.parkedUsage(records))
+	history.carry(id, running.provider, turnPolicy.parkedUsage(records))
 	let held = approval.held(records)
 	// The scripted reply of the round, read once its stream ended: a
 	// stream may settle what to ask while it runs (task b81).
@@ -219,7 +219,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) return yield* roundStream.stream(id, model, running, signal)
-		let reply = (replied = scripted(await history.read(id), answers, id))
+		let reply = (replied = scripted(history.readSync(id), answers, id))
 		answers = undefined
 		yield* reply.stream ?? synthetic.paced(reply.say, signal)
 	}
@@ -311,7 +311,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				}
 				if (last?.type === 'error' && last.failure && !last.canceled && !signal.aborted) {
 					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id) })
-					await turns.waitOut(id, last, failures++, signal)
+					await turnPolicy.waitOut(id, last, failures++, signal)
 					if (turns.state.running.get(id) !== running) return
 					continue
 				}
@@ -340,7 +340,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (last?.type === 'done') {
 					failures = 0
 					rounds++
-					last = turns.stopped(last)
+					last = turnPolicy.stopped(last)
 				}
 				if (replied?.ask && last?.type === 'done' && !signal.aborted) return turns.ask(id, replied.ask)
 				if (replied?.pause && last?.type === 'done' && !signal.aborted) [capped, last] = [replied.pause, undefined]
@@ -408,12 +408,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				}
 			} else {
 				let r = history.results(id, results)
-				host.broadcast(
-					id,
-					r?.n === undefined
-						? { type: 'tool-results', sessionId: id, results, ts: r?.ts }
-						: { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts },
-				)
+				host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts })
 				commits.cards(id, made)
 			}
 			if (signal.aborted) continue
@@ -464,10 +459,5 @@ export const turns = {
 	start,
 	stop,
 	recover: () => turnRecovery.recover(),
-	leftWork: (id: string) => turnRecovery.leftWork(id),
 	runTurn,
-	parkedUsage: (...args: Parameters<typeof turnPolicy.parkedUsage>) => turnPolicy.parkedUsage(...args),
-	stopped: (...args: Parameters<typeof turnPolicy.stopped>) => turnPolicy.stopped(...args),
-	waitOut: (...args: Parameters<typeof turnPolicy.waitOut>) => turnPolicy.waitOut(...args),
-	backoffMs: (...args: Parameters<typeof turnPolicy.backoffMs>) => turnPolicy.backoffMs(...args),
 }

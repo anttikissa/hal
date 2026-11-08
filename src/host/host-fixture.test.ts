@@ -199,7 +199,7 @@ export const shown = (items: Item[] | undefined) =>
 		return rest
 	})
 
-export const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, n: _n, ...r }) => r)
+export const records = async (id: string) => history.readSync(id).map(({ ts: _ts, n: _n, ...r }) => r)
 
 // A session whose cwd holds notes.txt, for the read tool.
 export function toolSession(c: ReturnType<typeof client>): string {

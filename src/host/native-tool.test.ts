@@ -274,9 +274,9 @@ test('HELP comes from the tool modules; $other_tools lists only tools the prompt
 	expect(agents).toContain('/resume')
 	let spawnHelp = (await act(id, 'HELP SPAWN')).output
 	expect(spawnHelp).toContain('SPAWN { task, [ kind, mode, model, cwd, name, limit ] }')
-	let googleHelp = (await act(id, 'HELP GOOGLE')).output
-	expect(googleHelp).toContain('GOOGLE "search terms" [ { num: 5 } ]')
-	expect(googleHelp).toContain('num (integer, default 5)')
+	let braveHelp = (await act(id, 'HELP BRAVE')).output
+	expect(braveHelp).toContain('BRAVE "search terms" [ { num: 5 } ]')
+	expect(braveHelp).toContain('num (integer, default 5)')
 	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets } ]'])
 })
 

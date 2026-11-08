@@ -117,7 +117,7 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 		await auth.changed(signal)
 		return
 	}
-	let at = error.retryAt ?? clock.now() + turns.backoffMs(failures)
+	let at = error.retryAt ?? clock.now() + turnPolicy.backoffMs(failures)
 	if (error.failure === 'limited' && at > clock.now()) {
 		let model = sessions.open(id).model
 		let provider = turns.state.running.get(id)?.provider ?? model.split('/')[0]!

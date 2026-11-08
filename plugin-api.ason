@@ -1,5 +1,5 @@
 {
-	version: 26,
+	version: 27,
 	changes: [
 		{
 			version: 2,
@@ -396,6 +396,59 @@
 					kind: 'compatible',
 					target: 'host/tools/edit',
 					description: 'Includes commit reporting lines in output'
+				}
+			]
+		},
+		{
+			version: 27,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/history.read',
+					description: 'Removed',
+					port: 'Use history.readSync'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/history.load',
+					description: 'Removed',
+					port: 'Use history.readSync'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/history.lastByte',
+					description: 'Removed',
+					port: 'Use pages.readBytes'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/turns.parkedUsage',
+					description: 'Removed',
+					port: 'Use turnPolicy.parkedUsage'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/turns.stopped',
+					description: 'Removed',
+					port: 'Use turnPolicy.stopped'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/turns.waitOut',
+					description: 'Removed',
+					port: 'Use turnPolicy.waitOut'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/turns.backoffMs',
+					description: 'Removed',
+					port: 'Use turnPolicy.backoffMs'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/turns.leftWork',
+					description: 'Removed',
+					port: 'Use turnRecovery.leftWork'
 				}
 			]
 		}

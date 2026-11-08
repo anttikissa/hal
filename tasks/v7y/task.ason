@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 03/10: Turn execution',
 	spec: 'Under task nt8, turns, streaming, interruption, recovery and message queues have documented state-transition ownership. Review repeated orchestration and invalid intermediate states; preserve tool ordering, cancellation, delivery and recovery semantics. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed turns.ts, turn-policy.ts, turn-recovery.ts. Accepted y2j: drop forwarding wrappers and the duplicate tool-results broadcast. Rejected: helper for canceled-question answers (no net reduction); the two lazy rebase-agent requires avoid an import cycle.'
+	],
+	needs: ['y2j']
 }

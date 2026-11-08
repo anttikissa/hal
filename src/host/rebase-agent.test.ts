@@ -49,7 +49,7 @@ test('self-removed paused rebase keeps a durable report with drop ranges and edi
 	let tail = history.readSync(id).at(-1)!.n! + 1
 	calls[0]!.push(command(`/rebase run --paused edit ${n} "after"; drop ${tail}-`), { type: 'done', reason: 'tool_use' })
 	await until(() => !turns.state.running.has(id))
-	let current = replay.current(await history.read(id))
+	let current = replay.current(history.readSync(id))
 	expect(current.some((r) => r.type === 'assistant' && r.block.type === 'tool_call')).toBe(false)
 	let report = current.find((r) => r.type === 'output' && r.text.startsWith('Rebase applied ('))
 	expect(report).toBeDefined()

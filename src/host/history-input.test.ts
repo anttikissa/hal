@@ -73,7 +73,7 @@ test('a failed turn stores the provider body with the message, never just a head
 	fakeStream(() => [{ type: 'error', message: 'Invalid JSON input', body: '{"command": "ls' }])
 	history.submit(id, 'go')
 	await drain(historyInput.turn(id))
-	expect((await history.read(id)).at(-1)).toMatchObject({
+	expect(history.readSync(id).at(-1)).toMatchObject({
 		type: 'turn_end',
 		status: 'error',
 		error: 'Invalid JSON input\n{"command": "ls',

@@ -186,7 +186,7 @@ test('mixed batches retain every durable image, error and file version across hi
 	history.append('s', { type: 'user', blocks: [{ type: 'text', text: 'read these' }] })
 	history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 'batch', ...resolved } })
 	let record = history.append('s', { type: 'user', blocks: [result] })
-	let records = await history.read('s')
+	let records = history.readSync('s')
 	let messages = replay.toMessages(records)
 	let req = { model: 'test', messages, image: (blob: string) => blobs.image('s', blob) }
 	let expected = [png, gif].map((bytes) => bytes.toString('base64'))
