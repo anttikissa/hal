@@ -6,5 +6,5 @@
 		'Reviewed common/{prompt,picker,completion,queue-edit,toggle,send-keys,find-dialog,modals,amend,prompt-changes}.ts, client/{keys,prompt-keys,folds,queue-edit,tab-switch}.ts, web/{folds,queue-edit,router,target,completions,edit-prompt}.ts (export use scan, client/web twin diff). Accepted (1qr): merged identical web queue-edit cancel/save. Source 54 -> 47 lines. Rejected: client and web queue-edit and folds adapters differ in platform mechanics (keys vs signals), kept apart; prompt.ts key table is already one decision point. Not reviewed in depth: forms, find, keys and app files under concurrent edit by another session.',
 		'Second pass (39-law): client app forwarders to tabSwitch/linkState/appModals and web app.backgroundStep removed; forms, form-view, help-row, web keys, Question.tsx and find reviewed with no change. Source 2305 -> 2300.'
 	],
-	needs: ['1qr']
+	needs: ['1qr', 'zzm']
 }
