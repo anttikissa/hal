@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 09/10: Rendering',
 	spec: 'Under task nt8, transcript/card presentation, Markdown, layout, scrolling, terminal frames and web components have documented presentation ownership. Review repeated preparation and rendering coordination while preserving viewport ownership, incremental rendering, accessibility and platform differences. Interaction decisions belong to area 08. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed client render/render-view/frame/frame-layout/modal-view/prompt-view/app-view/item-view/tool-view/markdown-view, common transcript/transcript-live/markdown/card/blocks, web view/scroll/viewport/transcript-rows (export scan plus reading central files). Accepted: dropped frame.order, render.tail/later forwarders, modalView.modalScroll wrapper, dead promptView.mark/FIRST/REST; app-view uses frame.scrolls instead of a copy. Rejected: render.draw/show forwarders (test seams, app.ts under concurrent edit), frame.promptWidth and web view.commandDraft (callers in files under concurrent edit), test-only exports (render.paint/reset, markdown.inline, scroll.intent: real test seams), frame-layout restructuring (no net clarity win). Web components skipped: several under concurrent edit. 1596->1573 nonblank noncomment lines.'
+	],
+	needs: ['fww']
 }

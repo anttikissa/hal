@@ -144,18 +144,10 @@ function box(
 	}
 }
 
-// Text rows marked as a prompt: the first with `FIRST`, the rest indented.
-function mark(rows: string[]): string[] {
-	return rows.map((l, i) => (i ? promptView.REST : promptView.FIRST) + l)
-}
-
 export const promptView = {
-	FIRST: '> ',
-	REST: '  ',
 	layoutPrompt,
 	rule,
 	slots,
 	example,
 	box,
-	mark,
 }

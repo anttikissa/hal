@@ -38,14 +38,14 @@ export type Past = {
 function layout(view: View, cols: number, deadline = Infinity, save = true, screenRows = 24): Past | undefined {
 	let session = view.transcript?.meta.id
 	// Ordered once per transcript (updates replace its items), in slices
-	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
+	// (task 7j); an unsaved layout (renderView.tail's) leaves the memo alone.
 	let src = view.transcript ? transcript.shown(view.transcript) : [],
 		memo = frameLayout.state.ordered,
 		how = `${session} ${src.length}`
-	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src)) } }
+	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: batchOrder.order(promptChanges.group(src)) } }
 	else if (memo?.src !== src || memo.how !== how)
 		memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
-	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, deadline, memo.at)
+	if (memo.at.i < memo.grouped.length) memo.at = batchOrder.order(memo.grouped, deadline, memo.at)
 	if (save) frameLayout.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
 	let items = memo.at.out

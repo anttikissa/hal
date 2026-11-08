@@ -7,6 +7,7 @@ import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { settings } from '../common/settings.ts'
 import { frame, type View } from './frame.ts'
 import { frameLayout } from './frame-layout.ts'
+import { batchOrder } from './batch-order.ts'
 import { ansi } from './ansi.ts'
 import { plain, strip, targets, view, useNames } from './frame-fixture.test.ts'
 
@@ -341,12 +342,12 @@ test('legacy rename controls never appear in terminal answers without a naming f
 })
 
 test('a batch seen running keeps its output and results below its calls until a rebuild', () => {
-	type Row = Parameters<typeof frame.order>[0][number]
+	type Row = Parameters<typeof batchOrder.order>[0][number]
 	let call = (id: string, partial?: string) =>
 		({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}`, ...(partial && { partial }) }) as Row
 	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Row
 	let keys = (items: Row[]) =>
-		frame
+		batchOrder
 			.order(items)
 			.map((i) => i.key)
 			.join(' ')

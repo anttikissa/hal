@@ -11,7 +11,6 @@ import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { transcriptLive } from '../common/transcript-live.ts'
 import { ansi } from './ansi.ts'
-import { batchOrder } from './batch-order.ts'
 import { frameLayout, type Past } from './frame-layout.ts'
 import { itemView, type Look } from './item-view.ts'
 import { bashCard } from './bash-card.ts'
@@ -313,7 +312,6 @@ export const frame = {
 	itemRows,
 	look,
 	queuedRows,
-	order: batchOrder.order,
 	promptWidth,
 	scrolls,
 }

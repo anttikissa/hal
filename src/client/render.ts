@@ -472,8 +472,6 @@ export const render = {
 	clear,
 	column,
 	draw: (force = false, trigger?: string): void => renderView.draw(force, trigger),
-	tail: (view: View, cols: number, rows: number): Past => renderView.tail(view, cols, rows),
-	later: (): void => renderView.later(),
 	request,
 	show: (view: View): void => renderView.show(view),
 	park,

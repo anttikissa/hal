@@ -1,5 +1,5 @@
 {
-	version: 30,
+	version: 31,
 	changes: [
 		{
 			version: 2,
@@ -529,6 +529,41 @@
 					target: 'host/plugin-sync-session.find',
 					description: 'Removed from exports',
 					port: 'Use pluginSyncSession.open'
+				}
+			]
+		},
+		{
+			version: 31,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'client/frame.frame.order',
+					description: 'Removed from exports',
+					port: 'Use batchOrder.order from client/batch-order'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/render.render.tail',
+					description: 'Removed from exports',
+					port: 'Use renderView.tail from client/render-view'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/render.render.later',
+					description: 'Removed from exports',
+					port: 'Use renderView.later from client/render-view'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/modal-view.modalView.modalScroll',
+					description: 'Removed from exports',
+					port: 'Use modals.scroll from common/modals'
+				},
+				{
+					kind: 'breaking',
+					target: 'client/prompt-view.promptView.mark',
+					description: 'Removed from exports',
+					port: 'Prefix rows yourself'
 				}
 			]
 		}

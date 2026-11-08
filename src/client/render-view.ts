@@ -55,10 +55,10 @@ function draw(force = false, trigger?: string): void {
 			st.past = { session, past: full, tail: false }
 			return full
 		}
-		render.later()
+		renderView.later()
 		st.past = kept ?? {
 			session,
-			past: render.tail(st.view, cols, rows),
+			past: renderView.tail(st.view, cols, rows),
 			tail: true,
 		}
 		return st.past.past
@@ -116,7 +116,7 @@ function later(): void {
 		if (!st.out) return
 		let { cols, rows } = st.out.size()
 		if (frameLayout.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)) render.request()
-		else render.later()
+		else renderView.later()
 	}, 0)
 }
 

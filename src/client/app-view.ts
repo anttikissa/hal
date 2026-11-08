@@ -14,7 +14,7 @@ import { placeholders, type PromptExample } from '../common/placeholders.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
-import type { View } from './frame.ts'
+import { frame, type View } from './frame.ts'
 import { halCursor } from './hal-cursor.ts'
 import { pulse } from './pulse.ts'
 import type { StatusInfo } from './status-row.ts'
@@ -22,7 +22,6 @@ import { tabBar } from './tab-bar.ts'
 import { versions } from './versions.ts'
 import { folds } from './folds.ts'
 import { blockView } from './block-view.ts'
-import { bashCard } from './bash-card.ts'
 
 function view(): View {
 	let st = app.state
@@ -64,15 +63,7 @@ function view(): View {
 	let tick = t && appView.tick(t, Date.now())
 	if (tick) v.tick = tick
 	let now = pulse.now()
-	if (
-		t?.items
-			.slice(-20)
-			.some(
-				(i) =>
-					i.type === 'tool' && i.name === 'bash' && bashCard.scrolling(i.input.command, now - Date.parse(i.ts ?? '')),
-			)
-	)
-		v.now = now
+	if (t?.items.slice(-20).some((i) => frame.scrolls(i, now))) v.now = now
 	if (t) v.status = appView.status(t)
 	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
 	return v

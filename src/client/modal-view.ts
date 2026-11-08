@@ -108,7 +108,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// Ctrl-O, Ctrl-F and Ctrl-M keep a blank row above and below their content.
 	if (m.question || m.tree) below = [...below, '']
 	let visible = Math.max(0, height - 2 - content.length - below.length)
-	let scroll = modalView.modalScroll(m, visible)
+	let scroll = modals.scroll(m.scroll, m.selected, m.items.length, visible)
 	let cursor = fields.cursor ?? { row: content.length, col: 0 }
 	// Settings-like rows: the items as a column as wide as the longest.
 	// Model picker: a table of postfix (with the selected row's effort),
@@ -304,11 +304,6 @@ function highlight(row: string, query: string, after?: Style, literal = false): 
 	return out + row.slice(at)
 }
 
-// The first list row a modal shows with `visible` rows for its list.
-function modalScroll(m: ModalState, visible: number): number {
-	return modals.scroll(m.scroll, m.selected, m.items.length, visible)
-}
-
 // `line` with the box row `row` drawn over its columns from `left`, a
 // blank column kept on each side of the box.
 function overlay(line: string, row: string, left: number, width: number, cols: number): string {
@@ -358,7 +353,6 @@ export const modalView = {
 	previewLines,
 	footer,
 	highlight,
-	modalScroll,
 	overlay,
 	withModal,
 }

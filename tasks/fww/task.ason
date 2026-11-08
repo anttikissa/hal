@@ -1,0 +1,6 @@
+{
+	title: 'Rendering forwarders and duplicates removed',
+	spec: 'Terminal rendering code calls owners directly: batch ordering through batchOrder.order, sliced layout through renderView.tail/later, modal scroll through modals.scroll; the app view reuses frame.scrolls for scrolling Bash commands; prompt-view exports no unused prompt marks.',
+	status: 'done',
+	needs: []
+}
