@@ -269,11 +269,8 @@ async function finish(observation: Observation): Promise<{ lines: string[]; comm
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {
-		try {
-			if (observation.commits) found = await commits.finish(observation.commits)
-		} finally {
-			release()
-		}
+		if (observation.commits) found = await commits.finish(observation.commits)
+		release()
 	}
 	if (files.length) await pluginFiles.changed(files, ctx)
 	return found

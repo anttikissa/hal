@@ -11,7 +11,6 @@ import type { CommitBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { open, stat } from 'fs/promises'
 import type { NoticeEvent } from '../common/notices.ts'
-import { diag } from './diag.ts'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -183,8 +182,8 @@ async function committed(_info: Committed): Promise<string[]> {
 	return []
 }
 
-// Announces this call's new commits; returns the lines commits.committed
-// gives for those whose Session trailer names the calling session.
+// Announces this call's new commits; returns hook output and reporting
+// errors as lines, without throwing for operational or committed-hook failures.
 async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitBlock[] }> {
 	let lines: string[] = [],
 		found: CommitBlock[] = []
@@ -269,11 +268,11 @@ async function finish(watch: Watch): Promise<{ lines: string[]; commits: CommitB
 				if (tags.length) block.tags = tags
 				lines.push(...added, ...tags)
 			} catch (err: any) {
-				diag.log(`commit hook ${c.short}: ${err?.stack ?? err?.message ?? err}`)
+				lines.push(`commit hook ${c.short}: ${err?.stack ?? err?.message ?? err}`)
 			}
 		}
 	} catch (e: any) {
-		diag.log(`commit notices: ${e?.message ?? e}`)
+		lines.push(`commit notices: ${e?.stack ?? e?.message ?? e}`)
 	}
 	return { lines, commits: found }
 }

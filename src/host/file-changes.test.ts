@@ -72,23 +72,13 @@ test('Bash observers run after recording and unlocking; failure reports without 
 	}
 })
 
-test('failed commit bookkeeping releases file locks and its active watch', async () => {
+test('unreadable commit reflog returns the error and releases file locks', async () => {
 	const observation = await fileChanges.begin(context(), ['file'])
-	const owner = { path: `${home}/commit-hook.ts`, hash: '', hooks: [], open: true as const }
-	const failure = new Error('commit bookkeeping failed')
-	plugins.api(owner).around(commits, 'finish', async () => {
-		throw failure
-	})
-	try {
-		expect(fileChanges.state.locks).toHaveLength(1)
-		expect(commits.state.active.has(observation.commits!)).toBe(true)
-		await expect(fileChanges.finish(observation)).rejects.toBe(failure)
-		expect(fileChanges.state.locks).toHaveLength(0)
-		expect(commits.state.active.has(observation.commits!)).toBe(false)
-	} finally {
-		plugins.deactivate(owner)
-		observation.release()
-	}
+	observation.commits!.log = cwd
+	const result = await fileChanges.finish(observation)
+	expect(result.lines.join('\n')).toContain('EISDIR')
+	expect(fileChanges.state.locks).toHaveLength(0)
+	expect(commits.state.active.has(observation.commits!)).toBe(false)
 })
 
 // One integration test covers all snapshot transitions; undeclared files are never recorded.

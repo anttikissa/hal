@@ -1,5 +1,5 @@
 {
-	version: 25,
+	version: 26,
 	changes: [
 		{
 			version: 2,
@@ -381,6 +381,21 @@
 					target: 'host/naming.save',
 					description: 'Removed naming-only save helper',
 					port: 'Use sessions.update(id, {}) to save and publish pending edits.'
+				}
+			]
+		},
+		{
+			version: 26,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/commits.finish',
+					description: 'Returns reporting errors in lines'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/tools/edit',
+					description: 'Includes commit reporting lines in output'
 				}
 			]
 		}

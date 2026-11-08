@@ -447,7 +447,7 @@ ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recove
 			cleanup.push(`recovery ${recovery}: ${e.message}`)
 		}
 		try {
-			await fileChanges.finish(observation)
+			result = [result, ...(await fileChanges.finish(observation)).lines].filter(Boolean).join('\n')
 		} catch (e: any) {
 			cleanup.push(e.message)
 		}
