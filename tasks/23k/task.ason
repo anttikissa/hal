@@ -1,6 +1,9 @@
 {
 	title: 'Simplification 10/10: Platform and extensions',
 	spec: 'Under task nt8, startup, installation, plugins, hooks, diagnostics and development scripts have documented lifecycle and resource ownership. Review repeated coordination while preserving plugin contracts, opt-in diagnostics, import safety and deployment behavior. Include maintained extras and performance tooling; private plugins remain outside tracked task records. Record candidate outcomes.',
-	status: 'planned',
-	needs: []
+	status: 'done',
+	notes: [
+		'Reviewed main.ts, host/plugins, plugin-history, plugin-reports, plugin-sync*, web-diagnostics, common/perf, common/plugin-sync (export scan plus reading main.ts and plugins.ts). Accepted: dropped main.initHost/mayHost forwarders, joinHost options in one literal, one terminal check before remote and terminal modes (a no-terminal start now exits before host init), Plugin api methods as one-line arrows, unexported idOf/everyone/isVersion/isHead. Rejected: merging plugins observe/run and deactivate/mute (different throw and missing-patch semantics), test-only seams (plugins.close/load/remove, webDiagnostics.clean, pluginSyncReview.show). Scripts and private plugins not changed. 1355->1333 nonblank noncomment lines.'
+	],
+	needs: ['vdv']
 }

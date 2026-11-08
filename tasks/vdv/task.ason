@@ -1,0 +1,6 @@
+{
+	title: 'Startup and plugin wiring trimmed',
+	spec: 'main.ts calls lifecycle.initHost/mayHost directly, passes link options in one literal and checks for a terminal once before any terminal mode; the plugin registration API forwards each method in one line; plugin modules export only members used elsewhere.',
+	status: 'done',
+	needs: []
+}

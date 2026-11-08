@@ -1,5 +1,5 @@
 {
-	version: 31,
+	version: 32,
 	changes: [
 		{
 			version: 2,
@@ -564,6 +564,47 @@
 					target: 'client/prompt-view.promptView.mark',
 					description: 'Removed from exports',
 					port: 'Prefix rows yourself'
+				}
+			]
+		},
+		{
+			version: 32,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'main.main.initHost',
+					description: 'Removed from exports',
+					port: 'Use lifecycle.initHost from host/lifecycle'
+				},
+				{
+					kind: 'breaking',
+					target: 'main.main.mayHost',
+					description: 'Removed from exports',
+					port: 'Use lifecycle.mayHost from host/lifecycle'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/plugin-history.pluginHistory.idOf',
+					description: 'Removed from exports',
+					port: 'Use the version id stored by pluginHistory'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/plugin-reports.pluginReports.everyone',
+					description: 'Removed from exports',
+					port: 'Use pluginReports.report'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/plugin-sync.pluginSyncWire.isVersion',
+					description: 'Removed from exports',
+					port: 'Use pluginSyncWire.invalidEvent'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/plugin-sync.pluginSyncWire.isHead',
+					description: 'Removed from exports',
+					port: 'Use pluginSyncWire.invalidEvent'
 				}
 			]
 		}

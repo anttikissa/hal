@@ -221,24 +221,15 @@ function override(entry: Loaded, obj: any, key: string, value: unknown): void {
 
 // The API one file version registers through.
 function api(entry: Loaded): Plugin {
-	const plugin: Plugin = {
-		before(obj, key, fn) {
-			hook(entry, 'before', obj, key, fn)
-		},
-		after(obj, key, fn) {
-			hook(entry, 'after', obj, key, fn)
-		},
-		around(obj, key, fn) {
-			hook(entry, 'around', obj, key, fn)
-		},
-		set(obj, key, value) {
-			override(entry, obj, key, value)
-		},
-		disable() {
+	return {
+		before: (obj, key, fn) => hook(entry, 'before', obj, key, fn),
+		after: (obj, key, fn) => hook(entry, 'after', obj, key, fn),
+		around: (obj, key, fn) => hook(entry, 'around', obj, key, fn),
+		set: (obj, key, value) => override(entry, obj, key, value),
+		disable: () => {
 			throw DISABLED
 		},
 	}
-	return plugin
 }
 
 // Removes `entry`'s hooks once its expiry passes. Timers cap at ~24

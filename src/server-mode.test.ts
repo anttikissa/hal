@@ -53,8 +53,9 @@ import { paths } from './src/host/paths.ts'
 paths.state.home = ${JSON.stringify(home)}
 import { config } from './src/host/config.ts'
 import { main } from './src/main.ts'
+import { lifecycle } from './src/host/lifecycle.ts'
 config.init()
-main.initHost()
+lifecycle.initHost()
 await main.joinHost(() => {}, (s) => process.stdout.write(s.type === 'connected' ? s.role + '\\n' : s.type + '\\n'))
 `,
 			]),

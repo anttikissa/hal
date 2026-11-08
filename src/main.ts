@@ -105,7 +105,7 @@ function keepTab(tab: Tab): void {
 
 // Module init() calls go here, in order, once modules have them.
 function init(): void {
-	main.initHost()
+	lifecycle.initHost()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
 	if (!terminal.available()) return
 	main.initTerminal()
@@ -182,14 +182,13 @@ function onEvent(event: Event): void {
 // way the terminal talks to the host through connection.send and gets
 // events through onEvent; the host process uses the in-memory one.
 function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) => void): Promise<void> {
-	let opts: Parameters<typeof link.start>[0] = {
+	return link.start({
 		socketPath: server.socketPath(),
-		tryHost: async () => main.mayHost() && main.becomeHost(),
+		tryHost: async () => lifecycle.mayHost() && main.becomeHost(),
 		local: (deliver) => host.connect(deliver),
 		onEvent,
-	}
-	if (onState) opts.onState = onState
-	return link.start(opts)
+		onState,
+	})
 }
 
 // Becomes host if nobody is. Then, once the first frame is up, serves
@@ -350,14 +349,14 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 		process.stderr.write(`hal: ${cwd} is not a directory\n`)
 		process.exit(2)
 	}
-	main.initHost()
+	lifecycle.initHost()
 	let run = print.run({ ...job, cwd }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
 	// `hal -p` never hosts (task gw): a host needs the web and recovery. If
 	// no host answers the first dial, it starts a detached `hal serve`
 	// (logging to state/serve.log) once, and keeps dialing until it is up.
 	let tries = 0
 	let tryHost = async () => {
-		if (++tries !== 2 || !main.mayHost()) return false
+		if (++tries !== 2 || !lifecycle.mayHost()) return false
 		let file = join(paths.stateDir(), 'serve.log')
 		let log = openSync(file, 'a', 0o600)
 		let serve = Bun.spawn(
@@ -418,19 +417,13 @@ async function start(): Promise<void> {
 	perf.mark('plugins')
 	if (parsed.kind === 'serve') return main.serve(parsed.port)
 	if (parsed.kind === 'print') return main.printMode(parsed)
-	if (parsed.kind === 'remote') {
-		if (!terminal.available()) {
-			process.stderr.write('hal needs a terminal\n')
-			process.exit(1)
-		}
-		return main.remote(parsed.host)
-	}
-	main.init()
-	perf.mark('init')
 	if (!terminal.available()) {
 		process.stderr.write('hal needs a terminal\n')
 		process.exit(1)
 	}
+	if (parsed.kind === 'remote') return main.remote(parsed.host)
+	main.init()
+	perf.mark('init')
 	await main.joinHost(
 		(event) => main.onEvent(event),
 		(state) => app.onState(state),
@@ -453,14 +446,12 @@ export const main = {
 	localPath,
 	loadLocal,
 	loadPlugins,
-	initHost: lifecycle.initHost,
 	init,
 	initTerminal,
 	trackVersion,
 	onEvent,
 	becomeHost,
 	settle,
-	mayHost: lifecycle.mayHost,
 	// hal serve (tasks fd1, kp0): the headless host, logging to stdout.
 	serve: async (port?: number) => {
 		main.state.headless = true
@@ -473,7 +464,7 @@ export const main = {
 				disk: `${serverLog.gb(resources.state.sample.disk)} free`,
 			}),
 		}))
-		main.initHost()
+		lifecycle.initHost()
 		serverLog.log('hal serve', {
 			home: paths.home(),
 			state: paths.stateDir(),

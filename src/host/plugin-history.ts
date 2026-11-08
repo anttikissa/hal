@@ -299,7 +299,6 @@ export const pluginHistory = {
 		versions: new Map<string, Version>(),
 		heads: new Map<string, string>(),
 	},
-	idOf,
 	filePath,
 	fileName,
 	content,

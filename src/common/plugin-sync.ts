@@ -176,8 +176,6 @@ export const pluginSyncWire = {
 	HOME_FILES,
 	isPlugin,
 	isName,
-	isVersion,
-	isHead,
 	invalidCommand,
 	invalidEvent,
 	ignoreList,

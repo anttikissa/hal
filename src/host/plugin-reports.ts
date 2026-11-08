@@ -84,7 +84,6 @@ export const pluginReports = {
 	state: { sources: new Map<string, { source: string; side?: 'client' | 'server' }>() },
 	lastEditor,
 	deliver,
-	everyone,
 	report,
 	via,
 	changed,
