@@ -1,5 +1,5 @@
 {
-	version: 33,
+	version: 34,
 	changes: [
 		{
 			version: 2,
@@ -676,6 +676,17 @@
 					target: 'web/app.app.backgroundStep',
 					description: 'Removed from exports',
 					port: 'Use tabs.backgroundStep from web/tabs'
+				}
+			]
+		},
+		{
+			version: 34,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'web/reflow.reflow.watch',
+					description: 'Removes onResize callback',
+					port: 'Use scroll.state.pinned or scroll.hold for position ownership'
 				}
 			]
 		}

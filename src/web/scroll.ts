@@ -80,6 +80,7 @@ function navigate(): void {
 	st.held = undefined
 	if (scroll.gap(el) <= atBottom) pin(true, 'drag')
 	else if (up) pin(false, 'drag')
+	st.reanchor()
 }
 
 // Sets the view's position; the reading anchor follows it.
@@ -109,7 +110,7 @@ function check(why: string): void {
 	if (!el) return
 	if (why === 'scroll') navigate()
 	if (!st.pinned) {
-		scroll.keep()
+		if (!scroll.keep() && why !== 'scroll') st.restoreReading()
 		return
 	}
 	let g = scroll.gap(el)
@@ -152,13 +153,8 @@ function quiet(change: () => void): void {
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
 	scroll.state.top = el.scrollTop
-	let { stop: stopReflow, capture } = reflow.watch(el, () => {
-		if (scroll.state.pinned) {
-			scroll.put(el, scroll.target(el, 0))
-			return true
-		}
-		return scroll.keep()
-	})
+	let { stop: stopReflow, capture, restore: restoreReading } = reflow.watch(el)
+	scroll.state.restoreReading = restoreReading
 	scroll.state.reanchor = capture
 	let scrolled = () => {
 		scroll.check('scroll')
@@ -218,6 +214,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	return () => {
 		scroll.state.el = null
 		scroll.state.reanchor = () => {}
+		scroll.state.restoreReading = () => {}
 		stopReflow()
 		el.removeEventListener('scroll', scrolled)
 		content.disconnect()
@@ -280,6 +277,7 @@ export const scroll = {
 		el: null as Box | null,
 		top: 0,
 		reanchor: (): void => {},
+		restoreReading: (): void => {},
 		quiet: false,
 		finger: false,
 		input: -Infinity,

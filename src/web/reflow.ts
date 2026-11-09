@@ -1,9 +1,6 @@
 /// <reference lib="dom" />
-// Keeps the reader's place when the layout changes, with a reading
-// anchor taken before layout: an exclusive nearby edge, otherwise the
-// text at the visible center. Resize events arrive after layout, so
-// scroll and content observers refresh it only while the box size is
-// unchanged.
+// Keeps the reader's text in place through content and viewport reflow.
+import { scroll } from './scroll.ts'
 
 type Anchor = {
 	width: number
@@ -13,6 +10,7 @@ type Anchor = {
 	range?: Range
 	element?: Element
 	fraction: number
+	point: number
 	offset: number
 }
 
@@ -26,10 +24,10 @@ function capture(el: HTMLElement): Anchor {
 		top: el.scrollTop,
 		bottom: Math.max(0, el.scrollHeight - el.clientHeight - el.scrollTop),
 		fraction: 0,
+		point: 0,
 		offset: 0,
 	}
-	// Most streaming readers need only an edge gap, not text geometry.
-	if (anchor.top <= 40 !== anchor.bottom <= 40) return anchor
+	if (scroll.state.pinned) return anchor
 	// WebKit supplies caretRangeFromPoint; other engines may supply a
 	// caret position instead. Extend to one character for a measurable rect.
 	for (let step = 0; step <= 40; step += 2) {
@@ -68,24 +66,25 @@ function capture(el: HTMLElement): Anchor {
 		distance = d
 		anchor.element = child
 		anchor.fraction = (point - rect.top) / rect.height
+		anchor.point = point - rect.top
 		anchor.offset = point - y
 	}
 	return anchor
 }
 
-function restore(el: HTMLElement, anchor: Anchor): void {
+function restore(el: HTMLElement, anchor: Anchor, resized: boolean): void {
 	let top = anchor.top <= 40,
 		bottom = anchor.bottom <= 40
 	let target: number
-	if (top !== bottom) target = top ? anchor.top : el.scrollHeight - el.clientHeight - anchor.bottom
+	if (resized && top !== bottom) target = top ? anchor.top : el.scrollHeight - el.clientHeight - anchor.bottom
 	else {
 		let y: number | undefined
-		if (anchor.range && el.contains(anchor.range.startContainer)) {
+		if (anchor.range?.startContainer.nodeType === Node.TEXT_NODE && el.contains(anchor.range.startContainer)) {
 			let rect = anchor.range.getBoundingClientRect()
 			if (rect.height) y = rect.top + rect.height / 2
 		} else if (anchor.element && el.contains(anchor.element)) {
 			let rect = anchor.element.getBoundingClientRect()
-			y = rect.top + rect.height * anchor.fraction
+			y = rect.top + (resized ? rect.height * anchor.fraction : anchor.point)
 		}
 		target =
 			y === undefined
@@ -95,38 +94,29 @@ function restore(el: HTMLElement, anchor: Anchor): void {
 	el.scrollTop = Math.max(0, Math.min(target, el.scrollHeight - el.clientHeight))
 }
 
-// `onResize` returns true when the caller owns the position (pinned
-// bottom or a reader gesture), so the anchor is left alone. `capture` takes the
-// anchor now, after a move whose scroll event has not come yet.
-function watch(el: HTMLElement, onResize: () => boolean): { stop: () => void; capture: () => void } {
+function watch(el: HTMLElement): { stop: () => void; capture: () => void; restore: () => void } {
 	let anchor = capture(el)
+	let resized = () => el.clientWidth !== anchor.width || el.clientHeight !== anchor.height
 	let update = () => {
-		if (el.clientWidth !== anchor.width || el.clientHeight !== anchor.height) {
-			if (!onResize()) restore(el, anchor)
-		}
+		if (scroll.state.pinned) scroll.put(el, scroll.target(el, 0))
+		else if (!scroll.keep()) restore(el, anchor, resized())
+		scroll.state.top = el.scrollTop
 		anchor = capture(el)
 	}
-	// Images acquire intrinsic height outside a controller redraw. Keep the
-	// pre-load reading anchor, including a card just revealed by a deep link.
-	let loaded = () => {
-		if (!onResize()) restore(el, anchor)
-		anchor = capture(el)
+	let scrolled = () => {
+		if (resized()) update()
+		else anchor = capture(el)
 	}
-	el.addEventListener('load', loaded, true)
-	// A resize may clamp scrollTop and emit scroll before ResizeObserver.
-	// Detect the changed geometry there too, before replacing the anchor.
-	el.addEventListener('scroll', update, { passive: true })
+	el.addEventListener('load', update, true)
+	el.addEventListener('scroll', scrolled, { passive: true })
 	let resize = new ResizeObserver(update)
 	resize.observe(el)
-	let content = new MutationObserver(update)
-	content.observe(el, { childList: true, characterData: true, subtree: true })
 	let stop = () => {
-		el.removeEventListener('load', loaded, true)
-		el.removeEventListener('scroll', update)
+		el.removeEventListener('load', update, true)
+		el.removeEventListener('scroll', scrolled)
 		resize.disconnect()
-		content.disconnect()
 	}
-	return { stop, capture: () => void (anchor = capture(el)) }
+	return { stop, capture: () => void (anchor = capture(el)), restore: update }
 }
 
 export const reflow = { watch }
