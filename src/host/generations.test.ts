@@ -2,12 +2,15 @@ import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
+import { replay } from '../common/replay.ts'
 import { generations } from './generations.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
+import { rebasePlans } from './rebase-plans.ts'
+import { rewriteHistory } from './rewrite-history.ts'
 import { sessions } from './sessions.ts'
 
 let savedHome = paths.state.home,
@@ -81,4 +84,24 @@ test('a generation file outside the session directory is refused', () => {
 	meta.generations = [{ file: '../x/history.asonl', reason: 'rebase', next: 1, ts: '' }]
 	writeFileSync(path, ason.stringify(meta))
 	expect(() => history.file(id)).toThrow('invalid generations: file')
+})
+
+test('migration resolves an old rebase once, keeps the old file, and /rebase undo still reverses it', () => {
+	let ts = '2026-11-09T12:00:00Z'
+	let legacy = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'one' }], n: 1, ts },
+		{ type: 'output', text: 'dropped', n: 2, ts },
+		{ type: 'turn_end', status: 'completed', usage: {}, n: 3, ts },
+		{ type: 'rebase', base: 3, drop: [2], edit: [], n: 4, ts },
+	]
+	writeFileSync(history.file(id), legacy.map((r) => ason.stringify(r, 'short') + '\n').join(''))
+	let original = readFileSync(history.file(id), 'utf8')
+	let current = replay.current(history.readSync(id))
+	expect(rewriteHistory.migrate(id)).toBe(true)
+	expect(rewriteHistory.migrate(id)).toBe(false)
+	expect(generations.list(id).map((g) => `${g.file} ${g.reason}`)).toEqual(['history2.asonl migrate'])
+	expect(readFileSync(`${paths.sessionDir(id)}/history.asonl`, 'utf8')).toBe(original)
+	expect(replay.current(history.readSync(id))).toEqual(current)
+	rebasePlans.undo(id)
+	expect(replay.current(history.readSync(id)).map((r) => r.type === 'output' && r.text)).toContain('dropped')
 })

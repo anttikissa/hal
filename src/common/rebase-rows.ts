@@ -242,12 +242,16 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 		}
 	}
 	let previous: string | undefined
+	let rowOf = new Map<number, RebaseRow>()
+	for (let row of rows) for (let n of row.ns) if (!rowOf.has(n)) rowOf.set(n, row)
 	for (let row of rows) {
 		row.time = replayText.clock(row.ts, previous)
 		previous = row.ts
 		row.group = [...new Set(row.ns.flatMap((n) => [...(groups.get(n) ?? [n])]))]
 		if (row.group.some((n) => !row.ns.includes(n) && byNumber.has(n)))
-			row.carries.push(`drop group ${[...new Set(row.group.map((n) => cardOf(rows, n)))].join(', ')}`)
+			row.carries.push(
+				`drop group ${[...new Set(row.group.map((n) => (rowOf.has(n) ? id(rowOf.get(n)!) : String(n))))].join(', ')}`,
+			)
 		if (row.ns.some((n) => options.pruned?.includes(n)) && !row.carries.includes('pruned')) row.carries.push('pruned')
 		row.tokens = tokenEstimates.estimate(row.characters, options.model, options.ratios)
 	}

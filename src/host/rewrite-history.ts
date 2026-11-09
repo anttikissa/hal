@@ -49,4 +49,19 @@ function commit(id: string, raw: HistoryRecord[], records: HistoryRecord[], reco
 	return marker
 }
 
-export const rewriteHistory = { latest, project, commit }
+// Writes a history whose old rebases or edits readers still replay as a
+// resolved generation (scripts/migrate-histories). The latest rewrite
+// keeps its source file, so /rebase undo still reverses it. False when
+// nothing needs resolving.
+function migrate(id: string): boolean {
+	let raw = history.readSync(id)
+	if (!raw.some((r) => (r.type === 'rebase' && !r.applied) || (r.type === 'user' && r.replaces))) return false
+	let old = basename(history.file(id))
+	let records = generations.resolved(raw)
+	let last = rewriteHistory.latest(records)
+	if (last && !last.replacesFile) last.replacesFile = old
+	generations.start(id, records, { reason: 'migrate', replaces: old }, pages.marks(id).size)
+	return true
+}
+
+export const rewriteHistory = { latest, project, commit, migrate }

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Converts a Hal home's histories for generations (task e4z); Hal stopped.
+# usage: scripts/migrate-histories <hal home>
+exec bun "$(dirname "$0")/migrate-histories.ts" "$@"
