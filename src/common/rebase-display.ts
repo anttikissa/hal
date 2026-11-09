@@ -11,26 +11,30 @@ function current(raw: HistoryRecord[]): HistoryRecord[] {
 		byNumber = new Map(projected.filter((r) => r.n !== undefined).map((r) => [r.n, r]))
 	let candidates: HistoryRecord[] = []
 	for (let r of rebase.latest(raw)) {
-		if (r.type === 'rebase') candidates = rebase.apply(candidates, r)
-		else candidates.push(r)
+		if (r.inactive !== undefined) continue
+		if (r.type === 'rebase') {
+			if (!r.applied) candidates = rebase.apply(candidates, r)
+		} else candidates.push(r)
 	}
 	return [
 		...candidates.flatMap((r) => (active.has(r) ? [r] : byNumber.has(r.n) ? [byNumber.get(r.n)!] : [])),
-		...rebase.latest(raw).filter((r) => r.type === 'rebase'),
+		...rebase.latest(raw).filter((r) => r.type === 'rebase' && r.inactive === undefined),
 	]
 }
 
 // Each line says what changed and how to go back (task p3e).
 function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): string {
+	if (r.applied) return r.text ?? 'History rewritten.'
 	let before = raw.slice(
 		0,
 		raw.findIndex((record) => record.n === r.n),
 	)
 	let snapshot = rebaseRows.build(before)
 	let boundary = (plan: HistoryRecord & { type: 'rebase' }) =>
-		plan.drop.length === 1 && !plan.edit.length
+		plan.rewrittenBoundary ??
+		(plan.drop.length === 1 && !plan.edit.length
 			? before.find((x) => x.n === plan.drop[0] && (x.type === 'reset' || x.type === 'compact'))?.type
-			: undefined
+			: undefined)
 	if (!r.drop.length && !r.edit.length) {
 		let undone = before.findLast((x) => x.type === 'rebase' && x.base === r.base && (x.drop.length || x.edit.length))
 		let kind = undone?.type === 'rebase' ? boundary(undone) : undefined

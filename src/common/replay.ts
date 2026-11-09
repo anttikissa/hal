@@ -188,13 +188,19 @@ export type HistoryRecord = Numbered &
 				transition?: string
 				contextChanged?: true
 				quiet?: true
+				applied?: true
+				text?: string
+				replacesFile?: string
+				undo?: number
+				removed?: number[]
+				rewrittenBoundary?: 'reset' | 'compact'
 				ts: string
 		  } & import('./rebase.ts').RebasePlan)
 		| { type: 'reset'; transition?: string; ts: string }
 	)
 
 // Copied records retain their original session through repeated forks (v6).
-type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true }
+type Numbered = { n?: number; originSession?: string; noticeSuppressed?: true; inactive?: number }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
@@ -388,6 +394,7 @@ function lastPrompt(records: HistoryRecord[]): number {
 // Inbox messages a dropped prompt delivered leave with it: the edit
 // replaced them, so they never wait again.
 function current(records: HistoryRecord[]): HistoryRecord[] {
+	records = records.filter((r) => r.inactive === undefined)
 	let materialized = new Set(records.flatMap((r) => (r.type === 'notice' && r.source !== undefined ? [r.source] : [])))
 	if (materialized.size)
 		records = records.map((r) => (materialized.has(r.n!) && !r.noticeSuppressed ? { ...r, noticeSuppressed: true } : r))
@@ -396,7 +403,7 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 	let out: HistoryRecord[] = []
 	for (let r of records) {
 		if (r.type === 'rebase') {
-			out = rebase.apply(out, r)
+			if (!r.applied) out = rebase.apply(out, r)
 			continue
 		}
 		if (r.type === 'user' && r.replaces) {

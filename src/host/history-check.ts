@@ -144,6 +144,15 @@ function check(value: unknown): HistoryRecord {
 			!Number.isFinite(Date.parse(r.until)))
 	)
 		throw new Error('invalid rate limit wait')
+	if (r.inactive !== undefined && (!Number.isSafeInteger(r.inactive) || r.inactive < 1))
+		throw new Error('invalid inactive amendment number')
+	if (r.type === 'rebase') {
+		if (r.applied !== undefined && r.applied !== true) throw new Error('invalid applied rebase')
+		if (r.replacesFile !== undefined && !/^history(\d+)?\.asonl$/.test(r.replacesFile))
+			throw new Error('invalid replaced history file')
+		if (r.undo !== undefined && (!Number.isSafeInteger(r.undo) || r.undo < 1)) throw new Error('invalid undo number')
+		if (r.text !== undefined && typeof r.text !== 'string') throw new Error('invalid rebase text')
+	}
 	if (r.type === 'rebase' && r.contextChanged !== undefined && r.contextChanged !== true)
 		throw new Error('invalid rebase setting flag')
 	if (r.type === 'rebase') {

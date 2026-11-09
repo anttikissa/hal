@@ -4,7 +4,7 @@
 import type { HistoryRecord } from '../common/replay.ts'
 import { names } from '../common/names.ts'
 import { sessions } from './sessions.ts'
-import { history } from './history.ts'
+import { pages } from './pages.ts'
 import { tabs } from './tabs.ts'
 
 // Naming matters only when the user juggles tabs: interactive ones, 4 or more open.
@@ -24,7 +24,7 @@ function prepare(id: string, record: Extract<HistoryRecord, { type: 'user' }>): 
 	let meta = sessions.open(id)
 	if (meta.autoclose || tabs.file().open.length < 4) return
 	// History commits the counter with the prompt; reconcile a crash before meta saved.
-	let prior = history.readSync(id).findLast((r) => r.type === 'user' && r.naming?.version === (meta.nameVersion ?? 0))
+	let prior = pages.findLast(id, (r) => r.type === 'user' && r.naming?.version === (meta.nameVersion ?? 0))
 	let turn = Math.max(meta.nameTurns ?? 0, prior?.type === 'user' ? (prior.naming?.turn ?? 0) : 0) + 1
 	record.naming = { turn, version: meta.nameVersion ?? 0, name: meta.name!, eligible: turn <= 3 || turn % 4 === 3 }
 }

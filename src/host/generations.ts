@@ -8,6 +8,8 @@ import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { Generation } from '../common/session.ts'
+import { replay } from '../common/replay.ts'
+import { rebaseDisplay } from '../common/rebase-display.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { pages } from './pages.ts'
@@ -35,6 +37,49 @@ function file(id: string): string {
 // Record numbers below this were given out in earlier generations.
 function next(id: string): number {
 	return generations.list(id).at(-1)?.next ?? 1
+}
+export type Segment = { session: string; file: string; end: number }
+
+function segments(id: string, name = generations.list(id).at(-1)?.file ?? 'history.asonl', end?: number): Segment[] {
+	let path = `${paths.sessionDir(id)}/${name}`
+	let g = generations.list(id).find((g) => g.file === name)
+	let before = g?.continues
+	return [
+		...(before ? generations.segments(before.session ?? id, before.file, before.end) : []),
+		{ session: id, file: name, end: end ?? (existsSync(path) ? statSync(path).size : 0) },
+	]
+}
+
+function readFile(segment: Segment): HistoryRecord[] {
+	let path = `${paths.sessionDir(segment.session)}/${segment.file}`
+	return pages.lines(path, pages.readBytes(path, 0, segment.end), 0).map((l) => l.record)
+}
+
+function read(id: string, name?: string): HistoryRecord[] {
+	let out: HistoryRecord[] = []
+	for (let segment of generations.segments(id, name)) {
+		let records =
+			segment.session === id && segment.file === generations.list(id).at(-1)?.file && name === undefined
+				? history.local(id)
+				: generations.readFile(segment)
+		if (segment.session !== id)
+			records = records
+				.filter((r) => r.type !== 'inbox')
+				.map((r) => ({ ...r, originSession: r.originSession ?? segment.session }))
+		let byNumber = new Map(records.map((r) => [r.n, r]))
+		let seen = new Set(out.map((r) => r.n))
+		out = [...out.map((r) => byNumber.get(r.n) ?? r), ...records.filter((r) => !seen.has(r.n))]
+	}
+	return out
+}
+
+function resolved(raw: HistoryRecord[]): HistoryRecord[] {
+	let kept = new Map(replay.current(raw).map((r) => [r.n, r]))
+	return raw.flatMap((r) => {
+		if (r.inactive !== undefined) return []
+		if (r.type === 'rebase') return [{ ...r, applied: true as const, text: rebaseDisplay.text(r, raw) }]
+		return kept.has(r.n) ? [kept.get(r.n)!] : []
+	})
 }
 
 // Writes `records` as the session's new generation and switches to it.
@@ -78,4 +123,4 @@ function start(
 	return g
 }
 
-export const generations = { list, file, next, start }
+export const generations = { list, file, next, segments, readFile, read, resolved, start }

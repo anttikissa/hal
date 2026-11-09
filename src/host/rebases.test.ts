@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { history } from './history.ts'
+import { generations } from './generations.ts'
 import { historyInput } from './history-input.ts'
 import { host } from './host.ts'
 import { pages } from './pages.ts'
@@ -44,15 +45,17 @@ function seed() {
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 }
 
-test('apply is append-only; provider input, pages, index and links project edits and drops; undo restores', async () => {
+test('apply writes a new generation and keeps the old file; provider input, pages, index and links project edits and drops; undo restores', async () => {
 	seed()
-	let prefix = readFileSync(history.file(id))
+	let first = history.file(id)
+	let prefix = readFileSync(first)
 	findIndex.init()
 	await findIndex.catchup(id)
 	let applied = rebases.apply(id, { base: 4, drop: [2], edit: [{ n: 1, text: 'newneedle' }] })
 	expect(applied.n).toBe(6)
 	expect(snapshots.build(id).dropped).toEqual([2])
-	expect(readFileSync(history.file(id)).subarray(0, prefix.length)).toEqual(prefix)
+	expect(history.file(id)).not.toBe(first)
+	expect(readFileSync(first).subarray(0, prefix.length)).toEqual(prefix)
 	expect(JSON.stringify(await historyInput.messages(id))).toContain('newneedle')
 	expect(JSON.stringify(await historyInput.messages(id))).not.toContain('oldanswer')
 	expect(pages.page(id).records.map((r) => r.n)).toEqual(expect.arrayContaining([1, 3, 4]))
@@ -117,15 +120,16 @@ test('rebase restores cwd, qualified model and autoclose without replaying comma
 	Object.assign(sessions.open(id), { cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
 	await historyInput.messages(id)
 	let base = history.readSync(id).at(-1)!.n!
-	let bytes = readFileSync(history.file(id))
+	let first = history.file(id),
+		bytes = readFileSync(first)
 	rebases.apply(id, { base, drop: [transition.n!, note.n!], edit: [] })
 	expect(sessions.open(id)).toMatchObject({ cwd: '/', model: 'fake/m', autoclose: false })
 	expect(sessions.open(id).effort).toBeUndefined()
-	expect(readFileSync(history.file(id)).subarray(0, bytes.length)).toEqual(bytes)
+	expect(readFileSync(first)).toEqual(bytes)
 	let text = JSON.stringify(await historyInput.messages(id))
 	expect(text).toContain('Old project instructions')
 	expect(text).not.toContain('New project instructions')
-	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(1)
+	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(0)
 	rebases.apply(id, { base, drop: [], edit: [] }, history.readSync(id).at(-1)!.n)
 	expect(sessions.open(id)).toMatchObject({ cwd: '/new', model: 'openai/gpt-6-sol', effort: 'max', autoclose: true })
 })
@@ -166,7 +170,7 @@ test('dropping a cwd transition and its update restores historical project instr
 		expect(input).toContain('Original project A rules')
 		expect(input).not.toContain('Project B rules')
 		expect(input).not.toContain('A disk change after the transition')
-		expect(history.readSync(id).filter((r) => r.type === 'notice' && r.sectionUpdate)).toHaveLength(1)
+		expect(history.readSync(id).filter((r) => r.type === 'notice' && r.sectionUpdate)).toHaveLength(0)
 		writeFileSync(`${a}/AGENTS.md`, 'Genuine later source edit')
 		promptCache.prepare(id, { cwd: a, model: 'fake/m', now: 4000 })
 		expect(JSON.stringify(await historyInput.messages(id))).toContain('Genuine later source edit')
@@ -197,7 +201,9 @@ test('committed settings recover after metadata synchronization fails without re
 	sessions.open(id).cwd = '/new'
 	liveFiles.save(sessions.open(id))
 	let save = liveFiles.save
-	liveFiles.save = () => {
+	// The generation switch is durable and succeeds; the settings save after it fails.
+	liveFiles.save = (data, options) => {
+		if (options?.durable) return save(data, options)
 		throw new Error('metadata disk full at session.ason')
 	}
 	try {
@@ -212,7 +218,7 @@ test('committed settings recover after metadata synchronization fails without re
 	liveFiles.save(sessions.open(id))
 	sessions.close(id)
 	expect(sessions.open(id).cwd).toBe('/')
-	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(1)
+	expect(history.readSync(id).filter((r) => r.type === 'change')).toHaveLength(0)
 })
 
 test('missing starting state refuses setting surgery without migration but permits notice edits', () => {
@@ -258,10 +264,9 @@ test('edited tool output survives an omission saved before the rebase', async ()
 
 test('failed rewrite commit keeps original content even when it must pause before committing', async () => {
 	seed()
-	let append = history.append
-	history.append = (id, record) => {
-		if (record.type === 'rebase') throw new Error('disk full at history path')
-		return append(id, record)
+	let start = generations.start
+	generations.start = () => {
+		throw new Error('disk full at history path')
 	}
 	try {
 		expect(() => rebases.apply(id, { base: 4, drop: [2], edit: [] })).toThrow(
@@ -271,6 +276,6 @@ test('failed rewrite commit keeps original content even when it must pause befor
 		expect(snapshots.build(id).state.type).toBe('paused')
 		expect(JSON.stringify(await historyInput.messages(id))).toContain('oldanswer')
 	} finally {
-		history.append = append
+		generations.start = start
 	}
 })

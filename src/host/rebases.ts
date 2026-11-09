@@ -16,6 +16,8 @@ import { stats } from './stats.ts'
 import { promptCache } from './prompt-cache.ts'
 import { sessionSettings } from './session-settings.ts'
 import { status } from './status.ts'
+import { rewriteHistory } from './rewrite-history.ts'
+import { basename } from 'path'
 
 // `continuing`: the caller sends a prompt next, which shows the change
 // (an amend, task a8x): a turn left without its end is not paused, and
@@ -37,7 +39,10 @@ function apply(
 	if (problem) throw new Error(problem)
 	if (plan.base !== expectedBase && !raw.some((r) => r.type === 'rebase' && r.base === plan.base))
 		throw new Error('Undo base has no earlier rebase.')
-	let current = replay.current([...raw, { type: 'rebase', ...plan, ts: new Date().toISOString() }])
+	let rewrite = !options.quiet && !options.continuing
+	let projected = rewrite ? rewriteHistory.project(id, raw, plan) : undefined
+	let current =
+		projected?.records ?? replay.current([...raw, { type: 'rebase', ...plan, ts: new Date().toISOString() }])
 	let meta = sessions.open(id)
 	let changes = (records: HistoryRecord[]) => replay.current(records).filter((r) => r.type === 'change')
 	let settingEdits = JSON.stringify(changes(raw)) !== JSON.stringify(changes(current))
@@ -57,18 +62,25 @@ function apply(
 		!options.continuing &&
 		!history.state.running.has(id) &&
 		(state.type === 'running' || (state.type === 'idle' && unanswered))
-	if (pausing) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+	let pause = pausing ? history.append(id, { type: 'turn_end', status: 'paused', usage: {} }) : undefined
+	if (pause && projected) projected.records.push(pause)
 	if (!history.state.running.has(id)) status.state.states.delete(id)
 	status.state.derived.delete(id)
 	let record: HistoryRecord
 	try {
-		record = history.append(id, {
+		let marker: HistoryRecord & { type: 'rebase' } = {
 			type: 'rebase',
 			...plan,
+			ts: new Date().toISOString(),
 			...(contextChanged && { contextChanged: true }),
 			...((options.continuing || options.quiet) && { quiet: true }),
 			...(options.transition && { transition: options.transition }),
-		})
+			...(projected?.undo && { undo: projected.undo }),
+		}
+		let boundary = plan.drop.length === 1 && !plan.edit.length ? raw.find((r) => r.n === plan.drop[0]) : undefined
+		if (boundary?.type === 'reset' || boundary?.type === 'compact') marker.rewrittenBoundary = boundary.type
+		marker.text = rebaseDisplay.text(marker, [...raw, marker])
+		record = projected ? rewriteHistory.commit(id, raw, projected.records, marker) : history.append(id, marker)
 	} catch (error) {
 		if (pausing)
 			throw new Error(
@@ -81,7 +93,8 @@ function apply(
 			sessionSettings.assign(meta, settings)
 			liveFiles.save(meta)
 		}
-		meta.settledRebase = pages.marks(id).rebase
+		meta.settledRebase = pages.marks(id).latestRebase
+		meta.settledRebaseFile = basename(history.file(id))
 		liveFiles.save(meta)
 		if (contextChanged) promptCache.rebased(id)
 		host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
@@ -91,9 +104,9 @@ function apply(
 		)
 	}
 	// The model hears what the user changed, so it does not trust stale replies (task p3e).
-	let rewrite = record as HistoryRecord & { type: 'rebase' }
-	if (!rewrite.quiet && !options.boundary)
-		history.append(id, { type: 'notice', text: rebaseDisplay.text(rewrite, history.readSync(id)) })
+	let written = record as HistoryRecord & { type: 'rebase' }
+	if (!written.quiet && !options.boundary)
+		history.append(id, { type: 'notice', text: rebaseDisplay.text(written, history.readSync(id)) })
 	return record
 }
 

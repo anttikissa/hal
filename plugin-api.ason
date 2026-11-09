@@ -1,5 +1,5 @@
 {
-	version: 35,
+	version: 36,
 	changes: [
 		{
 			version: 2,
@@ -697,6 +697,27 @@
 					kind: 'compatible',
 					target: 'common/session.SessionMeta',
 					description: 'Adds optional field generations'
+				}
+			]
+		},
+		{
+			version: 36,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/replay.HistoryRecord',
+					description: 'Adds optional fields inactive, applied, removed, undo, replacesFile, rewrittenBoundary, text'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/session.SessionMeta',
+					description: 'Adds optional fields historyRevision, settledRebaseFile'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/history.readSync',
+					description: 'After a rebase, dropped records are absent',
+					port: "Read them from the file named by the rebase record's replacesFile"
 				}
 			]
 		}

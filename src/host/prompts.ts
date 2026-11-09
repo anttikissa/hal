@@ -26,6 +26,8 @@ import { commands } from './commands.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { historyTail } from './history-tail.ts'
+import { amendHistory } from './amend-history.ts'
 import { naming } from './naming.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
@@ -179,27 +181,25 @@ function senders(list: UserBlock[]): Sender[] {
 // is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string, target?: number): string | undefined {
 	autoclose.promote(id)
-	let records = replay.current(history.readSync(id))
+	let tail = historyTail.read(id, target)
+	let records = replay.current(tail.records)
 	let at = target === undefined ? replay.lastPrompt(records) : records.findIndex((r) => r.n === target)
 	let old = records[at]
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
 	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
-	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1)))
+	if (states.busy(status.stateOf(id)) || mine < 0 || !prompts.harmless(records.slice(at + 1)))
 		return prompts.submit(id, text, command)
-	rebasePlans.drop(
-		id,
-		records.slice(at).flatMap((r) => (r.n === undefined || rebasePlans.survives(r) ? [] : [r.n])),
-		{ continuing: true },
-	)
-	let refused = status.transition(id, { type: 'submit' })
-	if (refused) return refused
 	parts[mine] = { type: 'text', text: literal.strip(text) }
 	// Images stay while their markers do: the texts are resolved again.
 	let blocks = prompts.blocks(id, parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, amends: old!.n! }
+	if (old?.type === 'user' && old.inbox) record.inbox = [...old.inbox]
 	if (command !== undefined) record.command = command
-	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
-	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))
+	let written = amendHistory.apply(id, tail, record)
+	let refused = status.transition(id, { type: 'submit' })
+	if (refused) return refused
+	host.broadcast(id, prompts.promptEvent(id, written))
+	rebasePlans.broadcast(id, old!.n!)
 	turns.start(id)
 }
 

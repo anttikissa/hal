@@ -9,7 +9,7 @@ import { turnMarks } from './turn-marks.ts'
 
 // A quiet rebase that only drops: an amendment.
 function is(r: HistoryRecord): boolean {
-	return r.type === 'rebase' && r.quiet === true && !r.edit.length
+	return r.type === 'rebase' && !r.applied && r.quiet === true && !r.edit.length
 }
 
 // Marks after an amendment, from the first `end` bytes of the history:
@@ -34,6 +34,8 @@ function apply(id: string, m: Marks, path: string, end: number): void {
 		if (r.type !== 'rebase') dropped.push(r.n!)
 	})
 	Object.assign(m, { inactive, dropped })
+	delete m.beforePrompt
+	delete m.beforeAmend
 }
 
 // Whether the line at `offset` is one an amendment left out.

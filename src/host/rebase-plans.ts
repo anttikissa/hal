@@ -10,6 +10,10 @@ import { states } from '../common/states.ts'
 import { readdirSync, statSync, existsSync } from 'fs'
 import { blobs } from './blobs.ts'
 import { history } from './history.ts'
+import { historyTail } from './history-tail.ts'
+import { amendHistory } from './amend-history.ts'
+import { pages } from './pages.ts'
+import { rewriteHistory } from './rewrite-history.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { pruning } from './pruning.ts'
@@ -92,15 +96,21 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 function undo(id: string): string {
 	let snapshot = rebasePlans.build(id),
 		raw = history.readSync(id)
-	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase' && (r.drop.length || r.edit.length))
+	let last = rewriteHistory.latest(rebase.latest(raw))
 	if (!last || last.type !== 'rebase') throw new Error('No rebase to undo.')
+	if (last.applied && last.quiet) return amendHistory.undo(id)
 	let plan: RebasePlan = { base: last.base, drop: [], edit: [] }
 	rebases.apply(id, plan, snapshot.base)
 	let before = raw.slice(
 		0,
 		raw.findIndex((r) => r.n === last.n),
 	)
-	rebasePlans.broadcast(id, rebaseRows.totals(rebaseRows.build(before), last).cacheFrom ?? last.base)
+	rebasePlans.broadcast(
+		id,
+		last.applied
+			? Math.min(last.base, ...last.drop, ...last.edit.map((e) => e.n))
+			: (rebaseRows.totals(rebaseRows.build(before), last).cacheFrom ?? last.base),
+	)
 	return 'Rebase undone.'
 }
 
@@ -131,6 +141,8 @@ function survives(r: HistoryRecord): boolean {
 // which now ends in an unanswered prompt. The rebase is quiet: the
 // command's card reports it, not a divider.
 function unamend(id: string): string {
+	let latest = pages.findLast(id, (r) => r.type === 'rebase')
+	if (latest?.type === 'rebase' && latest.applied) return amendHistory.undo(id)
 	let raw = history.readSync(id)
 	if (forms.open(raw)) throw new Error('Answer or dismiss the open question before undoing the edit.')
 	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase')
@@ -159,10 +171,9 @@ function unamend(id: string): string {
 // then the edited text sent as a new prompt. Returns why it is refused,
 // if it is.
 function rewind(id: string, n: number, text: string, command?: string): string | undefined {
-	let raw = history.readSync(id),
-		state = status.stateOf(id, raw).type
+	let state = status.stateOf(id).type
 	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
-	let current = replay.current(raw),
+	let current = replay.current(historyTail.read(id, n).records),
 		at = current.findIndex((r) => r.n === n),
 		target = current[at]
 	let mine =

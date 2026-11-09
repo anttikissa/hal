@@ -142,6 +142,7 @@ function project(
 	let original = new Map(all.map((r) => [r.n, r]))
 	let records = replay.current(all)
 	let edited = new Set(records.filter((r) => JSON.stringify(r) !== JSON.stringify(original.get(r.n))).map((r) => r.n))
+	for (let r of all) if (r.type === 'rebase' && r.applied) for (let edit of r.edit) edited.add(edit.n)
 	all = records = projectCurrent(records).map(materialize)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let active = records.slice(at + 1)

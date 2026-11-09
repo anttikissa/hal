@@ -45,6 +45,8 @@ export interface SessionMeta {
 	// History files after history.asonl, oldest first; the last is the one
 	// written (task e4z).
 	generations?: Generation[]
+	historyRevision?: number
+	settledRebaseFile?: string
 }
 
 // `replaces`: the file this one supersedes. `continues`: where the

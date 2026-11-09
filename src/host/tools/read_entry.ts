@@ -218,7 +218,8 @@ export const tool: Tool<ToolOutput> = {
 			let raw = history.readSync(session)
 			let records = replay.current(raw)
 			let record = records.find((r) => r.n === n)
-			if (!record && raw.some((r) => r.n === n)) return `Entry ${input.id} was dropped by rebase.`
+			if (!record && raw.some((r) => r.n === n || (r.type === 'rebase' && r.removed?.includes(n))))
+				return `Entry ${input.id} was dropped by rebase.`
 			if (!record) throw new Error(`entry ${input.id} not found`)
 			let found: Found = { images: [], errors: [] }
 			let text: string

@@ -175,6 +175,18 @@ function submit(id: string, prompt: string | UserBlock[], command?: string): His
 // open session's records stay in memory (provider input is rebuilt from
 // them every round): only what was appended since is read.
 function readSync(id: string): HistoryRecord[] {
+	return generations.list(id).at(-1)?.continues ? generations.read(id) : history.local(id)
+}
+
+// The active file alone; compaction and clear carry all current context here.
+function context(id: string): HistoryRecord[] {
+	let local = history.local(id)
+	return local.some((r) => r.inactive === undefined && (r.type === 'compact' || r.type === 'reset'))
+		? local
+		: history.readSync(id)
+}
+
+function local(id: string): HistoryRecord[] {
 	let path = history.file(id)
 	for (let key of history.state.cache.keys()) if (!sessions.state.open.has(key)) history.state.cache.delete(key)
 	if (!existsSync(path)) return []
@@ -448,6 +460,8 @@ export const history = {
 	submit,
 	readSync,
 	callNumber,
+	local,
+	context,
 	unfinished,
 	open,
 	record,

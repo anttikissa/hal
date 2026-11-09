@@ -27,7 +27,7 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 	})
 	let records = pruning.project(
 		id,
-		history.readSync(id),
+		history.context(id),
 		budget,
 		(r) =>
 			r.type === 'user'

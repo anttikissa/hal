@@ -193,8 +193,8 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 // Other bases compose. Rebuild from original records, not edited clones.
 function latest(records: HistoryRecord[]): HistoryRecord[] {
 	let latest = new Map<number, HistoryRecord & { type: 'rebase' }>()
-	for (let r of records) if (r.type === 'rebase') latest.set(r.base, r)
-	return records.filter((r) => r.type !== 'rebase' || latest.get(r.base) === r)
+	for (let r of records) if (r.type === 'rebase' && !r.applied) latest.set(r.base, r)
+	return records.filter((r) => r.type !== 'rebase' || r.applied || latest.get(r.base) === r)
 }
 
 export const rebase = { invalid, groups, text, edited, apply, latest }

@@ -5,6 +5,8 @@
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import type { SessionMeta } from '../common/session.ts'
 import { models } from './models.ts'
+import { basename } from 'path'
+import { history } from './history.ts'
 
 export type SessionSettings = { cwd: string; model: string; autoclose: boolean; previousCwd?: string }
 
@@ -42,12 +44,15 @@ function assign(meta: SessionMeta, settings: SessionSettings): void {
 // keeps the marks' rebase offset whose settings the metadata holds.
 function recover(meta: SessionMeta): boolean {
 	let { pages } = require('./pages.ts') as typeof import('./pages.ts')
-	let at = pages.marks(meta.id).rebase
-	if (at === undefined || meta.settledRebase === at) return false
-	let { history } = require('./history.ts') as typeof import('./history.ts')
-	let raw = history.readSync(meta.id)
+	let at = pages.marks(meta.id).latestRebase ?? pages.marks(meta.id).rebase
+	let file = basename(history.file(meta.id))
+	if (at === undefined || (meta.settledRebase === at && (meta.settledRebaseFile ?? 'history.asonl') === file))
+		return false
+	meta.settledRebaseFile = file
 	meta.settledRebase = at
-	if (!raw.some((r) => r.type === 'rebase' && r.contextChanged)) return true
+	let last = pages.lineAt(history.file(meta.id), at).record
+	if (last.type !== 'rebase' || !last.contextChanged) return true
+	let raw = history.readSync(meta.id)
 	let settings = sessionSettings.project(meta, raw)
 	let changed =
 		meta.cwd !== settings.cwd ||

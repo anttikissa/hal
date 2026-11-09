@@ -28,6 +28,7 @@ import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { pageSlices } from './page-slices.ts'
+import { historyTail, type TailMarks } from './history-tail.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
 // `file`: the history file covered; absent, history.asonl.
@@ -37,8 +38,9 @@ import { pageSlices } from './page-slices.ts'
 // `reply`: the latest assistant text, unless a user record followed it.
 // `inactive`: the byte ranges of the lines amendments leave out (task
 // e4z), and `dropped` the numbers of their records.
-export type Marks = {
-	version?: 3
+export type Marks = TailMarks & {
+	version?: 4
+	latestRebase?: number
 	file?: string
 	rebase?: number
 	transitions?: number[]
@@ -176,11 +178,16 @@ function findLast(id: string, pred: (r: HistoryRecord) => boolean): HistoryRecor
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
-	if ((r.type === 'rebase' && (m.rebase !== undefined || !amendments.is(r))) || (r.type === 'user' && r.replaces))
+	if (
+		(r.type === 'rebase' && !r.applied && (m.rebase !== undefined || !amendments.is(r))) ||
+		(r.type === 'user' && r.replaces)
+	)
 		m.rebase = offset
+	if (r.type === 'rebase' && r.inactive === undefined) m.latestRebase = offset
+	historyTail.mark(m, r, offset)
 	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
 	changedFiles.apply(m, r, offset, path)
-	turnMarks.follow(m, r, offset)
+	if (r.inactive === undefined) turnMarks.follow(m, r, offset)
 }
 
 // Where each non-blank line of `buf`, read from file offset `base`,
@@ -234,9 +241,9 @@ function* catchUp(id: string): Steps<Marks> {
 		let file = basename(path)
 		// Marks of another version or history file (task e4z) are rebuilt.
 		changedFiles.upgrade(m)
-		if (m.size < 0 || m.size > size || (m.file ?? 'history.asonl') !== file || (m.size > 0 && m.version !== 3)) {
+		if (m.size < 0 || m.size > size || (m.file ?? 'history.asonl') !== file || (m.size > 0 && m.version !== 4)) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, version: 3 }, file !== 'history.asonl' && { file })
+			Object.assign(m, { size: 0, inbox: {}, version: 4 }, file !== 'history.asonl' && { file })
 			changedFiles.reset(m)
 		}
 		if (m.size >= size) return done()
