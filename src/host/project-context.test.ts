@@ -1,6 +1,7 @@
 // Project trust gates executable context; shared directories unload only after the last tab leaves.
 import { expect, test } from 'bun:test'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, realpathSync, writeFileSync } from 'fs'
+import { paths } from './paths.ts'
 import { calls, client, created, testHome, until, useHost } from './host-fixture.test.ts'
 import { projectContext } from './project-context.ts'
 import { plugins } from './plugins.ts'
@@ -134,7 +135,7 @@ test('/cd asks before changing cwd; Not now asks again on the next /cd, Never tr
 	expect(tabs.list().find((t) => t.id === id)?.untrusted).toBeUndefined()
 	c.conn.send({ type: 'submit', sessionId: id, text: '/trust forget' })
 	await until(() => !Object.hasOwn(projectContext.file().projects, root))
-	expect(projectContext.question(root)?.quote?.text).toBe(root)
+	expect(projectContext.question(root)?.quote?.text).toBe(realpathSync(root))
 })
 
 test('empty projects ask nothing; new instructions, skills, or plugins ask, but trusted future changes do not', () => {
@@ -144,11 +145,19 @@ test('empty projects ask nothing; new instructions, skills, or plugins ask, but 
 		expect(projectContext.question(root)).toBeUndefined()
 		mkdirSync(`${root}/${file.slice(0, file.lastIndexOf('/') + 1)}`, { recursive: true })
 		writeFileSync(`${root}/${file}`, '')
-		expect(projectContext.question(root)?.quote?.text).toBe(root)
+		expect(projectContext.question(root)?.quote?.text).toBe(realpathSync(root))
 		projectContext.decide(root, true)
 		writeFileSync(`${root}/${file}`, 'changed')
 		expect(projectContext.question(root)).toBeUndefined()
 	}
+})
+
+test("Hal's own source is trusted without asking until the user decides otherwise", () => {
+	let hal = realpathSync(paths.repoRoot())
+	expect(projectContext.question(hal)).toBeUndefined()
+	expect(projectContext.allowed(hal)).toBe(true)
+	projectContext.decide(hal, false)
+	expect(projectContext.allowed(hal)).toBe(false)
 })
 
 test('trusted repo ancestors apply to nested cwd, not nested Git projects or unrelated non-Git children', () => {

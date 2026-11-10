@@ -13,7 +13,7 @@ const ACTIONS = ['yes', 'no', 'forget']
 function overview(cwd: string, own?: string | false): string {
 	let root = projectContext.root(cwd)
 	let content = projectContext.contents(cwd).map((p) => relative(root, p))
-	let decided = projectContext.file().projects[root]
+	let decided = projectContext.decision(root)
 	let state = !content.length
 		? 'nothing to trust'
 		: own === false
@@ -23,7 +23,9 @@ function overview(cwd: string, own?: string | false): string {
 				: decided === undefined
 					? 'undecided'
 					: decided
-						? 'trusted'
+						? Object.hasOwn(projectContext.file().projects, root)
+							? 'trusted'
+							: 'trusted (Hal itself)'
 						: 'not trusted'
 	let lines = [`This project: ${root}: ${state}${content.length ? ` (${content.join(', ')})` : ''}`]
 	let remembered = Object.entries(projectContext.file().projects)

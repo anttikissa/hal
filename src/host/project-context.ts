@@ -39,10 +39,21 @@ function root(cwd: string): string {
 	}
 }
 
+// The remembered decision for `root`. Hal's own source is trusted until
+// the user decides otherwise: whoever can change its instructions can
+// already change its code.
+function decision(root: string): boolean | undefined {
+	return projectContext.file().projects[root] ?? (projectContext.isHal(root) || undefined)
+}
+
+function isHal(root: string): boolean {
+	return root === realpathSync(paths.repoRoot())
+}
+
 // `own`: the session's override (SessionMeta.projectTrust).
 function allowed(cwd: string, own?: string | false): boolean {
 	let root = projectContext.root(cwd)
-	return own !== false && (own === root || projectContext.file().projects[root] === true)
+	return own !== false && (own === root || projectContext.decision(root) === true)
 }
 
 function decide(cwd: string, trust: boolean): void {
@@ -101,7 +112,7 @@ function question(cwd: string, id?: string): Form | undefined {
 	if (id !== undefined && sessions.open(id).interactive === false) return
 	let root = projectContext.root(cwd)
 	if (id !== undefined && projectContext.state.later.get(id) === root) return
-	if (Object.hasOwn(projectContext.file().projects, root) || !projectContext.contents(cwd).length) return
+	if (projectContext.decision(root) !== undefined || !projectContext.contents(cwd).length) return
 	return {
 		text: 'Trust this project? Its instructions, skills, and plugins can direct Hal and run code with your permissions. You can change this later with /trust.',
 		quote: { text: root },
@@ -187,6 +198,8 @@ export const projectContext = {
 	file,
 	root,
 	allowed,
+	decision,
+	isHal,
 	decide,
 	forget,
 	skipped,
