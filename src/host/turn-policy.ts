@@ -105,6 +105,20 @@ function retryNotice(error: ErrorEvent): string {
 	return `Your response was cut off by an error${kind ? ` (${kind})` : ''}: ${error.message}${body}\nRetrying. Continue without repeating what you already wrote.`
 }
 
+// Keeps a failed attempt with the provider's complete reply, so it can
+// be diagnosed later. A reply already shown in this run of failures
+// (a retry into the same error) adds nothing.
+function keepFailure(id: string, text: string): void {
+	let records = history.readSync(id)
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type !== 'rate_limit' && !(r.type === 'output' && r.error)) break
+		if (r.text === text) return
+	}
+	let r = history.append(id, { type: 'output', text, error: true })
+	host.broadcast(id, { type: 'output', sessionId: id, text, error: true, ts: r.ts, n: r.n })
+}
+
 async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
 	// Partial output can be followed by usage/bookkeeping, not only an assistant record.
 	if (
@@ -112,17 +126,19 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 		'assistant'
 	)
 		history.append(id, { type: 'continue', reason: turnPolicy.retryNotice(error) })
+	let model = sessions.open(id).model
+	let at = error.retryAt ?? clock.now() + turnPolicy.backoffMs(failures)
+	let waits = error.failure === 'limited' && at > clock.now()
+	if (!waits) turnPolicy.keepFailure(id, `${model}: ${history.errorText(error)}`)
 	if (error.failure === 'auth' && error.retryAt === undefined) {
 		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
 		await auth.changed(signal)
 		return
 	}
-	let at = error.retryAt ?? clock.now() + turnPolicy.backoffMs(failures)
-	if (error.failure === 'limited' && at > clock.now()) {
-		let model = sessions.open(id).model
+	if (waits) {
 		let provider = turns.state.running.get(id)?.provider ?? model.split('/')[0]!
 		let until = new Date(at).toISOString()
-		let text = `Rate limit: ${provider}, ${model}, until ${until}\n${error.message}`
+		let text = `Rate limit: ${provider}, ${model}, until ${until}\n${history.errorText(error)}`
 		// One record per run of waits: the status line shows each new deadline.
 		let last = history.readSync(id).at(-1)
 		if (last?.type !== 'rate_limit' || last.provider !== provider || last.model !== model) {
@@ -157,6 +173,7 @@ export const turnPolicy = {
 	stoppedBy,
 	parkedUsage,
 	waitOut,
+	keepFailure,
 	waitFor,
 	retryNotice,
 	backoffMs,

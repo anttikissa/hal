@@ -3,7 +3,8 @@
 	spec: 'When a turn waits on a rate limit, the host appends a visible history record naming provider, model and until when. states.recoveries() stops counting continues at such a record: a turn that got a provider answer is not what stops the host. Invariant: restarting the host while sessions wait on limits never pauses them. Test: a limited turn survives six restarts unpaused. Consecutive waits on the same provider and model share one record; the status line shows each new deadline. Invariant: retrying into the same limit adds no transcript lines.',
 	status: 'done',
 	notes: [
-		'The wait hook records only future rate-limit deadlines, not immediate account rotation. Its new rate_limit record stays out of provider input, renders through the shared output card, and naturally ends recoveries() counting because it is not assistant output or an inbox message. Six in-memory host recoveries retain retrying state without a turn_end.'
+		'The wait hook records only future rate-limit deadlines, not immediate account rotation. Its new rate_limit record stays out of provider input, renders through the shared output card, and naturally ends recoveries() counting because it is not assistant output or an inbox message. Six in-memory host recoveries retain retrying state without a turn_end.',
+		'Invariant restored 10 Nov: every failed provider attempt, including an immediate account rotation and a temporary retry, is stored in history as an error output naming model and account, with the complete provider body; the rate_limit record carries the body too. A reply already shown in the current run of failure records adds nothing, so retrying into the same limit still adds no lines. Before, rotation stored nothing: a ChatGPT plan refusing gpt-6.2-sol on three accounts left only "every usable openai account is rate limited".'
 	],
 	needs: ['j1']
 }

@@ -173,13 +173,23 @@ test('a login in another tab resumes all quota waits without resuming paused or 
 	expect(a.ends().filter((e) => e.status === 'completed')).toHaveLength(2)
 })
 
-test('a rotation to another account retries at once', async () => {
+test("a rotation to another account retries at once and keeps the provider's reply once", async () => {
 	let a = client()
-	script = [[{ type: 'error', message: 'HTTP 429 from fake', status: 429, failure: 'limited', retryAt: now }], done]
-	start(a)
+	let refused: StreamEvent = {
+		type: 'error',
+		message: 'HTTP 400 from fake (a@x)',
+		status: 400,
+		body: '{"detail":"model not supported"}',
+		failure: 'limited',
+		retryAt: now,
+	}
+	script = [[refused], [refused], done]
+	let id = start(a)
 	await until(() => a.ends().length)
-	expect(calls).toHaveLength(2)
+	expect(calls).toHaveLength(3)
 	expect(slept).toEqual([])
+	let kept = history.readSync(id).filter((r) => r.type === 'output' && r.error)
+	expect(kept.map((r: any) => r.text)).toEqual(['fake/m1: HTTP 400 from fake (a@x)\n{"detail":"model not supported"}'])
 })
 
 test('switching model while blocked on a login tries the new model at once', async () => {

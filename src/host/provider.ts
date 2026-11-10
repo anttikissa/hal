@@ -380,6 +380,8 @@ async function* stream(
 		for await (let event of (http.parse ?? p.parse)(provider.sse(res.body, conn.signal))) {
 			if (signal?.aborted) throw new Canceled()
 			if (event.type === 'error') {
+				// Name the account, as an HTTP failure does: rotation tries several.
+				event.message += await who(id.provider, http.account, event.status ?? 0)
 				yield failed(p, modelId, http.account, event)
 				return
 			}

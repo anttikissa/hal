@@ -219,7 +219,7 @@ test("incomplete responses stop for their reason; a failed one is an error with 
 			},
 		})
 	let end = (await run()).at(-1) as any
-	expect(end).toMatchObject({ type: 'error', message: 'try later', failure: 'temporary' })
+	expect(end).toMatchObject({ type: 'error', message: expect.stringMatching(/^try later/), failure: 'temporary' })
 	expect(end.body).not.toContain('SYSTEM PROMPT')
 })
 

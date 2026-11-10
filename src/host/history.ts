@@ -468,6 +468,7 @@ export const history = {
 	interrupted,
 	results,
 	end,
+	errorText,
 	park,
 	carry,
 	stop,
