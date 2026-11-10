@@ -22,7 +22,8 @@ It is resumable: after a restart or a steered message it continues from the firs
 		'Model step also offers up to four local Ollama models, labeled "<tag> (Ollama, local)" from the cached ollama list; the greeting starts models.warm so the list is ready by then. With only Ollama, the step is asked instead of skipped.',
 		'The timezone step was removed: intro runs on the user’s own machine, where the zone adds nothing. USER.md may still hold a hand-written Timezone line; greetings read it. How a server host gets USER.md is open.',
 		'Task 4c1 adds a theme question before the language one; the count names it (four, five with Brave Search). Only the theme answer itself selects, so a /theme during the intro is not undone by later steps.',
-		'Login and model-choice discovery (accounts, choices) live in src/host/intro-accounts.ts (introAccounts); greetings.ts reads introAccounts.accounts() (179-mia).'
+		'Login and model-choice discovery (accounts, choices) live in src/host/intro-accounts.ts (introAccounts); greetings.ts reads introAccounts.accounts() (179-mia).',
+		'Bug fix: the intro sample ls -l tool call starts the session without a prompt, so replay drops it as a leading assistant message. Its tool_result then led the first user message and Anthropic rejected the request with HTTP 400 after switching models. Invariant: replay.toMessages never sends a tool_result whose call it dropped; a leading user message loses its tool results.'
 	],
 	needs: ['n2', 'wq']
 }

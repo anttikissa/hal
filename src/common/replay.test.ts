@@ -287,6 +287,17 @@ test('setting transitions do not duplicate rendered instruction update notices',
 	expect(prompts(messages).at(-1)).not.toContain('changed from')
 })
 
+test('a turn started without a prompt sends no orphan tool results', () => {
+	let messages = replay.toMessages([
+		block({ type: 'text', text: 'hello' }),
+		block(call('intro-1')),
+		user({ type: 'tool_result', id: 'intro-1', output: 'ok' }),
+		say('hi'),
+	])
+	expect(messages[0]!.role).toBe('user')
+	expect(messages.some((m) => m.blocks.some((b) => b.type === 'tool_result'))).toBe(false)
+})
+
 test('a change is not a turn: withoutCommands drops it', () => {
 	let records: HistoryRecord[] = [say('hi'), end('completed'), { type: 'change', cwd: '/x', ts }]
 	expect(replay.withoutCommands(records).at(-1)).toEqual(end('completed'))

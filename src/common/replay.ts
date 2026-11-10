@@ -372,8 +372,16 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	}
 	if (!pending.length) flush()
 	// Providers want a user message first; a turn started without a
-	// prompt (the intro, tabs.create) leaves assistant text before it.
-	while (out[0]?.role === 'assistant') out.shift()
+	// prompt (the intro, tabs.create) leaves assistant messages before
+	// it, and results of their dropped tool calls.
+	while (out[0]) {
+		let first = out[0]
+		if (first.role === 'user') {
+			first.blocks = first.blocks.filter((b) => b.type !== 'tool_result')
+			if (first.blocks.length) break
+		}
+		out.shift()
+	}
 	return out
 }
 // Whether the record is a prompt: a user record with text.
