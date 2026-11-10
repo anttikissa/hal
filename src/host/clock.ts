@@ -47,14 +47,17 @@ function onWake(fn: Listener): () => void {
 	return () => clock.state.listeners.delete(fn)
 }
 
-// One tick of the wake detector. A tick that comes much later than
-// scheduled means the process did not run: the machine slept (or was
-// suspended with Ctrl-Z, which is handled the same, harmlessly).
+// One tick of the wake detector. Wall time keeps running while the
+// machine sleeps; monotonic time (performance.now) stops. A busy
+// process delays ticks but advances both alike, so it is no wake.
 function tick(): void {
 	let now = clock.now()
+	let mono = clock.mono()
 	let last = clock.state.last
+	let lastMono = clock.state.lastMono
 	clock.state.last = now
-	if (last !== null && now - last > clock.tickMs + clock.wakeGapMs) clock.wake()
+	clock.state.lastMono = mono
+	if (last !== null && now - last - (mono - lastMono) > clock.wakeGapMs) clock.wake()
 }
 
 function wake(): void {
@@ -71,6 +74,7 @@ function wake(): void {
 function init(): void {
 	if (clock.state.timer) return
 	clock.state.last = clock.now()
+	clock.state.lastMono = clock.mono()
 	clock.state.timer = setInterval(() => clock.tick(), clock.tickMs)
 	clock.state.timer.unref?.()
 }
@@ -83,9 +87,10 @@ function stop(): void {
 
 export const clock = {
 	now: (): number => Date.now(),
+	mono: (): number => performance.now(),
 	sleep,
 	until,
-	// Wake detector period, and how late a tick must be to count as a wake.
+	// Wake detector period, and how much sleep counts as a wake.
 	tickMs: 1000,
 	wakeGapMs: 4000,
 	onWake,
@@ -96,6 +101,7 @@ export const clock = {
 	state: {
 		listeners: new Set<Listener>(),
 		last: null as number | null,
+		lastMono: 0,
 		timer: null as ReturnType<typeof setInterval> | null,
 	},
 }

@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { clock } from './clock.ts'
 
-const orig = { now: clock.now, sleep: clock.sleep }
+const orig = { now: clock.now, mono: clock.mono, sleep: clock.sleep }
 let now = 0
 
 afterEach(() => {
@@ -22,14 +22,20 @@ function fake() {
 	return slept
 }
 
-test('a tick that comes far too late is a wake; normal ticks are not', () => {
+// 10 Nov 2026: 36 sessions blocked the host loop for over 5s; the old
+// detector took that for sleep and dropped every open stream.
+test('wall time outrunning monotonic time is a wake; a late, busy tick is not', () => {
 	fake()
+	let mono = 0
+	clock.mono = () => mono
 	let wakes = 0
 	clock.onWake(() => wakes++)
 	clock.tick()
 	now += clock.tickMs
+	mono += clock.tickMs
 	clock.tick()
-	now += clock.tickMs + 100
+	now += 60_000
+	mono += 60_000
 	clock.tick()
 	expect(wakes).toBe(0)
 	now += 3600_000
