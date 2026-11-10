@@ -37,6 +37,21 @@ browserTest(
 			}
 			let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
 			await open()
+			await b.evaluate(`document.querySelector('.completions').style.maxHeight = '60px'`)
+			let position = await b.evaluate(`document.querySelector('textarea').getBoundingClientRect().top`)
+			let count = await b.evaluate(`document.querySelectorAll('.completions button').length`)
+			for (let key of ['ArrowDown', 'ArrowUp']) {
+				for (let i = 0; i < count; i++) {
+					await press(key)
+					await b.waitFor(`(() => {
+						let menu = document.querySelector('.completions').getBoundingClientRect();
+						let row = document.querySelector('.completions [aria-selected="true"]').getBoundingClientRect();
+						return row.top >= menu.top - 1 && row.bottom <= menu.bottom + 1;
+					})()`)
+				}
+			}
+			expect(await b.evaluate(`document.querySelector('textarea').getBoundingClientRect().top`)).toBe(position)
+			expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(true)
 			let choice = await b.evaluate(`document.querySelector('.completions button strong').textContent + ' '`)
 			expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
 			await press('Enter')

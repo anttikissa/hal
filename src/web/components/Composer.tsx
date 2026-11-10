@@ -42,6 +42,18 @@ export function Composer(props: {
 }) {
 	let input!: HTMLTextAreaElement
 	let measure!: HTMLTextAreaElement
+	let suggestions!: HTMLDivElement
+	createEffect(
+		() => props.menu,
+		(menu) => {
+			let row = menu && suggestions?.children[menu.selected]
+			if (!row) return
+			let bounds = suggestions.getBoundingClientRect()
+			let selected = row.getBoundingClientRect()
+			if (selected.top < bounds.top) suggestions.scrollTop += selected.top - bounds.top
+			else if (selected.bottom > bounds.bottom) suggestions.scrollTop += selected.bottom - bounds.bottom
+		},
+	)
 	// The copy has height 0, so its scrollHeight is the text's height plus padding.
 	let fit = () => {
 		if (!input || !measure) return
@@ -338,7 +350,7 @@ export function Composer(props: {
 			</Show>
 			<div class={['entry input', { dropping: props.dropping }]}>
 				{props.menu && (
-					<div class="completions" role="listbox" aria-label="Completions">
+					<div ref={(e) => (suggestions = e)} class="completions" role="listbox" aria-label="Completions">
 						{/* Keep the editor focused: iOS may blur without focusing the button,
 						    dismissing the menu before its click. Choose only on click, not
 						    pointerdown, so scrolling and canceled touches remain harmless. */}
