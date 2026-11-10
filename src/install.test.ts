@@ -2,7 +2,7 @@
 // there (this checkout), so it only links hal and fixes the PATH.
 
 import { afterEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, readlinkSync, rmSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { dirname } from 'path'
 
@@ -30,4 +30,12 @@ test('links hal, adds the PATH line once, then finds everything in order', () =>
 	expect(readFileSync(`${home}/.zshenv`, 'utf8').split('.local/bin').length).toBe(2)
 	let done = install({ PATH: `${home}/.local/bin:${path}` })
 	expect(done.out).toContain('Everything in order')
+})
+
+test('puts ~/.bun/bin on the PATH when bun is only there', () => {
+	home = mkdtempSync(`${tmpdir()}/hal-install-`)
+	mkdirSync(`${home}/.bun/bin`, { recursive: true })
+	symlinkSync(process.execPath, `${home}/.bun/bin/bun`)
+	expect(install({ PATH: '/usr/bin:/bin' }, '-y').code).toBe(0)
+	expect(readFileSync(`${home}/.zshenv`, 'utf8')).toContain('export PATH="$HOME/.bun/bin:$PATH"')
 })

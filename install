@@ -30,16 +30,19 @@ esac
 
 pretty() { echo "${1/#$HOME/~}"; }
 
-# The shell config that sets PATH for this user's login shell.
+# The shell config that sets PATH for this user's login shell, and its
+# PATH line format for a directory under $HOME.
 case "$(basename "${SHELL:-/bin/sh}")" in
-	zsh) rc="$HOME/.zshenv"; line='export PATH="$HOME/.local/bin:$PATH"' ;;
-	bash) [ "$(uname -s)" = Darwin ] && rc="$HOME/.bash_profile" || rc="$HOME/.bashrc"; line='export PATH="$HOME/.local/bin:$PATH"' ;;
-	fish) rc="$HOME/.config/fish/config.fish"; line='fish_add_path $HOME/.local/bin' ;;
-	*) rc=""; line='export PATH="$HOME/.local/bin:$PATH"' ;;
+	zsh) rc="$HOME/.zshenv"; fmt='export PATH="$HOME/%s:$PATH"' ;;
+	bash) [ "$(uname -s)" = Darwin ] && rc="$HOME/.bash_profile" || rc="$HOME/.bashrc"; fmt='export PATH="$HOME/%s:$PATH"' ;;
+	fish) rc="$HOME/.config/fish/config.fish"; fmt='fish_add_path $HOME/%s' ;;
+	*) rc=""; fmt='export PATH="$HOME/%s:$PATH"' ;;
 esac
 
-need_bun="" need_deps="" need_link="" need_path=""
+need_bun="" need_bun_path="" need_deps="" need_link="" need_path=""
 command -v bun >/dev/null || [ -x "$HOME/.bun/bin/bun" ] || need_bun=1
+# Bun's installer leaves PATH alone when ~/.zshrc is missing (a new Mac).
+command -v bun >/dev/null || need_bun_path=1
 [ -d "$hal_dir/node_modules" ] || need_deps=1
 [ "$(readlink "$bin_dir/hal" 2>/dev/null)" = "$hal_dir/run" ] || need_link=1
 case ":$PATH:" in *":$bin_dir:"*) ;; *) need_path=1 ;; esac
@@ -47,12 +50,13 @@ case ":$PATH:" in *":$bin_dir:"*) ;; *) need_path=1 ;; esac
 mark() { [ -n "$1" ] && echo "[ ] $2" || echo "[x] $2"; }
 echo
 mark "$need_bun" "bun"
+mark "$need_bun_path" "bun in PATH"
 mark "$need_deps" "bun install"
 mark "$need_link" "$(pretty "$bin_dir")/hal -> $(pretty "$hal_dir")/run"
 mark "$need_path" "$(pretty "$bin_dir") in PATH"
 echo
 
-if [ -z "$need_bun$need_deps$need_link$need_path" ]; then
+if [ -z "$need_bun$need_bun_path$need_deps$need_link$need_path" ]; then
 	echo "Everything in order. Start with: hal"
 	exit 0
 fi
@@ -79,16 +83,24 @@ if [ -n "$need_link" ]; then
 	echo "Linked $(pretty "$bin_dir")/hal"
 fi
 
-if [ -n "$need_path" ]; then
+# Adds $HOME/$1 to PATH in the shell config, unless the config has it.
+add_path() {
+	local line
+	line="$(printf "$fmt" "$1")"
 	if [ -z "$rc" ]; then
 		echo "Add this to your shell config: $line"
-	elif [ -f "$rc" ] && grep -v '^#' "$rc" | grep -qF '.local/bin'; then
+	elif [ -f "$rc" ] && grep -v '^#' "$rc" | grep -qF "$1"; then
 		: # the config already adds it; only this shell lacks it
 	else
 		mkdir -p "$(dirname "$rc")"
 		printf '\n# Added by hal installer\n%s\n' "$line" >> "$rc"
-		echo "Added $(pretty "$bin_dir") to PATH in $(pretty "$rc")"
+		echo "Added ~/$1 to PATH in $(pretty "$rc")"
 	fi
+}
+
+if [ -n "$need_bun_path" ]; then add_path .bun/bin; fi
+if [ -n "$need_path" ]; then add_path .local/bin; fi
+if [ -n "$need_bun_path$need_path" ]; then
 	echo
 	echo "Open a new shell, then start with: hal"
 else
