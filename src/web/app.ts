@@ -171,6 +171,11 @@ function onEvent(event: Event): void {
 					event.items.length > 1 && done.notice
 						? completions.receive(event.text, event.items, st.menu, event.descriptions)
 						: undefined
+				if (menu && done.text === st.text) {
+					st.menu = menu
+					app.choose(menu.selected)
+					return
+				}
 				st.view = { ...st.view, notice: event.items.length ? undefined : done.notice }
 				if (done.text !== st.text) app.rewrite(() => ({ text: done.text, cursor: done.text.length }))
 				st.menu = menu

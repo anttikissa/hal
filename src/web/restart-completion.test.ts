@@ -152,3 +152,31 @@ test('Tab completes prefixes, not passive highlights, before or after model sugg
 	expect(app.state.menu).toBeUndefined()
 	expect(sent.some((c) => c.type === 'submit')).toBe(false)
 })
+
+test('Tab extends a shared prefix, then accepts the highlighted choice, before or after replies', () => {
+	for (let ready of [false, true]) {
+		let input = '/cd ~/gh'
+		let candidates = ['/cd ~/ghost/', '/cd ~/ghost-old/']
+		app.input(input)
+		let event = { type: 'completions' as const, sessionId, text: input, items: candidates }
+		if (ready) app.onEvent(event)
+		press('Tab')
+		if (!ready) app.onEvent(event)
+		expect(app.state.text).toBe('/cd ~/ghost')
+		expect(app.state.menu).toBeDefined()
+		let next = { ...event, text: app.state.text }
+		if (ready) app.onEvent(next)
+		press('Tab')
+		if (!ready) app.onEvent(next)
+		expect(app.state.text).toBe('/cd ~/ghost/')
+		expect(app.state.menu).toBeUndefined()
+		expect(drafts.text(sessionId)).toBe('/cd ~/ghost/')
+	}
+	let input = '/model gpt-6.1-so'
+	let candidates = ['/model openai/gpt-6.1-sol', '/model openrouter/openai/gpt-6.1-sol']
+	app.input(input)
+	app.onEvent({ type: 'completions', sessionId, text: input, items: candidates })
+	press('Tab')
+	expect(app.state.text).toBe(candidates[0]!)
+	expect(app.state.menu).toBeUndefined()
+})
