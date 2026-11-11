@@ -86,6 +86,10 @@ function toMessages(req: ProviderRequest): any[] {
 		// empty text drop out, as they did then.
 		if (m.cache) earlier = content.slice(0, m.cache).findLast(keep)
 		content = content.filter(keep)
+		// The API rejects text after tool_use (task a0z: Sources follow a
+		// round's calls); calls go last, the rest keeps its order.
+		if (m.role === 'assistant')
+			content = [...content.filter((b) => b.type !== 'tool_use'), ...content.filter((b) => b.type === 'tool_use')]
 		if (content.length) out.push({ role: m.role, content })
 	}
 	// Cache the whole prefix: the next turn starts with it. A second marker

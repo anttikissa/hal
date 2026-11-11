@@ -257,6 +257,24 @@ test('failed tool results keep text and move all images after sibling results', 
 	])
 })
 
+test('tool_use goes last in an assistant message; Sources after a call made the API reject it', () => {
+	let [assistant] = anthropic.toMessages({
+		model: 'claude-test',
+		messages: [
+			{
+				role: 'assistant',
+				blocks: [
+					{ type: 'text', text: 'answer' },
+					{ type: 'tool_call', id: 'c', name: 'bash', input: {} },
+					{ type: 'text', text: '\n\nSources:\nhttps://example.com/\n' },
+				],
+			},
+			{ role: 'user', blocks: [{ type: 'tool_result', id: 'c', output: 'ok' }] },
+		],
+	})
+	expect(assistant.content.map((b: any) => b.type)).toEqual(['text', 'text', 'tool_use'])
+})
+
 test('thinking is enabled within max_tokens, and skipped when there is no room for it', async () => {
 	reply = endTurn
 	await run(undefined, { maxTokens: 20_000 })
