@@ -151,7 +151,8 @@ export function Composer(props: {
 		document.addEventListener('touchstart', sync, { capture: true, passive: true })
 		let touched: { button: Element; at: number; x: number; y: number } | undefined
 		let remember = (e: PointerEvent) => {
-			let button = e.target instanceof Element && e.target.closest('.Composer .actions button')
+			let button =
+				e.target instanceof Element && e.target.closest('.Composer .actions button, .Composer .completions button')
 			touched =
 				e.pointerType === 'touch' && button ? { button, at: e.timeStamp, x: e.clientX, y: e.clientY } : undefined
 		}
@@ -246,27 +247,7 @@ export function Composer(props: {
 	let Action = (p: { kind: keyof typeof BUTTONS; class?: string; disabled?: boolean; onClick: () => void }) => {
 		let b = () => BUTTONS[p.kind]
 		let show = () => explains.matches && setCaption(b().caption)
-		// iOS can finish a touch on the button without a click (task qp9):
-		// a touch lifted inside acts at once; the click after it is ignored.
-		let tapped = -Infinity
-		let up = (e: PointerEvent & { currentTarget: HTMLButtonElement }) => {
-			let r = e.currentTarget.getBoundingClientRect()
-			if (
-				e.pointerType === 'mouse' ||
-				e.currentTarget.disabled ||
-				e.clientX < r.left ||
-				e.clientX > r.right ||
-				e.clientY < r.top ||
-				e.clientY > r.bottom
-			)
-				return
-			tapped = e.timeStamp
-			p.onClick()
-		}
-		let click = (e: MouseEvent) => {
-			if (e.timeStamp - tapped < 1000) tapped = -Infinity
-			else p.onClick()
-		}
+		let { up, click } = tap(p.onClick)
 		return (
 			<button
 				type="button"
@@ -352,24 +333,28 @@ export function Composer(props: {
 				{props.menu && (
 					<div ref={(e) => (suggestions = e)} class="completions" role="listbox" aria-label="Completions">
 						{/* Keep the editor focused: iOS may blur without focusing the button,
-						    dismissing the menu before its click. Choose only on click, not
-						    pointerdown, so scrolling and canceled touches remain harmless. */}
+						    dismissing the menu before its click. Choose on a touch lifted
+						    inside (tap), so scrolling and canceled touches remain harmless. */}
 						<For each={props.menu.choices}>
-							{(choice, index) => (
-								<button
-									type="button"
-									role="option"
-									aria-selected={props.menu?.selected === index() ? 'true' : 'false'}
-									onPointerDown={(e) => e.preventDefault()}
-									onClick={() => {
-										app.choose(index())
-										input.focus()
-									}}
-								>
-									<strong>{choice.label}</strong>
-									<span>{choice.description}</span>
-								</button>
-							)}
+							{(choice, index) => {
+								let { up, click } = tap(() => {
+									app.choose(index())
+									input.focus()
+								})
+								return (
+									<button
+										type="button"
+										role="option"
+										aria-selected={props.menu?.selected === index() ? 'true' : 'false'}
+										onPointerDown={(e) => e.preventDefault()}
+										onPointerUp={up}
+										onClick={click}
+									>
+										<strong>{choice.label}</strong>
+										<span>{choice.description}</span>
+									</button>
+								)
+							}}
 						</For>
 					</div>
 				)}
@@ -502,3 +487,28 @@ const BUTTONS = {
 	run: { icon: 'run', name: 'Run', label: 'Run', caption: 'Run the command.' },
 	save: { icon: 'send', name: 'Save', label: 'Save queued message', caption: 'Keep its place in the queue.' },
 } satisfies Record<string, { icon: IconName; name: string; label: string; caption: string }>
+
+// iOS can finish a touch on a button without a click (task qp9): a touch
+// lifted inside acts at once; the click after it is ignored.
+function tap(act: () => void) {
+	let tapped = -Infinity
+	let up = (e: PointerEvent & { currentTarget: HTMLButtonElement }) => {
+		let r = e.currentTarget.getBoundingClientRect()
+		if (
+			e.pointerType === 'mouse' ||
+			e.currentTarget.disabled ||
+			e.clientX < r.left ||
+			e.clientX > r.right ||
+			e.clientY < r.top ||
+			e.clientY > r.bottom
+		)
+			return
+		tapped = e.timeStamp
+		act()
+	}
+	let click = (e: MouseEvent) => {
+		if (e.timeStamp - tapped < 1000) tapped = -Infinity
+		else act()
+	}
+	return { up, click }
+}

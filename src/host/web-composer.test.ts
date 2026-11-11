@@ -76,6 +76,16 @@ browserTest(
 			})()`)
 				expect(retained).toEqual({ focused: true, menu: true, text: '/c' })
 			}
+			// iOS can end a touch on the choice without any click.
+			await open()
+			let tapped = await b.evaluate(`(() => {
+				let row = document.querySelector('.completions button'), r = row.getBoundingClientRect();
+				let at = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: r.x + 5, clientY: r.y + 5 };
+				row.dispatchEvent(new PointerEvent('pointerdown', at));
+				row.dispatchEvent(new PointerEvent('pointerup', at));
+				return document.querySelector('textarea').value;
+			})()`)
+			expect(tapped).toBe(choice)
 			// A real touch tap still produces click after pointerdown cancellation.
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await open()
