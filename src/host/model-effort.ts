@@ -37,7 +37,7 @@ function capability(provider: string, model: string): Capability | undefined {
 	if (provider === 'anthropic') {
 		if (/^claude-(opus|sonnet)-5-5(?:-\d{8})?$/.test(model))
 			return adaptive(frontier, model.includes('opus') ? 'medium' : 'high')
-		if (/^claude-(opus-4-[78]|opus-5|sonnet-5|fable-5(?:-1)?)(?:-\d{8})?$/.test(model))
+		if (/^claude-(opus-4-[78]|opus-5|sonnet-5|fable-5(?:-[12])?)(?:-\d{8})?$/.test(model))
 			return adaptive(frontier, 'high')
 		if (/^claude-(opus|sonnet)-4-6(?:-\d{8})?$/.test(model)) return adaptive([...standard, 'max'], 'high')
 		if (/^claude-(opus-4(?:-[15])?|sonnet-4(?:-5)?|sonnet-3-7)(?:-\d{8})?$/.test(model))

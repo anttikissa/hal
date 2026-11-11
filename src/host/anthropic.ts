@@ -21,7 +21,7 @@ const IDENTITY = "You are a Claude agent, built on Anthropic's Claude Agent SDK.
 const OAUTH_BETAS = 'claude-code-20250219,oauth-2025-04-20'
 // The Claude Code version reported in the OAuth user-agent, as the
 // Agent SDK does; the entrypoint slot honestly says "hal".
-const CLAUDE_CODE_VERSION = '2.1.280'
+const CLAUDE_CODE_VERSION = '2.1.322'
 // Tool inputs use standard buffered streaming: Hal only executes complete
 // parsed calls, so eager fragments add risk without earlier execution.
 // Smallest thinking budget the API accepts.
