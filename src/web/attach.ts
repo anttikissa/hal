@@ -20,18 +20,39 @@ export type Pasted = {
 }
 
 // Starts uploading `blob` for the session shown; `from`: its file name.
+// An image over the size limit is shrunk to a JPEG that fits.
 function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 	let id = app.sessionId()
 	if (!id) return
-	let big = uploads.tooBig(b.size)
-	if (big) return app.setNotice(big)
+	let shrink = mediaType.startsWith('image/') && b.size > attachments.maxBytes
+	if (shrink) mediaType = 'image/jpeg'
+	let big = shrink ? undefined : uploads.tooBig(b.size)
+	if (big) return app.setNotice(from ? `${from}: ${big}` : big)
 	let command = connection.nextId()
 	insert(uploads.begin(id, command, mediaType, from))
-	b.arrayBuffer().then(
-		(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
-		(e) =>
-			app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
-	)
+	;(shrink ? attach.fit(b) : Promise.resolve(b))
+		.then((b) => b.arrayBuffer())
+		.then(
+			(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
+			(e) =>
+				app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
+		)
+}
+
+// `image` as a JPEG within attachments.maxBytes: its long edge at most
+// 2576 px (Opus downscales to that anyway), smaller until it fits.
+async function fit(image: Blob): Promise<Blob> {
+	let bitmap = await createImageBitmap(image)
+	for (let edge = 2576; ; edge = Math.round(edge * 0.7)) {
+		let scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height))
+		let canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale))
+		let g = canvas.getContext('2d')!
+		g.fillStyle = '#fff' // JPEG has no alpha; transparency becomes white, not black.
+		g.fillRect(0, 0, canvas.width, canvas.height)
+		g.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+		let out = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 })
+		if (out.size <= attachments.maxBytes) return out
+	}
 }
 
 // What the file picker offers.
@@ -63,4 +84,4 @@ function paste(data: Pasted, insert: Insert): boolean {
 	return true
 }
 
-export const attach = { accept, kind, blob, files, paste }
+export const attach = { accept, kind, blob, fit, files, paste }
