@@ -1,9 +1,7 @@
-// Browser diagnostic privacy validation, transport limits and causal retention.
+// Browser diagnostic privacy validation and transport limits.
 import { expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import type { Breadcrumb } from '../common/web-diagnostics.ts'
-import { retain } from '../web/diagnostics.ts'
 import { settings } from '../common/settings.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
@@ -105,48 +103,4 @@ test('diagnostic validation rejects malformed collections and numeric state', ()
 	})
 	expect(cleaned?.entries).toEqual([{ at: 1, kind: 'load', detail: 'parsed', ms: 2.5, bytes: 10, tab: 3 }])
 	expect(webDiagnostics.clean({ ...report(), entries: Array(33).fill(report().entries[0]) })).toBeUndefined()
-})
-
-test('scroll diagnostics project structural snapshots without leaking arbitrary causes or fields', () => {
-	let entry = {
-		at: 1,
-		kind: 'pulled',
-		detail: 'visible',
-		cause: 'resize',
-		scroll: { top: 5, height: 100, client: 80, gap: 15, pinned: false, held: false, intent: true },
-	} satisfies Breadcrumb
-	let clean = (e: unknown) => webDiagnostics.clean({ ...report(), entries: [e] })
-	expect(clean({ ...entry, scroll: { ...entry.scroll, text: 'private' } })?.entries).toEqual([entry])
-	expect(clean({ ...entry, cause: 'private' })?.entries[0]?.cause).toBeUndefined()
-	for (let scroll of [null, [], { top: -1 }, { gap: Infinity }, { height: 'private' }, { pinned: 1 }])
-		expect(clean({ ...entry, scroll })).toBeUndefined()
-	expect(clean({ ...entry, kind: 'newer-kind' })?.entries).toEqual([])
-})
-
-test('scroll causes survive generic event floods and failed-batch merges within 32 entries', () => {
-	let entries: Breadcrumb[] = [],
-		dropped = 0
-	for (let at = 0; at < 100; at++) {
-		entries.push({ at, kind: at === 0 ? 'pin' : at < 15 ? 'scroll' : 'event', detail: 'other' })
-		dropped += retain(entries)
-	}
-	expect(entries[0]?.kind).toBe('pin')
-	expect(entries.filter((e) => e.kind === 'scroll').map((e) => e.at)).toEqual(
-		Array.from({ length: 12 }, (_, i) => i + 3),
-	)
-	expect(entries.length).toBe(32)
-	expect(dropped).toBe(68)
-	let merged = [
-		...entries,
-		...Array.from({ length: 32 }, (_, i): Breadcrumb => ({ at: 100 + i, kind: 'event', detail: 'other' })),
-	]
-	expect(retain(merged)).toBe(32)
-	expect(merged.slice(0, 12)).toEqual(entries.slice(0, 12))
-	expect(merged.map((e) => e.at)).toEqual(merged.map((e) => e.at).sort((a, b) => a - b))
-	// A wheel flood never evicts the pin change that caused it.
-	for (let at = 200; at < 300; at++) {
-		merged.push({ at, kind: 'scroll', detail: 'other' })
-		retain(merged)
-	}
-	expect(merged[0]?.kind).toBe('pin')
 })

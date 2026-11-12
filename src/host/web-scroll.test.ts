@@ -152,9 +152,9 @@ browserTest(
 // A reader scrolled up with everything selected (Cmd+A) while Hal
 // streams 80 rows: no update may remove a shown node, move the focus,
 // collapse the selection or scroll the view.
-// Task 4s, pinned bottom: a card can grow with no DOM change (its open
-// animation, an image); a reader at the bottom must still end there.
-browserTest('a pinned reader stays at the bottom when a card grows by itself', async () => {
+// Task tzg: the browser keeps a bottom reader at the bottom through any
+// growth, with no script; the pill takes a reader above back down.
+browserTest('a bottom reader stays at the bottom as content and composer change', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -175,93 +175,33 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 				for (let i = 0; i < 40; i++) yield { type: 'text', text: `Line ${i} text.\n\n` }
 				yield { type: 'done', reason: 'end' }
 			})()
-		let atBottom = `(() => { let t = document.querySelector('.Transcript'); return t.scrollHeight - t.clientHeight - t.scrollTop <= 1 })()`
+		let atBottom = `document.querySelector('.Transcript').scrollTop >= -1`
+		let frames = `new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`
 		await b.waitFor(
 			`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
 		)
-		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle') && ${atBottom}`)
-		// Let the turn's last redraw land, so nothing else pulls the view.
-		await b.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-		expect(
-			await b.evaluate(`(() => {
-			let t = document.querySelector('.Transcript'), c = t.querySelector('.Card:last-of-type');
-			return c.getBoundingClientRect().top + c.querySelector('header').offsetHeight <= t.getBoundingClientRect().top;
-		})()`),
-		).toBe(true)
-		await b.evaluate(`document.querySelector('.Transcript .Card:last-of-type .mark').click()`)
-		await b.waitFor(`document.querySelector('.Transcript .Card:last-of-type').offsetHeight < 200`)
-		await b.evaluate(`(() => {
-			let extra = document.createElement('div'); extra.id = 'collapse-growth'; extra.style.height = '300px';
-			document.querySelector('.Transcript').append(extra);
-		})()`)
-		await b.waitFor(atBottom)
-		await b.evaluate(
-			`document.querySelector('#collapse-growth').remove(); document.querySelector('.Transcript .Card:last-of-type .mark').click()`,
-		)
-		await b.waitFor(`document.querySelector('.Transcript .Card:last-of-type').offsetHeight > 1000 && ${atBottom}`)
-		// A card tap must not leave navigation armed for a later layout shift.
-		await b.evaluate(`(() => {
-			let t = document.querySelector('.Transcript');
-			t.dispatchEvent(new Event('touchstart', { bubbles: true }));
-			t.dispatchEvent(new Event('touchend', { bubbles: true }));
-			t.scrollTop -= 37;
-			t.appendChild(document.createTextNode('layout update'));
-		})()`)
-		await b.waitFor(atBottom)
-		// A style change is not a DOM mutation and fires no scroll event.
-		// Two frames later the view must be back, not left short until
-		// some later change happens to pull it.
-		let grown = await b.evaluate(`new Promise((r) => {
-			document.querySelector('.Transcript > .Card:last-of-type').style.minHeight = '3000px'
-			requestAnimationFrame(() => requestAnimationFrame(() => r(${atBottom})))
-		})`)
-		expect(grown).toBe(true)
-		let point = await b.evaluate(
-			`(() => { let r = document.querySelector('.Transcript').getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 } })()`,
-		)
-		let grow = async () => {
-			await b.evaluate(
-				`(() => { let c = document.querySelector('.Transcript > .Card:last-of-type'); c.style.minHeight = (c.getBoundingClientRect().height + 200) + 'px' })()`,
-			)
-			await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-			expect(await b.evaluate(atBottom)).toBe(true)
-		}
-		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: 120 })
-		await grow()
-		await b.evaluate(`document.querySelector('.Tabs button').focus()`)
-		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
-		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
-		await grow()
-		await b.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 })
-		await b.evaluate(`document.querySelector('.cursor-line').style.display = 'none'`)
-		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-		await b.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 })
-		await grow()
-		await b.evaluate(`document.querySelector('.cursor-line').style.display = ''`)
-		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: -120 })
-		await b.waitFor(`!${atBottom}`)
-		let reading = await b.evaluate(`document.querySelector('.Transcript').scrollTop`)
-		await b.evaluate(`document.querySelector('.Transcript > .Card:last-of-type').style.minHeight = '4000px'`)
-		await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-		expect(await b.evaluate(`document.querySelector('.Transcript').scrollTop`)).toBe(reading)
-		await b.call('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX: 0, deltaY: 10000 })
-		await b.waitFor(atBottom)
-		await grow()
-		// Composer grows and shrinks while output is pinned: no glide or
-		// transient gap in any rendered frame, including an empty last row.
+		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle')`)
+		expect(await b.evaluate(atBottom)).toBe(true)
+		await b.evaluate(`document.querySelector('.Transcript .Card:last-of-type').style.minHeight = '3000px'`)
+		await b.evaluate(frames)
+		expect(await b.evaluate(atBottom)).toBe(true)
+		// Composer grows and shrinks: no transient gap in any frame.
 		let gaps = await b.evaluate(`(async () => {
 			let t = document.querySelector('.Transcript'), box = document.querySelector('textarea'), gaps = []
 			for (let value of ['hello', 'hello\\n', 'hello\\na', 'hello\\n', 'hello', '']) {
 				box.value = value; box.dispatchEvent(new InputEvent('input', { bubbles: true }))
 				for (let i = 0; i < 3; i++) {
 					await new Promise(r => requestAnimationFrame(r))
-					gaps.push(t.scrollHeight - t.clientHeight - t.scrollTop)
+					gaps.push(-t.scrollTop)
 				}
 			}
 			return gaps
 		})()`)
 		expect(gaps.every((gap: number) => gap <= 1)).toBe(true)
+		await b.evaluate(`document.querySelector('.Transcript').scrollTop = -1500`)
+		await b.waitFor(`!!document.querySelector('.to-bottom button')`)
+		await b.evaluate(`document.querySelector('.to-bottom button').click()`)
+		expect(await b.evaluate(atBottom)).toBe(true)
 	} finally {
 		await b.close()
 	}
@@ -379,11 +319,10 @@ browserTest(
 				else events.push('removed ' + String(html).slice(0, 100) + ' from ' + (m.target.className?.baseVal ?? m.target.className))
 			} }).observe(t, { childList: true, subtree: true })
 			document.addEventListener('selectionchange', () => { if (getSelection().isCollapsed) events.push('collapsed; focus ' + (document.activeElement?.tagName)) })
-			window.scrolls = []
-			t.addEventListener('scroll', () => scrolls.push(Math.round(t.scrollTop)))
 			document.activeElement?.blur?.()
-			document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1000 }))
-			t.scrollTop = 0
+			t.scrollTop = -1e6
+			window.first = t.querySelector('.Card')
+			window.firstTop = first.getBoundingClientRect().top
 			getSelection().selectAllChildren(document.body)
 			window.length0 = getSelection().toString().length
 		})()`)
@@ -392,9 +331,9 @@ browserTest(
 			await b.waitFor(`!!document.querySelector('.cursor-line')`)
 			await Bun.sleep(300)
 			let out = await b.evaluate(
-				`({ events: [...new Set(events)], scrolls: [...new Set(scrolls)], collapsed: getSelection().isCollapsed, grew: getSelection().toString().length >= length0 })`,
+				`({ events: [...new Set(events)], moved: Math.round(first.getBoundingClientRect().top - firstTop), collapsed: getSelection().isCollapsed, grew: getSelection().toString().length >= length0 })`,
 			)
-			expect(out).toEqual({ events: [], scrolls: [0], collapsed: false, grew: true })
+			expect(out).toEqual({ events: [], moved: 0, collapsed: false, grew: true })
 		} finally {
 			release()
 			await b.close()

@@ -248,7 +248,6 @@ export function Card(props: {
 	let failed = () =>
 		!!presentationError() || !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let clicks = cardMotion.toggler({
-		root: () => root,
 		canToggle: () => canToggle(),
 		expanded: () => expanded(),
 		disclose: () =>

@@ -14,10 +14,6 @@ export const diagnosticKinds = [
 	'connection',
 	'event',
 	'key',
-	'drift',
-	'pulled',
-	'scroll',
-	'pin',
 	'load',
 	'pointerup',
 	'pointercancel',
@@ -104,35 +100,6 @@ export const diagnosticDetails = [
 ] as const
 export type DiagnosticKind = (typeof diagnosticKinds)[number]
 export type DiagnosticDetail = (typeof diagnosticDetails)[number]
-export const scrollCauses = [
-	'other',
-	'sample',
-	'wheel',
-	'touchstart',
-	'touchend',
-	'key',
-	'find',
-	'press',
-	'release',
-	'drag',
-	'restore',
-	'force',
-	'resume',
-	'scroll',
-	'content',
-	'resize',
-	'settle',
-	'shown',
-	'toggle',
-	'link',
-] as const
-// from: the position Hal last saw before a pin change. delta, up: a
-// wheel event's |deltaY| and direction.
-export const scrollNumbers = ['top', 'height', 'client', 'gap', 'from', 'delta'] as const
-export const scrollBooleans = ['pinned', 'held', 'intent', 'up'] as const
-export type ScrollDiagnostic = Partial<
-	Record<(typeof scrollNumbers)[number], number> & Record<(typeof scrollBooleans)[number], boolean>
->
 export type Breadcrumb = {
 	at: number
 	kind: DiagnosticKind
@@ -142,8 +109,6 @@ export type Breadcrumb = {
 	ms?: number
 	bytes?: number
 	tab?: number
-	cause?: (typeof scrollCauses)[number]
-	scroll?: ScrollDiagnostic
 }
 // heap: the page's JS heap in MiB (Chrome only, coarse: web/memory.ts).
 export const diagnosticNumbers = [

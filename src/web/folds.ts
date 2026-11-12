@@ -16,7 +16,6 @@ import { toggle, type Mode } from '../common/toggle.ts'
 import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
-import { scroll } from './scroll.ts'
 import { draftPastes } from '../common/draft-pastes.ts'
 
 let draft: ReturnType<typeof draftPastes.create> | undefined
@@ -77,14 +76,12 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	let at = folds.at(t)
 	let p = toggle.plan(mode, toggle.items(t), args, at)
 	if (typeof p === 'string') return p
-	scroll.follow(() => {
-		for (let item of p.items) {
-			let result =
-				item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			folds.set(`${t.meta.id}#${item.key}`, toggle.step(at(item), p.open), result ? [item.key, result] : [item.key])
-		}
-		flush()
-	})
+	for (let item of p.items) {
+		let result =
+			item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
+		folds.set(`${t.meta.id}#${item.key}`, toggle.step(at(item), p.open), result ? [item.key, result] : [item.key])
+	}
+	flush()
 	return undefined
 }
 

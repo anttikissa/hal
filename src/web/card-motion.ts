@@ -26,7 +26,6 @@ function enter(el: HTMLElement): void {
 }
 
 type Toggle = {
-	root: () => HTMLElement | undefined
 	canToggle: () => boolean
 	expanded: () => boolean
 	// Opens or closes the card's fold.
@@ -47,27 +46,10 @@ function toggler(card: Toggle): { click: (e: MouseEvent) => void; press: (e: Mou
 		let control = hit.closest('.mark, .CardHeader:not(.inline)')
 		if (!card.canToggle() || hit.closest('a, .command-toggle, .kill, .edit, .send, .discard, .undo, .raw-tool')) return
 		if (!control && card.expanded()) return
-		let flip = () =>
-			scroll.follow(() => {
-				let root = card.root(),
-					el = scroll.state.el as HTMLElement | undefined,
-					top = root?.getBoundingClientRect().top,
-					edge = el?.getBoundingClientRect().top
-				if (
-					!scroll.state.pinned &&
-					card.expanded() &&
-					el &&
-					top !== undefined &&
-					edge !== undefined &&
-					top + (root?.querySelector('header')?.offsetHeight ?? 0) <= edge
-				) {
-					scroll.leave('toggle')
-					el.scrollTo({ top: el.scrollTop + top - edge, behavior: 'instant' })
-					scroll.moved()
-				}
-				card.disclose()
-				flush()
-			})
+		let flip = () => {
+			card.disclose()
+			flush()
+		}
 		if (e.detail === 0) flip()
 		else pending = setTimeout(flip, 200)
 	}

@@ -1,4 +1,5 @@
-// Checks that content reflow leaves the text being read at the same position.
+// Checks that the browser keeps the text being read in place as content
+// changes above and below it (task tzg).
 import { expect } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { tabs } from './tabs.ts'
@@ -58,41 +59,35 @@ browserTest(
 				`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
 			)
 			await b.waitFor(`document.querySelector('.Transcript')?.innerText.includes('Row 48')`)
+			release()
+			await b.waitFor(`document.querySelector('.Transcript')?.innerText.includes('Finished table.')`)
 			await b.evaluate(`(async () => {
 				let t = document.querySelector('.Transcript');
 				window.reading = [...t.querySelectorAll('td span')].find(e => e.textContent === 'Row 25');
-				t.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true }));
 				t.scrollTop += reading.getBoundingClientRect().top - t.getBoundingClientRect().top - t.clientHeight / 2;
-				t.dispatchEvent(new Event('scroll'));
 				await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 				window.readingTop = reading.getBoundingClientRect().top;
 			})()`)
-			release()
-			await b.waitFor(`document.querySelector('.Transcript')?.innerText.includes('Finished table.')`)
-			await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
-			expect(await b.evaluate(`Math.abs(reading.getBoundingClientRect().top - readingTop)`)).toBeLessThanOrEqual(1)
 			for (let change of [
-				`let p = document.createElement('div'); p.id = 'above-reader'; p.style.height = '180px'; t.prepend(p)`,
+				`let p = document.createElement('div'); p.id = 'above-reader'; p.style.height = '180px'; rows.prepend(p)`,
 				`document.querySelector('#above-reader').style.height = '340px'`,
-				`let p = document.createElement('div'); p.style.height = '180px'; t.append(p)`,
+				`let p = document.createElement('div'); p.style.height = '180px'; rows.append(p)`,
 			]) {
-				await b.evaluate(`(() => { let t = document.querySelector('.Transcript'); ${change} })()`)
+				await b.evaluate(`(() => { let rows = document.querySelector('.Transcript .rows'); ${change} })()`)
 				await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 				expect(await b.evaluate(`Math.abs(reading.getBoundingClientRect().top - readingTop)`)).toBeLessThanOrEqual(1)
 			}
+			// 20px above the bottom is above it: growth below leaves the view.
 			await b.evaluate(`(async () => {
 				let t = document.querySelector('.Transcript');
-				t.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true }));
-				t.scrollTop = t.scrollHeight - t.clientHeight - 20;
-				t.dispatchEvent(new Event('scroll'));
+				t.scrollTop = -20;
 				await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-				window.nearBottomTop = t.scrollTop;
-				let p = document.createElement('div'); p.style.height = '200px'; t.append(p);
+				window.last = [...t.querySelectorAll('.Card')].at(-1);
+				window.lastTop = last.getBoundingClientRect().top;
+				let p = document.createElement('div'); p.style.height = '200px'; t.querySelector('.rows').append(p);
 				await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 			})()`)
-			expect(await b.evaluate(`document.querySelector('.Transcript').scrollTop`)).toBe(
-				await b.evaluate(`nearBottomTop`),
-			)
+			expect(await b.evaluate(`Math.abs(last.getBoundingClientRect().top - lastTop)`)).toBeLessThanOrEqual(1)
 		} finally {
 			release()
 			finish()

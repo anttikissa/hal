@@ -217,7 +217,7 @@ browserTest(
 					)
 					await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 					let geometry = await b.evaluate(
-						`Array.from(document.querySelectorAll('.Transcript > .Card, .Transcript > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position === 'sticky', tall:c.matches('[data-tall]') }; })`,
+						`Array.from(document.querySelectorAll('.Transcript .rows > .Card, .Transcript .rows > .Question'), c => { let h = c.querySelector('.CardHeader'), stamp = h.querySelector('.stamp'); return { headers:c.querySelectorAll('.CardHeader').length, x:stamp.getBoundingClientRect().left, triangle:/[▸▾▶▼]/.test(h.textContent), overflow:c.scrollWidth > c.clientWidth, sticky:getComputedStyle(h.classList.contains('inline') ? stamp : h).position === 'sticky', tall:c.matches('[data-tall]') }; })`,
 					)
 					expect(geometry.length).toBeGreaterThanOrEqual(10)
 					expect(geometry.every((c: any) => c.headers === 1 && !c.triangle && !c.overflow && c.sticky === c.tall)).toBe(
@@ -229,7 +229,7 @@ browserTest(
 				}
 				await b.evaluate(`document.querySelector('.Transcript').dispatchEvent(new WheelEvent('wheel', { deltaY: -1 }))`)
 				let sticking = await b.evaluate(
-					`(async () => { let main = document.querySelector('.Transcript'), cards = [...main.querySelectorAll(':scope > .Card, :scope > .Question')].filter(c => c.clientHeight > 200), results = []; for (let c of cards) { main.scrollTop += c.getBoundingClientRect().top - main.getBoundingClientRect().top + 60; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); let h = c.querySelector('.CardHeader'), pin = h.classList.contains('inline') ? h.querySelector('.stamp') : h; results.push(Math.abs(pin.getBoundingClientRect().top - main.getBoundingClientRect().top - parseFloat(getComputedStyle(main).paddingTop)) <= 1); } return results; })()`,
+					`(async () => { let main = document.querySelector('.Transcript'), cards = [...main.querySelectorAll(':scope > .rows > .Card, :scope > .rows > .Question')].filter(c => c.clientHeight > 200), results = []; for (let c of cards) { main.scrollTop += c.getBoundingClientRect().top - main.getBoundingClientRect().top + 60; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); let h = c.querySelector('.CardHeader'), pin = h.classList.contains('inline') ? h.querySelector('.stamp') : h; results.push(Math.abs(pin.getBoundingClientRect().top - main.getBoundingClientRect().top - parseFloat(getComputedStyle(main).paddingTop)) <= 1); } return results; })()`,
 				)
 				expect(sticking.length).toBeGreaterThanOrEqual(5)
 				expect(sticking.every(Boolean)).toBe(true)

@@ -209,18 +209,26 @@
 				color: var(--text);
 				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
 			}
-			/* The one scroller: nothing inside it scrolls; long lines wrap. */
+			/* The one scroller: nothing inside it scrolls; long lines wrap.
+   column-reverse puts its scroll origin at the bottom, so the browser
+   keeps a bottom reader there as content grows or the view resizes,
+   and scroll anchoring keeps a reader above in place (scroll.ts). The
+   rows' auto margin keeps a short transcript at the top. */
 			/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
 			.Transcript {
 				flex: 1;
 				min-height: 0;
+				display: flex;
+				flex-direction: column-reverse;
 				overflow: hidden auto;
-				overflow-anchor: none;
 				overscroll-behavior: contain;
 				--gut: max(1ch, env(safe-area-inset-left));
 				padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut);
+			}
+			.Transcript > .rows {
+				margin-bottom: auto;
 			}
 			.Transcript {
 				container: transcript / inline-size;
@@ -234,7 +242,7 @@
 					--leading: 22px;
 				}
 			}
-			.Transcript > * {
+			.Transcript .rows > * {
 				margin: 0 0 0.5lh;
 			}
 			/* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
@@ -246,7 +254,6 @@
 				position: sticky;
 				bottom: 0;
 				height: 0;
-				margin: 0;
 				z-index: 1;
 			}
 			.to-bottom button {
@@ -477,7 +484,7 @@
 			.CardHeader .side:empty {
 				display: none;
 			}
-			.Transcript > :is(.Card, .Question) {
+			.Transcript .rows > :is(.Card, .Question) {
 				view-timeline: --sticky-card block;
 			}
 			.CardHeader {
@@ -529,10 +536,10 @@
 				align-self: start;
 				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
 			}
-			.Transcript > :not([data-tall]) :is(.CardHeader.inline .stamp, .CardHeader.inline .side > *) {
+			.Transcript .rows > :not([data-tall]) :is(.CardHeader.inline .stamp, .CardHeader.inline .side > *) {
 				position: static;
 			}
-			.Transcript > :not([data-tall]) .CardHeader:not(.inline) {
+			.Transcript .rows > :not([data-tall]) .CardHeader:not(.inline) {
 				position: relative;
 			}
 			.CardHeader.inline .stamp {
@@ -783,8 +790,8 @@
 			.Card.user {
 				transition: color 300ms var(--ease-out);
 			}
-			.Transcript > .Card.queued.user:has(+ .Card.queued.user),
-			.Transcript > .Card.queued.message:has(+ .Card.queued.message) {
+			.Transcript .rows > .Card.queued.user:has(+ .Card.queued.user),
+			.Transcript .rows > .Card.queued.message:has(+ .Card.queued.message) {
 				margin-bottom: 0;
 			}
 			.Card.queued {
@@ -841,7 +848,7 @@
 					text-decoration: underline;
 				}
 			}
-			.Transcript > .target {
+			.Transcript .rows > .target {
 				scroll-margin-top: 0.5lh;
 			}
 			.Card .command-toggle {
@@ -1108,22 +1115,6 @@
 				50% {
 					opacity: 0;
 				}
-			}
-			/* Opt-in scroll-follow debug marker (web/drift.ts, task 981). */
-			.ScrollMark {
-				position: fixed;
-				top: 2lh;
-				right: 1ch;
-				z-index: 3;
-				padding: 0.25lh 1ch;
-				border-left: 3px solid;
-				background: var(--overlay-bg);
-				pointer-events: none;
-			}
-			.ScrollMark.heat-0,
-			.ScrollMark.heat-100 {
-				font-weight: bold;
-				background: color-mix(in oklab, var(--heat) 20%, var(--overlay-bg));
 			}
 			/* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 			.Notices {

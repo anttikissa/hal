@@ -55,9 +55,7 @@ browserTest(
 			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
 			seen.observe(main, { childList: true, subtree: true })
 			for (let i = 0; i < 200 && !main.innerText.includes('prompt 0'); i++) {
-				main.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true }))
-				main.scrollTop = 0
-				main.dispatchEvent(new Event('scroll'))
+				main.scrollTop = -1e6
 				await new Promise((r) => setTimeout(r, 20))
 			}
 			seen.disconnect()
@@ -141,7 +139,7 @@ browserTest(
 			// It flashes; scrolled out of view, the address drops its #block.
 			expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
 			await b.evaluate(
-				`(() => { let t = document.querySelector('.Transcript'); t.dispatchEvent(new WheelEvent('wheel', { deltaY: 1000, bubbles: true })); t.scrollTop = 1e6 })()`,
+				`document.querySelector('.Transcript').scrollTop = 0`,
 			)
 			await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
 		} finally {
@@ -208,7 +206,7 @@ browserTest('answering a linked question keeps following new output at the botto
 		})
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#q${question.n}` })
 		await b.waitFor(`!!document.querySelector('.Question.target')`)
-		let bottom = `(() => { let m = document.querySelector('.Transcript'); return m.scrollHeight - m.clientHeight - m.scrollTop <= 1 })()`
+		let bottom = `document.querySelector('.Transcript').scrollTop >= -1`
 		await b.waitFor(bottom)
 		history.append(id, { type: 'answer', question: 'approval', answers: { answer: 'yes' } })
 		host.broadcast(id, { type: 'answer', sessionId: id, question: 'approval', answers: { answer: 'yes' } })

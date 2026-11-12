@@ -19,28 +19,11 @@ let page = '',
 	timer: ReturnType<typeof setTimeout> | undefined,
 	busy = false,
 	last = 0
-// Pin changes are never evicted (but by each other): they are the
-// cause. The newest 12 other scroll entries outlast generic events.
-const pinEntry = (e: Breadcrumb) => e.kind === 'pin'
-const scrollEntry = (e: Breadcrumb) => e.kind === 'scroll' || e.kind === 'pulled' || e.kind === 'drift'
-export function retain(entries: Breadcrumb[]): number {
-	let before = entries.length
-	while (entries.length > 32) {
-		let i =
-			entries.filter(scrollEntry).length > 12
-				? entries.findIndex(scrollEntry)
-				: entries.findIndex((e) => !scrollEntry(e) && !pinEntry(e))
-		entries.splice(
-			i >= 0
-				? i
-				: Math.max(
-						0,
-						entries.findIndex((e) => !pinEntry(e)),
-					),
-			1,
-		)
-	}
-	return before - entries.length
+// Keeps the newest 32 entries; answers how many it dropped.
+function retain(entries: Breadcrumb[]): number {
+	let n = Math.max(0, entries.length - 32)
+	entries.splice(0, n)
+	return n
 }
 function record(
 	kind: DiagnosticKind,

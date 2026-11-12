@@ -1,8 +1,7 @@
 /// <reference lib="dom" />
 // A tool card's command. A compact card clips it to one line and adds
 // a control to show it whole.
-import { createEffect, createSignal, flush, onSettled, Show, untrack } from 'solid-js'
-import { scroll } from '../scroll.ts'
+import { createEffect, createSignal, onSettled, Show, untrack } from 'solid-js'
 import { Disclosure } from './Disclosure.tsx'
 
 export function ToolCommand(props: { lines: string[]; compact: boolean }) {
@@ -25,11 +24,7 @@ export function ToolCommand(props: { lines: string[]; compact: boolean }) {
 		() => [props.lines, whole()] as const,
 		() => measure(),
 	)
-	let toggle = () =>
-		scroll.follow(() => {
-			setExpanded(!expanded())
-			flush()
-		})
+	let toggle = () => setExpanded(!expanded())
 	return (
 		<div class="ToolCommand">
 			<div ref={(el) => (line = el)} class={whole() ? 'command' : 'command clipped'}>

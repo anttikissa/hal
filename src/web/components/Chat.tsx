@@ -45,9 +45,8 @@ const snap = () => ({
 })
 type Snap = ReturnType<typeof snap>
 
-// A change to the transcript follows the bottom: a new prompt pending
-// (sent) goes to the bottom; other output follows only while pinned.
-// Anything else (typing, the status) just redraws.
+// A change to the transcript redraws; only a new prompt pending (sent)
+// moves the view, to the bottom (scroll.ts).
 function redraw(before: Snap, set: (s: Snap) => void): void {
 	let next = snap()
 	let items = (s: Snap) => s.view.transcript?.items
@@ -63,10 +62,10 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 		if (scroll.atTop()) app.older()
 		return
 	}
-	// Earlier history arrived above: what was being read stays put, and
-	// a reader still near the top gets the page before.
+	// Earlier history arrived above; a reader still near the top gets
+	// the page before.
 	if (next.pages !== before.pages) {
-		scroll.anchor(() => {
+		scroll.quiet(() => {
 			set(next)
 			flush()
 		})
@@ -79,11 +78,9 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 		next.pending.length === before.pending.length
 	)
 		return set(next)
-	let sent = next.pending.length > before.pending.length
-	scroll.follow(() => {
-		set(next)
-		flush()
-	}, sent)
+	set(next)
+	flush()
+	if (next.pending.length > before.pending.length) scroll.bottom()
 }
 
 // The linked block's card came: scroll to it once (the redraw that
@@ -92,12 +89,10 @@ function reveal(): void {
 	let t = app.state.target
 	if (!t?.found || t.shown) return
 	flush()
-	let card = document.querySelector('.Transcript > .target')
+	let card = document.querySelector('.Transcript .rows > .target')
 	if (!card) return
 	t.shown = true
 	card.scrollIntoView({ block: 'start' })
-	scroll.hold(card)
-	scroll.moved()
 	flash.card(card)
 	away(card)
 }
@@ -234,7 +229,7 @@ export function Chat() {
 		let stop = viewport.page()
 		let stopFlash = flash.buttons()
 		let stopTap = viewport.statusTap(() =>
-			document.querySelector('.Transcript')?.scrollTo({ top: 0, behavior: 'smooth' }),
+			document.querySelector('.Transcript')?.scrollTo({ top: -1e9, behavior: 'smooth' }),
 		)
 		app.start()
 		return () => {

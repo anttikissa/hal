@@ -5,8 +5,8 @@
 // history arrives above or a pending prompt lands; the open question as
 // a form; the mark where replayed history ends; the prompts still
 // pending, after the rows; and Hal's cursor, inside the card that
-// streams (Card.tsx), else on a line of its own. The one scroller: Chat
-// and scroll.ts keep a bottom reader at the bottom.
+// streams (Card.tsx), else on a line of its own. The one scroller: the
+// browser keeps a bottom reader at the bottom (scroll.ts).
 
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
@@ -57,7 +57,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Nearing the top: rows already loaded first, then earlier history.
 	let more = () => {
 		if (start() === 0) return app.older()
-		scroll.anchor(() => {
+		scroll.quiet(() => {
 			setStart(Math.max(0, start() - page))
 			flush()
 		})
@@ -156,40 +156,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	createEffect(shown, () => {
 		requestAnimationFrame(() => {
 			check()
-			for (let block of el.querySelectorAll(':scope > :is(.Card, .Question)')) tall.observe(block)
+			for (let block of el.querySelectorAll(':scope > .rows > :is(.Card, .Question)')) tall.observe(block)
 		})
 	})
 	let open = (row: Row) => (row.item.type === 'question' && formId() === row.item.id ? row.item : undefined)
 	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
-			<For each={shown()} keyed={(row) => row.key}>
-				{(row) => (
-					<>
-						<Show
-							when={open(row())}
-							fallback={
-								<Card
-									row={row()}
-									session={session()}
-									blocks={blocks()}
-									running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
-									cursor={cursorKey() === row().key}
-									target={hit() === row().key}
-									job={jobs().has(row().item.key) ? row().item.key : undefined}
-									edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
-									discard={row().note !== undefined && row().key !== queueHold()}
-									waiting={waiting}
-								/>
-							}
-						>
-							{(q) => <Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />}
-						</Show>
-						<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
-					</>
-				)}
-			</For>
-			<Show when={!streaming() && !rows().length}>{line()}</Show>
 			<div class="to-bottom">
 				<Show when={away()}>
 					<button
@@ -197,7 +170,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 						aria-label="Scroll to the bottom"
 						title="Scroll to the bottom"
 						onPointerDown={(e) => e.preventDefault()}
-						onClick={() => scroll.follow(() => {}, true)}
+						onClick={scroll.bottom}
 					>
 						<span class="pill">
 							<svg viewBox="0 0 12 16" aria-hidden="true">
@@ -206,6 +179,37 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 						</span>
 					</button>
 				</Show>
+			</div>
+			<div class="rows">
+				<For each={shown()} keyed={(row) => row.key}>
+					{(row) => (
+						<>
+							<Show
+								when={open(row())}
+								fallback={
+									<Card
+										row={row()}
+										session={session()}
+										blocks={blocks()}
+										running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
+										cursor={cursorKey() === row().key}
+										target={hit() === row().key}
+										job={jobs().has(row().item.key) ? row().item.key : undefined}
+										edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
+										discard={row().note !== undefined && row().key !== queueHold()}
+										waiting={waiting}
+									/>
+								}
+							>
+								{(q) => (
+									<Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />
+								)}
+							</Show>
+							<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
+						</>
+					)}
+				</For>
+				<Show when={!streaming() && !rows().length}>{line()}</Show>
 			</div>
 		</main>
 	)

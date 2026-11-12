@@ -64,7 +64,7 @@ function backgroundStep(): void {
 function busy(id: string): boolean {
 	let view = app.state.cached.get(id)
 	let place = scroll.state.places.get(id)
-	return follow.busy(id) || !!view?.editing || !!view?.form || (!!place && 'top' in place)
+	return follow.busy(id) || !!view?.editing || !!view?.form || (place ?? 0) < 0
 }
 
 function unfollow(id: string): void {

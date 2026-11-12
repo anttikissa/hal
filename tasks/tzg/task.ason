@@ -1,0 +1,10 @@
+{
+	title: 'Browser-native web transcript scrolling',
+	spec: 'The browser owns web transcript scrolling. Hal sets scrollTop only on an explicit user act: sending (only when pending items grew), the scroll-to-bottom pill, a link to a block (scrollIntoView), the status line (to the top) and returning to a tab (its saved position, or the bottom). Nothing else writes scrollTop: no follow state, pinning, pull-back, glide, timers, reflow anchoring or drift probe. The transcript is a flex column-reverse scroller (scrollTop 0 is the bottom, negative is up) whose only child rows box has margin-bottom: auto, so short transcripts start at the top; Chrome and Safari keep the bottom through growth and keep a reader above it in place through appends below and history prepended above. Loading earlier history and tab restore suppress the next scroll event (quiet) so they do not trigger another load. This overrides the scrolling rules of tasks 4s (bottom follow, pinned bottom, smooth follow, sending glide), e5h, 981, 3y, rha, t1a, mfj and ykr, and the scroll diagnostics of s0 (drift, pulled, scroll and pin kinds, src/web/drift.ts); diagnostics keep no scroll kinds. Keep browser regressions for: growth at the bottom stays at the bottom, a reader above stays put through appends and prepends, send and pill reach the bottom, tab return restores the place.',
+	status: 'done',
+	notes: [
+		'Chrome native anchoring in column-reverse does not keep the place when a big table reflows inside the card being read (removed reflow.ts did). Accepted for simplicity; the reading-reflow browser check was dropped.'
+	],
+	needs: ['4s', 's0'],
+	foldInto: ['4s', 'e5h', '981', '3y', '5cz', 'rha', 't1a', 'mfj', 'ykr', 's0']
+}
