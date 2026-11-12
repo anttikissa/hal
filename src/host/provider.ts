@@ -209,7 +209,8 @@ function detail(body: string): string {
 
 // When a rate limit lifts (epoch ms), from whichever of retry-after
 // (seconds or a date), Anthropic's unified reset (unix seconds) or a
-// reset in the body (OpenAI usage limits) says latest.
+// reset in the body (OpenAI usage limits: wrapped in `error` over HTTP,
+// bare in a stream error) says latest.
 function resetAt(headers: Headers, body: string): number | undefined {
 	let now = clock.now()
 	let times: number[] = []
@@ -218,7 +219,8 @@ function resetAt(headers: Headers, body: string): number | undefined {
 	let unified = Number(headers.get('anthropic-ratelimit-unified-reset') ?? NaN)
 	if (unified > 0) times.push(unified * 1000)
 	try {
-		let e = JSON.parse(body)?.error
+		let v = JSON.parse(body)
+		let e = typeof v?.error === 'object' ? v.error : v
 		if (typeof e?.resets_at === 'number') times.push(e.resets_at * 1000)
 		if (typeof e?.resets_in_seconds === 'number') times.push(now + e.resets_in_seconds * 1000)
 	} catch {}
@@ -382,7 +384,7 @@ async function* stream(
 			if (event.type === 'error') {
 				// Name the account, as an HTTP failure does: rotation tries several.
 				event.message += await who(id.provider, http.account, event.status ?? 0)
-				yield failed(p, modelId, http.account, event)
+				yield failed(p, modelId, http.account, event, provider.resetAt(new Headers(), event.body ?? ''))
 				return
 			}
 			if (event.type === 'usage') {

@@ -256,6 +256,15 @@ test('a model refused on a plan over the stream sets that account aside for the 
 	expect(limits.on('openai/gpt-5.5', 'a@x')).toBeGreaterThan(Date.now())
 })
 
+test('a usage limit over the stream sets that account aside until its reset', async () => {
+	writeAuth({ openai: [{ accessToken: subscriptionToken, email: 'a@x' }] })
+	let error = { type: 'usage_limit_reached', message: 'The usage limit has been reached', resets_in_seconds: 3600 }
+	fake.reply = () => sse({ type: 'error', error })
+	let before = Date.now()
+	expect((await run()).at(-1)).toMatchObject({ type: 'error', failure: 'limited' })
+	expect(limits.on('openai/gpt-6-luna', 'a@x')).toBeGreaterThanOrEqual(before + 3_600_000 - 1000)
+})
+
 test('a 401 refreshes the token once and retries at once', async () => {
 	let old = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' }, v: 1 })
 	writeAuth({ openai: { accessToken: old, refreshToken: 'r', email: 'a@x', expires: Date.now() + 3_600_000 } })
