@@ -17,10 +17,9 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
   row shows the focus draws no outline of its own.
 - Spacing follows the terminal grid: quarter lines vertically, whole
   ch across. Small text is fine where space is scarce.
-- No icons, terminal or web: the user can never tell what they mean.
-  Say it in words. Thinking reads as italics; tool cards by their tool
-  name (task yn7). Web buttons still carry icons until the user decides
-  their fate.
+- Never add icons, terminal or web: the user can never tell what they
+  mean. Say it in words. Thinking reads as italics; tool cards by their
+  tool name (task yn7).
 - Never use ✗ (U+2717, ballot X): the user finds it ugly. The failure
   mark is × (U+00D7), on the terminal and the web.
 - Hover hints look like Hal, never like the browser's gray `title`

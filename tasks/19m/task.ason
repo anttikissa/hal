@@ -8,7 +8,7 @@
 		'Python detection was checked against bash commands in the 50 most recent sessions: 441 mention python; the command-position regex matches 440 (the miss runs no Python). Forms: python3 - <<EOF heredoc 386, -c 39, script.py 11, -m 1. One false positive quoted ; python3 inside a tsk spec string; acceptable.',
 		"Unfolded cards (no summary: a subagent's task, plain send messages) draw their header via heading(), not the folded CardHeader; both pick the icon from titles.letter === 'm', so commands from other sessions get it too.",
 		"Python icon is Tabler brand-python (user's choice, 5 Oct): it reads clearly at 17.5px with stroke 1.5, and dropping IconPark removed the 48 grid and the Apache notice. The demo page (task wwf) still offers the snakes.",
-		'User 2026-11-12: card header icons removed (task yn7); thinking, message, tool and plugin icons and card-icons.ts are gone. Button icons remain, pending the user.'
+		'User 2026-11-12: card header icons removed (task yn7); thinking, message, tool and plugin icons and card-icons.ts are gone. Button icons stay (user 2026-11-12: the complaint was cryptic tool icons).'
 	],
 	needs: ['wwf']
 }
