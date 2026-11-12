@@ -85,6 +85,33 @@ test('following is immediate; a reader leaving even 10px is not pulled back', ()
 	}
 })
 
+test('a pull that iOS undoes is made again once layout settles', async () => {
+	let original = { ...scroll.state }
+	// Geometry from 2026-11-12: iOS kept the pre-send maximum, 1378.
+	let top = 1378,
+		limit = 1378
+	let el = {
+		scrollHeight: 1664,
+		clientHeight: 225,
+		get scrollTop() {
+			return top
+		},
+		set scrollTop(v: number) {
+			top = Math.min(v, limit)
+		},
+	}
+	Object.assign(scroll.state, { el, pinned: true, finger: false, input: -Infinity })
+	try {
+		scroll.check('content')
+		expect(scroll.gap(el)).toBe(61)
+		limit = Infinity
+		await Bun.sleep(250)
+		expect(scroll.gap(el)).toBe(0)
+	} finally {
+		Object.assign(scroll.state, original)
+	}
+})
+
 test('after the finger lifts, nothing but the reader changes following', () => {
 	let original = { ...scroll.state }
 	let el = box(4360, 2357, 622)

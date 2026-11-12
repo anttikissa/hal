@@ -98,7 +98,7 @@ function watch(el: HTMLElement): { stop: () => void; capture: () => void; restor
 	let anchor = capture(el)
 	let resized = () => el.clientWidth !== anchor.width || el.clientHeight !== anchor.height
 	let update = () => {
-		if (scroll.state.pinned) scroll.put(el, scroll.target(el, 0))
+		if (scroll.state.pinned) scroll.pull(el)
 		else if (!scroll.keep()) restore(el, anchor, resized())
 		scroll.state.top = el.scrollTop
 		anchor = capture(el)

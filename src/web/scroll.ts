@@ -25,6 +25,9 @@ const atBottom = 1
 // A wheel or key scroll may move the view this long after its event.
 const inputMs = 300
 
+// A pull is checked again this long after, once layout has settled.
+const settleMs = 200
+
 // Sets following. Each change is a diagnostic transition (task 981).
 function pin(on: boolean, why: string): void {
 	let st = scroll.state
@@ -116,7 +119,20 @@ function check(why: string): void {
 	let g = scroll.gap(el)
 	if (g <= atBottom || why === 'scroll') return
 	scroll.onTrace(why, g)
+	scroll.pull(el, why !== 'settle')
+}
+
+// Puts a following view at the bottom. iOS can undo a move made in the
+// frame where the view or content changed size (2026-11-12: a send grew
+// both and the view stayed 61px short until the next change), so look
+// once more after layout settles. Only that one look follows a pull, so
+// Hal still never fights iOS's own settling (task 981).
+function pull(el: Box, settle = true): void {
+	let st = scroll.state
 	scroll.put(el, scroll.target(el, 0))
+	if (!settle) return
+	clearTimeout(st.settle)
+	st.settle = setTimeout(() => scroll.check('settle'), settleMs)
 }
 
 // Whether the reader is within `nearTop` px of the top, where earlier
@@ -213,6 +229,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	addEventListener('keydown', input)
 	return () => {
 		scroll.state.el = null
+		clearTimeout(scroll.state.settle)
 		scroll.state.reanchor = () => {}
 		scroll.state.restoreReading = () => {}
 		stopReflow()
@@ -282,6 +299,7 @@ export const scroll = {
 		finger: false,
 		input: -Infinity,
 		pinned: true,
+		settle: undefined as ReturnType<typeof setTimeout> | undefined,
 		held: undefined as { card: Element; top: number } | undefined,
 		places: new Map<string, { top: number } | { gap: number }>(),
 	},
@@ -293,6 +311,7 @@ export const scroll = {
 	hold,
 	keep,
 	put,
+	pull,
 	moved,
 	check,
 	target,

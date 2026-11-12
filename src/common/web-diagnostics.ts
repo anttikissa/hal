@@ -121,6 +121,7 @@ export const scrollCauses = [
 	'scroll',
 	'content',
 	'resize',
+	'settle',
 	'shown',
 	'toggle',
 	'link',
