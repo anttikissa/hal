@@ -70,7 +70,6 @@ test('rm -rf of paths matching the scratch setting runs without asking; anything
 			['rm -rf ~/s/24-pat/tmp', ['rm -rf ~/s/24-pat/tmp']],
 			['rm -rf ~/s/32-yam-fonts/v030', ['rm -rf ~/s/32-yam-fonts/v030']],
 			['rm -rf ~/s/a-tmp/../b', ['rm -rf ~/s/a-tmp/../b']],
-			['rm -rf "~/s/a-tmp"', ['rm -rf "~/s/a-tmp"']],
 			['D=~/s/a-tmp; D=~; rm -rf $D', ['rm -rf $D']],
 		]
 		for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])

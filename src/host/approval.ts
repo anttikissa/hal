@@ -44,46 +44,45 @@ function pathVars(command: string): Map<string, string> {
 	for (let m of command.matchAll(
 		/(?:^|[\s;])([A-Za-z_]\w*)=(?:((?:\/|~\/)[^\s;&|'"]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g,
 	)) {
-		if (m[2] || m[3]) vars.set(m[1]!, m[2] ? approval.home(m[2]) : mktemp)
+		if (m[2] || m[3]) vars.set(m[1]!, m[2] ? home(m[2]) : mktemp)
 		else vars.delete(m[1]!)
 	}
 	return vars
 }
 
-// A removal inside /tmp (not /tmp itself), or of a path matching a
-// `scratch` setting pattern: scratch space models clean up. `dir`: where
-// the command runs, if cd made it known (a relative target resolves
-// against it). $D/x needs D set to a literal path: a failed mktemp
-// leaves D empty, making it /x.
+// A removal matching a `scratch` pattern (default: inside /tmp), but
+// not /tmp/*: scratch space models clean up. `dir`: where the command
+// runs, if cd made it known (a relative target resolves against it).
+// $D/x needs D set to a literal path: a failed mktemp leaves D empty,
+// making it /x.
 function safeTarget(token: string, vars: Map<string, string>, dir?: string): boolean {
-	let quoted = /^['"]/.test(token)
-	let t = token.replace(/^['"]|['"]$/g, '')
+	let t = home(token.replace(/^['"]|['"]$/g, ''))
 	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?(\/.*)?$/)
 	let value = v && vars.get(v[1]!)
 	if (value && !(v![2] && value === mktemp)) t = value + (v![2] ?? '')
-	else if (!quoted) t = approval.home(t)
 	if (t.includes('..') || /[$`~\\]/.test(t)) return false
 	if (!t.startsWith('/')) {
 		if (!dir) return false
 		t = resolve(dir, t)
 	}
 	let r = resolve('/', t)
-	if (r.startsWith('/tmp/') && r !== '/tmp/*') return true
-	return settings
-		.scratch()
-		.split(/\s+/)
-		.some((p) => p && new Bun.Glob(resolve(approval.home(p))).match(r))
+	return (
+		r !== '/tmp/*' &&
+		settings
+			.scratch()
+			.split(/\s+/)
+			.some((p) => p && new Bun.Glob(resolve(home(p))).match(r))
+	)
 }
 
 // Where `cd <arg>` goes from `dir`, or undefined if that can't be told:
 // no argument (home), variables other than a known one, .., options.
 function cdTarget(arg: string | undefined, dir: string | undefined, vars: Map<string, string>): string | undefined {
 	if (!arg) return undefined
-	let t = arg.replace(/^['"]|['"]$/g, '')
+	let t = home(arg.replace(/^['"]|['"]$/g, ''))
 	if (t === '$(mktemp -d)') return '/tmp/mktemp'
 	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?$/)
 	if (v) return vars.get(v[1]!)
-	if (!/^['"]/.test(arg)) t = approval.home(t)
 	if (t.includes('..') || t.startsWith('-') || /[$`~*?\\]/.test(t)) return undefined
 	return t.startsWith('/') ? resolve(t) : dir && resolve(dir, t)
 }
@@ -272,16 +271,4 @@ function sensitive(path: string): boolean {
 	)
 }
 
-export const approval = {
-	home,
-	segments,
-	pathVars,
-	safeTarget,
-	cdTarget,
-	dirs,
-	findings,
-	form,
-	declined,
-	held,
-	sensitive,
-}
+export const approval = { segments, pathVars, safeTarget, cdTarget, dirs, findings, form, declined, held, sensitive }

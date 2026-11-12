@@ -9,7 +9,7 @@
 // value or unknown key is a warning and that setting uses its default.
 
 export type SettingType =
-	| { kind: 'text'; url?: true; optional?: true }
+	| { kind: 'text'; url?: true }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
@@ -55,10 +55,9 @@ const table: Setting[] = [
 	{
 		name: 'scratch',
 		label: 'Scratch paths',
-		type: { kind: 'text', optional: true },
-		default: '',
-		description:
-			'Space-separated glob patterns (~ allowed) of scratch paths that rm -rf may delete without asking, besides anything inside /tmp.',
+		type: { kind: 'text' },
+		default: '/tmp/**',
+		description: 'Space-separated glob patterns (~ allowed) of paths rm -rf may delete without asking.',
 	},
 	{
 		name: 'promptRows',
@@ -172,8 +171,7 @@ function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
 		case 'text':
 			// An empty address means the default (localhost).
-			if (typeof value !== 'string' || (value === '' && !type.url && !type.optional))
-				return 'expected a non-empty string'
+			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
 			if (value === '') return undefined
 			return !type.url || /^https?:\/\/[^\s\p{Cc}/?#]+(\/[^\s\p{Cc}?#]*)?$/u.test(value)
 				? undefined

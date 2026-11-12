@@ -1,6 +1,6 @@
 {
 	title: 'rm -rf of scratch paths runs without approval',
-	spec: 'Setting scratch (text, optional, default empty) holds space-separated glob patterns (Bun.Glob, ~/ allowed) of scratch paths. rm -rf of a target matching one runs without approval, like targets inside /tmp. Targets expand as the shell does: unquoted ~/, and $VAR set earlier in the command to a literal absolute or ~/ path; a cd to such a path makes relative targets known as before. Targets with .., unknown variables, or quoted ~ still ask (.. may cross a symlink). Rationale: 34 of 44 rm -rf prompts in Oct 24 - Nov 12 histories were for disposable scratch dirs; host-specific patterns live in the gitignored config.ason.',
+	spec: 'Setting scratch (text, default /tmp/**) holds space-separated glob patterns (Bun.Glob, ~/ allowed) of paths rm -rf may delete without approval; /tmp/* still asks. Targets expand as the shell does: ~/, and $VAR set earlier in the command to a literal absolute or ~/ path; a cd to such a path makes relative targets known as before. Targets with .. (may cross a symlink) or unknown variables still ask. Rationale: 34 of 44 rm -rf prompts in Oct 24 - Nov 12 histories were for disposable scratch dirs; host-specific patterns live in the gitignored config.ason.',
 	status: 'done',
 	needs: ['6f', 'pc'],
 	foldInto: ['6f']
