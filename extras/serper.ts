@@ -52,7 +52,7 @@ export const google: Tool & { url: string } = {
 		required: ['query'],
 	},
 	readOnly: true,
-	card: { command: 'query', icon: 'google' },
+	card: { command: 'query' },
 	url: 'https://google.serper.dev/search',
 	async run(input, ctx) {
 		let query = typeof input.query === 'string' ? input.query.trim() : ''

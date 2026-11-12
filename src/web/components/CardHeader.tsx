@@ -11,8 +11,6 @@ import { createMemo, onSettled, Show } from 'solid-js'
 import { bashResult } from '../../common/bash-result.ts'
 import { diff } from '../../common/diff.ts'
 import type { JSX } from '@solidjs/web'
-import { Icon } from './Icon.tsx'
-import type { IconName } from '../icons.ts'
 import { Disclosure } from './Disclosure.tsx'
 
 let sides: ResizeObserver | undefined
@@ -34,7 +32,6 @@ function watchSide(side: HTMLElement) {
 // card's line count, shown faintly on hover.
 export function CardHeader(props: {
 	inline?: boolean
-	icon?: IconName
 	prefix?: string
 	time?: string
 	label?: JSX.Element
@@ -101,7 +98,6 @@ export function CardHeader(props: {
 					<Show when={label()}> </Show>
 				</Show>
 				<span class="title">
-					<Show when={props.icon}>{(name) => <Icon name={name()} />}</Show>
 					<span class="label">
 						{props.prefix}
 						{label()}

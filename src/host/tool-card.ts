@@ -57,7 +57,6 @@ function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentatio
 		title: said ? `${name(tool)} ${said}` : name(tool),
 		blocks,
 		readOnly: tool.readOnly === true,
-		icon: tool.card?.icon ?? 'sparkle',
 		...(tool.card?.hue !== undefined && { hue: tool.card.hue }),
 	}
 }

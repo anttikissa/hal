@@ -1,5 +1,5 @@
 {
-	version: 36,
+	version: 37,
 	changes: [
 		{
 			version: 2,
@@ -718,6 +718,23 @@
 					target: 'host/history.readSync',
 					description: 'After a rebase, dropped records are absent',
 					port: "Read them from the file named by the rebase record's replacesFile"
+				}
+			]
+		},
+		{
+			version: 37,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/tools.ToolCard',
+					description: 'Drops field icon',
+					port: 'Remove it; a declared icon is ignored'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/tool-presentation.ToolPresentation',
+					description: 'Drops field icon',
+					port: 'Remove it; recorded icons are ignored'
 				}
 			]
 		}

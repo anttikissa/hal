@@ -27,7 +27,7 @@ const sqlTool: Tool = {
 		required: ['db', 'query'],
 	},
 	readOnly: true,
-	card: { command: 'query', language: 'sql', icon: 'database', title: (input) => String(input.db) },
+	card: { command: 'query', language: 'sql', title: (input) => String(input.db) },
 	syntax: { summary: 'query a SQLite database', usage: ['SQL "app.db" "select count(*) from users"'] },
 	run: async (input) => { /* ... */ return table },
 }

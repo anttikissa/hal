@@ -21,7 +21,6 @@ import { CardActivity } from './CardActivity.tsx'
 import { LinkedText } from './LinkedText.tsx'
 import { CardText } from './CardText.tsx'
 import { CardReceipt } from './CardReceipt.tsx'
-import { cardIcons } from '../card-icons.ts'
 import { cardMotion } from '../card-motion.ts'
 import { bashResult } from '../../common/bash-result.ts'
 import { card } from '../../common/card.ts'
@@ -160,7 +159,6 @@ export function Card(props: {
 		if (item.type === 'question') return <LinkedText parts={hrefs.urlParts(forms.title(item.form))} />
 		let ref = source(),
 			t = titles.who(item)
-		if (titles.letter(item) === 'm') t = cardIcons.unmark(t)
 		let shown = ref && (/^\d+$/.test(ref) ? `t${ref}` : ref)
 		return shown && t?.endsWith(shown) ? (
 			<>
@@ -207,12 +205,10 @@ export function Card(props: {
 			return expanded() && !(item.type === 'prompt' && item.summary) ? titles.who(item) : titles.compact(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		if (item.type === 'output' && item.commit) return `${titles.who(item)} ${firstLine()}`
-		return item.type === 'tool'
-			? cardIcons.unmark(
-					presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text,
-					item.name,
-				)
-			: lines()[0]
+		if (item.type !== 'tool') return lines()[0]
+		let title = presentation()?.title ?? toolDetails.headline(item.name, item.input, props.row.result?.output).text
+		// Bash shows the terminal's `$ ` instead of its name (task ya1).
+		return item.name === 'bash' ? title?.replace(/^bash /, '') : title
 	}
 	let shellPrompt = () => (props.row.item.type === 'tool' && props.row.item.name === 'bash' ? '$ ' : undefined)
 	// A wait links what it waits for (task zd8).
@@ -479,7 +475,6 @@ export function Card(props: {
 					onMouseDown={clicks.press}
 				>
 					<CardHeader
-						icon={cardIcons.kind(props.row.item)}
 						prefix={shellPrompt()}
 						time={time()}
 						name={canToggle() ? (head() ?? titles.who(props.row.item) ?? 'Card') : undefined}

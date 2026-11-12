@@ -79,7 +79,7 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 		name: 'eval',
 		description: 'Run code.',
 		parameters: { type: 'object' as const, properties: { code: { type: 'string' } }, required: ['code'] },
-		card: { command: 'code', language: 'javascript', hue: 265, icon: 'code' },
+		card: { command: 'code', language: 'javascript', hue: 265 },
 		run: async () => '2',
 	}
 	let taskTool = {
@@ -101,7 +101,6 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 			title: 'Eval Add',
 			blocks: [{ kind: 'code', text: 'return 1+1', language: 'javascript' }],
 			readOnly: false,
-			icon: 'code',
 			hue: 265,
 		})
 		let done = toolPresentations.attach(run!, { type: 'tool_result', id: 'e', output: '2' } as ToolResultBlock)
@@ -118,7 +117,6 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 			title: 'Task',
 			blocks: [{ kind: 'text', text: 'id: m3a' }],
 			readOnly: true,
-			icon: 'sparkle',
 		})
 	} finally {
 		tools.all = all

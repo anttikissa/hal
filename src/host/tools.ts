@@ -77,15 +77,13 @@ export type SyntaxSpec = {
 // the input field holding a raw command (code, a query), shown as code on
 // the second row; `language` names its syntax. `hue`: the OKLCH hue
 // (0-359) of the card, at the shared lightness and chroma, set only on
-// the user's request; without it, readOnly tools share READ's green,
-// others BASH's purple. `icon`: a web icon name (web/icons.ts), default
-// 'sparkle'. `title`: what the call works on, after the tool's name,
-// when the model gave no purpose ('m3a'; with the result, what it found).
+// others BASH's purple. `title`: what the call works on, after the
+// tool's name, when the model gave no purpose ('m3a'; with the result,
+// what it found).
 export type ToolCard = {
 	command?: string
 	language?: string
 	hue?: number
-	icon?: string
 	title?(input: Record<string, unknown>, result?: { output: string; isError?: boolean }): string | undefined
 }
 export type Tool<Output = string> = {

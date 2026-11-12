@@ -3,8 +3,7 @@
 // output; check() rejects a malformed presentation.
 // The look rides along so history replays it without the plugin (task
 // m3a): `hue` colors the card at the shared vivid levels (colors.cardHue),
-// else `readOnly` picks the read or side-effect color; `icon` names a
-// web icon (web/icons.ts).
+// else `readOnly` picks the read or side-effect color.
 export type PresentationBlock = {
 	kind: 'text' | 'code' | 'diff'
 	path?: string
@@ -16,7 +15,6 @@ export type ToolPresentation = {
 	blocks: PresentationBlock[]
 	hue?: number
 	readOnly?: boolean
-	icon?: string
 }
 
 function check(value: unknown, output = ''): void {
@@ -27,8 +25,6 @@ function check(value: unknown, output = ''): void {
 		throw new Error(`Invalid tool presentation hue ${p.hue}: expected 0 <= hue < 360`)
 	if (p.readOnly !== undefined && typeof p.readOnly !== 'boolean')
 		throw new Error('Invalid tool presentation readOnly: expected a boolean')
-	if (p.icon !== undefined && typeof p.icon !== 'string')
-		throw new Error('Invalid tool presentation icon: expected an icon name')
 	for (let b of p.blocks) {
 		if (
 			!b ||
