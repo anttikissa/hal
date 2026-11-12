@@ -70,3 +70,16 @@ test('a non-2xx answer is an error with the status and a clipped body', async ()
 	expect(err).toContain('429')
 	expect(err.length).toBeLessThan(600)
 })
+
+test('a 429 waits for the per-second reset and retries; an exhausted month does not', async () => {
+	key('k')
+	let limited = (remaining: string, reset: string) =>
+		new Response('{}', { status: 429, headers: { 'x-ratelimit-remaining': remaining, 'x-ratelimit-reset': reset } })
+	let answers = [limited('0, 1971', '0, 1595205'), Response.json({ web: { results: [{ title: 'T', url: 'u' }] } })]
+	answer = () => answers.shift()!
+	expect(await tool.run({ query: 'x' }, ctx())).toBe('T\nu\n')
+	expect(seen.length).toBe(2)
+	answer = () => limited('0, 0', '0, 1595205')
+	await expect(tool.run({ query: 'x' }, ctx())).rejects.toThrow('429')
+	expect(seen.length).toBe(3)
+})
