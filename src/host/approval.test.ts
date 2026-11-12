@@ -57,6 +57,28 @@ test('dangerous commands are caught and their offending part marked; harmless on
 	for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
 })
 
+test('rm -rf of paths matching the scratch setting runs without asking; anything else still asks', () => {
+	let original = settings.scratch
+	try {
+		settings.scratch = () => '~/s/**/*-tmp ~/s/**/*-tmp/** ~/s/**/tmp/**'
+		let table: [string, string[]][] = [
+			['rm -rf ~/s/41-mad-deploy-tmp', []],
+			['D=~/s/41-mad-deploy-tmp; rm -rf $D', []],
+			['rm -rf ~/s/43-con/e2e-tmp/x', []],
+			['cd ~/s/31-den-flicker-tmp && rm -rf f', []],
+			['rm -rf ~/s/24-pat/tmp/mig1', []],
+			['rm -rf ~/s/24-pat/tmp', ['rm -rf ~/s/24-pat/tmp']],
+			['rm -rf ~/s/32-yam-fonts/v030', ['rm -rf ~/s/32-yam-fonts/v030']],
+			['rm -rf ~/s/a-tmp/../b', ['rm -rf ~/s/a-tmp/../b']],
+			['rm -rf "~/s/a-tmp"', ['rm -rf "~/s/a-tmp"']],
+			['D=~/s/a-tmp; D=~; rm -rf $D', ['rm -rf $D']],
+		]
+		for (let [command, parts] of table) expect([command, marked(command)]).toEqual([command, parts])
+	} finally {
+		settings.scratch = original
+	}
+})
+
 test('only bash is checked, and the form asks y/N with No as default, giving each reason once', () => {
 	expect(approval.form({ type: 'tool_call', id: 'r', name: 'read', input: { path: 'rm -rf x' } })).toBeUndefined()
 	let form = approval.form(bash('rm -rf build; rm -rf dist; git reset --hard'))!

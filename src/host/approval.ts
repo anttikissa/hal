@@ -9,6 +9,7 @@
 // Best effort by name (setting `security`): there is no sandbox, and a
 // determined attacker gets around patterns. It catches mistakes.
 
+import { homedir } from 'os'
 import { resolve } from 'path'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { Form } from '../common/forms.ts'
@@ -31,45 +32,58 @@ function segments(command: string): Mark[] {
 
 const mktemp = '/tmp/mktemp'
 
-// Assignments like D=/tmp/x or D=$(mktemp -d [template]), so rm -rf $D
-// is known safe. Any other assignment to the name forgets it.
-function tmpVars(command: string): Map<string, string> {
+// `~/x` as the shell expands it, unquoted.
+function home(path: string): string {
+	return path.startsWith('~/') ? homedir() + path.slice(1) : path
+}
+
+// Assignments like D=/tmp/x, D=~/x or D=$(mktemp -d [template]), so
+// rm -rf $D can be judged. Any other assignment to the name forgets it.
+function pathVars(command: string): Map<string, string> {
 	let vars = new Map<string, string>()
 	for (let m of command.matchAll(
-		/(?:^|[\s;])([A-Za-z_]\w*)=(?:(\/tmp\/[^\s;&|]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g,
+		/(?:^|[\s;])([A-Za-z_]\w*)=(?:((?:\/|~\/)[^\s;&|'"]+)|(\$\(mktemp -d(?:\s+[^\s)$`;&|]+)*\))|)/g,
 	)) {
-		if (m[2] || m[3]) vars.set(m[1]!, m[2] ?? mktemp)
+		if (m[2] || m[3]) vars.set(m[1]!, m[2] ? approval.home(m[2]) : mktemp)
 		else vars.delete(m[1]!)
 	}
 	return vars
 }
 
-// A removal inside /tmp (not /tmp itself): scratch space models clean
-// up. `dir`: where the command runs, if cd made it known (a relative
-// target resolves against it). $D/x needs D set to a literal path: a
-// failed mktemp leaves D empty, making it /x.
-function safeTmp(token: string, vars: Map<string, string>, dir?: string): boolean {
+// A removal inside /tmp (not /tmp itself), or of a path matching a
+// `scratch` setting pattern: scratch space models clean up. `dir`: where
+// the command runs, if cd made it known (a relative target resolves
+// against it). $D/x needs D set to a literal path: a failed mktemp
+// leaves D empty, making it /x.
+function safeTarget(token: string, vars: Map<string, string>, dir?: string): boolean {
+	let quoted = /^['"]/.test(token)
 	let t = token.replace(/^['"]|['"]$/g, '')
 	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?(\/.*)?$/)
 	let value = v && vars.get(v[1]!)
 	if (value && !(v![2] && value === mktemp)) t = value + (v![2] ?? '')
+	else if (!quoted) t = approval.home(t)
 	if (t.includes('..') || /[$`~\\]/.test(t)) return false
 	if (!t.startsWith('/')) {
 		if (!dir) return false
 		t = resolve(dir, t)
 	}
 	let r = resolve('/', t)
-	return r.startsWith('/tmp/') && r !== '/tmp/*'
+	if (r.startsWith('/tmp/') && r !== '/tmp/*') return true
+	return settings
+		.scratch()
+		.split(/\s+/)
+		.some((p) => p && new Bun.Glob(resolve(approval.home(p))).match(r))
 }
 
 // Where `cd <arg>` goes from `dir`, or undefined if that can't be told:
-// no argument (home), ~, variables other than a known /tmp one, .., options.
+// no argument (home), variables other than a known one, .., options.
 function cdTarget(arg: string | undefined, dir: string | undefined, vars: Map<string, string>): string | undefined {
 	if (!arg) return undefined
 	let t = arg.replace(/^['"]|['"]$/g, '')
 	if (t === '$(mktemp -d)') return '/tmp/mktemp'
 	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?$/)
 	if (v) return vars.get(v[1]!)
+	if (!/^['"]/.test(arg)) t = approval.home(t)
 	if (t.includes('..') || t.startsWith('-') || /[$`~*?\\]/.test(t)) return undefined
 	return t.startsWith('/') ? resolve(t) : dir && resolve(dir, t)
 }
@@ -145,7 +159,7 @@ function envDump(seg: string): RegExpMatchArray | null {
 // with why it is dangerous.
 function findings(command: string): { at: Mark; reason: string }[] {
 	let out: { at: Mark; reason: string }[] = []
-	let vars = approval.tmpVars(command)
+	let vars = approval.pathVars(command)
 	let segs = approval.segments(command)
 	let where = approval.dirs(command, segs, vars)
 	for (let [i, [from, to]] of segs.entries()) {
@@ -159,7 +173,7 @@ function findings(command: string): { at: Mark; reason: string }[] {
 			let recursive = flags.some((f) => f === '--recursive' || /^-[a-zA-Z]*[rR]/.test(f))
 			let force = flags.some((f) => f === '--force' || /^-[a-zA-Z]*f/.test(f))
 			let targets = tokens.filter((t) => !t.startsWith('-'))
-			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i])))) {
+			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTarget(t, vars, where[i])))) {
 				found = rm
 				reason = reasons.rm
 			}
@@ -258,4 +272,16 @@ function sensitive(path: string): boolean {
 	)
 }
 
-export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, findings, form, declined, held, sensitive }
+export const approval = {
+	home,
+	segments,
+	pathVars,
+	safeTarget,
+	cdTarget,
+	dirs,
+	findings,
+	form,
+	declined,
+	held,
+	sensitive,
+}

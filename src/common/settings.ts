@@ -9,7 +9,7 @@
 // value or unknown key is a warning and that setting uses its default.
 
 export type SettingType =
-	| { kind: 'text'; url?: true }
+	| { kind: 'text'; url?: true; optional?: true }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
@@ -51,6 +51,14 @@ const table: Setting[] = [
 		type: { kind: 'choice', options: ['best-effort', 'yolo'] },
 		default: 'best-effort',
 		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (yolo).',
+	},
+	{
+		name: 'scratch',
+		label: 'Scratch paths',
+		type: { kind: 'text', optional: true },
+		default: '',
+		description:
+			'Space-separated glob patterns (~ allowed) of scratch paths that rm -rf may delete without asking, besides anything inside /tmp.',
 	},
 	{
 		name: 'promptRows',
@@ -164,7 +172,8 @@ function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
 		case 'text':
 			// An empty address means the default (localhost).
-			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
+			if (typeof value !== 'string' || (value === '' && !type.url && !type.optional))
+				return 'expected a non-empty string'
 			if (value === '') return undefined
 			return !type.url || /^https?:\/\/[^\s\p{Cc}/?#]+(\/[^\s\p{Cc}?#]*)?$/u.test(value)
 				? undefined
@@ -249,6 +258,7 @@ export const settings = {
 	subagentSlots: (): number => settings.value('subagentSlots') as number,
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'yolo' => settings.value('security') as 'best-effort' | 'yolo',
+	scratch: (): string => settings.value('scratch') as string,
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).
 	webUrl: (): string =>
