@@ -283,6 +283,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 				: (handover.request(), {})
 	if (c.type === 'terminal-error')
 		return (diag.log(`${client.record.kind} client pid ${client.record.pid ?? '?'}: ${c.text}`), {})
+	if (c.type === 'hello' && c.sendAuthCodes) webLinks.follow(client, client.deliver)
 	if (c.type === 'hello' || c.type === 'screen')
 		return c.type === 'hello'
 			? clients.hello(client.record, c.pid, c.version, c.newCode)
@@ -299,10 +300,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		recap.visibility(previous, client.visible)
 		return {}
 	}
-	if (c.type === 'auth') {
-		if (c.link) webLinks.follow(client, client.deliver)
-		return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
-	}
+	if (c.type === 'get-auth-code') return { reply: webLinks.event(webAuth.issue()) }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	return sessionCommands.act(client, c)
 }

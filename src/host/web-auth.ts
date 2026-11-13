@@ -171,8 +171,7 @@ function close(): void {
 
 // The /auth and `hal auth` text: the code, a link carrying it, and how
 // to connect a terminal. Shown, never saved, so the visible code is fine.
-function message(codes: string | string[]): string {
-	let url = settings.webUrl().replace(/\/$/, '')
+function message(codes: string | string[], url = settings.webUrl()): string {
 	let logins = (typeof codes === 'string' ? [codes] : codes)
 		.map(
 			(code) =>

@@ -46,8 +46,9 @@ async function until(check: () => unknown): Promise<void> {
 function client() {
 	let events: Event[] = []
 	let conn = host.connect((e) => events.push(e))
-	let codes = () => events.flatMap((e) => (e.type === 'auth' && e.link !== undefined ? [e] : []))
-	return { conn, events, codes }
+	let codes = () => events.flatMap((e) => (e.type === 'auth-code' ? [e] : []))
+	let subscribe = () => conn.send({ type: 'hello', pid: 1, sendAuthCodes: true })
+	return { conn, events, codes, subscribe }
 }
 
 // A click on a link: the code redeemed as web.ts does for ?auth=.
@@ -57,9 +58,9 @@ test('a terminal gets the web address and a link code, a new one once it is used
 	settings.state.raw = { webUrl: 'https://h2.example/' }
 	let a = client()
 	let b = client()
-	a.conn.send({ type: 'auth', link: true, id: 'c1' })
-	b.conn.send({ type: 'auth', link: true })
-	expect(a.codes()).toEqual([{ type: 'auth', code: expect.any(String), link: 'https://h2.example' }])
+	a.conn.send({ type: 'hello', pid: 1, sendAuthCodes: true, id: 'c1' })
+	b.subscribe()
+	expect(a.codes()).toEqual([{ type: 'auth-code', code: expect.any(String), url: 'https://h2.example' }])
 	let first = a.codes()[0]!.code
 	expect(b.codes()[0]!.code).not.toBe(first)
 	expect(click(first).cookie).toBeDefined()
@@ -67,17 +68,19 @@ test('a terminal gets the web address and a link code, a new one once it is used
 	expect(a.codes()[1]!.code).not.toBe(first)
 	// Only the holder of the used code gets a new one.
 	expect(b.codes()).toHaveLength(1)
-	// A plain auth (./run auth) is a one-off code and no link code.
-	a.conn.send({ type: 'auth' })
-	expect(a.events.at(-1)).toEqual({ type: 'auth', code: expect.any(String) })
-	expect(a.codes()).toHaveLength(2)
+	// get-auth-code (hal auth) answers a one-off code, not replaced when used.
+	a.conn.send({ type: 'get-auth-code' })
+	let once = a.events.at(-1) as { type: string; code: string; url?: string }
+	expect(once).toEqual({ type: 'auth-code', code: expect.any(String), url: 'https://h2.example' })
+	expect(click(once.code).cookie).toBeDefined()
+	expect(a.codes()).toHaveLength(3)
 })
 
 test('a link code is replaced before it is half its life old, and the old one still works', async () => {
 	expect(webLinks.renewMs()).toBeLessThanOrEqual(webAuth.codeMs - 5 * 60_000)
 	webLinks.renewMs = () => 5
 	let a = client()
-	a.conn.send({ type: 'auth', link: true })
+	a.subscribe()
 	await until(() => a.codes().length >= 3)
 	expect(new Set(a.codes().map((e) => e.code)).size).toBe(a.codes().length)
 	expect(click(a.codes()[0]!.code).cookie).toBeDefined()
@@ -95,7 +98,7 @@ test('no link code reaches any file of the home', async () => {
 	let a = client()
 	a.conn.send({ type: 'create', cwd: home, model: 'hal/intro' })
 	let id = (a.events.find((e) => e.type === 'snapshot') as { sessionId: string }).sessionId
-	a.conn.send({ type: 'auth', link: true })
+	a.subscribe()
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	a.conn.send({ type: 'draft', sessionId: id, text: 'typing' })
 	await until(() => a.events.some((e) => e.type === 'question'))
@@ -109,8 +112,9 @@ test('no link code reaches any file of the home', async () => {
 
 test('a busy preferred web port falls back; the advertised URL and link codes follow the bound port', async () => {
 	let a = client()
-	a.conn.send({ type: 'auth', link: true })
-	expect(a.codes()[0]!.link).toBe(`http://localhost:${settings.webPort()}`)
+	a.subscribe()
+	// Not listening yet: no address; the client falls back to its own.
+	expect(a.codes()[0]!.url).toBeUndefined()
 	// The preferred port is taken (say by another Hal), so the server moves on.
 	// web.start tries ports up to 9100, so take one below it.
 	let busy!: ReturnType<typeof Bun.serve>
@@ -130,7 +134,7 @@ test('a busy preferred web port falls back; the advertised URL and link codes fo
 		expect((await fetch(`http://127.0.0.1:${bound}/`)).status).toBe(200)
 		expect(settings.webUrl()).toBe(`http://localhost:${bound}`)
 		expect(statusUsage.runtime()).toContain(`Web: port ${bound}`)
-		expect(a.codes().at(-1)!.link).toBe(`http://localhost:${bound}`)
+		expect(a.codes().at(-1)!.url).toBe(`http://localhost:${bound}`)
 	} finally {
 		web.port = origPort
 		await web.stop()

@@ -8,6 +8,7 @@ const maxBytes = 20_000 // about 5,000 tokens
 // src-relative paths allowed to exceed the limit, with the reason.
 const exceptions: Record<string, string> = {
 	'common/ason.ts': 'self-contained format: parser and stringifier belong together',
+	'common/protocol.ts': 'the whole host/client contract, read as one catalog of commands and events',
 }
 
 const advice = `How to split:

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Event } from '../common/protocol.ts'
+import { settings } from '../common/settings.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { transcriptLive } from '../common/transcript-live.ts'
 import { history } from './history.ts'
@@ -134,6 +135,18 @@ test('./run auth prints a code from the running host, or says none is running', 
 		expect('token' in webAuth.redeem(code)).toBe(true)
 		expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
 		expect(everyFile(home)).not.toContain(code)
+	}
+	// --url (Hal.app): only while the web server listens, then one line.
+	let early = runAuth('--url')
+	expect(await early.exited).toBe(1)
+	expect(await new Response(early.stderr).text()).toContain('no web server listening')
+	settings.state.listeningPort = 9123
+	try {
+		let url = runAuth('--url')
+		expect(await url.exited).toBe(0)
+		expect(await new Response(url.stdout).text()).toMatch(/^http:\/\/localhost:9123\/\?auth=[0-9a-hjkmnp-tv-z]{6}\n$/)
+	} finally {
+		settings.state.listeningPort = undefined
 	}
 })
 

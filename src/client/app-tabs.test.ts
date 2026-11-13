@@ -93,7 +93,7 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	// It also asks for a code for its web links.
 	expect(sent).toEqual([
 		{ type: 'tab-start', cwd: '/w', last: 'b', timezone: expect.any(String) },
-		{ type: 'auth', link: true },
+		{ type: 'hello', pid: process.pid, sendAuthCodes: true },
 	])
 	app.onEvent(tabsEvent('a', 'b'))
 	expect(shown()).toBeUndefined()
@@ -225,7 +225,7 @@ test('a shown tab that wants attention is told seen', () => {
 test('web links carry the latest link code only in their hidden target', () => {
 	startOn(['a', 'b'])
 	try {
-		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'https://h.example' })
+		app.onEvent({ type: 'auth-code', code: 'k3x9qa', url: 'https://h.example' })
 		app.onEvent({ type: 'output', sessionId: 'a', text: 'AGENTS.md changed', n: 1 })
 		type('see [image/frdbn1.png]')
 		let lines = frame.build(appView.view(), 60).lines
@@ -242,14 +242,11 @@ test('web links carry the latest link code only in their hidden target', () => {
 		// than the preferred one) links to where it really listens.
 		let item = () => frame.build(appView.view(), 60).lines.find((l) => l.includes('#s1'))
 		expect(item()).toContain('https://h.example/a?auth=k3x9qa#s1')
-		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'http://localhost:9003' })
+		app.onEvent({ type: 'auth-code', code: 'k3x9qa', url: 'http://localhost:9003' })
 		expect(item()).toContain('http://localhost:9003/a?auth=k3x9qa#s1')
 		// A replaced code is what the next paint links with.
-		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })
+		app.onEvent({ type: 'auth-code', code: 'm2p7rt', url: 'https://h.example' })
 		expect(frame.build(appView.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')
-		// A plain `auth` reply (./run auth) is not a link code.
-		app.onEvent({ type: 'auth', code: 'zzzzzz' })
-		expect(frame.build(appView.view(), 60).lines.join('\n')).not.toContain('zzzzzz')
 	} finally {
 		ansi.state.web = { url: '', code: '' }
 	}

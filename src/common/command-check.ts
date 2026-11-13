@@ -35,7 +35,7 @@ const commandTypes: CommandType[] = [
 	'tab-move',
 	'tab-start',
 	'tab-seen',
-	'auth',
+	'get-auth-code',
 	'push-subscribe',
 	'push',
 	'notice-history',
@@ -83,7 +83,9 @@ function invalid(value: unknown): string | undefined {
 				? 'hello: version must be a short hash, optionally +7 hex digits'
 				: c.newCode !== undefined && c.newCode !== true
 					? 'hello: newCode must be true when present'
-					: undefined
+					: c.sendAuthCodes !== undefined && c.sendAuthCodes !== true
+						? 'hello: sendAuthCodes must be true when present'
+						: undefined
 	if (c.type === 'screen') {
 		let size = (n: unknown) => Number.isInteger(n) && (n as number) > 0 && (n as number) <= 10000
 		if (!size(c.cols) || !size(c.rows)) return 'screen: cols and rows must be integers from 1 to 10000'
@@ -130,8 +132,6 @@ function invalid(value: unknown): string | undefined {
 							: undefined)
 		)
 	}
-	if (c.type === 'auth')
-		return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if ((c.type === 'create' || c.type === 'tab-new') && c.autoclose !== undefined && typeof c.autoclose !== 'boolean')
 		return `${c.type}: autoclose must be a boolean`
 	for (let flag of ['interactive', 'trust'])
@@ -153,7 +153,7 @@ function invalid(value: unknown): string | undefined {
 			? undefined
 			: 'push-subscribe: invalid subscription'
 	}
-	if (c.type === 'notice-history') return undefined
+	if (c.type === 'notice-history' || c.type === 'get-auth-code') return undefined
 	if (c.type === 'push')
 		return ['list', 'remove', 'test'].includes(c.action as string)
 			? str('endpoint', c.action === 'list')

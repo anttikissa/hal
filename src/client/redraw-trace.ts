@@ -118,7 +118,7 @@ function start(path: string | URL): void {
 			'draft',
 			'inbox',
 			'notice',
-			'auth',
+			'auth-code',
 			'output',
 			'prompt',
 			'meta',

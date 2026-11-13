@@ -36,8 +36,8 @@ function onState(state: LinkState): void {
 			...(last === undefined ? {} : { last }),
 			...(timezone ? { timezone } : {}),
 		})
-		// A code for the web links this terminal prints (task e3).
-		app.send({ type: 'auth', link: true })
+		// Codes for the web links this terminal prints (task e3).
+		app.send({ type: 'hello', pid: process.pid, sendAuthCodes: true })
 		app.sendScreen()
 	}
 	app.show()

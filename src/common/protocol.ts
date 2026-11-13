@@ -143,11 +143,10 @@ export type Command = (
 	// `name` (attachments.fileName, chosen by the client) makes its
 	// marker [image/<name>] or [paste/<name>] (tasks qy, 31).
 	| { type: 'attach'; sessionId: string; mediaType: string; data: string; name?: string }
-	// A one-time web login code (host/web-auth.ts) for `./run auth`;
-	// answered, to this client only, with `auth`. With `link` (a
-	// terminal, task e3): a code for its web links, replaced by a new
-	// `auth` event whenever it is used and before it grows old.
-	| { type: 'auth'; link?: boolean }
+	// `hal auth` (also run by Hal.app) asks for one one-time web login
+	// code (host/web-auth.ts); answered, to this client only, with
+	// `auth-code`.
+	| { type: 'get-auth-code' }
 	// A browser registers a push endpoint and reports its shown tab.
 	// Both push commands are answered, to this client only, with `push-devices`.
 	| {
@@ -162,7 +161,10 @@ export type Command = (
 	// A peer on the host socket names its process, for /clients (task z8),
 	// and once known its version and whether a newer commit is checked
 	// out, for /version (task jjr); sent again when either changes.
-	| { type: 'hello'; pid: number; version?: string; newCode?: true }
+	// `sendAuthCodes`: the client prints clickable web links (today only
+	// the terminal UI; task e3). The host sends `auth-code` now, after
+	// each use of its code and before it expires. Web clients never set it.
+	| { type: 'hello'; pid: number; version?: string; newCode?: true; sendAuthCodes?: true }
 	// hal serve asks a peer host to restart and leave it the home (task kp0).
 	| { type: 'handover' }
 	// A terminal client's size, terminal (TERM, program, color depth) and
@@ -399,9 +401,9 @@ export type Event =
 	// Sent only to the sender: the command with this id was carried out.
 	// `tab`: the tab a tab command created, reopened or picked.
 	| { type: 'ack'; id: string; tab?: string }
-	// The one-time web login code an `auth` command asked for; `link`,
-	// the host's web address, if it is meant for links (task e3).
-	| { type: 'auth'; code: string; link?: string }
+	// A one-time web login code (valid 10 minutes) and the web address it
+	// works at; `url` is absent while the host's web server does not listen.
+	| { type: 'auth-code'; code: string; url?: string }
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }

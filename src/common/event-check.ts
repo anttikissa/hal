@@ -106,7 +106,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	restart: {},
 	'web-update': {},
 	redraw: { sessionId: 's' },
-	auth: { code: 's', link: 's?' },
+	'auth-code': { code: 's', url: 's?' },
 	sync: {
 		request: 's?',
 		changed: 'b?',

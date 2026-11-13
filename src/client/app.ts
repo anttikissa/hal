@@ -175,7 +175,7 @@ function onEvent(event: Event): void {
 				cmd: chord === 'cmd-enter',
 			},
 		])
-	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
+	if (event.type === 'auth-code') ansi.state.web = { url: event.url ?? '', code: event.code }
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') {
 		if (event.sessions) markdown.state.sessions = new Set(event.sessions)

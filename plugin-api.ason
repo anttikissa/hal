@@ -1,5 +1,5 @@
 {
-	version: 37,
+	version: 38,
 	changes: [
 		{
 			version: 2,
@@ -735,6 +735,23 @@
 					target: 'common/tool-presentation.ToolPresentation',
 					description: 'Drops field icon',
 					port: 'Remove it; recorded icons are ignored'
+				}
+			]
+		},
+		{
+			version: 38,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'common/protocol.Command',
+					description: 'auth replaced',
+					port: 'Send get-auth-code, or hello with sendAuthCodes for link codes'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/protocol.Event',
+					description: 'auth replaced',
+					port: 'Read auth-code {code, url?} instead of auth {code, link?}'
 				}
 			]
 		}

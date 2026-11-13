@@ -1,9 +1,9 @@
-// Link codes (task e3): a terminal client that asks ({type: 'auth',
-// link: true}) is given the host's public web address and a one-time
-// code (web-auth.ts) for the hidden OSC 8 targets of the links it
-// prints. Codes are not minted per frame: each client holds one, and
-// gets a new one when it is redeemed and before it is renewMs() old,
-// so a link painted with it works for at least codeMs() - renewMs().
+// Link codes (task e3): a terminal client that says hello with
+// sendAuthCodes is given the host's web address and a one-time code
+// (web-auth.ts) for the hidden OSC 8 targets of the links it prints.
+// Codes are not minted per frame: each client holds one, and gets a
+// new one when it is redeemed and before it is renewMs() old, so a
+// link painted with it works for at least codeMs() - renewMs().
 // Codes are delivered only as events, never stored or logged.
 
 import type { Event } from '../common/protocol.ts'
@@ -12,6 +12,14 @@ import { webAuth } from './web-auth.ts'
 
 type Holder = { deliver: (event: Event) => void; code: string; timer: ReturnType<typeof setTimeout> }
 
+// `code` and where it works: the configured webUrl, else the port the
+// web server really listens on, if it listens yet.
+function event(code: string): Event {
+	let port = settings.state.listeningPort
+	let url = (settings.value('webUrl') as string) || (port ? `http://localhost:${port}` : '')
+	return { type: 'auth-code', code, ...(url && { url: url.replace(/\/+$/, '') }) }
+}
+
 // Gives `key`'s client a fresh code and the address, replacing any it had.
 function follow(key: object, deliver: (event: Event) => void): void {
 	webLinks.drop(key)
@@ -19,7 +27,7 @@ function follow(key: object, deliver: (event: Event) => void): void {
 	let timer = setTimeout(() => webLinks.follow(key, deliver), webLinks.renewMs())
 	timer.unref?.()
 	webLinks.state.holders.set(key, { deliver, code, timer })
-	deliver({ type: 'auth', code, link: settings.webUrl() })
+	deliver(webLinks.event(code))
 }
 
 // The client went away.
@@ -49,6 +57,7 @@ function reset(): void {
 export const webLinks = {
 	state: { holders: new Map<object, Holder>() },
 	renewMs: (): number => webAuth.codeMs / 2 - 30_000,
+	event,
 	follow,
 	drop,
 	used,

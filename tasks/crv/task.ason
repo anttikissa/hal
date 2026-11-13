@@ -1,0 +1,7 @@
+{
+	title: 'Auth code protocol: get-auth-code, auth-code with its url, hello.sendAuthCodes',
+	spec: 'Web login codes travel in one event, auth-code {code, url}: url is where the code works, the webUrl setting if set, else http://localhost:<the port the web server really listens on>, and absent while it does not listen. A client that prints clickable web links (today only the terminal UI) says hello with sendAuthCodes: true; the host then sends it auth-code now, after each use of its code and before it expires (task e3). hal auth (also run by Hal.app) sends get-auth-code, answered to that client only with one auth-code; plain hal auth prints the link from that url, so it names the port the host really listens on, not the preferred one; hal auth --url prints one line per code, <url>/?auth=<code>, or exits 1 while url is absent. Web clients never set sendAuthCodes. protocol.ts documents these three messages.',
+	status: 'done',
+	needs: [],
+	foldInto: ['e3']
+}

@@ -8,7 +8,7 @@ export type Args = (
 	| { kind: 'terminal'; noUser?: true }
 	| { kind: 'help' }
 	| { kind: 'version' }
-	| { kind: 'auth'; count?: number }
+	| { kind: 'auth'; count?: number; url?: true }
 	| { kind: 'serve'; noUser?: true; port?: number }
 	| { kind: 'remote'; host?: string }
 	| {
@@ -39,7 +39,8 @@ const help = `Usage:
   hal -r [host]               connect to a remote Hal (default: the last one)
   hal serve [--port <n>]      run the foreground headless host;
                               --port: web only on port n, else exit
-  hal auth [count]            print one-time login codes (default: 1, max: 100)
+  hal auth [count] [--url]    print one-time login codes (default: 1, max: 100);
+                              --url: only <local web address>/?auth=<code> (Hal.app)
   hal -v, --version           show the version, commit and checkout
   hal -h, --help              show this help
 
@@ -57,6 +58,7 @@ type Out = {
 	noTrust?: true
 	port?: number
 	count?: number
+	url?: true
 	prompt?: string
 	host?: string
 	dir?: string
@@ -123,7 +125,11 @@ command('serve', 'serve', () => {
 		out.port = /^\d+$/.test(port) && +port >= 1 && +port <= 65535 ? +port : fail(`--port needs 1-65535, got ${port}`)
 	})
 })
-command('auth [count]', 'auth')
+command('auth [count]', 'auth', () => {
+	arg('--url', (out) => {
+		out.url = true
+	})
+})
 command('-v, --version', 'version')
 command('-h, --help, help', 'help')
 arg('--home <dir>', (out, dir) => {
