@@ -133,9 +133,10 @@ async function login(req: Request, ip?: string): Promise<Response> {
 }
 
 // A page address with ?auth=<code>: redeemed, then sent to the same
-// address without it, logged in if the code was right.
+// address without it, logged in if the code was right. A browser
+// already logged in keeps its token: no new one per link (task bap).
 function linkLogin(url: URL, req: Request, ip?: string): Response {
-	let { cookie } = web.redeem(url.searchParams.get('auth'), req, ip)
+	let { cookie } = web.authorized(req) ? {} : web.redeem(url.searchParams.get('auth'), req, ip)
 	url.searchParams.delete('auth')
 	let headers: Record<string, string> = { location: url.pathname + url.search, 'cache-control': 'no-store' }
 	if (cookie) headers['set-cookie'] = cookie

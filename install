@@ -56,8 +56,31 @@ mark "$need_link" "$(pretty "$bin_dir")/hal -> $(pretty "$hal_dir")/run"
 mark "$need_path" "$(pretty "$bin_dir") in PATH"
 echo
 
+# Hal.app (task bap), only on macOS: an installed app is rebuilt when
+# mac/ changes; a missing one is offered on a terminal, default no (also
+# with -y). Terminal and web work without it.
+mac_app() {
+	[ "$(uname -s)" = Darwin ] || return 0
+	local app="$HOME/Applications/Hal.app"
+	if [ -d "$app" ]; then
+		"$hal_dir/mac/build" --if-changed "$app" || echo "Hal.app was not rebuilt; Terminal and web work without it."
+		return 0
+	fi
+	[ -t 0 ] && [ -z "$yes" ] || return 0
+	printf "Install the Mac app (Hal.app in ~/Applications)? Terminal and web work without it. [y/N] "
+	read -r answer || answer=""
+	case "$answer" in [Yy]*) ;; *) return 0 ;; esac
+	if ! command -v swiftc >/dev/null; then
+		echo "Hal.app needs swiftc. Get it with: xcode-select --install"
+		echo "Then run ./install again. Continuing without the app."
+		return 0
+	fi
+	"$hal_dir/mac/build" "$app" || echo "Hal.app was not built; Terminal and web work without it."
+}
+
 if [ -z "$need_bun$need_bun_path$need_deps$need_link$need_path" ]; then
 	echo "Everything in order. Start with: hal"
+	mac_app
 	exit 0
 fi
 
@@ -107,3 +130,4 @@ else
 	echo
 	echo "Start with: hal"
 fi
+mac_app

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Builds Hal.app (task bap) from mac/Hal.swift for this checkout, into
+# ~/Applications/Hal.app or the given path. --if-changed builds only
+# when the source, checkout or bun path differ from the installed app's.
+set -euo pipefail
+
+mac="$(cd "$(dirname "$0")" && pwd)"
+checkout="$(dirname "$mac")"
+if_changed=""
+[ "${1:-}" = --if-changed ] && { if_changed=1; shift; }
+app="${1:-$HOME/Applications/Hal.app}"
+bun="$(command -v bun || echo "$HOME/.bun/bin/bun")"
+hash="$( (cat "$mac/build" "$mac/Hal.swift"; echo "$checkout $bun") | shasum | cut -d' ' -f1)"
+
+if [ -n "$if_changed" ] && [ "$(cat "$app/Contents/Resources/source-hash" 2>/dev/null)" = "$hash" ]; then
+	exit 0
+fi
+command -v swiftc >/dev/null || { echo "swiftc is missing: run xcode-select --install" >&2; exit 1; }
+
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/hal-app.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+contents="$tmp/Hal.app/Contents"
+mkdir -p "$contents/MacOS" "$contents/Resources"
+swiftc -O -o "$contents/MacOS/Hal" "$mac/Hal.swift"
+cat > "$contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>CFBundleName</key><string>Hal</string>
+	<key>CFBundleIdentifier</key><string>local.hal.Hal</string>
+	<key>CFBundleExecutable</key><string>Hal</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1</string>
+	<key>LSMinimumSystemVersion</key><string>13.3</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<key>HalCheckout</key><string>$checkout</string>
+	<key>HalBun</key><string>$bun</string>
+</dict></plist>
+EOF
+echo "$hash" > "$contents/Resources/source-hash"
+codesign --force --sign - "$tmp/Hal.app" 2>/dev/null
+mkdir -p "$(dirname "$app")"
+rm -rf "$app"
+mv "$tmp/Hal.app" "$app"
+echo "Built ${app/#$HOME/~}"
