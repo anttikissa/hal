@@ -1,5 +1,5 @@
 {
-	version: 38,
+	version: 39,
 	changes: [
 		{
 			version: 2,
@@ -752,6 +752,23 @@
 					target: 'common/protocol.Event',
 					description: 'auth replaced',
 					port: 'Read auth-code {code, url?} instead of auth {code, link?}'
+				}
+			]
+		},
+		{
+			version: 39,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'common/placeholders.placeholders',
+					description: 'Drops general, hal, follow and BACK',
+					port: 'Nothing replaces them'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/colors.colors',
+					description: 'input no longer has a placeholder color',
+					port: 'Drop it from themes'
 				}
 			]
 		}

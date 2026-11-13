@@ -10,7 +10,6 @@ import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import { notices } from '../common/notices.ts'
-import { placeholders, type PromptExample } from '../common/placeholders.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
@@ -33,17 +32,7 @@ function view(): View {
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal
 	if (st.choices) v.choices = st.choices
-	// An example request over the prompt (placeholders.follow); none for
-	// the intro or while a question waits: neither takes requests.
 	let t = st.transcript
-	let list =
-		t && t.meta.model !== 'hal/intro' && !st.form
-			? tabSwitch.focusedTab()?.hal
-				? placeholders.hal
-				: placeholders.general
-			: undefined
-	let example = placeholders.follow(appView.state.example, t?.meta.id ?? '', list, st.prompt.text, pulse.now())
-	if (example) v.placeholder = example
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs))
 		Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
@@ -138,12 +127,10 @@ export const appView = {
 	// `remote`: the host's name when following a remote one (task tr),
 	// shown where the role would be.
 	// `plugins`: the plugin sync indicator of a remote terminal (b81).
-	// `example`: the prompt example's clock (placeholders.follow).
 	// `noUser`: the host runs with --no-user (host-mode event).
 	state: {
 		remote: undefined as string | undefined,
 		plugins: undefined as string | undefined,
-		example: {} as PromptExample,
 		noUser: false,
 	},
 	view,

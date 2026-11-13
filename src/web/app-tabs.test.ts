@@ -2,7 +2,6 @@
 // browser history, switching keys and per-tab drafts.
 
 import { expect, test } from 'bun:test'
-import { placeholders } from '../common/placeholders.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { router } from './router.ts'
@@ -11,17 +10,6 @@ import { editPrompt } from './edit-prompt.ts'
 import { useApp, alt, fx, message, meta, press, snapOf, snapshot, tab, tabsEvent, ts } from './app-fixture.test.ts'
 
 useApp()
-
-test('the empty box shows an example request, from the Hal list in a tab the host marks hal', () => {
-	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { hal: true })))
-	expect(app.state.shown).toBe('1-aaa')
-	expect(app.placeholder('', 0)).toBeUndefined()
-	app.onEvent(snapOf('1-aaa'))
-	expect(app.placeholder('', 0)?.text).toBe(placeholders.general[0])
-	tabs.show('2-bbb', false)
-	app.onEvent(snapOf('2-bbb'))
-	expect(app.placeholder('', 0)?.text).toBe(placeholders.hal[0])
-})
 
 test('a block address resumes even a closed session, retaining its hash and history entry', () => {
 	fx.address = 'http://h/2-bbb#5'

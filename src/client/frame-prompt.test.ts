@@ -1,8 +1,6 @@
 // Frame tests for the prompt box, its cursor and the notice above it.
 
 import { describe, expect, test } from 'bun:test'
-import { colors } from '../common/colors.ts'
-import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
@@ -138,29 +136,6 @@ describe('prompt box', () => {
 		expect(rows(grown)).toBe(3)
 		expect(rows(prompt.step(grown, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
 		expect(rows(prompt.step(st, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
-	})
-
-	test('an empty prompt shows a readable example distinguishable from typed text', () => {
-		let f = frame.build(
-			{ prompt: { text: '', cursor: 0 }, placeholder: { cut: '', text: 'Try this', next: Infinity } },
-			40,
-		)
-		expect(boxOf(f).rows).toEqual(['Try this'])
-		let rgb = /38;2;(\d+);(\d+);(\d+)mTry this/.exec(f.lines[2]!)!.slice(1).map(Number)
-		let fg = oklch.toRgb(colors.input().fg!),
-			bg = oklch.toRgb(colors.input().bg!)
-		// It stands out from the dark box, but recedes behind typed text.
-		let dist = (a: number[], b: number[]) => Math.hypot(...a.map((v, i) => v - b[i]!))
-		expect(dist(rgb, bg)).toBeGreaterThan(100)
-		expect(dist(rgb, bg)).toBeLessThan(dist(fg, bg) * 0.7)
-		expect(f.cursor).toEqual({ row: 2, col: 1 })
-		// Erasing from its left as typing starts: what is left keeps its columns.
-		let typed = frame.build(
-			{ prompt: { text: 'x', cursor: 1 }, placeholder: { cut: 'Tr', text: 'y this', fade: 'left', next: 5 } },
-			40,
-		)
-		expect(boxOf(typed).rows).toEqual(['x y this'])
-		expect(typed.cursor).toEqual({ row: 2, col: 2 })
 	})
 
 	test('tabs are drawn as spaces to the next stop', () => {

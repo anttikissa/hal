@@ -181,7 +181,7 @@ export type CommandType = Command['type']
 
 // One tab as the tab bar needs it, without opening the session.
 // `attention`: its turn ended, failed or asked since a client showed it.
-// `hal`: its cwd is the Hal repo (own prompt placeholders).
+// `hal`: its cwd is the Hal repo (the status row's home color).
 // `color`: the project color index (task 22) when tabs span 2+ projects.
 // `jobs`: background commands still running.
 // `untrusted`: Hal skips its project's content.

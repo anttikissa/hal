@@ -11,7 +11,6 @@ import { backfill, type Backfill } from '../common/backfill.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Sending } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
-import { placeholders, type PromptExample, type Shown } from '../common/placeholders.ts'
 import type { Delivery, Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
@@ -88,17 +87,6 @@ function pending(): Sending[] {
 
 function notice(): string | undefined {
 	return view.notice(app.state.view)
-}
-
-// The example over the box (placeholders.follow); Tab `hal`: Hal list.
-// None for the intro or while a question waits: neither takes requests.
-const example: PromptExample = {}
-function placeholder(text: string, now: number): Shown | undefined {
-	let v = app.state.view,
-		t = v.transcript
-	let hal = !!app.state.tabs.find((tab) => tab.id === app.state.shown)?.hal
-	let list = t && t.meta.model !== 'hal/intro' && !v.form ? (hal ? placeholders.hal : placeholders.general) : undefined
-	return placeholders.follow(example, t?.meta.id ?? '', list, text, now)
 }
 
 function setView(v: ViewState): void {
@@ -487,7 +475,6 @@ export const app = {
 	sessionId,
 	pending,
 	notice,
-	placeholder,
 	choose,
 	menuKey,
 	dismissMenu,

@@ -17,7 +17,6 @@ import { bashCard } from './bash-card.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
 import type { Folded } from '../common/notices.ts'
-import type { Shown } from '../common/placeholders.ts'
 import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
@@ -42,8 +41,6 @@ export interface View {
 	noticeClearable?: boolean
 	/** The open question being answered here: keys and cursor go to it. */
 	form?: FormState
-	/** A dim example request over the prompt (placeholders.follow). */
-	placeholder?: Shown
 	/** A modal drawn over everything: keys and cursor go to it. */
 	modal?: ModalState
 	/** The host's tabs and the one shown: a tab bar row above the prompt;
@@ -252,7 +249,7 @@ function build(
 	// Below them, the chrome proper: tab bar, the prompt box between
 	// two rules, then the help row. Its height depends only on the
 	// prompt's rows, so nothing below the transcript jumps.
-	let p = promptView.box(view.prompt, width, view.placeholder)
+	let p = promptView.box(view.prompt, width)
 	let input = colors.input()
 	let rule = (left: string, center: string, right: string) =>
 		ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center), ansi.clean(right)) + ansi.UNCOLOR

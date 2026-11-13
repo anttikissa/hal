@@ -1,6 +1,6 @@
 {
 	title: 'Prompt box without the > marker and indent',
-	spec: "The terminal prompt box has no '> ' marker and no two-space indent on any row, typed or empty: text, wrapped rows and the rotating example placeholder all start at the box's first column (after the outer padding) and use its full inside width (the marker is gone, not only on the placeholder). Transcript items (commands, pending prompts) keep their own markers.",
+	spec: "The terminal prompt box has no '> ' marker and no two-space indent on any row, typed or empty: text and wrapped rows start at the box's first column (after the outer padding) and use its full inside width. Transcript items (commands, pending prompts) keep their own markers.",
 	status: 'done',
 	notes: [
 		'The empty terminal prompt uses the full inside width for the quiet placeholder and leaves its cursor at column one (after the outer padding). Browser textarea already has no prompt marker.',

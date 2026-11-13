@@ -3,7 +3,6 @@
 // them. Pure.
 
 import { ansi } from './ansi.ts'
-import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import { placeholders, type Shown } from '../common/placeholders.ts'
 import { promptLayout } from '../common/prompt-layout.ts'
@@ -69,44 +68,32 @@ const slots = {
 	bottomRight: (): string => '',
 }
 
-// An example in `fg` on `bg` from column `from` (where the text before
-// it ends) to `width`: its cut blank, then its text, clipped. A fading
-// edge (ansi.fades()) steps its last or first 3 glyphs toward `bg`,
-// unless clipped; a returning one (`back`) fades in from `bg` on a
-// quartic ease-out, near the web's --ease-out. Ends in `back`.
-function example(ex: Shown, fg: Oklch, bg: Oklch, width: number, back: Oklch | undefined, from = 0): string {
-	let pad = Math.max(0, strings.visLen(ex.cut) - from)
-	let room = width - from - pad
+// A form field's placeholder in `fg` on `bg`, clipped to `width`. A
+// fading edge (ansi.fades()) steps its last 3 glyphs toward `bg`,
+// unless clipped. Ends in `back`.
+function example(ex: Shown, fg: Oklch, bg: Oklch, width: number, back: Oklch | undefined): string {
 	let text = ansi.clean(ex.text)
-	if (room <= 0 || !text) return ''
-	if (ex.back !== undefined && ansi.fades()) {
-		let t = 1 - (1 - Math.min(1, ex.back / placeholders.BACK)) ** 4
-		fg = [bg[0] + (fg[0] - bg[0]) * t, bg[1] + (fg[1] - bg[1]) * t, fg[2]]
-	}
+	if (width <= 0 || !text) return ''
 	let end = back ? ansi.sgr({ fg: back }) : ''
-	if (!ex.fade || !ansi.fades() || strings.visLen(text) > room)
-		return ' '.repeat(pad) + ansi.sgr({ fg }) + strings.clipVisual(text, room) + end
+	if (!ex.fade || !ansi.fades() || strings.visLen(text) > width)
+		return ansi.sgr({ fg }) + strings.clipVisual(text, width) + end
 	let g = placeholders.graphemes(text)
 	let n = Math.min(3, g.length)
 	let mix = (t: number): Oklch => [fg[0] + (bg[0] - fg[0]) * t, fg[1] + (bg[1] - fg[1]) * t, fg[2]]
-	let faded = (s: string[], t: (i: number) => number) => s.map((c, i) => ansi.sgr({ fg: mix(t(i)) }) + c).join('')
-	let body = ansi.sgr({ fg })
-	let out =
-		ex.fade === 'right'
-			? body + g.slice(0, g.length - n).join('') + faded(g.slice(g.length - n), (i) => (i + 1) / (n + 1))
-			: faded(g.slice(0, n), (i) => (n - i) / (n + 1)) + body + g.slice(n).join('')
-	return ' '.repeat(pad) + out + end
+	let faded = g
+		.slice(g.length - n)
+		.map((c, i) => ansi.sgr({ fg: mix((i + 1) / (n + 1)) }) + c)
+		.join('')
+	return ansi.sgr({ fg }) + g.slice(0, g.length - n).join('') + faded + end
 }
 
 // The prompt box, unmarked (no '> ', no indent): its rows scrolled to show the cursor (`scroll` is
 // where it was), how many rows it hides above and below, all its rows
-// (`total`), the most it shows before scrolling (`limit`), and a dim
-// example: on an empty prompt, or right of one typed row while the
-// example erases from its left. Rows are marked, not yet painted.
+// (`total`) and the most it shows before scrolling (`limit`). Rows are
+// marked, not yet painted.
 function box(
 	st: PromptState,
 	width: number,
-	placeholder?: Shown,
 ): {
 	above: number
 	rows: string[]
@@ -122,16 +109,6 @@ function box(
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
 	let shown = p.rows.slice(vp.top, vp.top + height)
 	while (shown.length < height) shown.push('')
-	let input = colors.input()
-	if (placeholder && (!st.text || p.rows.length === 1))
-		shown[0] += promptView.example(
-			placeholder,
-			input.placeholder!,
-			input.bg!,
-			width,
-			input.fg,
-			strings.visLen(shown[0]!),
-		)
 	return {
 		above: vp.above,
 		rows: shown,
@@ -139,7 +116,7 @@ function box(
 		total: p.rows.length,
 		limit: st.rows ?? settings.promptRows(),
 		row: p.row - vp.top,
-		col: !st.text && placeholder ? 0 : p.col,
+		col: p.col,
 		scroll: vp.top,
 	}
 }

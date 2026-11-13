@@ -109,7 +109,6 @@ function css(): string {
 		// Selection is reverse video in the style's own color (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (fg && !style.output) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
-		if (name === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${name} { ${decls.join('; ')} }`)
 	}
 	let tab = colors.tab(),

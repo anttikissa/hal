@@ -65,21 +65,6 @@ export function Composer(props: {
 		() => props.text,
 		() => fit(),
 	)
-	// The example over the box (placeholders.follow), redrawn when its
-	// text next changes. With reduced motion its clock stands still: the
-	// first example stays, and typing hides it at once.
-	let reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-	let [tick, setTick] = createSignal(0)
-	let example = createMemo(() => {
-		tick()
-		void props.view.transcript
-		return reduced && props.text ? undefined : app.placeholder(props.text, reduced ? 0 : Date.now())
-	})
-	createEffect(example, (ex) => {
-		if (!ex || reduced || ex.next === Infinity) return
-		let timer = setTimeout(() => setTick((n) => n + 1), ex.next)
-		return () => clearTimeout(timer)
-	})
 	// Text at the caret, replacing the selection, as if typed.
 	let insert = (text: string) => {
 		text = uploads.pad(text, input.value.slice(0, input.selectionStart))
@@ -94,7 +79,7 @@ export function Composer(props: {
 	let picker!: HTMLInputElement
 	let typing = false
 	// The box can hold text no handled input event reported (keys.ts does
-	// the same on keydown): the example and Send must use what it shows.
+	// the same on keydown): Send must use what it shows.
 	let sync = () => {
 		if (input && input.value !== app.state.text) app.input(input.value)
 	}
@@ -394,12 +379,7 @@ export function Composer(props: {
 				>
 					<Icon name="plus" />
 				</button>
-				{/* Our own placeholder, so it can erase and fade at its edges. */}
 				<div class="field">
-					<span class={['hint', example()?.fade, { gone: !example() }]} aria-hidden="true">
-						<span class="cut">{example()?.cut}</span>
-						<span class="text">{example()?.text}</span>
-					</span>
 					<textarea
 						ref={box}
 						rows={1}

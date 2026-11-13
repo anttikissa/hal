@@ -71,13 +71,7 @@ export const look: Look = {
 		title: [0.82, 0.18, 350],
 		output: [0.62, 0.18, 350],
 	}),
-	// placeholder: the example request in an empty prompt, readable but
-	// quieter than typed text.
-	input: (): Style => ({
-		...colors.user(),
-		cursor: colors.user().fg!,
-		placeholder: oklch.faint(colors.user().fg!, colors.user().bg!),
-	}),
+	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg! }),
 	// Log: neutral, moderately dim.
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.

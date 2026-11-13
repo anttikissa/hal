@@ -4,7 +4,6 @@ import { expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { modals } from '../common/modals.ts'
-import { placeholders } from '../common/placeholders.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'
 import { appModals } from './app-modals.ts'
@@ -53,13 +52,6 @@ test('after the focused paint, at most 8 tabs load in slices, neighbors first; s
 	await Bun.sleep(5)
 	expect(sent.filter((c) => c.type === 'close').map((c) => c.sessionId)).toEqual(['i'])
 	expect(opened().slice(7)).toEqual(['a'])
-})
-
-test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {
-	startOn(['a', 'b'])
-	expect(appView.view().placeholder?.text).toBe(placeholders.general[0])
-	app.onEvent(tabsEvent(tabOf('a', { hal: true }), 'b'))
-	expect(appView.view().placeholder?.text).toBe(placeholders.hal[0])
 })
 
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {

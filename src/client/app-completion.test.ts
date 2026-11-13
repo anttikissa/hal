@@ -2,12 +2,10 @@
 
 import { expect, test } from 'bun:test'
 import { drafts } from '../common/drafts.ts'
-import { placeholders } from '../common/placeholders.ts'
 import { strings } from '../common/strings.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
-import { pulse } from './pulse.ts'
 import { useApp, sent, snapshot, key, type, enter } from './app-fixture.test.ts'
 
 useApp()
@@ -136,25 +134,5 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 		expect(appView.view().prompt.cursor).toBe(30 - frame.promptWidth(20))
 	} finally {
 		app.cols = cols
-	}
-})
-
-test('typing erases the example from its left, right of the typed text, then it is gone', () => {
-	let now = 1_000_000,
-		saved = pulse.now
-	pulse.now = () => now
-	try {
-		app.onEvent(snapshot())
-		let first = placeholders.general[0]!
-		expect(appView.view().placeholder?.text).toBe(first)
-		type('hi')
-		let ex = appView.view().placeholder!
-		expect(ex.fade).toBe('left')
-		expect(ex.cut + ex.text).toBe(first)
-		expect(strings.visLen(ex.cut)).toBeGreaterThan(2)
-		now += 5 * first.length
-		expect(appView.view().placeholder).toBeUndefined()
-	} finally {
-		pulse.now = saved
 	}
 })

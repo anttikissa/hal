@@ -213,7 +213,7 @@ function example(st: FormState, index: number, now: number): Shown {
 	let p = f?.type === 'text' ? f.placeholder : undefined
 	return Array.isArray(p)
 		? placeholders.rotate(p, now - (st.opened ?? now))
-		: { cut: '', text: p ?? '', next: Infinity }
+		: { text: p ?? '', next: Infinity }
 }
 
 // The form state for question `open` (the transcript's open one): the

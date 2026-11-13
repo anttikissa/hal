@@ -118,24 +118,6 @@ function languages(): string[] {
 	return [first!, mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
 }
 
-// Name examples: people who talked to a fictional AI, most iconic
-// first. Dave (2001) always comes first and Chell (Portal) last for
-// those who know; the rest get a fresh weighted shuffle each run.
-const NAMES = [
-	'Dave',
-	'Professor Falken',
-	'Will Robinson',
-	'Tony',
-	'Michael',
-	'Theodore',
-	'Ripley',
-	'Cooper',
-	'Caleb',
-	'Lister',
-	'Chell',
-]
-const names = (): string[] => [NAMES[0]!, ...ranked(NAMES.slice(1, -1)), NAMES.at(-1)!]
-
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
 const saved = 'I saved your '
 const closing = "You're all set."
@@ -237,7 +219,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	}
 	let ask: Form = {
 		text: 'What should I call you? (Optional)',
-		fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }],
+		fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...known('Name') }],
 	}
 	// Local servers answer before the model question (task vc).
 	let hello = (): Reply => (

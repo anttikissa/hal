@@ -104,13 +104,7 @@ export const colors = {
 	user: (): Style => ({ fg: gray(0.92), bg: gray(0.24), title: gray(0.97) }),
 	// Messages and commands from another session (task 9p).
 	message: (): Style => ({ fg: gray(0.8), bg: gray(0.22), title: gray(0.93), output: gray(0.7) }),
-	// placeholder: the example request in an empty prompt, readable but
-	// quieter than typed text.
-	input: (): Style => ({
-		...colors.user(),
-		cursor: colors.user().fg!,
-		placeholder: oklch.faint(colors.user().fg!, colors.user().bg!),
-	}),
+	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg! }),
 	log: (): Style => ({ fg: gray(0.7), code: gray(0.78), linkBg: gray(0.3) }),
 	warning: (): Style => ({ fg: gray(0.94), bg: gray(0.26), code: gray(0.97), linkBg: gray(0.32) }),
 	question: (): Style => colors.plain(),

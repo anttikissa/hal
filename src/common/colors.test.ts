@@ -48,9 +48,7 @@ test('overriding one style is seen by styles built on it', () => {
 // tasks/README.md, readable text: WCAG AA against the background each
 // color sits on, its style's own bg or else the screen we design for.
 function readable(): string[] {
-	// placeholder: the example request, faint on purpose (frame.test.ts
-	// checks it stands apart from both the box and typed text).
-	let backgrounds = /^(bg|canvas|field|border|button|placeholder)$|Bg$/
+	let backgrounds = /^(bg|canvas|field|border|button)$|Bg$/
 	let marks = /^(cursor|cursorIdle)$/
 	let low: string[] = []
 	let check = (name: string, fg: Oklch, bg: Oklch, min: number) => {
