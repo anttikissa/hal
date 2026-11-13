@@ -235,21 +235,10 @@ function key(e: KeyInput, target: Target): boolean {
 		return false
 	}
 	if (target.kind !== 'message') {
-		if (
-			plain &&
-			e.key === 'Enter' &&
-			target.kind === 'other' &&
-			!st.text.trim() &&
-			!st.view.editing &&
-			view.nudge(st.view, 0)
-		) {
-			let delivery = sendKeys.delivery({})
-			if (!delivery) return false
-			app.send(delivery)
-			return true
-		}
 		// Typing outside any field goes into the box at its caret, as in
-		// Slack; Space still presses a focused button or link.
+		// Slack, and Enter sends it as there; Space and Enter still press
+		// a focused button or link.
+		if (e.key === 'Enter' && target.kind === 'other') return send(e)
 		if (target.kind === 'field' || !typing(e) || (target.kind === 'button' && e.key === ' ')) return false
 		keys.insert(e.key)
 		return true
@@ -317,8 +306,14 @@ function key(e: KeyInput, target: Target): boolean {
 	let indents = lead && (!e.shiftKey || /^[ \t]/.test(st.text.slice(start)))
 	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents))
 		return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
-	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
-	// Each Enter chord sends as sendKeys binds it (tasks csn, 8kx).
+	if (target.coarse && plain) return false
+	return send(e)
+}
+
+// Enter on the box: each chord sends as sendKeys binds it (tasks csn,
+// 8kx); Shift-Enter is a newline.
+function send(e: KeyInput): boolean {
+	if (e.key !== 'Enter' || e.shiftKey) return false
 	let delivery = sendKeys.delivery({ ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
 	if (!delivery) return false
 	app.send(delivery)

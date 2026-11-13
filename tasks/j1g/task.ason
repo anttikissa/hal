@@ -1,9 +1,10 @@
 {
-	title: 'Nudge from Enter outside the web prompt',
-	spec: 'On the web, plain Enter outside the composer nudges an idle session when the draft is empty, through the same submission path as Enter in the composer. Focused fields, buttons, links, other native interactive controls, open dialogs and questions retain their keyboard ownership. Modified Enter, IME, nonempty drafts and prompt editing do not trigger this outside-prompt nudge. Terminal behavior is unchanged. Restore the invariant that idle empty-prompt nudging does not depend on composer focus.',
+	title: 'Enter outside the web prompt acts as in it',
+	spec: "On the web, Enter pressed outside any field, button, link or dialog goes through the message box's own Enter path, as typed keys go into the box: it sends the draft, steers, continues a paused or failed turn, or nudges an idle one, as Enter in the box would. Focused fields, buttons, links, other native interactive controls, open dialogs and questions retain their keyboard ownership. Shift-Enter and IME composition do nothing outside the box. Terminal behavior is unchanged. Restore the invariant that Enter does not depend on composer focus.",
 	status: 'done',
 	notes: [
-		'Outside Enter reuses app.send and the configured Enter delivery. Eligibility stays idle, empty draft and no prompt edit; select and summary retain native keys alongside fields, buttons, links and dialogs. Focused web keys/view tests pass (26 tests), TypeScript noEmit passes, and changed-source oxlint reports no warnings or errors. No timers, growing state or history scans added.'
+		'Outside Enter reuses app.send and the configured Enter delivery. Eligibility stays idle, empty draft and no prompt edit; select and summary retain native keys alongside fields, buttons, links and dialogs. Focused web keys/view tests pass (26 tests), TypeScript noEmit passes, and changed-source oxlint reports no warnings or errors. No timers, growing state or history scans added.',
+		'Outside Enter calls the same send() as Enter in the box; no separate eligibility rules, so it cannot drift (it once ignored paused turns).'
 	],
 	needs: ['yhn', 'qn'],
 	foldInto: ['yhn']
