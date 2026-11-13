@@ -172,15 +172,24 @@ function start(clients: Iterable<Watcher>): void {
 	// Edits made while the host was down: noted at once, in slices of
 	// sliceMs so many open tabs never block the event loop (task 7j).
 	void promptFiles.catchUp(tabs.file().open)
+	// Idle, one wakeup a second; while a turn runs, two.
 	let tick = () => {
+		let st = promptFiles.state,
+			working = new Set<string>()
 		try {
-			let shown = ++promptFiles.state.ticks % 2 === 0
-			promptFiles.check(clients, promptFiles.polled(clients, shown))
+			working = promptFiles.polled(clients, false)
+			let now = performance.now()
+			let shown = now - st.shownAt >= promptFiles.shownMs - 100
+			if (shown) st.shownAt = now
+			promptFiles.check(clients, shown ? promptFiles.polled(clients, true) : working)
 		} catch (e: any) {
 			diag.log(`prompt files: ${e?.message ?? e}`)
 		}
+		if (st !== promptFiles.state) return
+		st.timer = setTimeout(tick, working.size ? promptFiles.workingMs : promptFiles.shownMs)
+		st.timer.unref?.()
 	}
-	promptFiles.state.timer = setInterval(tick, promptFiles.intervalMs)
+	promptFiles.state.timer = setTimeout(tick, promptFiles.shownMs)
 	promptFiles.state.timer.unref?.()
 }
 
@@ -197,7 +206,7 @@ async function catchUp(ids: string[]): Promise<void> {
 }
 
 function stop(): void {
-	clearInterval(promptFiles.state.timer)
+	clearTimeout(promptFiles.state.timer)
 	promptFiles.state = fresh()
 }
 
@@ -206,8 +215,8 @@ function fresh() {
 		seen: new Map<string, string | null>(),
 		stamps: new Map<string, string>(),
 		tabs: new Map<string, Tab>(),
-		timer: undefined as ReturnType<typeof setInterval> | undefined,
-		ticks: 0,
+		timer: undefined as ReturnType<typeof setTimeout> | undefined,
+		shownAt: -Infinity,
 		seq: 0,
 		hooks: undefined as unknown,
 	}
@@ -215,8 +224,9 @@ function fresh() {
 
 export const promptFiles = {
 	state: fresh(),
-	// Working tabs every tick, shown tabs every other.
-	intervalMs: 500,
+	// Shown tabs are polled this often, tabs a turn runs in more often.
+	shownMs: 1000,
+	workingMs: 500,
 	sliceMs: 4,
 	files,
 	polled,
