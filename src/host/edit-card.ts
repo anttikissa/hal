@@ -1,18 +1,13 @@
-// Shows EDIT calls as readable cards: the title keeps the call's
-// description (or else its files and line counts), and the versioned
-// result shows once.
-import { diff } from '../common/diff.ts'
+// Shows EDIT calls as readable cards: the title names the files and the
+// call's description (tool-details.ts), and the versioned result shows once.
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
+import { toolDetails } from '../common/tool-details.ts'
 import type { ToolPresentation } from '../common/tool-presentation.ts'
 
 function present(call: ToolCallBlock, result?: ToolResultBlock): ToolPresentation | undefined {
 	if (!Array.isArray(call.input.edits)) return undefined
-	const names = [...new Set<string>(call.input.edits.flatMap((e) => (typeof e?.path === 'string' ? [e.path] : [])))]
-	const description = typeof call.input.description === 'string' ? call.input.description.trim() : ''
-	const counts = result && !result.isError ? diff.stats(result.output) : undefined
-	const suffix = counts ? `${counts.added ? `+${counts.added}` : ''}${counts.removed ? `-${counts.removed}` : ''}` : ''
 	return {
-		title: `edit ${description || names.join(', ') + (suffix ? ` ${suffix}` : '') || 'files'}`,
+		title: toolDetails.headline('edit', call.input).text,
 		blocks: !result
 			? []
 			: result.isError

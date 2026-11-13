@@ -164,20 +164,26 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'notify':
 			if (str('text')) return { text: marked(str('text')!), key: 'text' }
 			break
-		// The files it changes; the purpose and diff open below (task ese).
+		// The files it changes, created ones marked + and deleted ones -,
+		// then its purpose: "edit a.ts, b.ts+: Purpose" (task yn7).
 		case 'edit': {
-			let files = [
-				...new Set(
-					[
-						input.path,
-						...(Array.isArray(input.edits)
-							? input.edits.map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).path : undefined))
-							: []),
-					].filter((p): p is string => typeof p === 'string' && p !== ''),
-				),
-			]
-			if (files.length) return { text: marked(files.join(', ')), keys: ['path', 'hash'] }
-			break
+			let ops = [input, ...(Array.isArray(input.edits) ? input.edits : [])].filter(
+				(e): e is Record<string, unknown> =>
+					!!e && typeof e === 'object' && typeof e.path === 'string' && e.path !== '',
+			)
+			let paths = [...new Set(ops.map((e) => e.path as string))]
+			let base = (p: string) => p.split('/').at(-1)!
+			let files = paths.map((p) => {
+				let shown = paths.filter((q) => base(q) === base(p)).length > 1 ? p : base(p)
+				let mark = ops.find((e) => e.path === p && (e.create || e.delete))
+				return shown + (mark?.create ? '+' : mark?.delete ? '-' : '')
+			})
+			if (!files.length) break
+			let description = str('description')
+			return {
+				text: marked(files.join(', ') + (description ? `: ${description}` : '')),
+				keys: ['path', 'hash', 'description'],
+			}
 		}
 		case 'help':
 			return { text: str('name') ? marked(str('name')!) : 'help', key: 'name' }

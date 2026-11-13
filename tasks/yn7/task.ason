@@ -1,6 +1,6 @@
 {
 	title: 'Card headers name their kind in words, not icons',
-	spec: 'Web card headers show no icon. Tool cards begin with the lowercase tool name, as on the terminal; bash keeps its copyable "$ " prompt instead (task ya1). Thinking is told apart by its italic text, and messages from other sessions keep their <= or => mark. Plugin tool cards have no icon: ToolCard and ToolPresentation have no icon field, and older recorded presentations that carry one simply have it ignored. src/web/icons.ts keeps only icons that buttons still render. User 2026-11-12: icons must be memorized and new ones kept appearing.',
+	spec: 'Web card headers show no icon. Tool cards begin with the lowercase tool name, as on the terminal; bash keeps its copyable "$ " prompt instead (task ya1). Thinking is told apart by its italic text, and messages from other sessions keep their <= or => mark. Plugin tool cards have no icon: ToolCard and ToolPresentation have no icon field, and older recorded presentations that carry one simply have it ignored. src/web/icons.ts keeps only icons that buttons still render. User 2026-11-12: icons must be memorized and new ones kept appearing. Edit titles name every file, even with a description: "edit STYLE.md, Card.tsx, new.txt+, gone.txt-: Purpose" - file names (full paths only when two share a name), created files marked +, deleted ones -, no line counts, then a colon and the description, as send and spawn do. User 2026-11-13: the description alone hid what was edited.',
 	status: 'done',
 	needs: [],
 	foldInto: ['19m']

@@ -52,7 +52,7 @@ test('EDIT line lists cannot consume the title or block reference', () => {
 	for (let cols of [40, 60, 100]) {
 		let rows = plain(frame.itemRows(item, cols, 's-1', undefined, undefined, undefined, [], status))
 		let header = rows.find((r) => r.includes('edit '))!
-		expect(header).toContain('edit src/')
+		expect(header).toContain('edit file-')
 		expect(header).toContain(' t62')
 		expect(header).toContain('…')
 		expect(strings.visLen(header)).toBeLessThanOrEqual(cols)
