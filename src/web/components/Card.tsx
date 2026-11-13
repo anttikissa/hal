@@ -41,6 +41,7 @@ import { target } from '../target.ts'
 import { view } from '../view.ts'
 import type { Row } from '../transcript-rows.ts'
 import { hrefs } from '../hrefs.ts'
+import { app } from '../app.ts'
 import { folds } from '../folds.ts'
 import { toggle as blockToggle } from '../../common/toggle.ts'
 import type { Verbosity } from '../../common/card.ts'
@@ -403,7 +404,7 @@ export function Card(props: {
 										rel="noopener"
 										title="Open image in a separate tab to zoom"
 									>
-										<img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} />
+										<img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} onError={app.imageFailed} />
 									</a>
 								)}
 							</Show>

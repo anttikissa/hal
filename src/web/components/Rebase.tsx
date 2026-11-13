@@ -10,6 +10,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { rebaseRows, type RebaseRow } from '../../common/rebase-rows.ts'
 import { rebaseView, type Action, type Part, type RebaseState } from '../rebase.ts'
 import { hrefs } from '../hrefs.ts'
+import { app } from '../app.ts'
 import { Icon } from './Icon.tsx'
 
 const labels: Action[] = ['keep', 'drop', 'edit']
@@ -78,7 +79,11 @@ function Detail(props: { st: RebaseState; row: RebaseRow }) {
 						<div class="part">
 							<div class="label">image{p.bytes ? ` · ${Math.round(p.bytes / 100) / 10} kB` : ''}</div>
 							<a href={hrefs.blobUrl(props.st.sessionId, p.blob)} target="_blank" rel="noopener">
-								<img src={hrefs.blobUrl(props.st.sessionId, p.blob)} alt={`image ${p.blob}`} />
+								<img
+									src={hrefs.blobUrl(props.st.sessionId, p.blob)}
+									alt={`image ${p.blob}`}
+									onError={app.imageFailed}
+								/>
 							</a>
 						</div>
 					) : (

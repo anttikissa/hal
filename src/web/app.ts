@@ -516,6 +516,9 @@ export const app = {
 	start,
 	// Whether the cookie is good; logging in sets it.
 	authorized: async (): Promise<boolean> => (await fetch('/login')).status !== 401,
+	// A failed image may mean the login is gone (revoked, or replaced by
+	// another Hal's): then reload onto the gate instead of a broken image.
+	imageFailed: (): void => void app.authorized().then((ok) => ok || location.reload()),
 	login,
 	reset,
 }
