@@ -205,6 +205,7 @@ function onEvent(event: Event): void {
 	let shown = st.focus.tab
 	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown)
 		return tabSwitch.hiddenEvent(event)
+	if (event.type === 'find-open') return find.open()
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)

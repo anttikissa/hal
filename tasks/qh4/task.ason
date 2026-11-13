@@ -1,0 +1,10 @@
+{
+	title: 'Open Find from the mobile menu and /find',
+	spec: 'The web tab menu has a Find action that closes the menu and opens the existing Find dialog. Bare /find opens that same dialog in each client following the session and records no history entry. /find <query> keeps its existing ranked search output.',
+	status: 'done',
+	notes: [
+		'Bare /find sends a session-scoped find-open event; its command record is suppressed. The web menu closes before opening the existing Picker dialog.'
+	],
+	needs: ['6m'],
+	foldInto: ['6m']
+}

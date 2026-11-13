@@ -95,6 +95,14 @@ async function opened(id: string) {
 const outputs = (t: Transcript) =>
 	t.items.flatMap((i) => (i.type === 'output' || (i.type === 'text' && i.synthetic) ? [i.text] : []))
 
+test('bare /find opens the dialog without a history entry', async () => {
+	let c = client()
+	let id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/find' })
+	await until(() => c.of('find-open').length)
+	expect(c.of('find-open').at(-1)).toEqual({ type: 'find-open', sessionId: id })
+	expect(history.readSync(id).some((r) => r.type === 'command' && r.text === '/find')).toBe(false)
+})
 test('/cd changes the session cwd for every follower; a relative path resolves from the old cwd', async () => {
 	let a = client()
 	let id = created(a)

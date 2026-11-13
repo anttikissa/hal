@@ -28,6 +28,14 @@ test('Ctrl-O p expands draft pastes without sending the draft', () => {
 	expect(fx.sent.some((c) => c.type === 'submit')).toBe(false)
 })
 
+test('find-open opens the Find dialog without changing the draft', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('keep this draft')
+	app.onEvent({ type: 'find-open', sessionId })
+	expect(app.state.view.modal?.find).toBeDefined()
+	expect(app.state.text).toBe('keep this draft')
+})
+
 test('Enter sends the message box as a prompt: it shows pending and the box empties', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	// Text put in the box without an input event is what gets sent.

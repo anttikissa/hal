@@ -3,6 +3,19 @@ import { keyHelp } from '../common/key-help.ts'
 import { app } from './app.ts'
 import { render } from './render.ts'
 
+test('the host opens Find for the focused session', () => {
+	let saved = { show: render.show }
+	app.reset()
+	render.show = () => {}
+	try {
+		app.state.focus.tab = '12-abc'
+		app.onEvent({ type: 'find-open', sessionId: '12-abc' })
+		expect(app.state.modal?.find).toBeDefined()
+	} finally {
+		app.reset()
+		render.show = saved.show
+	}
+})
 test('Ctrl-F debounces transient queries, cancels on Escape and tells where the selected block is', async () => {
 	let saved = { send: app.send, show: render.show },
 		sent: any[] = []

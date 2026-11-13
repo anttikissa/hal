@@ -5,7 +5,7 @@ import { find } from '../find.ts'
 export const command: SlashCommand = {
 	help: () =>
 		[
-			'Ctrl-F or /find <query> finds the tab that did something: one row per tab, best evidence first (title, former title, commit, request, then mentions).',
+			'Ctrl-F or /find opens Find; /find <query> finds the tab that did something: one row per tab, best evidence first (title, former title, commit, request, then mentions).',
 			'  in:here           only this tab, listing its matching cards',
 			'  in:181-ibm,12-abc those tabs; in:10-19 tab numbers 10 to 19',
 			'  in:. in:~/x       tabs in this directory, or in ~/x and below',
@@ -15,8 +15,9 @@ export const command: SlashCommand = {
 			'  since:24h         only evidence newer than 30m, 12h, 3d, 2w...',
 			'In the results, Right lists the selected tab\u2019s matching cards; Left goes back.',
 		].join('\n'),
+	record: (args) => (args.trim() ? undefined : null),
 	run: async (args, _answers, ctx) => {
-		if (!args.trim()) return { error: 'usage: /find <query>' }
+		if (!args.trim()) return { open: 'find' }
 		let hits = await find.top(args, { here: ctx.sessionId })
 		return {
 			say: hits.length

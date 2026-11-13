@@ -136,6 +136,7 @@ function onEvent(event: Event): void {
 	if (landed) app.settled(landed)
 	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown)
 		return tabs.hiddenEvent(event)
+	if (event.type === 'find-open') return find.open()
 	st.view = view.onEvent(st.view, event)
 	if (event.type === 'snapshot') {
 		st.menu = undefined

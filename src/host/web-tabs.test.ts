@@ -184,6 +184,14 @@ browserTest(
 			await b.waitFor(
 				`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`,
 			)
+			await b.evaluate(
+				`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent.trim() === 'Find').click()`,
+			)
+			await b.waitFor(`document.querySelector('.Picker[open]') && !document.querySelector('.Tabs .sheet').open`)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
+			await b.waitFor(`!document.querySelector('.Picker[open]')`)
+			await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
 			await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
 			await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
 			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)

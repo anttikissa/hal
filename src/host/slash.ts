@@ -208,6 +208,7 @@ function report(id: string, name: string, args: string, reply: Reply, sender?: S
 	if (reply.error !== undefined) slash.output(id, reply.error, true, sender?.origin)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
 	if (reply.open === 'settings') host.broadcast(id, { ...config.event(), sessionId: id })
+	if (reply.open === 'find') host.broadcast(id, { type: 'find-open', sessionId: id })
 	// The intro paused for this login (task vc): signed in, it goes on.
 	if (
 		name === 'login' &&

@@ -18,7 +18,8 @@ import type { Answers, Form } from '../common/forms.ts'
 // What a command did: something to say, a failure, or a question.
 // `result`: tool acknowledgement when durable output was already recorded.
 // `open`: a client modal to open on every client following the session
-// (tasks/w4/forms.md, Provenance): 'models' is the model picker.
+// (tasks/w4/forms.md, Provenance): 'models' is the model picker; 'find'
+// opens the Find dialog.
 // `show`: said like `say` but never recorded, so it is gone on the next
 // snapshot (a one-time code, /auth).
 export type Reply = {
@@ -29,7 +30,7 @@ export type Reply = {
 	error?: string
 	ask?: Form
 	askArgs?: string
-	open?: 'models' | 'settings'
+	open?: 'models' | 'settings' | 'find'
 	rebase?: import('../common/rebase-rows.ts').RebaseRows
 }
 

@@ -206,6 +206,7 @@ export type Tab = {
 // went into. Clients key transcript items by it (task w5).
 export type Event =
 	| { type: 'subscription-usage'; accounts: SubscriptionData; replace?: boolean }
+	| { type: 'find-open'; sessionId: string }
 	| FindBatch
 	| FindPreview
 	| { type: 'rebase-result'; sessionId: string; command?: string; ok: boolean; text: string }
