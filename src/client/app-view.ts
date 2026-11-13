@@ -34,8 +34,6 @@ function view(): View {
 	if (st.choices) v.choices = st.choices
 	let t = st.transcript
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
-	if (v.tabs && tabBar.blinks(st.tabs))
-		Object.assign(v.tabs, { lit: pulse.slow(pulse.beat()), alt: Math.floor(pulse.beat() / 4) % 2 === 1 })
 	let stopped = t && appView.why(t),
 		notice = st.notice ?? (t && (queueEdit.notice(t) ?? inbox.heldNotice(t))) ?? versions.notice()
 	if (stopped) v.why = stopped
@@ -46,8 +44,6 @@ function view(): View {
 	if (appView.state.noUser) v.noUser = true
 	let activity = t && appView.activity(t)
 	if (activity) v.activity = activity
-	let hal = halCursor.of(st.transcript, pulse.beat())
-	if (hal) v.hal = hal
 	let states = t && folds.state.folds.get(t.meta.id)
 	if (states?.size) v.folds = { states, sig: [...states].join() }
 	let tick = t && appView.tick(t, Date.now())
@@ -56,7 +52,20 @@ function view(): View {
 	if (t?.items.slice(-20).some((i) => frame.scrolls(i, now))) v.now = now
 	if (t) v.status = appView.status(t)
 	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
-	return v
+	return appView.blink(v)
+}
+
+// `v` with what blinks set for the current beat: the Hal cursor and
+// blinking tab marks.
+function blink(v: View): View {
+	let b = pulse.beat()
+	let out = { ...v }
+	let hal = halCursor.of(app.state.transcript, b)
+	if (hal) out.hal = hal
+	else delete out.hal
+	if (v.tabs && tabBar.blinks(v.tabs.list))
+		out.tabs = { ...v.tabs, lit: pulse.slow(b), alt: Math.floor(b / 4) % 2 === 1 }
+	return out
 }
 
 // The status row's facts (client/status-row.ts): the session's, and
@@ -139,4 +148,5 @@ export const appView = {
 	why,
 	tick,
 	blinks,
+	blink,
 }

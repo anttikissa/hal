@@ -129,19 +129,27 @@ function previewTheme(): void {
 }
 
 // The pulse beats while something in `v` blinks: every frame while a
-// Bash command scrolls, every other while a call's spinner turns.
+// Bash command scrolls, every other while a call's spinner turns, and
+// every other beat while only slow blinks (idle cursor, tab marks) do.
 function keepPulse(v: ReturnType<typeof appView.view>): void {
+	let slow = v.hal?.at !== 'stream' && !v.tick
 	pulse.keep(
 		appView.blinks(v) ? app.beat : null,
-		v.now !== undefined ? pulse.frame : v.tick?.call ? pulse.frame * 2 : pulse.ms,
+		v.now !== undefined ? pulse.frame : v.tick?.call ? pulse.frame * 2 : slow ? pulse.ms * 2 : pulse.ms,
 	)
 }
 
-// A beat of the pulse: a repaint, if a blink changed.
+// A beat of the pulse: a repaint, if a blink changed. While only the
+// Hal cursor and tab marks blink, the painted view gets the new phase
+// and only their rows are rewritten (render.blink); a ticking time or
+// a scrolling command needs the whole view.
 function beat(): void {
-	let v = appView.view()
+	let painted = render.state.view
+	let quick = painted.tick === undefined && painted.now === undefined
+	let v = quick ? appView.blink(painted) : appView.view()
 	keepPulse(v)
-	if (appView.blinks(v) !== appView.blinks(render.state.view)) render.show(v)
+	if (appView.blinks(v) === appView.blinks(painted)) return
+	if (!quick || !render.blink(v)) render.show(v)
 }
 
 function onEvent(event: Event): void {

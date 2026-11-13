@@ -15,10 +15,13 @@ const fast = (b: number): boolean => b % 2 === 0
 // Lit two beats, dark two (the idle cursor, blinking indicators).
 const slow = (b: number): boolean => b % 4 < 2
 
+// The next wakeup: the next interval boundary, and every beat while
+// the interval is finer; a coarser one (slow blinks only) skips beats.
 function schedule(): void {
 	let now = pulse.now()
 	let st = pulse.state
-	let next = Math.min((Math.floor(now / pulse.ms) + 1) * pulse.ms, (Math.floor(now / st.interval) + 1) * st.interval)
+	let after = (ms: number) => (Math.floor(now / ms) + 1) * ms
+	let next = st.interval < pulse.ms ? Math.min(after(pulse.ms), after(st.interval)) : after(st.interval)
 	st.timer = setTimeout(
 		() => {
 			st.timer = null

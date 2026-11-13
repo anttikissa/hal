@@ -91,6 +91,9 @@ interface RenderState {
 	/** Wall clock minus monotonic clock at the last draw; grows by the
 	 * time asleep. */
 	skew: number | undefined
+	/** The painted frame's cursor column and blinking rows (Frame.blinks). */
+	col: number
+	blinks: Frame['blinks']
 }
 
 const CSI = '\x1b['
@@ -116,6 +119,8 @@ function createState(): RenderState {
 		past: undefined,
 		slicing: null,
 		skew: undefined,
+		col: 0,
+		blinks: undefined,
 	}
 }
 
@@ -367,6 +372,8 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 	st.prev = lines
 	st.shape = shape
 	st.cursorRow = onScreen(next.cursor.row, lines.length, rows)
+	st.col = next.cursor.col
+	st.blinks = next.blinks
 	return [
 		SYNC_ON + HIDE_CURSOR,
 		...body,
@@ -383,6 +390,42 @@ function onScreen(row: number, length: number, rows: number): number {
 
 function column(col: number): string {
 	return col > 0 ? `\r${CSI}${col + 1}G` : '\r'
+}
+
+/**
+ * Paint `view`, which differs from the painted one only in its blink
+ * phase, by rewriting just its blinking rows: no frame is built, so an
+ * idle blink costs a few bytes. False when it cannot (a paint is due,
+ * the frame changed shape, or a row is off the screen); then paint
+ * as usual.
+ */
+function blink(view: View): boolean {
+	let st = render.state
+	let at = st.blinks
+	if (!st.out || !at || st.parked || st.dirty || st.full !== undefined) return false
+	if (terminal.state.external || terminal.state.suspended) return false
+	let { rows, cols } = st.out.size()
+	let idle = view.hal?.at === 'idle' ? view.hal : undefined
+	if (cols !== at.cols || !!idle !== (at.hal !== undefined) || !!view.tabs?.list.length !== (at.tabs !== undefined))
+		return false
+	let changed: [number, string][] = []
+	if (idle) changed.push([at.hal!, frame.halRow(idle)])
+	let was = st.view.tabs
+	if (view.tabs?.list.length && (view.tabs.lit !== was?.lit || view.tabs.alt !== was?.alt))
+		changed.push([at.tabs!, frame.tabRow(view.tabs, cols)])
+	changed = changed.filter(([row, line]) => st.prev[row] !== line)
+	if (changed.some(([row]) => row < st.prev.length - rows || flows(st.prev[row]))) return false
+	st.view = view
+	if (!changed.length) return true
+	let out = SYNC_ON + HIDE_CURSOR
+	let row = st.cursorRow
+	for (let [to, line] of changed) {
+		out += move(row, to) + `\r${CSI}2K` + line
+		st.prev[to] = line
+		row = to
+	}
+	st.out.write(out + move(row, st.cursorRow) + render.column(st.col) + SHOW_CURSOR + SYNC_OFF)
+	return true
 }
 
 /**
@@ -474,6 +517,7 @@ export const render = {
 	draw: (force = false, trigger?: string): void => renderView.draw(force, trigger),
 	request,
 	show: (view: View): void => renderView.show(view),
+	blink,
 	park,
 	init,
 	reset,

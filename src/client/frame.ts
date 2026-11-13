@@ -83,6 +83,20 @@ export interface Frame {
 	/** The transcript items in it and the row each ends at (Past). */
 	items?: Item[]
 	ends?: number[]
+	/** Rows that only blink, for render.blink: the idle Hal cursor's and
+	 * the tab bar's, on a terminal `cols` wide. None under a modal or
+	 * notices, which can cover them. */
+	blinks?: { cols: number; hal?: number; tabs?: number }
+}
+
+// The idle Hal cursor's row, as build draws it.
+function halRow(hal: HalCursor): string {
+	return ansi.side() + halCursor.glyph(hal)
+}
+
+// The tab bar's row, as build draws it.
+function tabRow(tabs: NonNullable<View['tabs']>, cols: number): string {
+	return tabBar.row(tabs.list, tabs.focused, cols, tabs.lit ?? true, tabs.alt)
 }
 
 // The prompt's content width on a terminal `cols` wide: what Up/Down
@@ -195,9 +209,11 @@ function build(
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.
 	// It is the work now, so it comes before waiting messages (the future).
+	let halAt: number | undefined
 	if (view.hal?.at === 'idle' && !formCursor) {
 		lines.push('')
-		lines.push(ansi.side() + halCursor.glyph(view.hal))
+		halAt = lines.length
+		lines.push(frame.halRow(view.hal))
 	}
 	// Running background jobs stream here (task 6nn), then unsent and
 	// waiting messages use the normal prompt renderer; queued ones stack
@@ -259,8 +275,7 @@ function build(
 	if (over !== undefined) lines.push(over)
 	else lines.push('')
 	let anchor = lines.length
-	if (view.tabs?.list.length)
-		lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true, view.tabs.alt))
+	if (view.tabs?.list.length) lines.push(frame.tabRow(view.tabs, cols))
 	lines.push(rule(join(p.above ? `↑${p.above}` : '', s.topLeft()), s.topCenter(view.activity), s.topRight()))
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols, ansi.PAD))
@@ -279,7 +294,7 @@ function build(
 	if (tick && lines.length - tick.row > rows && lines[tick.row] === tick.labeled) lines[tick.row] = tick.plain
 	top += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
-	let out = {
+	let out: Frame = {
 		lines,
 		cursor,
 		promptScroll: p.scroll,
@@ -287,6 +302,8 @@ function build(
 		items: past.items,
 		ends: past.ends,
 	}
+	if (!view.modal && !view.notices)
+		out.blinks = { cols, hal: halAt, tabs: view.tabs?.list.length ? history.length + pad + anchor : undefined }
 	if (!view.modal) return out
 	let m = modalView.withModal(lines, view.modal, rows, cols)
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
@@ -311,4 +328,6 @@ export const frame = {
 	queuedRows,
 	promptWidth,
 	scrolls,
+	halRow,
+	tabRow,
 }

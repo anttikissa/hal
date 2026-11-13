@@ -1,5 +1,5 @@
 {
-	version: 39,
+	version: 40,
 	changes: [
 		{
 			version: 2,
@@ -769,6 +769,26 @@
 					target: 'common/colors.colors',
 					description: 'input no longer has a placeholder color',
 					port: 'Drop it from themes'
+				}
+			]
+		},
+		{
+			version: 40,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'client/render.render',
+					description: 'Adds blink'
+				},
+				{
+					kind: 'compatible',
+					target: 'client/frame.frame',
+					description: 'Adds halRow, tabRow'
+				},
+				{
+					kind: 'compatible',
+					target: 'client/app-view.appView',
+					description: 'Adds blink'
 				}
 			]
 		}

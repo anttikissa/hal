@@ -144,7 +144,16 @@ test('a blink phase rewrites the cursor row alone', () => {
 	render.draw()
 	written = ''
 	now = 2 * pulse.ms
-	app.beat()
+	// An idle blink builds no frame: it is the client's idle CPU cost.
+	let build = frame.build
+	let built = 0
+	frame.build = (...a) => (built++, build(...a))
+	try {
+		app.beat()
+	} finally {
+		frame.build = build
+	}
+	expect(built).toBe(0)
 	render.draw()
 	expect(written.split('\x1b[2K').length).toBe(2)
 	// A beat that changes nothing paints nothing.
@@ -156,7 +165,7 @@ test('a blink phase rewrites the cursor row alone', () => {
 
 test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	let shown: string[] = []
-	render.show = (v) => void shown.push(JSON.stringify(v.tabs))
+	render.show = (v) => void ((render.state.view = v), shown.push(JSON.stringify(v.tabs)))
 	let tab = (state: SessionState) => ({ id: 't1', name: 't1', cwd: '/', model: 'm', state })
 	app.onEvent({ type: 'tabs', tabs: [tab({ type: 'idle' })] })
 	expect(pulse.running()).toBe(false)
@@ -185,5 +194,5 @@ test('tool climbing advances at 10fps without changing the normal blink beat', (
 	now = 100
 	expect(pulse.beat()).toBe(0)
 	state({ type: 'idle' })
-	expect(pulse.state.interval).toBe(pulse.ms)
+	expect(pulse.state.interval).toBe(pulse.ms * 2)
 })
