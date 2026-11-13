@@ -1,0 +1,6 @@
+{
+	title: 'scripts/fresh-hal: try Hal as a new user',
+	spec: "scripts/fresh-hal starts a fresh copy of this checkout, so the first-run intro (task vc) can be tried as a new user sees it. Each run stops a Hal still running from the last try, wipes /tmp/hal-fresh, clones the checkout there and applies its uncommitted changes and new untracked files, so work in progress is what runs. Ignored files stay behind (sessions, login, USER.md, config, plugins, local.ts); node_modules is a symlink to the checkout's and the fetched web fonts are copied. With no argument it runs the terminal client there; --web runs hal serve in the copy and opens the web client with a one-time login link; --app builds Hal.app for the copy (mac/build, task bap) inside it and opens it.",
+	status: 'done',
+	needs: ['vc', 'bap']
+}

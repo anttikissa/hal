@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Tries Hal as a brand-new user: copies this checkout, uncommitted
+# changes included, to a fresh clone in /tmp/hal-fresh (wiped each run:
+# no sessions, login, USER.md or plugins) and starts it there, so the
+# first-run intro shows. Task: qd9.
+set -euo pipefail
+
+dir=/tmp/hal-fresh
+mode=terminal
+case "${1:-}" in
+	'') ;;
+	--web) mode=web ;;
+	--app) mode=app ;;
+	*)
+		printf 'Usage: scripts/fresh-hal [--web | --app]\nStarts a fresh copy of this checkout in %s: the terminal client, the web\nclient in your browser (--web), or Hal.app built for the copy (--app).\n' "$dir"
+		[ "$1" = -h ] || [ "$1" = --help ]; exit ;;
+esac
+
+checkout="$(cd "$(dirname "$0")/.." && pwd)"
+# A Hal left running from the last try would hold the old copy's files.
+if pkill -f "$dir/src/main.ts"; then
+	while pgrep -f "$dir/src/main.ts" >/dev/null; do sleep 0.1; done
+fi
+rm -rf "$dir"
+git clone -q --no-hardlinks "$checkout" "$dir"
+# The working tree as it is now: uncommitted changes and new files, not
+# ignored ones.
+git -C "$checkout" diff --binary HEAD | git -C "$dir" apply --allow-empty
+real="$(cd "$dir" && pwd -P)"
+(cd "$checkout" && git ls-files -o --exclude-standard -z | cpio -0pdm --quiet "$real")
+# Ignored but needed: dependencies and the fetched web fonts.
+ln -s "$checkout/node_modules" "$dir/node_modules"
+cp -R "$checkout/src/web/fonts/." "$dir/src/web/fonts/"
+
+cd "$dir"
+case "$mode" in
+	terminal) exec ./run ;;
+	web)
+		bun "$dir/src/main.ts" serve >"$dir/serve.log" 2>&1 &
+		for _ in $(seq 50); do
+			if out="$(bun "$dir/src/main.ts" auth 2>/dev/null)"; then
+				open "$(sed -n 's/^Open: //p' <<<"$out" | head -1)"
+				echo "Hal serves $dir (log: $dir/serve.log); stop it with: pkill -f $dir/src/main.ts"
+				exit
+			fi
+			sleep 0.2
+		done
+		echo "hal serve did not start; see $dir/serve.log" >&2
+		exit 1 ;;
+	app)
+		mac/build "$dir/Hal.app"
+		open -n "$dir/Hal.app" ;;
+esac
