@@ -79,8 +79,8 @@ export const command: SlashCommand = {
 			let url = await login.url()
 			return {
 				ask: {
-					text: `Open this URL to log in to Claude:\n\n${url}\n\nThen paste the code#state value the page shows.`,
-					fields: [{ type: 'secret', name: 'code', label: 'code#state' }],
+					text: `Open this URL to log in to Claude:\n\n${url}\n\nThen paste the code the page shows.`,
+					fields: [{ type: 'secret', name: 'code', label: 'Code' }],
 				},
 				askArgs: which,
 			}

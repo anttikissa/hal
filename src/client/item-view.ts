@@ -313,7 +313,7 @@ function itemLines(
 			let details = forms.details(item.form)
 			return [
 				...ansi.wrap(titles.title(item)!, width).map((row) => ansi.heading(row, itemView.itemStyle(item))),
-				...details.flatMap((l) => ansi.wrap(l, width)),
+				...details.flatMap((l, i) => [...(i ? [] : ['']), ...ansi.wrap(l, width)]),
 				'',
 				...quote,
 				...(quote.length ? [''] : []),

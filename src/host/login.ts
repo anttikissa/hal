@@ -19,7 +19,7 @@ type Entry = Record<string, any>
 
 const REDIRECT = 'https://console.anthropic.com/oauth/code/callback'
 const SCOPE = 'org:create_api_key user:profile user:inference'
-const BAD_CODE = 'not a Claude login code; paste the whole code#state value from the page'
+const BAD_CODE = 'not a Claude login code; paste the whole code from the page'
 
 function base64url(bytes: Uint8Array): string {
 	return btoa(String.fromCharCode(...bytes))

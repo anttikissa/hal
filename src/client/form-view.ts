@@ -25,7 +25,7 @@ function formLines(
 	let quote = itemView.quoteLines(st.form.quote, width)
 	let rows = [
 		...ansi.wrap(titles.stamp(ts, forms.title(st.form)), width).map((row) => ansi.heading(row, colors.question())),
-		...forms.details(st.form).flatMap((l) => ansi.wrap(l, width)),
+		...forms.details(st.form).flatMap((l, i) => [...(i ? [] : ['']), ...ansi.wrap(l, width)]),
 		...(quote.length ? ['', ...quote] : []),
 	]
 	let f = formView.fieldLines(st, width)

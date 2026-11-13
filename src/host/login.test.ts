@@ -156,7 +156,7 @@ test('a login replaces the account with the same email and adds any other, keepi
 test('a bad code or a refused exchange is an error that never echoes the code, and writes nothing', async () => {
 	for (let code of ['', 'no-hash', 'a#short', 'a#b#c']) {
 		let e = await error(() => command.run('claude', { code }, ctx) as Promise<unknown>)
-		expect(e.message).toContain('code#state')
+		expect(e.message).toContain('paste the whole code')
 	}
 	expect(tokenRequests).toHaveLength(0)
 	tokenReply = () => Response.json({ error: 'invalid_grant', error_description: 'bad secret-code' }, { status: 400 })
