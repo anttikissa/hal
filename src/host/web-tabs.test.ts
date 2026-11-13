@@ -9,7 +9,7 @@ import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { testHome, useWeb, base, cookie, providerHome } from './web-fixture.test.ts'
+import { testHome, useWeb, base, cookieParts, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
@@ -58,7 +58,7 @@ browserTest('tab squares align with numerals and blink in terminal colors', asyn
 	try {
 		await server.serve()
 		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 		await b.waitFor(`!!document.querySelector('.Tabs .strip .tab .n')`)
@@ -102,7 +102,7 @@ browserTest(
 		try {
 			await server.serve()
 			web.start()
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width: 1200,
 				height: 800,

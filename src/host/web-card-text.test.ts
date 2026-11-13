@@ -9,7 +9,7 @@ import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { useWeb, base, cookie, providerHome } from './web-fixture.test.ts'
+import { useWeb, base, cookieParts, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
@@ -99,7 +99,7 @@ browserTest('interrupted answers keep accessible decoration outside prose at pho
 	try {
 		await server.serve()
 		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`document.querySelectorAll('.interrupted').length === 5`)
 		for (let width of [390, 1280]) {

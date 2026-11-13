@@ -30,7 +30,7 @@ test('a code logs in once with a 10-year HttpOnly SameSite=Strict cookie; a wron
 	// Plain HTTP on this machine: not Secure, or the browser would drop it.
 	expect(set).not.toMatch(/Secure/i)
 	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBe(10 * 365 * 24 * 3600)
-	let token = /hal=([^;]+)/.exec(set)![1]!
+	let token = /^hal(?:-\d+)?=([^;]+)/.exec(set)![1]!
 	expect(token).toMatch(/^[0-9a-hjkmnp-tv-z]{20}$/)
 	// Used up.
 	expect((await login(code)).status).toBe(401)
@@ -93,6 +93,13 @@ test('the login check and ws need the cookie', async () => {
 	expect((await dial(auth, '', 'https://evil.example')).opened).toBe(false)
 	expect((await dial(auth, '', '')).opened).toBe(false)
 	expect((await dial(auth)).opened).toBe(true)
+	// Browsers share cookies across ports: this port's cookie has its own
+	// name and still counts beside another Hal's hal cookie.
+	expect(auth).toStartWith(`hal-${web.state.server!.port}=`)
+	let token = auth.split('=')[1]
+	let both = { cookie: `hal=abcdefghjkmnpqrstvwx; hal-${web.state.server!.port}=${token}` }
+	expect((await fetch(`${base()}/login`, { headers: both })).status).toBe(204)
+	expect((await fetch(`${base()}/login`, { headers: { cookie: `hal=${token}` } })).status).toBe(204)
 })
 
 test('an expired or revoked token is refused, and revoking closes open pages', async () => {

@@ -57,7 +57,7 @@ async function login(at: string, code: string): Promise<string | undefined> {
 	if (!res.ok) throw new Error(`${at}: ${(await res.text()).trim() || `HTTP ${res.status}`}`)
 	for (let header of res.headers.getSetCookie()) {
 		let c = Bun.Cookie.parse(header)
-		if (c.name === 'hal' && c.value) return c.value
+		if (/^hal(-\d+)?$/.test(c.name) && c.value) return c.value
 	}
 	throw new Error(`${at} answered the login without a session cookie; is it a Hal host?`)
 }

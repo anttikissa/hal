@@ -8,7 +8,7 @@ import { turns } from './turns.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
-import { useWeb, base, cookie, providerHome } from './web-fixture.test.ts'
+import { useWeb, base, cookieParts, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
@@ -31,7 +31,7 @@ browserTest(
 		try {
 			await server.serve()
 			web.start()
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}` })
 			// Commands naming /help wait in the page until let go, so the
 			// pending card is shown (and done fading in) before it lands.
@@ -87,7 +87,7 @@ browserTest(
 			web.start()
 			let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 			tabs.insert(id, 0)
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}` })
 			await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
 			for (let [seed, delta, selector] of [
@@ -161,7 +161,7 @@ browserTest('a bottom reader stays at the bottom as content and composer change'
 		await server.serve()
 		web.start()
 		let id = tabs.create('/tmp')
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 		await b.call('Emulation.setDeviceMetricsOverride', {
 			width: 1200,
 			height: 800,
@@ -220,7 +220,7 @@ browserTest(
 			await server.serve()
 			web.start()
 			let id = tabs.create('/tmp')
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width: 1000,
 				height: 600,
@@ -285,7 +285,7 @@ browserTest(
 			await server.serve()
 			web.start()
 			let id = tabs.create('/tmp')
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}` })
 			await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
 			let finish = new Promise<void>((r) => {

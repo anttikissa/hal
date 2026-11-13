@@ -54,7 +54,25 @@ import { webLinks } from './web-links.ts'
 import { webPage } from './web-page.ts'
 import { serverLog } from './server-log.ts'
 
-const cookieName = 'hal'
+// Browsers share cookies across ports of one host, so each port's Hal
+// sets its own cookie: hal on 9001, hal-<port> elsewhere. Otherwise a
+// login to localhost:9002 replaces the 9001 token.
+function cookieName(): string {
+	let port = settings.state.listeningPort
+	return port === undefined || port === 9001 ? 'hal' : `hal-${port}`
+}
+
+// The hash of this host's live token among the request's Hal cookies:
+// tokens are per host, so another port's cookie never matches. Reading
+// every name keeps older hal cookies and `hal -r` (which sends hal) working.
+function loginHash(req: Request): string | undefined {
+	for (let [name, value] of new Bun.CookieMap(req.headers.get('cookie') ?? '')) {
+		if (name !== 'hal' && !/^hal-\d+$/.test(name)) continue
+		let h = webAuth.tokenHash(value)
+		if (webAuth.validHash(h)) return h
+	}
+	return undefined
+}
 
 type Data = {
 	loginHash?: string
@@ -68,8 +86,8 @@ type Data = {
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
-	let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
-	if (!webAuth.validHash(h)) return false
+	let h = web.loginHash(req)
+	if (!h) return false
 	webAuth.touch(h)
 	return true
 }
@@ -98,7 +116,7 @@ function redeem(code: unknown, req: Request, ip?: string): { cookie?: string; re
 	let local =
 		['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
 	let maxAge = Math.floor(webAuth.tokenMs / 1000)
-	let cookie = new Bun.Cookie(cookieName, out.token, {
+	let cookie = new Bun.Cookie(web.cookieName(), out.token, {
 		path: '/',
 		httpOnly: true,
 		secure: !local,
@@ -197,15 +215,15 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (pathname === '/login' && req.method === 'POST') return web.login(req, srv.requestIP(req)?.address)
 	if (pathname === '/logout' && req.method === 'POST') {
 		if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
-		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
-		if (!webAuth.validHash(h)) return new Response('log in first\n', { status: 401 })
+		let h = web.loginHash(req)
+		if (!h) return new Response('log in first\n', { status: 401 })
 		webAuth.list()
 		web.revoke((webAuth.store()[h!] as import('./web-auth.ts').WebLogin).id)
 		return new Response(null, {
 			status: 303,
 			headers: {
 				location: '/',
-				'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+				'set-cookie': `${web.cookieName()}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`,
 				'cache-control': 'no-store',
 			},
 		})
@@ -238,8 +256,8 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	let v = params.get('v')
 	let manualUpdates = v !== null && params.get('updates') === 'manual'
 	let stale = v !== null && v !== (await webPage.version())
-	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
-	if (!webAuth.validHash(loginHash)) return new Response('log in first\n', { status: 401 })
+	let loginHash = web.loginHash(req)
+	if (!loginHash) return new Response('log in first\n', { status: 401 })
 	if (
 		srv.upgrade(req, {
 			data: {
@@ -372,6 +390,8 @@ export const web = {
 	},
 	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),
+	cookieName,
+	loginHash,
 	authorized,
 	sameOrigin,
 	redeem,

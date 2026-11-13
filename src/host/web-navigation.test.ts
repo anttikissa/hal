@@ -12,7 +12,7 @@ import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
-import { useWeb, base, cookie } from './web-fixture.test.ts'
+import { useWeb, base, cookieParts } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
@@ -40,7 +40,7 @@ browserTest(
 				deviceScaleFactor: 1,
 				mobile: false,
 			})
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}` })
 			await b.waitFor(
 				`document.querySelector('main')?.innerText.includes('thought 3') && !document.querySelector('main')?.innerText.includes('prompt 0')`,
@@ -123,7 +123,7 @@ browserTest(
 				deviceScaleFactor: 1,
 				mobile: false,
 			})
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}#${result.n}` })
 			await b.waitFor(`!!document.querySelector('.Card.target.open')?.innerText.includes('row 40')`)
 			let seen = await b.evaluate(`(() => {

@@ -65,6 +65,12 @@ export async function cookie(): Promise<string> {
 	return res.headers.get('set-cookie')!.split(';')[0]!
 }
 
+// The login cookie as name and value, for a browser's cookie jar.
+export async function cookieParts(): Promise<{ name: string; value: string }> {
+	let [name, value] = (await cookie()).split('=') as [string, string]
+	return { name, value }
+}
+
 export async function until(check: () => unknown): Promise<void> {
 	for (let i = 0; i < 500; i++) {
 		if (check()) return

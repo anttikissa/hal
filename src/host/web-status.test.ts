@@ -10,7 +10,7 @@ import { server } from './server.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 import { webPage } from './web-page.ts'
-import { useWeb, base, cookie, providerHome } from './web-fixture.test.ts'
+import { useWeb, base, cookieParts, providerHome } from './web-fixture.test.ts'
 import { browser, browserTest, useChrome } from './web-chrome-fixture.test.ts'
 
 useWeb()
@@ -174,7 +174,7 @@ browserTest(
 				deviceScaleFactor: 1,
 				mobile: true,
 			})
-			await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+			await b.call('Network.setCookie', { ...(await cookieParts()), url: base() })
 			await b.call('Page.navigate', { url: `${base()}/${id}` })
 			await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 			let input = (text: string) =>
