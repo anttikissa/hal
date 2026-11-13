@@ -277,6 +277,7 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 			let to = onScreen(next.cursor.row, lines.length, rows)
 			let out = move(st.cursorRow, to) + render.column(next.cursor.col)
 			st.cursorRow = to
+			st.col = next.cursor.col
 			if (lines.length > rows) st.fullscreen = true
 			st.shape = shape
 			return [out]

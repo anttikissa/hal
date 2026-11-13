@@ -163,6 +163,26 @@ test('a blink phase rewrites the cursor row alone', () => {
 	expect(written).toBe('')
 })
 
+test('a blink leaves the terminal cursor where the prompt has it', async () => {
+	let written = ''
+	render.init({ write: (s) => void (written += s), size: () => ({ rows: 30, cols: 40 }) })
+	render.frameMs = 0
+	app.onEvent(snapshot())
+	let press = (key: string, text?: string) =>
+		app.onKeys([{ key, text, shift: false, alt: false, ctrl: false, cmd: false }])
+	for (let c of 'abcdef') press(c, c)
+	await Bun.sleep(5)
+	// Only the cursor moves: the frame's rows stay the same.
+	written = ''
+	press('home')
+	await Bun.sleep(5)
+	expect(written).toBe('\r\x1b[2G')
+	written = ''
+	now = 2 * pulse.ms
+	app.beat()
+	expect(written).toEndWith('\r\x1b[2G\x1b[?25h\x1b[?2026l')
+})
+
 test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	let shown: string[] = []
 	render.show = (v) => void ((render.state.view = v), shown.push(JSON.stringify(v.tabs)))
