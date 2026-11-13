@@ -12,6 +12,7 @@ import { findQuery } from './find.ts'
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
 	'subscription-usage': { accounts: 'o', replace: 'b?' },
+	'find-open': { sessionId: 's' },
 	'find-results': { request: 's', tier: 's', results: 'a', done: 'b', scanning: 'i?', error: 's?' },
 	'find-preview': { sessionId: 's', blockId: 's', kind: 's', query: 's', records: 'a', error: 's?' },
 	'rebase-result': { sessionId: 's', command: 's?', ok: 'b', text: 's' },

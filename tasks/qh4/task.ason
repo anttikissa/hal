@@ -3,7 +3,8 @@
 	spec: 'The web tab menu has a Find action that closes the menu and opens the existing Find dialog. Bare /find opens that same dialog in each client following the session and records no history entry. /find <query> keeps its existing ranked search output.',
 	status: 'done',
 	notes: [
-		'Bare /find sends a session-scoped find-open event; its command record is suppressed. The web menu closes before opening the existing Picker dialog.'
+		'Bare /find sends a session-scoped find-open event; its command record is suppressed. The web menu closes before opening the existing Picker dialog.',
+		'The wire event schema accepts find-open with its sessionId. The native Picker search input is the autofocus target when the dialog opens, including mobile web. Checked bare /find through a real browser at 390x760 with touch enabled: dialog opens and document.activeElement is its search field.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']

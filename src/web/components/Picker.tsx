@@ -120,6 +120,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			type="text"
 			aria-label={props.modal?.find ? 'Find' : (props.modal?.question ?? 'Search')}
 			autocomplete="off"
+			autofocus
 			aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
 			placeholder={
 				props.modal?.find

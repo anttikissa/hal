@@ -69,6 +69,14 @@ afterEach(() => {
 	connection.random = origRandom
 })
 
+test('Find opener reaches clients through event validation', async () => {
+	answers = ['client']
+	await start()
+	let event = { type: 'find-open' as const, sessionId: '01-test' }
+	conns[0]!.deliver(event)
+	expect(events).toContainEqual(event)
+})
+
 test('joining, connected, then disconnected with a retry time until the host is back', async () => {
 	answers = ['client']
 	await start()
