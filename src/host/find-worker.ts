@@ -93,7 +93,7 @@ function hit(row: FindRow, c: Context): FindResult | undefined {
 }
 
 function home(dir: string): string {
-	let h = paths.home()
+	let h = homedir()
 	return dir === h || dir.startsWith(h + '/') ? '~' + dir.slice(h.length) : dir
 }
 
