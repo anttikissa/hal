@@ -403,7 +403,8 @@ export type Event =
 	| { type: 'ack'; id: string; tab?: string }
 	// A one-time web login code (valid 10 minutes) and the web address it
 	// works at; `url` is absent while the host's web server does not listen.
-	| { type: 'auth-code'; code: string; url?: string }
+	// `local`: the localhost address, which works without network.
+	| { type: 'auth-code'; code: string; url?: string; local?: string }
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }

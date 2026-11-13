@@ -269,10 +269,12 @@ function shown(): void {
 // code (host/web-auth.ts) and prints it. It never becomes host itself:
 // a code from a process about to exit would log nobody in.
 // It prints the address the host gives, or exits 1 while its web server
-// does not listen yet; Hal.app reads the Open: line (task bap).
+// does not listen yet. When that address is not localhost, a Local: line
+// gives the localhost one; Hal.app opens it, else the Open: line (task bap).
 async function auth(count = 1): Promise<number> {
 	let codes: string[] = []
 	let address: string | undefined
+	let local: string | undefined
 	let answer = await new Promise<{ codes?: string[]; error?: string }>((resolve) => {
 		let timer = setTimeout(() => resolve({ error: 'the host did not answer' }), main.authWaitMs)
 		let done = (out: { codes?: string[]; error?: string }) => {
@@ -286,6 +288,7 @@ async function auth(count = 1): Promise<number> {
 					if (e.type === 'auth-code') {
 						codes.push(e.code)
 						address = e.url
+						local = e.local
 						if (codes.length === count) done({ codes })
 					} else if (e.type === 'rejected' && e.command === 'get-auth-code')
 						done({ error: `the host refused: ${e.reason}` })
@@ -305,7 +308,7 @@ async function auth(count = 1): Promise<number> {
 		process.stderr.write('hal: the host has no web server listening yet\n')
 		return 1
 	}
-	process.stdout.write(`${webAuth.message(answer.codes, address)}\n`)
+	process.stdout.write(`${webAuth.message(answer.codes, address, local)}\n`)
 	return 0
 }
 

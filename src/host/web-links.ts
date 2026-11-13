@@ -13,11 +13,13 @@ import { webAuth } from './web-auth.ts'
 type Holder = { deliver: (event: Event) => void; code: string; timer: ReturnType<typeof setTimeout> }
 
 // `code` and where it works: the configured webUrl, else the port the
-// web server really listens on, if it listens yet.
+// web server really listens on, if it listens yet; `local` is always
+// that port, for clients on this machine (Hal.app needs no network).
 function event(code: string): Event {
 	let port = settings.state.listeningPort
-	let url = (settings.value('webUrl') as string) || (port ? `http://localhost:${port}` : '')
-	return { type: 'auth-code', code, ...(url && { url: url.replace(/\/+$/, '') }) }
+	let local = port ? `http://localhost:${port}` : ''
+	let url = (settings.value('webUrl') as string) || local
+	return { type: 'auth-code', code, ...(url && { url: url.replace(/\/+$/, '') }), ...(local && { local }) }
 }
 
 // Gives `key`'s client a fresh code and the address, replacing any it had.

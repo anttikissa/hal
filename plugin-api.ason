@@ -1,5 +1,5 @@
 {
-	version: 40,
+	version: 41,
 	changes: [
 		{
 			version: 2,
@@ -789,6 +789,16 @@
 					kind: 'compatible',
 					target: 'client/app-view.appView',
 					description: 'Adds blink'
+				}
+			]
+		},
+		{
+			version: 41,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Event',
+					description: 'auth-code adds optional field local'
 				}
 			]
 		}

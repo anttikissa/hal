@@ -175,7 +175,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
 				let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
 				last = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
 				p.waitUntilExit()
-				let open = text.split(separator: "\n").first { $0.hasPrefix("Open: ") }?.dropFirst(6)
+				let lines = text.split(separator: "\n")
+				let open = (lines.first { $0.hasPrefix("Local: ") } ?? lines.first { $0.hasPrefix("Open: ") })?.split(separator: " ", maxSplits: 1).last
 				if p.terminationStatus == 0, let open, let u = URL(string: String(open)) {
 					DispatchQueue.main.async {
 						self.origin = "\(u.scheme ?? "http")://\(u.host ?? ""):\(u.port ?? (u.scheme == "https" ? 443 : 80))"

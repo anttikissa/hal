@@ -171,14 +171,17 @@ function close(): void {
 
 // The /auth and `hal auth` text: the code, a link carrying it, and how
 // to connect a terminal. Shown, never saved, so the visible code is fine.
-function message(codes: string | string[], url = settings.webUrl()): string {
-	let logins = (typeof codes === 'string' ? [codes] : codes)
+// A `local` address other than `url` adds Local: links (Hal.app's).
+function message(codes: string | string[], url = settings.webUrl(), local?: string): string {
+	let list = typeof codes === 'string' ? [codes] : codes
+	let logins = list
 		.map(
 			(code) =>
 				`Login code (works once, for ${Math.round(webAuth.codeMs / 60_000)} minutes): ${code}\n\nOpen: ${url}/?auth=${code}`,
 		)
 		.join('\n\n')
-	return `${logins}\nOr connect a terminal: hal -r ${url.replace(/^https?:\/\//, '')}`
+	let locals = local && local !== url ? list.map((code) => `\nLocal: ${local}/?auth=${code}`).join('') : ''
+	return `${logins}\nOr connect a terminal: hal -r ${url.replace(/^https?:\/\//, '')}${locals}`
 }
 
 export const webAuth = {
