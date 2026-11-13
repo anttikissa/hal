@@ -37,7 +37,8 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 		promptFiles.check(watchers) // first sight: remembered, nothing shown
 		expect(got).toEqual({ a: [], b: [] })
 
-		writeFileSync(`${root}/AGENTS.md`, 'v2')
+		// Sizes change: a same-size write within one mtime tick goes unseen.
+		writeFileSync(`${root}/AGENTS.md`, 'v2 longer')
 		writeFileSync(`${root}/sub/CLAUDE.md`, 'new')
 		writeFileSync(`${other}/../AGENTS.md`, 'outside every project')
 		promptFiles.check(watchers)
@@ -47,7 +48,7 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 		])
 		expect(got.b).toEqual([])
 
-		writeFileSync(`${testHome()}/inc.md`, 'i2')
+		writeFileSync(`${testHome()}/inc.md`, 'i2 longer')
 		rmSync(`${root}/AGENTS.md`)
 		promptFiles.check(watchers)
 		expect(got.a.slice(2).map((e) => [e.name, e.what])).toEqual([
@@ -55,7 +56,7 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 			['AGENTS.md', 'deleted'],
 		])
 		expect(got.b.map((e) => [e.name, e.what, e.session])).toEqual([['inc.md', 'changed', elsewhere]])
-		writeFileSync(system, 'v2\n@inc.md\n')
+		writeFileSync(system, 'v2 longer\n@inc.md\n')
 		promptFiles.check(watchers)
 		expect(got.b.map((e) => e.name)).toEqual(['inc.md', 'SYSTEM.md'])
 	} finally {

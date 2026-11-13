@@ -137,7 +137,7 @@ function interactive(id: string): boolean {
 
 // state.noUser: this host process runs with --no-user, so no tab's
 // prompt has USER.md.
-function input(id: string, selected?: PromptInput): PromptInput {
+function input(id: string, selected?: Partial<PromptInput>): PromptInput {
 	let meta = sessions.open(id)
 	return {
 		cwd: meta.cwd,
@@ -145,7 +145,7 @@ function input(id: string, selected?: PromptInput): PromptInput {
 		now: Date.now(),
 		sessionId: id,
 		noUser: promptCache.state.noUser,
-		interactive: promptCache.interactive(id),
+		interactive: selected?.interactive ?? promptCache.interactive(id),
 		parent: meta.parent,
 		forkedFrom: meta.forkedFrom,
 		slots: meta.slots,
