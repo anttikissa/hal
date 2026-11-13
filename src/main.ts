@@ -380,6 +380,7 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 				paths.home(),
 				'serve',
 				...(promptCache.state.noUser ? ['--no-user'] : []),
+				...(job.anthropicUrl ? ['--anthropic-url', job.anthropicUrl] : []),
 			],
 			{ env: process.env, stdio: ['ignore', log, log], detached: true },
 		)
@@ -408,6 +409,12 @@ async function start(): Promise<void> {
 		process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
 	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
 	if ('noUser' in parsed && parsed.noUser) promptCache.state.noUser = true
+	if (parsed.anthropicUrl) {
+		// Imported only here: model adapters load on first use.
+		let { anthropic } = await import('./host/anthropic.ts')
+		anthropic.apiUrl = new URL('v1/messages?beta=true', parsed.anthropicUrl.replace(/\/*$/, '/')).href
+		anthropic.gzip = false
+	}
 	if (parsed.home) paths.state.home = toolView.home = resolve(parsed.home)
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')

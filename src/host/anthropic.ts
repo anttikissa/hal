@@ -166,7 +166,13 @@ async function headers(
 async function request(req: ProviderRequest) {
 	let { headers, oauth, account } = await anthropic.headers(req.model, req)
 	// The Messages API takes gzip bodies (zstd is refused with a 400).
-	return { url: anthropic.apiUrl, headers, body: anthropic.body(req, oauth), account, encoding: 'gzip' as const }
+	return {
+		url: anthropic.apiUrl,
+		headers,
+		body: anthropic.body(req, oauth),
+		account,
+		...(anthropic.gzip && { encoding: 'gzip' as const }),
+	}
 }
 
 // The models the account may use (GET /v1/models). On failure the
@@ -337,6 +343,8 @@ export const anthropic = {
 	// ?beta=true is required for OAuth tokens; without it requests land
 	// on a pool that answers 529 overloaded far more often.
 	apiUrl: 'https://api.anthropic.com/v1/messages?beta=true',
+	// --anthropic-url turns this off: other servers may not take gzip.
+	gzip: true,
 	// Current Claude models allow at least 64k output: big file writes.
 	maxTokens: 64_000,
 	thinkingBudget: 10_000,

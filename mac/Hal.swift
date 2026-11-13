@@ -124,8 +124,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
 
 	// Exit 100 is /restart host: start again, like ./run. Exit 1 when
 	// another hal serve hosts; join() then finds that host.
+	// ANTHROPIC_BASE_URL in the app's environment (benchmarks set it with
+	// launchctl setenv to point at a replay server) becomes the flag.
 	func startServe() {
-		let p = hal(["serve"])
+		let url = env["ANTHROPIC_BASE_URL"].flatMap { $0.isEmpty ? nil : ["--anthropic-url", $0] } ?? []
+		let p = hal(["serve"] + url)
 		serveOutput.attach(p)
 		p.terminationHandler = { p in
 			DispatchQueue.main.async {

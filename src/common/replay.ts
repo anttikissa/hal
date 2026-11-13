@@ -16,6 +16,7 @@ import type {
 import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
 import { replayText } from './replay-text.ts'
+import { settings } from './settings.ts'
 import { modelNotices, type Notice } from './model-notices.ts'
 import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
@@ -359,13 +360,14 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (!texts.length) continue
 			// Never merged: a prompt always starts a message of its own. Its
 			// texts (several when it delivers the inbox) are one block, each
-			// under its own header. Its images (task 2a) follow the text.
+			// under its own header unless promptTime is off. Its images (task
+			// 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
 			let text = texts
-				.map(
-					(b) =>
-						`${header(r.ts, ref(r, replayText.letter(b), r.blocks.indexOf(b)), replayText.tags(b))}\n${replayText.framed(b)}`,
-				)
+				.map((b) => {
+					let head = header(r.ts, ref(r, replayText.letter(b), r.blocks.indexOf(b)), replayText.tags(b))
+					return settings.promptTime() ? `${head}\n${replayText.framed(b)}` : replayText.framed(b)
+				})
 				.join('\n\n')
 			out.push({ role: 'user', blocks: [{ type: 'text', text }, ...images.map((b) => ({ ...b }))] })
 		}

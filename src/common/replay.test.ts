@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import type { AssistantBlock, Message, UserBlock } from './blocks.ts'
 import { inbox } from './inbox.ts'
 import { replay, type HistoryRecord, type TurnStatus } from './replay.ts'
+import { settings } from './settings.ts'
 
 const ts = '2026-01-01T00:00:00.000Z'
 const user = (...blocks: UserBlock[]): HistoryRecord => ({ type: 'user', blocks, ts })
@@ -375,4 +376,14 @@ test('replay headers carry block ids, steering, durations and what the model wro
 		{ type: 'user', blocks: [{ type: 'text', text: 'bye' }], ts: at(12, 44), n: 11 },
 	])
 	expect(JSON.stringify(more.slice(0, msgs.length))).toBe(JSON.stringify(msgs))
+})
+
+test('promptTime false sends the prompt text alone, as typed', () => {
+	settings.state.raw = { promptTime: false }
+	try {
+		let msgs = replay.toMessages([say('one'), end('completed'), say('replay:seed')])
+		expect(prompts(msgs)).toEqual(['one', 'replay:seed'])
+	} finally {
+		settings.state.raw = {}
+	}
 })

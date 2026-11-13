@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Prototype, measured 2026-11-13 on an M-series Mac (macOS 27.2, scratch home): launch to live WebSocket 0.46-0.76 s; footprint of all app processes 175 MB (Hal 21, hal serve 56, WebContent 79, GPU 14, Networking 6); idle CPU over 60 s 0.25% total, mostly hal serve (0.15 s), the same with the window hidden. Reading the login shell environment (zsh -ilc env) costs about 70 ms. Five launches left one token in web-sessions.ason.',
-		'A GUI app gets launchd PATH only, so tools would miss bun, Homebrew and ~/.local/bin: the app reads $SHELL -ilc env once (5 s cap) and gives it to its children. The app waits for its own serve to log web on before asking hal auth, else a terminal handing over could answer with an address about to vanish. Not handled yet: a crashed app orphans its hal serve (the next launch joins it); no app icon; notifications in Hal.app are untested.'
+		'A GUI app gets launchd PATH only, so tools would miss bun, Homebrew and ~/.local/bin: the app reads $SHELL -ilc env once (5 s cap) and gives it to its children. The app waits for its own serve to log web on before asking hal auth, else a terminal handing over could answer with an address about to vanish. Not handled yet: a crashed app orphans its hal serve (the next launch joins it); no app icon; notifications in Hal.app are untested.',
+		'A non-empty ANTHROPIC_BASE_URL in the app environment (benchmarks set it with launchctl setenv) becomes hal serve --anthropic-url.'
 	],
 	needs: ['fd1', 'kp0', 'hd', '8a', 'crv']
 }

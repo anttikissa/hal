@@ -8,7 +8,8 @@
 		"The artifact's thinking budget, min(10000, MAX_TOKENS - 1), only works with its fixed 64k max_tokens. With a caller-supplied maxTokens, the API needs 1024 <= budget_tokens < max_tokens, so thinking is skipped when maxTokens is too small for it.",
 		'redacted_thinking has no text: it is stored as a thinking block with signature `{"redacted": data}` and turned back into redacted_thinking on replay. Unsigned thinking, or thinking signed by another provider, is dropped rather than sent, because the API rejects it.',
 		"The artifact's web_search server tool, usage logging and 429 credential rotation were deliberately left out.",
-		'Bug fix (11 Nov: Fable 5.2 failed with HTTP 400, Claude Code 2.1.280 does not support this model; 2.1.290 or newer is required): invariant: CLAUDE_CODE_VERSION in src/host/anthropic.ts is at least the minimum the API demands for every served model. Raised to 2.1.322, the latest on npm then; a real Fable 5.2 request worked.'
+		'Bug fix (11 Nov: Fable 5.2 failed with HTTP 400, Claude Code 2.1.280 does not support this model; 2.1.290 or newer is required): invariant: CLAUDE_CODE_VERSION in src/host/anthropic.ts is at least the minimum the API demands for every served model. Raised to 2.1.322, the latest on npm then; a real Fable 5.2 request worked.',
+		'hal --anthropic-url <base> (hal, hal serve, hal -p; print mode forwards it to the host it spawns) sends Anthropic requests to <base>/v1/messages?beta=true without gzip, for local replay servers that may not take gzip. Invariant: the anthropic module still loads only on first use; main.ts imports it dynamically, and only when the flag is given.'
 	],
 	needs: ['7f', 'b8']
 }

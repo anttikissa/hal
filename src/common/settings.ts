@@ -114,6 +114,14 @@ const table: Setting[] = [
 		description: 'Send web push notifications to subscribed devices.',
 	},
 	{
+		name: 'promptTime',
+		label: 'Prompt time headers',
+		type: { kind: 'boolean' },
+		default: true,
+		description:
+			'Send each prompt to the model under a [time id] header; false sends the prompt text alone (e.g. for replay benchmarks that match it exactly).',
+	},
+	{
 		name: 'webDiagnostics',
 		label: 'Web diagnostics',
 		type: { kind: 'boolean' },
@@ -268,6 +276,7 @@ export const settings = {
 	maxRounds: (): number => settings.value('maxRounds') as number,
 	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
+	promptTime: (): boolean => settings.value('promptTime') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
 	shortRows: (): number => settings.value('cardVerbosityShortRows') as number,

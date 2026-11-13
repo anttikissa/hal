@@ -23,7 +23,7 @@ export type Args = (
 			delivery?: Delivery
 	  }
 	| { kind: 'error'; message: string }
-) & { home?: string }
+) & { home?: string; anthropicUrl?: string }
 
 const help = `Usage:
   hal                         start the terminal client
@@ -47,6 +47,8 @@ Options:
   --home <dir>                use this Hal home instead of the checkout
   --no-user                   leave your notes (USER.md) out of every tab's prompt;
                               only for hal, hal serve and hal -p, used by the process that hosts
+  --anthropic-url <url>       send Anthropic model requests to this base URL
+                              (e.g. a local replay server); hal, hal serve and hal -p
 `
 
 type Kind = Exclude<Args['kind'], 'error'>
@@ -64,6 +66,7 @@ type Out = {
 	session?: string
 	keep?: true
 	delivery?: Delivery
+	anthropicUrl?: string
 }
 type Entry = { names: string[]; value?: string; kind?: Kind; within?: Entry; set?: (out: Out, value: string) => void }
 
@@ -132,6 +135,9 @@ arg('--home <dir>', (out, dir) => {
 arg('--no-user', (out) => {
 	out.noUser = true
 })
+arg('--anthropic-url <url>', (out, url) => {
+	out.anthropicUrl = /^https?:\/\/[^/]/.test(url) ? url : fail(`--anthropic-url needs an http(s) URL, got ${url}`)
+})
 
 const find = (list: Entry[], token: string) => list.find((e) => e.names.includes(token))
 
@@ -174,6 +180,8 @@ function parse(argv: string[]): Args {
 			if (e.within && e.within !== selected) fail(`${e.names[0]} applies only to hal ${e.within.names[0]}`)
 		if (out.noUser && !['terminal', 'serve', 'print'].includes(out.kind))
 			fail('--no-user applies only to hal, hal serve and hal -p')
+		if (out.anthropicUrl && !['terminal', 'serve', 'print'].includes(out.kind))
+			fail('--anthropic-url applies only to hal, hal serve and hal -p')
 		if (out.session && out.keep) fail('--keep cannot be used with --session')
 		if (out.session && out.noTrust) fail('--no-trust cannot be used with --session')
 		if (out.session && out.dir) fail('--dir cannot be used with --session; use /cd to change its directory')
