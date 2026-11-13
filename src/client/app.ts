@@ -111,7 +111,10 @@ function show(): void {
 	clearTimeout(st.typing)
 	let f = st.form ?? st.modal?.form
 	let now = pulse.now()
-	let next = Math.min(Infinity, ...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
+	let next = Math.min(
+		...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []),
+		(st.form && forms.settleIn(st.form, now)) || Infinity,
+	)
 	if (next === Infinity) return
 	st.typing = setTimeout(app.show, pulse.until(next))
 	;(st.typing as { unref?: () => void }).unref?.()
@@ -312,6 +315,7 @@ function onKeys(events: KeyEvent[]): void {
 			tabSwitch.watch()
 			continue
 		}
+		forms.keyed(k)
 		delete st.choices
 		// Typing snaps the terminal to the bottom, so blocks held tall
 		// (task fn) may shrink now without a jolt.

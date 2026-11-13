@@ -4,6 +4,7 @@
 import { expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
+import { forms } from '../common/forms.ts'
 import { modals } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
 import type { Snapshot } from '../common/snapshot.ts'
@@ -256,6 +257,7 @@ test('typing updates the shared draft; a draft from elsewhere fills the prompt',
 test('an open question takes the keys until it is answered; the prompt keeps its text', () => {
 	app.onEvent(snapshot())
 	type('draft')
+	forms.state.typed -= 1000 // typing stopped before the question (task qs7)
 	let form = { text: 'How should I call you?', fields: [{ type: 'text' as const, name: 'name' }] }
 	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })

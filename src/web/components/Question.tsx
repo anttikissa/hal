@@ -60,6 +60,18 @@ export function Question(props: {
 		tick()
 		return () => clearTimeout(timer)
 	})
+	// Repaints when a question that opened while typing starts taking keys.
+	let [tock, setTock] = createSignal(0)
+	let settling = createMemo(() => (tock(), forms.settleIn(props.form) > 0))
+	createEffect(
+		() => props.form.settling,
+		() => {
+			let left = forms.settleIn(props.form)
+			if (!left) return
+			let timer = setTimeout(() => setTock((n) => n + 1), left)
+			return () => clearTimeout(timer)
+		},
+	)
 	let submit = (e: SubmitEvent) => {
 		e.preventDefault()
 		app.submitForm()
@@ -168,6 +180,11 @@ export function Question(props: {
 					)
 				}
 			</For>
+			<Show when={settling()}>
+				<p class="details" role="status">
+					Waiting for typing to stop
+				</p>
+			</Show>
 			<Show when={form().fields.some((f) => f.type !== 'choice') || form().fields.length > 1}>
 				<button class="answer">
 					<Icon name="check" />

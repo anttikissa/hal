@@ -9,7 +9,7 @@
 // the old Hal. Pure.
 
 import { colors } from '../common/colors.ts'
-import type { FormState } from '../common/forms.ts'
+import { forms, type FormState } from '../common/forms.ts'
 import { sendKeys } from '../common/send-keys.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
@@ -56,7 +56,8 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	let h = colors.help()
 	let line = (text: string, fg = h.description!) =>
 		ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
-	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
+	if (v.form)
+		return line(forms.settleIn(v.form) ? 'Waiting for typing to stop' : helpRow.paint(helpRow.question(v.form)))
 	if (v.editing) {
 		let parts = /^(\[[^\]]+\]) (.*)$/.exec(v.editing)
 		return parts

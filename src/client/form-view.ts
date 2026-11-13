@@ -30,7 +30,11 @@ function formLines(
 	]
 	let f = formView.fieldLines(st, width)
 	let escape = st.form.skip ? 'Escape: skip question' : 'Escape: pause'
-	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`
+	let hint = forms.settleIn(st)
+		? 'Waiting for typing to stop'
+		: st.form.fields.length > 1
+			? `Enter: next · Tab: move · ${escape}`
+			: `Enter: answer · ${escape}`
 	// The fields stand apart: a blank row above and below them.
 	let cursor = { row: rows.length + 1 + f.cursor.row, col: f.cursor.col }
 	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(hint, width), colors.question())], cursor }

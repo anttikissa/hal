@@ -20,7 +20,7 @@ import { queuedPrompt } from './queue-edit.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import { findDialog } from '../common/find-dialog.ts'
-import type { Key } from '../common/forms.ts'
+import { forms, type Key } from '../common/forms.ts'
 import { prompt } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
 import { settings } from '../common/settings.ts'
@@ -101,6 +101,7 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
+	if (k) forms.keyed(k)
 	let named =
 		k &&
 		commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name
@@ -169,6 +170,11 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	if (st.view.form) {
+		// A question that opened while typing waits for it to stop (forms.settleIn).
+		if (k && !e.metaKey && !e.ctrlKey && forms.settleIn(st.view.form)) {
+			app.setView(view.formKey(st.view, k).state)
+			return true
+		}
 		// Native Tab reaches every control and URL; Enter on a URL never answers.
 		if (e.key === 'Tab' || (target.kind === 'link' && e.key === 'Enter')) return false
 		// Text fields edit natively, a submit button submits, Cmd and Ctrl

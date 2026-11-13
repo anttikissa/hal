@@ -228,6 +228,16 @@ test('a client keeps what was typed while the same question is open, and starts 
 	expect(forms.follow(typedIn, undefined)).toBeUndefined()
 })
 
+test('a question opening while the user types ignores keys until typing stops; one after Enter does not', () => {
+	let now = Date.now()
+	forms.keyed(k('x', 'x'), now)
+	let st = forms.follow(undefined, { id: 'q', form: yesNo })!
+	expect(forms.step(st, k('y', 'y'), now + 400)).toEqual({ state: { ...st, settling: now + 400 } })
+	expect(forms.step(st, k('y', 'y'), now + 600).action).toEqual({ type: 'submit', answers: { ok: 'yes' } })
+	forms.keyed(k('enter'), now)
+	expect(forms.follow(undefined, { id: 'q', form: yesNo })!.settling).toBeUndefined()
+})
+
 test('a quote cuts into plain and marked parts in order, overlapping marks merged', () => {
 	let parts = forms.quoteParts({
 		text: 'ls; rm -rf a; git reset --hard',

@@ -1,0 +1,7 @@
+{
+	title: 'Questions wait for typing to stop',
+	spec: 'A question that opens on a client while the user is typing there ignores keys until no key has arrived for 500 ms, so a stray Enter, Escape or letter cannot answer it (the trust question is the worst case). Typing means any key since the last plain Enter: a question asked by the user\'s own submitted command (/cd into an untrusted directory) takes keys at once. The guard is per client, in common/forms.ts (forms.keyed at each client key entry, FormState.settling, forms.settleIn), so terminal and web share it. While it waits, the question says "Waiting for typing to stop" in place of its key hints (terminal in-block hint and help row; web status line). Mouse clicks are not guarded.',
+	status: 'done',
+	needs: ['w4'],
+	foldInto: ['w4']
+}
