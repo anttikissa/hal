@@ -86,7 +86,7 @@ test('only bash is checked, and the form asks y/N with No as default, giving eac
 	])
 	expect(form.quote!.text).toBe('rm -rf build; rm -rf dist; git reset --hard')
 	expect(form.text).toBe(
-		'Approval needed\nMay wipe out important files by accident.\nThrows away uncommitted changes.\n/help security to learn more.',
+		'Approval needed — /help security to learn more.\nMay wipe out important files by accident.\nThrows away uncommitted changes.',
 	)
 })
 

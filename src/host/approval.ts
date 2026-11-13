@@ -205,7 +205,7 @@ function form(call: ToolCallBlock): Form | undefined {
 	let found = approval.findings(command)
 	if (!found.length) return undefined
 	return {
-		text: ['Approval needed', ...new Set(found.map((f) => f.reason)), '/help security to learn more.'].join('\n'),
+		text: ['Approval needed — /help security to learn more.', ...new Set(found.map((f) => f.reason))].join('\n'),
 		quote: { text: command, marks: found.map((f) => f.at) },
 		fields: [{ type: 'choice', name: 'run', options: ['yes, I take responsibility', 'no'], initial: 1 }],
 	}
