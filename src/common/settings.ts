@@ -100,6 +100,14 @@ const table: Setting[] = [
 			'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
 	{
+		name: 'trustAllProjects',
+		label: 'Trust all projects',
+		type: { kind: 'boolean' },
+		default: false,
+		description:
+			'Trust every project without asking: its instructions, skills and plugins load and can run code. For unattended runs such as benchmarks.',
+	},
+	{
 		name: 'sessionRecap',
 		label: 'Session recap',
 		type: { kind: 'boolean' },
@@ -275,6 +283,7 @@ export const settings = {
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,
 	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
+	trustAllProjects: (): boolean => settings.value('trustAllProjects') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
 	promptTime: (): boolean => settings.value('promptTime') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, realpathSync } from 'fs'
 import { relative, resolve } from 'path'
 import type { Answers, Form } from '../common/forms.ts'
 import { liveFiles } from './live-file.ts'
+import { settings } from '../common/settings.ts'
 import { paths } from './paths.ts'
 import { plugins } from './plugins.ts'
 import { sessions } from './sessions.ts'
@@ -41,8 +42,9 @@ function root(cwd: string): string {
 
 // The remembered decision for `root`. Hal's own source is trusted until
 // the user decides otherwise: whoever can change its instructions can
-// already change its code.
+// already change its code. trustAllProjects trusts every root.
 function decision(root: string): boolean | undefined {
+	if (settings.trustAllProjects()) return true
 	return projectContext.file().projects[root] ?? (projectContext.isHal(root) || undefined)
 }
 
