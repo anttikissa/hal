@@ -74,11 +74,13 @@ async function loadLocal(): Promise<void> {
 async function loadPlugins(): Promise<void> {
 	plugins.report = (text, path) => void pluginReports.report(text, path)
 	plugins.changed = pluginReports.changed
-	// An old color-theme.ts link becomes the portable theme.ts (task 4c1).
+	// An old color-theme.ts link becomes the portable theme.ts (task 4c1);
+	// a new home starts on hal (task 1x9).
 	try {
 		theme.migrate()
+		theme.initDefault()
 	} catch (e) {
-		plugins.report(`theme migration: ${e instanceof Error ? e.message : e}`)
+		plugins.report(`theme setup: ${e instanceof Error ? e.message : e}`)
 	}
 	await plugins.init()
 }

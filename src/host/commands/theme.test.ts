@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { colors } from '../../common/colors.ts'
+import { paths } from '../paths.ts'
 import { plugins } from '../plugins.ts'
 import { theme } from './theme.ts'
 import { client, created, until, useHost } from '../host-fixture.test.ts'
@@ -115,4 +116,15 @@ test('a selector naming a missing theme reports its load error and selects nothi
 		plugins.report = report
 		rmSync(file(), { force: true })
 	}
+})
+
+test('a new home starts on hal; in a used home a removed theme.ts stays <none>', () => {
+	rmSync(file(), { force: true })
+	rmSync(paths.sessionsDir(), { recursive: true, force: true })
+	theme.initDefault()
+	expect(selected()).toBe('hal')
+	rmSync(file())
+	mkdirSync(join(paths.sessionsDir(), '01-abc'), { recursive: true })
+	theme.initDefault()
+	expect(existsSync(file())).toBe(false)
 })

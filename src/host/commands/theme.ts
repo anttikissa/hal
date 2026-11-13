@@ -6,6 +6,7 @@
 // is converted to theme.ts with the same theme.
 
 import {
+	existsSync,
 	lstatSync,
 	mkdirSync,
 	readFileSync,
@@ -18,6 +19,7 @@ import {
 } from 'fs'
 import { basename, dirname, join, relative, resolve } from 'path'
 import type { SlashCommand } from '../commands.ts'
+import { paths } from '../paths.ts'
 import { plugins } from '../plugins.ts'
 
 const themesDir = () => join(import.meta.dir, '../../../themes')
@@ -91,6 +93,13 @@ function migrate(): void {
 	if (linked() !== undefined && now.name !== undefined) select(now.name)
 }
 
+// A new home (no sessions yet) starts on hal, intro or not. Only a new
+// one: in a used home, no theme.ts is the user's choice of <none>.
+function initDefault(): void {
+	let used = existsSync(paths.sessionsDir()) && readdirSync(paths.sessionsDir()).length > 0
+	if (!used && active().name === none) select('hal')
+}
+
 // Shows theme `name` in this process until preview() with none; <none>,
 // the built-in look, has no file.
 async function preview(name?: string): Promise<void> {
@@ -98,7 +107,7 @@ async function preview(name?: string): Promise<void> {
 	await plugins.preview(file(), name === none ? undefined : join(themesDir(), `${name}.ts`))
 }
 
-export const theme = { none, names, active, select, migrate, file, preview }
+export const theme = { none, names, active, select, migrate, initDefault, file, preview }
 
 export const command: SlashCommand = {
 	help: () =>
