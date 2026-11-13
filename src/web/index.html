@@ -999,7 +999,7 @@
 			.Markdown .line.tail {
 				display: inline;
 			}
-			.Markdown .line.p:has(> span:empty) {
+			.Markdown .line:is(.p, .quote):has(> span:empty) {
 				height: 0.5lh;
 				min-height: 0;
 			}
