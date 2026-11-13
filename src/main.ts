@@ -266,9 +266,9 @@ function shown(): void {
 // `./run auth`: asks this home's running host for a one-time web login
 // code (host/web-auth.ts) and prints it. It never becomes host itself:
 // a code from a process about to exit would log nobody in.
-// --url (Hal.app, task bap): one line per code, the host's web address
-// with the code, or exit 1 while its web server does not listen.
-async function auth(count = 1, url = false): Promise<number> {
+// It prints the address the host gives, or exits 1 while its web server
+// does not listen yet; Hal.app reads the Open: line (task bap).
+async function auth(count = 1): Promise<number> {
 	let codes: string[] = []
 	let address: string | undefined
 	let answer = await new Promise<{ codes?: string[]; error?: string }>((resolve) => {
@@ -299,15 +299,11 @@ async function auth(count = 1, url = false): Promise<number> {
 		process.stderr.write(`hal: ${answer.error}\n`)
 		return 1
 	}
-	if (!url) {
-		process.stdout.write(`${webAuth.message(answer.codes, address)}\n`)
-		return 0
-	}
 	if (!address) {
 		process.stderr.write('hal: the host has no web server listening yet\n')
 		return 1
 	}
-	process.stdout.write(answer.codes.map((code) => `${address}/?auth=${code}\n`).join(''))
+	process.stdout.write(`${webAuth.message(answer.codes, address)}\n`)
 	return 0
 }
 
@@ -423,7 +419,7 @@ async function start(): Promise<void> {
 		process.stderr.write(`hal: ${problem}\n`)
 		process.exit(1)
 	}
-	if (parsed.kind === 'auth') process.exit(await main.auth(parsed.count, parsed.url))
+	if (parsed.kind === 'auth') process.exit(await main.auth(parsed.count))
 	// config.ason first, so local.ts sees it and may override settings.*.
 	config.init(() => warnings.all())
 	await main.loadLocal()

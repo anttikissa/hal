@@ -125,26 +125,23 @@ test('./run auth prints a code from the running host, or says none is running', 
 	expect(await none.exited).toBe(1)
 	expect(await new Response(none.stderr).text()).toContain('no Hal is running')
 	expect(await server.serve()).toBe(true)
-	let asked = runAuth('3')
-	expect(await asked.exited).toBe(0)
-	let output = await new Response(asked.stdout).text()
-	let codes = [...output.matchAll(/minutes\): ([0-9a-hjkmnp-tv-z]{6})/g)].map((m) => m[1]!)
-	expect(new Set(codes).size).toBe(3)
-	for (let code of codes) {
-		expect(output).toContain(`/?auth=${code}`)
-		expect('token' in webAuth.redeem(code)).toBe(true)
-		expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
-		expect(everyFile(home)).not.toContain(code)
-	}
-	// --url (Hal.app): only while the web server listens, then one line.
-	let early = runAuth('--url')
+	// Only while the web server listens: then the address it really has.
+	let early = runAuth()
 	expect(await early.exited).toBe(1)
 	expect(await new Response(early.stderr).text()).toContain('no web server listening')
 	settings.state.listeningPort = 9123
 	try {
-		let url = runAuth('--url')
-		expect(await url.exited).toBe(0)
-		expect(await new Response(url.stdout).text()).toMatch(/^http:\/\/localhost:9123\/\?auth=[0-9a-hjkmnp-tv-z]{6}\n$/)
+		let asked = runAuth('3')
+		expect(await asked.exited).toBe(0)
+		let output = await new Response(asked.stdout).text()
+		let codes = [...output.matchAll(/minutes\): ([0-9a-hjkmnp-tv-z]{6})/g)].map((m) => m[1]!)
+		expect(new Set(codes).size).toBe(3)
+		for (let code of codes) {
+			expect(output).toContain(`Open: http://localhost:9123/?auth=${code}`)
+			expect('token' in webAuth.redeem(code)).toBe(true)
+			expect(webAuth.redeem(code)).toEqual({ refused: 'wrong' })
+			expect(everyFile(home)).not.toContain(code)
+		}
 	} finally {
 		settings.state.listeningPort = undefined
 	}

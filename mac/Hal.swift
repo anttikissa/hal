@@ -1,7 +1,7 @@
 // Hal.app (task bap): a native Mac window on Hal's web client. It holds
 // no Hal code: it runs `hal serve` from the checkout that built it (or
-// joins the host already running), asks `hal auth --url` for the
-// loopback address and a one-time code, and shows that page.
+// joins the host already running), takes the Open: link that `hal auth`
+// prints (the host's web address with a one-time code) and shows it.
 
 import Cocoa
 import WebKit
@@ -164,15 +164,16 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
 				Thread.sleep(forTimeInterval: 0.02)
 				continue
 			}
-			let p = hal(["auth", "--url"])
+			let p = hal(["auth"])
 			let out = Pipe(), err = Pipe()
 			p.standardOutput = out
 			p.standardError = err
 			if (try? p.run()) != nil {
-				let url = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+				let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
 				last = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
 				p.waitUntilExit()
-				if p.terminationStatus == 0, let u = URL(string: url.trimmingCharacters(in: .whitespacesAndNewlines)) {
+				let open = text.split(separator: "\n").first { $0.hasPrefix("Open: ") }?.dropFirst(6)
+				if p.terminationStatus == 0, let open, let u = URL(string: String(open)) {
 					DispatchQueue.main.async {
 						self.origin = "\(u.scheme ?? "http")://\(u.host ?? ""):\(u.port ?? (u.scheme == "https" ? 443 : 80))"
 						self.web.load(URLRequest(url: u))
@@ -184,7 +185,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
 			}
 			Thread.sleep(forTimeInterval: 0.1)
 		}
-		let text = "Hal did not start within \(Int(startWait)) s.\n\nhal auth --url:\n\(last)\nhal serve:\n\(serveOutput.text)"
+		let text = "Hal did not start within \(Int(startWait)) s.\n\nhal auth:\n\(last)\nhal serve:\n\(serveOutput.text)"
 		DispatchQueue.main.async { self.web.loadHTMLString(page("<pre>\(escape(text))</pre>"), baseURL: nil) }
 	}
 
