@@ -75,8 +75,8 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	let a = client()
 	let id = created(a)
 	let b = await opened(id)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	await until(() => transcript.question(b.views.get(id)))
+	a.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
+	await until(() => field(b, id)?.name === 'name')
 	let q = transcript.question(b.views.get(id))!
 	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(a.of('turn-end')).toEqual([])
@@ -91,8 +91,8 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	await until(() => !['name', undefined].includes(transcript.question(a.views.get(id))?.form.fields[0]?.name))
 	let view = a.views.get(id)!
 	expect(view.state).toEqual({ type: 'blocked', reason: 'question' })
-	expect(texts(view)[1]).toContain('Dave')
-	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ answers: { name: 'Dave' } })
+	expect(texts(view).at(-1)).toContain('Dave')
+	expect(view.items.find((i) => i.type === 'question' && i.id === q.id)).toMatchObject({ answers: { name: 'Dave' } })
 	expect((await opened(id)).views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 })
@@ -100,7 +100,7 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 test('an open question survives a restart, is not continued by the new host, and its answer still works', async () => {
 	let a = client()
 	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 	await until(() => transcript.question(a.views.get(id)))
 	let q = transcript.question(a.views.get(id))!
 	host.reset()
@@ -112,7 +112,7 @@ test('an open question survives a restart, is not continued by the new host, and
 	expect(transcript.question(b.views.get(id))?.id).toBe(q.id)
 	expect(b.views.get(id)!.items.filter((i) => i.type === 'question')).toHaveLength(1)
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: '' } })
-	await until(() => !['name', undefined].includes(transcript.question(b.views.get(id))?.form.fields[0]?.name))
+	await until(() => field(b, id)?.name === 'login')
 })
 
 test('Escape while a question waits pauses the turn; continuing asks again', async () => {
@@ -187,12 +187,11 @@ async function reply(c: ReturnType<typeof client>, id: string, name: string, val
 test('intro resumes through profile, save, model and secret search setup', async () => {
 	let c = client(),
 		id = created(c)
-	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
+	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 	process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+	await until(() => field(c, id)?.name === 'name')
+	expect(texts(c.views.get(id)!)[0]).toBe('Hello — I am HAL 9001, the no-bloat agent harness. You can call me Hal.')
 	await reply(c, id, 'name', 'Rowan', 'login')
-	expect(texts(c.views.get(id)!)[0]).toBe(
-		'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have six questions for you.',
-	)
 	// A restart between steps keeps answers in history.
 	host.reset()
 	sessions.closeAll()
@@ -240,15 +239,7 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	apiKeys.save('brave', 'existing-key')
 	let c = client(),
 		id = created(c)
-	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-	expect(
-		texts(
-			await (async () => {
-				await until(() => field(c, id))
-				return c.views.get(id)!
-			})(),
-		)[0],
-	).toContain('five questions')
+	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 	await reply(c, id, 'name', '', 'login')
 	// Nothing answered, nothing saved.
 	expect(profile.text()).toBe('')
@@ -275,7 +266,7 @@ test('the Brave step never traps: Maybe later, an empty key or Escape moves on a
 	for (let skip of ['later', 'empty', 'escape']) {
 		let c = client(),
 			id = created(c)
-		c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
+		c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 		await reply(c, id, 'name', '', 'login')
 		await reply(c, id, 'login', 'Skip', 'search')
 		if (skip === 'later') await reply(c, id, 'search', 'Maybe later')
@@ -332,13 +323,16 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	expect(texts(c.views.get(id)!).join('\n')).toContain('I removed your name from')
 })
 
-test('text typed outside a question asks whether to go on; No ends the intro', () => {
+test('the first run only welcomes; text typed outside a question asks whether to go on; No ends the intro', () => {
 	let ts = new Date().toISOString()
+	let welcome = intro.run([{ type: 'user', blocks: [{ type: 'text', text: 'hi' }], ts }])
+	expect(welcome.ask).toBeUndefined()
+	expect(welcome.say).toContain('Type /intro')
 	let records: HistoryRecord[] = [
 		{ type: 'user', blocks: [{ type: 'text', text: 'hi' }], ts },
 		{
 			type: 'assistant',
-			block: { type: 'text', text: 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.' },
+			block: { type: 'text', text: 'Hello — I am HAL 9001, the no-bloat agent harness. You can call me Hal.' },
 			ts,
 		},
 		{ type: 'user', blocks: [{ type: 'text', text: 'open the pod bay doors' }], ts },

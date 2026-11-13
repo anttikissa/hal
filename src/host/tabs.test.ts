@@ -35,9 +35,10 @@ test('without a default model, new tabs run the intro, which starts by itself; o
 	let c = client()
 	let first = newTab(c)
 	expect(sessions.open(first).model).toBe('hal/intro')
-	// The intro starts by itself and waits on its first question.
-	await until(() => status.stateOf(first).type === 'blocked')
+	// The intro starts by itself, welcomes and asks nothing.
+	await until(() => history.readSync(first).some((r) => r.type === 'turn_end'))
 	expect(history.readSync(first).some((r) => r.type === 'user')).toBe(false)
+	expect(status.stateOf(first).type).toBe('idle')
 	// A headless tab (hal -p) gets the intro model but no scripted start.
 	let headless = ack(c, send(c, { type: 'tab-new', cwd: '/tmp/w', interactive: false })).tab as string
 	expect(status.stateOf(headless).type).toBe('idle')

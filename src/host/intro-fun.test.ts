@@ -9,7 +9,7 @@ const user = (text: string): HistoryRecord => ({ type: 'user', blocks: [{ type: 
 const assistant = (text: string): HistoryRecord => ({ type: 'assistant', block: { type: 'text', text }, ts })
 const history = (...records: HistoryRecord[]): HistoryRecord[] =>
 	[
-		assistant('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'),
+		assistant('Hello — I am HAL 9001, the no-bloat agent harness. You can call me Hal.'),
 		assistant("I saved your language and tone.\n\nYou're all set. A few tips:"),
 		...records,
 	].map((r, i) => ({ ...r, n: i + 1 }))

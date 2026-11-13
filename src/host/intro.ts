@@ -118,7 +118,13 @@ function languages(): string[] {
 	return [first!, mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
 }
 
-const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
+const greeting = 'Hello — I am HAL 9001, the no-bloat agent harness. You can call me Hal.'
+// The automatic first run only says this; the user types the commands.
+const welcome = `${greeting}
+
+Type /intro to personalize your experience. (You can do this later.)
+
+Type /login to set up a provider.`
 const saved = 'I saved your '
 const closing = "You're all set."
 const restart = 'Starting the intro.'
@@ -128,7 +134,6 @@ const yesNo = (name: string, text: string): Form => ({
 	text,
 	fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }],
 })
-const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six']
 // The sample thinking card the card question previews on (task 5zq).
 const sample = `Thinking cards hold the model's reasoning before it acts. Here it decides to list the files in this folder, so a tool card shows up below with the command and its output.
 
@@ -222,16 +227,11 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...known('Name') }],
 	}
 	// Local servers answer before the model question (task vc).
-	let hello = (): Reply => (
-		void models.warm(),
-		{
-			say: `${greeting}
-
-I have ${words[5 + (apiKeys.get('brave') ? 0 : 1)]} questions for you.`,
-			ask,
-		}
-	)
-	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
+	let hello = (requested: boolean): Reply =>
+		requested ? (void models.warm(), { say: greeting, ask }) : { say: welcome }
+	if (start < 0) return hello(records.some((r) => r.type === 'output' && r.text === restart))
+	if (records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello(true)
+	let welcomed = said(records.slice(start, start + 1), welcome)
 	let run = records.slice(start + 1)
 	let finished = run.findIndex(
 		(r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(closing),
@@ -258,12 +258,15 @@ I have ${words[5 + (apiKeys.get('brave') ? 0 : 1)]} questions for you.`,
 			if (text.length > 80) text = `${text.slice(0, 79)}…`
 			return {
 				say: `I see you typed: "${text}" — but I'm not a language model, so I can't understand you.`,
-				ask: yesNo('intro', over ? 'Start from the beginning?' : 'Continue with the intro?'),
+				ask: yesNo(
+					'intro',
+					over ? 'Start from the beginning?' : welcomed ? 'Start the intro?' : 'Continue with the intro?',
+				),
 			}
 		}
 		if (go === 'No')
 			return { say: `Okay, the intro stops here; what you answered stays saved. /model or Ctrl-M picks a model.` }
-		if (over) return hello()
+		if (over) return hello(true)
 	}
 	let name = profile.value(answered(run, 'name'))
 	if (answered(run, 'name') === undefined) return { ask }
@@ -430,15 +433,6 @@ I have ${words[5 + (apiKeys.get('brave') ? 0 : 1)]} questions for you.`,
 		liveFiles.save(config.state.data!)
 		if (sessionId) slash.change(sessionId, { model })
 	}
-	let now = model
-		? `This tab now uses ${chosen}, also the default for new tabs.`
-		: !loggedIn.names.length
-			? 'No model can answer yet: after /login, /model or Ctrl-M picks one.'
-			: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
-	// Not signed in (environment keys aside): the close always says how.
-	if (!loggedIn.stored)
-		now +=
-			"\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
 	return reply({
 		say: `${closing} A few tips:
 
@@ -450,8 +444,26 @@ The web client is at ${settings.webUrl()} — /auth gives the one-time login cod
 
 Ctrl-C to quit.
 
-${now}`,
+${next(model, chosen, loggedIn)}`,
 	})
+}
+
+// What the user can do now: which model answers, and how to sign in.
+function next(
+	model: string | undefined,
+	chosen: string | undefined,
+	loggedIn: ReturnType<typeof introAccounts.accounts>,
+): string {
+	let now = model
+		? `This tab now uses ${chosen}, also the default for new tabs.`
+		: !loggedIn.names.length
+			? 'No model can answer yet: after /login, /model or Ctrl-M picks one.'
+			: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
+	// Not signed in (environment keys aside): the close always says how.
+	if (!loggedIn.stored)
+		now +=
+			"\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
+	return now
 }
 
 export const intro = { languages, restart, run, answered }
