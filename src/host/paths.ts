@@ -2,8 +2,8 @@
 // root (git clone is the only install), or state.home, set by
 // hal --home <dir> or by a test so it never touches live data.
 
-import { chmodSync, mkdirSync } from 'fs'
-import { homedir, tmpdir } from 'os'
+import { accessSync, chmodSync, constants, mkdirSync } from 'fs'
+import { homedir, tmpdir, userInfo } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../common/attachments.ts'
 
@@ -35,9 +35,35 @@ function sessionDir(id: string): string {
 // Pasted images and long texts by name until a prompt copies them into
 // a session blob (tasks qy, 31): /tmp/hal/image and /tmp/hal/paste,
 // where the model's tools can read them too; inside the home under
-// test, so tests never touch /tmp/hal.
+// test, so tests never touch /tmp/hal. When a directory cannot be
+// written (another macOS user's Hal owns /tmp/hal), the next one is used.
 function tmpDir(): string {
-	return paths.state.home || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp` : '/tmp/hal'
+	if (paths.state.home || process.env.NODE_ENV === 'test') return `${paths.home()}/tmp`
+	return (paths.state.tmp ??= tmpCandidates().find(writable) ?? '/tmp/hal')
+}
+
+function tmpCandidates(): string[] {
+	return [...new Set(['/tmp/hal', `/tmp/hal-${userInfo().username}`, `${tmpdir()}/hal`])]
+}
+
+function writable(dir: string): boolean {
+	try {
+		mkdirSync(dir, { recursive: true, mode: 0o700 })
+		accessSync(dir, constants.W_OK | constants.X_OK)
+		return true
+	} catch {
+		return false
+	}
+}
+
+// Moves tmpDir to the next writable candidate after a write failed in
+// it; false when none is left.
+function nextTmpDir(): boolean {
+	if (paths.state.home || process.env.NODE_ENV === 'test') return false
+	let list = tmpCandidates()
+	let next = list.slice(list.indexOf(paths.tmpDir()) + 1).find(writable)
+	if (next) paths.state.tmp = next
+	return next !== undefined
 }
 
 function imageDir(): string {
@@ -103,13 +129,14 @@ function expand(path: string): string {
 }
 
 export const paths = {
-	state: { home: undefined as string | undefined },
+	state: { home: undefined as string | undefined, tmp: undefined as string | undefined },
 	repoRoot: (): string => repoRoot,
 	home,
 	userHome,
 	sessionsDir,
 	sessionDir,
 	tmpDir,
+	nextTmpDir,
 	imageDir,
 	fileDir,
 	stateDir,

@@ -80,8 +80,16 @@ function stage(name: string, mediaType: string, data: string): Stored {
 	if (existsSync(path)) {
 		if (!bytes.equals(readFileSync(path))) throw new Error(`file name ${name} is taken`)
 	} else {
-		mkdirSync(paths.fileDir(name), { recursive: true, mode: 0o700 })
-		writeFileSync(path, bytes, { mode: 0o600 })
+		// Another directory when this one cannot be written (paths.nextTmpDir).
+		for (;;) {
+			try {
+				mkdirSync(paths.fileDir(name), { recursive: true, mode: 0o700 })
+				writeFileSync(`${paths.fileDir(name)}/${name}`, bytes, { mode: 0o600 })
+				break
+			} catch (e) {
+				if (!paths.nextTmpDir()) throw e
+			}
+		}
 	}
 	return { blob: name.slice(0, 6), mediaType, bytes: bytes.length, marker: attachments.named(name) }
 }
