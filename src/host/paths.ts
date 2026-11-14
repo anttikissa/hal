@@ -2,8 +2,8 @@
 // root (git clone is the only install), or state.home, set by
 // hal --home <dir> or by a test so it never touches live data.
 
-import { chmodSync, mkdirSync } from 'fs'
-import { homedir, tmpdir } from 'os'
+import { chmodSync, mkdirSync, statSync } from 'fs'
+import { homedir, tmpdir, userInfo } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../common/attachments.ts'
 
@@ -35,9 +35,16 @@ function sessionDir(id: string): string {
 // Pasted images and long texts by name until a prompt copies them into
 // a session blob (tasks qy, 31): /tmp/hal/image and /tmp/hal/paste,
 // where the model's tools can read them too; inside the home under
-// test, so tests never touch /tmp/hal.
+// test, so tests never touch /tmp/hal. When another macOS user's Hal
+// owns /tmp/hal, this user gets /tmp/hal-<username>.
 function tmpDir(): string {
-	return paths.state.home || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp` : '/tmp/hal'
+	if (paths.state.home || process.env.NODE_ENV === 'test') return `${paths.home()}/tmp`
+	return (paths.state.tmp ??= sharedTmpDir())
+}
+
+function sharedTmpDir(): string {
+	let owner = statSync('/tmp/hal', { throwIfNoEntry: false })?.uid
+	return owner === undefined || owner === process.getuid?.() ? '/tmp/hal' : `/tmp/hal-${userInfo().username}`
 }
 
 function imageDir(): string {
@@ -103,7 +110,7 @@ function expand(path: string): string {
 }
 
 export const paths = {
-	state: { home: undefined as string | undefined },
+	state: { home: undefined as string | undefined, tmp: undefined as string | undefined },
 	repoRoot: (): string => repoRoot,
 	home,
 	userHome,

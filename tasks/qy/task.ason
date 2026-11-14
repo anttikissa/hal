@@ -10,7 +10,8 @@
 		'paths.imageDir() is /tmp/hal/image, but <home>/tmp/image when --home is given or NODE_ENV=test, so tests never touch /tmp/hal. Bytes from /tmp are checked (magic number, size) before they are copied, since anyone on the machine can write there.',
 		'GET /image/<name> reads /tmp first, then scans sessions/*/blobs/<name>. An unauthenticated click gets the login gate (task e3).',
 		'The terminal link target is ansi.links makes <webUrl>/image/<six-character id>?auth=<link code> (task e3 added the webUrl setting and the code). ansi.links wraps whole markers per row (after ansi.clean), so a marker split by wrapping or cut by a selection is not linked.',
-		'Web Card links markers only in prompt cards, through memos gated on the text string, so snapshots and streaming never rebuild nodes.'
+		'Web Card links markers only in prompt cards, through memos gated on the text string, so snapshots and streaming never rebuild nodes.',
+		'Invariant: a pasted image never fails with EACCES because another macOS user owns /tmp/hal (drwx------). paths.tmpDir uses /tmp/hal only when it is missing or ours, else /tmp/hal-<username>; the choice is cached per process in paths.state.tmp.'
 	],
 	needs: ['2a', '8a'],
 	foldInto: ['2a']
