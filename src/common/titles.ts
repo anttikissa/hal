@@ -120,6 +120,14 @@ function receipt(item: Shown): 0 | 1 | 2 {
 		: 0
 }
 
+function senderParts(item: Shown, text: string): (string | { href: string; text: string })[] {
+	let from = (item.type === 'prompt' || item.type === 'command') && item.from
+	let at = from && !bashResult.background(item) ? text.indexOf(from) : -1
+	return from && at >= 0
+		? [text.slice(0, at), { href: `/${encodeURIComponent(from)}`, text: from }, text.slice(at + from.length)]
+		: [text]
+}
+
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
@@ -262,6 +270,7 @@ export const titles = {
 	address,
 	receipt,
 	messageHead,
+	senderParts,
 	preview,
 	compact,
 	hidden,

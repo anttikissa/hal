@@ -8,6 +8,8 @@ import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 import { uploads } from '../common/uploads.ts'
+import { titles } from '../common/titles.ts'
+import type { Shown } from '../common/transcript.ts'
 
 // The escape that switches to a style's fg and bg (truecolor); none
 // in a monochrome terminal.
@@ -109,6 +111,13 @@ function heading(text: string, style: Style | undefined): string {
 		: ansi.sgr({ fg: style.title ?? colors.title(style.fg) }) + text + ansi.sgr({ fg: style.fg })
 }
 
+function senderLink(item: Shown, text: string): string {
+	return titles
+		.senderParts(item, text)
+		.map((p) => (typeof p === 'string' ? p : `\x1b]8;;${ansi.webUrl(p.href)}\x07${p.text}${ansi.LINK_OFF}`))
+		.join('')
+}
+
 export const ansi = {
 	// The host's web address and this client's link code, from its
 	// latest `auth` event (task e3); empty until one came.
@@ -148,5 +157,6 @@ export const ansi = {
 	clean: (s: string): string => strings.clean(s),
 	wrap,
 	links,
+	senderLink,
 	webUrl,
 }

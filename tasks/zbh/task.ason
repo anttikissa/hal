@@ -1,0 +1,12 @@
+{
+	title: 'Link message sender IDs in card headers',
+	spec: 'Message sender session IDs in transcript headers link to their originating session, through native anchors on the web and OSC 8 links in the terminal. Links remain available in expanded, collapsed, summary and waiting queued message cards, without changing visible attribution, timestamps, colors or layout. Reuse existing session navigation; activating a link does not toggle its card. Human prompts and background Bash headers retain their current behavior. Invariant: a message sender is as navigable as a session ID in assistant prose.',
+	status: 'done',
+	notes: [
+		'Shared titles.senderParts links the recorded sender only; web uses native LinkedText anchors and terminal adds OSC 8 after wrapping or clipping. Background Bash links remain unchanged. One-off Chromium probe passed at 390 and 1200 px for plain, summary and queued messages, expanded and collapsed, and actual navigation to the sender; screenshots inspected. Probe deleted after verification. Eight terminal fold/width/summary variants and human exclusion passed; 37 focused tests and changed-file lint passed. Typecheck is blocked by errors outside this change in plugins/eval.ts, host/anthropic.ts, host/commands/schedule.ts and host/plugin-sync-session.test.ts. No dependencies, network requests, timers or growing state added.',
+		'Broader shared transcript and terminal run: 53 tests passed, 0 failed (6175 assertions). Changed-file lint passed.',
+		'Commit size checks required moving link adapters into existing ansi.ts and hrefs.ts; compact header parsing moved with the web header links. The post-extraction sender browser probe passed. Broader web-cards tests: three passed and one reported STRICT_READ_UNTRACKED; running the same tests with all six changed source files at HEAD reproduced the identical diagnostic. No fix to that unrelated warning is included.'
+	],
+	needs: ['hp', 'b4b'],
+	foldInto: ['hp']
+}

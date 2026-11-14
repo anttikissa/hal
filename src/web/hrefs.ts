@@ -1,5 +1,7 @@
 // Link targets in shown text: attachment markers, plain URLs, blobs.
 import { attachments } from '../common/attachments.ts'
+import { titles } from '../common/titles.ts'
+import type { Shown } from '../common/transcript.ts'
 
 // A prompt's text in parts, each [image/<name>] or [paste/<name>]
 // marker a link to its page (tasks qy, 31), and each plain URL a link.
@@ -32,9 +34,22 @@ function urlParts(text: string): (string | { href: string; text: string })[] {
 	return out
 }
 
+function headerParts(item: Shown, text: string): ReturnType<typeof urlParts> {
+	return titles.senderParts(item, text).flatMap((p) => (typeof p === 'string' ? hrefs.urlParts(p) : [p]))
+}
+
+// A closed reply or prompt: its sender in the title color, its text
+// in the body color it has open, as a closed Bash card shows output.
+function compactParts(item: Shown, head: string) {
+	let who = titles.who(item) ?? ''
+	return who && head.startsWith(`${who}: `)
+		? { who: `${who}:`, text: hrefs.urlParts(head.slice(who.length + 2)) }
+		: undefined
+}
+
 // Where the page loads a session's image from (host/web.ts).
 function blobUrl(sessionId: string, blob: string): string {
 	return `/blob/${encodeURIComponent(sessionId)}/${encodeURIComponent(blob)}`
 }
 
-export const hrefs = { links, urlParts, blobUrl }
+export const hrefs = { links, urlParts, headerParts, compactParts, blobUrl }

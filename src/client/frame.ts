@@ -179,7 +179,12 @@ function queuedRows(
 		return frame.itemRows(item, cols, session, undefined, undefined, undefined, [], '', { ...look, pad: false })
 	let style = itemView.itemStyle(item)
 	let { inner, mark } = itemView.place(item, cols, session, style)
-	let lines = [strings.clipVisual(ansi.clean(`${note} ${card.text(item)}`.split('\n')[0]!).replace(/\s+/g, ' '), inner)]
+	let lines = [
+		ansi.senderLink(
+			item,
+			strings.clipVisual(ansi.clean(`${note} ${card.text(item)}`.split('\n')[0]!).replace(/\s+/g, ' '), inner),
+		),
+	]
 	mark(lines, 0)
 	return lines.flatMap((r) => ansi.paintRows(r, style, cols))
 }

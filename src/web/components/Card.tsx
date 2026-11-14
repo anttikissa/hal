@@ -154,6 +154,7 @@ export function Card(props: {
 	// line. Prompts and model text show those words above their text
 	// (task hp).
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #?(t?\d+)$/)?.[1]
+	let linkedSender = (text: string) => <LinkedText parts={hrefs.headerParts(props.row.item, text)} />
 	let who = () => {
 		let item = props.row.item
 		// A question is headed by its text, its addresses links.
@@ -169,7 +170,7 @@ export function Card(props: {
 				</a>
 			</>
 		) : (
-			t
+			linkedSender(t ?? '')
 		)
 	}
 	let lines = () => (shown()?.text ?? '').split('\n')
@@ -219,14 +220,8 @@ export function Card(props: {
 			? props.waiting?.(head() ?? '')
 			: undefined
 	}
-	let headerParts = createMemo(() => waitParts() ?? hrefs.urlParts(head() ?? ''))
-	// A closed reply or prompt: its sender in the title color, its text
-	// in the body color it has open, as a closed Bash card shows output.
-	let compactParts = createMemo(() => {
-		let h = head() ?? '',
-			w = titles.who(props.row.item) ?? ''
-		return w && h.startsWith(`${w}: `) ? { who: `${w}:`, text: hrefs.urlParts(h.slice(w.length + 2)) } : undefined
-	})
+	let headerParts = createMemo(() => waitParts() ?? hrefs.headerParts(props.row.item, head() ?? ''))
+	let compactParts = createMemo(() => hrefs.compactParts(props.row.item, head() ?? ''))
 	let call = createMemo(() => {
 		let item = props.row.item
 		if (item.type !== 'tool') return []
@@ -342,7 +337,7 @@ export function Card(props: {
 		if (props.row.note !== undefined)
 			return (
 				<>
-					{unstamp(props.row.note)}
+					{linkedSender(unstamp(props.row.note))}
 					<Show when={!expanded()}>
 						{' '}
 						<span class="secondary">{titles.preview(text())}</span>
@@ -356,7 +351,7 @@ export function Card(props: {
 					<Show when={compactParts()} fallback={<LinkedText parts={headerParts()} />}>
 						{(c) => (
 							<>
-								{c().who}{' '}
+								{linkedSender(c().who)}{' '}
 								<span class="secondary">
 									<LinkedText parts={c().text} />
 								</span>

@@ -128,7 +128,7 @@ function headed(item: Item, body: string[], width: number, session?: string, gap
 		if (href)
 			rows[rows.length - 1] = `${last.slice(0, -call.length)}\x1b]8;;${ansi.webUrl(href)}\x07${call}${ansi.LINK_OFF}`
 	}
-	rows = rows.map((row) => ansi.heading(row, itemView.itemStyle(item)))
+	rows = rows.map((row) => ansi.heading(ansi.senderLink(item, row), itemView.itemStyle(item)))
 	return body.length ? [...rows, ...(gap ? [''] : []), ...body] : rows
 }
 
@@ -166,6 +166,7 @@ function itemLines(
 			let shown = row.startsWith(head)
 				? ansi.heading(head, itemView.itemStyle(item)) + row.slice(head.length)
 				: ansi.heading(row, itemView.itemStyle(item))
+			shown = ansi.senderLink(item, shown)
 			return [
 				more
 					? itemView.right(
