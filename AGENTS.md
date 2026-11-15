@@ -111,6 +111,8 @@ words, why the module exists.
 Format code with `bunx oxfmt` (config: .oxfmtrc.json). Markdown and
 tasks/ stay hand-wrapped.
 
+ASON is a JS object literal. Exact same rules.
+
 Write code for humans to read. Use small, well-named abstractions that express
 intent rather than mixing all the mechanics together. For example, an argument
 parser might declare options with arg('--home <dir>', 'Set Hal home directory',
