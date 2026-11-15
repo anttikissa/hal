@@ -319,12 +319,14 @@ function onKeys(events: KeyEvent[]): void {
 		forms.keyed(k)
 		delete st.choices
 		// Typing snaps the terminal to the bottom, so blocks held tall
-		// (task fn) may shrink now without a jolt.
+		// (task fn) may shrink now without a jolt, and headers drawn before
+		// midnight get their date.
 		if (frame.state.padded) {
 			frame.state.peaks.clear()
 			frameLayout.state.history = undefined
 			frame.state.padded = false
 		}
+		if (titles.stale()) render.request('the first key of a new day')
 		// Tab and command keys, whatever has the keys.
 		if (tabSwitch.tabKey(k) || clientCommands.key(k)) continue
 		if (st.modal) {

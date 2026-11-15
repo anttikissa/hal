@@ -42,13 +42,19 @@ function learn(event: { names: Record<string, string>; defaults?: Record<string,
 // 'Oct 2, HH:MM' before, 'Oct 2, 2025, HH:MM' in another year; '' without
 // one. Memoized per minute string until the next full repaint: midnight
 // alone rewrites no scrollback (which would clear the terminal), but a
-// repaint that clears it anyway (Ctrl-L, a tab switch) forgets the
-// memo, so its headers are dated. A long history's headers share few
-// parses (the startup budget, kn).
+// repaint that clears it anyway (Ctrl-L, a tab switch, the first key of
+// a new day) forgets the memo, so its headers are dated. A long
+// history's headers share few parses (the startup budget, kn).
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const times = new Map<string, string>()
+let timesDay = new Date().toDateString()
 function forgetTimes(): void {
 	times.clear()
+	timesDay = new Date().toDateString()
+}
+// The memo was made on an earlier day: some headers lack their date.
+function stale(): boolean {
+	return timesDay !== new Date().toDateString()
 }
 function time(ts: string | undefined): string {
 	if (ts === undefined) return ''
@@ -269,6 +275,7 @@ export const titles = {
 	learn,
 	time,
 	forgetTimes,
+	stale,
 	resultTime,
 	stamp,
 	ended,
