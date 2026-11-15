@@ -8,7 +8,18 @@
 // streams (Card.tsx), else on a line of its own. The one scroller: the
 // browser keeps a bottom reader at the bottom (scroll.ts).
 
-import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
+import {
+	createEffect,
+	createMemo,
+	createProjection,
+	createSignal,
+	flush,
+	For,
+	onSettled,
+	Show,
+	untrack,
+} from 'solid-js'
+import type { SessionMeta } from '../../common/session.ts'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
@@ -26,6 +37,15 @@ import { Question } from './Question.tsx'
 
 const none: Item[] = []
 const sameSet = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b.size && [...a].every((k) => b.has(k))
+// A row's marks, bits in Transcript's `marks`.
+const CURSOR = 1,
+	LAST = 2,
+	TARGET = 4,
+	JOB = 8,
+	EDIT = 16,
+	DISCARD = 32,
+	RUNNING = 64
+type Shared = { session: string; blocks?: SessionMeta['blocks']; formId?: string; since?: string }
 
 // A tab shows its newest rows first: building every card of a long
 // session takes most of a second. Earlier rows are added a page at a
@@ -107,15 +127,10 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			jobCalls(),
 		),
 	)
-	// The row Hal's cursor sits in: the last, while it streams. Cards
-	// compare against these keys in per-row memos: rows() is a new array
-	// on every streamed event, and a card reading it would rerun each time.
+	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let lastKey = createMemo(() => rows().at(-1)?.key)
-	let cursorKey = createMemo(() => (streaming() ? lastKey() : undefined))
 	// The call the session runs now: its card ticks (task hyt).
-	// Cards read these memos, not props.view, which changes with every
-	// streamed delta: thousands of card bindings would re-run each time.
 	let running = createMemo(
 		() => {
 			let st = props.view.transcript?.state
@@ -123,10 +138,6 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		},
 		{ equals: (a, b) => a?.call === b?.call && a?.since === b?.since },
 	)
-	let session = createMemo(id)
-	let blocks = createMemo(() => forms.cards(props.view.form, props.view.transcript?.meta.blocks))
-	let queueHold = createMemo(() => props.view.transcript?.queueHold)
-	let formId = createMemo(() => props.view.form?.id)
 	// Otherwise its own line after the last row, before waiting and
 	// pending messages: the cursor is the work now, they the future.
 	let line = () => (
@@ -138,14 +149,45 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let jobs = createMemo(() => transcriptRows.jobs(all()), { equals: sameSet })
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
 	// One queued message is edited at a time, in one window.
-	let editableWaiting = (r: Row) =>
-		!queueHold() &&
-		r.note !== undefined &&
-		r.item.type === 'prompt' &&
-		r.item.from === undefined &&
-		r.item.origin !== 'model'
+	let editableWaiting = (r: Row, held: string | undefined) =>
+		!held && r.note !== undefined && r.item.type === 'prompt' && r.item.from === undefined && r.item.origin !== 'model'
 	let editable = createMemo(() => amend.editable(items()), { equals: sameSet })
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
+	// What cards read, as stores: a card subscribes to its own row's
+	// marks and to shared leaves, never to a memo of props.view. Every
+	// streamed event replaces props.view, and Solid marks each node
+	// downstream of it, so one read of such a memo per card made each
+	// event cost O(rows). A store notifies only readers of the keys that
+	// changed (createProjection, Solid 2's createSelector).
+	let shared = createProjection<Shared>(
+		(draft) => {
+			draft.session = id()
+			draft.blocks = forms.cards(props.view.form, props.view.transcript?.meta.blocks)
+			draft.formId = props.view.form?.id
+			draft.since = running()?.since
+		},
+		{ session: '' },
+	)
+	let marks = createProjection<Record<string, number>>((draft) => {
+		let next = new Map<string, number>()
+		let add = (key: string | undefined | false, bit: number) =>
+			key !== undefined && key !== false && next.set(key, (next.get(key) ?? 0) | bit)
+		let call = running()?.call,
+			held = props.view.transcript?.queueHold,
+			edits = editable(),
+			busy = jobs()
+		add(lastKey(), streaming() ? CURSOR : LAST)
+		add(hit(), TARGET)
+		for (let r of all()) {
+			if (busy.has(r.item.key)) add(r.key, JOB)
+			if (!r.pending && (r.waiting ? editableWaiting(r, held) : edits.has(r.item.key))) add(r.key, EDIT)
+			if (r.note !== undefined && r.key !== held) add(r.key, DISCARD)
+			if (call && !r.job && r.item.type === 'tool' && r.item.id === call) add(r.key, RUNNING)
+		}
+		for (let key of Object.keys(draft)) if (!next.has(key)) delete draft[key]
+		for (let [key, bits] of next) if (draft[key] !== bits) draft[key] = bits
+	}, {})
+	let marked = (key: string, bit: number) => !!((marks[key] ?? 0) & bit)
 	// The linked card is always among the rows shown.
 	let shown = createMemo(() => {
 		let rows = all()
@@ -157,13 +199,28 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		() => (all().length && !starts().has(id()) ? start() : -1),
 		(i) => void (i >= 0 && setStart(i)),
 	)
+	// New cards only: observing every card again on each streamed event
+	// re-measured them all.
+	let added = new MutationObserver((records) => {
+		for (let { addedNodes } of records)
+			for (let node of addedNodes)
+				if (node instanceof HTMLElement && node.matches('.Card, .Question')) tall.observe(node)
+	})
+	onSettled(() => {
+		let list = el.querySelector(':scope > .rows')!
+		for (let block of list.querySelectorAll(':scope > :is(.Card, .Question)')) tall.observe(block)
+		added.observe(list, { childList: true })
+		return () => added.disconnect()
+	})
+	// One check a frame, however many events arrive in it.
+	let frame = 0
 	createEffect(shown, () => {
-		requestAnimationFrame(() => {
+		frame ||= requestAnimationFrame(() => {
+			frame = 0
 			check()
-			for (let block of el.querySelectorAll(':scope > .rows > :is(.Card, .Question)')) tall.observe(block)
 		})
 	})
-	let open = (row: Row) => (row.item.type === 'question' && formId() === row.item.id ? row.item : undefined)
+	let open = (row: Row) => (row.item.type === 'question' && shared.formId === row.item.id ? row.item : undefined)
 	let waiting = (title: string) => toolDetails.waiting(title, props.view.transcript?.meta.id ?? '', items(), props.tabs)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
@@ -187,12 +244,8 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<div class="rows">
 				<For each={shown()} keyed={(row) => row.key}>
 					{(row) => {
-						let cursor = createMemo(() => cursorKey() === row().key)
-						let last = createMemo(() => !streaming() && row().key === lastKey())
-						let job = createMemo(() => (jobs().has(row().item.key) ? row().item.key : undefined))
-						let edit = createMemo(
-							() => !row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key)),
-						)
+						let cursor = createMemo(() => marked(row().key, CURSOR))
+						let last = createMemo(() => marked(row().key, LAST))
 						return (
 							<>
 								<Show
@@ -200,22 +253,31 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 									fallback={
 										<Card
 											row={row()}
-											session={session()}
-											blocks={blocks()}
+											session={shared.session}
+											blocks={shared.blocks}
 											running={
-												row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()
+												row().job
+													? { call: (row().item as { id: string }).id, since: row().item.ts }
+													: marked(row().key, RUNNING)
+														? { call: (row().item as { id: string }).id, since: shared.since }
+														: undefined
 											}
 											cursor={cursor()}
-											target={hit() === row().key}
-											job={job()}
-											edit={edit()}
-											discard={row().note !== undefined && row().key !== queueHold()}
+											target={marked(row().key, TARGET)}
+											job={marked(row().key, JOB) ? row().item.key : undefined}
+											edit={marked(row().key, EDIT)}
+											discard={marked(row().key, DISCARD)}
 											waiting={waiting}
 										/>
 									}
 								>
 									{(q) => (
-										<Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />
+										<Question
+											item={q()}
+											form={props.view.form!}
+											session={shared.session}
+											target={marked(row().key, TARGET)}
+										/>
 									)}
 								</Show>
 								<Show when={last()}>{line()}</Show>

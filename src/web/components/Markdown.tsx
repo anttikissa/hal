@@ -109,12 +109,19 @@ export function Markdown(props: {
 		observer.observe(el)
 		return () => observer.disconnect()
 	})
+	// Measured once a frame: a measurement forces layout, and deltas
+	// arrive many times a frame.
+	let frame = 0
 	createEffect(
 		() => [blocks(), props.streaming] as const,
 		([, streaming]) => {
-			if (!streaming || !root) return
-			peak = Math.max(peak, root.getBoundingClientRect().height)
-			root.style.minHeight = `${peak}px`
+			if (!streaming || !root || frame) return
+			frame = requestAnimationFrame(() => {
+				frame = 0
+				if (!props.streaming || !root) return
+				peak = Math.max(peak, root.getBoundingClientRect().height)
+				root.style.minHeight = `${peak}px`
+			})
 		},
 	)
 	return (

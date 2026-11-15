@@ -27,16 +27,16 @@ const NAME = 12
 
 function Marker(props: { mark: Mark | undefined }) {
 	let marker!: HTMLSpanElement
-	createEffect(
-		() => props.mark,
-		(mark) => {
-			if (!mark?.blinks) return
-			let frame = requestAnimationFrame(() => {
-				for (let animation of marker.getAnimations()) animation.startTime = performance.now() - (Date.now() % 2000)
-			})
-			return () => cancelAnimationFrame(frame)
-		},
-	)
+	// A memo: an effect reruns whenever its source does, equal or not,
+	// and the mark is a new object with each tabs event.
+	let blinking = createMemo(() => props.mark?.blinks && props.mark.kind)
+	createEffect(blinking, (blinking) => {
+		if (!blinking) return
+		let frame = requestAnimationFrame(() => {
+			for (let animation of marker.getAnimations()) animation.startTime = performance.now() - (Date.now() % 2000)
+		})
+		return () => cancelAnimationFrame(frame)
+	})
 	return (
 		<span
 			ref={(e) => (marker = e)}
