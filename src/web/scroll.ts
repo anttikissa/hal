@@ -2,9 +2,9 @@
 // Hal moves the transcript only when the reader acts: sends, taps the
 // to-bottom pill, follows a link or returns to a tab. The transcript is
 // a column-reverse scroller (index.html): scrollTop is 0 at the bottom
-// and negative above it, so the browser keeps a bottom reader there
-// through growth and resizes, and its scroll anchoring keeps a reader
-// above in place. Task tzg.
+// and negative above it. Through growth and resizes, Hal keeps a bottom
+// reader at the bottom and a reader above with the same row where it
+// was: WebKit has no scroll anchoring before Safari 27. Task tzg.
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
 
@@ -41,10 +41,36 @@ function quiet(change: () => void): void {
 // the top.
 function init(el: HTMLElement, onTop: () => void): () => void {
 	scroll.state.el = el
-	let scrolled = () => scroll.atTop() && onTop()
+	let rows = el.querySelector(':scope > .rows')!
+	// The reader's place: the first row in sight and its top, or none at
+	// the bottom. Other scrolls set it again; Hal's own corrections keep
+	// it, as rows may have moved again before their scroll event.
+	let anchor: { row: Element; top: number } | undefined
+	let ours: number | undefined
+	let mark = () => {
+		let top = el.getBoundingClientRect().top
+		let row = scroll.gap(el) < 1 ? undefined : [...rows.children].find((r) => r.getBoundingClientRect().bottom > top)
+		anchor = row && { row, top: row.getBoundingClientRect().top }
+	}
+	let hold = new ResizeObserver(() => {
+		if (!anchor) return el.scrollTop < 0 && (el.scrollTop = 0)
+		if (!anchor.row.isConnected) return mark()
+		let moved = anchor.row.getBoundingClientRect().top - anchor.top
+		if (!moved) return
+		el.scrollTop += moved
+		ours = el.scrollTop
+	})
+	hold.observe(el)
+	hold.observe(rows)
+	let scrolled = () => {
+		if (el.scrollTop !== ours) mark()
+		ours = undefined
+		if (scroll.atTop()) onTop()
+	}
 	el.addEventListener('scroll', scrolled, { passive: true })
 	return () => {
 		scroll.state.el = null
+		hold.disconnect()
 		el.removeEventListener('scroll', scrolled)
 	}
 }

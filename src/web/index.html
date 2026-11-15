@@ -210,9 +210,9 @@
 				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
 			}
 			/* The one scroller: nothing inside it scrolls; long lines wrap.
-   column-reverse puts its scroll origin at the bottom, so the browser
-   keeps a bottom reader there as content grows or the view resizes,
-   and scroll anchoring keeps a reader above in place (scroll.ts). The
+   column-reverse puts its scroll origin at the bottom. scroll.ts keeps
+   the reader's place as content grows or the view resizes; the
+   browser's own anchoring is off, as it would correct twice. The
    rows' auto margin keeps a short transcript at the top. */
 			/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
@@ -223,6 +223,7 @@
 				display: flex;
 				flex-direction: column-reverse;
 				overflow: hidden auto;
+				overflow-anchor: none;
 				overscroll-behavior: contain;
 				--gut: max(1ch, env(safe-area-inset-left));
 				padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut);
