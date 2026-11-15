@@ -2,8 +2,8 @@
 // root (git clone is the only install), or state.home, set by
 // hal --home <dir> or by a test so it never touches live data.
 
-import { accessSync, chmodSync, constants, mkdirSync } from 'fs'
-import { homedir, tmpdir, userInfo } from 'os'
+import { chmodSync, lstatSync, mkdirSync } from 'fs'
+import { homedir, tmpdir } from 'os'
 import { resolve } from 'path'
 import { attachments } from '../common/attachments.ts'
 
@@ -35,35 +35,37 @@ function sessionDir(id: string): string {
 // Pasted images and long texts by name until a prompt copies them into
 // a session blob (tasks qy, 31): /tmp/hal/image and /tmp/hal/paste,
 // where the model's tools can read them too; inside the home under
-// test, so tests never touch /tmp/hal. When a directory cannot be
-// written (another macOS user's Hal owns /tmp/hal), the next one is used.
+// test, so tests never touch /tmp/hal. When another user owns /tmp/hal,
+// the first of /tmp/hal1-9, /tmp/hala-z that is free or ours is used:
+// only a directory this user owns, so pastes are never readable by others.
 function tmpDir(): string {
 	if (paths.state.home || process.env.NODE_ENV === 'test') return `${paths.home()}/tmp`
-	return (paths.state.tmp ??= tmpCandidates().find(writable) ?? '/tmp/hal')
+	return (paths.state.tmp ??= pickTmpDir())
 }
 
-function tmpCandidates(): string[] {
-	return [...new Set(['/tmp/hal', `/tmp/hal-${userInfo().username}`, `${tmpdir()}/hal`])]
-}
-
-function writable(dir: string): boolean {
-	try {
-		mkdirSync(dir, { recursive: true, mode: 0o700 })
-		accessSync(dir, constants.W_OK | constants.X_OK)
-		return true
-	} catch {
-		return false
+function pickTmpDir(): string {
+	for (let suffix of ['', ...'123456789abcdefghijklmnopqrstuvwxyz']) {
+		let dir = `/tmp/hal${suffix}`
+		try {
+			mkdirSync(dir, { mode: 0o700 })
+			return dir
+		} catch {}
+		let stat = lstatSync(dir, { throwIfNoEntry: false })
+		if (stat?.isDirectory() && stat.uid === process.getuid?.()) {
+			chmodSync(dir, 0o700)
+			return dir
+		}
 	}
+	return `${tmpdir()}/hal`
 }
 
-// Moves tmpDir to the next writable candidate after a write failed in
-// it; false when none is left.
-function nextTmpDir(): boolean {
+// Picks tmpDir again after a write in it failed (say, /tmp was cleaned
+// and another user took the name); false when the pick is unchanged.
+function repickTmpDir(): boolean {
 	if (paths.state.home || process.env.NODE_ENV === 'test') return false
-	let list = tmpCandidates()
-	let next = list.slice(list.indexOf(paths.tmpDir()) + 1).find(writable)
-	if (next) paths.state.tmp = next
-	return next !== undefined
+	let old = paths.state.tmp
+	paths.state.tmp = undefined
+	return paths.tmpDir() !== old
 }
 
 function imageDir(): string {
@@ -136,7 +138,7 @@ export const paths = {
 	sessionsDir,
 	sessionDir,
 	tmpDir,
-	nextTmpDir,
+	repickTmpDir,
 	imageDir,
 	fileDir,
 	stateDir,
