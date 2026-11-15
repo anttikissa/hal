@@ -5,6 +5,7 @@ import { frameLayout, type Past } from './frame-layout.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { batchOrder } from './batch-order.ts'
+import { titles } from '../common/titles.ts'
 
 function rebuild(view: View): void {
 	batchOrder.state.split.clear()
@@ -13,6 +14,7 @@ function rebuild(view: View): void {
 	frame.state.peaks.clear()
 	frameLayout.state.history = undefined
 	frameLayout.state.ordered = undefined
+	titles.forgetTimes()
 }
 
 function draw(force = false, trigger?: string): void {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item } from '../common/transcript.ts'
@@ -58,6 +58,18 @@ describe('grow mode', () => {
 		show(items(2), 'hi')
 		show(items(2), 'hi', 2, true)
 		expect(term.content()).toEqual(['$ hal', ...frameText()])
+	})
+
+	test('a forced repaint dates headers painted on an earlier day', () => {
+		setSystemTime(new Date(2026, 10, 12, 15, 0))
+		setup(14, 40)
+		let list: Item[] = [{ type: 'prompt', text: 'hi', ts: new Date(2026, 10, 12, 14, 54).toISOString() }]
+		show(list)
+		expect(term.content().join('\n')).toContain('14:54 You')
+		setSystemTime(new Date(2026, 10, 15, 17, 0))
+		show(list, '', 0, true)
+		setSystemTime()
+		expect(term.content().join('\n')).toContain('Nov 12, 14:54 You')
 	})
 })
 
