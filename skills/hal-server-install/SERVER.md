@@ -149,7 +149,7 @@ user unit for that same home. Substitute your own generic paths/account:
       ExecStart = "${pkgs.bun}/bin/bun /var/lib/hal/checkout/src/main.ts serve";
       Restart = "on-failure";
       RestartForceExitStatus = [ 100 ];
-      RestartSec = 2;
+      RestartSec = "100ms";
       KillMode = "control-group";
       OOMPolicy = "continue";
       TimeoutStopSec = 30;
