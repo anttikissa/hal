@@ -13,6 +13,7 @@ import { app } from './app.ts'
 import { diagnostics } from './diagnostics.ts'
 import { composerDebug } from './composer-debug.ts'
 import { memory } from './memory.ts'
+import { day } from './day.ts'
 import { App } from './components/App.tsx'
 
 // The host's settings (config.ason) are read before the first render.
@@ -29,6 +30,7 @@ if (typeof document !== 'undefined') {
 		}),
 	)
 	settings.load(document.getElementById('settings')?.textContent)
+	day.install()
 	sendKeys.load(document.getElementById('send-keys')?.textContent)
 	// Off unless config.ason opts in (webDiagnostics).
 	if (settings.webDiagnostics())

@@ -57,6 +57,7 @@ function stale(): boolean {
 	return timesDay !== new Date().toDateString()
 }
 function time(ts: string | undefined): string {
+	titles.track?.()
 	if (ts === undefined) return ''
 	let key = ts.endsWith('Z') ? ts.slice(0, 16) : ts
 	let hit = times.get(key)
@@ -267,6 +268,9 @@ function blockId(item: Shown & { key: string }): string {
 
 export const titles = {
 	names: {} as Record<string, string>,
+	// The web's day signal: a time read inside a reactive scope re-runs
+	// when forgetTimes re-dates the headers.
+	track: undefined as (() => unknown) | undefined,
 	defaults: {} as Record<string, string>,
 	modelName,
 	shortName,
