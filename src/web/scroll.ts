@@ -49,7 +49,9 @@ function init(el: HTMLElement, onTop: () => void): () => void {
 	let ours: number | undefined
 	let mark = () => {
 		let top = el.getBoundingClientRect().top
-		let row = scroll.gap(el) < 1 ? undefined : [...rows.children].find((r) => r.getBoundingClientRect().bottom > top)
+		// WebKit leaves a bottom reader a pixel up as rows grow; that
+		// pixel is still the bottom.
+		let row = scroll.gap(el) < 2 ? undefined : [...rows.children].find((r) => r.getBoundingClientRect().bottom > top)
 		anchor = row && { row, top: row.getBoundingClientRect().top }
 	}
 	let hold = new ResizeObserver(() => {
