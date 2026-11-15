@@ -17,3 +17,8 @@ a task and remove it here.
 - Cards need some status: if a background or foreground task is
   working, if /status is running - needs to be obvious. Maybe even add
   to bottom area these since those scroll away easily
+- Nightly run that spends subscription quota otherwise expiring
+  unused (e.g. a3's last 12% before its 7d reset), on agent
+  benchmarks or similar. Pin the run to that account; never spend
+  quota needed for daytime work; report results in the morning.
+  Rotation (3vj) alone may leave it until the user is asleep.
