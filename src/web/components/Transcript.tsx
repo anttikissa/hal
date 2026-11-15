@@ -25,6 +25,7 @@ import { Card } from './Card.tsx'
 import { Question } from './Question.tsx'
 
 const none: Item[] = []
+const sameSet = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b.size && [...a].every((k) => b.has(k))
 
 // A tab shows its newest rows first: building every card of a long
 // session takes most of a second. Earlier rows are added a page at a
@@ -106,9 +107,12 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			jobCalls(),
 		),
 	)
-	// The row Hal's cursor sits in: the last, while it streams.
+	// The row Hal's cursor sits in: the last, while it streams. Cards
+	// compare against these keys in per-row memos: rows() is a new array
+	// on every streamed event, and a card reading it would rerun each time.
 	let streaming = createMemo(() => view.streaming(props.view))
-	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
+	let lastKey = createMemo(() => rows().at(-1)?.key)
+	let cursorKey = createMemo(() => (streaming() ? lastKey() : undefined))
 	// The call the session runs now: its card ticks (task hyt).
 	// Cards read these memos, not props.view, which changes with every
 	// streamed delta: thousands of card bindings would re-run each time.
@@ -131,7 +135,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		</div>
 	)
 	// Background jobs still running, by call key: their cards offer Kill.
-	let jobs = createMemo(() => transcriptRows.jobs(all()))
+	let jobs = createMemo(() => transcriptRows.jobs(all()), { equals: sameSet })
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
 	// One queued message is edited at a time, in one window.
 	let editableWaiting = (r: Row) =>
@@ -140,7 +144,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		r.item.type === 'prompt' &&
 		r.item.from === undefined &&
 		r.item.origin !== 'model'
-	let editable = createMemo(() => amend.editable(items()))
+	let editable = createMemo(() => amend.editable(items()), { equals: sameSet })
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	// The linked card is always among the rows shown.
 	let shown = createMemo(() => {
@@ -182,32 +186,42 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			</div>
 			<div class="rows">
 				<For each={shown()} keyed={(row) => row.key}>
-					{(row) => (
-						<>
-							<Show
-								when={open(row())}
-								fallback={
-									<Card
-										row={row()}
-										session={session()}
-										blocks={blocks()}
-										running={row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()}
-										cursor={cursorKey() === row().key}
-										target={hit() === row().key}
-										job={jobs().has(row().item.key) ? row().item.key : undefined}
-										edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))}
-										discard={row().note !== undefined && row().key !== queueHold()}
-										waiting={waiting}
-									/>
-								}
-							>
-								{(q) => (
-									<Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />
-								)}
-							</Show>
-							<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
-						</>
-					)}
+					{(row) => {
+						let cursor = createMemo(() => cursorKey() === row().key)
+						let last = createMemo(() => !streaming() && row().key === lastKey())
+						let job = createMemo(() => (jobs().has(row().item.key) ? row().item.key : undefined))
+						let edit = createMemo(
+							() => !row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key)),
+						)
+						return (
+							<>
+								<Show
+									when={open(row())}
+									fallback={
+										<Card
+											row={row()}
+											session={session()}
+											blocks={blocks()}
+											running={
+												row().job ? { call: (row().item as { id: string }).id, since: row().item.ts } : running()
+											}
+											cursor={cursor()}
+											target={hit() === row().key}
+											job={job()}
+											edit={edit()}
+											discard={row().note !== undefined && row().key !== queueHold()}
+											waiting={waiting}
+										/>
+									}
+								>
+									{(q) => (
+										<Question item={q()} form={props.view.form!} session={session()} target={hit() === row().key} />
+									)}
+								</Show>
+								<Show when={last()}>{line()}</Show>
+							</>
+						)
+					}}
 				</For>
 				<Show when={!streaming() && !rows().length}>{line()}</Show>
 			</div>
