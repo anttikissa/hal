@@ -57,6 +57,16 @@ const first = 40
 const page = 60
 const [starts, setStarts] = createSignal<ReadonlyMap<string, string>>(new Map())
 
+// Session `id`'s tab is shown again. Read at the bottom, it starts over
+// from its newest rows: rows a long turn added while it was shown would
+// otherwise all be built again (ADEMark A11 took 10 s to switch).
+export function reopened(id: string): void {
+	if ((scroll.state.places.get(id) ?? 0) < -1 || !starts().has(id)) return
+	let next = new Map(starts())
+	next.delete(id)
+	setStarts(next)
+}
+
 // `target`: the block the address links to (target.ts), whose card is
 // marked and opens.
 export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string; tabs?: Tab[] }) {

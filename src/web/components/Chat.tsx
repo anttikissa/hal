@@ -25,7 +25,7 @@ import { Changes } from './Changes.tsx'
 import { Rebase } from './Rebase.tsx'
 import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
-import { Transcript } from './Transcript.tsx'
+import { Transcript, reopened } from './Transcript.tsx'
 import { Icon } from './Icon.tsx'
 
 const snap = () => ({
@@ -53,6 +53,7 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	// Another tab's transcript: back to where the reader left it.
 	let id = next.view.transcript?.meta.id
 	if (id !== before.view.transcript?.meta.id) {
+		if (id) reopened(id)
 		scroll.quiet(() => {
 			set(next)
 			flush()
