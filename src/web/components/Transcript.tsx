@@ -48,13 +48,14 @@ const CURSOR = 1,
 type Shared = { session: string; blocks?: SessionMeta['blocks']; formId?: string; since?: string }
 
 // A tab shows its newest rows first: building every card of a long
-// session takes most of a second. Earlier rows are added a page at a
-// time as the reader nears the top, per session so a tab keeps its
+// session takes most of a second. Earlier rows are added a few at a
+// time as the reader nears the top (60 at once dropped frames while
+// scrolling: ADEMark A11), per session so a tab keeps its
 // rows when shown again. The first shown row is kept by key, so new
 // rows only add below: a row once shown never leaves the top, and text
 // a reader is reading or selecting never moves.
 const first = 40
-const page = 60
+const page = 5
 const [starts, setStarts] = createSignal<ReadonlyMap<string, string>>(new Map())
 
 // Session `id`'s tab is shown again. Read at the bottom, it starts over
