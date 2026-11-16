@@ -223,16 +223,12 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		added.observe(list, { childList: true })
 		return () => added.disconnect()
 	})
-	// One check a frame, however many events arrive in it. Rows also
-	// load ahead, a page a frame, until nearTop px wait above: Hal.app
-	// (WebKit) scrolled to the top of the first rows before loading any
-	// and stopped there (ADEMark A11).
+	// One check a frame, however many events arrive in it.
 	let frame = 0
 	createEffect(shown, () => {
 		frame ||= requestAnimationFrame(() => {
 			frame = 0
 			check()
-			if (scroll.atTop()) more()
 		})
 	})
 	let open = (row: Row) => (row.item.type === 'question' && shared.formId === row.item.id ? row.item : undefined)
