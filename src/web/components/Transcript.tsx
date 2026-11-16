@@ -87,11 +87,19 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
 		})
 	// Nearing the top: rows already loaded first, then earlier history.
+	// Repeats each frame while still near the top: WebKit scrolls off
+	// the main thread, reaches the top between scroll events and then
+	// sends none, so the list stopped growing (ADEMark A11).
+	let loading = 0
 	let more = () => {
 		if (start() === 0) return app.older()
 		scroll.quiet(() => {
 			setStart(Math.max(0, start() - page))
 			flush()
+		})
+		loading ||= requestAnimationFrame(() => {
+			loading = 0
+			if (scroll.atTop()) more()
 		})
 	}
 	onSettled(() => scroll.init(el, more))

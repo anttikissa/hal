@@ -92,7 +92,7 @@ function restore(id: string): void {
 export const scroll = {
 	// Further above the bottom than this shows the to-bottom pill.
 	awayPx: 200,
-	nearTop: 800,
+	nearTop: 2000,
 	state: {
 		el: null as Box | null,
 		quiet: false,
