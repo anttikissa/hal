@@ -87,19 +87,11 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
 		})
 	// Nearing the top: rows already loaded first, then earlier history.
-	// Repeats each frame while still near the top: WebKit scrolls off
-	// the main thread, reaches the top between scroll events and then
-	// sends none, so the list stopped growing (ADEMark A11).
-	let loading = 0
 	let more = () => {
 		if (start() === 0) return app.older()
 		scroll.quiet(() => {
 			setStart(Math.max(0, start() - page))
 			flush()
-		})
-		loading ||= requestAnimationFrame(() => {
-			loading = 0
-			if (scroll.atTop()) more()
 		})
 	}
 	onSettled(() => scroll.init(el, more))
@@ -231,12 +223,16 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		added.observe(list, { childList: true })
 		return () => added.disconnect()
 	})
-	// One check a frame, however many events arrive in it.
+	// One check a frame, however many events arrive in it. Rows also
+	// load ahead, a page a frame, until nearTop px wait above: Hal.app
+	// (WebKit) scrolled to the top of the first rows before loading any
+	// and stopped there (ADEMark A11).
 	let frame = 0
 	createEffect(shown, () => {
 		frame ||= requestAnimationFrame(() => {
 			frame = 0
 			check()
+			if (scroll.atTop()) more()
 		})
 	})
 	let open = (row: Row) => (row.item.type === 'question' && shared.formId === row.item.id ? row.item : undefined)
