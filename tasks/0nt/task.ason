@@ -3,7 +3,7 @@
 	spec: 'Every tool argument that carries text (BASH commands and scripts, regexes, GREP patterns, SEND messages, file contents) reaches the tool byte-exact as the model wrote it. The model never quotes or escapes anything: a backslash, \\n, \\d, quote or newline it writes is the literal character. The cmd framing works like a network protocol with self-delimiting payloads (literal blocks with markers, as in EDIT, or length/boundary framing), not JS string literals. Malformed framing fails as a tool error showing the raw text; nothing runs.',
 	status: 'planned',
 	notes: [
-		'User, 2026-11-16: every frontier model breaks JS string escaping in tool calls. Seen: a heredoc inside a BASH string turned \\n into a real newline; a rewrite then lost backslashes, breaking \\d in a regex. Models burn turns fixing escapes instead of working. The agent writing this task hit it too: tsk add through BASH doubled every backslash.'
+		'User, 2026-11-16: every frontier model breaks JS string escaping in tool calls. Seen with Claude Fable 5.2 (high effort): a heredoc inside a BASH string turned \\n into a real newline; a rewrite then lost backslashes, breaking \\d in a regex. Models burn turns fixing escapes instead of working. The agent writing this task hit it too: tsk add through BASH doubled every backslash.'
 	],
 	needs: ['3fv'],
 	foldInto: ['3fv']
