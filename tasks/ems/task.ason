@@ -1,9 +1,10 @@
 {
-	title: 'Leave fewer broken tests in owned areas',
-	spec: 'AGENTS.md Tests section includes the user-approved boy-scout rule: Leave the codebase with fewer broken tests than you found. Fix failures in your area, including pre-existing ones. Leave failures elsewhere only when another active session is working on them; confirm ownership and report them before finishing. Keep the guidance concise and preserve the existing focused-testing rules.',
+	title: 'Require passing known tests before completion',
+	spec: 'AGENTS.md requires agents to fix every known test failure, including pre-existing failures, and complete work only when those tests pass. Agents coordinate with other sessions and verify their fixes; another session working on a failure is no completion exception. Preserve focused test selection.',
 	status: 'done',
 	notes: [
-		'Inserted the exact approved wording at the start of Tests. Diff reviewed and whitespace check passed; documentation-only change, no runtime tests needed. User-requested guidance needs no human-review TODO marker.'
+		'Inserted the exact approved wording at the start of Tests. Diff reviewed and whitespace check passed; documentation-only change, no runtime tests needed. User-requested guidance needs no human-review TODO marker.',
+		'User removed the active-session completion exception on 2026-11-17. Known failing tests must pass before completion; fewer failures is insufficient.'
 	],
 	needs: ['4x'],
 	foldInto: ['4x']

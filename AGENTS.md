@@ -120,9 +120,10 @@ dir => { /* handle dir */ }). Apply this principle throughout the codebase.
 
 # Tests
 
-Leave the codebase with fewer broken tests than you found. Fix failures
-in your area, and others if nobody else is fixing them. Tests may fail
-only while active sessions are working to fix them.
+Fix every known test failure, including pre-existing failures. Work is
+complete only when those tests pass. Coordinate with other sessions,
+then verify their fixes; another session working on a failure is no
+completion exception.
 
 Run tests only for the code being developed unless changes are crosscutting.
 Use ./test <filename-pattern> for focused normal tests; patterns match filenames,
