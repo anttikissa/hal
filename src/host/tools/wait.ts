@@ -39,6 +39,6 @@ export const tool: Tool = {
 		let targets = given.length ? given.map((v) => work.target(ctx.sessionId, v)) : work.defaults(ctx.sessionId)
 		if (targets.some((t) => t.sessionId === ctx.sessionId && (!t.call || t.call.id === ctx.callId)))
 			throw new Error('WAIT cannot wait for its own session or its own call. Name background work or another session.')
-		return work.wait(targets, ctx.signal)
+		return work.wait(targets, ctx.signal, ctx.sessionId)
 	},
 }

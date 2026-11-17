@@ -1,0 +1,7 @@
+{
+	title: 'Messages reach a session blocked in WAIT',
+	spec: 'Invariant: a session idle in WAIT never strands a message. WAIT also ends when its own session holds a deliverable message: next-round or now messages from the human or other sessions, including ones that arrived before WAIT started. Queued (after-turn) messages move up to next-round, oldest first, keeping id and provenance, and stop at one being edited. Reports of its own background commands keep their normal delivery. Targets needing attention win over the message wake. Requested by the user after 48-kim stayed in WAIT 48-let for 44 s while 48-let had already sent its reply (2026-11-17, session 48-lit); reviewed by gpt-6-astra.',
+	status: 'done',
+	needs: ['m3s'],
+	foldInto: ['m3s']
+}

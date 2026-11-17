@@ -93,6 +93,28 @@ test('wait with no subagent running says so at once and the turn goes on', async
 	expect(status.stateOf(p).type).toBe('running')
 })
 
+test('WAIT ends for a message from a still busy session and for a queued human message (task 6q5)', async () => {
+	let c = client()
+	let other = toolSession(c)
+	c.conn.send({ type: 'submit', sessionId: other, text: 'keep busy' })
+	await until(() => calls.length === 1)
+	let p = toolSession(c)
+	c.conn.send({ type: 'submit', sessionId: p, text: 'plan the work' })
+	await until(() => calls.length === 2)
+	calls[1]!.push(call('w1', 'wait', { targets: [other] }), { type: 'done', reason: 'tool_use' })
+	await until(() => status.stateOf(p).type === 'running' && (status.stateOf(p) as any).phase === 'tools')
+	prompts.submit(p, 'shared now', undefined, 'soft-steer', { from: other, advisory: true })
+	await until(() => calls.length === 3)
+	expect(text(2)).toContain('A message arrived')
+	expect(lastText(2)).toContain('shared now')
+	calls[2]!.push(call('w2', 'wait', { targets: [other] }), { type: 'done', reason: 'tool_use' })
+	await until(() => status.inboxOf(p).length === 0 && (status.stateOf(p) as any).phase === 'tools')
+	c.conn.send({ type: 'submit', sessionId: p, text: 'when you can', delivery: 'queue' })
+	await until(() => calls.length === 4)
+	expect(lastText(3)).toContain('when you can')
+	expect(status.stateOf(other).type).toBe('running')
+})
+
 test('ordinary steering prevents pending spawn and wait calls from running', async () => {
 	let c = client()
 	let p = await parent(c)

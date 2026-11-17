@@ -3,6 +3,7 @@
 // id or tool call (t123) and act on all of it.
 import type { ToolCallBlock } from '../common/blocks.ts'
 import { forms } from '../common/forms.ts'
+import { inbox } from '../common/inbox.ts'
 import type { Event } from '../common/protocol.ts'
 import { session } from '../common/session.ts'
 import { states } from '../common/states.ts'
@@ -10,6 +11,7 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
 import { notify } from './notify.ts'
+import { queueEdits } from './queue-edits.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { slash } from './slash.ts'
@@ -127,7 +129,9 @@ function wake(id: string): void {
 		}
 }
 
-async function wait(targets: Target[], signal: AbortSignal): Promise<string> {
+// Ends when a target needs attention, or when `self` gets a message:
+// WAIT is idle time, so every waiting message goes through (task 6q5).
+async function wait(targets: Target[], signal: AbortSignal, self?: string): Promise<string> {
 	if (!targets.length) return 'No owned background command or subagent is running. Go on without waiting.'
 	return new Promise((resolve, reject) => {
 		let finish = (text?: string, error?: unknown) => {
@@ -136,25 +140,43 @@ async function wait(targets: Target[], signal: AbortSignal): Promise<string> {
 			if (error) reject(error)
 			else resolve(text!)
 		}
+		let watched = () =>
+			new Set([...(self ? [self] : []), ...targets.flatMap((t) => work.tree(t).map((c) => c.sessionId))])
 		let check = () => {
 			try {
 				let ready = targets.filter(work.attention)
-				listener.ids = new Set(targets.flatMap((t) => work.tree(t).map((c) => c.sessionId)))
+				listener.ids = watched()
 				if (ready.length)
-					finish(
+					return finish(
 						`Work needs attention: ${ready.map((t) => t.ref).join(', ')}. Inspect the targets; available reports follow through their usual delivery.`,
 					)
+				if (self && work.messages(self)) finish('A message arrived; it follows. WAIT again if still needed.')
 			} catch (e) {
 				finish(undefined, e)
 			}
 		}
 		let abort = () => finish(undefined, new Error(jobs.why(signal, 'Wait stopped')))
-		let listener = { ids: new Set(targets.flatMap((t) => work.tree(t).map((c) => c.sessionId))), check }
+		let listener = { ids: watched(), check }
 		work.listeners.add(listener)
 		signal.addEventListener('abort', abort, { once: true })
 		if (signal.aborted) abort()
 		else check()
 	})
+}
+
+// Whether session `id` has messages its next round can deliver, other
+// than reports of its own background commands. Queued ones move up to
+// next-round first, oldest first, stopping at one being edited.
+function messages(id: string): boolean {
+	let held = queueEdits.held(id)
+	let waiting = status.inboxOf(id).filter((m) => m.from !== id)
+	let queued = waiting.filter((m) => m.delivery === 'after-turn')
+	let editing = queued.findIndex((m) => m.id === held)
+	let movable = editing < 0 ? queued : queued.slice(0, editing)
+	for (let m of movable)
+		history.append(id, { type: 'inbox', id: m.id, text: m.text, ...inbox.provenance(m), delivery: 'next-round' })
+	if (movable.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+	return movable.length > 0 || waiting.some((m) => m.delivery !== 'after-turn')
 }
 
 // "12-xyz (tab 3)": users find sessions by tab number.
@@ -325,6 +347,7 @@ export const work = {
 	changed,
 	wake,
 	wait,
+	messages,
 	inspect,
 	stop,
 	survivors,
