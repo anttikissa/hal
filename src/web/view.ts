@@ -292,10 +292,11 @@ function streaming(st: ViewState): 'thinking' | 'text' | undefined {
 // need the user).
 export type Line = { text: string; tone: 'idle' | 'busy' | 'warn' | 'error' }
 
-function line(st: ViewState, connected: boolean): Line {
+function line(st: ViewState, connected: boolean, fresh = true): Line {
 	let t = st.transcript
 	if (!connected) return { text: 'reconnecting', tone: 'error' }
 	if (!t) return { text: 'connecting', tone: 'busy' }
+	if (!fresh) return { text: 'Updating...', tone: 'idle' }
 	let s = t.state
 	if (queueEdit.waiting(t)) return { text: 'waiting for queue edit', tone: 'warn' }
 	let jobs = t.meta.background?.length ?? 0

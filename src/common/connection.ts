@@ -147,6 +147,21 @@ function dropped(): void {
 	void connection.attempt()
 }
 
+// Replaces a stale link without losing followed sessions or command IDs.
+function reconnect(first?: string): void {
+	let st = connection.state
+	if (st.stopped) return
+	if (st.timer !== null) clearTimeout(st.timer)
+	st.timer = null
+	st.attempt = null
+	let conn = st.conn
+	st.conn = null
+	conn?.close()
+	if (first && st.followed.has(first)) st.followed = new Set([first, ...st.followed])
+	st.failures = 0
+	void connection.attempt()
+}
+
 // Waits before the next attempt, longer after each failure.
 function retry(): void {
 	let st = connection.state
@@ -233,6 +248,7 @@ export const connection = {
 	attempt,
 	attach,
 	dropped,
+	reconnect,
 	retry,
 	delay,
 	receive,

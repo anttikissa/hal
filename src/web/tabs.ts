@@ -5,7 +5,6 @@
 // and scroll place), Back and Forward, and the tab keys (key()).
 // The state lives in app.state (tabs, shown, asked).
 
-import { backfill } from '../common/backfill.ts'
 import { follow } from '../common/follow.ts'
 import { commandList } from '../common/commands/list.ts'
 import { markdown } from '../common/markdown.ts'
@@ -23,15 +22,13 @@ import { router } from './router.ts'
 import { push } from './push.ts'
 import { scroll } from './scroll.ts'
 import { diagnostics } from './diagnostics.ts'
-import { view } from './view.ts'
 
 // A hidden tab receives live updates but must not change the visible DOM.
 function hiddenEvent(event: Event): void {
 	let st = app.state
 	if (!('sessionId' in event) || !event.sessionId) return
 	if (st.background.has(event.sessionId)) {
-		if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
-		st.cached.set(event.sessionId, view.onEvent(st.cached.get(event.sessionId) ?? {}, event))
+		st.cached.set(event.sessionId, app.receiveView(st.cached.get(event.sessionId) ?? {}, event))
 	}
 	if (st.loading === event.sessionId && (event.type === 'snapshot' || event.type === 'rejected')) {
 		delete st.loading
@@ -72,6 +69,8 @@ function unfollow(id: string): void {
 	st.background.delete(id)
 	st.cached.delete(id)
 	st.older.delete(id)
+	st.refreshing.delete(id)
+	st.fresh.delete(id)
 	connection.send({ type: 'close', sessionId: id })
 }
 
@@ -178,9 +177,7 @@ function onTabs(list: Tab[]): void {
 	delete st.landing
 	for (let id of st.cached.keys())
 		if (!list.some((tab) => tab.id === id)) {
-			st.cached.delete(id)
-			st.background.delete(id)
-			connection.send({ type: 'close', sessionId: id })
+			tabs.unfollow(id)
 		}
 	let target = router.pick(list, st.shown ?? router.parse(router.href()), before)
 	if (target && target !== st.shown) return tabs.show(target, true)

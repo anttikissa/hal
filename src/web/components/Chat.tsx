@@ -39,6 +39,7 @@ const snap = () => ({
 	pending: app.pending(),
 	notice: app.notice(),
 	connected: connection.connected(),
+	fresh: app.fresh(),
 	pushReady: !!push.state.registration,
 	notices: notices.state.entries,
 	updateAvailable: app.state.updateAvailable,
@@ -177,6 +178,7 @@ export function Chat() {
 	]
 	let stack = field('notices')
 	let updateAvailable = field('updateAvailable')
+	let fresh = field('fresh')
 	let pending = createMemo(() => state().pending, { equals: same })
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
@@ -244,7 +246,7 @@ export function Chat() {
 		}
 	})
 	return (
-		<div class={['Chat', 'project', { offline: !connected() }]}>
+		<div class={['Chat', 'project', { offline: !connected(), stale: !fresh() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Show when={updateAvailable()}>
 				<div class="source-update">
@@ -259,6 +261,7 @@ export function Chat() {
 			<StatusRow
 				view={view()}
 				connected={connected()}
+				fresh={fresh()}
 				color={tabs().find((t) => t.id === shown())?.color}
 				hal={!!tabs().find((t) => t.id === shown())?.hal}
 				untrusted={!!tabs().find((t) => t.id === shown())?.untrusted}

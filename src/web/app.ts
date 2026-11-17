@@ -12,6 +12,7 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Sending } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Delivery, Event, Tab } from '../common/protocol.ts'
+import { transcript, type Transcript } from '../common/transcript.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
 import { completions, type Known, type Menu } from './completions.ts'
@@ -26,6 +27,7 @@ import { find } from './find.ts'
 import { folds } from './folds.ts'
 import { rebaseView } from './rebase.ts'
 import { diagnostics } from './diagnostics.ts'
+import { wake } from './wake.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
 // `tabs`: the host's, in order; `shown`: the tab this page shows;
@@ -52,6 +54,8 @@ export type AppState = {
 	suppressed?: string
 	cached: Map<string, ViewState>
 	background: Set<string>
+	fresh: Set<string>
+	refreshing: Map<string, { first: number; transcript: Transcript }>
 	painted: boolean
 	updateAvailable?: boolean
 	loading?: string
@@ -71,12 +75,18 @@ function createState(): AppState {
 		pages: 0,
 		cached: new Map(),
 		background: new Set(),
+		fresh: new Set(),
+		refreshing: new Map(),
 		painted: false,
 	}
 }
 
 function sessionId(): string | undefined {
 	return app.state.view.transcript?.meta.id
+}
+
+function fresh(): boolean {
+	return connection.connected() && !wake.state.hidden && app.state.fresh.has(app.state.shown ?? app.sessionId() ?? '')
 }
 
 // Prompts sent and not acknowledged, shown after the transcript.
@@ -110,6 +120,46 @@ function sendNow(command: unknown): boolean {
 	return true
 }
 
+// A new tail cannot replace cards the reader loaded above it. Fold into
+// its replacement while fetching that range, then reveal it together.
+function receiveView(current: ViewState, event: Event): ViewState {
+	let st = app.state
+	let id = 'sessionId' in event ? event.sessionId : current.transcript?.meta.id
+	let held = id && st.refreshing.get(id)
+	let next = view.onEvent(held ? { ...current, transcript: held.transcript } : current, event)
+	if (!id || !next.transcript) return next
+	if (event.type === 'snapshot') {
+		let first = held ? held.first : st.older.get(id)?.loaded[0]?.n
+		backfill.onSnapshot(st.older, event)
+		held =
+			first !== undefined && event.snapshot.older !== undefined && (event.snapshot.history[0]?.n ?? Infinity) > first
+				? { first, transcript: next.transcript }
+				: undefined
+		if (held) {
+			st.refreshing.set(id, held)
+			st.fresh.delete(id)
+		} else {
+			st.refreshing.delete(id)
+			st.fresh.add(id)
+		}
+	}
+	if (event.type === 'history' && backfill.onPage(st.older, event)) {
+		next = { ...next, transcript: backfill.apply(st.older, next.transcript) }
+		if (id === app.sessionId()) st.pages++
+	}
+	if (!held) return next
+	held.transcript = next.transcript!
+	let loaded = st.older.get(id)!
+	if (loaded.older === undefined || (loaded.loaded[0]?.n ?? Infinity) <= held.first) {
+		st.refreshing.delete(id)
+		st.fresh.add(id)
+		return { ...next, form: forms.follow(current.form, transcript.question(next.transcript!)) }
+	}
+	let command = backfill.next(st.older, id)
+	if (command) connection.send(command)
+	return { ...next, transcript: current.transcript, form: current.form }
+}
+
 function onEvent(event: Event): void {
 	let st = app.state
 	let queueChanged = queueEdit.onEvent(event)
@@ -137,17 +187,12 @@ function onEvent(event: Event): void {
 	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown)
 		return tabs.hiddenEvent(event)
 	if (event.type === 'find-open') return find.open()
-	st.view = view.onEvent(st.view, event)
+	st.view = app.receiveView(st.view, event)
 	if (event.type === 'snapshot') {
 		st.menu = undefined
 		st.known = undefined
 		st.completedByTab = undefined
 		st.suppressed = undefined
-		backfill.onSnapshot(st.older, event)
-	}
-	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
-		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
-		st.pages++
 	}
 	if (event.type === 'completions' && st.view.transcript?.meta.id === event.sessionId && st.text === event.text) {
 		if (st.suppressed === event.text) return
@@ -256,7 +301,11 @@ function older(): void {
 }
 
 function onState(state: LinkState): void {
-	if (state.type !== 'connected') queueEdit.disconnected()
+	if (state.type !== 'connected') {
+		queueEdit.disconnected()
+		app.state.fresh.clear()
+		app.changed()
+	}
 	if (restart.linkChanged(state)) return
 	if (state.type === 'connected') {
 		tabs.connected()
@@ -448,6 +497,7 @@ function start(): void {
 	addEventListener('blur', visible)
 	document.addEventListener('visibilitychange', visible)
 	setInterval(() => document.visibilityState === 'visible' && push.visibility(app.state.shown), 20_000) // heartbeat (notify.present)
+	wake.start()
 }
 
 async function login(code: string): Promise<string | undefined> {
@@ -463,6 +513,8 @@ function reset(): void {
 	if (app.state.view.modal?.find) find.close()
 	find.state = { filters: [...find.state.filters] }
 	if (app.state.timer) clearTimeout(app.state.timer)
+	wake.stop()
+	wake.state.hidden = false
 	app.state = createState()
 	recall.reset()
 	queueEdit.disconnected()
@@ -474,6 +526,7 @@ export const app = {
 	// Called after every change; main.tsx redraws from app.state.
 	changed: (): void => {},
 	sessionId,
+	fresh,
 	pending,
 	notice,
 	choose,
@@ -488,6 +541,7 @@ export const app = {
 		app.changed()
 	},
 	onEvent,
+	receiveView,
 	settled,
 	aim,
 	seek,

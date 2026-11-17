@@ -40,13 +40,14 @@ function Parts(props: { group: StatusGroup }) {
 export function StatusRow(props: {
 	view: ViewState
 	connected: boolean
+	fresh?: boolean
 	color?: number
 	hal?: boolean
 	untrusted?: boolean
 }) {
 	let details!: HTMLDialogElement
 	let meta = () => props.view.transcript?.meta
-	let line = () => view.line(props.view, props.connected)
+	let line = () => view.line(props.view, props.connected, props.fresh)
 	let tone = () => ({ idle: '', busy: 'busy', warn: 'warning', error: 'error' })[line().tone]
 	let context = () => status.context(props.view)
 	let quota = () => status.quota(props.view)

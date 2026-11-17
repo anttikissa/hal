@@ -208,6 +208,56 @@ test('events and drops from a replaced connection are ignored; stop ends retryin
 	expect(timers).toEqual([])
 })
 
+test('wake replaces a still-open link, opens the visible session first and preserves pending IDs', async () => {
+	answers = ['client', 'client']
+	await start()
+	let old = conns[0]!
+	old.deliver(snapshot('background'))
+	old.deliver(snapshot('visible'))
+	connection.send({ type: 'submit', sessionId: 'visible', text: 'keep this' })
+	let command = old.sent.at(-1)
+	connection.reconnect('visible')
+	expect(connection.connected()).toBe(false)
+	expect(old.closed).toBe(true)
+	old.deliver(snapshot('stale'))
+	old.drop()
+	await tick()
+	expect(conns).toHaveLength(2)
+	expect(connection.state.followed.has('stale')).toBe(false)
+	expect(conns[1]!.sent).toEqual([
+		{ type: 'open', sessionId: 'visible', id: expect.any(String) },
+		{ type: 'open', sessionId: 'background', id: expect.any(String) },
+		command,
+	])
+	conns[1]!.deliver({ type: 'ack', id: command.id })
+	expect(connection.state.pending.size).toBe(0)
+})
+
+test('wake bypasses a scheduled retry and a replaced dial cannot attach', async () => {
+	answers = ['client']
+	await start()
+	conns[0]!.drop()
+	await tick()
+	expect(connection.state.timer).not.toBe(null)
+	let attempts: { on: Parameters<Transport['connect']>[0]; resolve: (answer: any) => void }[] = []
+	connection.state.opts!.transport = {
+		connect: (on) => new Promise((resolve) => attempts.push({ on, resolve })),
+	}
+	connection.reconnect()
+	expect(connection.state.timer).toBe(null)
+	connection.reconnect()
+	let closed = false
+	attempts[0]!.on.event(snapshot('stale'))
+	attempts[0]!.resolve({ role: 'client', conn: { send() {}, close: () => (closed = true) } })
+	await tick()
+	expect(closed).toBe(true)
+	expect(connection.connected()).toBe(false)
+	expect(connection.state.followed.has('stale')).toBe(false)
+	attempts[1]!.resolve({ role: 'client', conn: { send() {}, close() {} } })
+	await tick()
+	expect(connection.connected()).toBe(true)
+})
+
 test('an event that fails its check is not applied: the client gets one plain warning naming it', async () => {
 	answers = ['client']
 	await start()

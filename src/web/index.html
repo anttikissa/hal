@@ -3046,6 +3046,13 @@
 					color: var(--mark-alt, var(--mark-lit));
 				}
 			}
+			.Chat.stale .cursor-line span,
+			.Chat.stale .Card .cursor,
+			.Chat.stale .CardHeader .spinner.on::after,
+			.Chat.stale .status .dot,
+			.Chat.stale .Tabs .marker.blink {
+				animation-play-state: paused;
+			}
 			.Tabs .marker.blocked {
 				font-weight: 600;
 			}
