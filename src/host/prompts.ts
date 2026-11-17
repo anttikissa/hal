@@ -176,22 +176,29 @@ function senders(list: UserBlock[]): Sender[] {
 // happened since it, one rebase drops it and what followed (task a8x),
 // then the edit runs as a new prompt linked to it by `amends`; otherwise,
 // or while the turn is still busy, it is a prompt like any other. The
-// edit is of the human's last text in the prompt: the other texts it
-// delivered from the inbox stay. A prompt with no text of the human's
-// is not theirs to edit: the edit goes on top.
-function amend(id: string, text: string, command?: string, target?: number): string | undefined {
+// edit selects a human text, defaulting to the last one. Other texts stay.
+function amend(id: string, text: string, command?: string, target?: number, textIndex?: number): string | undefined {
 	autoclose.promote(id)
 	let tail = historyTail.read(id, target)
 	let records = replay.current(tail.records)
 	let at = target === undefined ? replay.lastPrompt(records) : records.findIndex((r) => r.n === target)
 	let old = records[at]
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
-	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
+	let mine = textIndex ?? parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
+	if (textIndex !== undefined && (!parts[mine] || parts[mine]!.from !== undefined || parts[mine]!.origin === 'model'))
+		return 'That message was not sent by the human.'
 	if (states.busy(status.stateOf(id)) || mine < 0 || !prompts.harmless(records.slice(at + 1)))
 		return prompts.submit(id, text, command)
-	parts[mine] = { type: 'text', text: literal.strip(text) }
-	// Images stay while their markers do: the texts are resolved again.
+	parts[mine] = { ...(textIndex === undefined ? {} : parts[mine]), type: 'text', text: literal.strip(text) }
 	let blocks = prompts.blocks(id, parts)
+	if (textIndex !== undefined && old?.type === 'user') {
+		let index = 0
+		let kept = old.blocks.map((b) => (b.type === 'text' ? parts[index++]! : b))
+		blocks = [
+			...kept,
+			...blocks.filter((b) => b.type === 'image' && !kept.some((k) => k.type === 'image' && k.blob === b.blob)),
+		]
+	}
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, amends: old!.n! }
 	if (old?.type === 'user' && old.inbox) record.inbox = [...old.inbox]
 	if (command !== undefined) record.command = command

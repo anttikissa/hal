@@ -42,14 +42,12 @@ export type Editing = {
 const mine = (i: Item): i is Item & { type: 'prompt' } =>
 	i.type === 'prompt' && i.from === undefined && i.origin !== 'model'
 
-// Keys of the prompts the human sent since the latest compaction (a
-// clear leaves no items before it): each has an Edit button. A record
-// delivering several texts is edited by its first (key `n`).
+// Keys of human prompt cards since the latest compaction.
 function editable(items: Item[]): Set<string> {
 	let out = new Set<string>()
 	for (let i of items) {
 		if (i.type === 'divider' && i.text.startsWith('Context compacted')) out.clear()
-		else if (mine(i) && /^\d+$/.test(i.key)) out.add(i.key)
+		else if (mine(i)) out.add(i.key)
 	}
 	return out
 }
@@ -68,7 +66,7 @@ function at(t: Transcript, key: string): { editing: Editing; command?: unknown }
 	let after = t.items.slice(i + 1)
 	editing.changed = after.some((x) => x.type === 'tool' && !toolDetails.harmless(x.name, x.input))
 	if (t.items.findLast(mine) !== item) {
-		editing.rewind = Number(key)
+		editing.rewind = Number(key.split('.')[0])
 		editing.later = after.filter((x) => !['turn-end', 'divider', 'tool-result', 'image'].includes(x.type)).length
 	}
 	return command ? { editing, command } : { editing }
@@ -117,7 +115,9 @@ function enter(editing: Editing, t: Transcript | undefined, text: string, queue 
 	if (editing.changed) return { type: 'submit', sessionId: editing.sessionId, text }
 	if (editing.inbox !== undefined)
 		return { type: 'submit', sessionId: editing.sessionId, text, amend: true, edits: editing.inbox }
-	return { type: 'submit', sessionId: editing.sessionId, text: `/edit ${parseInt(editing.target!)}\n${text}` }
+	let target = editing.target!
+	if (!target.includes('.') && t?.items.some((i) => i.key.startsWith(`${target}.`))) target += '.0'
+	return { type: 'submit', sessionId: editing.sessionId, text: `/edit ${target}\n${text}` }
 }
 
 // Leaving the edit (Down unchanged, Escape): continue the paused turn,
@@ -158,7 +158,7 @@ export const amend = {
 		let waiting = editing.inbox !== undefined && !editing.paused
 		let changed = text !== editing.original
 		let label = waiting ? 'editing waiting message' : 'editing prompt'
-		if (editing.rewind !== undefined) label += ` u${editing.rewind}`
+		if (editing.rewind !== undefined) label += ` u${editing.target}`
 		let edit = editing.rewind !== undefined ? 'edit and discard later prompts' : 'edit'
 		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : edit}, ` : ''
 		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'cancel' : 'continue'}`

@@ -6,13 +6,19 @@ import { rebasePlans } from '../rebase-plans.ts'
 export const command: SlashCommand = {
 	quiet: true,
 	help: () =>
-		'/edit <prompt> <text>: replace prompt <prompt> (u12 or 12) and what followed it with <text>, newlines included, and run it. If something with side effects ran since, <text> is sent as a new prompt.\n/edit undo: restore the prompt the latest edit replaced, with its partial output, and leave the session paused. A running turn is paused first.\n\nYou rarely type /edit yourself: Up in an empty prompt box opens your latest prompt, Up again goes to older ones, and Enter runs /edit for you.\n\nA corner case of a corner case: `/rebase undo` after `/edit undo` keeps both versions in the history.',
+		'/edit <prompt> <text>: replace prompt <prompt> (u12 or 12; u12.1 selects a subcard) and what followed it with <text>, newlines included, and run it. If something with side effects ran since, <text> is sent as a new prompt.\n/edit undo: restore the prompt the latest edit replaced, with its partial output, and leave the session paused. A running turn is paused first.\n\nYou rarely type /edit yourself: Up in an empty prompt box opens your latest prompt, Up again goes to older ones, and Enter runs /edit for you.\n\nA corner case of a corner case: `/rebase undo` after `/edit undo` keeps both versions in the history.',
 	run: (args, _answers, ctx) => {
 		if (ctx.sender?.from) return { error: 'Run /edit in this session, not from another session.' }
 		if (args.trim() === 'undo') return { say: rebasePlans.unamend(ctx.sessionId) }
-		let m = /^\s*[u#]?(\d+)[ \t]*\n?([\s\S]+)$/.exec(args)
-		if (!m?.[2]!.trim()) return { error: 'Usage: /edit <prompt> <text>, or /edit undo.' }
-		let refused = rebasePlans.rewind(ctx.sessionId, Number(m[1]), m[2]!, ctx.command)
+		let m = /^\s*[u#]?(\d+)(?:\.(\d+))?(?:[ \t]*\n|[ \t]+)([\s\S]+)$/.exec(args)
+		if (!m?.[3]!.trim()) return { error: 'Usage: /edit <prompt[.card]> <text>, or /edit undo.' }
+		let refused = rebasePlans.rewind(
+			ctx.sessionId,
+			Number(m[1]),
+			m[3]!,
+			ctx.command,
+			m[2] === undefined ? undefined : Number(m[2]),
+		)
 		return refused ? { error: refused } : {}
 	},
 }

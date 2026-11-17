@@ -147,3 +147,51 @@ test('unchanged edits continue without sending, and older targets respect side e
 	expect(amend.enter(changed, t, 'uno')).toEqual({ type: 'submit', sessionId: 's1', text: 'uno' })
 	expect(amend.hint(changed, 'uno')).toContain('enter: send as new')
 })
+
+test('human steering subcards retain exact edit addresses and parent rewind boundaries', () => {
+	let t = transcript.fromSnapshot({
+		meta,
+		state: { type: 'paused' },
+		history: [
+			{
+				type: 'user',
+				n: 5,
+				ts,
+				blocks: [
+					{ type: 'text', text: 'peer', from: 's9' },
+					{ type: 'text', text: 'steering' },
+					{ type: 'image', blob: 'abcdef', mediaType: 'image/png' },
+					{ type: 'text', text: 'later' },
+					{ type: 'text', text: 'automatic', origin: 'model' },
+				],
+			},
+		],
+	})
+	expect([...amend.editable(t.items)]).toEqual(['5.1', '5.3'])
+	expect(amend.at(t, '5')).toBeUndefined()
+	expect(amend.at(t, '5.4')).toBeUndefined()
+	let editing = amend.at(t, '5.1')!.editing
+	expect(editing).toMatchObject({ original: 'steering', target: '5.1', rewind: 5 })
+	expect(amend.hint(editing)).toContain('u5.1')
+	expect(amend.enter(editing, t, 'corrected')).toMatchObject({ text: '/edit 5.1\ncorrected' })
+	expect(amend.step(editing, t, 1)?.target).toBe('5.3')
+	let root = transcript.fromSnapshot({
+		meta,
+		state: { type: 'paused' },
+		history: [
+			{
+				type: 'user',
+				n: 7,
+				ts,
+				blocks: [
+					{ type: 'text', text: 'first' },
+					{ type: 'text', text: 'second' },
+				],
+			},
+		],
+	})
+	let first = root.items.find((i) => i.type === 'prompt')!
+	expect(amend.enter(amend.at(root, first.key)!.editing, root, 'changed')).toMatchObject({
+		text: `/edit ${first.key}.0\nchanged`,
+	})
+})

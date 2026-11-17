@@ -4,6 +4,9 @@
 import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
+import { replay } from '../common/replay.ts'
+import { blobs } from './blobs.ts'
+import { rebasePlans } from './rebase-plans.ts'
 import {
 	amending,
 	calls,
@@ -299,5 +302,53 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	expect((await records(id)).filter((r) => r.type === 'user')).toHaveLength(2)
 	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([
 		{ type: 'prompt', text: 'right', edited: true },
+	])
+})
+
+test('editing one steering subcard preserves adjacent authors, texts and images through reopen and undo', async () => {
+	let a = client(),
+		id = created(a)
+	let image = blobs.store(id, 'image/gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+	let original = history.append(id, {
+		type: 'user',
+		blocks: [
+			{ type: 'text', text: 'peer advice', from: 'other', advisory: true },
+			{ type: 'image', blob: image.blob, mediaType: image.mediaType },
+			{ type: 'text', text: 'human steering', interactive: true },
+			{ type: 'text', text: 'another human message' },
+			{ type: 'text', text: 'automatic', origin: 'model' },
+		],
+	})
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let before = history.readSync(id)
+	for (let part of [0, 1, 4, 99])
+		expect(rebasePlans.rewind(id, original.n!, 'refused', undefined, part)).toContain('not a prompt of yours')
+	expect(history.readSync(id)).toEqual(before)
+	a.conn.send({ type: 'submit', sessionId: id, text: `/edit u${original.n}.2\ncorrected steering` })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.views.get(id)!.state.type === 'idle')
+	let edited = replay.current(history.readSync(id)).findLast((r) => r.type === 'user')!
+	expect(edited).toMatchObject({ type: 'user', amends: original.n })
+	if (edited.type !== 'user' || original.type !== 'user') throw new Error('Missing prompt')
+	expect(edited.blocks).toEqual(original.blocks.map((b, i) => (i === 2 ? { ...b, text: 'corrected steering' } : b)))
+	restartHost()
+	expect((await fresh(id)).items.filter((i) => i.type === 'prompt').map((i) => i.text)).toEqual([
+		'peer advice',
+		'corrected steering',
+		'another human message',
+		'automatic',
+	])
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	b.conn.send({ type: 'submit', sessionId: id, text: '/edit undo' })
+	await until(() => b.views.get(id)?.items.some((i) => i.type === 'prompt' && i.text === 'human steering'))
+	expect(replay.current(history.readSync(id)).findLast((r) => r.type === 'user')).toEqual(original)
+	restartHost()
+	expect((await fresh(id)).items.filter((i) => i.type === 'prompt').map((i) => i.text)).toEqual([
+		'peer advice',
+		'human steering',
+		'another human message',
+		'automatic',
 	])
 })

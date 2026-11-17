@@ -7,6 +7,7 @@ import type { Command, Event } from '../common/protocol.ts'
 import { forms } from '../common/forms.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
+import { transcript } from '../common/transcript.ts'
 import { readdirSync, statSync, existsSync } from 'fs'
 import { blobs } from './blobs.ts'
 import { history } from './history.ts'
@@ -170,7 +171,7 @@ function unamend(id: string): string {
 // rebase dropping #n and every later record that does not survive,
 // then the edited text sent as a new prompt. Returns why it is refused,
 // if it is.
-function rewind(id: string, n: number, text: string, command?: string): string | undefined {
+function rewind(id: string, n: number, text: string, command?: string, part?: number): string | undefined {
 	let state = status.stateOf(id).type
 	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
 	let current = replay.current(historyTail.read(id, n).records),
@@ -180,10 +181,18 @@ function rewind(id: string, n: number, text: string, command?: string): string |
 		target?.type === 'user' &&
 		target.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
 	if (!mine) return `${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
+	let textIndex: number | undefined
+	if (part !== undefined) {
+		let shown = transcript.recordShown(target!),
+			selected = shown[part]
+		if (selected?.type !== 'prompt' || selected.from !== undefined || selected.origin === 'model')
+			return `u${n}.${part} is not a prompt of yours in this session's history (rewritten meanwhile?).`
+		textIndex = shown.slice(0, part).filter((i) => i.type === 'prompt').length
+	}
 	let later = current.slice(at)
 	if (later.some((r) => r.type === 'compact' || r.type === 'reset'))
 		return `u${n} is before the latest compaction or clear.`
-	return prompts.amend(id, text, command, n)
+	return prompts.amend(id, text, command, n, textIndex)
 }
 
 function answer(c: Command & { type: 'rebase-apply' }): Event {

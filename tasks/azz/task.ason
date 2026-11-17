@@ -1,0 +1,10 @@
+{
+	title: 'Edit human steering subcards without changing adjacent messages',
+	spec: 'Web and terminal Edit actions accept every persisted human prompt card, including steering subcards addressed as uN.K. Both clients load the selected text and preserve its exact card address when submitting the edit. The host resolves that display address to its human text block, changes only that block, and retains adjacent peer messages, other human text and attachments. Peer-authored and model-origin subcards remain ineligible. Editing a card without a suffix remains unambiguous when the record has multiple text cards; existing numeric slash-command behavior remains supported. Rewind boundaries use the parent record number, and whole-history edit backups restore every original block through undo and reopen. Focused shared-client and host replay tests cover mixed-author steering records, noneditable peers, exact subcard selection and undo. No history or wire-format migration is required.',
+	status: 'done',
+	notes: [
+		'Display suffixes count every shown item, including images and tool-result stand-ins. Resolve the selected shown prompt to its text ordinal before amending; rewind and backup boundaries still use the parent history record. Explicit card edits retain the original block order and sender metadata, and add newly resolved images without dropping adjacent attachments. Bare numeric commands retain last-human selection. Require whitespace after a complete address so an incomplete subcard command cannot backtrack into another target. Shared-client and host tests verify selection, rejected peer/model/image addresses, reopen and undo; 32 focused edit and slash tests pass.'
+	],
+	needs: ['a8x', 'ky7'],
+	foldInto: ['a8x', 'ky7']
+}
