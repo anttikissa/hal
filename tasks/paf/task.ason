@@ -1,0 +1,10 @@
+{
+	title: 'Run normal tests in parallel workers',
+	spec: './test runs normal test files, full and focused, with bun test --parallel (one worker per CPU core). The default normal run starts tsc and oxlint in the background beside the tests and prints their output after the test output; any failure still fails the run. ./test-expensive keeps web tests serial, since they share Chromium. Measured on a 4-core server: full normal run 50-72 s serial, 23-25 s parallel.',
+	status: 'done',
+	notes: [
+		'Four full parallel runs: one failure of client/hal-cursor.test.ts "a blink phase rewrites the cursor row alone" (expected one erased row, got none); three runs and 12 isolated runs of that file under CPU load passed. Same tests fail serial and parallel otherwise.'
+	],
+	needs: ['kdg'],
+	foldInto: ['kdg']
+}

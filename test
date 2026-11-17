@@ -43,16 +43,26 @@ if [ ${#paths[@]} -eq 0 ]; then
 	echo "./test: no $suite test filenames match: $*" >&2
 	exit 1
 fi
-if [ $# -gt 0 ] || [ "$suite" = web ]; then exec bun test "${paths[@]}"; fi
+if [ "$suite" = web ]; then exec bun test "${paths[@]}"; fi
+if [ $# -gt 0 ]; then exec bun test --parallel "${paths[@]}"; fi
+# Typecheck and lint run beside the tests; their output prints after them.
+tsc_log=$(mktemp) lint_log=$(mktemp)
+trap 'rm -f "$tsc_log" "$lint_log"' EXIT
+./node_modules/.bin/tsc --noEmit >"$tsc_log" 2>&1 &
+tsc_pid=$!
+./node_modules/.bin/oxlint --deny-warnings src >"$lint_log" 2>&1 &
+lint_pid=$!
 lock="$(git rev-parse --git-path index.lock 2>/dev/null)"
 had_lock=$([ -e "$lock" ] && echo 1)
-bun test "${paths[@]}" || status=1
+bun test --parallel "${paths[@]}" || status=1
 if [ -z "$had_lock" ] && [ -e "$lock" ]; then
 	echo "./test: the tests left $lock behind (a host git call takes a lock)" >&2
 	status=1
 fi
-./node_modules/.bin/tsc --noEmit || status=1
-./node_modules/.bin/oxlint --deny-warnings src || status=1
+wait $tsc_pid || status=1
+cat "$tsc_log"
+wait $lint_pid || status=1
+cat "$lint_log"
 # The optional, gitignored local.ts is typechecked by tsc above (it sits in
 # the project root); here it is also imported in its own process, since
 # ordinary tests never load it.
