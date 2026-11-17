@@ -1,8 +1,8 @@
 // The text the model reads in provider input rebuilt from history
 // (replay.ts): prompt headers and framing, a call as native-tool text,
-// and what it is told of a call with no result. Tasks: 3fv, c2t, 9p.
+// and what it is told of hosted calls or calls with no result.
 
-import type { ToolCallBlock, UserText } from './blocks.ts'
+import type { HostedToolBlock, TextBlock, ToolCallBlock, UserText } from './blocks.ts'
 import { ason } from './ason.ts'
 import { titles } from './titles.ts'
 import type { TurnStatus } from './replay.ts'
@@ -17,6 +17,13 @@ function asNative(b: ToolCallBlock): ToolCallBlock {
 			? b.input.cmd
 			: `${b.name.toUpperCase()} ${ason.stringify(b.input, 'short')}`)
 	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
+}
+
+function hosted(b: HostedToolBlock): TextBlock {
+	return {
+		type: 'text',
+		text: `Provider executed ${b.name}${b.isError ? ' (failed)' : ''}: ${ason.stringify(b.input, 'short')}\n${b.output}`,
+	}
 }
 
 // A prompt text as the model reads it, below its header: a next-round
@@ -74,6 +81,7 @@ export const replayText = {
 	nextRoundNotice:
 		'<hal-note>Another session sent this while you were working. No need to stop your task for it.</hal-note>',
 	asNative,
+	hosted,
 	framed,
 	letter,
 	tags,

@@ -1,0 +1,10 @@
+{
+	title: 'Preserve hosted search evidence in model replay',
+	spec: 'Provider-hosted tools remain visible in subsequent model input as labeled text containing their name, exact input and complete stored output, including failure status. Replay preserves their chronological place beside ordinary tool exchanges, across rounds, restarts and provider changes, without executing them or emitting foreign provider-native calls. This replaces the display-only replay-dropping rule in a0z. Existing histories need no migration. Offline tests cover recorded provider searches and search failures through replay and provider request mapping.',
+	status: 'done',
+	notes: [
+		'Root cause: a0z preserved hosted tools for display but explicitly dropped them from provider replay. After an ordinary tool exchange the model retained its search claims while losing the recorded evidence, encouraging repeated searches and contradictory corrections. Replay now converts hosted blocks to labeled assistant text with exact input, stored output and failure status. This applies to both providers and existing records without new schema or client changes. Recorded SSE fixtures exercise the next request through both provider mappers; a separate failure case keeps the complete stored error.'
+	],
+	needs: ['a0z'],
+	foldInto: ['a0z']
+}

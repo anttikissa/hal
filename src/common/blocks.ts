@@ -98,8 +98,8 @@ export type Sender = {
 export type UserText = TextBlock & Sender
 
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
-// A tool the provider ran itself (OpenAI web_search, task a0z): shown as a
-// finished tool card; never executed by Hal or replayed to providers.
+// A tool the provider ran itself: shown as a finished tool card, never
+// executed by Hal. Replay preserves its input and output as labeled text.
 export type HostedToolBlock = {
 	type: 'hosted_tool'
 	id: string
@@ -109,7 +109,7 @@ export type HostedToolBlock = {
 	isError?: boolean
 }
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | HostedToolBlock
-// What providers receive: replay drops hosted tools.
+// Providers receive hosted tool evidence as text, never as native calls.
 export type ReplayBlock = Exclude<AssistantBlock, HostedToolBlock>
 
 // `cache`: an earlier request's input ended after this many of the
