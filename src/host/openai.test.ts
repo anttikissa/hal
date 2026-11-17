@@ -247,13 +247,34 @@ test('a 429 limits that account until resets_in_seconds and the next account tak
 	expect(fake.seen.at(-1)!.headers.get('chatgpt-account-id')).toBe('acct-2')
 })
 
-test('a model refused on a plan over the stream sets that account aside for the model', async () => {
-	writeAuth({ openai: [{ accessToken: subscriptionToken, email: 'a@x' }] })
+test('model refusals rotate accounts then end with the access error, without a quota wait', async () => {
+	let other = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } })
+	writeAuth({
+		openai: [
+			{ accessToken: subscriptionToken, email: 'a@x' },
+			{ accessToken: other, email: 'b@x' },
+		],
+	})
 	let error = { type: 'invalid_request_error', code: 'model_not_found' }
 	let message = "The 'gpt-5.5' model is not supported when using Codex with a ChatGPT account."
 	fake.reply = () => sse({ type: 'error', error: { ...error, message } })
-	expect((await run()).at(-1)).toMatchObject({ type: 'error', failure: 'limited' })
-	expect(limits.on('openai/gpt-5.5', 'a@x')).toBeGreaterThan(Date.now())
+	for (let account of ['acct-1', 'acct-2']) {
+		expect((await run()).at(-1)).toMatchObject({ type: 'error', failure: 'auth' })
+		expect(fake.seen.at(-1)!.headers.get('chatgpt-account-id')).toBe(account)
+	}
+	let end = (await run()).at(-1) as any
+	expect(end.type).toBe('error')
+	expect(end.message).toContain(message)
+	expect(end.message).toContain('a@x')
+	expect(end.message).toContain('b@x')
+	expect(end.message).toContain('model_not_found')
+	expect(end.failure).toBeUndefined()
+	expect(end.retryAt).toBeUndefined()
+	expect(fake.seen).toHaveLength(2)
+	expect(auth.limitedUntil('openai/gpt-5.5')).toBe(0)
+	expect(limits.on('openai/gpt-5.5', 'a@x')).toBe(0)
+	fake.reply = () => sse(completed())
+	expect((await run(hi, {}, 'openai/gpt-6-luna')).at(-1)).toMatchObject({ type: 'done' })
 })
 
 test('a usage limit over the stream sets that account aside until its reset', async () => {

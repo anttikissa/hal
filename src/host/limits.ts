@@ -1,27 +1,25 @@
-// Rate limits the providers told us about (429, quota), per model and
-// account, until the time they gave. Kept in state/limits.ason so a
-// restart neither forgets a limit hours away nor hammers the provider
-// for it: account rotation skips a limited account (auth.ts), and a
-// provider without accounts is not asked again before then (provider.ts).
+// Provider rate limits and model access refusals, per model and account.
+// Kept in state/limits.ason so account rotation remembers both across
+// restarts; access refusals never appear as quota deadlines.
 
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { clock } from './clock.ts'
+
+type Limit = string | { until: string; refusal: string }
 
 // "provider/model" or "provider/model account".
 function key(modelId: string, account?: string): string {
 	return account ? `${modelId} ${account}` : modelId
 }
 
-// The latest limit on the model for the account: its own (a model the
-// plan lacks, or whose credits ran out) or the account's (a 429: the
-// subscription's quota is shared by all its models).
+// The latest quota deadline on the model or its shared account.
 function on(modelId: string, account: string): number {
 	return Math.max(limits.until(key(modelId, account)), limits.until(key(modelId.split('/')[0]!, account)))
 }
 
 // The live file for the current home; reopened if the home changes.
-function store(): Record<string, string> {
+function store(): Record<string, Limit> {
 	let path = `${paths.stateDir()}/limits.ason`
 	if (limits.state.store && limits.state.path === path) return limits.state.store
 	limits.close()
@@ -32,15 +30,26 @@ function store(): Record<string, string> {
 
 // Until when (epoch ms) `key` is limited; 0 if it is not.
 function until(key: string): number {
-	let at = Date.parse(limits.store()[key] ?? '')
+	let entry = limits.store()[key]
+	let at = Date.parse(typeof entry === 'string' ? entry : '')
 	return at > clock.now() ? at : 0
 }
 
+// The complete access error while its account/model cooldown is active.
+function refusal(key: string): string | undefined {
+	let entry = limits.store()[key]
+	return entry && typeof entry !== 'string' && Date.parse(entry.until) > clock.now() ? entry.refusal : undefined
+}
+
 // Records a limit; forgets ones already over.
-function set(key: string, at: number): void {
+function set(key: string, at: number, refusal?: string): void {
 	let data = limits.store()
-	for (let [k, v] of Object.entries(data)) if (!(Date.parse(v) > clock.now())) delete data[k]
-	if (at > clock.now()) data[key] = new Date(at).toISOString()
+	for (let [k, v] of Object.entries(data))
+		if (!(Date.parse(typeof v === 'string' ? v : v.until) > clock.now())) delete data[k]
+	if (at > clock.now()) {
+		let until = new Date(at).toISOString()
+		data[key] = refusal === undefined ? until : { until, refusal }
+	}
 }
 
 // Whether a key limits `kind`: a model ("openai/m a@x") or a whole
@@ -52,9 +61,11 @@ function ofKind(key: string, kind: string): boolean {
 // Drops every limit on one account of a provider: a fresh login is new
 // evidence that outdates them (a plan refusal before an upgrade).
 // Drops the account's skips; true if there were any.
-function forget(kind: string, account: string): boolean {
+function forget(kind: string, account: string, refusals = true): boolean {
 	let data = limits.store()
-	let keys = Object.keys(data).filter((k) => limits.ofKind(k, kind) && k.endsWith(` ${account}`))
+	let keys = Object.keys(data).filter(
+		(k) => limits.ofKind(k, kind) && k.endsWith(` ${account}`) && (refusals || typeof data[k] === 'string'),
+	)
 	for (let k of keys) delete data[k]
 	return keys.length > 0
 }
@@ -71,9 +82,10 @@ export const limits = {
 	store,
 	until,
 	on,
+	refusal,
 	set,
 	ofKind,
 	forget,
 	close,
-	state: { store: null as Record<string, string> | null, path: '' },
+	state: { store: null as Record<string, Limit> | null, path: '' },
 }

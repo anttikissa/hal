@@ -201,7 +201,10 @@ function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 // rate limited for `model`.
 function skipped(kind: Kind, account: Account, model?: string): boolean {
 	return (
-		auth.state.broken.has(fingerprint(account.entry)) || (!!model && limits.on(`${kind}/${model}`, account.name) > 0)
+		auth.state.broken.has(fingerprint(account.entry)) ||
+		(!!model &&
+			(!!limits.refusal(limits.key(`${kind}/${model}`, account.name)) ||
+				limits.on(`${kind}/${model}`, account.name) > 0))
 	)
 }
 
@@ -213,6 +216,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 	list = auth.pickAccount(kind, list, who)
 	let limitedUntil = Infinity
 	let problems: string[] = []
+	let refused = false
 	// Why each subscription passed over was, for the fallback notice.
 	let skipped: string[] = []
 	for (let account of list) {
@@ -221,6 +225,13 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 			problems.push(why)
 			if (subscription(account)) skipped.push(`${account.name}: ${why}`)
 			auth.tellBroken(kind, account, why, who)
+			continue
+		}
+		let refusal = model ? limits.refusal(limits.key(`${kind}/${model}`, account.name)) : undefined
+		if (refusal) {
+			refused = true
+			problems.push(`${account.name}: ${refusal}`)
+			if (subscription(account)) skipped.push(`${account.name}: ${refusal}`)
 			continue
 		}
 		let until = model ? limits.on(`${kind}/${model}`, account.name) : 0
@@ -260,7 +271,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 			retryAt: limitedUntil,
 		})
 	}
-	throw Object.assign(new Error(problems.join('; ')), { failure: 'auth' })
+	throw Object.assign(new Error(problems.join('; ')), { failure: refused ? undefined : 'auth' })
 }
 
 // A broken login is never skipped silently: each session that passes it

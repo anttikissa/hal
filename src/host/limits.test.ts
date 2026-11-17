@@ -45,3 +45,16 @@ test('limits already over are forgotten', () => {
 	limits.set('m2', now + 1000)
 	expect(Object.keys(limits.store())).toEqual(['m2'])
 })
+
+test('access refusals survive restart without quota deadlines and expire or clear on login', () => {
+	let key = limits.key('openai/m1', 'a@x')
+	limits.set(key, now + 1000, 'model_not_found: not supported')
+	limits.close()
+	expect(limits.refusal(key)).toBe('model_not_found: not supported')
+	expect(limits.on('openai/m1', 'a@x')).toBe(0)
+	now += 1000
+	expect(limits.refusal(key)).toBeUndefined()
+	limits.set(key, now + 1000, 'not supported')
+	expect(limits.forget('openai', 'a@x')).toBe(true)
+	expect(limits.refusal(key)).toBeUndefined()
+})

@@ -165,10 +165,6 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	store[kind]![account.name] = Object.fromEntries(
 		Object.entries(windows).map(([name, w]) => [name, { ...w, observed }]),
 	)
-	// Fresh usage with room in every window outranks an older skip (a 429,
-	// or a refusal from before a plan change): forget it and wake waiting
-	// turns to try the account. If it still fails, the skip comes back.
-	if (Object.values(windows).every((w) => w.used < 100) && limits.forget(kind, account.name)) auth.state.logins++
 	let email =
 		typeof raw?.email === 'string' && raw.email.includes('@')
 			? raw.email
@@ -199,6 +195,12 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	let before = current.plan
 	if (kind === 'openai' && typeof raw?.plan_type === 'string' && /^[\w -]{1,32}$/.test(raw.plan_type))
 		current.plan = raw.plan_type
+	// Spare quota clears rate limits; access refusals need a plan change.
+	if (
+		Object.values(windows).every((w) => w.used < 100) &&
+		limits.forget(kind, account.name, !!before && before !== current.plan)
+	)
+		auth.state.logins++
 	if (current.email || current.plan) liveFiles.save(data)
 	if (migrated) {
 		// A learned email changes the master key and its session references.

@@ -1,5 +1,5 @@
 {
-	version: 41,
+	version: 42,
 	changes: [
 		{
 			version: 2,
@@ -799,6 +799,17 @@
 					kind: 'compatible',
 					target: 'common/protocol.Event',
 					description: 'auth-code adds optional field local'
+				}
+			]
+		},
+		{
+			version: 42,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/limits',
+					description: 'Refusal entries',
+					port: 'Use limits.until'
 				}
 			]
 		}

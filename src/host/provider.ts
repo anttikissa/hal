@@ -272,10 +272,9 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 		return e
 	}
 	if (account && provider.notOnAccount(e)) {
-		// This account cannot run the model (a ChatGPT plan lapsed to
-		// free): set it aside for this model and retry on the next.
-		limits.set(limits.key(modelId, account), now + provider.planLimitMs)
-		e.failure = 'limited'
+		// Preserve the access error while trying the remaining accounts.
+		limits.set(limits.key(modelId, account), now + provider.planLimitMs, [e.message, e.body].filter(Boolean).join('\n'))
+		e.failure = 'auth'
 		e.retryAt = now
 		return e
 	}

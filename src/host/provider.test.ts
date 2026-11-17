@@ -380,8 +380,9 @@ test('a model refused for the account plan sets that account aside for the model
 		),
 	)
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
-	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
-	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + provider.planLimitMs)
+	expect(e).toMatchObject({ failure: 'auth', retryAt: now })
+	expect(limits.refusal(limits.key('fake/m1', 'a@x'))).toContain('not supported')
+	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(0)
 	expect(limits.until(limits.key('fake/m2', 'a@x'))).toBe(0)
 })
 

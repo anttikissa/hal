@@ -119,17 +119,20 @@ test('Anthropic usage endpoint utilization is already percent', () => {
 	expect(w['7d']?.used).toBe(70)
 })
 
-// 2 Oct 2026: a plan refusal from before an upgrade kept a plus account
-// skipped while /status showed it at 0%.
-test('fresh usage with room clears the account skip and wakes waiting turns', async () => {
+test('fresh quota clears rate limits while access refusals wait for a plan change', async () => {
 	let all = auth.all,
 		credential = auth.credential,
 		store = usage.store,
 		lstore = limits.store,
 		save = liveFiles.save,
 		fetchOld = globalThis.fetch
-	let account = { name: 'a@example.com', entry: { accessToken: 't', email: 'a@example.com' }, replace: () => {} }
-	let skips: Record<string, string> = {
+	let account = {
+		name: 'a@example.com',
+		entry: { accessToken: 't', email: 'a@example.com', plan: 'plus' },
+		replace: () => {},
+	}
+	let skips: ReturnType<typeof limits.store> = {
+		'openai/new a@example.com': { until: new Date(Date.now() + 3600_000).toISOString(), refusal: 'not supported' },
 		'openai/m a@example.com': new Date(Date.now() + 3600_000).toISOString(),
 		'openai a@example.com': new Date(Date.now() + 3600_000).toISOString(),
 		'openai/m b@example.com': new Date(Date.now() + 3600_000).toISOString(),
@@ -146,14 +149,21 @@ test('fresh usage with room clears the account skip and wakes waiting turns', as
 				rate_limit: { primary_window: { used_percent: 100, limit_window_seconds: 18000 } },
 			})) as unknown as typeof fetch
 		await statusUsage.refresh('openai', account as any)
-		expect(Object.keys(skips)).toHaveLength(3)
+		expect(Object.keys(skips)).toHaveLength(4)
 		globalThis.fetch = (async () =>
 			Response.json({
 				rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18000 } },
 			})) as unknown as typeof fetch
 		await statusUsage.refresh('openai', account as any)
-		expect(Object.keys(skips)).toEqual(['openai/m b@example.com'])
+		expect(Object.keys(skips)).toEqual(['openai/new a@example.com', 'openai/m b@example.com'])
 		expect(auth.state.logins).toBe(logins + 1)
+		globalThis.fetch = (async () =>
+			Response.json({
+				plan_type: 'pro',
+				rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18000 } },
+			})) as unknown as typeof fetch
+		await statusUsage.refresh('openai', account as any)
+		expect(Object.keys(skips)).toEqual(['openai/m b@example.com'])
 	} finally {
 		auth.all = all
 		auth.credential = credential

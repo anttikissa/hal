@@ -1,0 +1,11 @@
+{
+	title: 'Keep model access refusals separate from rate limits',
+	spec: 'Invariant: a model access refusal never creates a quota limit or an automatic one-hour wait. Preserve the provider error and body, skip that account for that model for the existing one-hour access-refusal cooldown, and try other accounts immediately. If every account refuses the model, end with the access errors instead of reporting a rate limit or blocking on login. Genuine 429 handling remains unchanged. Persist refusal reasons separately from quota deadlines in the existing limits store; expired refusals and fresh logins clear them. Shared terminal and web error behavior stays aligned through host events.',
+	status: 'done',
+	notes: [
+		'Access refusals persist as {until, refusal} entries in the existing limits store; quota deadlines keep their original ISO string representation. limits.until/on and quota status exclude refusals. Account rotation retries access refusals immediately, then ends with the full stored provider errors when every account refuses. Quota refresh alone preserves refusals so error-time usage checks cannot create a rotation loop; a real plan change or fresh login clears them. Bun 1.4.4 toMatchObject with an asymmetric matcher mutates the received object; regression assertions use direct string checks.',
+		'Verified all affected provider/account regression tests, and the complete normal suite under Bun 1.4.4: 1770 passed, one skipped, two failures outside the changed modules (server.test.ts expects an initial home event; conventions.test.ts finds color literals in web/demo HTML). Typecheck and lint passed. The initial detached run used the system service default Bun 1.3.14; the final run explicitly used the active Bun 1.4.4 runtime.'
+	],
+	needs: ['3g'],
+	foldInto: ['3g']
+}

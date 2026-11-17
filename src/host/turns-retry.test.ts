@@ -180,7 +180,7 @@ test("a rotation to another account retries at once and keeps the provider's rep
 		message: 'HTTP 400 from fake (a@x)',
 		status: 400,
 		body: '{"detail":"model not supported"}',
-		failure: 'limited',
+		failure: 'auth',
 		retryAt: now,
 	}
 	script = [[refused], [refused], done]
