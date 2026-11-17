@@ -113,6 +113,12 @@ function submit(
 			if (delivery !== 'soft-steer' || running.controller.signal.aborted) prompts.force(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+		// A turn parked on approval goes on with it; the approval stays open
+		// (turns.release; task 6q5).
+		if (!running && state.type === 'blocked' && state.reason === 'question' && !(agent && tabs.closed(id))) {
+			let open = forms.open(history.readSync(id))
+			if (open?.call !== undefined && !open.from && !status.transition(id, { type: 'answer' })) turns.start(id)
+		}
 		return
 	}
 	let refused = status.transition(id, { type: 'submit' })

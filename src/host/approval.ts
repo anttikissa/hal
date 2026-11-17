@@ -221,6 +221,27 @@ function declined(call: ToolCallBlock) {
 	}
 }
 
+// A message reached the turn while the batch waited for approval
+// (turns.release): each call gets a final result. `pending`: the call
+// whose approval stays open; answering runs it (commands/approve.ts).
+function unrun(call: ToolCallBlock, pending: boolean) {
+	return {
+		type: 'tool_result' as const,
+		id: call.id,
+		output: pending
+			? "Not run yet: it waits for the user's approval, and a message arrived meanwhile. When the user answers, a message tells you: the result if approved (it runs in the background), or that it was declined."
+			: "Did not run: another call of this batch waited for the user's approval when a message arrived. Run it again if still needed.",
+		isError: true,
+	}
+}
+
+// The approval question for a call whose turn went on without it.
+function later(form: Form): Form {
+	let [, ...reasons] = form.text.split('\n')
+	let text = 'Approval still open — the turn went on without this command. Yes runs it in the background.'
+	return { ...form, text: [text, ...reasons].join('\n') }
+}
+
 // The last round's calls, if they are held for approval and none has
 // run: at least one was asked about, nothing answered them, and no host
 // continued the turn after every question was answered (then they may
@@ -271,4 +292,17 @@ function sensitive(path: string): boolean {
 	)
 }
 
-export const approval = { segments, pathVars, safeTarget, cdTarget, dirs, findings, form, declined, held, sensitive }
+export const approval = {
+	segments,
+	pathVars,
+	safeTarget,
+	cdTarget,
+	dirs,
+	findings,
+	form,
+	declined,
+	unrun,
+	later,
+	held,
+	sensitive,
+}

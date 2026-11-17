@@ -80,6 +80,18 @@ function ask(id: string, form: Form, call?: string): void {
 	status.transition(id, { type: 'block', reason: 'question' })
 }
 
+// A message ran a turn parked on approval (prompts.submit; task 6q5):
+// the held calls get final results, so the turn goes on with the
+// message, and the approval stays open beside the turn as a question
+// of /approve, which runs the call once when answered yes.
+function release(id: string, calls: ToolCallBlock[], question: { id: string; form: Form; call?: string }): void {
+	let results = calls.map((c) => approval.unrun(c, c.id === question.call))
+	let r = history.results(id, results)
+	host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts })
+	slash.dismiss(id, question.id)
+	slash.report(id, 'approve', question.call!, { ask: approval.later(question.form) })
+}
+
 // Runs a turn whose prompt or `continue` record is in history.
 // `answers`: the fresh answer to its question, secrets included;
 // `images`: the prompt's image blocks, for followers to show; `record`:
@@ -213,6 +225,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let records = history.readSync(id)
 	history.carry(id, running.provider, turnPolicy.parkedUsage(records))
 	let held = approval.held(records)
+	// Its approval still open: a message ran the turn, not an answer.
+	let open = forms.open(records)
+	if (held && open?.call !== undefined && !open.from) {
+		turns.release(id, held.calls, open)
+		held = undefined
+	}
 	// The scripted reply of the round, read once its stream ended: a
 	// stream may settle what to ask while it runs (task b81).
 	let replied: Reply | undefined
@@ -456,6 +474,7 @@ export const turns = {
 	stream: (model: string, input: Omit<ProviderRequest, 'model'>, signal?: AbortSignal): AsyncIterable<StreamEvent> =>
 		provider.stream(model, input, signal),
 	ask,
+	release,
 	start,
 	stop,
 	recover: () => turnRecovery.recover(),
