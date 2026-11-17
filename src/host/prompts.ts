@@ -35,12 +35,9 @@ import { jobs } from './jobs.ts'
 import { slash } from './slash.ts'
 import { rebasePlans } from './rebase-plans.ts'
 import { status } from './status.ts'
-import { sessions } from './sessions.ts'
 import { statusUsage } from './status-usage.ts'
-import { subagents } from './subagents.ts'
 import { autoclose } from './autoclose.ts'
 import { tabs } from './tabs.ts'
-import { notify } from './notify.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
 import { projectContext } from './project-context.ts'
@@ -58,9 +55,8 @@ import { projectContext } from './project-context.ts'
 // pause or a failure the user has to see to, nor wakes a session whose
 // tab the user closed: it waits in the inbox unless the session is
 // idle, where it runs as a turn of its own and so gets full attention
-// (no longer advisory). An emergency (a sender's 'steer', task zb0) is
-// the exception: it ends a pause or failure and does not wait behind
-// the user's answer.
+// (no longer advisory), even after a <question> (task 6q5). An emergency
+// (a sender's 'steer', task zb0) also ends a pause or failure.
 //
 // `delivery` (task csn): 'soft-steer' leaves the stream and
 // running tools alone, the turn delivering it before its next request;
@@ -85,28 +81,14 @@ function submit(
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	text = literal.strip(text)
 	let state = status.stateOf(id)
-	// Automatic reports never answer a question. A deliberate soft-steer
-	// from the parent of delegated work does (kar); emergencies bypass it (zb0).
 	let agent = sender?.from !== undefined || sender?.origin === 'model'
 	let emergency = agent && delivery === 'steer' && sender?.advisory !== true
-	let asked = notify.asked(id)
-	let parentAnswer =
-		asked &&
-		delivery === 'soft-steer' &&
-		sender?.from !== undefined &&
-		sender.from === sessions.open(id).parent &&
-		sessions.open(id).spawn !== 'interactive' &&
-		subagents.owed(id, history.readSync(id))
-	let waitingAnswer = agent && !emergency && !parentAnswer && asked
 	let queue = delivery === 'queue'
-	let interrupt = !queue && !waitingAnswer && sender?.advisory !== true
+	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.delivery === 'after-turn')
-	// After an asking turn (task nd6), a queued message waits for the reply's turn.
 	if (
 		behind ||
-		waitingAnswer ||
-		(queue && notify.asked(id)) ||
 		turns.state.running.has(id) ||
 		states.busy(state) ||
 		((queue || (agent && !emergency)) && (state.type !== 'idle' || tabs.closed(id)))
@@ -315,12 +297,10 @@ function steer(id: string): void {
 
 // After a completed turn: runs the oldest queued message, if any. One
 // being edited waits, and the ones behind it too (queueEdits.release).
-// A turn that ended with <question> waits for the user's reply first
-// (task nd6); queued messages run after a final answer.
+// An open <question> does not hold it (task 6q5).
 function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.delivery === 'after-turn')
-	if (!queued || queued.id === queueEdits.held(id) || notify.asked(id) || status.transition(id, { type: 'submit' }))
-		return
+	if (!queued || queued.id === queueEdits.held(id) || status.transition(id, { type: 'submit' })) return
 	let record = prompts.deliver(id, [queued], undefined, undefined, true)
 	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), {
 		...record,

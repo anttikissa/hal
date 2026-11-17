@@ -11,13 +11,14 @@ import { clients as clientInfo } from './clients.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { noticeHistory } from './notice-history.ts'
-import { pages } from './pages.ts'
+import { pages, type Marks } from './pages.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 import { scheduler } from './scheduler.ts'
+import { turnMarks } from './turn-marks.ts'
 
 type Watcher = {
 	deliver: (event: Event) => void
@@ -41,23 +42,24 @@ function kind(event: Event, id?: string): NoticeKind | undefined {
 	return event.status === 'error' ? 'failed' : undefined
 }
 
-// Whether the latest turn's reply ends with a <question> tag: derived
-// from history, so a restart, a reload and every client agree.
+// Whether a <question> waits for its answer (turnMarks.asking): from
+// the human, or for a delegated child also from its parent. Derived from
+// history, so a restart, a reload and every client agree.
 function asked(id: string): boolean {
 	let m = pages.marks(id)
-	if (m.rebase === undefined) {
-		let r = m.reply === undefined ? undefined : pages.lineAt(history.file(id), m.reply).record
-		return r?.type === 'assistant' && r.block.type === 'text' && summary.asks(r.block.text)
-	}
-	return pages.kept(id, 'asked', () => {
-		let records = pages.page(id).records
-		for (let i = records.length - 1; i >= 0; i--) {
-			let r = records[i]!
-			if (r.type === 'user') return false
-			if (r.type === 'assistant' && r.block.type === 'text') return summary.asks(r.block.text)
-		}
-		return false
-	})
+	let open =
+		m.rebase === undefined
+			? m.asking === undefined
+				? undefined
+				: (m.answeredBy ?? [])
+			: pages.kept(id, 'asked', () => {
+					let v = { size: 0, inbox: {} } as Marks
+					pages.page(id).records.forEach((r, i) => turnMarks.asking(v, r, i))
+					return v.asking === undefined ? undefined : (v.answeredBy ?? [])
+				})
+	if (!open) return false
+	let meta = sessions.open(id)
+	return !(meta.parent && meta.spawn && meta.spawn !== 'interactive' && open.includes(meta.parent))
 }
 
 // What the latest turn replied: its <summary> (common/summary.ts), else

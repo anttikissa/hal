@@ -101,14 +101,14 @@ test('questions and errors leave ordinary autoclose tabs open', async () => {
 	calls[0]!.push({ type: 'text', text: '<question>Which choice?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => status.stateOf(id).type === 'idle')
 	expect(tabs.file().open).toContain(id)
-	// A queued reply waits behind the question without promoting the session.
+	// A queued reply runs (task 6q5) without promoting the session.
 	prompts.submit(id, 'follow-up', undefined, 'queue')
 	expect(sessions.open(id).autoclose).toBe(true)
-	expect(status.inboxOf(id)).toHaveLength(1)
+	await until(() => calls.length === 2)
 	let failed = ordinary()
 	failed.c.conn.send({ type: 'submit', sessionId: failed.id, text: 'failing work' })
-	await until(() => calls.length === 2)
-	calls[1]!.push({ type: 'error', message: 'bad request', status: 400 })
+	await until(() => calls.length === 3)
+	calls[2]!.push({ type: 'error', message: 'bad request', status: 400 })
 	await until(() => status.stateOf(failed.id).type === 'error')
 	expect(sessions.open(failed.id).autoclose).toBe(true)
 	expect(tabs.file().open).toContain(failed.id)

@@ -13,7 +13,6 @@ import { card } from '../common/card.ts'
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
-import { inbox } from '../common/inbox.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
@@ -246,7 +245,7 @@ function editKey(
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.transcript && (queueEdit.notice(st.transcript) ?? inbox.heldNotice(st.transcript)))
+	return st.notice ?? (st.transcript && queueEdit.notice(st.transcript))
 }
 
 // Tab in the message box with `text` (the caret at its end): the

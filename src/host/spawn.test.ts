@@ -11,6 +11,7 @@ import { prompts } from './prompts.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { subagents } from './subagents.ts'
+import { notify } from './notify.ts'
 
 useHost()
 
@@ -340,7 +341,7 @@ test('a child question wakes its waiting parent, stays open, and ordinary send r
 	await until(() => !tabs.file().open.includes(child))
 })
 
-test('automatic reports and unrelated senders do not answer a delegated question; parent metadata alone is not ownership', async () => {
+test('other senders reach a child with an open question; only its human or parent answers it (task 6q5)', async () => {
 	let c = client()
 	let p = await parent(c)
 	calls[0]!.push(call('s1', 'spawn', { task: 'clarify ownership' }), call('w1', 'wait'), {
@@ -351,21 +352,12 @@ test('automatic reports and unrelated senders do not answer a delegated question
 	let child = tabs.file().open[1]!
 	calls[k]!.push({ type: 'text', text: '<question>Which parent?</question>' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('Which parent?', k + 1)
-	// A report can come from the parent when the sessions delegate to one another.
-	prompts.submit(child, 'automatic report', undefined, 'steer', { from: p, advisory: true })
-	prompts.submit(child, 'unrelated answer', undefined, 'soft-steer', { from: 'other', advisory: true })
-	expect(status.inboxOf(child).map((m) => [m.text, m.delivery])).toEqual([
-		['automatic report', 'next-round'],
-		['unrelated answer', 'next-round'],
-	])
-	expect(status.stateOf(child).type).toBe('idle')
-	// A human takes over this child; later questions belong to that human.
-	c.conn.send({ type: 'open', sessionId: child })
-	c.conn.send({ type: 'submit', sessionId: child, text: 'Work for me instead' })
-	let human = await callWith('Work for me instead', woke + 1)
-	calls[human]!.push({ type: 'text', text: '<question>Human choice?</question>' }, { type: 'done', reason: 'end' })
+	prompts.submit(child, 'unrelated note', undefined, 'soft-steer', { from: 'other', advisory: true })
+	let noted = await callWith('unrelated note', woke + 1)
+	calls[noted]!.push({ type: 'text', text: '<summary>Noted.</summary>' }, { type: 'done', reason: 'end' })
 	await until(() => status.stateOf(child).type === 'idle')
-	prompts.submit(child, 'former parent answer', undefined, 'soft-steer', { from: p, advisory: true })
-	expect(status.inboxOf(child).at(-1)).toMatchObject({ text: 'former parent answer', delivery: 'next-round' })
-	expect(status.stateOf(child).type).toBe('idle')
+	expect(notify.asked(child)).toBe(true)
+	prompts.submit(child, 'parent answer', undefined, 'soft-steer', { from: p, advisory: true })
+	await callWith('parent answer', noted + 1)
+	expect(notify.asked(child)).toBe(false)
 })

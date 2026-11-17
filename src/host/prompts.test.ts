@@ -19,6 +19,7 @@ import {
 } from './host-fixture.test.ts'
 import { inboxOf, texts } from './prompts-fixture.test.ts'
 import { prompts } from './prompts.ts'
+import { notify } from './notify.ts'
 import { turns } from './turns.ts'
 
 useHost()
@@ -183,26 +184,32 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	})
 })
 
-// Task nd6: a turn that ends with <question> waits for the user; queued
-// messages run only after a later final answer.
-test('queued messages wait through an asking turn until the reply turn ends', async () => {
+// Task 6q5: after a <question>, queued and agent messages still run; the
+// question stays open, also across a restart, until the human answers.
+test('messages run after an asking turn and the question stays open until the human answers', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
 	calls[0]!.push({ type: 'text', text: 'Which one?\n<question>A or B?</question>' }, { type: 'done', reason: 'end' })
-	await until(() => a.of('turn-end').length === 1)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'also', queue: true })
-	await Bun.sleep(50)
-	expect(calls).toHaveLength(1)
-	expect(inboxOf(a, id)).toEqual(['later', 'also'])
-	a.conn.send({ type: 'submit', sessionId: id, text: 'A' })
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('A')])
-	calls[1]!.push({ type: 'text', text: 'Done.\n<summary>Did A.</summary>' }, { type: 'done', reason: 'end' })
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining('later')])
+	calls[1]!.push({ type: 'text', text: '<summary>Noted.</summary>' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 2)
+	prompts.submit(id, 'agent report', undefined, 'soft-steer', { from: 'other', advisory: true })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining('later')])
+	expect(texts(calls[2]!.input.messages.at(-1)).join('\n')).toContain('agent report')
+	calls[2]!.push({ type: 'text', text: '<summary>Read it.</summary>' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 3)
+	restartHost()
+	await fresh(id)
+	expect(notify.asked(id)).toBe(true)
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	b.conn.send({ type: 'submit', sessionId: id, text: 'A' })
+	await until(() => calls.length === 4)
+	expect(notify.asked(id)).toBe(false)
 })
 
 test('a queued message sent to an idle session just runs', async () => {
@@ -370,42 +377,4 @@ test('a steer resent to the next host is not added twice', async () => {
 		(r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'more'),
 	).length
 	expect(pending + delivered).toBe(1)
-})
-
-test('agent reports retain next-round delivery through a question and restart, arriving with the human answer', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	calls[0]!.push(
-		{ type: 'text', text: 'Recommendation.\n<question>A or B?</question>' },
-		{ type: 'done', reason: 'end' },
-	)
-	await until(() => a.of('turn-end').length === 1)
-	prompts.submit(id, 'agent report', undefined, 'steer', { from: 'other', advisory: true })
-	prompts.submit(id, 'agent steer', undefined, 'soft-steer', { from: 'other' })
-	prompts.submit(id, 'explicit queue', undefined, 'queue', { from: 'other' })
-	expect(inboxOf(a, id)).toEqual(['agent report', 'agent steer', 'explicit queue'])
-	expect(a.views.get(id)!.inbox.map((m) => m.delivery)).toEqual(['next-round', 'next-round', 'after-turn'])
-	restartHost()
-	expect((await fresh(id)).inbox.map((m) => [m.text, m.delivery])).toEqual([
-		['agent report', 'next-round'],
-		['agent steer', 'next-round'],
-		['explicit queue', 'after-turn'],
-	])
-	expect(calls).toHaveLength(1)
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	b.conn.send({ type: 'submit', sessionId: id, text: 'A' })
-	await until(() => calls.length === 2)
-	let delivered = texts(calls[1]!.input.messages.at(-1)).join('\n')
-	expect(delivered).toContain('agent report')
-	expect(delivered).toContain('agent steer')
-	expect(delivered).toMatch(/\nA$/)
-	expect(delivered).not.toContain('explicit queue')
-	expect(b.views.get(id)!.inbox.map((m) => m.text)).toEqual(['explicit queue'])
-	calls[1]!.push({ type: 'text', text: '<summary>Did A.</summary>' }, { type: 'done', reason: 'end' })
-	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1)).join('\n')).toContain('explicit queue')
-	expect(b.views.get(id)!.inbox).toEqual([])
 })

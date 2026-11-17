@@ -20,7 +20,18 @@ function apply(id: string, m: Marks, path: string, end: number): void {
 	let lines = pages.bounds(pages.readBytes(path, 0, end), 0)
 	let records = history.readSync(id).slice(0, lines.length)
 	let active = new Set(replay.current(records).map((r) => r.n))
-	for (let key of ['transitions', 'question', 'turnQuestion', 'answer', 'turn', 'ended', 'prompt', 'reply'] as const)
+	for (let key of [
+		'transitions',
+		'question',
+		'turnQuestion',
+		'answer',
+		'turn',
+		'ended',
+		'prompt',
+		'asking',
+		'askingEnded',
+		'answeredBy',
+	] as const)
 		delete m[key]
 	let inactive: Range[] = [],
 		dropped: number[] = []

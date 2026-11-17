@@ -50,7 +50,7 @@ function prefix(id: string, offset: number): PrefixMarks {
 	for (let saved of [m.beforePrompt, m.beforeAmend])
 		if (saved?.offset === offset) return historyTail.capture(saved.marks)
 	let path = history.file(id)
-	let before: Marks = { size: 0, inbox: {}, version: 4, file: m.file }
+	let before: Marks = { size: 0, inbox: {}, version: 5, file: m.file }
 	for (let line of pages.lines(path, pages.readBytes(path, 0, offset), 0))
 		pages.apply(before, line.record, line.offset, path)
 	before.size = offset

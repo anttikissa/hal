@@ -2,6 +2,7 @@
 // offsets of the few records from which the session's state, inbox and
 // open question are found again without reading the whole history.
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { summary } from '../common/summary.ts'
 import type { Marks } from './pages.ts'
 
 // The turn state after record `r`, at `offset`.
@@ -9,8 +10,7 @@ function follow(m: Marks, r: HistoryRecord, offset: number): void {
 	if (r.type === 'output' && r.transition) m.transitions = [offset]
 	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
 	if (r.type === 'output' && r.transitionDone) m.transitions = []
-	if (r.type === 'user') delete m.reply
-	if (r.type === 'assistant' && r.block.type === 'text') m.reply = offset
+	turnMarks.asking(m, r, offset)
 	if (r.type === 'question') {
 		m.question = offset
 		if (!r.from) {
@@ -37,6 +37,22 @@ function follow(m: Marks, r: HistoryRecord, offset: number): void {
 	}
 }
 
+// An open <question> (task 6q5): `asking` is the reply that asked,
+// open until a human text arrives or a later text of the same turn
+// asks nothing; `answeredBy` lists the sessions that wrote since.
+function asking(m: Marks, r: HistoryRecord, offset: number): void {
+	if (r.type === 'turn_end' && m.asking !== undefined) m.askingEnded = true
+	if (r.type === 'assistant' && r.block.type === 'text') {
+		if (summary.asks(r.block.text)) Object.assign(m, { asking: offset, askingEnded: false, answeredBy: [] })
+		else if (!m.askingEnded) delete m.asking
+	}
+	if (r.type !== 'user' || m.asking === undefined) return
+	for (let b of r.blocks)
+		if (b.type !== 'text') continue
+		else if (b.from === undefined && b.origin !== 'model' && b.delivery !== 'after-turn') return void delete m.asking
+		else if (b.from !== undefined && !m.answeredBy?.includes(b.from)) (m.answeredBy ??= []).push(b.from)
+}
+
 // The positions of the records the state needs, ascending.
 function picked(m: Marks): number[] {
 	return [
@@ -54,4 +70,4 @@ function picked(m: Marks): number[] {
 	].sort((a, b) => a - b)
 }
 
-export const turnMarks = { follow, picked }
+export const turnMarks = { follow, asking, picked }

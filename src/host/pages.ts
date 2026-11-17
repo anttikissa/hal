@@ -35,11 +35,11 @@ import { historyTail, type TailMarks } from './history-tail.ts'
 // `rebase`: the latest rewrite that readers replay the whole history
 // for: a rebase other than an amendment, or a legacy `replaces` prompt;
 // once there is one, every later rebase.
-// `reply`: the latest assistant text, unless a user record followed it.
+// `asking`, `askingEnded`, `answeredBy`: the open <question> (turnMarks.asking).
 // `inactive`: the byte ranges of the lines amendments leave out (task
 // e4z), and `dropped` the numbers of their records.
 export type Marks = TailMarks & {
-	version?: 4
+	version?: 5
 	latestRebase?: number
 	file?: string
 	rebase?: number
@@ -52,7 +52,9 @@ export type Marks = TailMarks & {
 	turn?: number
 	ended?: number
 	prompt?: number
-	reply?: number
+	asking?: number
+	askingEnded?: boolean
+	answeredBy?: string[]
 	inbox: Record<string, number | number[]>
 	changes?: number[]
 	files?: number
@@ -241,9 +243,9 @@ function* catchUp(id: string): Steps<Marks> {
 		let file = basename(path)
 		// Marks of another version or history file (task e4z) are rebuilt.
 		changedFiles.upgrade(m)
-		if (m.size < 0 || m.size > size || (m.file ?? 'history.asonl') !== file || (m.size > 0 && m.version !== 4)) {
+		if (m.size < 0 || m.size > size || (m.file ?? 'history.asonl') !== file || (m.size > 0 && m.version !== 5)) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, version: 4 }, file !== 'history.asonl' && { file })
+			Object.assign(m, { size: 0, inbox: {}, version: 5 }, file !== 'history.asonl' && { file })
 			changedFiles.reset(m)
 		}
 		if (m.size >= size) return done()
