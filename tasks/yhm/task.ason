@@ -16,7 +16,8 @@ The filter toggles are user, Hal, reasoning, tools, commits, other (user request
 		'The rename/projection regression prepares a fully caught-up stale index before starting the worker. It must recover old titles from immutable history without modifying it; corrupting SQLite immediately after worker termination races the worker connection and produces database-is-locked failures.',
 		'The host fills in the open tab order for in: ranges (tabs.ason); clients send only here. Renames are ordinary indexed text: no former-title tier.',
 		'Bug fix: searching rename buried the actual /rename command under 50 requests, replies and tool cards, since everything else ranked last. Invariant: a slash command record outranks requests and tool calls that mention it.',
-		'The web dialog shows the examples as the field placeholder and no question lines (task sy3); the terminal keeps both lines.'
+		'The web dialog shows the examples as the field placeholder and no question lines (task sy3); the terminal keeps both lines.',
+		'Bug fix: a title or cwd match showed the tab creation age (10h) on a tab active a minute ago. Invariant: title and cwd evidence is dated by the tab last activity (history mtime), like the no-query list.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']

@@ -267,7 +267,9 @@ async function search(c: Search): Promise<void> {
 		for (tier of q.kinds) {
 			if (tier === 'metadata') {
 				for (let m of findIndex.state.meta.values()) {
-					let row = { sessionId: m.id, card: '', kind: tier, ts: Date.parse(m.createdAt), at: 0 }
+					// A title or cwd describes the tab now: date it by the tab's last activity.
+					let ts = statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt)
+					let row = { sessionId: m.id, card: '', kind: tier, ts, at: 0 }
 					take({ ...row, blockId: '', text: `${m.id} ${m.name ?? ''}` })
 					take({ ...row, blockId: 'cwd', text: m.cwd })
 				}
