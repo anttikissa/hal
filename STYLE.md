@@ -22,6 +22,12 @@ Alien, Blade Runner, Tron and CRT VT100 terminals:
   (task yn7). Plain symbols are fine: + - $ × => (tab 4).
 - Never use ✗ (U+2717, ballot X): the user finds it ugly. The failure
   mark is × (U+00D7), on the terminal and the web.
+- Hard rule: a symmetric symbol in a circle or square (×, +, a
+  geometric x) sits exactly at its center, horizontally and
+  vertically. Draw it as geometry (SVG or CSS), not a font glyph, whose
+  metrics put it off center, and verify the center by measuring pixels.
+  Asymmetric glyphs (a, 1, .) need optical alignment: verify with the
+  user.
 - Hover hints look like Hal, never like the browser's gray `title`
   box: themed colors and Hal's font, as in the composer button
   captions ("Sent after this turn ends."). Add a hint only where it

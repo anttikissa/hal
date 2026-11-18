@@ -194,8 +194,8 @@ its name, then syntax.summary. The model learns the rest with HELP.
 $other_tools
 ::
 
-:: section "Images"
-To link the user to an image, write a plain URL: ${hal_web_url}/image/<name>.
+:: section "Sharing files"
+Sharing images, files, or HTML pages with the user: put them in ${hal_file_dir}/ (a folder for multi-file pages); they will be served at ${hal_web_url}/file/<path>.
 ::
 
 :: section "User notes" update="diff"

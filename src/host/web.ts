@@ -31,6 +31,8 @@
 //                  /tmp or the session blob a prompt copied it into;
 //                  the name must be attachments.fileName.
 //   GET  /raw/<name>  that file's bytes (cookie).
+//   GET  /file/<path>, /raw/<path>  a file the model shared under
+//                  paths.fileDir() (cookie; host/file-page.ts).
 //   GET  /demo/<name>  a design demo page (cookie; task 86, demo-page.ts).
 //   Any page or file above asked for without a login gets the gate (the
 //   page at that address), which comes back to it once logged in; with
@@ -240,7 +242,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (blob)
 		return contextPage.owns(pathname)
 			? contextPage.serve(req, webPage.css(), (r) => srv.timeout(r, 0))
-			: web.blob(pathname)
+			: web.blob(pathname, req.headers.get('sec-fetch-dest'))
 	if (changesData) return changesPage.serve(url)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
@@ -273,10 +275,10 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
-// One attachment, by exact session and blob id, or a pasted file's page
-// or bytes by exact name; anything else is 404.
-function blob(pathname: string): Response {
-	if (filePage.owns(pathname)) return filePage.serve(pathname, webPage.css())
+// One attachment, by exact session and blob id, or a pasted or shared
+// file's page or bytes by exact name; anything else is 404.
+function blob(pathname: string, dest?: string | null): Response {
+	if (filePage.owns(pathname)) return filePage.serve(pathname, webPage.css(), dest)
 	let m = /^\/blob\/([\w-]+)\/([0-9a-z]{6}|[0-9a-f]{12})$/.exec(pathname)
 	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })

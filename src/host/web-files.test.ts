@@ -2,7 +2,7 @@
 // paste pages, raw bytes and file-address logins.
 
 import { expect, test } from 'bun:test'
-import { readFileSync, rmSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { paths } from './paths.ts'
@@ -140,6 +140,33 @@ test('binary file page previews no bytes and raw download is safe', async () => 
 	expect(raw.headers.get('x-content-type-options')).toBe('nosniff')
 	expect(new Uint8Array(await raw.arrayBuffer())).toEqual(new Uint8Array([0, 255, 60, 88]))
 	expect((await get('/image/a1b2c3.pdf')).status).toBe(404)
+})
+
+test('a shared file under fileDir: HTML as itself with its own assets, others on a page, raw bytes, no escape', async () => {
+	await server.serve()
+	web.start()
+	let dir = `${paths.fileDir()}/test-app`
+	mkdirSync(dir, { recursive: true })
+	writeFileSync(`${dir}/index.html`, '<link rel="stylesheet" href="style.css"><p>hi')
+	writeFileSync(`${dir}/style.css`, 'p { color: red }')
+	writeFileSync(`${paths.fileDir()}/notes-1.md`, '# <b>')
+	let jar = await cookie()
+	let get = (path: string, dest?: string) =>
+		fetch(`${base()}${path}`, { headers: { cookie: jar, ...(dest ? { 'sec-fetch-dest': dest } : {}) } })
+	let html = await get('/file/test-app/index.html', 'document')
+	expect(html.headers.get('content-type')).toContain('text/html')
+	expect(await html.text()).toBe('<link rel="stylesheet" href="style.css"><p>hi')
+	let css = await get('/file/test-app/style.css', 'style')
+	expect(css.headers.get('content-type')).toContain('text/css')
+	expect(await css.text()).toBe('p { color: red }')
+	let page = await (await get('/file/notes-1.md', 'document')).text()
+	expect(page).toContain(`${paths.fileDir()}/notes-1.md`)
+	expect(page).toContain('# &#60;b&#62;')
+	expect(page).toContain('href="/raw/notes-1.md"')
+	expect(await (await get('/raw/notes-1.md')).text()).toBe('# <b>')
+	expect((await fetch(`${base()}/file/notes-1.md`)).status).toBe(401)
+	for (let path of ['/file/test-app', '/file/../config.ason', '/file/%2e%2e/x', '/file/.hidden', '/file/test-app/../x', '/file/a/'])
+		expect((await get(path)).status).toBe(404)
 })
 
 test('a file address takes a link code; a used or expired one gets the gate, which leads back there', async () => {

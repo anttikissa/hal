@@ -107,6 +107,7 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		hal_src: paths.display(paths.repoRoot()),
 		hal_home: paths.display(paths.home()),
 		hal_web_url: settings.webUrl(),
+		hal_file_dir: paths.fileDir(),
 		subagent: input.parent ? 'true' : 'false',
 		subagent_parent: input.parent ?? '',
 		spawn_budget: String(input.slots ?? settings.subagentSlots()),
