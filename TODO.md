@@ -22,3 +22,4 @@ a task and remove it here.
   benchmarks or similar. Pin the run to that account; never spend
   quota needed for daytime work; report results in the morning.
   Rotation (3vj) alone may leave it until the user is asleep.
+- Investigate autoclose for tabs agents use for delegated work: agents may want to enable it to avoid dangling tabs, but a tab may contain something valuable to the user. Consider the spawn-budget bypass where an agent opens an interactive tab for a review after exhausting its subagent slots; preserve user-owned work and decide when autoclose is appropriate.
