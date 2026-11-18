@@ -1,3 +1,5 @@
+Hal is a noncommercial project, under the MIT license.
+
 # Git
 
 Commit when work is settled. While iterating with the user (colors,

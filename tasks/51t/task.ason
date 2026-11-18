@@ -1,0 +1,7 @@
+{
+	title: 'License Hal under MIT',
+	spec: 'Hal is a noncommercial project, under the MIT license. State this in AGENTS.md, set package.json license to the SPDX identifier MIT, and copy the exact MIT license artifact in this task to the root LICENSE file. Third-party assets retain their own licenses.',
+	status: 'done',
+	needs: ['jjr'],
+	foldInto: ['jjr']
+}
