@@ -99,7 +99,7 @@ export type UserText = TextBlock & Sender
 
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
 // A tool the provider ran itself: shown as a finished tool card, never
-// executed by Hal. Replay preserves its input and output as labeled text.
+// executed by Hal. Replay tells its input and output in a user-side note.
 export type HostedToolBlock = {
 	type: 'hosted_tool'
 	id: string
@@ -109,7 +109,7 @@ export type HostedToolBlock = {
 	isError?: boolean
 }
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | HostedToolBlock
-// Providers receive hosted tool evidence as text, never as native calls.
+// Providers receive hosted tool evidence as notes, never as native calls.
 export type ReplayBlock = Exclude<AssistantBlock, HostedToolBlock>
 
 // `cache`: an earlier request's input ended after this many of the

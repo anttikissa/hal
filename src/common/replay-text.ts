@@ -2,7 +2,7 @@
 // (replay.ts): prompt headers and framing, a call as native-tool text,
 // and what it is told of hosted calls or calls with no result.
 
-import type { HostedToolBlock, TextBlock, ToolCallBlock, UserText } from './blocks.ts'
+import type { HostedToolBlock, ToolCallBlock, UserText } from './blocks.ts'
 import { ason } from './ason.ts'
 import { titles } from './titles.ts'
 import type { TurnStatus } from './replay.ts'
@@ -19,11 +19,11 @@ function asNative(b: ToolCallBlock): ToolCallBlock {
 	return { type: 'tool_call', id: b.id, name: 'tool', input: { cmd: text } }
 }
 
-function hosted(b: HostedToolBlock): TextBlock {
-	return {
-		type: 'text',
-		text: `Provider executed ${b.name}${b.isError ? ' (failed)' : ''}: ${ason.stringify(b.input, 'short')}\n${b.output}`,
-	}
+// Told on the user side: as assistant text the model copied it and
+// faked searches it never ran (session 49-woo).
+function hosted(b: HostedToolBlock): string {
+	let ran = b.isError ? 'failed' : 'ran'
+	return `<hal-note>Your ${b.name} ${ran} on the provider: ${ason.stringify(b.input, 'short')}\n${b.output}</hal-note>`
 }
 
 // A prompt text as the model reads it, below its header: a next-round

@@ -313,7 +313,11 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			push({ role: 'user', blocks: missing })
 			flush()
 		} else if (r.type === 'assistant') {
-			let b = r.block.type === 'hosted_tool' ? replayText.hosted(r.block) : r.block
+			if (r.block.type === 'hosted_tool') {
+				facts.push({ source: r.n ?? i + 1, text: replayText.hosted(r.block) })
+				continue
+			}
+			let b = r.block
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') {
 				pending.push(b.id)

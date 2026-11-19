@@ -26,12 +26,15 @@ for (let [name, adapter] of Object.entries({ anthropic, openai })) {
 		let req = { model: 'test', messages }
 		for (let wire of [anthropic.toMessages(req), openai.input(req)]) {
 			let text = JSON.stringify(wire)
-			expect(text).toContain('Provider executed web_search')
+			expect(text).toContain('Your web_search ran on the provider')
 			expect(text).toContain(search.input.query as string)
 			for (let line of search.output.split('\n').filter(Boolean)) expect(text).toContain(line)
 			expect(text).not.toContain(search.id)
 			expect(text).toContain('Tools available')
 		}
+		// As assistant text the model copied it and faked searches.
+		let said = JSON.stringify(messages.filter((m) => m.role === 'assistant'))
+		expect(said).not.toContain(search.input.query as string)
 		expect(
 			messages
 				.filter((m) => m.role === 'assistant')
@@ -60,7 +63,7 @@ test('a hosted failure keeps its input, status and full error without a missing-
 	]
 	let messages = replay.toMessages(records)
 	let text = JSON.stringify(messages)
-	expect(text).toContain('Provider executed web_search (failed)')
+	expect(text).toContain('Your web_search failed on the provider')
 	expect(text).toContain('hotel')
 	expect(text).toContain('limit')
 	expect(text).toContain('too_many_requests')
