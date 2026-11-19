@@ -64,6 +64,7 @@ const list: CommandInfo[] = [
 	{ name: 'kill', description: 'stop one background job or all jobs here', category: 'session' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
 	{ name: 'logout', description: 'remove provider accounts', category: 'session' },
+	{ name: 'mcp', description: 'show MCP servers or reconnect one', category: 'app' },
 	{ name: 'mem', description: 'show host memory use', category: 'debug' },
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
 	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },

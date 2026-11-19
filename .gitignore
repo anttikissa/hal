@@ -2,6 +2,7 @@ node_modules/
 USER.md
 local.ts
 config.ason
+/mcp.ason
 .idea/
 sessions/
 state/

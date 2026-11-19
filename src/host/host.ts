@@ -13,6 +13,7 @@ import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
+import { mcp } from './mcp.ts'
 import { work } from './work.ts'
 import { pages, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
@@ -358,6 +359,7 @@ function init(): void {
 		history.stop(userQuit.state.requested && server.state.sockets.size === 0)
 		for (let r of turns.state.running.values()) r.controller.abort()
 		jobs.killAll()
+		mcp.stopAll()
 	})
 	clock.init()
 }
@@ -373,6 +375,7 @@ function reset(): void {
 	for (let running of tools.running.values()) running.controller.abort()
 	tools.running.clear()
 	jobs.killAll()
+	mcp.stopAll()
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()
