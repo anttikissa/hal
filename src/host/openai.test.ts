@@ -38,7 +38,8 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 		model: 'gpt-5.5',
 		store: false,
 		stream: true,
-		instructions: 'be brief',
+		instructions: 'Follow the developer message.',
+		input: [{ role: 'developer', content: 'be brief' }, expect.anything()],
 		prompt_cache_key: 'sess-1',
 		text: { verbosity: 'low' },
 	})

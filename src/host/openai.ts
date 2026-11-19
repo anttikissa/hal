@@ -81,7 +81,13 @@ function reasons(model: string): boolean {
 // `webSearch`: whether the endpoint offers OpenAI's hosted web search.
 function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<string, unknown> {
 	let b: Record<string, unknown> = { model: req.model, store: false, stream: true, input: openai.input(req) }
-	if (req.system) b.instructions = req.system
+	// The Codex backend renders `instructions` after the conversation, so
+	// they never join the cached prefix; the system prompt goes first as a
+	// developer item instead (measured on gpt-6.2-sol, 19 Nov 2026).
+	if (req.system && codex) {
+		b.instructions = 'Follow the developer message.'
+		;(b.input as unknown[]).unshift({ role: 'developer', content: req.system })
+	} else if (req.system) b.instructions = req.system
 	if (req.tools?.length) {
 		b.tools = req.tools.map((t) => ({
 			type: 'function',
@@ -281,8 +287,7 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	let results = await Promise.allSettled(
 		list.map(async (account) => {
 			let cred = await auth.credential(data, account, 'openai')
-			if (cred.type === 'api-key' || catalog.claims(cred.value).api)
-				return modelsDev.ids('openai')
+			if (cred.type === 'api-key' || catalog.claims(cred.value).api) return modelsDev.ids('openai')
 			let accountId = catalog.claims(cred.value).accountId ?? cred.accountId
 			let res = await fetch(openai.codexModelsUrl, {
 				signal,

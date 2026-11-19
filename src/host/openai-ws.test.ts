@@ -28,14 +28,14 @@ test('over a WebSocket, a request that extends the last one sends only the new i
 	)
 	expect(await text()).toBe('ok')
 	expect(fake.wsSeen.map((b) => [b.type, b.previous_response_id, b.input.length])).toEqual([
-		['response.create', undefined, 1],
+		['response.create', undefined, 2],
 		['response.create', 'resp-1', 1],
 	])
 	expect(fake.wsSeen[1].input[0].content[0].text).toBe('two')
 	// An edited earlier message breaks the chain: everything goes again.
 	messages[0] = { role: 'user', blocks: [{ type: 'text', text: 'one, edited' }] }
 	await text()
-	expect([fake.wsSeen[2].previous_response_id, fake.wsSeen[2].input.length]).toEqual([undefined, 3])
+	expect([fake.wsSeen[2].previous_response_id, fake.wsSeen[2].input.length]).toEqual([undefined, 4])
 	expect(fake.seen.filter((r) => r.path === '/codex/responses')).toEqual([])
 
 	fake.wsSeen = null

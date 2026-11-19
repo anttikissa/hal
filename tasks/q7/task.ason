@@ -12,7 +12,8 @@
 		"Bug fix, invariant: Codex backend requests carry the session id as an HTTP session_id header besides prompt_cache_key. Without it the backend's cache never hit (live probe: 0 of 4 requests cached; 2-6 Oct sessions 9-30% hit rate, mostly a fixed 2,176-token match); with it, every request after the first read about 99% from the cache. Another Codex client saw the same collapse after dropping the header (hermes-agent issue 47335).",
 		'WebSocket transport: task ak5.',
 		'Low output verbosity replaces the legacy inherited high value in Codex request bodies. The invariant is that subscription requests explicitly use low output verbosity regardless of transport; reasoning effort is unchanged. The earlier note describing high records the previous implementation, not the current default.',
-		'Bug fix (/login open<Tab> offered opencode but not openai): invariant: /login completion offers every name it accepts, aliases and -key methods included; one ALIASES table drives both.'
+		'Bug fix (/login open<Tab> offered opencode but not openai): invariant: /login completion offers every name it accepts, aliases and -key methods included; one ALIASES table drives both.',
+		'Bug fixed: the Codex backend renders instructions after the conversation, so the system prompt never joined the cached prefix and hits were rare (4-19% of input on stockroom tasks). The system prompt now goes first as a developer item and instructions hold a fixed line: 53-68% cached (session 50-dab, 19 Nov, gpt-6.2-sol, measured from usage.attribution.request_fields). Invariant: on the Codex backend the system prompt is part of the cacheable prefix.'
 	],
 	needs: ['nd', 'qq']
 }
