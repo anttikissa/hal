@@ -4,6 +4,9 @@
 import { expect } from 'bun:test'
 import { history } from './history.ts'
 import { server } from './server.ts'
+import { sessions } from './sessions.ts'
+import { tabs } from './tabs.ts'
+import { turns } from './turns.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 import { testHome, useWeb, base, providerHome } from './web-fixture.test.ts'
@@ -54,7 +57,12 @@ browserTest('touch tab navigation does not focus the composer', async () => {
 browserTest(
 	'a touch on Send sends once, even when iOS withholds the click',
 	async () => {
-		providerHome()
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		tabs.insert(id, 0)
+		turns.stream = () =>
+			(async function* () {
+				yield { type: 'done' as const, reason: 'end' }
+			})()
 		let b = await browser()
 		try {
 			await server.serve()
@@ -67,7 +75,9 @@ browserTest(
 			})
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await b.waitFor(
+				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+			)
 			let draft = (text: string) =>
 				b.evaluate(
 					`(() => { let box = document.querySelector('textarea'); box.focus(); box.value = '${text}'; box.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`,
@@ -129,7 +139,9 @@ browserTest(
 			})
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await b.waitFor(
+				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+			)
 			expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
 			expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
 			let toggle = async () => {

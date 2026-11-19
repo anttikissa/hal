@@ -17,7 +17,7 @@
 // work; text in a textarea can never be a link) with an × that deletes
 // the marker as an undoable edit. The text stays the only state.
 
-import { createEffect, createMemo, createSignal, For, Show, onSettled } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, onSettled, untrack } from 'solid-js'
 import { amend } from '../../common/amend.ts'
 import { queueEdit } from '../../common/queue-edit.ts'
 import { attachments } from '../../common/attachments.ts'
@@ -101,7 +101,7 @@ export function Composer(props: {
 	let away = createMemo(() => !!props.view.form || !!props.view.modal)
 	createEffect(away, (away) => {
 		// Touch navigation is for reading; only deliberate editing opens the keyboard.
-		if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()
+		if (!away && !matchMedia('(pointer: coarse)').matches) untrack(() => input.focus())
 	})
 	onSettled(() => {
 		let inside = (t: EventTarget | null) =>

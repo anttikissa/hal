@@ -218,8 +218,11 @@ test('an unknown command is refused; text that only starts with a path is a prom
 })
 
 test('a command runs while a turn is busy instead of waiting in the inbox; /pause skips a skippable question', async () => {
+	synthetic.models.question = () => ({
+		ask: { text: 'Continue?', fields: [{ type: 'text', name: 'reply' }], skip: true },
+	})
 	let a = client()
-	let id = created(a)
+	let id = created(a, 'hal/question')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => transcript.question(a.views.get(id)))
 	a.conn.send({ type: 'submit', sessionId: id, text: '/cd projects' })

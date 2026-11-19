@@ -26,18 +26,18 @@ browserTest('Unicode drafts keep the composer and tab navigation responsive', as
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`!!document.querySelector('.Chat')`)
-		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		await b.waitFor(
+			`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+		)
 		for (let width of [390, 1440]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
 			for (let text of ['é', '—', '漢字', '👨‍👩‍👧', 'e\u0301']) {
 				await b.evaluate(
 					`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.focus() })()`,
 				)
-				await b.waitFor(`!document.querySelector('.entry .hint').classList.contains('gone')`)
+				await b.waitFor(`document.querySelector('.actions button[aria-label="Send"]').disabled`)
 				await b.call('Input.insertText', { text })
-				await b.waitFor(
-					`document.querySelector('.entry .hint').classList.contains('gone') && !document.querySelector('.actions button[aria-label="Send"]').disabled`,
-				)
+				await b.waitFor(`!document.querySelector('.actions button[aria-label="Send"]').disabled`)
 				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
 			}
 			await b.evaluate(`document.querySelector('.Tabs [href="/${other}"]').click()`)

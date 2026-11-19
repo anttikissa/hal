@@ -35,7 +35,13 @@ function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 		.then(
 			(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
 			(e) =>
-				app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
+				app.onEvent({
+					type: 'rejected',
+					sessionId: id,
+					command: 'attach',
+					reason: String(e?.message ?? e),
+					id: command,
+				}),
 		)
 }
 
@@ -47,7 +53,7 @@ async function fit(image: Blob): Promise<Blob> {
 		let scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height))
 		let canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale))
 		let g = canvas.getContext('2d')!
-		g.fillStyle = '#fff' // JPEG has no alpha; transparency becomes white, not black.
+		g.fillStyle = 'white' // JPEG has no alpha; transparency becomes white, not black.
 		g.fillRect(0, 0, canvas.width, canvas.height)
 		g.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
 		let out = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 })

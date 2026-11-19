@@ -31,6 +31,7 @@ test('presentation survives live and persisted replay but never enters provider 
 		output: '-1 before\n+1 after\n',
 	} as ToolResultBlock)
 	let records: HistoryRecord[] = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'Edit these files.' }], ts: '2026-10-09T23:59:59Z', n: 0 },
 		{ type: 'assistant', block: start, ts: '2026-10-10T00:00:00Z', n: 1 },
 		{ type: 'user', blocks: [end], ts: '2026-10-10T00:00:01Z', n: 2 },
 	]
@@ -44,8 +45,11 @@ test('presentation survives live and persisted replay but never enters provider 
 	let ordinary = records.map((r) =>
 		r.type === 'assistant'
 			? { ...r, block: call }
-			: { ...r, blocks: [{ type: 'tool_result', id: call.id, output: end.output }] },
+			: r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result')
+				? { ...r, blocks: [{ type: 'tool_result', id: call.id, output: end.output }] }
+				: r,
 	) as HistoryRecord[]
+	expect(replay.toMessages(loaded)).toHaveLength(3)
 	expect(replay.toMessages(loaded)).toEqual(replay.toMessages(ordinary))
 	expect(toolPresentation.text(end.presentation!.blocks[0]!, end.output)).toBe(end.output)
 })
@@ -66,6 +70,7 @@ test('a broken presentation keeps the execution outcome and reaches model and us
 	expect(result.presentationError).toContain('Input:')
 	expect(transcript.resultItem(result)).toMatchObject({ presentationError: result.presentationError })
 	let records: HistoryRecord[] = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'Run the tool.' }], ts: '' },
 		{ type: 'assistant', block: call, ts: '' },
 		{ type: 'user', blocks: [result], ts: '' },
 	]

@@ -43,12 +43,11 @@ function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
 	if (isZeroWidth(cp)) return 0
+	if ((cp >= 0x2630 && cp <= 0x2637) || (cp >= 0x268a && cp <= 0x268f)) return 2
 	if (typeof Bun !== 'undefined') return Bun.stringWidth(String.fromCodePoint(cp))
 	return /\p{Emoji_Presentation}/u.test(String.fromCodePoint(cp)) ||
 		(cp >= 0x1100 && cp <= 0x115f) ||
 		(cp >= 0x2329 && cp <= 0x232a) ||
-		(cp >= 0x2630 && cp <= 0x2637) ||
-		(cp >= 0x268a && cp <= 0x268f) ||
 		(cp >= 0x2e80 && cp <= 0xa4cf && cp !== 0x303f) ||
 		(cp >= 0xa960 && cp <= 0xa97c) ||
 		(cp >= 0xac00 && cp <= 0xd7a3) ||

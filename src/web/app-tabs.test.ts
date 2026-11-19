@@ -59,17 +59,14 @@ test('with no valid id the page lands on the tab shown last, else the first, rep
 test('background neighbors fetch after paint and switching reuses their in-memory transcripts', async () => {
 	fx.address = 'http://h/2-bbb'
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc'), tab('4-ddd')))
+	tabs.onScreen(0, 4)
 	app.onEvent(snapOf('2-bbb'))
 	expect(fx.sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['2-bbb'])
-	await Bun.sleep(10)
-	expect(fx.sent.at(-1)).toEqual({ type: 'open', sessionId: '1-aaa' })
-	app.onEvent(snapOf('1-aaa'))
-	await Bun.sleep(10)
-	expect(fx.sent.at(-1)).toEqual({ type: 'open', sessionId: '3-ccc' })
-	app.onEvent(snapOf('3-ccc'))
-	await Bun.sleep(10)
-	expect(fx.sent.at(-1)).toEqual({ type: 'open', sessionId: '4-ddd' })
-	app.onEvent(snapOf('4-ddd'))
+	for (let id of ['3-ccc', '1-aaa', '4-ddd']) {
+		while (!fx.sent.some((c) => c.type === 'open' && c.sessionId === id)) await Bun.sleep(1)
+		expect(fx.sent.at(-1)).toEqual({ type: 'open', sessionId: id })
+		app.onEvent(snapOf(id))
+	}
 	let opens = fx.sent.filter((c) => c.type === 'open').length
 	tabs.show('3-ccc', false)
 	expect(app.sessionId()).toBe('3-ccc')

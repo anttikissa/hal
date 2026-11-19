@@ -24,7 +24,9 @@ browserTest(
 			await server.serve()
 			web.start()
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await b.waitFor(
+				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+			)
 			let type = async (text: string) => {
 				await b.evaluate(
 					`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,

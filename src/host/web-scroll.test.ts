@@ -18,7 +18,8 @@ browserTest(
 	'in a browser a command stays below the block already streaming: same card, no fade again',
 	async () => {
 		providerHome()
-		let id = tabs.create('/tmp')
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		tabs.insert(id, 0)
 		let release = () => {}
 		let gate = new Promise<void>((r) => (release = r))
 		turns.stream = () =>
@@ -44,7 +45,9 @@ browserTest(
 				b.evaluate(
 					`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`,
 				)
-			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await b.waitFor(
+				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+			)
 			await enter('go')
 			await b.waitFor(`document.querySelector('main')?.innerText.includes('streaming now')`)
 			await enter('/help')

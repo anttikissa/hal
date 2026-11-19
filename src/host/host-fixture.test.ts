@@ -3,7 +3,7 @@
 // what they would show.
 
 import { afterEach, beforeEach, expect } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import { type Event } from '../common/protocol.ts'
@@ -85,7 +85,7 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 // Registers the hooks that give each test a fresh home and host.
 export function useHost(withNaming = false, withGreetings = false, withRecaps = false): void {
 	beforeEach(() => {
-		home = mkdtempSync(`${tmpdir()}/hal-host-`)
+		home = realpathSync(mkdtempSync(`${tmpdir()}/hal-host-`))
 		paths.state.home = home
 		// Unset, the default model is the intro; tests that want it remove this.
 		writeFileSync(`${home}/config.ason`, "{ model: 'anthropic/claude-opus-5-5' }\n")

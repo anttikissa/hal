@@ -1,7 +1,7 @@
 // Enforces the layout and import-time rules from tasks/README.md.
 import { expect, test } from 'bun:test'
 import { Glob } from 'bun'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 import { sizeLimit } from '../scripts/size-limit.ts'
 
@@ -34,13 +34,19 @@ function violation(file: string, target: string): string | undefined {
 	return `${file.slice(srcDir.length + 1)} imports ${target.slice(srcDir.length + 1) || target}`
 }
 
+// Local untracked files, kept for days, must never change the result.
+function tracked(pattern: string): string[] {
+	let glob = new Glob(pattern)
+	let out = Bun.spawnSync(['git', 'ls-files', '-z'], { cwd: srcDir })
+	if (out.exitCode) throw new Error(out.stderr.toString())
+	let files = out.stdout.toString().split('\0')
+	return files.filter((rel) => rel && glob.match(rel) && existsSync(`${srcDir}/${rel}`))
+}
+
 function sourceFiles(): string[] {
-	let files: string[] = []
-	for (let rel of new Glob('**/*.{ts,tsx}').scanSync(srcDir)) {
-		if (/\.test\.tsx?$/.test(rel)) continue
-		files.push(`${srcDir}/${rel}`)
-	}
-	return files
+	return tracked('**/*.{ts,tsx}')
+		.filter((rel) => !/\.test\.tsx?$/.test(rel))
+		.map((rel) => `${srcDir}/${rel}`)
 }
 
 // Packages only the browser may use: the host path stays dependency-free.
@@ -96,7 +102,7 @@ function colorLiterals(text: string): string[] {
 
 test('src/web has no color literals', () => {
 	let found: string[] = []
-	for (let rel of new Glob('web/**/*.{ts,tsx,html,css}').scanSync(srcDir)) {
+	for (let rel of tracked('web/**/*.{ts,tsx,html,css}')) {
 		if (/\.test\.tsx?$/.test(rel)) continue
 		for (let c of colorLiterals(readFileSync(`${srcDir}/${rel}`, 'utf8'))) found.push(`${rel}: ${c}`)
 	}
@@ -135,7 +141,7 @@ test('importing every module has no side effects', () => {
 
 test('source modules stay under the size limit', () => {
 	let sizes: Record<string, number> = {}
-	for (let rel of new Glob('**/*').scanSync(srcDir)) {
+	for (let rel of tracked('**/*')) {
 		if (sizeLimit.covers(rel)) sizes[rel] = Bun.file(`${srcDir}/${rel}`).size
 	}
 	let found = sizeLimit.problems(sizes)

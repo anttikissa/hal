@@ -165,10 +165,25 @@ test('a file is an image, text by extension or type, or opaque binary', () => {
 		expect(kind(name!, type)).toBe('application/octet-stream')
 })
 
-test('an image too large to send is refused before reading it', () => {
-	attach.files([new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' })], insert)
-	expect(attaches()).toEqual([])
-	expect(app.notice()).toContain('5 MB')
+test('an oversized image gets a marker immediately and uploads as a fitted JPEG', async () => {
+	let image = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' })
+	let fit = attach.fit
+	let fitted: Blob | undefined
+	attach.fit = async (blob) => {
+		fitted = blob
+		return new Blob(['jpeg'], { type: 'image/jpeg' })
+	}
+	try {
+		attach.files([image], insert)
+		expect(app.state.text).toMatch(/^\[image\/[0-9a-z]{6}\.jpg\] $/)
+		expect(fitted).toBe(image)
+		expect(attaches()).toEqual([])
+		await tick()
+		expect(attaches()).toHaveLength(1)
+		expect(attaches()[0]).toMatchObject({ mediaType: 'image/jpeg', data: Buffer.from('jpeg').toString('base64') })
+	} finally {
+		attach.fit = fit
+	}
 })
 
 // What the page does on load (main.tsx): read the settings the host

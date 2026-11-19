@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
+import { forms } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
@@ -14,6 +15,7 @@ let typed: string[] = []
 const orig = { send: connection.send, connected: connection.connected, store: drafts.store, insert: keys.insert }
 
 beforeEach(() => {
+	forms.state.typed = 0
 	sent = []
 	typed = []
 	app.reset()

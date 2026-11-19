@@ -101,7 +101,7 @@ test('no link code reaches any file of the home', async () => {
 	a.subscribe()
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	a.conn.send({ type: 'draft', sessionId: id, text: 'typing' })
-	await until(() => a.events.some((e) => e.type === 'question'))
+	await until(() => a.events.some((e) => e.type === 'turn-end'))
 	click(a.codes()[0]!.code)
 	let files = readdirSync(home, { recursive: true, withFileTypes: true }).filter((d) => d.isFile())
 	let all = files.map((d) => readFileSync(`${d.parentPath}/${d.name}`, 'latin1')).join('\n')

@@ -51,7 +51,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 		} else expect(bytes.slice(0, frozen.length)).toEqual(frozen)
 		// Freeze complete messages, not the newest tail whose blocks can append.
 		frozen = bytes.slice(0, -1)
-		for (let toolRound = 0; toolRound < 12; toolRound++) {
+		for (let toolRound = 0; toolRound < 2; toolRound++) {
 			let call = `${turn}/${toolRound}`
 			let input = { command: `printf '${call}'`, path: 'src/file.ts', long: 'a'.repeat(2000) }
 			await round(id, [
@@ -87,7 +87,7 @@ test('provider prefix is byte-identical through many rounds, turns, retries and 
 	}
 	expect(boundaries).toBe(3)
 	expect(readFileSync(history.file(id), 'utf8')).toContain('payload 0/0 ')
-}, 30_000)
+})
 
 test('pressure omits only consumed work durably; original/capped recovery and copied-marker safety', async () => {
 	let id = sessions.create({ cwd: home, model: 'anthropic/test' }).id

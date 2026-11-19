@@ -1,5 +1,5 @@
 // Next-round host facts preserve provider input and survive context transitions.
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import { states } from '../common/states.ts'
 import { transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
@@ -8,14 +8,23 @@ import { compact } from './compact.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { turns } from './turns.ts'
+import { synthetic } from './synthetic.ts'
 import { calls, client, created, fresh, restartHost, until, useHost } from './host-fixture.test.ts'
 
 useHost()
+const originalModels = synthetic.models
+afterEach(() => {
+	synthetic.models = originalModels
+})
 
 const texts = (messages: any[]) =>
 	messages.flatMap((m) => m.blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text)).join('\n')
 
 test('switching from the intro and skipping its question sends the change on the first real request', async () => {
+	synthetic.models = {
+		...originalModels,
+		intro: () => ({ ask: { text: 'Continue?', fields: [{ type: 'text', name: 'reply' }], skip: true } }),
+	}
 	let c = client()
 	c.conn.send({ type: 'create', cwd: '/tmp/w', model: 'hal/intro' })
 	let id = c.of('snapshot').at(-1).sessionId

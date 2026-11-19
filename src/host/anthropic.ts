@@ -73,7 +73,7 @@ function toMessages(req: ProviderRequest): any[] {
 	let out: any[] = []
 	let earlier: any
 	for (let m of req.messages) {
-		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
+		let content: any[] = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock)
 		if (m.role === 'user')
 			content.push(
 				...m.blocks.flatMap((b) =>

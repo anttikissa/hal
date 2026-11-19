@@ -63,6 +63,8 @@ test('start reads config.ason, then local.ts, whose overrides hold at call time 
 let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
 let { models } = await import(${JSON.stringify(`${srcDir}/host/models.ts`)})
 let { web } = await import(${JSON.stringify(`${srcDir}/host/web.ts`)})
+let { terminal } = await import(${JSON.stringify(`${srcDir}/client/terminal.ts`)})
+terminal.available = () => true
 main.init = () => {
 	process.stderr.write(JSON.stringify({ seen: globalThis.seen, model: models.defaultModel(), port: web.port() }))
 	process.exit(0)
@@ -88,6 +90,8 @@ test('start loads plugins after local.ts and before init; /plugins names module 
 let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
 let { models } = await import(${JSON.stringify(`${srcDir}/host/models.ts`)})
 let { plugins } = await import(${JSON.stringify(`${srcDir}/host/plugins.ts`)})
+let { terminal } = await import(${JSON.stringify(`${srcDir}/client/terminal.ts`)})
+terminal.available = () => true
 main.init = () => {
 	process.stderr.write(JSON.stringify({ sawLocal: globalThis.sawLocal, model: models.defaultModel(), list: plugins.describe() }))
 	process.exit(0)

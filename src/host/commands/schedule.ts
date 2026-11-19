@@ -17,7 +17,7 @@ function show(j: Job): string {
 		? `[${tab < 0 ? id + ' (closed)' : `tab ${tab + 1}`}](${settings.webUrl().replace(/\/$/, '')}/${id})`
 		: 'none'
 	let next = new Date(j.next).toLocaleString('en-GB', { timeZone: j.timezone })
-	return `${j.id}. ${j.paused ? 'Paused' : scheduler.active(j) ? 'Running' : 'Waiting'} - ${j.prompt.split('\n')[0].slice(0, 100)}
+	return `${j.id}. ${j.paused ? 'Paused' : scheduler.active(j) ? 'Running' : 'Waiting'} - ${j.prompt.split('\n', 1)[0]!.slice(0, 100)}
 ${j.when} | Next: ${j.paused ? 'none' : next} | ${j.timezone}
 Last run: ${link}${j.run?.result ? ` - ${j.run.result}` : ''}`
 }

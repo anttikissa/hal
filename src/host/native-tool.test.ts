@@ -105,7 +105,7 @@ test('EDIT descriptions title both the call and its result', () => {
 		input: { cmd: 'EDIT /* TESTING */ test.ts write\n!!NEW\nebar\nzot\n!!END' },
 	})
 	expect(call.input.description).toBe('TESTING')
-	expect(call.presentation?.title).toBe('edit TESTING')
+	expect(call.presentation?.title).toBe('edit test.ts: TESTING')
 	for (let result of [
 		{ output: '== test.ts@abcde verified ==\n== diff ==\n-1 bar\n+1 ebar\n 2 zot\n' },
 		{ output: 'Unchanged; nothing written.' },
@@ -114,7 +114,7 @@ test('EDIT descriptions title both the call and its result', () => {
 		expect(
 			toolPresentations.attach<ToolResultBlock>(call, { type: 'tool_result', id: call.id, ...result }).presentation
 				?.title,
-		).toBe('edit TESTING')
+		).toBe('edit test.ts: TESTING')
 })
 
 test('arguments: strings, objects, comments as purpose, bare words, COMMAND', () => {

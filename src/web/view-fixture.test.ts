@@ -4,6 +4,7 @@
 
 import { afterEach, beforeEach } from 'bun:test'
 import { titles } from '../common/titles.ts'
+import { forms } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { view, type ViewState } from './view.ts'
 
@@ -15,6 +16,7 @@ export const ts = '2026-09-26T00:00:01Z'
 export function useNames(): void {
 	let originalNames: Record<string, string>
 	beforeEach(() => {
+		forms.state.typed = 0
 		originalNames = titles.names
 		titles.names = {}
 	})

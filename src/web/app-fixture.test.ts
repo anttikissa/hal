@@ -4,6 +4,7 @@
 
 import { afterEach, beforeEach } from 'bun:test'
 import { connection } from '../common/connection.ts'
+import { forms } from '../common/forms.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
@@ -38,6 +39,7 @@ const orig = {
 
 export function useApp(): void {
 	beforeEach(() => {
+		forms.state.typed = 0
 		fx.sent = []
 		fx.stored = new Map()
 		fx.redraws = 0

@@ -5,6 +5,10 @@ import { expect } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { host } from './host.ts'
 import { tabs } from './tabs.ts'
+import { sessions } from './sessions.ts'
+import { stats } from './stats.ts'
+import { usage } from './usage.ts'
+import { status } from './status.ts'
 import { turns } from './turns.ts'
 import { server } from './server.ts'
 import { web } from './web.ts'
@@ -21,7 +25,11 @@ browserTest(
 	async () => {
 		providerHome()
 		let b = await browser()
+		let statsOf = stats.of,
+			usageSnapshot = usage.snapshot
+		let accounts = { test: { '5h': { used: 17 } } }
 		try {
+			usage.snapshot = () => accounts
 			await server.serve()
 			web.start()
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
@@ -35,21 +43,17 @@ browserTest(
 				name: 'A long conversation name that must not wrap on a narrow phone',
 				createdAt: new Date().toISOString(),
 			}
-			for (let client of host.state.clients)
-				client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 17 } } } })
-			host.broadcast(meta.id, {
-				type: 'meta',
-				sessionId: meta.id,
-				meta,
-				stats: {
-					context: 85000,
-					window: 100000,
-					files: 4,
-					effort: 'medium',
-					plan: { account: 'a1', accounts: 1, key: 'test' },
-				},
+			Object.assign(sessions.open(id), meta)
+			for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts })
+			stats.of = () => ({
+				context: 85000,
+				window: 100000,
+				files: 4,
+				effort: 'medium',
+				plan: { account: 'a1', accounts: 1, key: 'test' },
 			})
-			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
+			host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: stats.of(meta.id) })
+			status.transition(meta.id, { type: 'submit' })
 			await b.waitFor(
 				"document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')",
 			)
@@ -76,17 +80,17 @@ browserTest(
 				expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('⣄')
 				expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
 			}
-			host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta: { ...meta, slots: 0 } })
+			sessions.update(meta.id, { slots: 0 })
 			await b.waitFor("document.querySelector('.budget').textContent === ''")
-			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'idle' } })
+			status.transition(meta.id, { type: 'end' })
 			await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 			// A master update alone must repaint quota on this idle view. No
 			// replacement Stats, transcript, status nodes or draft are needed.
 			await b.evaluate(
 				"window.quotaNodes = [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')]",
 			)
-			for (let client of host.state.clients)
-				client.deliver({ type: 'subscription-usage', accounts: { test: { '5h': { used: 52 } } } })
+			accounts.test['5h'].used = 52
+			for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts })
 			await b.waitFor(
 				"document.querySelector('.windows').textContent.includes('52% used') && getComputedStyle(document.querySelector('.model')).getPropertyValue('--fill') === '48%'",
 			)
@@ -123,7 +127,8 @@ browserTest(
 			expect(
 				await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))"),
 			).toEqual([`/${id}/changes`, `/context/${id}`])
-			host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
+			status.transition(meta.id, { type: 'submit' })
+			status.transition(meta.id, { type: 'pause' })
 			await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
 			await b.call('Input.dispatchKeyEvent', {
 				type: 'keyDown',
@@ -141,6 +146,8 @@ browserTest(
 			expect(await b.evaluate("document.activeElement === document.querySelector('.details-target')")).toBe(true)
 			expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
 		} finally {
+			stats.of = statsOf
+			usage.snapshot = usageSnapshot
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 			await b.close()
 		}
@@ -271,7 +278,9 @@ browserTest(
 			await server.serve()
 			web.start()
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+			await b.waitFor(
+				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
+			)
 			for (let width of [390, 1280]) {
 				await b.call('Emulation.setDeviceMetricsOverride', {
 					width,

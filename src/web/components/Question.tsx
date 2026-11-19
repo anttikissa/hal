@@ -64,9 +64,8 @@ export function Question(props: {
 	let [tock, setTock] = createSignal(0)
 	let settling = createMemo(() => (tock(), forms.settleIn(props.form) > 0))
 	createEffect(
-		() => props.form.settling,
-		() => {
-			let left = forms.settleIn(props.form)
+		() => forms.settleIn(props.form),
+		(left) => {
 			if (!left) return
 			let timer = setTimeout(() => setTock((n) => n + 1), left)
 			return () => clearTimeout(timer)

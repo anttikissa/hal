@@ -51,6 +51,7 @@ test('an unidentified plugin failure reaches notices without changing any sessio
 // Task b66: after the initial scan, each lifecycle change is one notice
 // naming the file; startup loads are quiet.
 test('plugin load, sync replacement and removal notify every client after a quiet startup', async () => {
+	let changed = plugins.changed
 	let c = client(),
 		dir = mkdtempSync('/tmp/hal-b66-')
 	plugins.changed = pluginReports.changed
@@ -74,6 +75,7 @@ test('plugin load, sync replacement and removal notify every client after a quie
 		])
 	} finally {
 		plugins.close()
+		plugins.changed = changed
 		rmSync(dir, { recursive: true, force: true })
 	}
 })

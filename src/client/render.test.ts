@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item } from '../common/transcript.ts'
@@ -7,7 +7,14 @@ import { cursorText, frameText, items, setup, show, term, transcript, trimmed } 
 import { render, type ClearReason } from './render.ts'
 import { terminal } from './terminal.ts'
 
-afterEach(() => render.reset())
+let sliceMs = render.sliceMs
+beforeEach(() => {
+	render.sliceMs = Infinity
+})
+afterEach(() => {
+	render.reset()
+	render.sliceMs = sliceMs
+})
 
 describe('grow mode', () => {
 	test('starts at the cursor without clearing what the shell printed', () => {
