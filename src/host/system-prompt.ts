@@ -90,12 +90,12 @@ function agents(cwd: string, sources?: PromptSource[], trust?: string | false): 
 	return parts.join('\n\n')
 }
 
-function vars(input: PromptInput, sources?: PromptSource[]): Record<string, string> {
+function vars(input: PromptInput, sources?: PromptSource[], problems?: string[]): Record<string, string> {
 	let timezone =
 		(input.sessionId ? scheduler.owned(input.sessionId)?.timezone : undefined) ??
 		(input.sessionId ? clients.timezone(input.sessionId) : undefined) ??
 		Intl.DateTimeFormat().resolvedOptions().timeZone
-	return {
+	let values: Record<string, string> = {
 		date: date(input.now, timezone),
 		timezone,
 		session_id: input.sessionId ?? '',
@@ -117,11 +117,15 @@ function vars(input: PromptInput, sources?: PromptSource[]): Record<string, stri
 		skills: systemPrompt.skills(input.cwd, input.projectTrust),
 		agents: systemPrompt.agents(input.cwd, sources, input.projectTrust),
 	}
+	values.tools = toolGuides(input, values, problems)
+	return values
 }
 
-// Templates rendered for a session see the tool guides as @tools.
-function generated(input: PromptInput): Record<string, string> {
-	return { tools: nativeTool.guides(input.tools, input.interactive ?? true) }
+// $tools: the guides hold directives and variables, and variable values
+// are not re-rendered, so they render here first.
+function toolGuides(input: PromptInput, values: Record<string, string>, problems?: string[]): string {
+	let text = nativeTool.guides(input.tools, input.interactive ?? true)
+	return promptLang.render('<tools>', values, [], problems, undefined, { text })
 }
 
 // SPAWN's systemPrompt (task 0rc) replaces SYSTEM.md; its @path
@@ -130,20 +134,17 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 	let custom = input.systemPrompt
 	return systemPrompt.preprocess(
 		custom === undefined ? systemPrompt.file() : `${input.cwd}/<systemPrompt>`,
-		systemPrompt.vars(input, sources),
+		systemPrompt.vars(input, sources, problems),
 		sources,
 		problems,
 		input.rendered,
-		{ generated: generated(input), ...(custom !== undefined && { text: custom }) },
+		custom === undefined ? {} : { text: custom },
 	)
 }
 
 // A tool's help text, rendered like the system prompt (HELP, task 5t3).
 function template(text: string, input: PromptInput, problems?: string[]): string {
-	return promptLang.render('<help>', systemPrompt.vars(input), [], problems, undefined, {
-		text,
-		generated: generated(input),
-	})
+	return promptLang.render('<help>', systemPrompt.vars(input), [], problems, undefined, { text })
 }
 
 export type PromptInput = {

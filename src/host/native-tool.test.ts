@@ -279,7 +279,7 @@ test('file tools work outside tracking scope and snapshot eligible literal filen
 	}
 })
 
-test('@tools: inPrompt guides in full, one Other tools line for every other tool with a summary', () => {
+test('$tools: inPrompt guides in full, one Other tools line for every other tool with a summary', () => {
 	let guides = nativeTool.guides()
 	expect(guides).toContain('## BASH\n')
 	let others = guides.slice(guides.indexOf('## Other tools'))

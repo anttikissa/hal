@@ -37,7 +37,7 @@ SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }?
 - fresh starts with only the task; fork copies this session's history so far.
 - limit is at most this session's slots left minus 1. Each subagent spawn costs one slot from this session and every ancestor. Interactive sessions are free and use the configured budget.
 - tools: [] gives none. A focus aid, not a sandbox: BASH and EVAL can do anything.
-- systemPrompt includes AGENTS.md and skills only if asked. Keep it short; weak models do best with only what the task needs. Add as needed: @tools (guides for its tools), $agents (AGENTS.md files), $skills (skill list), $date, $session_cwd.
+- systemPrompt includes AGENTS.md and skills only if asked. Keep it short; weak models do best with only what the task needs. Add as needed: $tools (guides for its tools), $agents (AGENTS.md files), $skills (skill list), $date, $session_cwd.
 - A <question> keeps a subagent open; answer through SEND. HELP SUBAGENTS covers coordination and resuming.`
 
 const kinds: SpawnKind[] = ['subagent', 'subagent-leave-open', 'interactive']

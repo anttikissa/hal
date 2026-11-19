@@ -255,7 +255,7 @@ function guide(tool: Tool<unknown>, interactive: boolean): string {
 	return interactive ? help : help.replace(/^([\t ]*[A-Z][A-Z_]*) \/\*.*?\*\//gm, '$1')
 }
 
-// The system prompt's @tools (task 5t3): the help of each tool with
+// The system prompt's $tools (task 5t3): the help of each tool with
 // inPrompt, then an Other tools line for each other tool with a summary
 // (HELP has none: the prompt names it); the model learns the rest with
 // HELP. `allowed`: the tools this session may call. A tool's promptIf

@@ -4,9 +4,6 @@ This is the Hal system prompt. HTML comments are stripped. The template
 language is documented in src/host/prompt-lang.ts. In short:
 
 @path                      include a file (@?path: only if it exists)
-@tools                     tool guides: each help of a tool whose module sets
-                           inPrompt, then "## Other tools", one line for each
-                           other tool (src/host/tools.ts)
 $name, ${name}             expand a variable
 :: section "Title"         a section; changes reach the model as a <hal-note>
 ::: if $session_interactive
@@ -40,6 +37,9 @@ These two are usually the same but might be different if hal is invoked with --h
   $user_notes           true (false with --no-user)
   $skills               Skills - read <dir>/SKILL.md when appropriate: ~/.hal/skills/x
   $agents               <file path="~/src/app/AGENTS.md">...</file>, one per directory
+  $tools                the tool guides: the full help of each tool whose module
+                        sets inPrompt, then "## Other tools", one summary line
+                        for each other tool (src/host/native-tool.ts)
 
 Tools: providers see one native tool, `tool` { cmd: string }; cmd is TOOL
 plus its arguments, such as READ "a.ts" or BASH "ls". README.md explains why.
@@ -96,7 +96,8 @@ You are Hal, a coding agent.
 - Prefer paths relative to cwd: file.txt, not /dir/to/file.txt. Avoid useless cd.
 - Block content is literal. A content line that is itself a marker (!!START, !!END, !!OLD, !!NEW) takes one extra !: write !!END as !!!END, !!!END as !!!!END.
 
-@tools
+<!-- See tools/<tool>.ts to see that comes here, or run /system --> 
+$tools
 ::
 
 :: section "Compaction"

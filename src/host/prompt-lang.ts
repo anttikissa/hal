@@ -13,8 +13,6 @@
 // - @?path does the same, but skips the line if the file does not exist.
 // - The path may use variables and ~/, and resolves relative to the
 //   including file. A cycle or unreadable file is an error.
-// - @name, for a name in options.generated, inserts that text instead,
-//   rendered as a template (@tools: tool guides, src/host/native-tool.ts).
 //
 // Fenced blocks
 // - A directive line starts with two or more colons: `:: if ...`.
@@ -93,7 +91,7 @@ function render(
 	sources: PromptSource[] = [],
 	problems: string[] = [],
 	rendered?: PromptRender,
-	options: { root?: string; text?: string; generated?: Record<string, string> } = {},
+	options: { root?: string; text?: string } = {},
 ): string {
 	let stack: Frame[] = [],
 		titles = new Set<string>(),
@@ -268,10 +266,6 @@ function render(
 				continue
 			}
 			let name = substitute(include[2]!)
-			if (options.generated && Object.hasOwn(options.generated, name)) {
-				run(`@${name}`, options.generated[name]!, chain)
-				continue
-			}
 			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
 			let target = resolve(dirname(path), name)
 			if (include[1] && !existsSync(target)) continue
