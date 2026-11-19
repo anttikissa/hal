@@ -12,6 +12,7 @@ import { callText } from '../common/call-text.ts'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
 import { type CallContext, type Tool, tools } from './tools.ts'
+import { quirks } from './quirks.ts'
 
 const name = 'tool'
 
@@ -40,8 +41,7 @@ function def(): ToolDef {
 }
 
 function find(id: string): Tool<unknown> {
-	// READ_BLOB was READ_ENTRY's name; old notices in histories still say it.
-	let tool = tools.all().find((t) => t.name === (id === 'read_blob' ? 'read_entry' : id))
+	let tool = tools.all().find((t) => t.name === id)
 	if (!tool)
 		throw new Error(
 			`unknown tool ${id.toUpperCase()} in tool's cmd; available: ${tools
@@ -110,9 +110,15 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 }
 
 // The internal call a call text stands for. Throws with what is wrong.
-// `ctx`: the session it serves, when known (task pf2). Marker lines mean
-// block syntax, which only the generic grammar reads; EDIT has its own.
+// `ctx`: the session it serves, when known (task pf2). Strict syntax
+// first; only its failure reaches quirks (task hq6).
 function resolve(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
+	return quirks.resolve(text, ctx, (text) => nativeTool.strict(text, ctx))
+}
+
+// Marker lines mean block syntax, which only the generic grammar reads;
+// EDIT has its own.
+function strict(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
 	let parsed = callText.parse(text)
 	let tool = nativeTool.find(parsed.name)
 	let custom = tool.syntax?.resolve && (tool.name === 'edit' || !callText.hasMarker(parsed.raw))
@@ -167,7 +173,7 @@ function expand(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock[] {
 	if (call.name !== name || call.cmd !== undefined || typeof call.input.cmd !== 'string')
 		return [nativeTool.arrived(call, ctx)]
 	try {
-		let commands = callText.split(call.input.cmd, isTool)
+		let commands = callText.split(quirks.joined(call.input.cmd, ctx) ?? call.input.cmd, isTool)
 		if (commands.length < 2) return [nativeTool.arrived(call, ctx)]
 		let resolved = commands.map((cmd) => ({ ...nativeTool.resolve(cmd, ctx), cmd }))
 		return resolved.map((resolved, i) => {
@@ -273,3 +279,4 @@ export const nativeTool = {
 	help,
 	summary,
 }
+	strict,
