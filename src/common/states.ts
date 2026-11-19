@@ -264,4 +264,5 @@ export const states = {
 	describe,
 	doing,
 	withJobs,
+	duration,
 }

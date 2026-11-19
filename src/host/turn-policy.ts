@@ -2,6 +2,7 @@
 import type { DoneEvent, ErrorEvent, ToolResultBlock, Usage } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
+import { states } from '../common/states.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { history } from './history.ts'
@@ -138,7 +139,7 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 	if (waits) {
 		let provider = turns.state.running.get(id)?.provider ?? model.split('/')[0]!
 		let until = new Date(at).toISOString()
-		let text = `Rate limit: ${provider}, ${model}, until ${until}\n${history.errorText(error)}`
+		let text = `Rate limited for ${states.duration(at - clock.now())}: ${model}\n${history.errorText(error)}`
 		// One record per run of waits: the status line shows each new deadline.
 		let last = history.readSync(id).at(-1)
 		if (last?.type !== 'rate_limit' || last.provider !== provider || last.model !== model) {

@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'The wait hook records only future rate-limit deadlines, not immediate account rotation. Its new rate_limit record stays out of provider input, renders through the shared output card, and naturally ends recoveries() counting because it is not assistant output or an inbox message. Six in-memory host recoveries retain retrying state without a turn_end.',
-		'Invariant restored 10 Nov: every failed provider attempt, including an immediate account rotation and a temporary retry, is stored in history as an error output naming model and account, with the complete provider body; the rate_limit record carries the body too. A reply already shown in the current run of failure records adds nothing, so retrying into the same limit still adds no lines. Before, rotation stored nothing: a ChatGPT plan refusing gpt-6.2-sol on three accounts left only "every usable openai account is rate limited".'
+		'Invariant restored 10 Nov: every failed provider attempt, including an immediate account rotation and a temporary retry, is stored in history as an error output naming model and account, with the complete provider body; the rate_limit record carries the body too. A reply already shown in the current run of failure records adds nothing, so retrying into the same limit still adds no lines. Before, rotation stored nothing: a ChatGPT plan refusing gpt-6.2-sol on three accounts left only "every usable openai account is rate limited".',
+		'Rate-limit card shows the wait as a duration ("Rate limited for 2h 20m: <model>"): the host runs in UTC, so an ISO or host-local time was unreadable or wrong for the user; a duration needs no timezone and the card timestamp gives the start. The model id names the provider. Invariant restored 19 Nov: the card states the deadline readably.'
 	],
 	needs: ['j1']
 }
