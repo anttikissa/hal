@@ -1,0 +1,6 @@
+{
+	title: 'Tool-failure review script',
+	spec: 'scripts/tool-failures.ts reads session histories of the last N days (default 14, sessions dir default the Hal home sessions/), writes every failed tool call with its raw call text or input, error, model and session to an ASON file, and prints calls per tool (ok, failed, no result), the 25 most common error first lines with numbers masked, and failures per model. Forked sessions count a copied call once. It is the input for periodic reviews that fix guidance or add leniency (task gtw); a scheduled job may run it.',
+	status: 'done',
+	needs: []
+}
