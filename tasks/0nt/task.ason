@@ -1,11 +1,11 @@
 {
-	title: 'Tool arguments need no quoting or escaping',
-	spec: 'Every tool argument that carries text (BASH commands and scripts, regexes, GREP patterns, SEND messages, file contents) reaches the tool byte-exact as the model wrote it. The model never quotes or escapes anything: a backslash, \\n, \\d, quote or newline it writes is the literal character. The cmd framing works like a network protocol with self-delimiting payloads (literal blocks with markers, as in EDIT, or length/boundary framing), not JS string literals. Malformed framing fails as a tool error showing the raw text; nothing runs.',
+	title: 'Literal !!START blocks: tool arguments need no quoting or escaping',
+	spec: "Every tool argument that carries text (BASH commands and scripts, EVAL code, regexes, GREP patterns, SEND messages, COMPACT summaries, file contents) reaches the tool byte-exact as written; nothing needs quoting or escaping. The advertised form is a header line, TOOL [/* purpose */] [short arguments] [{ options }], followed by one raw block: a !!START line, literal lines, a !!END line. The block fills the tool's main text field (task hq6). Block content excludes the newline before !!END and keeps every other character, leading spaces and blank lines. A content line that is itself a marker takes one extra ! (!!!END writes a literal !!END), as in EDIT. Command splitting never splits inside a block, for any tool; this replaces EVAL's code-to-the-end rule (task v99). Quoted string literals stay valid for one-liners. EDIT keeps its own !!OLD/!!NEW/!!END grammar and is the only tool with several blocks. Quirks (task hq6) accept !!NEW in place of !!START for a single block of another tool; !!OLD outside EDIT is rejected. SYSTEM.md drops its JS-string-literal and backslash rule and teaches: put an argument that spans lines or contains quotes or backslashes in a block. Malformed framing (an unclosed block, a block for a tool without a main text field, two blocks) fails as a tool error showing the raw text; nothing runs.",
 	status: 'planned',
 	notes: [
 		'User, 2026-11-16: every frontier model breaks JS string escaping in tool calls. Seen with Claude Fable 5.2 (high effort): a heredoc inside a BASH string turned \\n into a real newline; a rewrite then lost backslashes, breaking \\d in a regex. Models burn turns fixing escapes instead of working. The agent writing this task hit it too: tsk add through BASH doubled every backslash.',
 		'User, 2026-11-19: COMPACT nearly always fails; models struggle with quoted JS strings nested inside their JSON tool calls. Tool calls should use heredoc-style literal blocks instead. EVAL (2026-11-19) takes its code as literal text to the end of the cmd.'
 	],
-	needs: ['3fv'],
+	needs: ['3fv', 'hq6', 'v99'],
 	foldInto: ['3fv']
 }
