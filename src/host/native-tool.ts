@@ -278,5 +278,5 @@ export const nativeTool = {
 	align,
 	help,
 	summary,
-}
 	strict,
+}
