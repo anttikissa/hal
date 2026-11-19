@@ -19,7 +19,7 @@ const promptIf = '$spawn_budget'
 const summary = 'open a subagent or a session for the user'
 const help = `## SPAWN
 
-Open a session in the tab after this one. The task goes between !!START and !!END lines, literally: no quoting or escaping.
+Open a session in the tab after this one. The task goes between !!START and !!END lines.
 SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }?
 !!START
 <task>

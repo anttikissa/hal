@@ -75,7 +75,7 @@ function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: st
 			)
 		if (!h && ended !== undefined && at === ended + 1)
 			throw new Error(
-				`EDIT line ${at}: ${JSON.stringify(line.slice(0, 120))} is no operation header ("<path>@<version> <operation> [lines]"): the !!END on line ${ended} ended the block. If line ${ended} is file content, write it as !!!END; EDIT writes !!END. Nothing written.`,
+				`EDIT line ${at}: expected "<path>@<version> <operation> [lines]", got ${JSON.stringify(line.slice(0, 120))}. The !!END on line ${ended} ended the block; if that line is file content, write it as !!!END (EDIT writes !!END). Nothing written.`,
 			)
 		if (!h)
 			throw new Error(

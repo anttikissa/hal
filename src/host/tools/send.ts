@@ -26,8 +26,8 @@ const inPrompt = false
 const summary = 'message to session'
 const help = `## SEND
 
-Send a message to another session, by tab number or session id. The message goes between !!START and !!END lines, literally: no quoting or escaping.
-SEND /* <purpose> */ "<to>" { delivery? }?
+Send a message to another session. The message goes between !!START and !!END lines.
+SEND /* <purpose> */ "<session id>" { delivery? }?
 !!START
 <message>
 !!END

@@ -14,7 +14,7 @@ const inPrompt = false
 const summary = 'run async JavaScript/TypeScript in the Hal host; tool() chains Hal tools'
 const help = String.raw`## EVAL
 
-Run JavaScript/TypeScript inside the running Hal host process. The code goes between !!START and !!END lines, literally: no quoting or escaping.
+Run JavaScript/TypeScript inside the running Hal host process. The code goes between !!START and !!END lines.
 EVAL /* <purpose> */
 !!START
 <code>
