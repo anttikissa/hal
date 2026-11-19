@@ -8,6 +8,7 @@ import { blocks, type Message } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { limits } from './limits.ts'
 import { models } from './models.ts'
+import { modelsDev } from './models-dev.ts'
 import { openai } from './openai.ts'
 import { provider as catalog } from './providers/openai.ts'
 import { nativeTool } from './native-tool.ts'
@@ -305,11 +306,10 @@ test('a ChatGPT login lists only the models the Codex backend shows it', async (
 	expect(fake.seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	writeAuth({ openai: { apiKey: 'sk-file' } })
 	auth.close()
-	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(catalog.knownModels))
+	expect(await openai.listModels(new AbortController().signal)).toEqual(modelsDev.ids('openai'))
 })
 
-test('the picker offers models.dev ids and the known GPT ids; a subscription caps input at 272k', () => {
-	expect(models.known()).toEqual(expect.arrayContaining(catalog.knownModels.map((m) => `openai/${m}`)))
+test('a subscription caps input at 272k', () => {
 	writeAuth({ openai: { accessToken: subscriptionToken } })
 	expect(models.contextWindow('openai/gpt-5.5')).toBe(272_000)
 	writeAuth({ openai: { apiKey: 'sk-file' } })

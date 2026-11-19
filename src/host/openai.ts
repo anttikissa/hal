@@ -89,7 +89,7 @@ function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<st
 			description: t.description,
 			parameters: t.inputSchema,
 		}))
-		if (webSearch && req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model)) {
+		if (webSearch && req.tools.some((t) => t.name === 'tool') && catalog.webSearch(req.model)) {
 			;(b.tools as unknown[]).push({ type: 'web_search' })
 			b.include = ['web_search_call.action.sources']
 		}
@@ -282,7 +282,7 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 		list.map(async (account) => {
 			let cred = await auth.credential(data, account, 'openai')
 			if (cred.type === 'api-key' || catalog.claims(cred.value).api)
-				return [...new Set([...modelsDev.ids('openai'), ...catalog.knownModels])]
+				return modelsDev.ids('openai')
 			let accountId = catalog.claims(cred.value).accountId ?? cred.accountId
 			let res = await fetch(openai.codexModelsUrl, {
 				signal,

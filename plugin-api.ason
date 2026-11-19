@@ -1,5 +1,5 @@
 {
-	version: 48,
+	version: 49,
 	changes: [
 		{
 			version: 2,
@@ -937,6 +937,23 @@
 					kind: 'compatible',
 					target: 'host/openai.body',
 					description: 'Restores the optional webSearch parameter'
+				}
+			]
+		},
+		{
+			version: 49,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/providers/anthropic.provider',
+					description: 'Replaces knownModels, webSearchModels and known with webSearch(model)',
+					port: 'Override webSearch(model) instead of editing webSearchModels'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/providers/openai.provider',
+					description: 'Replaces knownModels, webSearchModels and known with webSearch(model)',
+					port: 'Override webSearch(model) instead of editing webSearchModels'
 				}
 			]
 		}

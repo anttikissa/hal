@@ -130,7 +130,7 @@ function body(req: ProviderRequest, oauth: boolean, webSearch = true): Record<st
 				? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } }
 				: { input_schema: t.inputSchema }),
 		}))
-	if (webSearch && req.tools?.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model))
+	if (webSearch && req.tools?.some((t) => t.name === 'tool') && catalog.webSearch(req.model))
 		(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
@@ -176,7 +176,7 @@ async function request(req: ProviderRequest) {
 }
 
 // The models the account may use (GET /v1/models). On failure the
-// picker falls back to models.dev, then knownModels (host/models.ts).
+// picker falls back to models.dev (host/models.ts).
 async function models(signal: AbortSignal): Promise<string[]> {
 	let url = new URL(anthropic.apiUrl)
 	url.pathname = url.pathname.replace(/\/messages$/, '/models')

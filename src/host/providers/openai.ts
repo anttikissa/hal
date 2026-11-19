@@ -41,42 +41,27 @@ function contextWindow(model: string): number | undefined {
 	return provider.subscription() ? Math.min(listed ?? provider.subscriptionWindow, provider.subscriptionWindow) : listed
 }
 
+// GPT 5.3 and newer get OpenAI's web_search beside BRAVE (task a0z):
+// gpt-6.2-sol, gpt-5.3-codex; not gpt-4.1 or gpt-5-mini.
+function webSearch(model: string): boolean {
+	let version = /^gpt-(\d+(?:\.\d+)?)/.exec(model)?.[1]
+	return Number(version) >= 5.3
+}
+
 export const provider: Provider & {
 	claims: typeof claims
 	subscription: typeof subscription
 	modelsKey: typeof modelsKey
 	contextWindow: typeof contextWindow
 	subscriptionWindow: number
-	knownModels: string[]
-	webSearchModels: string[]
+	webSearch: typeof webSearch
 } = {
 	claims,
 	subscription,
 	modelsKey,
 	contextWindow,
 	subscriptionWindow: 272_000,
-	knownModels: [
-		'gpt-6.1-sol',
-		'gpt-6-astra',
-		'gpt-6-sol',
-		'gpt-6-luna',
-		'gpt-5.5',
-		'gpt-5.6-sol',
-		'gpt-5.6-terra',
-		'gpt-5.6-luna',
-	],
-	webSearchModels: [
-		'gpt-6.1-sol',
-		'gpt-6-astra',
-		'gpt-6-sol',
-		'gpt-6-luna',
-		'gpt-5.5',
-		'gpt-5.6-sol',
-		'gpt-5.6-terra',
-		'gpt-5.6-luna',
-		'gpt-5.3-codex',
-	],
-	known: (): string[] => provider.knownModels,
+	webSearch,
 	available: () => providers.available('openai'),
 	request: (req) => load().request(req),
 	parse: (messages) => load().parse(messages),
