@@ -90,12 +90,12 @@ function agents(cwd: string, sources?: PromptSource[], trust?: string | false): 
 	return parts.join('\n\n')
 }
 
-function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
+function vars(input: PromptInput, sources?: PromptSource[]): Record<string, string> {
 	let timezone =
 		(input.sessionId ? scheduler.owned(input.sessionId)?.timezone : undefined) ??
 		(input.sessionId ? clients.timezone(input.sessionId) : undefined) ??
 		Intl.DateTimeFormat().resolvedOptions().timeZone
-	let vars = {
+	return {
 		date: date(input.now, timezone),
 		timezone,
 		session_id: input.sessionId ?? '',
@@ -114,11 +114,33 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 		fork: input.forkedFrom ? 'true' : 'false',
 		forked_from: input.forkedFrom ?? '',
 		user_notes: input.noUser ? 'false' : 'true',
-		other_tools: nativeTool.summary(),
 		skills: systemPrompt.skills(input.cwd, input.projectTrust),
 		agents: systemPrompt.agents(input.cwd, sources, input.projectTrust),
 	}
-	return systemPrompt.preprocess(systemPrompt.file(), vars, sources, problems, input.rendered)
+}
+
+// Templates rendered for a session see the tool guides as @tools.
+function generated(input: PromptInput): Record<string, string> {
+	return { tools: nativeTool.guides(input.tools, input.interactive ?? true) }
+}
+
+function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
+	return systemPrompt.preprocess(
+		systemPrompt.file(),
+		systemPrompt.vars(input, sources),
+		sources,
+		problems,
+		input.rendered,
+		{ generated: generated(input) },
+	)
+}
+
+// A tool's help text, rendered like the system prompt (HELP, task 5t3).
+function template(text: string, input: PromptInput, problems?: string[]): string {
+	return promptLang.render('<help>', systemPrompt.vars(input), [], problems, undefined, {
+		text,
+		generated: generated(input),
+	})
 }
 
 export type PromptInput = {
@@ -133,6 +155,8 @@ export type PromptInput = {
 	slots?: number
 	autoclose?: boolean
 	projectTrust?: string | false
+	// Lowercase names of the tools this session may call; default all.
+	tools?: string[]
 	rendered?: PromptRender
 }
 function build(input: PromptInput, problems?: string[]): string {
@@ -201,7 +225,9 @@ export const systemPrompt = {
 	skills,
 	agents,
 	candidates,
+	vars,
 	assemble,
+	template,
 	inspect,
 	build,
 }

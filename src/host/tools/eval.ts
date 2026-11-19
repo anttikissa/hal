@@ -8,6 +8,32 @@ import { nativeTool } from '../native-tool.ts'
 import { slash } from '../slash.ts'
 import { tools, type Tool, type ToolContext } from '../tools.ts'
 
+const summary = 'run async JavaScript/TypeScript in the Hal host; tool() chains Hal tools'
+const help = String.raw`## EVAL
+
+Run JavaScript/TypeScript inside the running Hal host process. The code goes between !!START and !!END lines, literally: no quoting or escaping.
+EVAL /* <purpose> */
+!!START
+<code>
+!!END
+- A single expression returns its value; otherwise write a function body and return the result. Top-level await works.
+- await tool('READ "a.ts"') runs a Hal tool (MCP included) and returns its text output. Chain tools in code when one result decides the next calls or raw output is large: only your return value and console.* output enter context. Example:
+EVAL /* Find host TODO files */
+!!START
+let files = (await tool('GREP "TODO" { files: true }')).split("\n")
+return files.filter(f => f.startsWith("src/host"))
+!!END
+- Import Hal modules with await import("hal/host/tools.ts"). ctx has cwd, sessionId and signal.
+- Synchronous code freezes all of Hal: keep it under 100 ms. Await tools and I/O; avoid spawnSync, execSync, *Sync file calls and busy-waits. Looping over fewer than 1,000 items is fine; for more, await between chunks or use BASH. Wait with await new Promise(r => setTimeout(r, ms)).`
+
+const parameters = {
+	type: 'object',
+	properties: { code: { type: 'string' }, description: { type: 'string' } },
+	required: ['code'],
+}
+
+const syntax = { usage: ['EVAL', '!!START', '<code>', '!!END'], block: 'code', resolve }
+
 const transpiler = new Bun.Transpiler({ loader: 'ts', deadCodeElimination: false })
 
 // Code that parses as one expression returns its value; otherwise it is a
@@ -110,28 +136,10 @@ function resolve(raw: string): { name: string; input: Record<string, unknown> } 
 
 export const tool: Tool = {
 	name: 'eval',
-	description:
-		'Run JavaScript/TypeScript inside the running Hal host process. The code is everything after EVAL, as written: no quoting or escaping. A single expression returns its value; otherwise write a function body and `return` the result. Top-level await works. `await tool(\'READ "a.ts"\')` runs a Hal tool (MCP included) and returns its text output. Chain tools in code when one result decides the next calls or raw output is large: only your return value and console.* output enter context. Import Hal modules with `await import("hal/host/tools.ts")`. `ctx` has cwd, sessionId and signal. Synchronous code freezes all of Hal: keep it under 100 ms. Await tools and I/O; avoid spawnSync, execSync, *Sync file calls and busy-waits. Looping over fewer than 1,000 items is fine; for more, await between chunks or use BASH. Wait with `await new Promise(r => setTimeout(r, ms))`.',
-	parameters: {
-		type: 'object',
-		properties: {
-			code: { type: 'string', description: 'JavaScript or TypeScript' },
-			description: { type: 'string', description: 'Why the code runs' },
-		},
-		required: ['code'],
-	},
+	summary,
+	help,
+	parameters,
+	syntax,
 	card: { command: 'code', language: 'typescript' },
-	syntax: {
-		summary: 'run async JavaScript/TypeScript in the Hal host; tool() chains Hal tools',
-		usage: [
-			'EVAL <code>                              // Literal code to the end of the call.',
-			'EVAL process.memoryUsage()',
-			'EVAL',
-			'let files = (await tool(`GREP "TODO" { files: true }`)).split("\\n")',
-			'return files.filter(f => f.startsWith("src/host"))',
-		],
-		block: 'code',
-		resolve,
-	},
 	run,
 }

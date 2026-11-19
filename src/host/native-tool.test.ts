@@ -38,7 +38,7 @@ test('array tool extensions participate in lookup, HELP, summaries and execution
 		let id = created(client(), testHome())
 		expect(nativeTool.find('example')).toBe(extra)
 		expect(tools.defs()[0]?.name).toBe('example')
-		expect(nativeTool.summary().split('\n')[0]).toBe('\tEXAMPLE show an example')
+		expect(nativeTool.guides()).toContain('\n\tEXAMPLE show an example\n')
 		expect((await act(id, 'HELP')).output).toContain('EXAMPLE')
 		expect(tools.readOnly('example')).toBe(true)
 		expect((await act(id, 'EXAMPLE')).output).toBe('example result')
@@ -50,9 +50,8 @@ test('array tool extensions participate in lookup, HELP, summaries and execution
 
 test('only interactive HELP teaches purpose comments; validation never does', async () => {
 	let id = created(client(), testHome())
-	expect((await act(id, 'HELP')).output).toContain('/* <description> */')
-	expect((await act(id, 'HELP')).output).toContain('BASH /* <description> */ "<command>"')
-	expect((await act(id, 'HELP bash')).output).toContain('BASH /* <description> */ "<command>"')
+	expect((await act(id, 'HELP')).output).toContain('/* <purpose> */')
+	expect((await act(id, 'HELP bash')).output).toContain('BASH /* <purpose> */ {')
 	sessions.open(id).interactive = false
 	for (let text of ['HELP', 'HELP BASH', 'HELP EDIT', 'BASH', 'EDIT', 'BASH "true" { unknown: 1 }']) {
 		let result = await act(id, text)
@@ -280,13 +279,14 @@ test('file tools work outside tracking scope and snapshot eligible literal filen
 	}
 })
 
-test('HELP documents schema fields; $other_tools lists only tools the prompt does not explain', async () => {
-	let id = created(client(), testHome())
-	expect((await act(id, 'HELP BRAVE')).output).toContain('num (integer, default 5)')
-	let summary = nativeTool.summary()
-	for (let name of ['SPAWN', 'WAIT', 'STOP', 'BASH']) expect(summary).not.toContain(name)
-	expect(summary).toContain('SEND')
-	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets, timeout } ]'])
+test('@tools: inPrompt guides in full, one Other tools line for every other tool with a summary', () => {
+	let guides = nativeTool.guides()
+	expect(guides).toContain('## BASH\n')
+	let others = guides.slice(guides.indexOf('## Other tools'))
+	for (let name of ['SEND', 'WAIT', 'STOP']) expect(others).toContain(`\t${name} `)
+	for (let name of ['BASH', 'HELP']) expect(others).not.toContain(`\t${name} `)
+	expect(nativeTool.guides(['bash', 'send'])).not.toContain('\tWAIT')
+	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT { targets?, timeout? }?'])
 })
 
 const version = (path: string) => require('./file-text.ts').fileText.hash(readFileSync(path)) as string

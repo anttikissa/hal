@@ -18,7 +18,41 @@ import { paths } from '../paths.ts'
 import { prompts } from '../prompts.ts'
 import { status } from '../status.ts'
 import { tabs } from '../tabs.ts'
-import type { Tool } from '../tools.ts'
+import type { Tool, ToolContext } from '../tools.ts'
+
+const summary = 'message to session'
+const help = `## SEND
+
+Send a message to another session, by tab number or session id. The message goes between !!START and !!END lines, literally: no quoting or escaping.
+SEND /* <purpose> */ "<to>" { delivery? }?
+!!START
+<message>
+!!END
+	delivery?: "soft-steer" | "queue" | "steer"    default "soft-steer"
+- soft-steer delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work.
+- Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed.
+- When a child asks you a question, answer with SEND.
+::: if $session_interactive
+- The purpose is one short plain-language sentence for the user: what the message says or asks, e.g. /* Ask tab 2 to rerun the tests */
+:::`
+
+const parameters = {
+	type: 'object',
+	properties: {
+		to: { type: 'string' },
+		text: { type: 'string' },
+		description: { type: 'string' },
+		delivery: { type: 'string', enum: ['soft-steer', 'queue', 'steer', 'emergency'] },
+	},
+	required: ['to', 'text'],
+}
+
+const syntax = {
+	usage: ['SEND "<to>" { delivery? }?', '!!START', '<message>', '!!END'],
+	positional: ['to', 'text'],
+	block: 'text',
+	aliases: { session: 'to', message: 'text' },
+}
 
 // The session a tab number or id names, if it exists.
 function target(to: string): string | undefined {
@@ -44,57 +78,29 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 		: `Sent to ${to}: it reads this before its next request`
 }
 
-export const tool: Tool = {
-	name: 'send',
-	syntax: {
-		summary: 'message to session',
-		positional: ['to', 'text'],
-		block: 'text',
-		aliases: { session: 'to', message: 'text' },
-	},
-	description:
-		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work. ' +
-		'Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed. emergency is a compatibility alias for steer. When a child asks you a question, use send to answer.',
-	parameters: {
-		type: 'object',
-		properties: {
-			to: { type: 'string', description: 'Tab number or session id' },
-			text: { type: 'string', description: 'The message' },
-			description: {
-				type: 'string',
-				description:
-					'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
-			},
-			delivery: {
-				type: 'string',
-				enum: ['soft-steer', 'queue', 'steer', 'emergency'],
-				description: 'Default soft-steer; emergency aliases steer',
-			},
-		},
-		required: ['to', 'text'],
-	},
-	async run(input, ctx) {
-		let { to, text, description, delivery = 'soft-steer' } = input
-		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
-		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
-		if (description !== undefined && (typeof description !== 'string' || !description.trim()))
-			throw new Error('description must be a non-empty sentence; the message was not sent')
-		if (delivery === 'emergency') delivery = 'steer'
-		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'steer')
-			throw new Error('delivery must be soft-steer, queue or steer (emergency aliases steer)')
-		let id = target(to.trim())
-		if (!id) throw new Error(`no session ${to}`)
-		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
-		await (host.ready(id) ?? Promise.resolve())
-		if (delivery === 'steer' && tabs.closed(id)) tabs.act({ type: 'tab-resume', sessionId: id })
-		let sender: Sender = {
-			from: ctx.sessionId,
-			label: tabs.label(ctx.sessionId),
-			...(description && { summary: description.replace(/\s+/g, ' ').trim() }),
-		}
-		if (delivery === 'soft-steer') sender.advisory = true
-		let refused = prompts.submit(id, text, undefined, delivery, sender)
-		if (refused) throw new Error(refused)
-		return outcome(id, text, ctx.sessionId, delivery)
-	},
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> {
+	let { to, text, description, delivery = 'soft-steer' } = input
+	if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
+	if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
+	if (description !== undefined && (typeof description !== 'string' || !description.trim()))
+		throw new Error('description must be a non-empty sentence; the message was not sent')
+	if (delivery === 'emergency') delivery = 'steer'
+	if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'steer')
+		throw new Error('delivery must be soft-steer, queue or steer (emergency aliases steer)')
+	let id = target(to.trim())
+	if (!id) throw new Error(`no session ${to}`)
+	if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
+	await (host.ready(id) ?? Promise.resolve())
+	if (delivery === 'steer' && tabs.closed(id)) tabs.act({ type: 'tab-resume', sessionId: id })
+	let sender: Sender = {
+		from: ctx.sessionId,
+		label: tabs.label(ctx.sessionId),
+		...(description && { summary: description.replace(/\s+/g, ' ').trim() }),
+	}
+	if (delivery === 'soft-steer') sender.advisory = true
+	let refused = prompts.submit(id, text, undefined, delivery, sender)
+	if (refused) throw new Error(refused)
+	return outcome(id, text, ctx.sessionId, delivery)
 }
+
+export const tool: Tool = { name: 'send', summary, help, parameters, syntax, run }

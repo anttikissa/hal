@@ -4,7 +4,9 @@
 	status: 'planned',
 	notes: [
 		'Open, 2026-11-19: which tools get a full guide in the prompt and which only a one-line summary plus HELP. Decide when implementing; ask the user if unclear.',
-		"From 10-cfg, 2026-11-19: when moving guides, drop 'then' from EDIT's 'replace A-B then !!NEW, new lines, !!END' (models write 'then !!NEW' literally); WAIT takes { timeout: <seconds> }, so BASH's 'set timeout and use WAIT' line applies to both."
+		"From 10-cfg, 2026-11-19: when moving guides, drop 'then' from EDIT's 'replace A-B then !!NEW, new lines, !!END' (models write 'then !!NEW' literally); WAIT takes { timeout: <seconds> }, so BASH's 'set timeout and use WAIT' line applies to both.",
+		'Decided 2026-11-19 (user): a tool module starts with its why-comment and imports, then summary, help (starting with "## <TOOL>", prose at column 0; guides are subsections of # Tools), parameters without field descriptions, syntax, run, helpers, and a short export. inPrompt tools (BASH, EDIT, GREP, READ) appear in full via @tools; every other tool with a summary gets one Other tools line; HELP has none because the Tools section names it. Short arguments (READ paths, GREP patterns, NOTIFY text, BRAVE queries, COMMAND) stay quoted.',
+		'Lesson: the running host renders SYSTEM.md with its loaded guides(); a new SYSTEM.md before a host restart reports sections cannot nest. Inside EDIT blocks, a help text line that is exactly !!END must be written !!!END.'
 	],
 	needs: ['0nt', 'hq6'],
 	foldInto: ['vd9']

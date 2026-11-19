@@ -5,7 +5,8 @@
 	notes: [
 		'User, 2026-11-16: every frontier model breaks JS string escaping in tool calls. Seen with Claude Fable 5.2 (high effort): a heredoc inside a BASH string turned \\n into a real newline; a rewrite then lost backslashes, breaking \\d in a regex. Models burn turns fixing escapes instead of working. The agent writing this task hit it too: tsk add through BASH doubled every backslash.',
 		'User, 2026-11-19: COMPACT nearly always fails; models struggle with quoted JS strings nested inside their JSON tool calls. Tool calls should use heredoc-style literal blocks instead. EVAL (2026-11-19) takes its code as literal text to the end of the cmd.',
-		"User, 2026-11-19: advertise only the block form for a tool's main text field, even for one-liners (BASH, EVAL, SEND, COMPACT ...); quoted strings stay accepted but never appear in prompts, HELP or examples. Goal: the least possible quoting."
+		"User, 2026-11-19: advertise only the block form for a tool's main text field, even for one-liners (BASH, EVAL, SEND, COMPACT ...); quoted strings stay accepted but never appear in prompts, HELP or examples. Goal: the least possible quoting.",
+		'Prompts teach blocks since 5t3: BASH, EVAL, SEND and COMPACT advertise only the !!START form.'
 	],
 	needs: ['3fv', 'hq6', 'v99'],
 	foldInto: ['3fv']

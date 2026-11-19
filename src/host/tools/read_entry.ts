@@ -12,9 +12,37 @@ import {
 import { toolDetails } from '../../common/tool-details.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
-import { type Tool, type ToolOutput, tools } from '../tools.ts'
+import { type Tool, type ToolContext, type ToolOutput, tools } from '../tools.ts'
 import { callText } from '../../common/call-text.ts'
 import { nativeTool } from '../native-tool.ts'
+
+const summary = 'read a history entry, its whole output and images'
+const help = `## READ_ENTRY
+
+Read a history entry with the whole output and images it refers to, one part of it, or a range of entries. Text is paged; images return as images.
+READ_ENTRY "<id>" { offset?, limit?, charOffset? }?
+READ_ENTRY "<id>" "<id>" ...    // several, first page of each
+	offset?: integer        first line, 1-based
+	limit?: integer         number of lines
+	charOffset?: integer    1-based character position; use instead of offset for lossless recovery of long or cut lines and JSON
+- <id> is an entry ID from a card or a [12:34 t35] header: t35 in this session, 176-ray/t35 in another. A tool call gives the call and its whole result.
+- Add .N for part N alone (t35.1 is a call's result). A range t30-t40 lists entries. A blob id from a cut notice also works.`
+
+const parameters = {
+	type: 'object',
+	properties: {
+		id: { type: 'string' },
+		offset: { type: 'integer', minimum: 1 },
+		limit: { type: 'integer', minimum: 1 },
+		charOffset: { type: 'integer', minimum: 1 },
+	},
+	required: ['id'],
+}
+
+const syntax = {
+	usage: ['READ_ENTRY "<id>" { offset?, limit?, charOffset? }?', 'READ_ENTRY "<id>" "<id>" ...'],
+	resolve: resolveCall,
+}
 
 type Image = { mediaType: string; data: string; source: string }
 type Found = { images: Image[]; errors: string[] }
@@ -120,130 +148,98 @@ function entryText(session: string, record: HistoryRecord, records: HistoryRecor
 	return toolDetails.value(record).join('\n')
 }
 
-export const tool: Tool<ToolOutput> = {
-	name: 'read_entry',
-	syntax: {
-		summary: 'read a history entry, its whole output and images',
-		usage: [
-			'READ_ENTRY "<id>" [ { offset, limit, charOffset } ]',
-			'READ_ENTRY "<id>" "<id>" ...   // several, first page of each',
-		],
-		resolve: resolveCall,
-	},
-	description:
-		'Read a history entry with the whole output and images it refers to, one part of it, or a range of entries. Text is paged; images return as images.',
-	parameters: {
-		type: 'object',
-		properties: {
-			id: {
-				type: 'string',
-				description:
-					"An entry ID from a card or a [12:34 t35] header: t35 in this session, 176-ray/t35 in another. A tool call gives the call and its whole result. Add .N for part N alone (t35.1 is a call's result). A range t30-t40 lists entries. A blob id from a cut notice also works.",
-			},
-			offset: { type: 'integer', minimum: 1, description: 'First line, 1-based' },
-			limit: { type: 'integer', minimum: 1, description: 'Number of lines' },
-			charOffset: {
-				type: 'integer',
-				minimum: 1,
-				description:
-					'1-based character position; use instead of offset for lossless recovery of long or cut lines and JSON',
-			},
-		},
-		required: ['id'],
-	},
-	readOnly: true,
-	async run(input, ctx) {
-		if (Array.isArray(input.ids)) {
-			let texts: string[] = [],
-				errors: string[] = []
-			let images: Image[] = []
-			for (let id of input.ids) {
-				try {
-					let out = await tool.run({ id }, ctx)
-					if (typeof out !== 'string')
-						images.push(
-							...[...(out.image ? [out.image] : []), ...(out.images ?? [])].map((image) => ({
-								source: String(id),
-								...image,
-							})),
-						)
-					let text = `== READ_ENTRY ${id} ==\n${typeof out === 'string' ? out : out.text}`
-					;(typeof out !== 'string' && out.isError ? errors : texts).push(text)
-				} catch (e: any) {
-					errors.push(`== READ_ENTRY ${id}: ${e?.message ?? e} ==`)
-				}
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+	if (Array.isArray(input.ids)) {
+		let texts: string[] = [],
+			errors: string[] = []
+		let images: Image[] = []
+		for (let id of input.ids) {
+			try {
+				let out = await run({ id }, ctx)
+				if (typeof out !== 'string')
+					images.push(
+						...[...(out.image ? [out.image] : []), ...(out.images ?? [])].map((image) => ({
+							source: String(id),
+							...image,
+						})),
+					)
+				let text = `== READ_ENTRY ${id} ==\n${typeof out === 'string' ? out : out.text}`
+				;(typeof out !== 'string' && out.isError ? errors : texts).push(text)
+			} catch (e: any) {
+				errors.push(`== READ_ENTRY ${id}: ${e?.message ?? e} ==`)
 			}
-			let text = [...errors, ...texts].join('\n\n')
-			return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
 		}
-		if (typeof input.id !== 'string') throw new Error('id must be a string')
-		let reference = input.id.trim()
-		for (let key of ['offset', 'limit', 'charOffset'] as const)
-			if (
-				input[key] !== undefined &&
-				(typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)
-			)
-				throw new Error(`${key} must be a positive integer`)
-		let page = (text: string) => {
-			if (input.charOffset === undefined)
-				return tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
-			let at = (input.charOffset as number) - 1
-			if (at > text.length)
-				throw new Error(`charOffset ${input.charOffset} is past the end (${text.length} characters)`)
-			let end = Math.min(text.length, at + Math.max(1, tools.maxChars - 200))
-			return (
-				text.slice(at, end) +
-				(end < text.length
-					? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]`
-					: '')
-			)
+		let text = [...errors, ...texts].join('\n\n')
+		return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
+	}
+	if (typeof input.id !== 'string') throw new Error('id must be a string')
+	let reference = input.id.trim()
+	for (let key of ['offset', 'limit', 'charOffset'] as const)
+		if (
+			input[key] !== undefined &&
+			(typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)
+		)
+			throw new Error(`${key} must be a positive integer`)
+	let page = (text: string) => {
+		if (input.charOffset === undefined)
+			return tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
+		let at = (input.charOffset as number) - 1
+		if (at > text.length) throw new Error(`charOffset ${input.charOffset} is past the end (${text.length} characters)`)
+		let end = Math.min(text.length, at + Math.max(1, tools.maxChars - 200))
+		return (
+			text.slice(at, end) +
+			(end < text.length
+				? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]`
+				: '')
+		)
+	}
+	let blob = BLOB.exec(reference)
+	let entry = ENTRY.exec(reference)
+	let range = RANGE.exec(reference)
+	if (blob && entry && blobs.find(blob[1] ?? ctx.sessionId, blob[2]!)) entry = null
+	if (range) {
+		let session = range[1] ?? ctx.sessionId
+		let from = number(range[2]!, 'entry number'),
+			to = number(range[3]!, 'entry number')
+		if (to < from) throw new Error(`range ${input.id} ends before it starts`)
+		let rows = replay.current(history.readSync(session)).filter((r) => r.n !== undefined && r.n >= from && r.n <= to)
+		if (!rows.length) throw new Error(`no entries in ${input.id}`)
+		return page(rows.map((r) => `== ${r.n} ==\n${toolDetails.value(r).join('\n')}`).join('\n\n'))
+	}
+	if (entry) {
+		let session = entry[1] ?? ctx.sessionId
+		let n = number(entry[2]!, 'entry number')
+		let slot = entry[3] === undefined ? undefined : number(entry[3], 'part number')
+		let raw = history.readSync(session)
+		let records = replay.current(raw)
+		let record = records.find((r) => r.n === n)
+		if (!record && raw.some((r) => r.n === n || (r.type === 'rebase' && r.removed?.includes(n))))
+			return `Entry ${input.id} was dropped by rebase.`
+		if (!record) throw new Error(`entry ${input.id} not found`)
+		let found: Found = { images: [], errors: [] }
+		let text: string
+		if (slot === undefined) text = entryText(session, record, records, reference, found)
+		else {
+			let value = parts(record, records)[slot]
+			if (value === undefined) throw new Error(`entry ${input.id} not found: entry ${n} has no part ${slot}`)
+			text = partText(session, value, reference, found)
 		}
-		let blob = BLOB.exec(reference)
-		let entry = ENTRY.exec(reference)
-		let range = RANGE.exec(reference)
-		if (blob && entry && blobs.find(blob[1] ?? ctx.sessionId, blob[2]!)) entry = null
-		if (range) {
-			let session = range[1] ?? ctx.sessionId
-			let from = number(range[2]!, 'entry number'),
-				to = number(range[3]!, 'entry number')
-			if (to < from) throw new Error(`range ${input.id} ends before it starts`)
-			let rows = replay.current(history.readSync(session)).filter((r) => r.n !== undefined && r.n >= from && r.n <= to)
-			if (!rows.length) throw new Error(`no entries in ${input.id}`)
-			return page(rows.map((r) => `== ${r.n} ==\n${toolDetails.value(r).join('\n')}`).join('\n\n'))
+		let output = [page(text), ...found.errors].join('\n')
+		return found.images.length || found.errors.length
+			? { text: output, images: found.images, ...(found.errors.length && { isError: true }) }
+			: output
+	}
+	if (!blob) throw new Error(`invalid entry id: ${JSON.stringify(input.id)}; use t35, 176-ray/t35, t35.1 or t30-t40`)
+	let session = blob[1] ?? ctx.sessionId
+	if (!attachments.blobId.test(blob[2]!)) throw new Error('invalid blob id')
+	let data = blobs.read(session, blob[2]!)
+	if (!data) throw new Error(`blob ${input.id} not found`)
+	if (data.mediaType !== 'text/plain')
+		return {
+			text: `Image blob ${input.id}`,
+			image: { mediaType: data.mediaType, data: data.bytes.toString('base64') },
 		}
-		if (entry) {
-			let session = entry[1] ?? ctx.sessionId
-			let n = number(entry[2]!, 'entry number')
-			let slot = entry[3] === undefined ? undefined : number(entry[3], 'part number')
-			let raw = history.readSync(session)
-			let records = replay.current(raw)
-			let record = records.find((r) => r.n === n)
-			if (!record && raw.some((r) => r.n === n || (r.type === 'rebase' && r.removed?.includes(n))))
-				return `Entry ${input.id} was dropped by rebase.`
-			if (!record) throw new Error(`entry ${input.id} not found`)
-			let found: Found = { images: [], errors: [] }
-			let text: string
-			if (slot === undefined) text = entryText(session, record, records, reference, found)
-			else {
-				let value = parts(record, records)[slot]
-				if (value === undefined) throw new Error(`entry ${input.id} not found: entry ${n} has no part ${slot}`)
-				text = partText(session, value, reference, found)
-			}
-			let output = [page(text), ...found.errors].join('\n')
-			return found.images.length || found.errors.length
-				? { text: output, images: found.images, ...(found.errors.length && { isError: true }) }
-				: output
-		}
-		if (!blob) throw new Error(`invalid entry id: ${JSON.stringify(input.id)}; use t35, 176-ray/t35, t35.1 or t30-t40`)
-		let session = blob[1] ?? ctx.sessionId
-		if (!attachments.blobId.test(blob[2]!)) throw new Error('invalid blob id')
-		let data = blobs.read(session, blob[2]!)
-		if (!data) throw new Error(`blob ${input.id} not found`)
-		if (data.mediaType !== 'text/plain')
-			return {
-				text: `Image blob ${input.id}`,
-				image: { mediaType: data.mediaType, data: data.bytes.toString('base64') },
-			}
-		return page(data.bytes.toString('utf8'))
-	},
+	return page(data.bytes.toString('utf8'))
 }
+
+export const tool: Tool<ToolOutput> = { name: 'read_entry', summary, help, readOnly: true, parameters, syntax, run }

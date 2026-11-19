@@ -3,46 +3,62 @@
 
 import { nativeTool } from '../native-tool.ts'
 import { promptCache } from '../prompt-cache.ts'
-import { type Tool, tools } from '../tools.ts'
+import { systemPrompt } from '../system-prompt.ts'
+import { type Tool, type ToolContext, tools } from '../tools.ts'
 
-export const tool: Tool = {
-	name: 'help',
-	syntax: { summary: false, positional: ['name'], usage: ['HELP [ "<TOOL>" ]'] },
-	description:
-		'Explain a tool: its syntax, fields, defaults and units. Without a name, list every tool with its syntax.',
-	parameters: { type: 'object', properties: { name: { type: 'string', description: 'A tool name, e.g. EDIT' } } },
-	readOnly: true,
-	async run(input, ctx) {
-		if (input.name !== undefined && typeof input.name !== 'string')
-			throw new Error('name must be a tool name, e.g. HELP EDIT')
-		if (input.name?.toLowerCase() === 'subagents')
-			return [
-				'SUBAGENTS: independently running sessions, coordinated like background commands.',
-				'SPAWN starts one; background BASH starts a command. HELP SPAWN and HELP BASH show exact syntax.',
-				'SPAWN kind subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a tab for the user.',
-				'fresh (default) gets only the task; fork copies the caller history. Each subagent costs one slot from every ancestor; slots do not return. Interactive sessions are free. HELP SPAWN explains limit; COMMAND "/budget" shows remaining slots.',
-				'The host returns a subagent’s final message to its parent automatically, including failures and questions. A <question> keeps it open. Answer through SEND; HELP SEND explains delivery and steering.',
-				'WAIT [targets...] yields until a command or session completes, fails, stops or needs an answer. Without targets, wait for any owned background work. Streaming output does not wake you. HELP WAIT shows syntax.',
-				'INSPECT <target> shows status, available output and pending questions. STOP <target> stops the execution and its owned work recursively, retaining sessions, tabs, history and output. Ownership is not created by sending messages. HELP INSPECT and HELP STOP explain details.',
-				'Targets are session IDs (12-xyz) or local tool-call references (t123 or 123). Bare numbers mean tool calls, never tabs.',
-				'STOP acts as pause/restart for agents: COMMAND "/resume <session-id>" reopens the selected session if needed, then SEND further instructions with { delivery: "steer" } to restart the paused agent with preserved history. Ordinary SEND stays queued while paused. Interrupted tool calls and stopped descendants do not restart automatically. Commands must be started again.',
-				'Esc pauses the current turn and interrupts foreground tools; background commands and subagents survive and are listed. COMMAND "/kill t123" stops one background command; COMMAND "/kill all" stops all background commands here without stopping the agent. COMMAND "/stop <target>" exposes recursive STOP to users.',
-				'Stopping is not rollback: external effects may remain. Explicit STOP, like /kill and Esc, interrupts unsafeToStop calls too and warns that broken state may remain.',
-			].join('\n\n')
-		// Purpose comments are taught only to interactive sessions (task 2bq).
-		let interactive = promptCache.interactive(ctx.sessionId)
-		if (input.name) return nativeTool.help(nativeTool.find(input.name.toLowerCase()), interactive)
-		let lines = tools.all().flatMap((t) => nativeTool.shown(t, interactive))
-		return [
-			`Syntax: <TOOL> ${interactive ? '[ /* <description> */ ] ' : ''}[ <args>... ]`,
-			'',
-			'<args> are JS string or object literals. [ ... ] means optional.',
-			...(interactive ? ["Hal shows <description> to the user as the call's title."] : []),
-			'Run HELP <TOOL> for details.',
-			'',
-			'Tools:',
-			'',
-			...nativeTool.align(lines),
-		].join('\n')
-	},
+const help = `## HELP
+
+Explain a tool: its syntax, fields, defaults and units. Without a name, list every tool with its syntax.
+HELP "<TOOL>"?`
+
+const parameters = { type: 'object', properties: { name: { type: 'string' } } }
+
+const syntax = { positional: ['name'], usage: ['HELP "<TOOL>"?'] }
+
+const subagents = [
+	'SUBAGENTS: independently running sessions, coordinated like background commands.',
+	'SPAWN starts one; background BASH starts a command. HELP SPAWN and HELP BASH show exact syntax.',
+	'SPAWN kind subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a tab for the user.',
+	'fresh (default) gets only the task; fork copies the caller history. Each subagent costs one slot from every ancestor; slots do not return. Interactive sessions are free. HELP SPAWN explains limit; COMMAND "/budget" shows remaining slots.',
+	'The host returns a subagent’s final message to its parent automatically, including failures and questions. A <question> keeps it open. Answer through SEND; HELP SEND explains delivery and steering.',
+	'WAIT [targets...] yields until a command or session completes, fails, stops or needs an answer. Without targets, wait for any owned background work. Streaming output does not wake you. HELP WAIT shows syntax.',
+	'INSPECT <target> shows status, available output and pending questions. STOP <target> stops the execution and its owned work recursively, retaining sessions, tabs, history and output. Ownership is not created by sending messages. HELP INSPECT and HELP STOP explain details.',
+	'Targets are session IDs (12-xyz) or local tool-call references (t123 or 123). Bare numbers mean tool calls, never tabs.',
+	'STOP acts as pause/restart for agents: COMMAND "/resume <session-id>" reopens the selected session if needed, then SEND further instructions with { delivery: "steer" } to restart the paused agent with preserved history. Ordinary SEND stays queued while paused. Interrupted tool calls and stopped descendants do not restart automatically. Commands must be started again.',
+	'Esc pauses the current turn and interrupts foreground tools; background commands and subagents survive and are listed. COMMAND "/kill t123" stops one background command; COMMAND "/kill all" stops all background commands here without stopping the agent. COMMAND "/stop <target>" exposes recursive STOP to users.',
+	'Stopping is not rollback: external effects may remain. Explicit STOP, like /kill and Esc, interrupts unsafeToStop calls too and warns that broken state may remain.',
+].join('\n\n')
+
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> {
+	if (input.name !== undefined && typeof input.name !== 'string')
+		throw new Error('name must be a tool name, e.g. HELP EDIT')
+	if (input.name?.toLowerCase() === 'subagents') return subagents
+	// Purpose comments are taught only to interactive sessions (task 2bq).
+	let interactive = promptCache.interactive(ctx.sessionId)
+	if (input.name) {
+		let found = nativeTool.find(input.name.toLowerCase())
+		if (!found.help) return nativeTool.help(found, interactive)
+		let problems: string[] = []
+		let text = systemPrompt.template(
+			nativeTool.guide(found, interactive),
+			promptCache.input(ctx.sessionId, { interactive }),
+			problems,
+		)
+		if (problems.length) throw new Error(`HELP ${found.name.toUpperCase()}: ${problems.join('; ')}`)
+		return text
+	}
+	let lines = tools.all().flatMap((t) => nativeTool.shown(t, interactive))
+	return [
+		`Syntax: <TOOL> ${interactive ? '/* <purpose> */? ' : ''}<args>...`,
+		'',
+		'<args> are JS string or object literals; a !!START ... !!END block holds raw text. ? marks optional.',
+		...(interactive ? ["Hal shows <purpose> to the user as the call's title."] : []),
+		'Run HELP <TOOL> for details.',
+		'',
+		'Tools:',
+		'',
+		...nativeTool.align(lines),
+	].join('\n')
 }
+
+export const tool: Tool = { name: 'help', help, readOnly: true, parameters, syntax, run }

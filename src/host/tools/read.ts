@@ -10,8 +10,38 @@ import { settings } from '../../common/settings.ts'
 import { approval } from '../approval.ts'
 import { blobs } from '../blobs.ts'
 import { fileText } from '../file-text.ts'
-import { type Tool, type ToolOutput, tools } from '../tools.ts'
+import { type Tool, type ToolContext, type ToolOutput, tools } from '../tools.ts'
 import { webRead } from '../web-read.ts'
+
+// READ help is injected into the system prompt in full.
+// TODO - to be reviewed by a human -10-zap: "Read only needed ranges..."
+const inPrompt = true
+const summary = 'read files, images, directories and URLs'
+const help = `## READ
+
+Use READ to read files instead of cat or sed. Text files give their version, <filename>@<version>, for EDIT.
+- Read only needed ranges. You can read many at a time.
+	READ "src/main.ts:20-60" "src/main.test.ts:80-120"
+	READ "file.ts:1-100"
+	READ "src/main.ts:300-"
+	READ "/tmp/image.png"
+	READ "https://example.com/test.md"
+- Ranges are 1-based and inclusive; the default is the first 200 lines. Directories list their entries; images attach; URLs return readable text or save other files under /tmp.`
+
+const parameters = {
+	type: 'object',
+	properties: {
+		path: { type: 'string' },
+		offset: { type: 'integer', minimum: 1 },
+		limit: { type: 'integer', minimum: 0 },
+	},
+	required: ['path'],
+}
+
+const syntax = {
+	usage: ['READ "<path>:<start>-<end>"? ...   // one or more; :5 reads line 5, :5- to the end', 'READ "<url>"'],
+	resolve: resolveCall,
+}
 
 function count(input: Record<string, unknown>, key: string, min: number): number | undefined {
 	let v = input[key]
@@ -52,85 +82,65 @@ function one(path: string): { name: string; input: Record<string, unknown> } {
 	}
 }
 
-export const tool: Tool<ToolOutput> = {
-	name: 'read',
-	description:
-		'Read files, images, directories, or URLs; multiple paths are accepted. Relative paths start from cwd. ' +
-		'Text results start with == path@version ==, followed by numbered lines. EDIT requires that version. ' +
-		'Ranges are 1-based and inclusive. Default: first 200 lines; path:1- reads all. ' +
-		'Images attach directly; URLs return readable text or save other files under /tmp. Sensitive local paths are refused in best-effort mode.',
-	syntax: {
-		summary: false,
-		usage: ['READ "<path>[:<start>[-<end>]]" ...   // one or more; :5 reads line 5, :5- to the end', 'READ "<url>"'],
-		resolve: resolveCall,
-	},
-	parameters: {
-		type: 'object',
-		properties: {
-			path: { type: 'string', description: 'File or directory path' },
-			offset: { type: 'integer', minimum: 1, description: 'First line, 1-based: the :start of READ "path:start-end"' },
-			limit: { type: 'integer', minimum: 0, description: 'Number of lines: from :start-end' },
-		},
-		required: ['path'],
-	},
-	async run(input, ctx) {
-		if (Array.isArray(input.paths)) {
-			let parts: string[] = [],
-				errors: string[] = []
-			let images: { mediaType: string; data: string; source?: string }[] = []
-			for (let p of input.paths) {
-				try {
-					let item = p as Record<string, unknown>
-					let out = await (item.url !== undefined ? webRead : tool).run(item, ctx)
-					let attached = typeof out === 'string' ? [] : [...(out.image ? [out.image] : []), ...(out.images ?? [])]
-					images.push(...attached.map((image) => ({ ...image, source: String(item.path ?? item.url) })))
-					if (typeof out !== 'string' && out.isError) errors.push(`== READ ${item.path ?? item.url} ==\n${out.text}`)
-					else parts.push(typeof out === 'string' ? out : out.text)
-				} catch (e: any) {
-					errors.push(
-						`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`,
-					)
-				}
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+	if (Array.isArray(input.paths)) {
+		let parts: string[] = [],
+			errors: string[] = []
+		let images: { mediaType: string; data: string; source?: string }[] = []
+		for (let p of input.paths) {
+			try {
+				let item = p as Record<string, unknown>
+				let out = await (item.url !== undefined ? webRead.run(item, ctx) : run(item, ctx))
+				let attached = typeof out === 'string' ? [] : [...(out.image ? [out.image] : []), ...(out.images ?? [])]
+				images.push(...attached.map((image) => ({ ...image, source: String(item.path ?? item.url) })))
+				if (typeof out !== 'string' && out.isError) errors.push(`== READ ${item.path ?? item.url} ==\n${out.text}`)
+				else parts.push(typeof out === 'string' ? out : out.text)
+			} catch (e: any) {
+				errors.push(
+					`== READ ${(p as { path?: string; url?: string })?.path ?? (p as { url?: string })?.url}: ${e?.message ?? e} ==`,
+				)
 			}
-			let text = [...errors, ...parts].join('\n\n')
-			return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
 		}
-		if (typeof input.url === 'string') return webRead.run(input, ctx)
-		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
-		let offset = count(input, 'offset', 1)
-		let limit = count(input, 'limit', 0)
-		let path = resolve(ctx.cwd, paths.expand(input.path))
-		if (settings.security() !== 'yolo' && (approval.sensitive(path) || approval.sensitive(realpathSync(path))))
-			throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
-		let st = statSync(path)
-		if (st.isDirectory()) {
-			let entries = readdirSync(path, { withFileTypes: true }).map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
-			return tools.page(
-				entries
-					.sort()
-					.map((e) => `${e}\n`)
-					.join(''),
-				offset,
-				limit,
-			)
-		}
-		let file = Bun.file(path)
-		let head = await file.slice(0, 12).bytes()
-		let mediaType = Object.keys(attachments.types).find(
-			(type) => type.startsWith('image/') && blobs.looksLike(type, head),
+		let text = [...errors, ...parts].join('\n\n')
+		return images.length || errors.length ? { text, images, ...(errors.length && { isError: true }) } : text
+	}
+	if (typeof input.url === 'string') return webRead.run(input, ctx)
+	if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
+	let offset = count(input, 'offset', 1)
+	let limit = count(input, 'limit', 0)
+	let path = resolve(ctx.cwd, paths.expand(input.path))
+	if (settings.security() !== 'yolo' && (approval.sensitive(path) || approval.sensitive(realpathSync(path))))
+		throw new Error(`${input.path} is a sensitive path; READ refused to expose secrets`)
+	let st = statSync(path)
+	if (st.isDirectory()) {
+		let entries = readdirSync(path, { withFileTypes: true }).map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+		return tools.page(
+			entries
+				.sort()
+				.map((e) => `${e}\n`)
+				.join(''),
+			offset,
+			limit,
 		)
-		let max = mediaType ? attachments.maxBytes : tools.maxFileBytes
-		if (st.size > max) throw new Error(`${input.path} is too large to read (${st.size} bytes)`)
-		let bytes = await file.slice(0, max + 1).bytes()
-		if (bytes.length > max) throw new Error(`${input.path} is too large to read (${bytes.length} bytes)`)
-		if (mediaType) {
-			return {
-				text: `Image from ${path} (${mediaType}, ${bytes.length} bytes)`,
-				image: { mediaType, data: Buffer.from(bytes).toString('base64') },
-			}
+	}
+	let file = Bun.file(path)
+	let head = await file.slice(0, 12).bytes()
+	let mediaType = Object.keys(attachments.types).find(
+		(type) => type.startsWith('image/') && blobs.looksLike(type, head),
+	)
+	let max = mediaType ? attachments.maxBytes : tools.maxFileBytes
+	if (st.size > max) throw new Error(`${input.path} is too large to read (${st.size} bytes)`)
+	let bytes = await file.slice(0, max + 1).bytes()
+	if (bytes.length > max) throw new Error(`${input.path} is too large to read (${bytes.length} bytes)`)
+	if (mediaType) {
+		return {
+			text: `Image from ${path} (${mediaType}, ${bytes.length} bytes)`,
+			image: { mediaType, data: Buffer.from(bytes).toString('base64') },
 		}
-		if (bytes.subarray(0, 8192).includes(0)) throw new Error(`${input.path} looks like a binary file`)
-		let capped = offset === undefined && limit === undefined
-		return fileText.read(input.path, bytes, offset, capped ? tools.readLines : limit, capped)
-	},
+	}
+	if (bytes.subarray(0, 8192).includes(0)) throw new Error(`${input.path} looks like a binary file`)
+	let capped = offset === undefined && limit === undefined
+	return fileText.read(input.path, bytes, offset, capped ? tools.readLines : limit, capped)
 }
+
+export const tool: Tool<ToolOutput> = { name: 'read', inPrompt, summary, help, parameters, syntax, run }

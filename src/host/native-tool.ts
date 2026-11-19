@@ -31,7 +31,7 @@ function def(): ToolDef {
 			properties: {
 				cmd: {
 					type: 'string',
-					description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'BASH "ls -l"'. HELP <TOOL> gives the exact syntax of one. Only wholly read-only work runs in parallel; any side-effectful call makes the whole round sequential. WAIT always runs last.`,
+					description: `One or more of "<TOOL> <args...>" on separate lines, e.g. 'READ "src/main.ts:1-80"' or 'GREP "TODO" { in: "src" }'. HELP <TOOL> gives the exact syntax of one. Only wholly read-only work runs in parallel; any side-effectful call makes the whole round sequential. WAIT always runs last.`,
 				},
 			},
 			required: ['cmd'],
@@ -213,23 +213,16 @@ function usage(tool: Tool<unknown>, interactive = false): string[] {
 			name = tool.name.toUpperCase()
 		let keeps = Object.hasOwn(schema(tool).properties ?? {}, 'description') || toolCard.has(tool)
 		if (!keeps || lines.some((u) => u.includes('/*'))) return lines
-		return lines.map((u) =>
-			u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <description> */`) : u,
-		)
+		return lines.map((u) => (u === name || u.startsWith(`${name} `) ? u.replace(name, `${name} /* <purpose> */`) : u))
 	}
 	if (tool.syntax?.usage) return tool.syntax.usage
 	let { properties = {}, required = [] } = schema(tool)
 	let positional = tool.syntax?.positional ?? required
 	let rest = Object.keys(properties).filter((k) => !positional.includes(k) && k !== 'description')
-	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `[ "<${k}>" ]`))
+	let args = positional.map((k) => (required.includes(k) ? `"<${k}>"` : `"<${k}>"?`))
 	if (rest.length) {
-		let req = rest.filter((k) => required.includes(k)),
-			opt = rest.filter((k) => !required.includes(k))
-		args.push(
-			!req.length
-				? `[ { ${opt.join(', ')} } ]`
-				: `{ ${[...req, ...(opt.length ? [`[ ${opt.join(', ')} ]`] : [])].join(', ')} }`,
-		)
+		let fields = rest.map((k) => (required.includes(k) ? k : `${k}?`)).join(', ')
+		args.push(rest.some((k) => required.includes(k)) ? `{ ${fields} }` : `{ ${fields} }?`)
 	}
 	return [[tool.name.toUpperCase(), ...args].join(' ')]
 }
@@ -247,7 +240,7 @@ function help(tool: Tool<unknown>, interactive = false): string {
 			return `  ${key} (${type}${extra})${text ? `: ${text}` : ''}`
 		})
 	return [
-		`${tool.name.toUpperCase()}: ${tool.description}`,
+		`${tool.name.toUpperCase()}: ${tool.description ?? tool.summary ?? ''}`,
 		'',
 		'Usage:',
 		...align(usage(tool, interactive)).map((u) => `  ${u}`),
@@ -255,13 +248,25 @@ function help(tool: Tool<unknown>, interactive = false): string {
 	].join('\n')
 }
 
-// One line per tool the system prompt does not explain, for $other_tools.
-function summary(): string {
-	return tools
-		.all()
-		.filter((t) => t.syntax?.summary !== false)
-		.map((t) => `\t${t.name.toUpperCase()}${t.syntax?.summary ? ` ${t.syntax.summary}` : ''}`)
-		.join('\n')
+// A tool's help as this session sees it: purpose comments after a tool
+// name are taught only to interactive sessions (task 2bq).
+function guide(tool: Tool<unknown>, interactive: boolean): string {
+	let help = tool.help ?? ''
+	return interactive ? help : help.replace(/^([\t ]*[A-Z][A-Z_]*) \/\*.*?\*\//gm, '$1')
+}
+
+// The system prompt's @tools (task 5t3): the help of each tool with
+// inPrompt, then an Other tools line for each other tool with a summary
+// (HELP has none: the prompt names it); the model learns the rest with
+// HELP. `allowed`: the tools this session may call.
+function guides(allowed?: string[], interactive = true): string {
+	let shown = tools.all().filter((t) => !allowed || allowed.includes(t.name))
+	let sections = shown.filter((t) => t.inPrompt).map((t) => guide(t, interactive))
+	let others = shown.flatMap((t) => {
+		let summary = t.summary ?? t.syntax?.summary
+		return !t.inPrompt && summary ? [`\t${t.name.toUpperCase()} ${summary}`] : []
+	})
+	return [...sections, `## Other tools\n${others.join('\n')}`].join('\n\n')
 }
 
 export const nativeTool = {
@@ -270,6 +275,7 @@ export const nativeTool = {
 	find,
 	generic,
 	resolve,
+	strict,
 	arrived,
 	multiple,
 	expand,
@@ -277,6 +283,6 @@ export const nativeTool = {
 	shown,
 	align,
 	help,
-	summary,
-	strict,
+	guide,
+	guides,
 }

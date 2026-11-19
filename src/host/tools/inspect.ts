@@ -18,18 +18,67 @@ import { provider } from '../provider.ts'
 import { stats } from '../stats.ts'
 import { statusUsage, type UsageRow } from '../status-usage.ts'
 import { tabs } from '../tabs.ts'
-import type { Tool, ToolOutput } from '../tools.ts'
+import type { SyntaxSpec, Tool, ToolContext, ToolOutput } from '../tools.ts'
 import { version } from '../version.ts'
 import { work } from '../work.ts'
+
+const summary = 'agent internals and subscription status'
+const help = `## INSPECT
+
+Inspect Hal read-only.
+INSPECT "<session id>"                  // status, available output and pending question, e.g. INSPECT 12-xyz
+INSPECT "<tool call id>"                // e.g. INSPECT t150; bare numbers mean tool calls, not tabs
+INSPECT "tabs"                          // every open tab
+INSPECT "<what>" "<scope>"? "<fields>"?
+INSPECT { what?, scope?, fields? }
+	what?: "sessions" | "host" | "models" | "clients" | "subscriptions" | "logins" | "files"   default "sessions"
+	scope?: "self" | "project" | "all"    sessions: default "self", the caller; "project": tabs sharing the calling cwd; files: "all" adds files Hal changed outside the Git root
+	fields?: string                       comma-separated subset, e.g. "name,cwd,context"; default all
+What each shows:
+	sessions        open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)"
+	host            fields pid, version, started, uptime, clients (count)
+	models          models by provider, the default, and which are rate limited until when
+	clients         connected clients; fields kind, pid, hostname, version (the code it runs), size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session)
+	subscriptions   refreshes every Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan, status, windows (percent used, resets), limits (recorded account/model skips), error. API keys are listed, not queried. A failed refresh marks the result as an error without hiding other accounts.
+	logins          stored logins (provider, type, account) from the credentials file, without network
+	files           uncommitted files of the caller's Git root, each with every session and call that declared and changed it since its last commit, newest first, and whether the file still matches the newest`
+
+const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions', 'logins', 'files']
+const SCOPES = ['self', 'project', 'all']
+
+const parameters = {
+	type: 'object',
+	properties: {
+		target: { type: 'string' },
+		what: { type: 'string', enum: WHATS },
+		scope: { type: 'string', enum: SCOPES },
+		fields: { type: 'string' },
+	},
+}
+
+const syntax: SyntaxSpec = {
+	// Plain words fill what, scope, fields in order.
+	positional: ['what', 'scope', 'fields'],
+	resolve: (raw) => {
+		let { values } = callText.values(raw)
+		if (values.length === 1 && values[0] === 'tabs')
+			return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
+		if (values.length === 1 && work.isTarget(values[0])) return { name: 'inspect', input: { target: values[0] } }
+		let input = nativeTool.generic(tool, raw)
+		// A lone unknown word was meant as a target or topic; say so in those terms.
+		if (values.length === 1 && typeof values[0] === 'string' && !WHATS.includes(values[0]))
+			throw new Error(
+				`INSPECT ${JSON.stringify(values[0])}: not a session ID, tool call ID or one of ${WHATS.join(', ')}.${usage()}`,
+			)
+		return { name: 'inspect', input }
+	},
+}
 
 // A model id, with until when it is rate limited on every account.
 function withLimit(id: string): string {
 	let until = auth.limitedUntil(id)
 	return until ? `${id} (rate limited until ${new Date(until).toISOString().slice(0, 16).replace('T', ' ')} UTC)` : id
 }
-
-const WHATS = ['sessions', 'host', 'models', 'clients', 'subscriptions', 'logins', 'files']
-const SCOPES = ['self', 'project', 'all']
 
 // Compact token counts as on the status row: 950, 87k, 1000k.
 const kilo = (n: number) => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
@@ -174,123 +223,79 @@ function table(fields: string[], rows: string[][]): string {
 	return [fields.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n')
 }
 
-export const tool: Tool<ToolOutput> = {
-	name: 'inspect',
-	syntax: {
-		summary: 'agent internals and subscription status',
-		// Plain words fill what, scope, fields in order; HELP shows the object form.
-		positional: ['what', 'scope', 'fields'],
-		usage: [
-			'INSPECT "<session id> | <tool call id>"    // e.g. INSPECT 12-xyz, INSPECT t150',
-			'INSPECT "subscriptions"',
-			'INSPECT "logins"',
-			'INSPECT [ { what, scope, fields } ]',
-		],
-		resolve: (raw) => {
-			let { values } = callText.values(raw)
-			if (values.length === 1 && values[0] === 'tabs')
-				return { name: 'inspect', input: { what: 'sessions', scope: 'all' } }
-			if (values.length === 1 && work.isTarget(values[0])) return { name: 'inspect', input: { target: values[0] } }
-			let input = nativeTool.generic(tool, raw)
-			// A lone unknown word was meant as a target or topic; say so in those terms.
-			if (values.length === 1 && typeof values[0] === 'string' && !WHATS.includes(values[0]))
-				throw new Error(
-					`INSPECT ${JSON.stringify(values[0])}: not a session ID, tool call ID or one of ${WHATS.join(', ')}.${usage()}`,
-				)
-			return { name: 'inspect', input }
-		},
-	},
-	description:
-		'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, hostname, version (the code it runs), size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session). what "subscriptions": refresh every configured Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan (unknown when not reported), status, windows (percent used, ISO resets and observations; cached on failure), limits (recorded account/model skips), error (complete safe refresh failure, always included on failure). API keys are listed, not queried. Refresh failures mark the tool result as an error without hiding other accounts. what "logins": stored logins (provider, type API key or subscription, account) read from the credentials file, instantly and without network. what "files": uncommitted files of the caller\'s Git root, each with every session and call that declared and changed it since its last commit, newest first, and whether the file still matches the newest; scope "all" adds files Hal changed outside the root. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the calling cwd) or "all". fields: comma-separated subset; default all.',
-	parameters: {
-		type: 'object',
-		properties: {
-			target: {
-				type: 'string',
-				description:
-					'Session ID or local tool-call reference (t123 or 123): status, available output and pending question. Bare numbers mean tool calls, not tabs. Cannot combine with what, scope or fields.',
-			},
-			what: {
-				type: 'string',
-				enum: WHATS,
-				description: 'sessions (default), host, models, clients, subscriptions, logins or files',
-			},
-			scope: { type: 'string', enum: SCOPES, description: 'self (default; files: project), project or all' },
-			fields: { type: 'string', description: 'Comma-separated fields, e.g. "name,cwd,context"' },
-		},
-	},
-	async run(input, ctx) {
-		if (input.target !== undefined) {
-			if ([input.what, input.scope, input.fields].some((v) => v !== undefined))
-				throw new Error('INSPECT target cannot be combined with what, scope or fields.')
-			return work.inspect(work.target(ctx.sessionId, input.target))
-		}
-		let what = oneOf('what', input.what, WHATS) ?? 'sessions'
-		let scope = oneOf('scope', input.scope, SCOPES) ?? (what === 'files' ? 'project' : 'self')
-		if (what === 'files') {
-			if (scope === 'self' || input.fields !== undefined)
-				throw new Error(
-					`INSPECT files takes scope "project" (default, uncommitted files of the Git root) or "all" (also files Hal changed outside it), and no fields.${usage()}`,
-				)
-			return fileEditors.report(ctx.cwd, scope as 'project' | 'all', clients.timezone(ctx.sessionId))
-		}
-		if (what === 'logins') return logins()
-		if (what === 'subscriptions') {
-			let fields = pick(input.fields, Object.keys(SUBSCRIPTION))
-			let rows = await statusUsage.rows(
-				ctx.sessionId,
-				ctx.model ?? tabs.list().find((t) => t.id === ctx.sessionId)?.model ?? '',
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+	if (input.target !== undefined) {
+		if ([input.what, input.scope, input.fields].some((v) => v !== undefined))
+			throw new Error('INSPECT target cannot be combined with what, scope or fields.')
+		return work.inspect(work.target(ctx.sessionId, input.target))
+	}
+	let what = oneOf('what', input.what, WHATS) ?? 'sessions'
+	let scope = oneOf('scope', input.scope, SCOPES) ?? (what === 'files' ? 'project' : 'self')
+	if (what === 'files') {
+		if (scope === 'self' || input.fields !== undefined)
+			throw new Error(
+				`INSPECT files takes scope "project" (default, uncommitted files of the Git root) or "all" (also files Hal changed outside it), and no fields.${usage()}`,
 			)
-			return {
-				text: rows.length
-					? rows
-							.map((r) => {
-								let shown = r.refreshError && !fields.includes('error') ? [...fields, 'error'] : fields
-								return table(shown, [shown.map((f) => SUBSCRIPTION[f]!(r))])
-							})
-							.join('\n\n')
-					: 'No accounts configured.',
-				isError: rows.some((r) => r.refreshError !== undefined),
-			}
+		return fileEditors.report(ctx.cwd, scope as 'project' | 'all', clients.timezone(ctx.sessionId))
+	}
+	if (what === 'logins') return logins()
+	if (what === 'subscriptions') {
+		let fields = pick(input.fields, Object.keys(SUBSCRIPTION))
+		let rows = await statusUsage.rows(
+			ctx.sessionId,
+			ctx.model ?? tabs.list().find((t) => t.id === ctx.sessionId)?.model ?? '',
+		)
+		return {
+			text: rows.length
+				? rows
+						.map((r) => {
+							let shown = r.refreshError && !fields.includes('error') ? [...fields, 'error'] : fields
+							return table(shown, [shown.map((f) => SUBSCRIPTION[f]!(r))])
+						})
+						.join('\n\n')
+				: 'No accounts configured.',
+			isError: rows.some((r) => r.refreshError !== undefined),
 		}
-		if (what === 'models') {
-			let ids = models.known()
-			let lines = [`Default: ${models.defaultModel()}`]
-			for (let name of ['hal', ...Object.keys(provider.state.providers)]) {
-				lines.push(
-					`${name}: ${
-						ids
-							.filter((id) => id.startsWith(`${name}/`))
-							.map(withLimit)
-							.join(', ') || '(none listed)'
-					}`,
+	}
+	if (what === 'models') {
+		let ids = models.known()
+		let lines = [`Default: ${models.defaultModel()}`]
+		for (let name of ['hal', ...Object.keys(provider.state.providers)]) {
+			lines.push(
+				`${name}: ${
+					ids
+						.filter((id) => id.startsWith(`${name}/`))
+						.map(withLimit)
+						.join(', ') || '(none listed)'
+				}`,
+			)
+		}
+		return lines.join('\n')
+	}
+	if (what === 'clients') {
+		let fields = pick(input.fields, Object.keys(CLIENT))
+		let list = [...clients.state.records].filter((c) => c.goneAt === undefined)
+		return list.length
+			? table(
+					fields,
+					list.map((c) => fields.map((f) => CLIENT[f]!(c, ctx.sessionId))),
 				)
-			}
-			return lines.join('\n')
-		}
-		if (what === 'clients') {
-			let fields = pick(input.fields, Object.keys(CLIENT))
-			let list = [...clients.state.records].filter((c) => c.goneAt === undefined)
-			return list.length
-				? table(
-						fields,
-						list.map((c) => fields.map((f) => CLIENT[f]!(c, ctx.sessionId))),
-					)
-				: 'No clients connected.'
-		}
-		if (what === 'host') {
-			let fields = pick(input.fields, Object.keys(HOST))
-			return table(fields, [fields.map((f) => HOST[f]!())])
-		}
-		let fields = pick(input.fields, Object.keys(SESSION))
-		let list = tabs.list()
-		let self = list.find((t) => t.id === ctx.sessionId)
-		let rows = list.flatMap((t, i) => {
-			if (scope === 'self' ? t.id !== ctx.sessionId : scope === 'project' ? t.cwd !== (self?.cwd ?? ctx.cwd) : false)
-				return []
-			return [fields.map((f) => SESSION[f]!(t, i) + (f === 'id' && t.id === ctx.sessionId ? ' (you)' : ''))]
-		})
-		if (!rows.length) return scope === 'self' ? 'This session is not an open tab.' : 'No open tabs.'
-		return table(fields, rows)
-	},
+			: 'No clients connected.'
+	}
+	if (what === 'host') {
+		let fields = pick(input.fields, Object.keys(HOST))
+		return table(fields, [fields.map((f) => HOST[f]!())])
+	}
+	let fields = pick(input.fields, Object.keys(SESSION))
+	let list = tabs.list()
+	let self = list.find((t) => t.id === ctx.sessionId)
+	let rows = list.flatMap((t, i) => {
+		if (scope === 'self' ? t.id !== ctx.sessionId : scope === 'project' ? t.cwd !== (self?.cwd ?? ctx.cwd) : false)
+			return []
+		return [fields.map((f) => SESSION[f]!(t, i) + (f === 'id' && t.id === ctx.sessionId ? ' (you)' : ''))]
+	})
+	if (!rows.length) return scope === 'self' ? 'This session is not an open tab.' : 'No open tabs.'
+	return table(fields, rows)
 }
+
+export const tool: Tool<ToolOutput> = { name: 'inspect', summary, help, parameters, syntax, run }

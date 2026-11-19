@@ -1,24 +1,8 @@
-// The EDIT block format (task ybg): its help text and the strict parser
-// from !!OLD/!!NEW/!!END text to edit operations.
+// The EDIT block format (task ybg): the strict parser from
+// !!OLD/!!NEW/!!END text to edit operations. tools/edit.ts teaches it.
 import { tools } from './tools.ts'
 
 const N = String.fromCharCode(10)
-const help = [
-	'Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:',
-	'  <path>@<version> replace A-B       then !!NEW, new lines, !!END',
-	'  <path>@<version> insert-before N   then !!NEW ... !!END',
-	'  <path>@<version> insert-after N    then !!NEW ... !!END',
-	'  <path>@<version> delete A-B        (no block)',
-	'  <path>@<version> delete            (no block; deletes the file)',
-	'  <path> replace                     then !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)',
-	'  <path> create                      then !!NEW ... !!END (file must not exist)',
-	'  <path>@<version> write             then !!NEW, whole new contents, !!END',
-	'Block content is literal: no quoting or escaping. Only a content line that is itself a marker needs one extra ! ' +
-		'(write !!!END for a literal !!END line). Always submit the <version> READ gave (<path>@<version>); line numbers ' +
-		"are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. " +
-		'Nothing is written unless every operation validates. Results show file contents or diffs with new versions; no ' +
-		'confirmation READ is needed.',
-].join(N)
 
 // The edits a block-format EDIT text stands for. Throws with the line at fault.
 function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: string[]; purpose?: string } {
@@ -143,8 +127,8 @@ function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: st
 		}
 		if (op === 'delete' && marker(lines[i] ?? '') === 'END') i++
 	}
-	if (!edits.length) throw new Error(`EDIT needs at least one operation.${N}${help}`)
+	if (!edits.length) throw new Error(`EDIT needs at least one operation; HELP EDIT shows the format.`)
 	return { edits, ...(then.length && { then }), ...(purpose && { purpose }) }
 }
 
-export const editBlocks = { help, parse: parseBlocks }
+export const editBlocks = { parse: parseBlocks }

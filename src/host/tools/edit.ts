@@ -5,7 +5,7 @@
 import { readFile, mkdir, mkdtemp, writeFile, link, unlink, rm, lstat, rename, chmod, open } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { dirname, resolve } from 'path'
-import { tools, type Tool, type ToolContext } from '../tools.ts'
+import { tools, type SyntaxSpec, type Tool, type ToolContext } from '../tools.ts'
 import { nativeTool } from '../native-tool.ts'
 import { approval } from '../approval.ts'
 import { fileChanges } from '../file-changes.ts'
@@ -14,6 +14,138 @@ import { textDiff } from '../text-diff.ts'
 import { paths } from '../paths.ts'
 import { editBlocks } from '../edit-blocks.ts'
 import { pluginFiles } from '../plugin-files.ts'
+
+// EDIT help is injected into the system prompt in full.
+// TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one
+// official, hard-to-misuse form per job; keep the guide short even if
+// slightly inconsistent (e.g. create shown without @version). Tolerate
+// other plausible forms silently, without spending prompt tokens on them
+// (!!OLD closed by !!END removes the text; an empty text replace of whole
+// lines also removes their newline). delete A-B stays the documented way
+// to remove lines.
+const inPrompt = true
+const summary = 'change, create and delete files'
+const help = `## EDIT
+
+Use EDIT for all file changes. Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:
+    <path>@<version> replace A-B       !!NEW, new lines, !!END
+    <path>@<version> insert-before N   !!NEW ... !!END
+    <path>@<version> insert-after N    !!NEW ... !!END
+    <path>@<version> delete A-B        (no block)
+    <path>@<version> delete            (no block; deletes the file)
+    <path> replace                     !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)
+    <path> create                      !!NEW ... !!END (file must not exist)
+    <path>@<version> write             !!NEW, whole new contents, !!END
+Block content is literal: no quoting or escaping. Only a content line that is itself a marker needs one extra ! (write !!!END for a literal !!END line). Always submit the <version> READ gave (<path>@<version>); line numbers are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. Nothing is written unless every operation validates. Results show verified diffs and new versions; no confirmation READ is needed.
+Example call text (markers start their lines):
+EDIT /* Rename handler */
+src/main.ts@4d9ej replace 3-4
+!!NEW
+function process(x) {
+	return x + 1
+!!END
+src/main.ts@4d9ej delete 9-9
+::: if $session_interactive
+- A descriptive /* comment */ is mandatory at the start of every EDIT: EDIT /* Rename helper to actualHelper in client files */
+:::`
+
+const fields: Record<string, unknown> = {
+	path: { type: 'string' },
+	old: { type: 'string', minLength: 1 },
+	count: { type: 'integer', minimum: 1 },
+	new: { type: 'string' },
+	hash: { type: 'string', minLength: 1 },
+	lines: { type: 'array', items: { type: 'string' } },
+	insert: { type: 'integer', minimum: 1 },
+	create: { const: true },
+	delete: { const: true },
+	range: {
+		anyOf: [
+			{ type: 'string' },
+			{ type: 'integer' },
+			{
+				type: 'array',
+				items: { type: 'integer' },
+				minItems: 1,
+				maxItems: 2,
+			},
+		],
+	},
+}
+
+const parameters = {
+	type: 'object',
+	additionalProperties: false,
+	required: ['edits'],
+	properties: {
+		description: { type: 'string', minLength: 1 },
+		then: { type: 'array', items: { type: 'string' } },
+		edits: {
+			type: 'array',
+			minItems: 1,
+			items: {
+				anyOf: [
+					['path', 'old', 'new'],
+					['path', 'old', 'new', 'hash'],
+					['path', 'old', 'new', 'count'],
+					['path', 'old', 'new', 'hash', 'count'],
+					['path', 'range', 'lines'],
+					['path', 'hash', 'range', 'lines'],
+					['path', 'insert', 'lines'],
+					['path', 'hash', 'insert', 'lines'],
+					['path', 'new'],
+					['path', 'new', 'create'],
+					['path', 'hash', 'new'],
+					['path', 'delete'],
+					['path', 'hash', 'delete'],
+				].map((required) => ({
+					type: 'object',
+					additionalProperties: false,
+					required,
+					properties: Object.fromEntries(required.map((key) => [key, fields[key]])),
+				})),
+			},
+		},
+	},
+}
+
+const syntax: SyntaxSpec = {
+	usage: [
+		'EDIT                                     // Exception: EDIT takes lines, not literals.',
+		'<path>@<version> replace A-B             // One or more operations; HELP EDIT lists all.',
+		'!!NEW',
+		'<new lines>                              // Literal text up to !!END.',
+		'!!END',
+	],
+	resolve(raw, ctx) {
+		const { edits, then, purpose } = editBlocks.parse(raw)
+		// Validate trailing calls before anything is written; one that needs
+		// approval must come as its own call, so approval still sees it.
+		for (const text of then ?? []) {
+			let r: { name: string; input: Record<string, unknown> }
+			try {
+				r = nativeTool.resolve(text, ctx)
+			} catch (e: any) {
+				throw new Error(`EDIT: the tool call after the last !!END is invalid; nothing written: ${e.message}`)
+			}
+			if (
+				approval.form({
+					type: 'tool_call',
+					id: 'then',
+					name: r.name,
+					input: r.input,
+				} as any)
+			)
+				throw new Error(
+					`EDIT: the ${r.name.toUpperCase()} after the last !!END needs approval; nothing written. Send it as its own call.`,
+				)
+		}
+		return {
+			name: 'edit',
+			input: { edits, ...(then?.length && { then }), ...(purpose && { description: purpose }) },
+		}
+	},
+}
 
 type Plan = {
 	path: string
@@ -104,374 +236,269 @@ export const io = {
 	},
 }
 
-const fields: Record<string, unknown> = {
-	path: { type: 'string' },
-	old: { type: 'string', minLength: 1 },
-	count: { type: 'integer', minimum: 1 },
-	new: { type: 'string' },
-	hash: { type: 'string', minLength: 1 },
-	lines: { type: 'array', items: { type: 'string' } },
-	insert: { type: 'integer', minimum: 1 },
-	create: { const: true },
-	delete: { const: true },
-	range: {
-		anyOf: [
-			{ type: 'string' },
-			{ type: 'integer' },
-			{
-				type: 'array',
-				items: { type: 'integer' },
-				minItems: 1,
-				maxItems: 2,
-			},
-		],
-	},
-}
-export const tool: Tool = {
-	name: 'edit',
-	description: editBlocks.help,
-	syntax: {
-		summary: false,
-		usage: [
-			'EDIT                                     // Exception: EDIT takes lines, not literals.',
-			'<path>@<version> replace A-B             // One or more operations; HELP EDIT lists all.',
-			'!!NEW',
-			'<new lines>                              // Literal text up to !!END.',
-			'!!END',
-		],
-		resolve(raw, ctx) {
-			const { edits, then, purpose } = editBlocks.parse(raw)
-			// Validate trailing calls before anything is written; one that needs
-			// approval must come as its own call, so approval still sees it.
-			for (const text of then ?? []) {
-				let r: { name: string; input: Record<string, unknown> }
-				try {
-					r = nativeTool.resolve(text, ctx)
-				} catch (e: any) {
-					throw new Error(`EDIT: the tool call after the last !!END is invalid; nothing written: ${e.message}`)
-				}
-				if (
-					approval.form({
-						type: 'tool_call',
-						id: 'then',
-						name: r.name,
-						input: r.input,
-					} as any)
-				)
-					throw new Error(
-						`EDIT: the ${r.name.toUpperCase()} after the last !!END needs approval; nothing written. Send it as its own call.`,
-					)
-			}
-			return {
-				name: 'edit',
-				input: { edits, ...(then?.length && { then }), ...(purpose && { description: purpose }) },
-			}
-		},
-	},
-	parameters: {
-		type: 'object',
-		additionalProperties: false,
-		required: ['edits'],
-		properties: {
-			description: {
-				type: 'string',
-				minLength: 1,
-				description: 'Brief human-readable purpose of this batch',
-			},
-			then: { type: 'array', items: { type: 'string' } },
-			edits: {
-				type: 'array',
-				minItems: 1,
-				items: {
-					anyOf: [
-						['path', 'old', 'new'],
-						['path', 'old', 'new', 'hash'],
-						['path', 'old', 'new', 'count'],
-						['path', 'old', 'new', 'hash', 'count'],
-						['path', 'range', 'lines'],
-						['path', 'hash', 'range', 'lines'],
-						['path', 'insert', 'lines'],
-						['path', 'hash', 'insert', 'lines'],
-						['path', 'new'],
-						['path', 'new', 'create'],
-						['path', 'hash', 'new'],
-						['path', 'delete'],
-						['path', 'hash', 'delete'],
-					].map((required) => ({
-						type: 'object',
-						additionalProperties: false,
-						required,
-						properties: Object.fromEntries(required.map((key) => [key, fields[key]])),
-					})),
-				},
-			},
-		},
-	},
-	async run(input, ctx) {
-		if (Object.keys(input).some((k) => k !== 'edits' && k !== 'description' && k !== 'then'))
-			throw new Error('only edits, then and description are accepted')
-		if (input.description !== undefined && (typeof input.description !== 'string' || !input.description.trim()))
-			throw new Error('description must be nonempty text')
-		if (!Array.isArray(input.edits) || !input.edits.length) throw new Error('edits must be a nonempty list')
-		const edits = input.edits as Record<string, unknown>[]
-		for (const e of edits) {
-			if (!e || typeof e !== 'object' || Array.isArray(e)) throw new Error('each edit must be an object')
-			fileChanges.validateFile(e.path)
-			if (
-				Object.keys(e).some(
-					(k) => !['path', 'old', 'new', 'hash', 'range', 'lines', 'count', 'insert', 'create', 'delete'].includes(k),
-				)
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> {
+	if (Object.keys(input).some((k) => k !== 'edits' && k !== 'description' && k !== 'then'))
+		throw new Error('only edits, then and description are accepted')
+	if (input.description !== undefined && (typeof input.description !== 'string' || !input.description.trim()))
+		throw new Error('description must be nonempty text')
+	if (!Array.isArray(input.edits) || !input.edits.length) throw new Error('edits must be a nonempty list')
+	const edits = input.edits as Record<string, unknown>[]
+	for (const e of edits) {
+		if (!e || typeof e !== 'object' || Array.isArray(e)) throw new Error('each edit must be an object')
+		fileChanges.validateFile(e.path)
+		if (
+			Object.keys(e).some(
+				(k) => !['path', 'old', 'new', 'hash', 'range', 'lines', 'count', 'insert', 'create', 'delete'].includes(k),
 			)
-				throw new Error(`unknown edit field: ${JSON.stringify(e)}`)
-		}
-		const observation = await fileChanges.begin(
-			ctx,
-			edits.map((e) => paths.expand(e.path as string)),
-			true,
 		)
-		const plans = new Map<string, Plan>(),
-			failures: string[] = [],
-			written: Plan[] = []
-		let recovery = '',
-			keep = false,
-			failure: unknown,
-			result: string | undefined
-		try {
-			result = await (async () => {
-				// Line operations refer to the read version, so each file's run before its text replaces.
-				const rank = (e: Record<string, unknown>) =>
-					e.old === undefined && (e.range !== undefined || e.insert !== undefined) ? 0 : 1
-				for (const [i, e] of [...edits.entries()].sort((a, b) => rank(a[1]) - rank(b[1])))
-					try {
-						check(ctx)
-						const path = await fileChanges.canonical(resolve(ctx.cwd, paths.expand(e.path as string)))
-						let p = plans.get(path)
-						if (!p) {
-							const before = await load(path)
-							if (before && before.length > tools.maxFileBytes) throw new Error(`${path} is too large`)
-							if (before) fileText.text(before, path)
-							plans.set(
-								path,
-								(p = { path, name: e.path as string, before, next: before ?? Buffer.alloc(0), ranges: [] }),
-							)
-						}
-						const kind =
-							e.delete !== undefined
-								? 'whole'
-								: e.old !== undefined
-									? 'text'
-									: e.range !== undefined || e.insert !== undefined
-										? 'range'
-										: 'whole'
-						if (
-							'count' in e &&
-							(kind !== 'text' ||
-								e.range !== undefined ||
-								e.lines !== undefined ||
-								!Number.isSafeInteger(e.count) ||
-								(e.count as number) < 1)
-						)
-							throw new Error('count requires exact text and a positive safe integer')
-						if (p.kind && (p.kind === 'whole' || kind === 'whole'))
-							throw new Error(
-								'a whole-file write cannot be combined with other edits of the same file (including deletion)',
-							)
-						if (e.hash !== undefined && !p.before) throw new Error(`${e.path}: no such file (${path})`)
-						if (e.hash !== undefined && (typeof e.hash !== 'string' || fileText.hash(p.before!) !== e.hash))
-							throw new Error(`${e.path}: stale version; READ again`)
-						if (e.delete !== undefined) {
-							if (e.delete !== true || !p.before || Object.keys(e).some((k) => !['path', 'hash', 'delete'].includes(k)))
-								throw new Error('file deletion requires an existing file, without other selectors')
-							p.mode = (await lstat(path)).mode & 0o7777
-							p.next = null
-						} else if (kind === 'range') {
-							if (e.old !== undefined || e.new !== undefined || !p.before)
-								throw new Error('line operations need an existing file; use lines, not new')
-							if (!Array.isArray(e.lines) || !e.lines.every((l) => typeof l === 'string'))
-								throw new Error('lines must be strings')
-							const plan = p
-							// Inserts at one point join in written order; an insert at a range's start leads it.
-							const add = (c: Change) => {
-								const insert = (r: Change) => r.end === r.start - 1,
-									same = plan.ranges.find((r) => r.start === c.start)
-								if (!same || !(insert(c) || insert(same))) return void plan.ranges.push(c)
-								if (insert(same))
-									plan.ranges.splice(plan.ranges.indexOf(same), 1, {
-										...c,
-										lines: [...same.lines, ...c.lines],
-									})
-								else same.lines = [...c.lines, ...same.lines]
-							}
-							if (e.insert !== undefined) {
-								const n = fileText.text(p.before, path).lines.length
-								if (!Number.isSafeInteger(e.insert) || (e.insert as number) < 1 || (e.insert as number) > n + 1)
-									throw new Error(`insert point outside the file's ${n} lines`)
-								add({
-									start: e.insert as number,
-									end: (e.insert as number) - 1,
-									lines: e.lines as string[],
-								})
-							} else add({ ...fileText.range(e.range), lines: e.lines as string[] })
-							p.next = Buffer.from(fileText.apply(fileText.text(p.before, path), p.ranges).after)
-						} else {
-							if (e.range !== undefined || e.lines !== undefined || typeof e.new !== 'string')
-								throw new Error('text/whole-file edits require new text, without range or lines')
-							if (kind === 'text') {
-								if (!p.before || typeof e.old !== 'string' || !e.old)
-									throw new Error('old must be nonempty text in an existing file')
-								const text = p.next!.toString(),
-									at = text.indexOf(e.old),
-									expected = e.count ?? 1
-								if (at < 0)
-									throw new Error(
-										`old not found in planned text (matched 0 times; count requires ${expected}); check exact whitespace and surrounding context`,
-									)
-								let count = 0,
-									matches: number[] = []
-								for (let pos = at; pos >= 0; pos = text.indexOf(e.old, pos + e.old.length)) {
-									count++
-									if (matches.length < 2) matches.push(text.slice(0, pos).split(String.fromCharCode(10)).length)
-								}
-								if (count !== expected) {
-									const lines = fileText
-										.text(p.next!, path)
-										.lines.map((l) => (l.length > 300 ? l.slice(0, 300) + '… [line cut]' : l))
-									const contexts = matches.map((n) =>
-										fileText.numbered(
-											lines,
-											Array.from(
-												{ length: Math.min(lines.length, n + 2) - Math.max(1, n - 2) + 1 },
-												(_, j) => Math.max(1, n - 2) + j,
-											),
-										),
-									)
-									throw new Error(
-										`old matched ${count} times; count requires ${expected}. Set count to the exact intended number, extend old with surrounding context, or use version-checked ranges. First two matches in planned text after earlier steps (not a READ version):${String.fromCharCode(10)}${contexts.join(String.fromCharCode(10) + '…' + String.fromCharCode(10))}`,
-									)
-								}
-								// Removing whole lines also removes their newline, leaving no blank line.
-								const line =
-									e.new === '' && count === 1 && (at === 0 || text[at - 1] === N) && text[at + e.old.length] === N
-								p.next = Buffer.from(
-									line ? text.slice(0, at) + text.slice(at + e.old.length + 1) : text.split(e.old).join(e.new),
-								)
-							} else {
-								if (e.create && p.before) throw new Error('create: file exists; READ it and use write with its version')
-								p.next = Buffer.from(e.new)
-							}
-						}
-						if (p.next && p.next.length > tools.maxFileBytes) throw new Error(`${path}: result is too large`)
-						p.kind = kind
-					} catch (e: any) {
-						failures.push(`step ${i + 1} (${edits[i]!.path}): ${e.message}`)
-					}
-				if (failures.length) throw new Error(`Nothing written: ${failures.join('; ')}`)
-				for (const p of plans.values()) {
-					if (p.next === null || p.before?.equals(p.next)) continue
-					const text = await pluginFiles.transform(p.path, p.next.toString(), ctx)
-					if (typeof text !== 'string') throw new Error(`${p.path}: plugin transform must return text; nothing written`)
-					p.next = Buffer.from(text)
-					if (p.next.length > tools.maxFileBytes)
-						throw new Error(`${p.path}: transformed result is too large; nothing written`)
-				}
-				const changed = [...plans.values()].filter((p) => p.next === null || !p.before?.equals(p.next))
-				for (const p of changed) {
-					p.diff = textDiff
-						.text(p.before?.toString() ?? '', p.next?.toString() ?? '', Infinity, true)
-						.replace(/^([ +-])\s*(\d+) /gm, '$1$2: ')
-					const now = await load(p.path)
-					if (p.before ? !now?.equals(p.before) : now !== null)
-						throw new Error(`${p.path} changed while planning; nothing written`)
-				}
-				check(ctx)
-				if (!changed.length) return [...plans.values()].map((p) => `${p.name}: no changes`).join(N)
-				await mkdir(paths.tmpDir(), { recursive: true })
-				recovery = await mkdtemp(`${paths.tmpDir()}/multiedit-`)
-				await writeFile(
-					`${recovery}/manifest.json`,
-					JSON.stringify(
-						changed.map((p, i) => ({
-							path: p.path,
-							backup: p.before ? `${i}` : null,
-						})),
-					),
-					{ mode: 0o600 },
-				)
-				for (const [i, p] of changed.entries())
-					if (p.before) await writeFile(`${recovery}/${i}`, p.before, { mode: 0o600 })
+			throw new Error(`unknown edit field: ${JSON.stringify(e)}`)
+	}
+	const observation = await fileChanges.begin(
+		ctx,
+		edits.map((e) => paths.expand(e.path as string)),
+		true,
+	)
+	const plans = new Map<string, Plan>(),
+		failures: string[] = [],
+		written: Plan[] = []
+	let recovery = '',
+		keep = false,
+		failure: unknown,
+		result: string | undefined
+	try {
+		result = await (async () => {
+			// Line operations refer to the read version, so each file's run before its text replaces.
+			const rank = (e: Record<string, unknown>) =>
+				e.old === undefined && (e.range !== undefined || e.insert !== undefined) ? 0 : 1
+			for (const [i, e] of [...edits.entries()].sort((a, b) => rank(a[1]) - rank(b[1])))
 				try {
-					for (const p of changed) {
-						check(ctx)
-						await mkdir(dirname(p.path), { recursive: true })
-						await io.save(p.path, p.next, p.before, () => {
-							written.push(p)
-						})
-						const saved = await load(p.path)
-						if (p.next === null ? saved !== null : !saved?.equals(p.next))
-							throw new Error(`${p.path}: disk verification failed`)
-						check(ctx)
+					check(ctx)
+					const path = await fileChanges.canonical(resolve(ctx.cwd, paths.expand(e.path as string)))
+					let p = plans.get(path)
+					if (!p) {
+						const before = await load(path)
+						if (before && before.length > tools.maxFileBytes) throw new Error(`${path} is too large`)
+						if (before) fileText.text(before, path)
+						plans.set(path, (p = { path, name: e.path as string, before, next: before ?? Buffer.alloc(0), ranges: [] }))
 					}
-				} catch (error: any) {
-					const rollback: string[] = []
-					for (const p of written.reverse())
-						try {
-							const now = await load(p.path)
-							if (p.next === null ? now !== null : !now?.equals(p.next))
-								throw new Error('changed externally; refusing to overwrite')
-							if (p.before) await io.save(p.path, p.before, p.next, undefined, p.mode)
-							else await unlink(p.path)
-						} catch (e: any) {
-							rollback.push(`${p.path}: ${e.message}`)
-						}
-					keep = rollback.length > 0
-					throw new Error(`${error.message}
-${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recovery}` : 'Rolled back all writes.'}`)
-				}
-				return changed
-					.map((p) =>
-						p.next === null
-							? `== ${p.name} deleted ==\n${p.diff}`
-							: p.kind === 'whole'
-								? fileText.read(p.name, p.next, 1, tools.readLines, true)
-								: `== ${p.name}@${fileText.hash(p.next)} ==\n${p.diff}`,
+					const kind =
+						e.delete !== undefined
+							? 'whole'
+							: e.old !== undefined
+								? 'text'
+								: e.range !== undefined || e.insert !== undefined
+									? 'range'
+									: 'whole'
+					if (
+						'count' in e &&
+						(kind !== 'text' ||
+							e.range !== undefined ||
+							e.lines !== undefined ||
+							!Number.isSafeInteger(e.count) ||
+							(e.count as number) < 1)
 					)
-					.join(N)
-			})()
-		} catch (e) {
-			failure = e
-		}
-		const cleanup: string[] = []
-		try {
-			if (recovery && !keep) await rm(recovery, { recursive: true })
-		} catch (e: any) {
-			cleanup.push(`recovery ${recovery}: ${e.message}`)
-		}
-		try {
-			result = [result, ...(await fileChanges.finish(observation)).lines].filter(Boolean).join('\n')
-		} catch (e: any) {
-			cleanup.push(e.message)
-		}
-		if (cleanup.length) throw new Error(`${failure ?? 'Files written'}; cleanup: ${cleanup.join('; ')}`)
-		if (failure) throw failure
-		let out = result!
-		const then = Array.isArray(input.then) ? (input.then as string[]) : []
-		for (const [k, text] of then.entries()) {
-			const r = nativeTool.resolve(text, ctx)
-			const res = await tools.run(
-				{
-					type: 'tool_call',
-					id: `${ctx.callId ?? 'edit'}-then${k + 1}`,
-					name: r.name,
-					input: r.input,
-				} as any,
-				ctx,
-			)
-			out += `${N}== then ${text.trim().split(N)[0]!.slice(0, 160)} ==${N}${res.output}`
-			if (res.isError && k + 1 < then.length) {
-				out += `${N}The ${then.length - k - 1} call(s) after it did not run.`
-				break
+						throw new Error('count requires exact text and a positive safe integer')
+					if (p.kind && (p.kind === 'whole' || kind === 'whole'))
+						throw new Error(
+							'a whole-file write cannot be combined with other edits of the same file (including deletion)',
+						)
+					if (e.hash !== undefined && !p.before) throw new Error(`${e.path}: no such file (${path})`)
+					if (e.hash !== undefined && (typeof e.hash !== 'string' || fileText.hash(p.before!) !== e.hash))
+						throw new Error(`${e.path}: stale version; READ again`)
+					if (e.delete !== undefined) {
+						if (e.delete !== true || !p.before || Object.keys(e).some((k) => !['path', 'hash', 'delete'].includes(k)))
+							throw new Error('file deletion requires an existing file, without other selectors')
+						p.mode = (await lstat(path)).mode & 0o7777
+						p.next = null
+					} else if (kind === 'range') {
+						if (e.old !== undefined || e.new !== undefined || !p.before)
+							throw new Error('line operations need an existing file; use lines, not new')
+						if (!Array.isArray(e.lines) || !e.lines.every((l) => typeof l === 'string'))
+							throw new Error('lines must be strings')
+						const plan = p
+						// Inserts at one point join in written order; an insert at a range's start leads it.
+						const add = (c: Change) => {
+							const insert = (r: Change) => r.end === r.start - 1,
+								same = plan.ranges.find((r) => r.start === c.start)
+							if (!same || !(insert(c) || insert(same))) return void plan.ranges.push(c)
+							if (insert(same))
+								plan.ranges.splice(plan.ranges.indexOf(same), 1, {
+									...c,
+									lines: [...same.lines, ...c.lines],
+								})
+							else same.lines = [...c.lines, ...same.lines]
+						}
+						if (e.insert !== undefined) {
+							const n = fileText.text(p.before, path).lines.length
+							if (!Number.isSafeInteger(e.insert) || (e.insert as number) < 1 || (e.insert as number) > n + 1)
+								throw new Error(`insert point outside the file's ${n} lines`)
+							add({
+								start: e.insert as number,
+								end: (e.insert as number) - 1,
+								lines: e.lines as string[],
+							})
+						} else add({ ...fileText.range(e.range), lines: e.lines as string[] })
+						p.next = Buffer.from(fileText.apply(fileText.text(p.before, path), p.ranges).after)
+					} else {
+						if (e.range !== undefined || e.lines !== undefined || typeof e.new !== 'string')
+							throw new Error('text/whole-file edits require new text, without range or lines')
+						if (kind === 'text') {
+							if (!p.before || typeof e.old !== 'string' || !e.old)
+								throw new Error('old must be nonempty text in an existing file')
+							const text = p.next!.toString(),
+								at = text.indexOf(e.old),
+								expected = e.count ?? 1
+							if (at < 0)
+								throw new Error(
+									`old not found in planned text (matched 0 times; count requires ${expected}); check exact whitespace and surrounding context`,
+								)
+							let count = 0,
+								matches: number[] = []
+							for (let pos = at; pos >= 0; pos = text.indexOf(e.old, pos + e.old.length)) {
+								count++
+								if (matches.length < 2) matches.push(text.slice(0, pos).split(String.fromCharCode(10)).length)
+							}
+							if (count !== expected) {
+								const lines = fileText
+									.text(p.next!, path)
+									.lines.map((l) => (l.length > 300 ? l.slice(0, 300) + '… [line cut]' : l))
+								const contexts = matches.map((n) =>
+									fileText.numbered(
+										lines,
+										Array.from(
+											{ length: Math.min(lines.length, n + 2) - Math.max(1, n - 2) + 1 },
+											(_, j) => Math.max(1, n - 2) + j,
+										),
+									),
+								)
+								throw new Error(
+									`old matched ${count} times; count requires ${expected}. Set count to the exact intended number, extend old with surrounding context, or use version-checked ranges. First two matches in planned text after earlier steps (not a READ version):${String.fromCharCode(10)}${contexts.join(String.fromCharCode(10) + '…' + String.fromCharCode(10))}`,
+								)
+							}
+							// Removing whole lines also removes their newline, leaving no blank line.
+							const line =
+								e.new === '' && count === 1 && (at === 0 || text[at - 1] === N) && text[at + e.old.length] === N
+							p.next = Buffer.from(
+								line ? text.slice(0, at) + text.slice(at + e.old.length + 1) : text.split(e.old).join(e.new),
+							)
+						} else {
+							if (e.create && p.before) throw new Error('create: file exists; READ it and use write with its version')
+							p.next = Buffer.from(e.new)
+						}
+					}
+					if (p.next && p.next.length > tools.maxFileBytes) throw new Error(`${path}: result is too large`)
+					p.kind = kind
+				} catch (e: any) {
+					failures.push(`step ${i + 1} (${edits[i]!.path}): ${e.message}`)
+				}
+			if (failures.length) throw new Error(`Nothing written: ${failures.join('; ')}`)
+			for (const p of plans.values()) {
+				if (p.next === null || p.before?.equals(p.next)) continue
+				const text = await pluginFiles.transform(p.path, p.next.toString(), ctx)
+				if (typeof text !== 'string') throw new Error(`${p.path}: plugin transform must return text; nothing written`)
+				p.next = Buffer.from(text)
+				if (p.next.length > tools.maxFileBytes)
+					throw new Error(`${p.path}: transformed result is too large; nothing written`)
 			}
+			const changed = [...plans.values()].filter((p) => p.next === null || !p.before?.equals(p.next))
+			for (const p of changed) {
+				p.diff = textDiff
+					.text(p.before?.toString() ?? '', p.next?.toString() ?? '', Infinity, true)
+					.replace(/^([ +-])\s*(\d+) /gm, '$1$2: ')
+				const now = await load(p.path)
+				if (p.before ? !now?.equals(p.before) : now !== null)
+					throw new Error(`${p.path} changed while planning; nothing written`)
+			}
+			check(ctx)
+			if (!changed.length) return [...plans.values()].map((p) => `${p.name}: no changes`).join(N)
+			await mkdir(paths.tmpDir(), { recursive: true })
+			recovery = await mkdtemp(`${paths.tmpDir()}/multiedit-`)
+			await writeFile(
+				`${recovery}/manifest.json`,
+				JSON.stringify(
+					changed.map((p, i) => ({
+						path: p.path,
+						backup: p.before ? `${i}` : null,
+					})),
+				),
+				{ mode: 0o600 },
+			)
+			for (const [i, p] of changed.entries())
+				if (p.before) await writeFile(`${recovery}/${i}`, p.before, { mode: 0o600 })
+			try {
+				for (const p of changed) {
+					check(ctx)
+					await mkdir(dirname(p.path), { recursive: true })
+					await io.save(p.path, p.next, p.before, () => {
+						written.push(p)
+					})
+					const saved = await load(p.path)
+					if (p.next === null ? saved !== null : !saved?.equals(p.next))
+						throw new Error(`${p.path}: disk verification failed`)
+					check(ctx)
+				}
+			} catch (error: any) {
+				const rollback: string[] = []
+				for (const p of written.reverse())
+					try {
+						const now = await load(p.path)
+						if (p.next === null ? now !== null : !now?.equals(p.next))
+							throw new Error('changed externally; refusing to overwrite')
+						if (p.before) await io.save(p.path, p.before, p.next, undefined, p.mode)
+						else await unlink(p.path)
+					} catch (e: any) {
+						rollback.push(`${p.path}: ${e.message}`)
+					}
+				keep = rollback.length > 0
+				throw new Error(`${error.message}
+${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recovery}` : 'Rolled back all writes.'}`)
+			}
+			return changed
+				.map((p) =>
+					p.next === null
+						? `== ${p.name} deleted ==\n${p.diff}`
+						: p.kind === 'whole'
+							? fileText.read(p.name, p.next, 1, tools.readLines, true)
+							: `== ${p.name}@${fileText.hash(p.next)} ==\n${p.diff}`,
+				)
+				.join(N)
+		})()
+	} catch (e) {
+		failure = e
+	}
+	const cleanup: string[] = []
+	try {
+		if (recovery && !keep) await rm(recovery, { recursive: true })
+	} catch (e: any) {
+		cleanup.push(`recovery ${recovery}: ${e.message}`)
+	}
+	try {
+		result = [result, ...(await fileChanges.finish(observation)).lines].filter(Boolean).join('\n')
+	} catch (e: any) {
+		cleanup.push(e.message)
+	}
+	if (cleanup.length) throw new Error(`${failure ?? 'Files written'}; cleanup: ${cleanup.join('; ')}`)
+	if (failure) throw failure
+	let out = result!
+	const then = Array.isArray(input.then) ? (input.then as string[]) : []
+	for (const [k, text] of then.entries()) {
+		const r = nativeTool.resolve(text, ctx)
+		const res = await tools.run(
+			{
+				type: 'tool_call',
+				id: `${ctx.callId ?? 'edit'}-then${k + 1}`,
+				name: r.name,
+				input: r.input,
+			} as any,
+			ctx,
+		)
+		out += `${N}== then ${text.trim().split(N)[0]!.slice(0, 160)} ==${N}${res.output}`
+		if (res.isError && k + 1 < then.length) {
+			out += `${N}The ${then.length - k - 1} call(s) after it did not run.`
+			break
 		}
-		return out
-	},
+	}
+	return out
 }
+
+export const tool: Tool = { name: 'edit', inPrompt, summary, help, syntax, parameters, run }

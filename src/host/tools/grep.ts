@@ -11,6 +11,35 @@ import { settings } from '../../common/settings.ts'
 import { approval } from '../approval.ts'
 import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
 
+// GREP help is injected into the system prompt in full.
+const inPrompt = true
+const summary = 'search file contents'
+const help = `## GREP
+
+Search files with GREP. This system has no rg; don't use grep -r.
+	GREP "handleClick|onSubmit"
+	GREP "resolve(" { in: ["src", "test"], glob: "*.ts", context: 2 }
+	GREP "TODO" { files: true }
+- The pattern is a regex (rg syntax); an invalid one is searched as literal |-separated alternatives. glob "!*.test.ts" excludes. Git-ignored files are skipped; at most 100 matches show.`
+
+const parameters = {
+	type: 'object',
+	properties: {
+		pattern: { type: 'string' },
+		in: { type: ['string', 'array'], items: { type: 'string' } },
+		glob: { type: 'string' },
+		context: { type: 'integer', minimum: 0, maximum: 100 },
+		files: { type: 'boolean' },
+	},
+	required: ['pattern'],
+}
+
+const syntax = {
+	usage: ['GREP "<pattern>" { in?, glob?, context?, files? }?'],
+	block: 'pattern',
+	resolve: resolveCall,
+}
+
 type Line = { path: string; line: number; text: string; match: boolean }
 type Search = { lines: Line[]; matches: number; files: Set<string>; more: boolean }
 type Query = {
@@ -207,72 +236,60 @@ function format(found: Search, filesOnly: boolean, separated: boolean): string {
 	return out.join('\n')
 }
 
+async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+	let pattern = input.pattern
+	if (typeof pattern !== 'string' || !pattern) throw new Error('pattern must be a non-empty string')
+	let wanted = [input.in ?? '.'].flat()
+	if (!wanted.every((p) => typeof p === 'string' && p)) throw new Error('in must be a path or a list of paths')
+	if (input.glob !== undefined && typeof input.glob !== 'string') throw new Error('glob must be a string')
+	let context = input.context ?? 0
+	if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 100)
+		throw new Error('context must be an integer from 0 to 100')
+	let notes: string[] = []
+	let roots: string[] = []
+	for (let p of wanted as string[]) {
+		let abs = resolve(ctx.cwd, paths.expand(p))
+		if (!existsSync(abs)) notes.push(`No such path: ${p}`)
+		else roots.push(abs)
+	}
+	if (!roots.length) return { text: notes.join('\n'), isError: true }
+	let q: Query = {
+		regex: pattern,
+		roots,
+		glob: input.glob as string | undefined,
+		context,
+		cwd: ctx.cwd,
+		signal: ctx.signal,
+	}
+	let bin = tool.rg()
+	let search = (q: Query) => (bin ? withRg(bin, q) : builtIn(q))
+	let found = await search(q)
+	if ('invalid' in found) {
+		let literals = alternatives(pattern)
+		notes.push(`Invalid regex, so searched as literal text: ${literals.map((l) => JSON.stringify(l)).join(' or ')}`)
+		found = await search({ ...q, regex: undefined, literals })
+		if ('invalid' in found) throw new Error(found.invalid)
+	}
+	if (settings.security() !== 'yolo') {
+		let hidden = new Set([...found.files].filter((f) => approval.sensitive(resolve(ctx.cwd, f))))
+		if (hidden.size) {
+			found.matches -= found.lines.filter((l) => l.match && hidden.has(l.path)).length
+			found.lines = found.lines.filter((l) => !hidden.has(l.path))
+			for (let f of hidden) found.files.delete(f)
+			notes.push(`Left out ${hidden.size} sensitive file${hidden.size === 1 ? '' : 's'}`)
+		}
+	}
+	return [...notes, format(found, input.files === true, context > 0)].join('\n')
+}
+
 export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 	name: 'grep',
-	description:
-		'Search file contents under paths (default cwd), skipping git-ignored files. The pattern is a regex (rg syntax); an invalid regex is searched as literal |-separated alternatives. Prints path:line: text, at most 100 matches.',
+	inPrompt,
+	summary,
+	help,
 	readOnly: true,
-	syntax: {
-		summary: false,
-		usage: ['GREP "<pattern>" [ { in: "<path>" | ["<path>", ...], glob: "*.ts", context: 2, files: true } ]'],
-		block: 'pattern',
-		resolve: resolveCall,
-	},
-	parameters: {
-		type: 'object',
-		properties: {
-			pattern: { type: 'string', description: 'Regex (rg syntax); | separates alternatives' },
-			in: { type: ['string', 'array'], items: { type: 'string' }, description: 'Path or paths to search, default cwd' },
-			glob: { type: 'string', description: 'Only files matching this glob, e.g. *.ts; a leading ! excludes' },
-			context: { type: 'integer', minimum: 0, maximum: 100, description: 'Lines of context around each match' },
-			files: { type: 'boolean', description: 'List matching files only' },
-		},
-		required: ['pattern'],
-	},
+	parameters,
+	syntax,
 	rg,
-	async run(input, ctx: ToolContext) {
-		let pattern = input.pattern
-		if (typeof pattern !== 'string' || !pattern) throw new Error('pattern must be a non-empty string')
-		let wanted = [input.in ?? '.'].flat()
-		if (!wanted.every((p) => typeof p === 'string' && p)) throw new Error('in must be a path or a list of paths')
-		if (input.glob !== undefined && typeof input.glob !== 'string') throw new Error('glob must be a string')
-		let context = input.context ?? 0
-		if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 100)
-			throw new Error('context must be an integer from 0 to 100')
-		let notes: string[] = []
-		let roots: string[] = []
-		for (let p of wanted as string[]) {
-			let abs = resolve(ctx.cwd, paths.expand(p))
-			if (!existsSync(abs)) notes.push(`No such path: ${p}`)
-			else roots.push(abs)
-		}
-		if (!roots.length) return { text: notes.join('\n'), isError: true }
-		let q: Query = {
-			regex: pattern,
-			roots,
-			glob: input.glob as string | undefined,
-			context,
-			cwd: ctx.cwd,
-			signal: ctx.signal,
-		}
-		let bin = tool.rg()
-		let search = (q: Query) => (bin ? withRg(bin, q) : builtIn(q))
-		let found = await search(q)
-		if ('invalid' in found) {
-			let literals = alternatives(pattern)
-			notes.push(`Invalid regex, so searched as literal text: ${literals.map((l) => JSON.stringify(l)).join(' or ')}`)
-			found = await search({ ...q, regex: undefined, literals })
-			if ('invalid' in found) throw new Error(found.invalid)
-		}
-		if (settings.security() !== 'yolo') {
-			let hidden = new Set([...found.files].filter((f) => approval.sensitive(resolve(ctx.cwd, f))))
-			if (hidden.size) {
-				found.matches -= found.lines.filter((l) => l.match && hidden.has(l.path)).length
-				found.lines = found.lines.filter((l) => !hidden.has(l.path))
-				for (let f of hidden) found.files.delete(f)
-				notes.push(`Left out ${hidden.size} sensitive file${hidden.size === 1 ? '' : 's'}`)
-			}
-		}
-		return [...notes, format(found, input.files === true, context > 0)].join('\n')
-	},
+	run,
 }

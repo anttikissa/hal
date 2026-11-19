@@ -25,7 +25,7 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true, parent: '01-abc', kind: 'subagent', autoclose: true }
 	let interactive = systemPrompt.inspect(input)
 	expect(interactive.text).toContain('BASH /*')
-	expect(interactive.sections.find((s) => s.title === 'BASH')?.body).toContain(
+	expect(interactive.sections.find((s) => s.title === 'Tools')?.body).toContain(
 		'Long-running commands must use background: true',
 	)
 	let unattended = systemPrompt.inspect({ ...input, interactive: false })
@@ -34,20 +34,20 @@ test('execution guidance follows interaction mode, not subagent kind or autoclos
 	expect(unattended.text).toContain('unsafeToStop')
 	expect(unattended.text).toContain('modifies')
 	expect(unattended.text).toContain('path')
-	let bash = unattended.sections.find((s) => s.title === 'BASH')?.body
+	let bash = unattended.sections.find((s) => s.title === 'Tools')?.body
 	expect(bash).toContain('foreground')
 	expect(bash).toContain('parallel work')
 	expect(bash).toContain('WAIT for completion')
 })
 
-test('a hook that rewrites a tool guide changes only that section; a removed heading withdraws its section', () => {
+test('a hook that rewrites a section changes only that section; a removed heading withdraws its section', () => {
 	let input = { cwd: root, model: 'm/x', now: at, noUser: true }
 	let plain = systemPrompt.inspect(input),
 		assemble = systemPrompt.assemble
 	systemPrompt.assemble = (...args) =>
 		assemble(...args)
-			.replace(/(# EDIT\n)[\s\S]*?(?=\n\n# )/, '$1- Use EDIT blocks.\n  !!NEW example')
-			.replace(/\n\n# WRITE\n[\s\S]*?(?=\n\n# )/, '')
+			.replace(/(# Compaction\n)[\s\S]*?(?=\n\n# )/, '$1- Use EDIT blocks.\n  !!NEW example')
+			.replace(/\n\n# Slash commands\n[\s\S]*?(?=\n\n# )/, '')
 	try {
 		let hooked = systemPrompt.inspect(input)
 		let outside = (r: typeof plain) =>
@@ -56,8 +56,8 @@ test('a hook that rewrites a tool guide changes only that section; a removed hea
 				.reduceRight((t, s) => t.slice(0, s.start) + t.slice(s.end), r.text)
 				.replace(/\n{3,}/g, '\n\n')
 		expect(outside(hooked)).toBe(outside(plain))
-		expect(hooked.sections.find((s) => s.title === 'EDIT')?.body).toBe('- Use EDIT blocks.\n  !!NEW example')
-		expect(hooked.sections.some((s) => s.title === 'WRITE')).toBe(false)
+		expect(hooked.sections.find((s) => s.title === 'Compaction')?.body).toBe('- Use EDIT blocks.\n  !!NEW example')
+		expect(hooked.sections.some((s) => s.title === 'Slash commands')).toBe(false)
 		for (let s of hooked.sections.filter((s) => s.body.trim()))
 			expect(hooked.text.slice(s.start, s.end)).toBe(`# ${s.title}\n${s.body}`)
 	} finally {

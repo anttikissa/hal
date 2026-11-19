@@ -1,5 +1,5 @@
 {
-	version: 43,
+	version: 44,
 	changes: [
 		{
 			version: 2,
@@ -820,6 +820,39 @@
 					kind: 'compatible',
 					target: 'host/tools.SyntaxSpec.block',
 					description: 'Tools name the field a !!START block fills'
+				}
+			]
+		},
+		{
+			version: 44,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/tools.Tool',
+					description: 'Adds optional summary, inPrompt and help; description becomes optional'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/prompt-lang.render',
+					description: 'Adds generated includes (@name)'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/system-prompt.vars',
+					description: 'Drops other_tools',
+					port: 'Use @tools in SYSTEM.md'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/native-tool.nativeTool.summary',
+					description: 'Removed',
+					port: 'Use nativeTool.guides()'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/edit-blocks.editBlocks.help',
+					description: 'Removed',
+					port: "Read the edit tool's help"
 				}
 			]
 		}

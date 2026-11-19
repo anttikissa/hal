@@ -88,13 +88,39 @@ export type ToolCard = {
 	hue?: number
 	title?(input: Record<string, unknown>, result?: { output: string; isError?: boolean }): string | undefined
 }
+// Model-facing text (task 5t3). `summary`: one line; HELP lists it, and
+// a tool without `inPrompt` appears in the prompt's Other tools as its
+// capitalized name and summary ('read a history entry' becomes
+// 'READ_ENTRY read a history entry'). `inPrompt`: `help` is the tool's
+// own section in the system prompt (src/host/native-tool.ts guides).
+// `help`: what HELP <TOOL> shows, rendered with the prompt's template
+// language (src/host/prompt-lang.ts) and the session's variables.
+//
+// Notation, in help and summaries:
+//   BASH            literal tool name
+//   <name>          placeholder
+//   "<name>"        a JS string
+//   /* <purpose> */ purpose comment; non-interactive sessions never see it
+//   { a, b? }       options object; b? is an optional field
+//   <token>?        optional token
+//   ...             repeats
+//   !!START ... !!END on their own lines: a raw block
+//   one line per alternative; `// note` trails a line
+//   name?: type   description     a field line; types: string, number,
+//                 boolean, string[], "a" | "b"
+// Field lines document; they may be stricter than run's validation.
+// Use $name variables only, never ${name}.
 export type Tool<Output = string> = {
 	name: string
-	description: string
+	// For tools without help: HELP's first line.
+	description?: string
 	parameters: ToolDef['inputSchema']
 	readOnly?: true
 	card?: ToolCard
 	syntax?: SyntaxSpec
+	summary?: string
+	inPrompt?: true
+	help?: string
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
 
@@ -299,7 +325,7 @@ export const tools = {
 	readOnly: (name: string, input: Record<string, unknown> = {}): boolean =>
 		toolDetails.harmless(name, input) || tools.all().find((t) => t.name === name)?.readOnly === true,
 	defs: (): ToolDef[] =>
-		tools.all().map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+		tools.all().map((t) => ({ name: t.name, description: t.description ?? t.summary ?? '', inputSchema: t.parameters })),
 	killAfterMs: 2000,
 	// Bash streams its output while it runs, a background job until it ends.
 	streams: (call: ToolCallBlock): boolean => call.name === 'bash',
