@@ -24,6 +24,7 @@ export const tool: Tool = {
 	// task is required unless kind is interactive, so the schema cannot require it.
 	syntax: {
 		summary: false,
+		block: 'task',
 		aliases: { title: 'name', goal: 'task' },
 		usage: ['SPAWN { task, [ kind, mode, model, cwd, name, limit ] }       // "[ ]" here means optional, not an array'],
 	},

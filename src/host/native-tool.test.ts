@@ -190,6 +190,26 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(() => nativeTool.resolve('BASH "x" { timeout: 1 + 2 }')).toThrow()
 })
 
+test('a !!START block fills the tool text field, also past custom grammars', () => {
+	expect(nativeTool.resolve('BASH /* Check */ { timeout: 2 }\n!!START\necho "a\\nb"\n!!END')).toEqual({
+		name: 'bash',
+		input: { command: 'echo "a\\nb"', timeout: 2, description: 'Check' },
+	})
+	expect(nativeTool.resolve('SEND "2"\n!!START\nhi "there"\n!!END')).toEqual({
+		name: 'send',
+		input: { to: '2', text: 'hi "there"' },
+	})
+	expect(nativeTool.resolve('COMPACT\n!!START\n## State\n!!END')).toEqual({
+		name: 'compact',
+		input: { summary: '## State' },
+	})
+	expect(nativeTool.resolve('EVAL\n!!START\nreturn `x`\n!!END')).toEqual({
+		name: 'eval',
+		input: { code: 'return `x`' },
+	})
+	expect(() => nativeTool.resolve('READ\n!!START\na.ts\n!!END')).toThrow(/READ takes no !!START block/)
+})
+
 test('replay sends calls back as their cmd text, old calls as their equivalent', () => {
 	expect(
 		replayText.asNative({ type: 'tool_call', id: 'a', name: 'bash', input: { command: 'ls' }, cmd: 'BASH "ls"' }).input,

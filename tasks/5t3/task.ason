@@ -3,7 +3,8 @@
 	spec: "Each tool's prompt guide (when and how to use it, with examples) lives in its module beside its syntax, not in SYSTEM.md. Guides use SYSTEM.md's template language, so they keep conditions such as $session_interactive and variables such as $session_id. SYSTEM.md places guide sections generated from the tool registry, replacing its hand-written READ, GREP, BASH, EDIT and Compaction sections; general rules stay in SYSTEM.md. Each guide teaches only the canonical form, with blocks for multi-line or quoted arguments (task 0nt); leniency stays unadvertised (task hq6). Tools without a prompt guide keep their one-line summary in Other tools, and HELP <TOOL> remains their detailed syntax. Rendering stays byte-identical across requests for prompt caching; a guide change reaches running sessions as a section update (task vd9). Plugins can add or replace a tool's guide.",
 	status: 'planned',
 	notes: [
-		'Open, 2026-11-19: which tools get a full guide in the prompt and which only a one-line summary plus HELP. Decide when implementing; ask the user if unclear.'
+		'Open, 2026-11-19: which tools get a full guide in the prompt and which only a one-line summary plus HELP. Decide when implementing; ask the user if unclear.',
+		"From 10-cfg, 2026-11-19: when moving guides, drop 'then' from EDIT's 'replace A-B then !!NEW, new lines, !!END' (models write 'then !!NEW' literally); WAIT takes { timeout: <seconds> }, so BASH's 'set timeout and use WAIT' line applies to both."
 	],
 	needs: ['0nt', 'hq6'],
 	foldInto: ['vd9']

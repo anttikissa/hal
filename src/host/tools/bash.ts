@@ -52,6 +52,7 @@ export const tool: Tool<ToolOutput> = {
 	syntax: {
 		summary: false,
 		positional: ['command'],
+		block: 'command',
 		aliases: { cmd: 'command' },
 		usage: ['BASH "<command>" [ { timeout, background, unsafeToStop, modifies } ]'],
 	},

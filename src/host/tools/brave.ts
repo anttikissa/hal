@@ -43,7 +43,7 @@ function resetWait(headers: Headers): number | undefined {
 
 export const tool: Tool & { url: string; format: typeof format } = {
 	name: 'brave',
-	syntax: { usage: [`BRAVE "search terms" [ { num: ${defaultNum} } ]`] },
+	syntax: { usage: [`BRAVE "search terms" [ { num: ${defaultNum} } ]`], block: 'query' },
 	description: 'Search the web with Brave Search. Returns titles, URLs and snippets.',
 	parameters: {
 		type: 'object',

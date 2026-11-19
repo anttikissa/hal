@@ -65,12 +65,14 @@ export type ToolOutput =
 // `resolve` maps the text after the name to a call when the grammar is
 // special, possibly of another tool. `aliases` silently accepts field
 // names models were seen to send: each maps to the real field, or null
-// to drop it; HELP never shows them.
+// to drop it; HELP never shows them. `block`: the text field a !!START
+// block fills (task 0nt); tools without one reject blocks.
 export type SyntaxSpec = {
 	summary?: string | false
 	usage?: string[]
 	positional?: string[]
 	aliases?: Record<string, string | null>
+	block?: string
 	resolve?(raw: string, ctx?: CallContext): { name: string; input: Record<string, unknown> }
 }
 // How a plugin tool's card looks (host/tool-card.ts, task m3a). `command`:

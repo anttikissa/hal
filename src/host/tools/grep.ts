@@ -215,6 +215,7 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 	syntax: {
 		summary: false,
 		usage: ['GREP "<pattern>" [ { in: "<path>" | ["<path>", ...], glob: "*.ts", context: 2, files: true } ]'],
+		block: 'pattern',
 		resolve: resolveCall,
 	},
 	parameters: {

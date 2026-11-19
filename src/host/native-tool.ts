@@ -53,16 +53,22 @@ function find(id: string): Tool<unknown> {
 }
 
 // Positional strings fill the tool's positional fields in order; an
-// object argument supplies fields by name. Every tool takes an optional
+// object argument supplies fields by name; a !!START block fills
+// syntax.block (task 0nt). Every tool takes an optional
 // purpose, as a comment or a description field; it becomes the description
 // where the tool has one and is dropped elsewhere.
 function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
-	let { values, purpose, unclosed } = callText.values(raw)
+	let { values, purpose, unclosed, block } = callText.values(raw)
 	let { properties = {}, required = [] } = schema(tool)
-	let positional = tool.syntax?.positional ?? required
+	let field = tool.syntax?.block
+	let positional = (tool.syntax?.positional ?? required).filter((k) => block === undefined || k !== field)
 	let input: Record<string, unknown> = {}
 	let next = 0
 	let usage = () => `Usage: ${nativeTool.usage(tool).join(' | ')}`
+	if (block !== undefined) {
+		if (!field) throw new Error(`${tool.name.toUpperCase()} takes no !!START block. ${usage()}`)
+		input[field] = block
+	}
 	for (let value of values) {
 		// [{ … }] stands for { … }.
 		if (
@@ -104,12 +110,14 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 }
 
 // The internal call a call text stands for. Throws with what is wrong.
-// `ctx`: the session it serves, when known (task pf2).
+// `ctx`: the session it serves, when known (task pf2). Marker lines mean
+// block syntax, which only the generic grammar reads; EDIT has its own.
 function resolve(text: unknown, ctx?: CallContext): { name: string; input: Record<string, unknown> } {
 	let parsed = callText.parse(text)
 	let tool = nativeTool.find(parsed.name)
-	let resolved = tool.syntax?.resolve
-		? tool.syntax.resolve(parsed.raw, ctx)
+	let custom = tool.syntax?.resolve && (tool.name === 'edit' || !callText.hasMarker(parsed.raw))
+	let resolved = custom
+		? tool.syntax!.resolve!(parsed.raw, ctx)
 		: { name: tool.name, input: nativeTool.generic(tool, parsed.raw) }
 	if (parsed.purpose && schema(tool).properties?.description)
 		resolved.input.description = [resolved.input.description, parsed.purpose].filter(Boolean).join(' ')

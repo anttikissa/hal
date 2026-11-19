@@ -130,6 +130,7 @@ export const tool: Tool = {
 			'let files = (await tool(`GREP "TODO" { files: true }`)).split("\\n")',
 			'return files.filter(f => f.startsWith("src/host"))',
 		],
+		block: 'code',
 		resolve,
 	},
 	run,

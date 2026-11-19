@@ -51,3 +51,37 @@ test('a line starts a new call only at a tool name, so bare paths stay in their 
 	let edit = 'EDIT /* Add deploy */\ndeploy create\n!!NEW\nf() {\n}\n!!END'
 	expect(split(`${edit}\nBASH "./deploy"`)).toEqual([edit, 'BASH "./deploy"'])
 })
+
+test('a !!START block keeps quotes, backslashes, blank lines and escaped markers byte-exact', () => {
+	let content = `grep -E '\\d+ "x"' a\\\\b\n\n  READ "no"\n!!END\n!!START\n`
+	let escaped = content.replace('!!END', '!!!END').replace('!!START', '!!!START')
+	for (let nl of ['\n', '\r\n']) {
+		let raw = ` /* Find */ { timeout: 5 }${nl}!!START${nl}${escaped.replaceAll('\n', nl)}${nl}!!END${nl}`
+		let crlf = nl === '\r\n' ? content.replaceAll('\n', '\r\n') : content
+		expect(callText.values(raw)).toEqual({ values: [{ timeout: 5 }], purpose: 'Find', block: crlf })
+	}
+	expect(callText.values('\n!!START\n!!END').block).toBe('')
+})
+
+test('calls never split inside a block; EVAL with a block ends at its !!END', () => {
+	let bash = 'BASH\n!!START\nREAD "x"\nEVAL 1\n!!END'
+	expect(split(`${bash}\nREAD a.ts`)).toEqual([bash, 'READ a.ts'])
+	let evalBlock = 'EVAL /* Chain */\n!!START\nread = 1\n!!END'
+	expect(split(`${evalBlock}\nREAD a.ts`)).toEqual([evalBlock, 'READ a.ts'])
+})
+
+test('malformed blocks fail with distinct codes', () => {
+	let code = (raw: string) => {
+		try {
+			callText.values(raw)
+		} catch (e: any) {
+			return e.code
+		}
+	}
+	expect(code('\n!!START\nls')).toBe('block-unclosed')
+	expect(code('\n!!START\na\n!!START\nb\n!!END')).toBe('block-nested')
+	expect(code('\n!!START\na\n!!END\n!!START\nb\n!!END')).toBe('block-two')
+	expect(code('\n!!NEW\nls\n!!END')).toBe('block-new')
+	expect(code('\n!!OLD\nls\n!!END')).toBe('block-old')
+	expect(code('\n!!END')).toBe('block-stray-end')
+})

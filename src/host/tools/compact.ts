@@ -10,6 +10,7 @@ export const tool: Tool = {
 		summary: 'replace active context with your working-state checkpoint; full history stays',
 		usage: ['COMPACT { summary: "..." }'],
 		positional: ['summary'],
+		block: 'summary',
 		aliases: { cmd: 'summary' },
 		// Unquoted text after leading /* comments is the summary as written.
 		resolve(raw) {

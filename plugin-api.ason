@@ -1,5 +1,5 @@
 {
-	version: 42,
+	version: 43,
 	changes: [
 		{
 			version: 2,
@@ -810,6 +810,16 @@
 					target: 'host/limits',
 					description: 'Refusal entries',
 					port: 'Use limits.until'
+				}
+			]
+		},
+		{
+			version: 43,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/tools.SyntaxSpec.block',
+					description: 'Tools name the field a !!START block fills'
 				}
 			]
 		}

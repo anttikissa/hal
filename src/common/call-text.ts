@@ -1,22 +1,64 @@
 // The call grammar (task 3fv): the cmd text of one native tool call.
 //
 //   NAME [/* purpose */] [arguments...]
+//   [!!START
+//   literal lines
+//   !!END]
 //
 // Names are case-insensitive. Arguments are JS string literals, ASON
 // objects or arrays (parsed, never evaluated), or bare words on the
 // call's own line; values may span lines. A quoted string followed
 // directly by more text keeps it ("src/a b.ts":1-9). /* comments */
 // between arguments join, in order, into the purpose. Blank lines and #
-// comment lines are skipped. This module is syntax only: which argument
-// fills which field belongs to each tool (host native-tool.ts).
+// comment lines are skipped. One !!START block (task 0nt) carries a
+// text argument byte-exact; a content line that is itself a marker takes
+// one extra ! (!!!END). This module is syntax only: which argument fills
+// which field belongs to each tool (host native-tool.ts).
 
 import { ason } from './ason.ts'
 
 export type Parsed = { name: string; raw: string; purpose?: string }
-export type Values = { values: unknown[]; purpose?: string; unclosed?: true }
+export type Values = { values: unknown[]; purpose?: string; unclosed?: true; block?: string }
 
 const maxChars = 200_000
 const one = 'one tool per call; make independent calls in parallel'
+
+// A call-text failure quirks (task hq6) can recognize by its code.
+function fail(code: string, message: string): never {
+	throw Object.assign(new Error(message), { code })
+}
+
+// The line from `i` without its \r, as a marker would be written.
+function lineAt(text: string, i: number): string {
+	return text.slice(i, lineEnd(text, i)).replace(/\r$/, '')
+}
+
+// Whether `raw` holds a marker line, so it is block syntax, not prose.
+function hasMarker(raw: string): boolean {
+	return /^!!(START|END|NEW|OLD)\r?$/m.test(raw)
+}
+
+// The !!START block whose marker line begins at `i`: its content and the
+// index after its !!END line.
+function block(raw: string, i: number): { content: string; end: number } {
+	let lines: string[] = []
+	let at = lineEnd(raw, i) + 1
+	while (at <= raw.length) {
+		let line = lineAt(raw, at)
+		let next = lineEnd(raw, at) + 1
+		if (line === '!!END') return { content: lines.join('\n').replace(/\r$/, ''), end: Math.min(next, raw.length) }
+		if (line === '!!START')
+			fail(
+				'block-nested',
+				'!!START inside a block: close the first with !!END. A literal !!START line takes one extra ! (!!!START).',
+			)
+		lines.push(
+			/^!!!+(START|END)\r?$/.test(raw.slice(at, next - 1)) ? raw.slice(at + 1, next - 1) : raw.slice(at, next - 1),
+		)
+		at = next
+	}
+	return fail('block-unclosed', '!!START block has no !!END line; each marker is a whole line.')
+}
 
 function lineEnd(text: string, i: number): number {
 	let end = text.indexOf('\n', i)
@@ -77,6 +119,7 @@ function values(raw: string): Values {
 	let purposes: string[] = []
 	let unclosed = false
 	let firstLine = true
+	let content: string | undefined
 	let i = 0
 	for (;;) {
 		while (i < raw.length) {
@@ -84,6 +127,17 @@ function values(raw: string): Values {
 			if (c === '\n') {
 				firstLine = false
 				i++
+			} else if (c === '!' && raw[i - 1] === '\n' && /^!!(START|END|NEW|OLD)$/.test(lineAt(raw, i))) {
+				let marker = lineAt(raw, i)
+				if (marker === '!!NEW')
+					fail(
+						'block-new',
+						'!!NEW starts new text in EDIT; other tools take one block: a !!START line, literal lines, an !!END line.',
+					)
+				if (marker === '!!OLD') fail('block-old', '!!OLD belongs to EDIT; other tools take one !!START block.')
+				if (marker === '!!END') fail('block-stray-end', '!!END without a !!START line before it.')
+				if (content !== undefined) fail('block-two', `a call takes one !!START block; ${one}`)
+				;({ content, end: i } = block(raw, i))
 			} else if (/\s/.test(c)) i++
 			else if (raw.startsWith('/*', i)) {
 				let close = raw.indexOf('*/', i + 2)
@@ -123,24 +177,29 @@ function values(raw: string): Values {
 		}
 	}
 	let purpose = purposes.filter(Boolean).join(' ')
-	return { values: out, ...(purpose && { purpose }), ...(unclosed && { unclosed: true as const }) }
+	return {
+		values: out,
+		...(purpose && { purpose }),
+		...(unclosed && { unclosed: true as const }),
+		...(content !== undefined && { block: content }),
+	}
 }
 
 // The calls in `text`. A line starts a new call only when its first word
-// is a tool name; any other line continues the call above it.
+// is a tool name; any other line continues the call above it. Block
+// content (!!START, or EDIT's !!OLD/!!NEW, to !!END) never starts one.
 function split(text: string, isTool: (name: string) => boolean): string[] {
 	callText.parse(text)
 	if (!text.includes('\n')) return [text]
 	let starts = [0],
 		lineStart = true,
 		first = true,
-		edit = false,
 		block = false
 	for (let i = 0; i < text.length;) {
-		if (lineStart && edit && (block || text[i] === '!')) {
+		if (lineStart && (block || text[i] === '!')) {
 			let end = lineEnd(text, i),
-				line = text.slice(i, end).replace(/\r$/, '')
-			if (block || /^!!(OLD|NEW)$/.test(line)) {
+				line = lineAt(text, i)
+			if (block || /^!!(START|OLD|NEW)$/.test(line)) {
 				block = line !== '!!END'
 				i = end < text.length ? end + 1 : end
 				continue
@@ -165,9 +224,8 @@ function split(text: string, isTool: (name: string) => boolean): string[] {
 		if (name && !first && !isTool(name.toLowerCase())) name = undefined
 		if (name) {
 			if (!first) starts.push(i)
-			// EVAL's code is literal text to the end (task v99).
-			if (name.toLowerCase() === 'eval') break
-			edit = name.toLowerCase() === 'edit'
+			// EVAL's code without a block is literal text to the end (task v99).
+			if (name.toLowerCase() === 'eval' && !/^[^\n]*\n!!START\r?(\n|$)/.test(text.slice(i))) break
 		}
 		first = false
 		lineStart = false
@@ -177,4 +235,4 @@ function split(text: string, isTool: (name: string) => boolean): string[] {
 	return starts.map((start, i) => text.slice(start, starts[i + 1]).trim())
 }
 
-export const callText = { parse, values, split, maxChars, withoutLineComment }
+export const callText = { parse, values, split, hasMarker, maxChars, withoutLineComment }
