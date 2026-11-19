@@ -32,11 +32,11 @@ SEND /* <purpose> */ "<session id>" { delivery? }?
 <message>
 !!END
 	delivery?: "soft-steer" | "queue" | "steer"    default "soft-steer"
-- soft-steer delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work.
-- Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed.
+- soft-steer delivers at the next round without interrupting; queue after the current turn; steer sends it now (unsafe calls and background work are not stopped).
+- Use soft-steer for routine updates, steer to wake up a paused, failed, or waiting-for-answer session.
 - When a child asks you a question, answer with SEND.
 ::: if $session_interactive
-- The purpose is one short plain-language sentence for the user: what the message says or asks, e.g. /* Ask tab 2 to rerun the tests */
+- purpose shows the summary to user: e.g. /* Ask tab 2 to rerun the tests */
 :::`
 
 const parameters = {
