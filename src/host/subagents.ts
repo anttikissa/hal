@@ -46,7 +46,7 @@ export type Spawn = {
 // A child gets at most its parent's tools (task 0rc); unknown names fail
 // so a typo never silently drops a tool.
 function allowedTools(parent: SessionMeta, asked: string[] | undefined): string[] | undefined {
-	let mine = parent.tools ?? tools.all().map((t) => t.name)
+	let mine = tools.allowed(parent.id).map((t) => t.name)
 	if (!asked) return parent.tools
 	let names = asked.map((n) => n.toLowerCase())
 	let unknown = names.filter((n) => !tools.all().some((t) => t.name === n))

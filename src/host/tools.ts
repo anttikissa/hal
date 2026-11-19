@@ -142,10 +142,11 @@ function all(): Tool<ToolOutput>[] {
 }
 
 // The tools a session may call: SPAWN's restriction (task 0rc), or all.
+// Any tool brings HELP, which the native tool's description names.
 // A session running a turn is open; tools also run for sessionless callers.
 function allowed(sessionId: string): Tool<ToolOutput>[] {
 	let names = sessions.state.open.get(sessionId)?.tools
-	return tools.all().filter((t) => !names || names.includes(t.name))
+	return tools.all().filter((t) => !names || names.includes(t.name) || (t.name === 'help' && names.length > 0))
 }
 
 // Lines offset..offset+limit-1 (1-based) of `text`, each at most
