@@ -11,7 +11,7 @@ const inPrompt = true
 const summary = 'run a shell command'
 const help = `## BASH
 
-Use BASH for file discovery (ls, find) and commands. The command goes between !!START and !!END lines.
+Run a shell command. To edit files, prefer EDIT.
 BASH /* <purpose> */ { timeout?, background?, unsafeToStop?, modifies? }?
 !!START
 <command>

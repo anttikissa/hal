@@ -28,7 +28,7 @@ const inPrompt = true
 const summary = 'change, create and delete files'
 const help = `## EDIT
 
-Use EDIT for all file changes. Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:
+Edit files. Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:
     <path>@<version> replace A-B       !!NEW, new lines, !!END
     <path>@<version> insert-before N   !!NEW ... !!END
     <path>@<version> insert-after N    !!NEW ... !!END
@@ -37,15 +37,16 @@ Use EDIT for all file changes. Apply one atomic batch of operations across files
     <path> replace                     !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)
     <path> create                      !!NEW ... !!END (file must not exist)
     <path>@<version> write             !!NEW, whole new contents, !!END
-Always submit the <version> READ gave (<path>@<version>); line numbers are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. Nothing is written unless every operation validates. Results show verified diffs and new versions; no confirmation READ is needed.
-Example call text (markers start their lines):
-EDIT /* Rename handler */
-src/main.ts@4d9ej replace 3-4
+Use READ to acquire <version>. Nothing is written unless every operation validates.
+Example call (line numbers refer to the version READ gave):
+EDIT /* Add handler logic, remove unused import */
+src/main.ts@4d9ej replace 6-7
 !!NEW
-function process(x) {
-	return x + 1
+function process(user) {
+	if (!user.name) return
+	const valid = user.name.length > 4
 !!END
-src/main.ts@4d9ej delete 9-9
+src/main.ts@4d9ej delete 2
 ::: if $session_interactive
 - A descriptive /* comment */ is mandatory at the start of every EDIT: EDIT /* Rename helper to actualHelper in client files */
 :::`

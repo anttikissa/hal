@@ -25,7 +25,8 @@
 		'Unknown-tool errors name their level: a top-level provider call (COMMAND { cmd }) says it is not a provider tool and shows tool { cmd: "COMMAND <args...>" }; an unknown NAME inside the cmd text says so. The user then sees which side erred, not a correct-looking COMMAND failing.',
 		'SYSTEM.md scopes testing to affected behavior: Test the behavior your change affects. Use broader tests for changes to shared code. User approved 19 Oct; edited files alone are not the test boundary.',
 		'Bug fix: a line inside one cmd starts a new call only when its first word is a tool name (callText.split takes isTool from the host). Models treat newlines as whitespace, so a bare EDIT header path (deploy create) was split off as a call named deploy, leaving an empty EDIT.',
-		'Invariant: when splitting a cmd into calls fails (e.g. a stray quote inside prose), expand still resolves the whole text as one call, as for single-call text; it never leaves a resolvable call unresolved.'
+		'Invariant: when splitting a cmd into calls fails (e.g. a stray quote inside prose), expand still resolves the whole text as one call, as for single-call text; it never leaves a resolvable call unresolved.',
+		"User, 2026-11-19: a tool guide states a rule only when it is clear; otherwise it states none. A vague rule makes the model infer, wasting time and tokens. EDIT's guide dropped 'Text replaces apply after a file's line operations' (an undefined term) and 'no confirmation READ is needed' (the result shows the diff before any READ). History had 34 EDIT calls mixing line and text operations on one file; in none did order matter. The EDIT example notes that line numbers refer to the version READ gave. BASH and EDIT guides open with what the tool does."
 	],
 	needs: ['gr', 'asp']
 }
