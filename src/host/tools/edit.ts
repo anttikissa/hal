@@ -37,16 +37,16 @@ Edit files. Apply one atomic batch of operations across files. Each operation is
     <path> replace                     !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)
     <path> create                      !!NEW ... !!END (file must not exist)
     <path>@<version> write             !!NEW, whole new contents, !!END
-Use READ to acquire <version>. Nothing is written unless every operation validates.
+Use READ to acquire <version>. Nothing is written unless every operation validates. Exact text replacements are done last.
 Example call (line numbers refer to the version READ gave):
-EDIT /* Add handler logic, remove unused import */
+EDIT /* Add handler logic, remove stale comment */
 src/main.ts@4d9ej replace 6-7
 !!NEW
 function process(user) {
 	if (!user.name) return
 	const valid = user.name.length > 4
 !!END
-src/main.ts@4d9ej delete 2
+src/main.ts@4d9ej delete 9
 ::: if $session_interactive
 - A descriptive /* comment */ is mandatory at the start of every EDIT: EDIT /* Rename helper to actualHelper in client files */
 :::`
