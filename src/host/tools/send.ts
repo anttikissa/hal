@@ -36,7 +36,7 @@ SEND /* <purpose> */ "<session id>" { delivery? }?
 - Use soft-steer for routine updates, steer to wake up a paused, failed, or waiting-for-answer session.
 - When a child asks you a question, answer with SEND.
 ::: if $session_interactive
-- purpose shows the summary to user: e.g. /* Ask tab 2 to rerun the tests */
+- purpose shows the summary to user: e.g. /* Ask 12-abc to rerun the tests */
 :::`
 
 const parameters = {
