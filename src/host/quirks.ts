@@ -247,6 +247,26 @@ export const list: Quirk[] = [
 		},
 	},
 	{
+		about:
+			'EDIT: further !!OLD/!!NEW pairs under one text replace header, with or without !!END between them, are more replaces of that file (seen: 2026-11)',
+		fix(text, e) {
+			let m = /^EDIT line (\d+): (unexpected !!OLD inside a block|expected "<path>@<version>[^]*got "!!OLD")/.exec(
+				String(e?.message ?? e),
+			)
+			if (!isEdit(text) || !m) return
+			let raw = text.split(N),
+				lines = raw.map((l) => l.replace(/\r$/, '')),
+				k = Number(m[1]) - 1
+			if (lines[k] !== '!!OLD') return
+			let header = lines.slice(0, k).findLast((l) => /^\S+/.test(l) && editHeader.test(l))
+			let before = lines.slice(0, k).findLast((l) => /^!!(OLD|NEW|END)$/.test(l))
+			let open = m[2]!.startsWith('unexpected')
+			if (!header || !/^\S+ replace\s*$/.test(header) || before !== (open ? '!!NEW' : '!!END')) return
+			raw.splice(k, 0, ...(open ? ['!!END', header] : [header]))
+			return raw.join(N)
+		},
+	},
+	{
 		about: 'EDIT: "insert after N" or "insert before N" means insert-after or insert-before (seen: 2026-11)',
 		fix(text, e) {
 			let got = /expected "<path>@<version> <operation> \[lines\]", got ("(?:[^"\\]|\\.)*")/.exec(
