@@ -23,11 +23,15 @@ function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: st
 	}
 	const marker = (l: string) => /^!!(OLD|NEW|END)$/.exec(l)?.[1]
 	const content = (l: string) => (/^!!!+(OLD|NEW|END)$/.test(l) ? l.slice(1) : l)
+	let ended: number | undefined
 	const block = (until: string[], at: number): [string[], string, number] => {
 		const out: string[] = []
 		for (let j = at; j < lines.length; j++) {
 			const m = marker(lines[j]!)
-			if (m && until.includes(m)) return [out, m, j + 1]
+			if (m && until.includes(m)) {
+				if (m === 'END') ended = j + 1
+				return [out, m, j + 1]
+			}
 			if (m)
 				throw new Error(
 					`EDIT line ${j + 1}: unexpected !!${m} inside a block; a literal marker line takes one extra ! (!!!${m})`,
@@ -68,6 +72,10 @@ function parseBlocks(raw: string): { edits: Record<string, unknown>[]; then?: st
 		const h =
 			/^(.+?)(?:@([A-Za-z0-9]+))? (replace|insert-before|insert-after|delete|create|write)(?: (\d+)(?:-(\d+))?)?\s*$/i.exec(
 				header,
+			)
+		if (!h && ended !== undefined && at === ended + 1)
+			throw new Error(
+				`EDIT line ${at}: ${JSON.stringify(line.slice(0, 120))} is no operation header ("<path>@<version> <operation> [lines]"): the !!END on line ${ended} ended the block. If line ${ended} is file content, write it as !!!END; EDIT writes !!END. Nothing written.`,
 			)
 		if (!h)
 			throw new Error(

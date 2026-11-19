@@ -229,8 +229,15 @@ function split(text: string, isTool: (name: string) => boolean): string[] {
 		}
 		first = false
 		lineStart = false
-		if ('{["\'`'.includes(c)) i = ason.parseAt(text, i).end
-		else while (i < text.length && !/\s/.test(text[i]!)) i++
+		// Text that is no value (say, after a content line ended a block
+		// early) stays with its call, whose own parser reports the fault.
+		if ('{["\'`'.includes(c)) {
+			try {
+				i = ason.parseAt(text, i).end
+			} catch {
+				break
+			}
+		} else while (i < text.length && !/\s/.test(text[i]!)) i++
 	}
 	return starts.map((start, i) => text.slice(start, starts[i + 1]).trim())
 }

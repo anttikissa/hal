@@ -41,6 +41,11 @@ test('unclosed EDIT blocks reach validation intact rather than becoming commands
 	expect(split(edit)).toEqual([edit])
 })
 
+test('a content !!END that ends an EDIT block early leaves the rest to EDIT, even unparsable values', () => {
+	let edit = 'EDIT a.ts create\n!!NEW\nconst help = `\n!!END\n`\nconst p = { kind: kinds }\n!!END'
+	expect(split(edit)).toEqual([edit])
+})
+
 test('EVAL code runs to the end, even past lines starting with tool names', () => {
 	let code = 'EVAL /* Chain */\nlet read = 1\nREAD "x"\nreturn read'
 	expect(split(code)).toEqual([code])

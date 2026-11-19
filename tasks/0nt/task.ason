@@ -7,7 +7,8 @@
 		'User, 2026-11-19: COMPACT nearly always fails; models struggle with quoted JS strings nested inside their JSON tool calls. Tool calls should use heredoc-style literal blocks instead. EVAL (2026-11-19) takes its code as literal text to the end of the cmd.',
 		"User, 2026-11-19: advertise only the block form for a tool's main text field, even for one-liners (BASH, EVAL, SEND, COMPACT ...); quoted strings stay accepted but never appear in prompts, HELP or examples. Goal: the least possible quoting.",
 		'Prompts teach blocks since 5t3: BASH, EVAL, SEND and COMPACT advertise only the !!START form.',
-		'SPAWN advertises the !!START block for its task since 2026-11-19; its field details moved into its help.'
+		'SPAWN advertises the !!START block for its task since 2026-11-19; its field details moved into its help.',
+		'Invariant (2026-11-19): a content line !!END that ends an EDIT block early reports the EDIT line after it and the !!END that ended the block, with the !!!END escape. Before, command splitting parsed the leftover text as values and threw a raw ASON error (e.g. "Unexpected token at 40:33") naming neither.'
 	],
 	needs: ['3fv', 'hq6', 'v99'],
 	foldInto: ['3fv']
