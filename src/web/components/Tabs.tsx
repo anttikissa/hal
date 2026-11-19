@@ -6,7 +6,7 @@
 // Tab links retain native Cmd- and middle-click behavior, and native link
 // drags; a drag dropped on the strip reorders the tabs.
 
-import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import { home } from '../../common/home.ts'
 import { settings } from '../../common/settings.ts'
 import type { Tab } from '../../common/protocol.ts'
@@ -376,8 +376,12 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<button
 					type="button"
 					onClick={() => {
+						// iOS opens the keyboard only for focus inside the tap: close the
+						// sheet, then open Find and focus its field before returning.
 						setOpen(false)
-						requestAnimationFrame(() => find.open())
+						flush()
+						find.open()
+						flush()
 					}}
 				>
 					<Icon name="google" />

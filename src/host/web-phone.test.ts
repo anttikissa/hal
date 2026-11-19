@@ -248,3 +248,27 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 		await b.close()
 	}
 })
+
+// iOS opens the keyboard only for focus inside the tap (task qh4).
+browserTest('menu Find focuses its search field inside the tap', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor("document.querySelector('button.menu')")
+		await b.evaluate("document.querySelector('button.menu').click()")
+		await b.waitFor("document.querySelector('dialog.sheet').open")
+		let focused = await b.evaluate(`(() => {
+			[...document.querySelectorAll('dialog.sheet button')].find((x) => x.textContent.trim() === 'Find').click()
+			return document.activeElement?.getAttribute('aria-label')
+		})()`)
+		expect(focused).toBe('Find')
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+})

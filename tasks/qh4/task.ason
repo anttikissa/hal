@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Bare /find sends a session-scoped find-open event; its command record is suppressed. The web menu closes before opening the existing Picker dialog.',
-		'The wire event schema accepts find-open with its sessionId. The native Picker search input is the autofocus target when the dialog opens, including mobile web. Checked bare /find through a real browser at 390x760 with touch enabled: dialog opens and document.activeElement is its search field.'
+		'The wire event schema accepts find-open with its sessionId. The native Picker search input is the autofocus target when the dialog opens, including mobile web. Checked bare /find through a real browser at 390x760 with touch enabled: dialog opens and document.activeElement is its search field.',
+		'Invariant: the menu Find tap focuses the search field before its handler returns; iOS opens the keyboard only for focus inside the tap. A requestAnimationFrame opener and the autofocus attribute both failed on iPhone while headless Chrome showed the field focused afterward. The handler closes the sheet, flushes, opens Find and flushes again; web-phone.test.ts checks focus synchronously after the click. Filter focus covers all filters (resultsFocus), not the first four.'
 	],
 	needs: ['6m'],
 	foldInto: ['6m']

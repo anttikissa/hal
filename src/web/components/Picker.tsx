@@ -100,7 +100,14 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		createMemo(() => props.modal?.find?.focus),
 		(f) =>
 			untrack(() => {
-				let el = f === undefined || !box.open ? undefined : f === 0 ? search : f < 5 ? filters[f - 1] : list
+				let el =
+					f === undefined || !box.open
+						? undefined
+						: f === 0
+							? search
+							: f < findDialog.resultsFocus
+								? filters[f - 1]
+								: list
 				if (el && document.activeElement !== el) el.focus()
 			}),
 	)
