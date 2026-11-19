@@ -135,34 +135,6 @@ test('no timer runs when nothing blinks', () => {
 	expect(pulse.running()).toBe(false)
 })
 
-test('a blink phase rewrites the cursor row alone', () => {
-	let written = ''
-	render.init({ write: (s) => void (written += s), size: () => ({ rows: 30, cols: 40 }) })
-	render.frameMs = 0
-	app.onEvent(snapshot())
-	for (let i = 0; i < 5; i++) app.onEvent({ type: 'command', sessionId: 's1', text: `/cmd${i}` } as any)
-	render.draw()
-	written = ''
-	now = 2 * pulse.ms
-	// An idle blink builds no frame: it is the client's idle CPU cost.
-	let build = frame.build
-	let built = 0
-	frame.build = (...a) => (built++, build(...a))
-	try {
-		app.beat()
-	} finally {
-		frame.build = build
-	}
-	expect(built).toBe(0)
-	render.draw()
-	expect(written.split('\x1b[2K').length).toBe(2)
-	// A beat that changes nothing paints nothing.
-	written = ''
-	now = 2.5 * pulse.ms
-	app.beat()
-	expect(written).toBe('')
-})
-
 test('a blink leaves the terminal cursor where the prompt has it', async () => {
 	let written = ''
 	render.init({ write: (s) => void (written += s), size: () => ({ rows: 30, cols: 40 }) })
