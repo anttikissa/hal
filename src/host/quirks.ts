@@ -247,6 +247,21 @@ export const list: Quirk[] = [
 		},
 	},
 	{
+		about: 'EDIT: "insert after N" or "insert before N" means insert-after or insert-before (seen: 2026-11)',
+		fix(text, e) {
+			let got = /expected "<path>@<version> <operation> \[lines\]", got ("(?:[^"\\]|\\.)*")/.exec(
+				String(e?.message ?? e),
+			)
+			if (!isEdit(text) || !got) return
+			let want = JSON.parse(got[1]!) as string
+			let raw = text.split(N)
+			let k = outside(raw.map((l) => l.replace(/\r$/, ''))).find((i) => raw[i]!.trim().slice(0, 120) === want)
+			if (k === undefined || !/ insert (after|before) \d+\s*$/.test(raw[k]!)) return
+			raw[k] = raw[k]!.replace(/ insert (after|before)( \d+\s*)$/, ' insert-$1$2')
+			return raw.join(N)
+		},
+	},
+	{
 		about: 'EDIT: "path@" with no version means "path" (seen: claude-sonnet-5-5)',
 		adjust(call) {
 			let edits = call.input.edits

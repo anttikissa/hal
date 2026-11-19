@@ -36,6 +36,9 @@ test('EDIT quirks rescue the recorded slips for any model and log each firing', 
 	expect(edit(['f.ts@ replace 1-1', '!!NEW', 'z', '!!END'])).toEqual({
 		edits: [...edits, { path: 'f.ts', range: '1-1', lines: ['z'] }],
 	})
+	expect(edit(['f.ts@abc insert after 2', '!!NEW', 'z', '!!END'])).toEqual({
+		edits: [...edits, { path: 'f.ts', hash: 'abc', insert: 3, lines: ['z'] }],
+	})
 	expect(input('EDIT\nf.ts create then !!NEW\nz\n!!END')).toEqual({
 		edits: [{ path: 'f.ts', create: true, new: 'z\n' }],
 	})
