@@ -1,6 +1,5 @@
 // Runs trusted Pi command extensions through Hal's session-owned commands (task 0zp).
 import { AsyncLocalStorage } from 'async_hooks'
-import { spawn } from 'child_process'
 import { plugins, type Plugin } from '../src/host/plugins.ts'
 import { commands, type Context, type SlashCommand } from '../src/host/commands.ts'
 import { commandList } from '../src/common/commands/list.ts'
@@ -75,48 +74,49 @@ export function install(
 				throw new Error('Pi adapter: timeout must be positive milliseconds')
 			let signal = AbortSignal.any([invocation.controller.signal, ...(options.signal ? [options.signal] : [])])
 			signal.throwIfAborted()
-			return new Promise((resolve, reject) => {
-				let child = spawn(command, args, {
+			let stopped = '',
+				child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
+			let detail = (outcome: string, stdout = '', stderr = '') =>
+				`${command} ${JSON.stringify(args)}: ${outcome}\nstdout:\n${stdout}\nstderr:\n${stderr}`
+			// Bun.spawn, not node:child_process: under load the latter can reap a
+			// child that exits before spawn() returns yet never emit its output,
+			// 'exit' or 'close' (oven-sh/bun#46326), so exec would hang forever.
+			try {
+				child = Bun.spawn([command, ...args], {
 					cwd: options.cwd ?? invocation.ctx.cwd,
 					detached: true,
 					stdio: ['ignore', 'pipe', 'pipe'],
 				})
-				let stdout = '',
-					stderr = '',
-					stopped = ''
-				let kill = (reason: string) => {
-					stopped = reason
-					if (child.pid)
-						try {
-							process.kill(-child.pid, 'SIGKILL')
-						} catch (e: any) {
-							if (e.code !== 'ESRCH') reject(e)
-						}
+			} catch (error) {
+				throw new Error(detail(String(error)))
+			}
+			let killFailed = Promise.withResolvers<never>()
+			let kill = (reason: string) => {
+				stopped = reason
+				try {
+					process.kill(-child.pid, 'SIGKILL')
+				} catch (e: any) {
+					if (e.code !== 'ESRCH') killFailed.reject(e)
 				}
-				let abort = () => kill('canceled')
-				let timer = setTimeout(() => kill(`timed out after ${timeout}ms`), timeout)
-				signal.addEventListener('abort', abort, { once: true })
-				child.stdout.setEncoding('utf8').on('data', (text) => {
-					stdout += text
-				})
-				child.stderr.setEncoding('utf8').on('data', (text) => {
-					stderr += text
-				})
-				let failure: Error | undefined
-				child.on('error', (error) => {
-					failure = error
-				})
-				child.on('close', (code, exitSignal) => {
-					clearTimeout(timer)
-					signal.removeEventListener('abort', abort)
-					let detail = `${command} ${JSON.stringify(args)}: ${failure ?? (stopped || `exit ${code ?? exitSignal}`)}\nstdout:\n${stdout}\nstderr:\n${stderr}`
-					if (failure || stopped) reject(new Error(detail))
-					else {
-						if (code !== 0) invocation.ctx.say(`Pi /${invocation.name}: ${detail}`)
-						resolve({ code: code ?? 1, stdout, stderr, killed: !!exitSignal })
-					}
-				})
-			})
+			}
+			let abort = () => kill('canceled')
+			let timer = setTimeout(() => kill(`timed out after ${timeout}ms`), timeout)
+			signal.addEventListener('abort', abort, { once: true })
+			try {
+				let [stdout, stderr] = await Promise.race([
+					Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]),
+					killFailed.promise,
+				])
+				let code = child.exitCode,
+					exitSignal = child.signalCode
+				let result = detail(stopped || `exit ${code ?? exitSignal}`, stdout, stderr)
+				if (stopped) throw new Error(result)
+				if (code !== 0) invocation.ctx.say(`Pi /${invocation.name}: ${result}`)
+				return { code: code ?? 1, stdout, stderr, killed: !!exitSignal }
+			} finally {
+				clearTimeout(timer)
+				signal.removeEventListener('abort', abort)
+			}
 		},
 		sendUserMessage(text, options) {
 			let { ctx, name } = current()
