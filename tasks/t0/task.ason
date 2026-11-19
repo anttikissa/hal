@@ -10,7 +10,7 @@
 		'Auto-close is subagents.finished after every completed turn (turns.ts): only kind subagent, idle, empty inbox and no running subagents of its own (a subagent parked in wait stays). A human submit or amend promotes subagent to subagent-leave-open.',
 		'Task mt replaced the send handoff with host reports (including errors and pauses) and made mode default to fresh.',
 		'The task field description says the session already loads its AGENTS.md and skills, so parents state only the goal and constraints. Invariant restored: subagent prompts no longer tell the child to re-read files Hal already loaded (seen in 24-ali asking 24-man to read AGENTS.md).',
-		'SYSTEM.md Spawn budget section repeats the rule where every spawning model sees it: subagents load AGENTS.md and skills themselves, so prompts carry only the goal and constraints, never Read AGENTS.md.'
+		'SYSTEM.md Spawn budget section tells every spawning model that subagents receive the same system prompt, so parents do not repeat its contents. The earlier wording quoted "Read AGENTS.md" and likely prompted GPT to send exactly that (50-dab).'
 	],
 	needs: ['rj']
 }
