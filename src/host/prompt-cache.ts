@@ -151,6 +151,8 @@ function input(id: string, selected?: Partial<PromptInput>): PromptInput {
 		slots: meta.slots,
 		autoclose: meta.autoclose,
 		projectTrust: meta.projectTrust,
+		tools: meta.tools,
+		systemPrompt: meta.systemPrompt,
 		...selected,
 	}
 }

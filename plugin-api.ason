@@ -1,5 +1,5 @@
 {
-	version: 44,
+	version: 45,
 	changes: [
 		{
 			version: 2,
@@ -853,6 +853,26 @@
 					target: 'host/edit-blocks.editBlocks.help',
 					description: 'Removed',
 					port: "Read the edit tool's help"
+				}
+			]
+		},
+		{
+			version: 45,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/tools.tools.allowed',
+					description: 'Added'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/system-prompt.PromptInput',
+					description: 'Adds systemPrompt'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/session.SessionMeta',
+					description: 'Adds tools and systemPrompt'
 				}
 			]
 		}

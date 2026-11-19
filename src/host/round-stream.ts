@@ -24,7 +24,7 @@ async function* stream(
 		now: clock.now(),
 		sessionId: id,
 	})
-	let defs = [nativeTool.def()]
+	let defs = sessions.open(id).tools?.length === 0 ? [] : [nativeTool.def()]
 	let messages = await historyInput.messages(id, {
 		overhead: system.length + JSON.stringify(defs).length,
 		window: models.contextWindow(model),

@@ -28,6 +28,7 @@ import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { auth } from './auth.ts'
+import { tools } from './tools.ts'
 
 export type Spawn = {
 	kind: SpawnKind
@@ -38,6 +39,28 @@ export type Spawn = {
 	name?: string
 	limit: number
 	callId?: string
+	tools?: string[]
+	systemPrompt?: string
+}
+
+// A child gets at most its parent's tools (task 0rc); unknown names fail
+// so a typo never silently drops a tool.
+function allowedTools(parent: SessionMeta, asked: string[] | undefined): string[] | undefined {
+	let mine = parent.tools ?? tools.all().map((t) => t.name)
+	if (!asked) return parent.tools
+	let names = asked.map((n) => n.toLowerCase())
+	let unknown = names.filter((n) => !tools.all().some((t) => t.name === n))
+	if (unknown.length)
+		throw new Error(
+			`unknown tools ${unknown.map((n) => n.toUpperCase()).join(', ')}; valid: ${tools
+				.all()
+				.map((t) => t.name.toUpperCase())
+				.join(', ')}`,
+		)
+	let wider = names.filter((n) => !mine.includes(n))
+	if (wider.length)
+		throw new Error(`this session cannot give tools it lacks: ${wider.map((n) => n.toUpperCase()).join(', ')}`)
+	return [...new Set(names)]
 }
 
 // Opens the child and starts its first turn; returns its id. Throws,
@@ -52,6 +75,9 @@ function spawn(parent: string, s: Spawn): string {
 			`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC on every ${selected.id.split('/')[0]} account`,
 		)
 	if (!Number.isSafeInteger(s.limit) || s.limit < 0) throw new Error('limit must be a non-negative integer')
+	if (s.fork && s.systemPrompt !== undefined)
+		throw new Error('mode fork cannot take systemPrompt: the copied history assumes Hal’s system prompt')
+	let allowed = allowedTools(meta, s.tools)
 	let charged: SessionMeta[] = []
 	if (s.kind !== 'interactive') {
 		let left = meta.slots ?? settings.subagentSlots()
@@ -74,6 +100,8 @@ function spawn(parent: string, s: Spawn): string {
 	Object.assign(child, {
 		...(s.kind !== 'interactive' && { parent, slots: s.limit }),
 		spawn: s.kind,
+		...(allowed && { tools: allowed }),
+		...(s.systemPrompt !== undefined && { systemPrompt: s.systemPrompt }),
 	} satisfies Partial<SessionMeta>)
 	let call = child.parent && s.callId ? history.callNumber(parent, s.callId) : undefined
 	if (call !== undefined) child.parentCall = call

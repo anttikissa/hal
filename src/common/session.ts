@@ -38,6 +38,10 @@ export interface SessionMeta {
 	spawn?: SpawnKind
 	// Spawn slots left; omitted uses the configured allowance.
 	slots?: number
+	// SPAWN's restrictions (task 0rc): lowercase tool names this session
+	// may call (omitted: all) and the template replacing SYSTEM.md.
+	tools?: string[]
+	systemPrompt?: string
 	// Ids of background bash commands still running (task v0).
 	background?: string[]
 	// How kinds of blocks start, over the client's settings (task hyt).

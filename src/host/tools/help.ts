@@ -47,7 +47,7 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 		if (problems.length) throw new Error(`HELP ${found.name.toUpperCase()}: ${problems.join('; ')}`)
 		return text
 	}
-	let lines = tools.all().flatMap((t) => nativeTool.shown(t, interactive))
+	let lines = tools.allowed(ctx.sessionId).flatMap((t) => nativeTool.shown(t, interactive))
 	return [
 		`Syntax: <TOOL> ${interactive ? '/* <purpose> */? ' : ''}<args>...`,
 		'',

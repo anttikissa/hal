@@ -124,14 +124,17 @@ function generated(input: PromptInput): Record<string, string> {
 	return { tools: nativeTool.guides(input.tools, input.interactive ?? true) }
 }
 
+// SPAWN's systemPrompt (task 0rc) replaces SYSTEM.md; its @path
+// includes resolve from the session's cwd.
 function assemble(input: PromptInput, sources?: PromptSource[], problems?: string[]): string {
+	let custom = input.systemPrompt
 	return systemPrompt.preprocess(
-		systemPrompt.file(),
+		custom === undefined ? systemPrompt.file() : `${input.cwd}/<systemPrompt>`,
 		systemPrompt.vars(input, sources),
 		sources,
 		problems,
 		input.rendered,
-		{ generated: generated(input) },
+		{ generated: generated(input), ...(custom !== undefined && { text: custom }) },
 	)
 }
 
@@ -157,6 +160,8 @@ export type PromptInput = {
 	projectTrust?: string | false
 	// Lowercase names of the tools this session may call; default all.
 	tools?: string[]
+	// SPAWN's template replacing SYSTEM.md (task 0rc).
+	systemPrompt?: string
 	rendered?: PromptRender
 }
 function build(input: PromptInput, problems?: string[]): string {
