@@ -37,7 +37,7 @@ Use EDIT for all file changes. Apply one atomic batch of operations across files
     <path> replace                     !!OLD, exact old text, !!NEW, new text, !!END (old must match exactly once)
     <path> create                      !!NEW ... !!END (file must not exist)
     <path>@<version> write             !!NEW, whole new contents, !!END
-Block content is literal: no quoting or escaping. Only a content line that is itself a marker needs one extra ! (write !!!END for a literal !!END line). Always submit the <version> READ gave (<path>@<version>); line numbers are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. Nothing is written unless every operation validates. Results show verified diffs and new versions; no confirmation READ is needed.
+Always submit the <version> READ gave (<path>@<version>); line numbers are 1-based, inclusive and all refer to that version. Text replaces apply after a file's line operations. Nothing is written unless every operation validates. Results show verified diffs and new versions; no confirmation READ is needed.
 Example call text (markers start their lines):
 EDIT /* Rename handler */
 src/main.ts@4d9ej replace 3-4
