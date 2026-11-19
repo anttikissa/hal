@@ -78,7 +78,8 @@ function reasons(model: string): boolean {
 	return /^(gpt-[56]|o\d|codex)/.test(model)
 }
 
-function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
+// `webSearch`: whether the endpoint offers OpenAI's hosted web search.
+function body(req: ProviderRequest, codex: boolean, webSearch = true): Record<string, unknown> {
 	let b: Record<string, unknown> = { model: req.model, store: false, stream: true, input: openai.input(req) }
 	if (req.system) b.instructions = req.system
 	if (req.tools?.length) {
@@ -88,6 +89,10 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 			description: t.description,
 			parameters: t.inputSchema,
 		}))
+		if (webSearch && req.tools.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model)) {
+			;(b.tools as unknown[]).push({ type: 'web_search' })
+			b.include = ['web_search_call.action.sources']
+		}
 		b.tool_choice = 'auto'
 		b.parallel_tool_calls = true
 	}
@@ -183,6 +188,16 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			case 'response.refusal.delta':
 				if (ev.delta) yield { type: 'text', text: ev.delta }
 				break
+			case 'response.content_part.done': {
+				let part = ev.part
+				let urls = new Set<string>(
+					(part?.annotations ?? [])
+						.filter((a: any) => a.type === 'url_citation' && typeof a.url === 'string' && !part.text?.includes(a.url))
+						.map((a: any) => a.url),
+				)
+				if (urls.size) yield { type: 'text', text: `\n\nSources:\n${[...urls].join('\n')}\n` }
+				break
+			}
 			case 'response.function_call_arguments.delta': {
 				let call = calls.get(index)
 				if (call) call.args += ev.delta ?? ''
@@ -190,6 +205,26 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			}
 			case 'response.output_item.done': {
 				let item = ev.item
+				if (item?.type === 'web_search_call') {
+					let action = item.action ?? {}
+					let queries: string[] = action.type === 'search' ? (action.queries ?? [action.query]).filter(Boolean) : []
+					let sources: string[] = (action.sources ?? [])
+						.map((s: any) => s?.url)
+						.filter((u: unknown) => typeof u === 'string')
+					let input = action.type === 'search' ? { query: queries.join('; ') } : { ...action }
+					let output =
+						item.status === 'completed'
+							? [...(queries.length > 1 ? queries : []), ...(sources.length ? ['Sources:', ...sources] : [])].join('\n')
+							: `Web search ${item.status ?? 'failed'}\n${m.data}`
+					yield {
+						type: 'hosted_tool',
+						id: item.id ?? `ws_${index}`,
+						name: 'web_search',
+						input,
+						output,
+						...(item.status !== 'completed' && { isError: true }),
+					}
+				}
 				if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string') {
 					yield { type: 'signature', value: JSON.stringify({ encrypted_content: item.encrypted_content }) }
 				}
@@ -246,7 +281,8 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	let results = await Promise.allSettled(
 		list.map(async (account) => {
 			let cred = await auth.credential(data, account, 'openai')
-			if (cred.type === 'api-key' || catalog.claims(cred.value).api) return modelsDev.ids('openai')
+			if (cred.type === 'api-key' || catalog.claims(cred.value).api)
+				return [...new Set([...modelsDev.ids('openai'), ...catalog.knownModels])]
 			let accountId = catalog.claims(cred.value).accountId ?? cred.accountId
 			let res = await fetch(openai.codexModelsUrl, {
 				signal,

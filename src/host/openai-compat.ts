@@ -177,7 +177,7 @@ function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpReq
 		return {
 			url: `${base}/responses`,
 			headers: { authorization: `Bearer ${key}`, accept: 'text/event-stream' },
-			body: openai.body(req, false),
+			body: openai.body(req, false, false),
 			parse: openai.parse,
 		}
 	}
@@ -186,7 +186,7 @@ function opencodeRoute(base: string, req: ProviderRequest, key: string): HttpReq
 		return {
 			url: `${root}/anthropic/v1/messages`,
 			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-			body: anthropic.body(req, false),
+			body: anthropic.body(req, false, false),
 			parse: anthropic.parse,
 		}
 	}

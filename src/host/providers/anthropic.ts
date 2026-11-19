@@ -1,11 +1,32 @@
-// The Anthropic provider, with anthropic.ts loaded on first use.
+// The Anthropic provider: its known models and web search models, with
+// anthropic.ts loaded on first use.
 import { auth } from '../auth.ts'
 import type { Provider } from '../provider.ts'
 import { providers } from '../providers.ts'
 
 const load = () => (require('../anthropic.ts') as typeof import('../anthropic.ts')).anthropic
 
-export const provider: Provider = {
+export const provider: Provider & { knownModels: string[]; webSearchModels: string[] } = {
+	knownModels: [
+		'claude-opus-5-5',
+		'claude-sonnet-5-5',
+		'claude-opus-5',
+		'claude-fable-5-2',
+		'claude-fable-5-1',
+		'claude-fable-5',
+		'claude-sonnet-5',
+	],
+	// Models offered Anthropic's web_search beside BRAVE (task a0z).
+	webSearchModels: [
+		'claude-opus-5-5',
+		'claude-sonnet-5-5',
+		'claude-opus-5',
+		'claude-fable-5-2',
+		'claude-fable-5-1',
+		'claude-fable-5',
+		'claude-sonnet-5',
+	],
+	known: () => provider.knownModels,
 	available: () => providers.available('anthropic'),
 	request: (req) => load().request(req),
 	parse: (messages) => load().parse(messages),

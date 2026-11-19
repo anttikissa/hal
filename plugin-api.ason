@@ -1,5 +1,5 @@
 {
-	version: 47,
+	version: 48,
 	changes: [
 		{
 			version: 2,
@@ -912,6 +912,31 @@
 					target: 'host/openai.body',
 					description: 'Drops the webSearch parameter',
 					port: 'Call body(req, codex)'
+				}
+			]
+		},
+		{
+			version: 48,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/providers/anthropic.provider',
+					description: 'Restores knownModels, webSearchModels and known'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/providers/openai.provider',
+					description: 'Restores knownModels, webSearchModels and known'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/anthropic.body',
+					description: 'Restores the optional webSearch parameter'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/openai.body',
+					description: 'Restores the optional webSearch parameter'
 				}
 			]
 		}

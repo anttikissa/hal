@@ -21,7 +21,7 @@
 // - timeoutMs: how long asking a provider may take → 3 s
 // - fetchList(name): a provider's ids: cache, provider, then fallback
 // - ask(name, list): calls the provider's own list under timeoutMs
-// - fallback(name): models.dev ids, then the provider's known() ones
+// - fallback(name): models.dev ids, then the provider's built-in ones
 // - cached(name): the cached listing, if still for the current key
 // State: models.state.lists, provider name to its cached listing.
 //
@@ -32,7 +32,7 @@
 // here: every registered provider, plus Hal's synthetic models. A
 // provider that can list its models is asked, at most once per ttlMs;
 // one that cannot, or fails or is slow (asked again next time), gets
-// its list from the models.dev cache (task qq) plus its known() one.
+// its list from the models.dev cache (task qq) plus its built-in one.
 
 import type { Pricing } from '../common/pricing.ts'
 import { blocks } from '../common/blocks.ts'
@@ -63,7 +63,7 @@ async function fetchList(name: string): Promise<string[] | undefined> {
 	return fallback.length ? fallback.map((m) => `${name}/${m}`) : undefined
 }
 
-// models.dev's ids for provider `name`, then its known() ones.
+// models.dev's ids for provider `name`, then its built-in ones.
 function fallback(name: string): string[] {
 	return [...new Set([...modelsDev.ids(name), ...(provider.state.providers[name]?.known?.() ?? [])])]
 }
@@ -115,7 +115,7 @@ function warm(): Promise<void> {
 }
 
 // The ids known without asking anyone: synthetic ones, and each
-// provider's cached list, else its models.dev and known() ones.
+// provider's cached list, else its models.dev and built-in ones.
 function known(): string[] {
 	let lists = Object.keys(provider.state.providers).map((name) => {
 		let ids = models.cached(name)?.ids
