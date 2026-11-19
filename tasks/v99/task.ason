@@ -1,0 +1,6 @@
+{
+	title: 'EVAL runs JavaScript in the host and chains tools',
+	spec: 'The built-in tool EVAL runs JavaScript or TypeScript inside the running host. Its code is literal text after the header, running to the end of the cmd: no quoting or escaping, and command splitting never splits it (task 0nt). One whole string literal or { code } is also accepted. A single expression returns its value; otherwise the code is an async function body that may return. await tool("<call text>") runs any Hal tool with its own checks and returns its text output; a call that would need approval is refused with that reason; a failed call throws. Only the returned value and console.* output enter context, so scripts can chain tools and MCP calls (Code Mode) and filter large output. ctx gives cwd, sessionId and signal; aborting the EVAL aborts its pending tool calls. A setTimeout or setInterval callback that throws after the call stops and reports a session notice. EVAL is effectful and runs without approval: agents can do the same through BASH, so gating it would be fake security. Guidance tells models that synchronous code freezes all of Hal: keep it under 100 ms, await tools and I/O, avoid sync spawn and file calls and busy-waits, chunk loops over 1000 items with await or use BASH.',
+	status: 'done',
+	needs: ['3fv', 'ep8']
+}

@@ -76,7 +76,7 @@ test('a broken presentation keeps the execution outcome and reaches model and us
 test('a plugin tool gets a card: purpose title, command as code, result, kind and look', () => {
 	let all = tools.all
 	let evalTool = {
-		name: 'eval',
+		name: 'js',
 		description: 'Run code.',
 		parameters: { type: 'object' as const, properties: { code: { type: 'string' } }, required: ['code'] },
 		card: { command: 'code', language: 'javascript', hue: 265 },
@@ -95,10 +95,10 @@ test('a plugin tool gets a card: purpose title, command as code, result, kind an
 			type: 'tool_call',
 			id: 'e',
 			name: 'tool',
-			input: { cmd: 'EVAL /* Add */ "return 1+1"' },
+			input: { cmd: 'JS /* Add */ "return 1+1"' },
 		})
 		expect(run!.presentation).toEqual({
-			title: 'Eval Add',
+			title: 'Js Add',
 			blocks: [{ kind: 'code', text: 'return 1+1', language: 'javascript' }],
 			readOnly: false,
 			hue: 265,

@@ -165,6 +165,8 @@ function split(text: string, isTool: (name: string) => boolean): string[] {
 		if (name && !first && !isTool(name.toLowerCase())) name = undefined
 		if (name) {
 			if (!first) starts.push(i)
+			// EVAL's code is literal text to the end (task v99).
+			if (name.toLowerCase() === 'eval') break
 			edit = name.toLowerCase() === 'edit'
 		}
 		first = false

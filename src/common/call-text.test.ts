@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { callText } from './call-text.ts'
 
-const isTool = (name: string) => ['read', 'bash', 'edit'].includes(name)
+const isTool = (name: string) => ['read', 'bash', 'edit', 'eval'].includes(name)
 const split = (text: string) => callText.split(text, isTool)
 
 test('EDIT source code stays literal while surrounding commands still split', () => {
@@ -39,6 +39,12 @@ BASH "do not execute"
 test('unclosed EDIT blocks reach validation intact rather than becoming commands', () => {
 	let edit = 'EDIT a.txt create\n!!NEW\nREAD missing.txt\nif (ready) run();'
 	expect(split(edit)).toEqual([edit])
+})
+
+test('EVAL code runs to the end, even past lines starting with tool names', () => {
+	let code = 'EVAL /* Chain */\nlet read = 1\nREAD "x"\nreturn read'
+	expect(split(code)).toEqual([code])
+	expect(split(`BASH "ls"\n${code}`)).toEqual(['BASH "ls"', code])
 })
 
 test('a line starts a new call only at a tool name, so bare paths stay in their EDIT', () => {
