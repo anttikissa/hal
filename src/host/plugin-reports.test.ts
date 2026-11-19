@@ -8,6 +8,7 @@ import { calls, client, created, until, useHost } from './host-fixture.test.ts'
 import { pluginReports } from './plugin-reports.ts'
 import { noticeHistory } from './notice-history.ts'
 import { plugins } from './plugins.ts'
+import { watchLive } from './watch-fixture.test.ts'
 
 useHost()
 let failure = (path: string) =>
@@ -58,6 +59,7 @@ test('plugin load, sync replacement and removal notify every client after a quie
 	try {
 		writeFileSync(join(dir, 'a.ts'), 'export default () => {}\n')
 		await plugins.init(dir)
+		await watchLive(dir)
 		expect(c.of('notice')).toEqual([])
 		let b = join(dir, 'b.ts'),
 			seen = (n: number) => until(() => c.of('notice').length === n)

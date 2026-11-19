@@ -8,6 +8,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { models } from './models.ts'
 import { sessions } from './sessions.ts'
+import { watchLive } from './watch-fixture.test.ts'
 
 const savedHome = paths.state.home
 const origOnError = liveFiles.onError
@@ -61,7 +62,7 @@ test('values in config.ason are what settings return; edits apply at once and ar
 	expect(settings.model()).toBe('test/one')
 	expect(settings.webPort()).toBe(4321)
 	expect(settings.security()).toBe(defaults().security as 'best-effort')
-	await Bun.sleep(50)
+	await watchLive(home)
 	edit("{ model: 'test/two' }\n")
 	await until(() => settings.model() === 'test/two')
 	expect(settings.model()).toBe('test/two')
@@ -98,6 +99,7 @@ test('a malformed file never crashes: defaults, a warning, and fixing it applies
 	expect(w.length).toBe(1)
 	expect(w[0]).toContain('config.ason')
 	expect(w[0]).not.toContain('sk-secret')
+	await watchLive(home)
 	edit("{ model: 'test/fixed' }\n")
 	await until(() => settings.model() === 'test/fixed')
 	expect(settings.model()).toBe('test/fixed')

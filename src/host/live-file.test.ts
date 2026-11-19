@@ -14,6 +14,7 @@ import {
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { liveFiles } from './live-file.ts'
+import { watchLive } from './watch-fixture.test.ts'
 
 let dir = ''
 let errors: Error[] = []
@@ -162,7 +163,7 @@ test('external atomic replacement updates the same object', async () => {
 	let path = `${dir}/watched.ason`
 	writeFileSync(path, ason.stringify({ v: 1, removed: true }) + '\n')
 	let data = live<Record<string, any>>(path, { v: 0 })
-	await Bun.sleep(50)
+	await watchLive(dir)
 	replace(path, ason.stringify({ v: 99, added: 'yes' }) + '\n')
 	await until(() => data.v === 99)
 	expect(data.v).toBe(99)
@@ -189,7 +190,7 @@ test('malformed external edit is reported and never overwritten', async () => {
 	let path = `${dir}/broken.ason`
 	writeFileSync(path, ason.stringify({ v: 1 }) + '\n')
 	let data = live(path, { v: 0 })
-	await Bun.sleep(50)
+	await watchLive(dir)
 	replace(path, '{ v: ')
 	await until(() => errors.length > 0)
 	expect(errors[0]?.message).toContain(path)
@@ -222,6 +223,7 @@ test('keepBroken starts a malformed file from defaults and loads it once fixed',
 	data.v = 1
 	await tick()
 	expect(readFileSync(path, 'utf8')).toContain('oops')
+	await watchLive(dir)
 	replace(path, ason.stringify({ v: 3 }) + '\n')
 	await until(() => data.v === 3)
 	expect(data.v).toBe(3)
@@ -237,6 +239,7 @@ test('onChange hears external edits and breakage, not own writes', async () => {
 	liveFiles.save(data)
 	await Bun.sleep(200)
 	expect(changes).toEqual([])
+	await watchLive(dir)
 	replace(path, ason.stringify({ v: 2 }) + '\n')
 	await until(() => changes.length > 0)
 	expect(changes).toEqual([null])

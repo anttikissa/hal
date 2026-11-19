@@ -1,0 +1,10 @@
+{
+	title: 'Watch tests write only once the watcher is live',
+	spec: "Tests that write into a directory watched by fs.watch (live files, plugin directories) first await watchLive(dir) from src/host/watch-fixture.test.ts, which returns once a probe watcher of its own has seen a write there. Invariant: a test's write is never lost to a watcher that is not yet delivering events, so these tests pass in the parallel full suite as reliably as alone. No guessed sleeps stand in for this wait.",
+	status: 'done',
+	notes: [
+		"Cause (Bun 1.4.4, macOS): fs.watch returns before its FSEvents stream runs, and a write before then is never reported. With the full suite running alongside, an immediate write after watch() went unseen in 15 of 90 trials even after 2 s; after a probe event 0 of 180. A watcher added later did not lose events for one already live (0 of 30). Failed in the suite, passed alone: plugin-reports b66, config malformed-file, plugins watched-directory, theme.test selector; live-file.test had the same 50-200 ms guesses. bun test --parallel runs files one after another per worker, so no other file's watchers were involved. Production has the same window between the initial scan and the stream starting; a file written then is picked up only at its next change. Not fixed: no failure was observed."
+	],
+	needs: ['n', 'an'],
+	foldInto: ['n', 'an']
+}

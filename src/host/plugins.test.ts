@@ -7,6 +7,7 @@ import { join } from 'path'
 import { plugins } from './plugins.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { paths } from './paths.ts'
+import { watchLive } from './watch-fixture.test.ts'
 
 let dir = ''
 let reports: string[] = []
@@ -324,6 +325,7 @@ test('a missing or non-function target, or a bad expires, breaks the file with a
 test('the directory is watched: a new file hooks, an edit reloads, /plugins names the targets', async () => {
 	// Its own directory: target.ts is no plugin.
 	await plugins.init(join(dir, 'p'))
+	await watchLive(join(dir, 'p'))
 	let path = join(dir, 'p', 'w.ts')
 	let head = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n`
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'one')\n`)
@@ -342,6 +344,7 @@ test.each(['', 'personal/'])('/plugins toggles a watched %splugin and restores i
 	plugins.dir = () => d
 	try {
 		await plugins.init(d, personal)
+		await watchLive(prefix ? personal : d)
 		let { command } = await import('./commands/plugins.ts')
 		let path = join(prefix ? personal : d, 'w.ts')
 		let text = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default function (p: any) {\n\tp.around(t, 'f', () => 'on')\n}\n`

@@ -6,6 +6,7 @@ import { paths } from '../paths.ts'
 import { plugins } from '../plugins.ts'
 import { theme } from './theme.ts'
 import { client, created, until, useHost } from '../host-fixture.test.ts'
+import { watchLive } from '../watch-fixture.test.ts'
 
 useHost()
 
@@ -51,6 +52,7 @@ test('/theme writes a portable selector the loader applies live; <none>, the bui
 	field = await ask()
 	expect(field.options[field.initial]).toBe('classic')
 	await plugins.init()
+	await watchLive(plugins.dir())
 	try {
 		await until(() => colors.page().canvas?.join() !== canvas?.join())
 		let classic = colors.page().canvas?.join()
