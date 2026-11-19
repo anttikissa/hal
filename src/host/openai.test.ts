@@ -10,7 +10,6 @@ import { limits } from './limits.ts'
 import { models } from './models.ts'
 import { openai } from './openai.ts'
 import { provider as catalog } from './providers/openai.ts'
-import { nativeTool } from './native-tool.ts'
 import {
 	completed,
 	fake,
@@ -125,39 +124,6 @@ test('history maps to Responses input, replaying only its own reasoning', async 
 	])
 	expect(body.tools).toEqual([{ type: 'function', name: 'bash', description: 'run', parameters: { type: 'object' } }])
 	expect(body.include).toEqual(['reasoning.encrypted_content'])
-})
-
-test('native search requires an allowlisted model and Hal tools', () => {
-	let req = { model: 'gpt-6.1-sol', messages: hi, tools: [nativeTool.def()] }
-	for (let codex of [false, true]) expect(openai.body(req, codex).tools).toContainEqual({ type: 'web_search' })
-	expect(openai.body({ ...req, tools: [] }, true).tools).toBeUndefined()
-	expect(openai.body({ ...req, model: 'gpt-4o-mini' }, true).tools).not.toContainEqual({ type: 'web_search' })
-})
-
-test('recorded native search becomes readable history without a local tool round or duplicate citations', async () => {
-	process.env.OPENAI_API_KEY = 'sk-test'
-	let recording = await Bun.file(`${import.meta.dir}/../fixtures/openai-search.sse`).text()
-	fake.reply = () => new Response(recording, { headers: { 'content-type': 'text/event-stream' } })
-	let turn = blocks.collect(await run(), 'openai')
-	expect(turn.end).toEqual({ type: 'done', reason: 'end' })
-	let [search, answer] = turn.blocks
-	expect(search).toEqual({
-		type: 'hosted_tool',
-		id: 'ws_058c1f3ca83fd353016acf3141fb4087d2917c750504b6797f',
-		name: 'web_search',
-		input: { query: 'VALO Hotel Helsinki official website' },
-		output: '',
-	})
-	if (answer?.type !== 'text') throw new Error('expected answer text')
-	let text = answer.text
-	expect(text).toStartWith('Official website: https://valo.fi/en/')
-	expect(text.match(/https:\/\/valo\.fi\/en\/\?utm_source=openai/g)).toHaveLength(1)
-	expect(openai.input({ model: 'gpt-6.1-sol', messages: [{ role: 'assistant', blocks: [answer] }] })).toContainEqual({
-		type: 'message',
-		role: 'assistant',
-		status: 'completed',
-		content: [{ type: 'output_text', text, annotations: [] }],
-	})
 })
 
 test('text, reasoning, tool calls and usage fold into a turn that ends in tool_use', async () => {
@@ -303,13 +269,9 @@ test('a ChatGPT login lists only the models the Codex backend shows it', async (
 	writeAuth({ openai: { accessToken: subscriptionToken } })
 	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-sol'])
 	expect(fake.seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
-	writeAuth({ openai: { apiKey: 'sk-file' } })
-	auth.close()
-	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(catalog.knownModels))
 })
 
-test('the picker offers models.dev ids and the known GPT ids; a subscription caps input at 272k', () => {
-	expect(models.known()).toEqual(expect.arrayContaining(catalog.knownModels.map((m) => `openai/${m}`)))
+test('a subscription caps input at 272k', () => {
 	writeAuth({ openai: { accessToken: subscriptionToken } })
 	expect(models.contextWindow('openai/gpt-5.5')).toBe(272_000)
 	writeAuth({ openai: { apiKey: 'sk-file' } })

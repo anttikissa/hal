@@ -1,5 +1,5 @@
 {
-	version: 46,
+	version: 47,
 	changes: [
 		{
 			version: 2,
@@ -883,6 +883,35 @@
 					kind: 'compatible',
 					target: 'host/tools.Tool',
 					description: 'Adds optional promptIf; inPrompt accepts false'
+				}
+			]
+		},
+		{
+			version: 47,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/providers/anthropic.provider',
+					description: 'Removes knownModels, webSearchModels and known',
+					port: 'Use models.ids from models.dev or set provider.known'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/providers/openai.provider',
+					description: 'Removes knownModels, webSearchModels and known',
+					port: 'Use models.ids from models.dev or set provider.known'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/anthropic.body',
+					description: 'Drops the webSearch parameter',
+					port: 'Call body(req, oauth)'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/openai.body',
+					description: 'Drops the webSearch parameter',
+					port: 'Call body(req, codex)'
 				}
 			]
 		}

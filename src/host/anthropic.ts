@@ -13,7 +13,6 @@ import {
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
-import { provider as catalog } from './providers/anthropic.ts'
 
 // OAuth tokens are rejected (disguised as a 429) unless the first system
 // block is one of the Claude Code identities; this one claims least.
@@ -106,8 +105,7 @@ function adaptive(model: string): boolean {
 	return /^claude-(?:opus-(?:4-[678]|5(?:-|$))|sonnet-(?:4-6|5(?:-|$))|fable-5(?:-|$))/.test(model)
 }
 
-// `webSearch`: whether the endpoint offers Anthropic's hosted web search.
-function body(req: ProviderRequest, oauth: boolean, webSearch = true): Record<string, unknown> {
+function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	let maxTokens = req.maxTokens ?? anthropic.maxTokens
 	let system: unknown[] = []
 	if (oauth) system.push({ type: 'text', text: IDENTITY })
@@ -130,8 +128,6 @@ function body(req: ProviderRequest, oauth: boolean, webSearch = true): Record<st
 				? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } }
 				: { input_schema: t.inputSchema }),
 		}))
-	if (webSearch && req.tools?.some((t) => t.name === 'tool') && catalog.webSearchModels.includes(req.model))
-		(b.tools as unknown[]).push({ type: 'web_search_20250305', name: 'web_search' })
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = {
@@ -176,7 +172,7 @@ async function request(req: ProviderRequest) {
 }
 
 // The models the account may use (GET /v1/models). On failure the
-// picker falls back to models.dev, then knownModels (host/models.ts).
+// picker falls back to models.dev (host/models.ts).
 async function models(signal: AbortSignal): Promise<string[]> {
 	let url = new URL(anthropic.apiUrl)
 	url.pathname = url.pathname.replace(/\/messages$/, '/models')
@@ -222,12 +218,7 @@ function usage(u: any): Usage | undefined {
 
 async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<StreamEvent> {
 	// Tool input arrives as JSON fragments per content block index.
-	// `server`: a tool Anthropic runs itself (web_search); its result
-	// arrives as a later block and becomes a hosted tool card.
-	let tools = new Map<number, { id: string; name: string; json: string; input: unknown; server?: true }>()
-	let searches = new Map<string, Record<string, unknown>>()
-	let cited = new Set<string>()
-	let written = ''
+	let tools = new Map<number, { id: string; name: string; json: string; input: unknown }>()
 	let reason: StopReason | undefined
 	let explanation: string | undefined
 	// A call whose input is not JSON, cut off by max_tokens or broken: a
@@ -244,42 +235,14 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			}
 			case 'content_block_start': {
 				let b = ev.content_block
-				if (b?.type === 'tool_use' || b?.type === 'server_tool_use')
-					tools.set(ev.index, {
-						id: b.id,
-						name: b.name,
-						json: '',
-						input: b.input,
-						...(b.type === 'server_tool_use' && { server: true as const }),
-					})
+				if (b?.type === 'tool_use') tools.set(ev.index, { id: b.id, name: b.name, json: '', input: b.input })
 				else if (b?.type === 'redacted_thinking')
 					yield { type: 'signature', value: JSON.stringify({ redacted: b.data }) }
-				else if (b?.type === 'web_search_tool_result') {
-					let results: any[] = Array.isArray(b.content) ? b.content : []
-					let urls = results.map((r) => r?.url).filter((u): u is string => typeof u === 'string')
-					let failed = !Array.isArray(b.content)
-					let output = failed
-						? `Web search failed: ${b.content?.error_code ?? 'unknown error'}\n${m.data}`
-						: urls.length
-							? ['Sources:', ...urls].join('\n')
-							: ''
-					yield {
-						type: 'hosted_tool',
-						id: b.tool_use_id,
-						name: 'web_search',
-						input: searches.get(b.tool_use_id) ?? {},
-						output,
-						...(failed && { isError: true }),
-					}
-				}
 				break
 			}
 			case 'content_block_delta': {
 				let d = ev.delta
-				if (d?.type === 'text_delta') {
-					written += d.text
-					yield { type: 'text', text: d.text }
-				} else if (d?.type === 'citations_delta' && typeof d.citation?.url === 'string') cited.add(d.citation.url)
+				if (d?.type === 'text_delta') yield { type: 'text', text: d.text }
 				else if (d?.type === 'thinking_delta') yield { type: 'thinking', text: d.thinking }
 				else if (d?.type === 'signature_delta') yield { type: 'signature', value: d.signature }
 				else if (d?.type === 'input_json_delta') {
@@ -301,11 +264,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 						input = undefined
 					}
 				}
-				if (t.server) {
-					if (input && typeof input === 'object' && !Array.isArray(input))
-						searches.set(t.id, input as Record<string, unknown>)
-					break
-				}
 				if (!input || typeof input !== 'object' || Array.isArray(input)) {
 					broken.push({ id: t.id, name: t.name, json: t.json })
 					break
@@ -322,11 +280,9 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			}
 			case 'message_stop': {
 				// A call still open when the stream ends was cut off mid-input.
-				for (let t of tools.values()) if (!t.server) broken.push({ id: t.id, name: t.name, json: t.json })
+				for (let t of tools.values()) broken.push({ id: t.id, name: t.name, json: t.json })
 				// The model sees its malformed call as a tool error and may retry.
 				for (let b of broken) yield { type: 'tool_call', id: b.id, name: b.name, input: { invalidJson: b.json } }
-				let sources = [...cited].filter((u) => !written.includes(u))
-				if (sources.length) yield { type: 'text', text: `\n\nSources:\n${sources.join('\n')}\n` }
 				yield { type: 'done', reason: reason ?? 'end', ...(explanation !== undefined && { explanation }) }
 				return
 			}

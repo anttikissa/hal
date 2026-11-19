@@ -1,6 +1,5 @@
-// The OpenAI provider: its known models, the claims in a ChatGPT token and
-// the smaller context window of a subscription, with openai.ts loaded on
-// first use.
+// The OpenAI provider: the claims in a ChatGPT token and the smaller
+// context window of a subscription, with openai.ts loaded on first use.
 import { auth, jwtClaims } from '../auth.ts'
 import { modelsDev } from '../models-dev.ts'
 import type { Provider } from '../provider.ts'
@@ -47,36 +46,12 @@ export const provider: Provider & {
 	modelsKey: typeof modelsKey
 	contextWindow: typeof contextWindow
 	subscriptionWindow: number
-	knownModels: string[]
-	webSearchModels: string[]
 } = {
 	claims,
 	subscription,
 	modelsKey,
 	contextWindow,
 	subscriptionWindow: 272_000,
-	knownModels: [
-		'gpt-6.1-sol',
-		'gpt-6-astra',
-		'gpt-6-sol',
-		'gpt-6-luna',
-		'gpt-5.5',
-		'gpt-5.6-sol',
-		'gpt-5.6-terra',
-		'gpt-5.6-luna',
-	],
-	webSearchModels: [
-		'gpt-6.1-sol',
-		'gpt-6-astra',
-		'gpt-6-sol',
-		'gpt-6-luna',
-		'gpt-5.5',
-		'gpt-5.6-sol',
-		'gpt-5.6-terra',
-		'gpt-5.6-luna',
-		'gpt-5.3-codex',
-	],
-	known: (): string[] => provider.knownModels,
 	available: () => providers.available('openai'),
 	request: (req) => load().request(req),
 	parse: (messages) => load().parse(messages),
