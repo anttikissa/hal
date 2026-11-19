@@ -1,6 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { appendFileSync, existsSync, openSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'
 import { args, type Args } from './client/args.ts'
@@ -367,35 +367,10 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 	}
 	lifecycle.initHost()
 	let run = print.run({ ...job, cwd }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
-	// `hal -p` never hosts (task gw): a host needs the web and recovery. If
-	// no host answers the first dial, it starts a detached `hal serve`
-	// (logging to state/serve.log) once, and keeps dialing until it is up.
-	let tries = 0
-	let tryHost = async () => {
-		if (++tries !== 2 || !lifecycle.mayHost()) return false
-		let file = join(paths.stateDir(), 'serve.log')
-		let log = openSync(file, 'a', 0o600)
-		let serve = Bun.spawn(
-			[
-				process.execPath,
-				import.meta.path,
-				'--home',
-				paths.home(),
-				'serve',
-				...(promptCache.state.noUser ? ['--no-user'] : []),
-				...(job.anthropicUrl ? ['--anthropic-url', job.anthropicUrl] : []),
-			],
-			{ env: process.env, stdio: ['ignore', log, log], detached: true },
-		)
-		serve.unref()
-		void serve.exited.then(
-			(code) => code && (process.stderr.write(`hal: hal serve exited with ${code}; see ${file}\n`), process.exit(1)),
-		)
-		return false
-	}
+	// No host: it hosts its own run in this process, and exits with it.
 	await link.start({
 		socketPath: server.socketPath(),
-		tryHost,
+		tryHost: async () => lifecycle.mayHost() && server.serve(),
 		local: (deliver) => host.connect(deliver),
 		onEvent: run.onEvent,
 	})
