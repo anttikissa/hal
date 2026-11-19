@@ -36,7 +36,8 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		settled = false,
 		noUser = false
 	let targets: { tabs: string[]; sessions: string[] } | undefined
-	let text = ''
+	let text = '',
+		error = ''
 	let end = (code: number) => {
 		if (!settled) {
 			settled = true
@@ -137,8 +138,13 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		} else if (!started) return
 		else if (e.type === 'stream' && e.event.type === 'tool_call') text = ''
 		else if (e.type === 'stream' && e.event.type === 'text' && !e.event.naming) text += e.event.text
+		else if (e.type === 'output' && e.error) error = e.text
 		else if (e.type === 'question') io.err(`hal: waiting for an answer in Hal: ${e.form.text}\n`)
-		else if (e.type === 'turn-end' && e.status === 'completed') {
+		// A broken login blocks the turn until someone logs in; nobody will here.
+		else if (e.type === 'state' && e.state.type === 'blocked' && e.state.reason !== 'question') {
+			if (!job.session && !job.keep) connection.send({ type: 'tab-close', sessionId: session })
+			fail(error || e.state.reason)
+		} else if (e.type === 'turn-end' && e.status === 'completed') {
 			io.out(`${summary.answer(text).trim()}\n`)
 			end(summary.asks(text) ? 3 : 0)
 		} else if (e.type === 'turn-end') fail(`turn ${e.status}${e.error ? `: ${e.error}` : ''}`)

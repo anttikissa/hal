@@ -64,6 +64,23 @@ test('print refuses a new tab running the intro', async () => {
 	})
 })
 
+// Invariant (bug fix): a turn blocked on a broken login fails hal -p
+// with the full error instead of waiting for a login nobody does.
+test('print fails with the error when its turn blocks on login', async () => {
+	await harness({ prompt: 'task', cwd: '/tmp' }, async ({ run, sent, event, err }) => {
+		run.begin()
+		event({ type: 'ack', id: sent[0].id, tab: '07-bah' })
+		event({ type: 'snapshot', sessionId: '07-bah', snapshot: { meta: { model: 'anthropic/claude-opus-5-5' } } as any })
+		let prompt = sent.find((s) => s.type === 'submit')
+		event({ type: 'turn-start', sessionId: '07-bah', provider: 'test', command: prompt.id })
+		event({ type: 'output', sessionId: '07-bah', text: 'm: auth.ason: no apiKey', error: true } as Event)
+		event({ type: 'state', sessionId: '07-bah', state: { type: 'blocked', reason: 'log in: no apiKey' } })
+		expect(await run.done).toBe(1)
+		expect(err).toEqual(['hal: m: auth.ason: no apiKey\n'])
+		expect(sent.at(-1)).toMatchObject({ type: 'tab-close', sessionId: '07-bah' })
+	})
+})
+
 // Invariant (bug fix): hal -p sends its prompt after /model even when
 // /model prints nothing, and not after a /model error.
 test('print submits after a silent /model and fails on its error', async () => {
