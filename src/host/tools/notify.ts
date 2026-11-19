@@ -14,14 +14,17 @@ export const tool: Tool = {
 		required: ['text'],
 		additionalProperties: false,
 	},
+	// Advertises under 80 characters, accepts up to 100 (task gtw).
 	async run(input, ctx) {
 		if (
 			typeof input.text !== 'string' ||
 			!input.text.trim() ||
-			[...input.text].length >= 80 ||
+			[...input.text].length > 100 ||
 			/[\r\n\p{Cc}]/u.test(input.text)
 		)
-			throw new Error('text must be one non-empty line under 80 characters')
+			throw new Error(
+				`text must be one non-empty line under 80 characters${typeof input.text === 'string' ? `; got ${[...input.text].length}` : ''}`,
+			)
 		if (Object.keys(input).some((k) => k !== 'text')) throw new Error('notify accepts only text')
 		if (ctx.signal.aborted) throw new Error('canceled; notice not sent')
 		notify.deliver(host.state.clients, ctx.sessionId, 'update', input.text, input.text)

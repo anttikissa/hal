@@ -9,6 +9,8 @@ export const tool: Tool = {
 	syntax: {
 		summary: 'replace active context with your working-state checkpoint; full history stays',
 		usage: ['COMPACT { summary: "..." }'],
+		positional: ['summary'],
+		aliases: { cmd: 'summary' },
 		// Unquoted text after leading /* comments is the summary as written.
 		resolve(raw) {
 			let text = raw.replace(/^(\s*\/\*[\s\S]*?\*\/)*\s*/, '')
@@ -21,10 +23,11 @@ export const tool: Tool = {
 	parameters: {
 		type: 'object',
 		properties: { summary: { type: 'string', description: 'Working-state handoff needed to continue.' } },
-		required: ['summary'],
 	},
+	// Without a summary, Hal writes the deterministic one (task gtw).
 	async run(input, ctx) {
-		if (typeof input.summary !== 'string' || !input.summary.trim()) throw new Error('COMPACT needs a nonempty summary')
+		if (input.summary !== undefined && typeof input.summary !== 'string') throw new Error('summary must be text')
+		let summary = typeof input.summary === 'string' && input.summary.trim() ? input.summary : undefined
 		if (ctx.signal.aborted) throw new Error('turn stopped')
 		let records = history.readSync(ctx.sessionId)
 		let round = records.slice(records.findLastIndex((r) => r.type === 'user') + 1)
@@ -32,7 +35,7 @@ export const tool: Tool = {
 			throw new Error(
 				'Call COMPACT alone after receiving all other tool results, so the checkpoint includes their outcomes.',
 			)
-		let reply = contextTransitions.request(ctx.sessionId, 'compact', '', { origin: 'model' }, input.summary)
+		let reply = contextTransitions.request(ctx.sessionId, 'compact', '', { origin: 'model' }, summary)
 		if (reply.error) throw new Error(reply.error)
 		return reply.result ?? reply.say ?? 'Checkpoint accepted.'
 	},

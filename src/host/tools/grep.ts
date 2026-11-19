@@ -223,7 +223,7 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 			pattern: { type: 'string', description: 'Regex (rg syntax); | separates alternatives' },
 			in: { type: ['string', 'array'], items: { type: 'string' }, description: 'Path or paths to search, default cwd' },
 			glob: { type: 'string', description: 'Only files matching this glob, e.g. *.ts; a leading ! excludes' },
-			context: { type: 'integer', minimum: 0, maximum: 20, description: 'Lines of context around each match' },
+			context: { type: 'integer', minimum: 0, maximum: 100, description: 'Lines of context around each match' },
 			files: { type: 'boolean', description: 'List matching files only' },
 		},
 		required: ['pattern'],
@@ -236,8 +236,8 @@ export const tool: Tool<ToolOutput> & { rg: () => string | undefined } = {
 		if (!wanted.every((p) => typeof p === 'string' && p)) throw new Error('in must be a path or a list of paths')
 		if (input.glob !== undefined && typeof input.glob !== 'string') throw new Error('glob must be a string')
 		let context = input.context ?? 0
-		if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 20)
-			throw new Error('context must be an integer from 0 to 20')
+		if (typeof context !== 'number' || !Number.isInteger(context) || context < 0 || context > 100)
+			throw new Error('context must be an integer from 0 to 100')
 		let notes: string[] = []
 		let roots: string[] = []
 		for (let p of wanted as string[]) {

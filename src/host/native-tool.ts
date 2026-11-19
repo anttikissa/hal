@@ -120,12 +120,31 @@ function resolve(text: unknown, ctx?: CallContext): { name: string; input: Recor
 // the text, or unchanged when it does not resolve (tools.run then
 // reports why).
 function arrived(call: ToolCallBlock, ctx?: CallContext): ToolCallBlock {
-	if (call.name === name && call.cmd === undefined)
+	let texts = call.name === name && call.cmd === undefined ? [call.input.cmd] : topLevel(call)
+	for (let text of texts)
 		try {
-			let { name: tool, input } = nativeTool.resolve(call.input.cmd, ctx)
-			call = { type: 'tool_call', id: call.id, name: tool, input, cmd: call.input.cmd as string }
+			let { name: tool, input } = nativeTool.resolve(text, ctx)
+			call = { type: 'tool_call', id: call.id, name: tool, input, cmd: text as string }
+			break
 		} catch {}
 	return toolPresentations.attach(call, call)
+}
+
+// A Hal tool called at the top level with { cmd } means the same call
+// through `tool` (seen: compact, read_entry; task gtw). Readings in
+// order: the text as a call, the name before it, the text as one string.
+// Tested once, then the tests were deleted. If you change this code,
+// first write tests for: compact { cmd: prose }, compact { cmd:
+// 'COMPACT "s"' }, read_entry { cmd: 'a/1' }, bash { command } unchanged,
+// unknown names unchanged.
+function topLevel(call: ToolCallBlock): string[] {
+	let id = call.name.toLowerCase()
+	let cmd = call.input.cmd
+	if (call.name === name || call.cmd !== undefined || typeof cmd !== 'string' || Object.keys(call.input).length !== 1)
+		return []
+	if (!isTool(id)) return []
+	if (new RegExp(`^\\s*${id}\\b`, 'i').test(cmd)) return [cmd]
+	return [`${id.toUpperCase()} ${cmd}`, `${id.toUpperCase()} ${JSON.stringify(cmd)}`]
 }
 
 function isTool(name: string): boolean {

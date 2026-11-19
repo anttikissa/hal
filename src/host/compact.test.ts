@@ -55,13 +55,13 @@ test('native COMPACT validates without dropping evidence, replaces prior checkpo
 	await until(() => calls.length === 1)
 	calls[0]!.push(
 		{ type: 'text', text: 'Original evidence' },
-		{ type: 'tool_call', id: 'invalid', name: 'tool', input: { cmd: 'COMPACT { summary: " " }' } },
+		{ type: 'tool_call', id: 'invalid', name: 'tool', input: { cmd: 'COMPACT { summary: 5 }' } },
 		{ type: 'done', reason: 'tool_use' },
 	)
 	await until(() => calls.length === 2)
 	expect(history.readSync(id).some((r) => r.type === 'compact')).toBe(false)
 	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Original evidence')
-	expect(JSON.stringify(calls[1]!.input.messages)).toContain('nonempty summary')
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('summary must be text')
 	for (let [i, summary] of ['First checkpoint', 'Updated checkpoint'].entries()) {
 		calls
 			.at(-1)!

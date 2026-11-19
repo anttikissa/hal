@@ -53,7 +53,7 @@ test('notify refuses invalid text before delivering anything', async () => {
 		other = created(c)
 	c.conn.send({ type: 'visibility', sessionId: other, visible: true })
 	for (let input of [
-		{ text: 'x'.repeat(80) },
+		{ text: 'x'.repeat(101) },
 		{ text: '' },
 		{ text: '\nhello' },
 		{ text: 1 },
@@ -62,6 +62,6 @@ test('notify refuses invalid text before delivering anything', async () => {
 		expect((await run(id, input)).isError).toBe(true)
 	}
 	expect(c.of('notice')).toEqual([])
-	expect((await run(id, { text: 'x'.repeat(79) })).isError).toBeUndefined()
+	expect((await run(id, { text: 'x'.repeat(100) })).isError).toBeUndefined()
 	expect(c.of('notice')).toHaveLength(1)
 })

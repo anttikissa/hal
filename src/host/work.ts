@@ -129,17 +129,26 @@ function wake(id: string): void {
 		}
 }
 
-// Ends when a target needs attention, or when `self` gets a message:
-// WAIT is idle time, so every waiting message goes through (task 6q5).
-async function wait(targets: Target[], signal: AbortSignal, self?: string): Promise<string> {
+// Ends when a target needs attention, when `self` gets a message, or
+// after `seconds`: WAIT is idle time, so every waiting message goes
+// through (task 6q5).
+async function wait(targets: Target[], signal: AbortSignal, self?: string, seconds?: number): Promise<string> {
 	if (!targets.length) return 'No owned background command or subagent is running. Go on without waiting.'
 	return new Promise((resolve, reject) => {
 		let finish = (text?: string, error?: unknown) => {
 			work.listeners.delete(listener)
 			signal.removeEventListener('abort', abort)
+			clearTimeout(timer)
 			if (error) reject(error)
 			else resolve(text!)
 		}
+		let timer =
+			seconds === undefined
+				? undefined
+				: setTimeout(
+						() => finish(`Waited ${seconds}s; still running: ${targets.map((t) => t.ref).join(', ')}.`),
+						seconds * 1000,
+					)
 		let watched = () =>
 			new Set([...(self ? [self] : []), ...targets.flatMap((t) => work.tree(t).map((c) => c.sessionId))])
 		let check = () => {

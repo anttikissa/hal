@@ -1,0 +1,11 @@
+{
+	title: 'Tools accept the unambiguous slips seen in failure data',
+	spec: 'From two weeks of failed calls (2026-11-19 review, 970 failures): a call whose meaning is clear runs instead of failing. GREP context accepts 0 to 100 lines (63 calls asked for 22-60). NOTIFY advertises one line under 80 characters and accepts up to 100. COMPACT without a summary compacts with the deterministic summary already used for overflow recovery (18 bare COMPACT calls); a model-written summary stays the advertised form. WAIT takes timeout in seconds: when it passes with no target needing attention, WAIT returns saying which targets still run. Field names models sent map to the real field when nothing conflicts: WAIT ids and sessions to targets, SEND message to text, COMPACT cmd to summary. A provider call named after a Hal tool at the top level with input exactly { cmd: string } (seen: compact, read_entry) resolves as that tool call: the cmd text itself when it starts with the tool name, else the name followed by the text, else the name with the whole text as one string argument; approval sees the resolved call. Invariant: an unambiguous call never fails on syntax Hal could read.',
+	status: 'done',
+	notes: [
+		'Bare COMPACT goes through the overflow path, so its summary header says context was compacted to avoid the token limit; models see that wording.',
+		'Aliases live in each tool syntax.aliases until hq6 moves them into quirks. Top-level routing is nativeTool.arrived/topLevel, before approval.'
+	],
+	needs: [],
+	foldInto: ['kjx', '5e', 'b4k', 'm3s', 'hq6']
+}

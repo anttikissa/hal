@@ -46,7 +46,7 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 
 export const tool: Tool = {
 	name: 'send',
-	syntax: { summary: 'message to session', positional: ['to', 'text'], aliases: { session: 'to' } },
+	syntax: { summary: 'message to session', positional: ['to', 'text'], aliases: { session: 'to', message: 'text' } },
 	description:
 		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) delivers at the next round without interrupting; queue waits for the current turn to end; steer starts or resumes the recipient and interrupts active work, except unsafe calls and background work. ' +
 		'Use soft-steer for routine updates and steer for explicit continuation of a paused or failed session; ordinary sends stay pending while paused or failed. emergency is a compatibility alias for steer. When a child asks you a question, use send to answer.',

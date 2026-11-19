@@ -173,7 +173,7 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 	expect(nativeTool.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
 	expect(nativeTool.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({
 		name: 'wait',
-		input: { targets: ['09-ada'] },
+		input: { targets: ['09-ada'], timeout: 60 },
 	})
 	expect(nativeTool.resolve('INSPECT sessions all "tab,id"')).toEqual({
 		name: 'inspect',
@@ -266,7 +266,7 @@ test('HELP documents schema fields; $other_tools lists only tools the prompt doe
 	let summary = nativeTool.summary()
 	for (let name of ['SPAWN', 'WAIT', 'STOP', 'BASH']) expect(summary).not.toContain(name)
 	expect(summary).toContain('SEND')
-	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets } ]'])
+	expect(nativeTool.usage({ ...nativeTool.find('wait'), syntax: undefined })).toEqual(['WAIT [ { targets, timeout } ]'])
 })
 
 const version = (path: string) => require('./file-text.ts').fileText.hash(readFileSync(path)) as string
