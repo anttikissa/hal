@@ -7,6 +7,9 @@ import { commands } from '../commands.ts'
 import { slash } from '../slash.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'run slash command like "/cd ../other"'
 const help = `## COMMAND
 
@@ -77,4 +80,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	})
 }
 
-export const tool: Tool = { name: 'command', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'command', inPrompt, summary, help, parameters, syntax, run }

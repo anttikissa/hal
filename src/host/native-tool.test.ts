@@ -163,7 +163,7 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 		input: { name: 'x', task: 'y' },
 	})
 	expect(() => nativeTool.resolve('SPAWN [{ name: "one", task: "x" }, { name: "two", task: "y" }]')).toThrow(
-		'SPAWN takes 0 plain arguments, got another: [{"name":"one","task":"x"},{"name":"two","task":"y"}]. Usage: SPAWN { task, [ kind, mode, model, cwd, name, limit, tools, systemPrompt ] }       // "[ ]" here means optional, not an array',
+		'SPAWN takes 0 plain arguments, got another: [{"name":"one","task":"x"},{"name":"two","task":"y"}]. Usage: SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }? | !!START | <task> | !!END',
 	)
 	expect(nativeTool.resolve('SEND { session: "2", text: "hi" }')).toEqual({
 		name: 'send',

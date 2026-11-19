@@ -3,6 +3,9 @@ import { host } from '../host.ts'
 import { notify } from '../notify.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'user'
 const help = `## NOTIFY
 
@@ -35,4 +38,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return 'sent'
 }
 
-export const tool: Tool = { name: 'notify', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'notify', inPrompt, summary, help, parameters, syntax, run }

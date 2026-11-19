@@ -16,6 +16,9 @@ import { type Tool, type ToolContext, type ToolOutput, tools } from '../tools.ts
 import { callText } from '../../common/call-text.ts'
 import { nativeTool } from '../native-tool.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'read a history entry, its whole output and images'
 const help = `## READ_ENTRY
 
@@ -242,4 +245,13 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<To
 	return page(data.bytes.toString('utf8'))
 }
 
-export const tool: Tool<ToolOutput> = { name: 'read_entry', summary, help, readOnly: true, parameters, syntax, run }
+export const tool: Tool<ToolOutput> = {
+	name: 'read_entry',
+	inPrompt,
+	summary,
+	help,
+	readOnly: true,
+	parameters,
+	syntax,
+	run,
+}

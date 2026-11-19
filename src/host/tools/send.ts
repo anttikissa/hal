@@ -20,6 +20,9 @@ import { status } from '../status.ts'
 import { tabs } from '../tabs.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'message to session'
 const help = `## SEND
 
@@ -103,4 +106,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return outcome(id, text, ctx.sessionId, delivery)
 }
 
-export const tool: Tool = { name: 'send', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'send', inPrompt, summary, help, parameters, syntax, run }

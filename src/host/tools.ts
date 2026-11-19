@@ -90,10 +90,12 @@ export type ToolCard = {
 	title?(input: Record<string, unknown>, result?: { output: string; isError?: boolean }): string | undefined
 }
 // Model-facing text (task 5t3). `summary`: one line; HELP lists it, and
-// a tool without `inPrompt` appears in the prompt's Other tools as its
+// a tool with inPrompt false appears in the prompt's Other tools as its
 // capitalized name and summary ('read a history entry' becomes
 // 'READ_ENTRY read a history entry'). `inPrompt`: `help` is the tool's
 // own section in the system prompt (src/host/native-tool.ts guides).
+// `promptIf`: a template condition, e.g. '$spawn_budget', for showing the
+// tool in the prompt at all.
 // `help`: what HELP <TOOL> shows, rendered with the prompt's template
 // language (src/host/prompt-lang.ts) and the session's variables.
 //
@@ -120,7 +122,8 @@ export type Tool<Output = string> = {
 	card?: ToolCard
 	syntax?: SyntaxSpec
 	summary?: string
-	inPrompt?: true
+	inPrompt?: boolean
+	promptIf?: string
 	help?: string
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }

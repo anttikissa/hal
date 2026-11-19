@@ -6,6 +6,9 @@ import { promptCache } from '../prompt-cache.ts'
 import { systemPrompt } from '../system-prompt.ts'
 import { type Tool, type ToolContext, tools } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// leaves HELP out of the tool list (the prompt names it).
+const inPrompt = false
 const help = `## HELP
 
 Explain a tool: its syntax, fields, defaults and units. Without a name, list every tool with its syntax.
@@ -61,4 +64,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	].join('\n')
 }
 
-export const tool: Tool = { name: 'help', help, readOnly: true, parameters, syntax, run }
+export const tool: Tool = { name: 'help', inPrompt, help, readOnly: true, parameters, syntax, run }

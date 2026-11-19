@@ -5,7 +5,8 @@ import { fileChanges } from '../file-changes.ts'
 import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
 import type { CommitBlock } from '../../common/blocks.ts'
 
-// BASH help is injected into the system prompt in full.
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'run a shell command'
 const help = `## BASH

@@ -258,15 +258,18 @@ function guide(tool: Tool<unknown>, interactive: boolean): string {
 // The system prompt's @tools (task 5t3): the help of each tool with
 // inPrompt, then an Other tools line for each other tool with a summary
 // (HELP has none: the prompt names it); the model learns the rest with
-// HELP. `allowed`: the tools this session may call.
+// HELP. `allowed`: the tools this session may call. A tool's promptIf
+// wraps its section or line in a template condition.
 function guides(allowed?: string[], interactive = true): string {
 	let shown = tools.all().filter((t) => !allowed || allowed.includes(t.name))
-	let sections = shown.filter((t) => t.inPrompt).map((t) => guide(t, interactive))
+	let when = (t: Tool<unknown>, text: string) => (t.promptIf ? `::: if ${t.promptIf}\n${text}\n:::` : text)
+	let sections = shown.filter((t) => t.inPrompt).map((t) => when(t, guide(t, interactive)))
 	let others = shown.flatMap((t) => {
 		let summary = t.summary ?? t.syntax?.summary
-		return !t.inPrompt && summary ? [`\t${t.name.toUpperCase()} ${summary}`] : []
+		return !t.inPrompt && summary ? [when(t, `\t${t.name.toUpperCase()} ${summary}`)] : []
 	})
-	return [...sections, `## Other tools\n${others.join('\n')}`].join('\n\n')
+	if (others.length) sections.push(`## Other tools\n${others.join('\n')}`)
+	return sections.join('\n\n')
 }
 
 export const nativeTool = {

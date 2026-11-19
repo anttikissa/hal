@@ -8,6 +8,9 @@ import { nativeTool } from '../native-tool.ts'
 import { slash } from '../slash.ts'
 import { tools, type Tool, type ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'run async JavaScript/TypeScript in the Hal host; tool() chains Hal tools'
 const help = String.raw`## EVAL
 
@@ -136,6 +139,7 @@ function resolve(raw: string): { name: string; input: Record<string, unknown> } 
 
 export const tool: Tool = {
 	name: 'eval',
+	inPrompt,
 	summary,
 	help,
 	parameters,

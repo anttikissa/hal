@@ -3,6 +3,9 @@
 import type { Tool, ToolContext } from '../tools.ts'
 import { work } from '../work.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'stop a session or tool call and the work it owns'
 const help = `## STOP
 
@@ -20,4 +23,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return work.stop(work.target(ctx.sessionId, input.target))
 }
 
-export const tool: Tool = { name: 'stop', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'stop', inPrompt, summary, help, parameters, syntax, run }

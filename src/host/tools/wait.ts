@@ -5,6 +5,9 @@ import { nativeTool } from '../native-tool.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 import { work } from '../work.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'wait until sessions or tool calls finish, fail or ask'
 const help = `## WAIT
 
@@ -46,4 +49,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return work.wait(targets, ctx.signal, ctx.sessionId, input.timeout as number | undefined)
 }
 
-export const tool: Tool = { name: 'wait', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'wait', inPrompt, summary, help, parameters, syntax, run }

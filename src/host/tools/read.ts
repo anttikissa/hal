@@ -13,8 +13,9 @@ import { fileText } from '../file-text.ts'
 import { type Tool, type ToolContext, type ToolOutput, tools } from '../tools.ts'
 import { webRead } from '../web-read.ts'
 
-// READ help is injected into the system prompt in full.
 // TODO - to be reviewed by a human -10-zap: "Read only needed ranges..."
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'read files, images, directories and URLs'
 const help = `## READ

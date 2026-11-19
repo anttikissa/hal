@@ -5,6 +5,9 @@ import { setTimeout as sleep } from 'timers/promises'
 import { apiKeys } from '../api-keys.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'search the web'
 const help = `## BRAVE
 
@@ -85,6 +88,7 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 
 export const tool: Tool & { url: string; format: typeof format } = {
 	name: 'brave',
+	inPrompt,
 	summary,
 	help,
 	parameters,

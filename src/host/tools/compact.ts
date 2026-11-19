@@ -4,6 +4,9 @@ import { history } from '../history.ts'
 import { nativeTool } from '../native-tool.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'replace active context with your working-state checkpoint; full history stays'
 const help = `## COMPACT
 
@@ -47,4 +50,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return reply.result ?? reply.say ?? 'Checkpoint accepted.'
 }
 
-export const tool: Tool = { name: 'compact', summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'compact', inPrompt, summary, help, parameters, syntax, run }

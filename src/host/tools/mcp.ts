@@ -5,6 +5,9 @@ import { callText } from '../../common/call-text.ts'
 import { mcp } from '../mcp.ts'
 import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'call MCP server tools; MCP lists servers'
 const help = `## MCP
 
@@ -55,4 +58,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<To
 	return mcp.call(server, name, args, ctx.signal)
 }
 
-export const tool: Tool<ToolOutput> = { name: 'mcp', summary, help, parameters, syntax, run }
+export const tool: Tool<ToolOutput> = { name: 'mcp', inPrompt, summary, help, parameters, syntax, run }

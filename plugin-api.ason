@@ -1,5 +1,5 @@
 {
-	version: 45,
+	version: 46,
 	changes: [
 		{
 			version: 2,
@@ -873,6 +873,16 @@
 					kind: 'compatible',
 					target: 'common/session.SessionMeta',
 					description: 'Adds tools and systemPrompt'
+				}
+			]
+		},
+		{
+			version: 46,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/tools.Tool',
+					description: 'Adds optional promptIf; inPrompt accepts false'
 				}
 			]
 		}

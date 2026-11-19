@@ -11,7 +11,8 @@ import { settings } from '../../common/settings.ts'
 import { approval } from '../approval.ts'
 import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
 
-// GREP help is injected into the system prompt in full.
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'search file contents'
 const help = `## GREP

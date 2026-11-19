@@ -15,7 +15,6 @@ import { paths } from '../paths.ts'
 import { editBlocks } from '../edit-blocks.ts'
 import { pluginFiles } from '../plugin-files.ts'
 
-// EDIT help is injected into the system prompt in full.
 // TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one
 // official, hard-to-misuse form per job; keep the guide short even if
 // slightly inconsistent (e.g. create shown without @version). Tolerate
@@ -23,6 +22,8 @@ import { pluginFiles } from '../plugin-files.ts'
 // (!!OLD closed by !!END removes the text; an empty text replace of whole
 // lines also removes their newline). delete A-B stays the documented way
 // to remove lines.
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'change, create and delete files'
 const help = `## EDIT

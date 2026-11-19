@@ -22,6 +22,9 @@ import type { SyntaxSpec, Tool, ToolContext, ToolOutput } from '../tools.ts'
 import { version } from '../version.ts'
 import { work } from '../work.ts'
 
+// Configuration: true puts the whole help in the system prompt; false
+// lists only the summary under Other tools (HELP <TOOL> shows the rest).
+const inPrompt = false
 const summary = 'agent internals and subscription status'
 const help = `## INSPECT
 
@@ -298,4 +301,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<To
 	return table(fields, rows)
 }
 
-export const tool: Tool<ToolOutput> = { name: 'inspect', summary, help, parameters, syntax, run }
+export const tool: Tool<ToolOutput> = { name: 'inspect', inPrompt, summary, help, parameters, syntax, run }
