@@ -1,17 +1,18 @@
 import { expect, test } from 'bun:test'
 import { calls, client, created, until, useHost } from './host-fixture.test.ts'
 import { push } from './push.ts'
+import { sessions } from './sessions.ts'
 
 useHost()
 
 // Runs one turn in `id` that replies `text`, counting pushes meanwhile.
-async function turn(c: ReturnType<typeof client>, id: string, text: string): Promise<number> {
+async function turn(c: ReturnType<typeof client>, id: string, text: string, interactive = true): Promise<number> {
 	let pushed = 0
 	let original = push.notify
 	push.notify = async () => void pushed++
 	try {
 		let ends = c.of('turn-end').length
-		c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+		c.conn.send({ type: 'submit', sessionId: id, text: 'go', interactive })
 		await until(() => calls.length)
 		calls.shift()!.push({ type: 'text', text }, { type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length > ends)
@@ -35,15 +36,15 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 	expect(await turn(a, one, 'first')).toBe(0)
 	expect(a.of('notice')).toEqual([])
 
-	// Only another tab is watched: a notice there, with the reply's last line, and no push.
+	// Only another tab is watched: a notice there, with the reply's summary, and no push.
 	b.conn.send({ type: 'visibility', sessionId: one, visible: false })
-	expect(await turn(a, one, 'working on it\n\ntests pass, pushed to main\n')).toBe(0)
+	expect(await turn(a, one, 'working on it\n\n<summary>tests pass, pushed to main</summary>\n')).toBe(0)
 	expect(a.of('notice')).toMatchObject([{ session: one, kind: 'done', line: 'tests pass, pushed to main' }])
 	expect(b.of('notice')).toEqual([])
 
 	// Nobody watches: a push, no notice.
 	a.conn.send({ type: 'visibility', sessionId: two, visible: false })
-	expect(await turn(a, one, 'third')).toBe(1)
+	expect(await turn(a, one, '<summary>third</summary>')).toBe(1)
 	expect(a.of('notice')).toHaveLength(1)
 
 	// History keeps both the notice and the push, newest first, for a client that saw neither.
@@ -56,4 +57,12 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 		{ session: one, kind: 'done', line: 'tests pass, pushed to main' },
 	])
 	expect(entries[0].block).toMatch(/^\d+$/)
+})
+
+test('a scripted session never notifies, until a human prompt takes it over', async () => {
+	let a = client()
+	let id = created(a)
+	sessions.open(id).interactive = false
+	expect(await turn(a, id, '[\n  {id: 1}\n]', false)).toBe(0)
+	expect(await turn(a, id, '<summary>mine now</summary>')).toBe(1)
 })

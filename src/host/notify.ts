@@ -11,11 +11,11 @@ import { clients as clientInfo } from './clients.ts'
 import { diag } from './diag.ts'
 import { noticeHistory } from './notice-history.ts'
 import { pages, type Marks } from './pages.ts'
+import { promptCache } from './prompt-cache.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
-import { names } from '../common/names.ts'
 import { scheduler } from './scheduler.ts'
 import { turnMarks } from './turn-marks.ts'
 
@@ -61,8 +61,9 @@ function asked(id: string): boolean {
 	return !(meta.parent && meta.spawn && meta.spawn !== 'interactive' && open.includes(meta.parent))
 }
 
-// What the latest turn replied: its <summary> (common/summary.ts), else
-// the last non-blank line of its text; and the key of its record.
+// What the latest turn replied: its <summary> (common/summary.ts), and
+// the key of its record. A reply without one says nothing: its last
+// line is often data, such as a closing `]`.
 function reply(id: string): { line: string; block?: string } {
 	let records = pages.page(id).records
 	for (let i = records.length - 1; i >= 0; i--) {
@@ -70,21 +71,20 @@ function reply(id: string): { line: string; block?: string } {
 		if (r.type === 'user') break
 		if (r.type !== 'assistant' || r.block.type !== 'text') continue
 		let told = summary.extract(r.block.text)
-		let block = r.n === undefined ? undefined : `${r.n}`
-		if (told) return { line: told, block }
-		let text = summary.strip(r.block.text)
-		let last = names
-			.strip(text)
-			.split('\n')
-			.map((l) => l.trim())
-			.filter(Boolean)
-			.at(-1)
-		if (last) return { line: last, block }
+		if (told) return { line: told, block: r.n === undefined ? undefined : `${r.n}` }
 	}
 	return { line: '' }
 }
 
-// One line saying what happened: the reply's last line, the error, or the question.
+// A session working for a parent or a script, not for the user: its
+// master reports to the user, so it never notifies. A human prompt
+// typed into a scripted session makes it the user's again.
+function worker(id: string): boolean {
+	let meta = sessions.open(id)
+	return !promptCache.interactive(id) || (!!meta.parent && meta.spawn !== 'interactive')
+}
+
+// One line saying what happened: the reply's summary, the error, or the question.
 function line(id: string, event: Event): string {
 	let text =
 		event.type === 'question'
@@ -118,6 +118,7 @@ function deliver(
 	pushText: string,
 	source: { block?: string; question?: string } = {},
 ): void {
+	if (notify.worker(id)) return
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let name = sessions.open(id).name ?? id
@@ -143,8 +144,8 @@ function deliver(
 
 // A tab closed by autoclose or /close (task 97r): every present client
 // hears it, even one showing that tab, and it replaces the session's
-// done notice; with nobody present, a push. `line` says why;
-// `before`: the tab list before closing, for its number and color;
+// done notice. It never pushes: the done push already told. `line` says
+// why; `before`: the tab list before closing, for its number and color;
 // `closer`: the client that closed it, present but not told.
 function closed(
 	clients: Iterable<Watcher>,
@@ -157,9 +158,7 @@ function closed(
 	let tab = before.findIndex((t) => t.id === id)
 	let title = tab >= 0 ? `Closed tab ${tab + 1}: ${name}` : `Closed ${name}`
 	noticeHistory.record({ session: id, name, kind: 'done', line, what: 'closed' })
-	let watching = [...clients].filter((c) => c === closer || present(c))
-	if (!watching.length) return void push.notify(id, title, line).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
-	watching = watching.filter((c) => c !== closer)
+	let watching = [...clients].filter((c) => c !== closer && present(c))
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: 'done', what: 'closed', title, line }
 	if (tab >= 0) notice.tab = tab + 1
 	if (before[tab]?.color !== undefined) notice.color = before[tab]!.color
@@ -181,4 +180,4 @@ function closedBy(
 	return `${tab >= 0 ? `Tab ${tab + 1} (${by})` : by} called /close`
 }
 
-export const notify = { kind, asked, reply, line, route, deliver, closed, closedBy }
+export const notify = { kind, asked, reply, worker, line, route, deliver, closed, closedBy }

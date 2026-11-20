@@ -49,7 +49,7 @@ function finished(id: string): void {
 	let before = tabs.list()
 	if (tabs.close(id) !== undefined) return
 	tabs.publish()
-	if (scheduler.owned(id)) return
+	if (scheduler.owned(id) || notify.worker(id)) return
 	let result = notify.reply(id).line.slice(0, 200)
 	notify.closed(host.state.clients, id, result ? `Result: ${result}` : 'Result: none', before)
 }
