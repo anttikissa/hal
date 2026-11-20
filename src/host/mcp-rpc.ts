@@ -16,6 +16,8 @@ export type ServerConfig = {
 	headers?: Record<string, string>
 	timeout?: number
 	enabled?: boolean
+	// The OAuth bearer token (mcp-oauth.ts), refreshed when `stale`.
+	authorize?: (stale: boolean) => Promise<string | undefined>
 }
 type RpcError = { code: number; message: string; data?: unknown }
 type Message = { jsonrpc: '2.0'; id?: number | string; method?: string; params?: any; result?: any; error?: RpcError }
@@ -144,20 +146,35 @@ function http(peer: Peer, config: ServerConfig): Transport {
 		let parsed = JSON.parse(text)
 		for (let message of Array.isArray(parsed) ? parsed : [parsed]) mcpRpc.receive(peer, message)
 	}
-	let headers = () => ({
-		'Content-Type': 'application/json',
-		Accept: 'application/json, text/event-stream',
-		...config.headers,
-		...(session && { 'Mcp-Session-Id': session }),
-		...(peer.protocol && { 'MCP-Protocol-Version': peer.protocol }),
-	})
+	let headers = async (stale = false) => {
+		let token = await config.authorize?.(stale)
+		return {
+			'Content-Type': 'application/json',
+			Accept: 'application/json, text/event-stream',
+			...(token && { Authorization: `Bearer ${token}` }),
+			...config.headers,
+			...(session && { 'Mcp-Session-Id': session }),
+			...(peer.protocol && { 'MCP-Protocol-Version': peer.protocol }),
+		}
+	}
+	let post = async (message: Message, signal?: AbortSignal, stale = false) =>
+		fetch(config.url!, { method: 'POST', headers: await headers(stale), body: JSON.stringify(message), signal })
 	return {
 		async send(message, signal) {
-			let res = await fetch(config.url!, { method: 'POST', headers: headers(), body: JSON.stringify(message), signal })
+			let res = await post(message, signal)
+			// A 401 was not processed: retry once with a refreshed token.
+			if (res.status === 401 && config.authorize) {
+				await res.body?.cancel()
+				res = await post(message, signal, true)
+			}
 			session = res.headers.get('mcp-session-id') ?? session
 			// A session the server no longer knows: mcp.ts starts a new one.
 			if (res.status === 404 && session)
 				throw Object.assign(new Error(`${peer.name}: session expired`), { expired: true })
+			if (res.status === 401)
+				throw new Error(
+					`${peer.name} answered HTTP 401: ${await res.text()}\nIf it uses OAuth, log in with /mcp login ${peer.name}`,
+				)
 			if (!res.ok) throw new Error(`${peer.name} answered HTTP ${res.status}: ${await res.text()}`)
 			let type = res.headers.get('content-type') ?? ''
 			if (type.includes('text/event-stream') && res.body) await mcpRpc.events(res.body, deliver)
@@ -165,7 +182,10 @@ function http(peer: Peer, config: ServerConfig): Transport {
 			else await res.body?.cancel()
 		},
 		close() {
-			if (session) fetch(config.url!, { method: 'DELETE', headers: headers() }).catch(() => {})
+			if (session)
+				headers()
+					.then((h) => fetch(config.url!, { method: 'DELETE', headers: h }))
+					.catch(() => {})
 		},
 		stderr: () => '',
 	}

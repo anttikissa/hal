@@ -4,6 +4,7 @@
 
 import { liveFiles } from './live-file.ts'
 import { mcpRpc, type Peer, type ServerConfig } from './mcp-rpc.ts'
+import { mcpOauth } from './mcp-oauth.ts'
 import { paths } from './paths.ts'
 import type { ToolOutput } from './tools.ts'
 import { version } from './version.ts'
@@ -96,6 +97,10 @@ async function start(name: string, s: Server, config: ServerConfig): Promise<Pee
 		env: mcp.expand(name, config.env),
 		headers: mcp.expand(name, config.headers),
 		cwd: config.cwd && paths.expand(config.cwd),
+		...(config.url &&
+			mcpOauth.store()[name]?.url === config.url && {
+				authorize: (stale: boolean) => mcpOauth.token(name, config.url!, stale),
+			}),
 	}
 	let peer = mcpRpc.open(name, resolved, {
 		notification(method) {
