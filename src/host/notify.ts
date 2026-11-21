@@ -18,6 +18,7 @@ import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { scheduler } from './scheduler.ts'
 import { turnMarks } from './turn-marks.ts'
+import { strings } from '../common/strings.ts'
 
 type Watcher = {
 	deliver: (event: Event) => void
@@ -92,7 +93,7 @@ function line(id: string, event: Event): string {
 			: event.type === 'turn-end' && event.error
 				? event.error
 				: notify.reply(id).line
-	return (text.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 200)
+	return strings.sliceText((text.split('\n').find((l) => l.trim()) ?? '').trim(), 0, 200)
 }
 
 function route(clients: Iterable<Watcher>, id: string, event: Event): void {

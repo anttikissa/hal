@@ -94,7 +94,7 @@ function encode(json: string, encoding: HttpRequest['encoding']): BodyInit {
 // tool output); one in history would fail every later request.
 // Tested once, then the tests were deleted. If you change this code,
 // first write tests for: lone high and low surrogates, intact pairs.
-export function requestJson(body: unknown): string {
+function requestJson(body: unknown): string {
 	return JSON.stringify(body, (_, v) => (typeof v === 'string' ? v.toWellFormed() : v))
 }
 
@@ -363,7 +363,7 @@ async function* stream(
 							...(http.encoding && { 'content-encoding': http.encoding }),
 							...http.headers,
 						},
-						body: encode(requestJson(http.body), http.encoding),
+						body: encode(provider.requestJson(http.body), http.encoding),
 						signal: conn.signal,
 					})
 		} catch (e) {
@@ -460,5 +460,6 @@ export const provider = {
 	detail,
 	resetAt,
 	sse,
+	requestJson,
 	stream,
 }

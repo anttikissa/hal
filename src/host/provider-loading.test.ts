@@ -38,7 +38,7 @@ function isolated(body: string): void {
 test('startup, command discovery and catalog metadata do not load model implementations', () => {
 	isolated(`
 		require('./src/host/commands.ts').commands.all();
-		assert(models.known().includes('openai/gpt-6-astra'));
+		assert(models.known().includes('hal/intro'));
 		assert(models.valid('anthropic/unknown-model'));
 		assert(!models.valid('../openai/model'));
 		assert(!models.valid('constructor/model'));

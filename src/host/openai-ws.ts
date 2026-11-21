@@ -9,8 +9,7 @@
 // codex.rate_limits message, not as response headers (usage.ts).
 
 import { isDeepStrictEqual } from 'node:util'
-import type { HttpRequest, ProviderRequest } from './provider.ts'
-import * as provider from './provider.ts'
+import { provider, type HttpRequest, type ProviderRequest } from './provider.ts'
 import { diag } from './diag.ts'
 import { usage } from './usage.ts'
 

@@ -13,6 +13,7 @@ import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
+import { strings } from '../common/strings.ts'
 import { scheduler } from './scheduler.ts'
 
 // `typed`: by /autoclose, whose card already names the setting.
@@ -50,7 +51,7 @@ function finished(id: string): void {
 	if (tabs.close(id) !== undefined) return
 	tabs.publish()
 	if (scheduler.owned(id) || notify.worker(id)) return
-	let result = notify.reply(id).line.slice(0, 200)
+	let result = strings.sliceText(notify.reply(id).line, 0, 200)
 	notify.closed(host.state.clients, id, result ? `Result: ${result}` : 'Result: none', before)
 }
 

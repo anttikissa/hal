@@ -1,6 +1,7 @@
 // Fetch a URL into readable text, a model-visible image, or a local file.
 import { mkdirSync } from 'fs'
 import { attachments } from '../common/attachments.ts'
+import { strings } from '../common/strings.ts'
 import { paths } from './paths.ts'
 import { type ToolContext, type ToolOutput, tools } from './tools.ts'
 
@@ -106,7 +107,7 @@ export const webRead = {
 			let max = tools.maxChars - 100
 			let more = cut ? `more than ${webRead.maxTextBytes} bytes; ` : ''
 			if (readable.length > max)
-				return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
+				return `${strings.sliceText(readable, 0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
 			return cut ? `${readable}\n[output truncated: the page is ${more.slice(0, -2)}]` : readable
 		}
 		let dir = paths.fileDir()

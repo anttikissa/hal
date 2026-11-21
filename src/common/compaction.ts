@@ -8,6 +8,7 @@
 
 import { replay, type HistoryRecord } from './replay.ts'
 import { replayText } from './replay-text.ts'
+import { strings } from './strings.ts'
 
 const HEAD_BYTES = 1024
 const TAIL_BYTES = 2048
@@ -25,7 +26,7 @@ function fit(text: string, limit: number, suffix: boolean): string {
 		if (suffix === ok) hi = suffix ? mid : mid - 1
 		else lo = suffix ? mid + 1 : mid
 	}
-	return suffix ? text.slice(lo) : text.slice(0, lo)
+	return suffix ? strings.sliceText(text, lo) : strings.sliceText(text, 0, lo)
 }
 
 const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))}kB`

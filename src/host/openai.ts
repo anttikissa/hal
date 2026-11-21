@@ -59,7 +59,7 @@ function assistantItem(b: ReplayBlock): unknown {
 				}
 			: undefined
 	if (b.type === 'tool_call')
-		return { type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input) }
+		return { type: 'function_call', call_id: b.id, name: b.name, arguments: provider.requestJson(b.input) }
 	if (b.provider !== 'openai' || !b.signature) return undefined
 	let encrypted: unknown
 	try {

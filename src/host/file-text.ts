@@ -3,6 +3,7 @@
 // the first 25 bits of SHA-256, a stale-file check, not a security boundary.
 import { createHash } from 'crypto'
 import { tools } from './tools.ts'
+import { strings } from '../common/strings.ts'
 
 const alphabet = '0123456789abcdefghjkmnpqrstvwxyz'
 
@@ -39,7 +40,7 @@ function numbered(lines: string[], shown: number[]): string {
 	for (let [i, n] of shown.entries()) {
 		if (i && n !== shown[i - 1]! + 1) out.push('…')
 		let line = strip(lines[n - 1]!)
-		if (line.length > max) line = `${line.slice(0, max)}… [line cut: ${line.length - max} more characters]`
+		if (line.length > max) line = `${strings.sliceText(line, 0, max)}… [line cut: ${line.length - max} more characters]`
 		out.push(`${n}: ${line}`)
 	}
 	return out.join('\n')

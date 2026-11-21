@@ -1,6 +1,6 @@
 {
 	title: 'Provider requests carry well-formed strings',
-	spec: 'Every provider request body (HTTP and the OpenAI WebSocket) replaces lone surrogates with U+FFFD before sending (provider.requestJson). Invariant restored: a half emoji anywhere in history, e.g. from a cut tool output, never makes the provider reject every later request; Anthropic answered "unexpected end of hex escape", OpenAI "Invalid request". Stored history stays unchanged. Measured on the server: about 4 ms extra per 1.7 MB body.',
+	spec: 'Every provider request body (HTTP and the OpenAI WebSocket), and tool-call arguments the OpenAI adapters serialize as nested JSON, replaces lone surrogates with U+FFFD before sending (provider.requestJson). Invariant restored: a half emoji anywhere in history never makes the provider reject every later request; Anthropic answered "unexpected end of hex escape", OpenAI "Invalid request". Stored history stays unchanged; well-formed text serializes byte for byte as before, so the prompt cache holds. Measured on the server: about 4 ms extra per 1.7 MB body. Hal cuts text to a length with strings.sliceText, which never splits a surrogate pair: tool output caps, READ, GREP and EDIT line cuts, bash head and tail, READ_ENTRY character pages, web pages, compaction, pruned arguments, recaps and notification lines. Model-written code (EVAL) can still cut an emoji; requestJson covers that.',
 	status: 'done',
 	needs: []
 }

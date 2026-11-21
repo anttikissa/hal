@@ -14,6 +14,7 @@ import { textDiff } from '../text-diff.ts'
 import { paths } from '../paths.ts'
 import { editBlocks } from '../edit-blocks.ts'
 import { pluginFiles } from '../plugin-files.ts'
+import { strings } from '../../common/strings.ts'
 
 // TODO - to be reviewed by a human -11-ape: EDIT guide policy. Document one
 // official, hard-to-misuse form per job; keep the guide short even if
@@ -363,7 +364,7 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 							if (count !== expected) {
 								const lines = fileText
 									.text(p.next!, path)
-									.lines.map((l) => (l.length > 300 ? l.slice(0, 300) + '… [line cut]' : l))
+									.lines.map((l) => (l.length > 300 ? strings.sliceText(l, 0, 300) + '… [line cut]' : l))
 								const contexts = matches.map((n) =>
 									fileText.numbered(
 										lines,
@@ -494,7 +495,7 @@ ${keep ? `Rollback incomplete: ${rollback.join('; ')}. Recovery copies: ${recove
 			} as any,
 			ctx,
 		)
-		out += `${N}== then ${text.trim().split(N)[0]!.slice(0, 160)} ==${N}${res.output}`
+		out += `${N}== then ${strings.sliceText(text.trim().split(N)[0]!, 0, 160)} ==${N}${res.output}`
 		if (res.isError && k + 1 < then.length) {
 			out += `${N}The ${then.length - k - 1} call(s) after it did not run.`
 			break

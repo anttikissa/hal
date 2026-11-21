@@ -10,6 +10,7 @@ import {
 	type UserBlock,
 } from '../../common/blocks.ts'
 import { toolDetails } from '../../common/tool-details.ts'
+import { strings } from '../../common/strings.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
 import { type Tool, type ToolContext, type ToolOutput, tools } from '../tools.ts'
@@ -189,8 +190,10 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<To
 		let at = (input.charOffset as number) - 1
 		if (at > text.length) throw new Error(`charOffset ${input.charOffset} is past the end (${text.length} characters)`)
 		let end = Math.min(text.length, at + Math.max(1, tools.maxChars - 200))
+		// Keep an emoji whole for the next page.
+		if (end < text.length && end - 1 > at && /[\ud800-\udbff]/.test(text[end - 1]!)) end--
 		return (
-			text.slice(at, end) +
+			strings.sliceText(text, at, end) +
 			(end < text.length
 				? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]`
 				: '')

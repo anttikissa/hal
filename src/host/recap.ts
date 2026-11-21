@@ -14,6 +14,7 @@ import { slash } from './slash.ts'
 import { tabs } from './tabs.ts'
 import { clock } from './clock.ts'
 import { modelEffort } from './model-effort.ts'
+import { strings } from '../common/strings.ts'
 
 type Cached = { key: number; controller: AbortController; result: Promise<string> }
 
@@ -44,8 +45,8 @@ function digest(id: string, records: HistoryRecord[]): string {
 			(r) =>
 				r.type !== 'round' && r.type !== 'file_changes' && !(r.type === 'assistant' && r.block.type === 'thinking'),
 		)
-		.map((r) => ason.stringify(r, 'short').slice(0, 1200))
-	return `Session ${id}: ${meta.name ?? id}\n${lines.join('\n').slice(-recap.digestChars)}`
+		.map((r) => strings.sliceText(ason.stringify(r, 'short'), 0, 1200))
+	return `Session ${id}: ${meta.name ?? id}\n${strings.sliceText(lines.join('\n'), -recap.digestChars)}`
 }
 
 // maxTokens covers adaptive thinking too: at 200, thinking sometimes

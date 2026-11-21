@@ -10,6 +10,7 @@ import { callText } from '../../common/call-text.ts'
 import { settings } from '../../common/settings.ts'
 import { approval } from '../approval.ts'
 import type { Tool, ToolContext, ToolOutput } from '../tools.ts'
+import { strings } from '../../common/strings.ts'
 
 // Configuration: true puts the whole help in the system prompt; false
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
@@ -229,7 +230,7 @@ function format(found: Search, filesOnly: boolean, separated: boolean): string {
 		if (l.match && shown === maxMatches) break
 		if (l.match) shown++
 		if (separated && prev && (prev.path !== l.path || l.line > prev.line + 1)) out.push('--')
-		let text = l.text.length > maxLineChars ? `${l.text.slice(0, maxLineChars)}… [line cut]` : l.text
+		let text = l.text.length > maxLineChars ? `${strings.sliceText(l.text, 0, maxLineChars)}… [line cut]` : l.text
 		out.push(`${l.path}${l.match ? ':' : '-'}${l.line}${l.match ? ':' : '-'} ${text}`)
 		prev = l
 	}

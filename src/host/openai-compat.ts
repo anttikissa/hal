@@ -47,7 +47,7 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 		for (let b of msg.blocks) {
 			if (b.type === 'text') text += b.text
 			else if (b.type === 'tool_call')
-				calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } })
+				calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: provider.requestJson(b.input) } })
 		}
 		out.push(
 			calls.length

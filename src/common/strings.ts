@@ -6,7 +6,7 @@
 // two columns, combining marks and joiners none, and a grapheme cluster
 // (ZWJ sequence, flag, skin tone) takes the width of its first glyph.
 // Tabs advance to four-column stops. ANSI CSI and OSC sequences are
-// invisible.
+// invisible. sliceText cuts text by offsets without splitting an emoji.
 
 const TAB_WIDTH = 4
 
@@ -302,6 +302,14 @@ function sliceVisual(s: string, from: number, to: number): string {
 	return out ? prefix + out : ''
 }
 
+// s.slice(from, to) that drops a surrogate half left at either edge, so
+// a cut never makes a lone surrogate (providers reject those).
+// Tested once, then the tests were deleted. If you change this code,
+// first write tests for: cuts before, inside and after a pair; negative from.
+function sliceText(s: string, from?: number, to?: number): string {
+	return s.slice(from, to).replace(/^[\udc00-\udfff]|[\ud800-\udbff]$/g, '')
+}
+
 export const strings = {
 	clean,
 	charWidth,
@@ -314,4 +322,5 @@ export const strings = {
 	wordWrap,
 	clipVisual,
 	sliceVisual,
+	sliceText,
 }

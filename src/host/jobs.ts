@@ -21,6 +21,7 @@ import { tabs } from './tabs.ts'
 import { work } from './work.ts'
 import { tools } from './tools.ts'
 import { busy } from './busy.ts'
+import { strings } from '../common/strings.ts'
 
 export type Run = { done: Promise<string>; stop: (why?: string) => void; output: () => string }
 // `unsafe`: the call was flagged unsafeToStop, so a restart asks first.
@@ -55,7 +56,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	child.stdout!.setEncoding('utf8').on('data', (d: string) => {
 		onOutput?.(d)
 		if (head.length < half) {
-			let take = d.slice(0, half - head.length)
+			let take = strings.sliceText(d, 0, half - head.length)
 			head += take
 			d = d.slice(take.length)
 		}
@@ -63,7 +64,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 		// Trim only once twice over, so trimming costs O(1) per byte.
 		if (tail.length > 2 * half) {
 			dropped += tail.length - half
-			tail = tail.slice(-half)
+			tail = strings.sliceText(tail, -half)
 		}
 	})
 	let { promise: done, resolve, reject } = Promise.withResolvers<string>()
@@ -80,7 +81,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 		}
 		if (tail.length > half) {
 			dropped += tail.length - half
-			tail = tail.slice(-half)
+			tail = strings.sliceText(tail, -half)
 		}
 		let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars} kept in memory]\n` : ''
 		resolve(`[${status}]\n${head}${gap}${tail}`)

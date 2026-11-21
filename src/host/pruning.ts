@@ -11,6 +11,7 @@ import { diag } from './diag.ts'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { tokenCalibration } from './token-calibration.ts'
 import { blobs } from './blobs.ts'
+import { strings } from '../common/strings.ts'
 
 type Saved = { boundary: number; checkpoint: number; pressure: number; omitted: number[]; consumed: number[] }
 type Budget = { overhead?: number; window?: number; model?: string }
@@ -41,7 +42,7 @@ function copied(value: unknown): string | undefined {
 // calls still show real calls to imitate rather than bare markers.
 function argumentsOf(value: unknown, ref: string): unknown {
 	if (typeof value === 'string' && value.length > pruning.maxArgumentChars) {
-		let head = value.split('\n', 1)[0]!.slice(0, pruning.keptArgumentChars)
+		let head = strings.sliceText(value.split('\n', 1)[0]!, 0, pruning.keptArgumentChars)
 		return `${head}\n[pruned argument: ${value.length - head.length} more characters; read_entry id=${ref}]`
 	}
 	if (typeof value === 'string') return value

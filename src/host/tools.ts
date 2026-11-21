@@ -20,6 +20,7 @@ import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { history } from './history.ts'
 import { sessions } from './sessions.ts'
+import { strings } from '../common/strings.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
@@ -163,7 +164,7 @@ function page(text: string, offset = 1, limit = tools.maxLines): string {
 	for (; n < lines.length && n < offset - 1 + limit; n++) {
 		let line = lines[n]!
 		if (line.length > lineMax)
-			line = `${line.slice(0, lineMax)}… [line cut: ${line.length - lineMax} more characters]\n`
+			line = `${strings.sliceText(line, 0, lineMax)}… [line cut: ${line.length - lineMax} more characters]\n`
 		if (out.length + line.length > tools.maxChars - 200 && n > offset - 1) break
 		out += line
 	}
@@ -305,7 +306,7 @@ function cap(
 	let head = byLines ? lines.slice(0, Math.ceil(maxLines / 2)).join('') : output
 	let tail = byLines ? lines.slice(-Math.floor(maxLines / 2)).join('') : output
 	let room = Math.max(0, max - note.length - gap.length - (onStore && sessionId ? 2 * (sessionId.length + 32) : 0))
-	return `${head.slice(0, Math.ceil(room / 2))}${gap}${room > 1 ? tail.slice(-Math.floor(room / 2)) : ''}${note}`
+	return `${strings.sliceText(head, 0, Math.ceil(room / 2))}${gap}${room > 1 ? strings.sliceText(tail, -Math.floor(room / 2)) : ''}${note}`
 }
 
 // Stops a tool's process group: SIGTERM now, SIGKILL killAfterMs later
