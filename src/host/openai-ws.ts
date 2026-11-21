@@ -10,6 +10,7 @@
 
 import { isDeepStrictEqual } from 'node:util'
 import type { HttpRequest, ProviderRequest } from './provider.ts'
+import * as provider from './provider.ts'
 import { diag } from './diag.ts'
 import { usage } from './usage.ts'
 
@@ -212,7 +213,7 @@ async function open(
 			ws.addEventListener('message', onMessage)
 			ws.addEventListener('close', onClose)
 			try {
-				ws.send(JSON.stringify(body))
+				ws.send(provider.requestJson(body))
 			} catch (e) {
 				fail(`OpenAI WebSocket send failed: ${e instanceof Error ? e.message : String(e)}`)
 			}

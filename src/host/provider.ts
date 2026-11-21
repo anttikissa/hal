@@ -90,6 +90,14 @@ function encode(json: string, encoding: HttpRequest['encoding']): BodyInit {
 	return json
 }
 
+// Providers reject lone surrogates (half an emoji, e.g. from a cut
+// tool output); one in history would fail every later request.
+// Tested once, then the tests were deleted. If you change this code,
+// first write tests for: lone high and low surrogates, intact pairs.
+export function requestJson(body: unknown): string {
+	return JSON.stringify(body, (_, v) => (typeof v === 'string' ? v.toWellFormed() : v))
+}
+
 // Read one chunk, failing on abort or when no data arrives in time, so
 // a half-dead connection cannot hang a turn forever.
 async function read(reader: ReadableStreamDefaultReader<Uint8Array>, signal?: AbortSignal) {
@@ -355,7 +363,7 @@ async function* stream(
 							...(http.encoding && { 'content-encoding': http.encoding }),
 							...http.headers,
 						},
-						body: encode(JSON.stringify(http.body), http.encoding),
+						body: encode(requestJson(http.body), http.encoding),
 						signal: conn.signal,
 					})
 		} catch (e) {

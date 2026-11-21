@@ -1,0 +1,6 @@
+{
+	title: 'Provider requests carry well-formed strings',
+	spec: 'Every provider request body (HTTP and the OpenAI WebSocket) replaces lone surrogates with U+FFFD before sending (provider.requestJson). Invariant restored: a half emoji anywhere in history, e.g. from a cut tool output, never makes the provider reject every later request; Anthropic answered "unexpected end of hex escape", OpenAI "Invalid request". Stored history stays unchanged. Measured on the server: about 4 ms extra per 1.7 MB body.',
+	status: 'done',
+	needs: []
+}
