@@ -130,7 +130,7 @@ function deliver(
 	// Mid-turn lines stack, each for its full time; a turn's end or question
 	// replaces only that session's previous end or question.
 	if (k === 'update') notice.key = `update:${id}:${++seq}`
-	let list = tabs.list()
+	let list = tabs.places()
 	let tab = list.findIndex((t) => t.id === id)
 	if (tab >= 0) notice.tab = tab + 1
 	if (list[tab]?.color !== undefined) notice.color = list[tab]!.color

@@ -265,7 +265,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (c.type === 'tab-close') {
 		// Other clients hear it; this one already sees the tab go (task 97r).
-		let before = tabs.list()
+		let before = tabs.places()
 		let outcome = tabs.act(c, client.record.timezone)
 		if (!outcome.refused) notify.closed(host.state.clients, c.sessionId, 'User closed the tab', before, client)
 		return outcome

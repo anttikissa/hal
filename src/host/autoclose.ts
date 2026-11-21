@@ -46,7 +46,7 @@ function finished(id: string): void {
 	if (!sessions.open(id).autoclose || status.stateOf(id).type !== 'idle') return
 	if (notify.asked(id) || status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
 	if (drafts.get(id).text.trim()) return
-	let before = tabs.list()
+	let before = tabs.places()
 	if (tabs.close(id) !== undefined) return
 	tabs.publish()
 	if (scheduler.owned(id) || notify.worker(id)) return

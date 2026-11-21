@@ -95,6 +95,20 @@ function list(): Tab[] {
 	return list
 }
 
+// Each tab's id and project color, as list() gives them, without its
+// state: what a close notice needs, at a fraction of list()'s cost.
+function places(): { id: string; cwd: string; color?: number }[] {
+	let list = [...tabs.file().open].map((id) => {
+		try {
+			return { id, cwd: sessions.open(id).cwd }
+		} catch {
+			return { id, cwd: '' }
+		}
+	})
+	projects.paint(list as Tab[])
+	return list
+}
+
 const questions = new Map<string, { size: number; question: Tab['question'] }>()
 
 function questionOf(id: string): Tab['question'] {
@@ -372,6 +386,7 @@ export const tabs = {
 	file,
 	is,
 	list,
+	places,
 	greet,
 	indexed,
 	label,

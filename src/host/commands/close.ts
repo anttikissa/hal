@@ -16,7 +16,7 @@ export const command: SlashCommand = {
 	run(args, _answers, ctx) {
 		let open = tabs.file().open
 		let id = !args ? ctx.sessionId : /^[1-9]\d*$/.test(args) ? open[Number(args) - 1] : args
-		let before = tabs.list()
+		let before = tabs.places()
 		let refused = id === undefined ? 'not a tab' : tabs.act({ type: 'tab-close', sessionId: id }).refused
 		if (refused) return { error: refused }
 		notify.closed(host.state.clients, id!, notify.closedBy(id!, ctx.sessionId, ctx.sender, before), before)
