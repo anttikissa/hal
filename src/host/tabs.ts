@@ -54,8 +54,14 @@ function file(): TabsFile {
 // stays, failed with the reader's error, rather than failing the rest.
 function list(): Tab[] {
 	let f = tabs.file()
-	for (let id of questions.keys()) if (!f.open.includes(id)) questions.delete(id)
-	let list = f.open.map((id) => {
+	// Plain copies: each read of the live-file proxy goes through a trap,
+	// and lookups per tab made 275 tabs cost 130 ms (task 7j).
+	let open = [...f.open]
+	let shown = new Set(open)
+	let attention = new Set(f.attention)
+	let untrusted = new Map<string, boolean>()
+	for (let id of questions.keys()) if (!shown.has(id)) questions.delete(id)
+	let list = open.map((id) => {
 		let meta: SessionMeta
 		try {
 			meta = sessions.open(id)
@@ -77,10 +83,12 @@ function list(): Tab[] {
 				tab.state = { type: 'error', message: String(e?.message ?? e) }
 			}
 		}
-		if (f.attention.includes(id)) tab.attention = true
+		if (attention.has(id)) tab.attention = true
 		if (meta.background?.length) tab.jobs = meta.background.length
 		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
-		if (projectContext.skipped(meta.cwd, meta.projectTrust).length) tab.untrusted = true
+		let trust = `${meta.cwd}\0${meta.projectTrust}`
+		if (!untrusted.has(trust)) untrusted.set(trust, projectContext.skipped(meta.cwd, meta.projectTrust).length > 0)
+		if (untrusted.get(trust)) tab.untrusted = true
 		return tab
 	})
 	projects.paint(list)
