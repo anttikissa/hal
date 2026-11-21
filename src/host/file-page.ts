@@ -10,10 +10,12 @@
 // path of plain names: /file/<path> shows an HTML file as itself and
 // anything else on the same page as a paste; a request that is not a
 // page load (an HTML page's own images, styles and scripts) and
-// /raw/<path> get the bytes.
+// /raw/<path> get the bytes. A folder at /file/<dir>/ serves its
+// index.html, else a plain list of its entries; /file/<dir> redirects
+// there so relative links resolve inside the folder.
 
 import { createHash } from 'crypto'
-import { readFileSync, statSync } from 'fs'
+import { readdirSync, readFileSync, statSync } from 'fs'
 import { attachments } from '../common/attachments.ts'
 import { blobs } from './blobs.ts'
 import { paths } from './paths.ts'
@@ -26,7 +28,8 @@ const closeHash = createHash('sha256').update(closeScript).digest('base64')
 const pagePath = /^\/(image|paste|file)\/([0-9a-z]{6})(?:\.([a-z0-9]{1,8}))?$/
 const rawPath = /^\/raw\/([0-9a-z]{6}\.[a-z0-9]{1,8})$/
 // No part may start with a dot, so no .. and no hidden files.
-const sharedPath = /^\/(file|raw)\/((?:[\w-][\w.-]*\/)*[\w-][\w.-]*)$/
+const sharedPath = /^\/(file|raw)\/((?:[\w-][\w.-]*\/)*[\w-][\w.-]*)(\/?)$/
+const plainName = /^[\w-][\w.-]*$/
 
 function escape(s: string): string {
 	return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
@@ -103,23 +106,56 @@ function serve(pathname: string, css: string, dest?: string | null): Response {
 	return page(name!, `/raw/${name}`, found.mediaType, found.bytes, where, css)
 }
 
-// A shared file under paths.fileDir(), served as described at the top.
+// A shared file or folder under paths.fileDir(), served as described at
+// the top.
 function shared(pathname: string, css: string, dest?: string | null): Response {
 	let m = sharedPath.exec(pathname)
-	let path = m && `${paths.fileDir()}/${m[2]}`
-	if (!path || !statSync(path, { throwIfNoEntry: false })?.isFile()) return notFound()
+	if (!m) return notFound()
+	let [, kind, rel = '', slash] = m
+	let path = `${paths.fileDir()}/${rel}`
+	let stat = statSync(path, { throwIfNoEntry: false })
+	if (stat?.isDirectory() && kind === 'file') {
+		if (!slash) return new Response(null, { status: 301, headers: { location: `${pathname}/` } })
+		if (!statSync(`${path}/index.html`, { throwIfNoEntry: false })?.isFile()) return listing(rel, path)
+		path += '/index.html'
+	} else if (slash || !stat?.isFile()) return notFound()
 	let file = Bun.file(path)
-	let name = m![2]!.split('/').pop()!
+	let name = path.split('/').pop()!
 	let mediaType = attachments.fileKind(name, file.type) ?? 'application/octet-stream'
-	if (m![1] === 'raw' || (dest && dest !== 'document') || file.type.startsWith('text/html'))
+	if (kind === 'raw' || (dest && dest !== 'document') || file.type.startsWith('text/html'))
 		return new Response(file, {
 			headers: { 'content-type': file.type, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' },
 		})
-	return page(name, `/raw/${m![2]}`, mediaType, readFileSync(path), [['file', path]], css)
+	return page(name, `/raw/${rel}`, mediaType, readFileSync(path), [['file', path]], css)
+}
+
+// A folder without index.html: links to its servable entries.
+function listing(rel: string, path: string): Response {
+	let items = readdirSync(path, { withFileTypes: true })
+		.filter((e) => plainName.test(e.name) && (e.isFile() || e.isDirectory()))
+		.map((e) => e.name + (e.isDirectory() ? '/' : ''))
+		.sort()
+		.map((n) => `<li><a href="${escape(n)}">${escape(n)}</a></li>`)
+		.join('')
+	let html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(rel)}/</title><h1>${escape(rel)}/</h1><ul>${items}</ul>`
+	return new Response(html, {
+		headers: {
+			'content-type': 'text/html; charset=utf-8',
+			'cache-control': 'no-store',
+			'content-security-policy': "default-src 'none'",
+		},
+	})
 }
 
 // The page of one file: where it lives, links to `rawUrl`, its content.
-function page(name: string, rawUrl: string, mediaType: string, bytes: Buffer, where: string[][], css: string): Response {
+function page(
+	name: string,
+	rawUrl: string,
+	mediaType: string,
+	bytes: Buffer,
+	where: string[][],
+	css: string,
+): Response {
 	// "file /tmp/hal/image/ain96g.png (384 x 298, 50.4 kB)": no format,
 	// the extension already says it.
 	let detail = [mediaType.startsWith('image/') && dimensions(bytes, mediaType), size(bytes.length)]

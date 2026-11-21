@@ -8,7 +8,8 @@
 		"Pages live in host/file-page.ts (dimensions come from scripts/image-dimensions.ts on demand): /image/<id> and /paste/<id> (also legacy extensionful addresses) are HTML (no-store, CSP default-src 'none', body class page, header class info) listing the /tmp path while it exists and every sessions/*/blobs/<name> copy (blobs.file scans all sessions); /raw/<name> is the bytes (immutable cache). The page kind must match the file type, else 404. All three are file addresses for web.fetch's gate and ?auth= redirect.",
 		'In flight: uploads.inFlight(marker) is true until the host answers; ansi.links draws such a marker dim and unlinked. The prompt is rebuilt on every event (app.show after attached), so it turns into a link without a text change. The web composer is a textarea and cannot style a marker, so on the web an in-flight marker looks the same (it is never a link there either).',
 		"Not checked by hand in a real browser yet: the page's look (colors from web.css(), monospace <pre> wrapping) at phone and desktop widths.",
-		'scripts/image-dimensions.ts is a thin wrapper around src/common/image-dimensions.ts, which pruning (task 0d) also loads lazily for image token estimates.'
+		'scripts/image-dimensions.ts is a thin wrapper around src/common/image-dimensions.ts, which pruning (task 0d) also loads lazily for image token estimates.',
+		'Shared folders behave like a static server: /file/<dir> 301s to /file/<dir>/, which serves index.html or, without one, a plain list of entries with plain names (hidden ones omitted); a trailing slash on a file is 404.'
 	],
 	needs: ['e3'],
 	foldInto: ['qy', '2a']

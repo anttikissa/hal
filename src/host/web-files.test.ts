@@ -165,7 +165,23 @@ test('a shared file under fileDir: HTML as itself with its own assets, others on
 	expect(page).toContain('href="/raw/notes-1.md"')
 	expect(await (await get('/raw/notes-1.md')).text()).toBe('# <b>')
 	expect((await fetch(`${base()}/file/notes-1.md`)).status).toBe(401)
-	for (let path of ['/file/test-app', '/file/../config.ason', '/file/%2e%2e/x', '/file/.hidden', '/file/test-app/../x', '/file/a/'])
+	expect(await (await get('/file/test-app/', 'document')).text()).toBe('<link rel="stylesheet" href="style.css"><p>hi')
+	let moved = await fetch(`${base()}/file/test-app`, { headers: { cookie: jar }, redirect: 'manual' })
+	expect([moved.status, moved.headers.get('location')]).toEqual([301, '/file/test-app/'])
+	mkdirSync(`${paths.fileDir()}/shots/sub`, { recursive: true })
+	writeFileSync(`${paths.fileDir()}/shots/a.png`, '')
+	writeFileSync(`${paths.fileDir()}/shots/.hidden`, '')
+	expect(await (await get('/file/shots/')).text()).toContain(
+		'<li><a href="a.png">a.png</a></li><li><a href="sub/">sub/</a></li></ul>',
+	)
+	for (let path of [
+		'/file/../config.ason',
+		'/file/%2e%2e/x',
+		'/file/.hidden',
+		'/file/test-app/../x',
+		'/file/a/',
+		'/file/notes-1.md/',
+	])
 		expect((await get(path)).status).toBe(404)
 })
 
