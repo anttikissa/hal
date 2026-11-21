@@ -1,6 +1,6 @@
 {
-	title: '/account moves the session to the next login',
-	spec: "/account moves the session to the next login of its model's provider (anthropic or openai), in /status order, wrapping; repeated before a request it keeps advancing. The pick (auth.state.picked, in memory per session) takes effect from the next request and outranks usage ranking and API-key ordering. It is a move, not a pin: once the account is rate limited for the model or its login is broken, rotation moves on as usual and the pick is forgotten. Other providers' models get an error naming the model. Requested by the user: manual account switching, as simple as account number + 1.",
+	title: '/account picks a login by id or moves to the next',
+	spec: "/account <id> moves the session to that login of its model's provider, by the ids /status shows (a1, o2, g1); completion offers them with account names; an unknown id gets an error listing the valid ones. Bare /account moves to the next login in /status order, wrapping; repeated before a request it keeps advancing. The reply names the id and the account. The pick (auth.state.picked, in memory per session) takes effect from the next request and outranks usage ranking and API-key ordering. It is a move, not a pin: once the account is rate limited for the model or its login is broken, rotation moves on as usual and the pick is forgotten. Models without accounts get an error naming the model. Requested by the user: manual account switching. Invariant restored: /account a2 selects a2; it once ignored its argument and rotated to the next login.",
 	status: 'done',
 	needs: ['wf'],
 	foldInto: ['wf']
