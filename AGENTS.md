@@ -113,6 +113,10 @@ words, why the module exists.
 Format code with `bunx oxfmt` (config: .oxfmtrc.json). Markdown and
 tasks/ stay hand-wrapped.
 
+<!-- TODO - to be reviewed by a human -52-par -->
+Cut text to a length with `strings.sliceText`: `.slice` can split an
+emoji, and providers reject the half.
+
 ASON is a JS object literal. Exact same rules.
 
 Write code for humans to read. Use small, well-named abstractions that express
