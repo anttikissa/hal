@@ -73,7 +73,7 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	}
 	let id = t.meta.id
 	let { text, cursor } = st.prompt
-	let shown = recall.step(id, recall.entries(t, true), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))
+	let shown = recall.step(id, recall.entries(t), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))
 	if (!shown) return false
 	let { goal: _, anchor: _a, typed: _t, ...rest } = st.prompt
 	st.prompt = { ...rest, ...shown }

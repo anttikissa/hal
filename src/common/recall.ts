@@ -18,11 +18,11 @@ export type Browse = { index: number; text: string; edited?: true }
 
 export type Shown = { text: string; cursor: number }
 
-// Human prompts sent to the session, oldest first, escaped to send as
-// prompts again.
-function entries(t: Transcript, commands = false): string[] {
+// Human prompts and slash commands sent to the session, oldest first;
+// prompts escaped to send as prompts again.
+function entries(t: Transcript): string[] {
 	return t.items.flatMap((i) =>
-		((i.type === 'prompt' && i.origin !== 'model') || (commands && i.type === 'command')) && i.from === undefined
+		((i.type === 'prompt' && i.origin !== 'model') || i.type === 'command') && i.from === undefined
 			? [i.type === 'prompt' ? literal.escape(i.text) : i.text]
 			: [],
 	)
