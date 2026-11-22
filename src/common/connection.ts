@@ -10,7 +10,7 @@
 // pending command is sent again on the next connection, and the host
 // ignores repeats, so it never acts twice.
 
-import { type Event } from './protocol.ts'
+import { type Event, type Tab } from './protocol.ts'
 import { subscriptions } from './subscriptions.ts'
 import { perf } from './perf.ts'
 import { home } from './home.ts'
@@ -62,6 +62,8 @@ type ConnectionState = {
 	// Prefix for command ids, fresh for each start.
 	client: string
 	sent: number
+	// The tabs as last heard, which tab events update.
+	tabs: Tab[]
 }
 
 function createState(): ConnectionState {
@@ -79,6 +81,7 @@ function createState(): ConnectionState {
 		timer: null,
 		client: '',
 		sent: 0,
+		tabs: [],
 	}
 }
 
@@ -188,6 +191,14 @@ function receive(event: Event): void {
 	}
 	if (event.type === 'subscription-usage') subscriptions.apply(event.accounts, event.replace)
 	if (event.type === 'tabs' && event.subscriptions) subscriptions.apply(event.subscriptions, true)
+	if (event.type === 'tabs') st.tabs = event.tabs
+	// Before this link's first tabs, the coming list holds the change.
+	if (event.type === 'tab') {
+		let i = st.tabs.findIndex((t) => t.id === event.tab.id)
+		if (i < 0) return
+		st.tabs = st.tabs.with(i, event.tab)
+		return st.opts?.onEvent({ type: 'tabs', tabs: st.tabs })
+	}
 	// A snapshot sent before the host read this client's close does not
 	// follow the session again.
 	if (event.type === 'snapshot' && !connection.closing(event.sessionId)) st.followed.add(event.sessionId)

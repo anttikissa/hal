@@ -77,6 +77,20 @@ test('Find opener reaches clients through event validation', async () => {
 	expect(events).toContainEqual(event)
 })
 
+test('a tab event replaces its row in the last tabs; before any tabs it waits for them', async () => {
+	answers = ['client']
+	await start()
+	let tab = (id: string, type: 'idle' | 'running'): any => ({ id, name: id, cwd: '/', model: 'm', state: { type } })
+	conns[0]!.deliver({ type: 'tab', tab: tab('a', 'running') } as Event)
+	expect(events).toEqual([])
+	let b = tab('b', 'idle')
+	conns[0]!.deliver({ type: 'tabs', tabs: [tab('a', 'idle'), b] } as Event)
+	conns[0]!.deliver({ type: 'tab', tab: tab('a', 'running') } as Event)
+	let last = events.at(-1) as Extract<Event, { type: 'tabs' }>
+	expect(last.tabs).toEqual([tab('a', 'running'), b])
+	expect(last.tabs[1]).toBe(b)
+})
+
 test('joining, connected, then disconnected with a retry time until the host is back', async () => {
 	answers = ['client']
 	await start()

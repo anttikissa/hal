@@ -27,7 +27,8 @@ Decisions are stored by canonical project root in
 `state/project-trust.ason` under the Hal home. To forget a decision, stop
 Hal, remove that project's entry from `projects`, and restart.
 
-Reconciliation follows tab and cwd changes, host startup, and turn entry;
-it adds no polling timer or separate reference counter. A newly created
-plugin directory is discovered on the next turn or navigation. Files in
+Reconciliation follows tab and cwd changes, host startup and trust
+changes; it adds no polling timer or separate reference counter. Turn
+entry activates only that tab's directories, so a newly created plugin
+directory is discovered on its tab's next turn or navigation. Files in
 an active directory already use the plugin loader's watcher.

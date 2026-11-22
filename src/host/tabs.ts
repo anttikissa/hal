@@ -61,38 +61,35 @@ function list(): Tab[] {
 	let attention = new Set(f.attention)
 	let untrusted = new Map<string, boolean>()
 	for (let id of questions.keys()) if (!shown.has(id)) questions.delete(id)
-	let list = open.map((id) => {
-		let meta: SessionMeta
-		try {
-			meta = sessions.open(id)
-		} catch (e: any) {
-			return {
-				id,
-				name: id,
-				cwd: '',
-				model: '',
-				state: { type: 'error', message: String(e?.message ?? e) },
-			} satisfies Tab
-		}
-		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
-		if (tab.state.type !== 'error') {
-			try {
-				let question = questionOf(id)
-				if (question) tab.question = question
-			} catch (e: any) {
-				tab.state = { type: 'error', message: String(e?.message ?? e) }
-			}
-		}
-		if (attention.has(id)) tab.attention = true
-		if (meta.background?.length) tab.jobs = meta.background.length
-		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
-		let trust = `${meta.cwd}\0${meta.projectTrust}`
-		if (!untrusted.has(trust)) untrusted.set(trust, projectContext.skipped(meta.cwd, meta.projectTrust).length > 0)
-		if (untrusted.get(trust)) tab.untrusted = true
-		return tab
-	})
+	let list = open.map((id) => row(id, attention, untrusted))
 	projects.paint(list)
 	return list
+}
+
+// One tab without its project color; `untrusted` caches trust per cwd.
+function row(id: string, attention: Set<string>, untrusted: Map<string, boolean>): Tab {
+	let meta: SessionMeta
+	try {
+		meta = sessions.open(id)
+	} catch (e: any) {
+		return { id, name: id, cwd: '', model: '', state: { type: 'error', message: String(e?.message ?? e) } }
+	}
+	let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
+	if (tab.state.type !== 'error') {
+		try {
+			let question = questionOf(id)
+			if (question) tab.question = question
+		} catch (e: any) {
+			tab.state = { type: 'error', message: String(e?.message ?? e) }
+		}
+	}
+	if (attention.has(id)) tab.attention = true
+	if (meta.background?.length) tab.jobs = meta.background.length
+	if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
+	let trust = `${meta.cwd}\0${meta.projectTrust}`
+	if (!untrusted.has(trust)) untrusted.set(trust, projectContext.skipped(meta.cwd, meta.projectTrust).length > 0)
+	if (untrusted.get(trust)) tab.untrusted = true
+	return tab
 }
 
 // Each tab's id and project color, as list() gives them, without its
@@ -201,7 +198,24 @@ function label(id: string): string {
 // Writes the change and tells every client.
 function publish(): void {
 	liveFiles.save(tabs.file())
-	let event: Event = { type: 'tabs', tabs: tabs.list() }
+	let list = tabs.list()
+	tabs.state.rows = new Map(list.map((t) => [t.id, t]))
+	let event: Event = { type: 'tabs', tabs: list }
+	for (let client of host.state.clients) client.deliver(event)
+}
+
+// Tells every client one tab's new row, if it changed. Its project and
+// color stay: a meta change (name, model, cwd) publishes every tab.
+function update(id: string): void {
+	let f = tabs.file()
+	let before = tabs.state.rows.get(id)
+	if (!before) return tabs.publish()
+	let tab = row(id, new Set(f.attention), new Map())
+	if (before.color !== undefined) tab.color = before.color
+	if (JSON.stringify(tab) === JSON.stringify(before)) return
+	tabs.state.rows.set(id, tab)
+	liveFiles.save(f)
+	let event: Event = { type: 'tab', tab }
 	for (let client of host.state.clients) client.deliver(event)
 }
 
@@ -354,7 +368,8 @@ function observe(id: string, event: Event): void {
 		tabs.state.kept.delete(id)
 		if (f.attention.includes(id)) f.attention = f.attention.filter((x) => x !== id)
 	}
-	tabs.publish()
+	if (event.type === 'meta') tabs.publish()
+	else tabs.update(id)
 }
 
 // Marks tabs unread (/unread). `shown`, the tab the command ran in, keeps
@@ -376,12 +391,14 @@ function reset(): void {
 	if (tabs.state.file) liveFiles.close(tabs.state.file)
 	tabs.state.file = null
 	tabs.state.kept.clear()
+	tabs.state.rows.clear()
 	questions.clear()
 }
 
 export const tabs = {
 	// kept: tabs /unread marked while shown, whose tab-seen is ignored.
-	state: { file: null as TabsFile | null, kept: new Set<string>() },
+	// rows: each tab as clients last heard it.
+	state: { file: null as TabsFile | null, kept: new Set<string>(), rows: new Map<string, Tab>() },
 	// How many recently closed tabs are remembered.
 	closedKept: 50,
 	file,
@@ -400,6 +417,7 @@ export const tabs = {
 	closed,
 	start,
 	act,
+	update,
 	observe,
 	unread,
 	left,

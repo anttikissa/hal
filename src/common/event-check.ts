@@ -100,6 +100,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'model-names': { names: 'o', defaults: 'o?' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?', title: 's?' },
 	tabs: { tabs: 'a', subscriptions: 'o?' },
+	tab: { tab: 'o', 'tab.id': 's', 'tab.name': 's', 'tab.cwd': 's' },
 	go: { sessionId: 's', tab: 's', block: 's?' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
@@ -210,8 +211,8 @@ function invalidEvent(value: unknown): string | undefined {
 	)
 		return 'tabs: every tab needs an id, name and cwd'
 	if (
-		value.type === 'tabs' &&
-		(value.tabs as Record<string, unknown>[]).some(
+		(value.type === 'tabs' || value.type === 'tab') &&
+		(value.type === 'tab' ? [value.tab as Record<string, unknown>] : (value.tabs as Record<string, unknown>[])).some(
 			(t) => t.question !== undefined && t.question !== 'ordinary' && t.question !== 'approval',
 		)
 	)

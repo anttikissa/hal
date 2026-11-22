@@ -1,5 +1,5 @@
 {
-	version: 50,
+	version: 51,
 	changes: [
 		{
 			version: 2,
@@ -964,6 +964,21 @@
 					kind: 'compatible',
 					target: 'host/provider.HttpRequest',
 					description: 'Supports JSON replies'
+				}
+			]
+		},
+		{
+			version: 51,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Event',
+					description: 'Adds the tab event'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/project-context',
+					description: 'Adds needed and enter'
 				}
 			]
 		}

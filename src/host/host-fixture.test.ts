@@ -126,6 +126,9 @@ export function client() {
 		// Every event the host sends passes the check clients make.
 		expect(eventCheck.invalidEvent(e)).toBeUndefined()
 		events.push(e)
+		let last = e.type === 'tab' ? events.findLast((x) => x.type === 'tabs') : undefined
+		if (e.type === 'tab' && last?.type === 'tabs')
+			events.push({ type: 'tabs', tabs: last.tabs.map((t) => (t.id === e.tab.id ? e.tab : t)) })
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {
 			let t = transcriptLive.fold(views.get(id), e)

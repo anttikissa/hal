@@ -148,29 +148,37 @@ function report(id: string, trust?: boolean): string | undefined {
 		: `${root} is not trusted; skipping ${list} (pass -d to trust it)`
 }
 
+// The trusted project plugin directories tab `id` needs.
+function needed(id: string): string[] {
+	let meta = sessions.open(id)
+	if (!projectContext.allowed(meta.cwd, meta.projectTrust)) return []
+	return systemPrompt
+		.candidates(meta.cwd)
+		.map((dir) => `${dir}/.agents/plugins/hal`)
+		.filter((path) => existsSync(path))
+		.map((path) => realpathSync(path))
+		.filter((path) => !plugins.state.personalDirectories.has(path))
+}
+
 async function refresh(): Promise<void> {
 	let wanted = new Set<string>()
 	for (let id of tabs.file().open) {
-		let meta
 		try {
-			meta = sessions.open(id)
+			for (let dir of projectContext.needed(id)) wanted.add(dir)
 		} catch (e: any) {
 			plugins.report(`project plugins for ${id}: ${e?.stack ?? e}`)
-			continue
-		}
-		let cwd = meta.cwd
-		if (!projectContext.allowed(cwd, meta.projectTrust)) continue
-		for (let dir of systemPrompt.candidates(cwd)) {
-			let path = `${dir}/.agents/plugins/hal`
-			if (existsSync(path)) {
-				let canonical = realpathSync(path)
-				if (!plugins.state.personalDirectories.has(canonical)) wanted.add(canonical)
-			}
 		}
 	}
 	let old = projectContext.state.active
 	projectContext.state.active = wanted
 	for (let dir of old) if (!wanted.has(dir)) plugins.deactivateDirectory(dir)
+	await projectContext.ready()
+}
+
+// Turn entry: activates what this tab needs, so plugins added since the
+// last refresh load; other tabs' directories wait for their own turns.
+async function enter(id: string): Promise<void> {
+	for (let dir of projectContext.needed(id)) projectContext.state.active.add(dir)
 	await projectContext.ready()
 }
 
@@ -209,7 +217,9 @@ export const projectContext = {
 	question,
 	answer,
 	report,
+	needed,
 	refresh,
+	enter,
 	ready,
 	changed,
 	reset,

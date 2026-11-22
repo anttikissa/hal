@@ -251,7 +251,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let rounds = 0
 	let capped: string | undefined
 	try {
-		await projectContext.refresh()
+		await projectContext.enter(id)
 		while (true) {
 			let transition = contextTransitions.pending(id)
 			if (transition?.kind === 'clear') {
