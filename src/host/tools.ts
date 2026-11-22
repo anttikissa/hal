@@ -134,11 +134,13 @@ function dir(): string {
 }
 
 // Every tool in filename order, read from the directory each time.
+// Helper modules beside the tools export no `tool` and are skipped.
 function all(): Tool<ToolOutput>[] {
 	let found: Tool<ToolOutput>[] = []
 	for (let file of readdirSync(tools.dir()).sort()) {
 		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
-		let tool: Tool = require(`${tools.dir()}/${file}`).tool
+		let tool: Tool | undefined = require(`${tools.dir()}/${file}`).tool
+		if (!tool) continue
 		if (tool.name !== file.slice(0, -3)) throw new Error(`${tools.dir()}/${file} defines tool '${tool.name}'`)
 		found.push(tool)
 	}

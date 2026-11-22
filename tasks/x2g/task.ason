@@ -1,0 +1,7 @@
+{
+	title: 'Helper modules in the tools folder',
+	spec: 'tools.all() skips src/host/tools/*.ts files that export no tool, so a helper module (such as an EVAL child script) beside the tools never breaks tool loading. Invariant restored: one non-tool file in the tools folder no longer fails every turn in every session with "undefined is not an object (evaluating tool.name)". A file exporting a tool under another name still throws.',
+	status: 'done',
+	needs: [],
+	foldInto: ['a4h']
+}
