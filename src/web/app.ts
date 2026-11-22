@@ -42,6 +42,8 @@ export type AppState = {
 	text: string
 	tabs: Tab[]
 	shown?: string
+	// The tab whose mark this page last asked the host to clear.
+	seen?: string
 	landing?: string
 	asked: Set<string>
 	kill?: string
@@ -491,7 +493,7 @@ function start(): void {
 	void push.start(() => app.changed()).catch(() => {})
 	let visible = () => {
 		push.visibility(app.state.shown)
-		if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen()
+		if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen(true)
 	}
 	addEventListener('focus', visible)
 	addEventListener('blur', visible)

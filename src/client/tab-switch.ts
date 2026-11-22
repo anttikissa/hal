@@ -147,8 +147,8 @@ function focusOn(focus: Focus): void {
 	queuedPrompt.sync(st)
 	let tab = tabSwitch.focusedTab()
 	if (tab) app.focused(tab)
-	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
 	tabSwitch.watch()
+	tabSwitch.seen(tab)
 	tabSwitch.backgroundStep()
 }
 
@@ -162,8 +162,18 @@ function watch(): void {
 	if (now === undefined || now === st.watching) return
 	st.watching = now
 	app.send({ type: 'visibility', sessionId: tab, visible: !st.away })
-	let shown = tabSwitch.focusedTab()
-	if (!st.away && shown?.attention) app.send({ type: 'tab-seen', sessionId: shown.id })
+	delete st.seen
+	if (!st.away) tabSwitch.seen(tabSwitch.focusedTab())
+}
+
+// Asks the host once to clear the shown tab's mark. A mark the host keeps
+// (an asked turn, /unread) would otherwise draw a request per tab list.
+function seen(tab: Tab | undefined): void {
+	let st = app.state
+	if (!tab?.attention) return void delete st.seen
+	if (st.seen === tab.id) return
+	st.seen = tab.id
+	app.send({ type: 'tab-seen', sessionId: tab.id })
 }
 
 // Tab keys: next, previous, go to 1-10. True if handled.
@@ -181,4 +191,4 @@ function tabKey(k: KeyEvent): boolean {
 	return true
 }
 
-export const tabSwitch = { focusedTab, onTabs, focusOn, tabKey, hiddenEvent, backgroundStep, watch }
+export const tabSwitch = { focusedTab, onTabs, focusOn, tabKey, hiddenEvent, backgroundStep, watch, seen }

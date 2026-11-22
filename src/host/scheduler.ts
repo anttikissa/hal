@@ -108,7 +108,7 @@ export const scheduler = {
 			j.run!.session = meta.id
 			scheduler.save()
 			tabs.resume(meta.id)
-			tabs.publish()
+			tabs.place(meta.id)
 			let refused = prompts.submit(meta.id, j.prompt, undefined, 'steer', {
 				interactive: false,
 				label: `Schedule ${j.id}`,

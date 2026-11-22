@@ -186,8 +186,10 @@ async function ready(): Promise<void> {
 	await Promise.all([...projectContext.state.active].map((dir) => plugins.activateDirectory(dir)))
 }
 
-function changed(): void {
-	void projectContext.refresh().catch((e) => plugins.report(`project plugins: ${e?.stack ?? e}`))
+// `id`: a tab that opened, which needs only its own directories.
+function changed(id?: string): void {
+	let done = id === undefined ? projectContext.refresh() : projectContext.enter(id)
+	void done.catch((e) => plugins.report(`project plugins: ${e?.stack ?? e}`))
 }
 
 function reset(): void {

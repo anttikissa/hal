@@ -25,6 +25,7 @@ function onState(state: LinkState): void {
 		)
 	// A new connection's host knows nothing this client watched.
 	delete st.watching
+	delete st.seen
 	if (state.type === 'connected') {
 		let tab = tabSwitch.focusedTab()
 		let last = tab?.id ?? st.start.last,

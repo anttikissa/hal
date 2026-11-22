@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect } from 'bun:test'
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
-import { type Event } from '../common/protocol.ts'
+import { type Event, type Tab } from '../common/protocol.ts'
+import { connection } from '../common/connection.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { transcriptLive } from '../common/transcript-live.ts'
 import { replay } from '../common/replay.ts'
@@ -122,13 +123,14 @@ export function useHost(withNaming = false, withGreetings = false, withRecaps = 
 export function client() {
 	let events: Event[] = []
 	let views = new Map<string, Transcript>()
+	let tabs: Tab[] = []
 	let conn = host.connect((e) => {
 		// Every event the host sends passes the check clients make.
 		expect(eventCheck.invalidEvent(e)).toBeUndefined()
 		events.push(e)
-		let last = e.type === 'tab' ? events.findLast((x) => x.type === 'tabs') : undefined
-		if (e.type === 'tab' && last?.type === 'tabs')
-			events.push({ type: 'tabs', tabs: last.tabs.map((t) => (t.id === e.tab.id ? e.tab : t)) })
+		if (e.type === 'tabs') tabs = e.tabs
+		let next = e.type === 'tab' || e.type === 'tab-gone' ? connection.tabsAfter(tabs, e) : undefined
+		if (next) events.push({ type: 'tabs', tabs: (tabs = next) })
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {
 			let t = transcriptLive.fold(views.get(id), e)

@@ -1,5 +1,5 @@
 {
-	version: 51,
+	version: 52,
 	changes: [
 		{
 			version: 2,
@@ -979,6 +979,26 @@
 					kind: 'compatible',
 					target: 'host/project-context',
 					description: 'Adds needed and enter'
+				}
+			]
+		},
+		{
+			version: 52,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Event',
+					description: 'Adds tab index, tab-gone'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/connection.tabsAfter',
+					description: 'Folds row events'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/tabs',
+					description: 'Adds place and drop'
 				}
 			]
 		}

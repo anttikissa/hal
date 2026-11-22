@@ -30,7 +30,7 @@ function create(parent: string): string {
 	if (draft.trim() && !commands.parse(draft)) drafts.set(child.id, draft)
 	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
-	tabs.publish()
+	tabs.place(child.id)
 	slash.output(parent, `This session was forked to ${child.id}.`)
 	host.broadcast(parent, { type: 'go', sessionId: parent, tab: child.id })
 	return child.id

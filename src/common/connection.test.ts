@@ -89,6 +89,10 @@ test('a tab event replaces its row in the last tabs; before any tabs it waits fo
 	let last = events.at(-1) as Extract<Event, { type: 'tabs' }>
 	expect(last.tabs).toEqual([tab('a', 'running'), b])
 	expect(last.tabs[1]).toBe(b)
+	conns[0]!.deliver({ type: 'tab', tab: tab('c', 'idle'), index: 1 } as Event)
+	conns[0]!.deliver({ type: 'tab', tab: b, index: 0 } as Event)
+	conns[0]!.deliver({ type: 'tab-gone', id: 'a' } as Event)
+	expect((events.at(-1) as Extract<Event, { type: 'tabs' }>).tabs.map((t) => t.id)).toEqual(['b', 'c'])
 })
 
 test('joining, connected, then disconnected with a retry time until the host is back', async () => {

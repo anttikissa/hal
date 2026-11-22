@@ -400,9 +400,11 @@ export type Event =
 	// The tabs changed, or the client just connected: every tab, in
 	// order. Sent to every client; which one a client shows is its own business.
 	| { type: 'tabs'; tabs: Tab[]; sessions?: string[]; subscriptions?: SubscriptionData }
-	// One tab's row changed (state, attention, question); the connection
-	// core replaces it in the last tabs and hands clients a tabs event.
-	| { type: 'tab'; tab: Tab }
+	// One tab's row changed (state, attention, question), or with `index`
+	// it opened or moved there; the connection core applies it to the last
+	// tabs and hands clients a tabs event, as for tab-gone.
+	| { type: 'tab'; tab: Tab; index?: number }
+	| { type: 'tab-gone'; id: string }
 	// /go in this session changes only windows currently showing/following it.
 	| { type: 'go'; sessionId: string; tab: string; block?: string }
 	// The session's draft changed; `command` is the id of the command

@@ -204,8 +204,7 @@ test('an unreadable session stays a tab, failed with the error, and opening it i
 	newTab(a, '/tmp/p')
 	let broken = newTab(a, '/tmp/p')
 	writeFileSync(`${paths.sessionDir(broken)}/history.asonl`, '{ type: @@ }\n')
-	send(a, { type: 'tab-new', cwd: '/tmp/p' })
-	let tab = tabsOf(a)?.find((t) => t.id === broken)
+	let tab = tabsOf(client())?.find((t) => t.id === broken)
 	expect(tab?.state).toEqual({
 		type: 'error',
 		message: expect.stringContaining(`${broken}/history.asonl: malformed history`),
@@ -224,9 +223,9 @@ test('a session with unreadable metadata fails its own tab, not the tab list', (
 		`${paths.sessionDir(broken)}/session.ason`,
 		`{ id: '${broken}', cwd: '/tmp/p', model: 'fake/m', createdAt: '2026-01-01', blocks: 'huge' }`,
 	)
-	send(a, { type: 'tab-new', cwd: '/tmp/p' })
-	expect(tabsOf(a)?.find((t) => t.id === good)?.state.type).not.toBe('error')
-	expect(tabsOf(a)?.find((t) => t.id === broken)?.state).toEqual({
+	let b = client()
+	expect(tabsOf(b)?.find((t) => t.id === good)?.state.type).not.toBe('error')
+	expect(tabsOf(b)?.find((t) => t.id === broken)?.state).toEqual({
 		type: 'error',
 		message: expect.stringContaining('invalid blocks'),
 	})

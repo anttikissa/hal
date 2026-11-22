@@ -120,6 +120,7 @@ function onEvent(event: Event): boolean {
 
 // Each connection brings the tabs; tab-start picks the one to show.
 function connected(): void {
+	delete app.state.seen
 	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 	let addressed = router.parse(router.href())
 	if (!app.state.shown && addressed) {
@@ -231,11 +232,18 @@ function onPopState(): void {
 	if (st.tabs.length) tabs.show(router.pick(st.tabs, router.parse(router.href()))!, true)
 }
 
-// The shown tab no longer wants attention.
-function seen(): void {
+// The shown tab no longer wants attention: asked once per mark, since a
+// mark the host keeps (an asked turn, /unread) comes back in every tab
+// list. `again`: the reader returned, so ask anew.
+function seen(again = false): void {
 	if (typeof document !== 'undefined' && (document.visibilityState !== 'visible' || !document.hasFocus())) return
-	let { tabs, shown } = app.state
-	if (tabs.find((t) => t.id === shown)?.attention) connection.send({ type: 'tab-seen', sessionId: shown })
+	let st = app.state
+	if (again) delete st.seen
+	let tab = st.tabs.find((t) => t.id === st.shown)
+	if (!tab?.attention) return void delete st.seen
+	if (st.seen === tab.id) return
+	st.seen = tab.id
+	connection.send({ type: 'tab-seen', sessionId: tab.id })
 }
 
 // A new tab in the shown tab's cwd, after it; it shows once made.

@@ -90,7 +90,7 @@ function find(name: string, after: string, cwd: string): { id: string; old?: str
 	let id = sessions.create({ cwd, model: MODEL, name }).id
 	let at = f.open.indexOf(old ?? after)
 	tabs.insert(id, at < 0 ? f.open.length : at + 1)
-	tabs.publish()
+	tabs.place(id)
 	return { id, old }
 }
 
@@ -111,9 +111,9 @@ function open(from: string, cwd: string): { error?: string; say?: string } {
 	// and ignore the go.
 	host.broadcast(from, { type: 'go', sessionId: from, tab: id })
 	if (old) {
-		tabs.close(old)
+		let refused = tabs.close(old)
 		pluginSyncSession.state.bound.delete(old)
-		tabs.publish()
+		if (refused === undefined) tabs.drop(old)
 	}
 	return {}
 }

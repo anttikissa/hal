@@ -115,7 +115,7 @@ function spawn(parent: string, s: Spawn): string {
 	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id, clients.timezone(parent))
 	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
-	tabs.publish()
+	tabs.place(child.id)
 	let text = s.task
 	if (text.trim()) {
 		let refused = prompts.submit(child.id, text, undefined, 'steer', { from: parent, label: tabs.label(parent) })

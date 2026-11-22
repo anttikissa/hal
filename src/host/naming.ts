@@ -22,6 +22,8 @@ function prepare(id: string, record: Extract<HistoryRecord, { type: 'user' }>): 
 		.find((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model' && b.text.trim())
 	if (!text || text.type !== 'text') return
 	let meta = sessions.open(id)
+	// A scripted prompt (hal -p, a script's submit) has nobody juggling tabs.
+	if ((text.interactive ?? meta.interactive) === false) return
 	if (meta.autoclose || tabs.file().open.length < 4) return
 	// History commits the counter with the prompt; reconcile a crash before meta saved.
 	let prior = pages.findLast(id, (r) => r.type === 'user' && r.naming?.version === (meta.nameVersion ?? 0))

@@ -15,7 +15,8 @@ Legacy trailing XML rename suffixes no longer act, but stay hidden in terminal a
 		'Verification of the command-based redesign: 31 focused naming, command, replay-context and web tests pass; the terminal legacy-suffix regression also passes. Source-only TypeScript and lint pass. Full-suite validation was interrupted by a host restart after terminal end-to-end timeouts; it is not claimed green.',
 		'Direct history fixtures isolate naming.prepare just as shared host fixtures do, instead of relying on manual name ownership to suppress unrelated reminder metadata. The web transport regression expects the persisted naming-counter meta broadcast; both transports receive identical events.',
 		'Latest broad functional verification (excluding terminal e2e and startup timing checks): 1301 pass, 1 skip, 3 fail. The failures are a status-label expectation polluted by cached model data and two spawn failures from suite-global tab state pointing at a deleted fixture directory; the two spawn checks pass individually. Naming, rename-command, history, web transport and legacy display regressions pass individually. Source-only typecheck and lint pass. Do not claim the entire suite green.',
-		'Nudges go only to interactive tabs (not autoclose: hal -p, subagents, benchmarks) and only while 4 or more tabs are open (user decision 8 Oct): naming matters when the user juggles tabs.'
+		'Nudges go only to interactive tabs (not autoclose: hal -p, subagents, benchmarks) and only while 4 or more tabs are open (user decision 8 Oct): naming matters when the user juggles tabs.',
+		"Scripted prompts (hal -p, a script's submit: interactive false on the prompt block, else on the session) get no naming context and bump no nameTurns. Bug fix invariant: a non-interactive tab is never asked to rename itself. Before, every Jev classification prompt carried the /rename reminder to the decision model and saved session meta."
 	],
 	needs: ['j8', 'x8', '29', '7', 'zk', 'mt']
 }

@@ -193,11 +193,11 @@ function receive(event: Event): void {
 	if (event.type === 'tabs' && event.subscriptions) subscriptions.apply(event.subscriptions, true)
 	if (event.type === 'tabs') st.tabs = event.tabs
 	// Before this link's first tabs, the coming list holds the change.
-	if (event.type === 'tab') {
-		let i = st.tabs.findIndex((t) => t.id === event.tab.id)
-		if (i < 0) return
-		st.tabs = st.tabs.with(i, event.tab)
-		return st.opts?.onEvent({ type: 'tabs', tabs: st.tabs })
+	if (event.type === 'tab' || event.type === 'tab-gone') {
+		let next = connection.tabsAfter(st.tabs, event)
+		if (!next) return
+		st.tabs = next
+		return st.opts?.onEvent({ type: 'tabs', tabs: next })
 	}
 	// A snapshot sent before the host read this client's close does not
 	// follow the session again.
@@ -250,7 +250,21 @@ function stop(): void {
 	conn?.close()
 }
 
+type TabEvent = Extract<Event, { type: 'tab' | 'tab-gone' }>
+
+// `tabs` after a one-row event, or undefined when it does not apply:
+// before the first list (never empty once heard) or for an unknown row.
+function tabsAfter(tabs: Tab[], event: TabEvent): Tab[] | undefined {
+	let id = event.type === 'tab' ? event.tab.id : event.id
+	let i = tabs.findIndex((t) => t.id === id)
+	if (!tabs.length) return
+	if (event.type === 'tab-gone') return i < 0 ? undefined : tabs.toSpliced(i, 1)
+	if (event.index !== undefined) return tabs.filter((t) => t.id !== id).toSpliced(event.index, 0, event.tab)
+	return i < 0 ? undefined : tabs.with(i, event.tab)
+}
+
 export const connection = {
+	tabsAfter,
 	state: createState(),
 	random: () => Math.random(),
 	schedule: (fn: () => void, ms: number): ReturnType<typeof setTimeout> => setTimeout(fn, ms),

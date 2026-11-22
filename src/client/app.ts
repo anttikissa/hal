@@ -58,10 +58,12 @@ import { command as restart } from './commands/restart.ts'
 // `hidden`: the client state of tabs not shown. `start`: where a starting
 // client looks for its tab (a restart: the one it left; remote: no cwd).
 // `away`: the window reported losing focus; `watching`: the visibility
-// last told the host (tab-switch.ts watch).
+// last told the host (tab-switch.ts watch); `seen`: the tab whose mark
+// this client last asked the host to clear.
 export type AppState = {
 	away?: boolean
 	watching?: string
+	seen?: string
 	tabs: Tab[]
 	focus: Focus
 	asked?: string

@@ -222,10 +222,37 @@ function update(id: string): void {
 	for (let client of host.state.clients) client.deliver(event)
 }
 
+// Tells every client where tab `id` now sits (opened, reopened, moved).
+// Joining a project that has open tabs, it takes their color; a new
+// project can recolor every tab, so then all of them go.
+function place(id: string): void {
+	let f = tabs.file()
+	let tab = row(id, new Set(f.attention), new Map())
+	let peer = [...tabs.state.rows.values()].find((t) => t.id !== id && t.cwd === tab.cwd)
+	if (!peer) return tabs.publish()
+	if (peer.color !== undefined) tab.color = peer.color
+	tabs.state.rows.set(id, tab)
+	liveFiles.save(f)
+	let event: Event = { type: 'tab', tab, index: f.open.indexOf(id) }
+	for (let client of host.state.clients) client.deliver(event)
+}
+
+// Tells every client tab `id` closed; the last tab of a project can
+// recolor the rest, so then all of them go.
+function drop(id: string): void {
+	let rows = tabs.state.rows
+	let cwd = rows.get(id)?.cwd
+	rows.delete(id)
+	if (![...rows.values()].some((t) => t.cwd === cwd)) return tabs.publish()
+	liveFiles.save(tabs.file())
+	let event: Event = { type: 'tab-gone', id }
+	for (let client of host.state.clients) client.deliver(event)
+}
+
 function insert(id: string, index: number): void {
 	let open = tabs.file().open
 	open.splice(Math.max(0, Math.min(open.length, index)), 0, id)
-	projectContext.changed()
+	projectContext.changed(id)
 }
 
 function create(
@@ -337,23 +364,27 @@ function act(c: TabCommand, timezone?: string): Outcome {
 		tabs.update(id)
 		return {}
 	}
-	let before = JSON.stringify(f)
+	let order = f.open.join('\n')
 	let outcome: Outcome = {}
 	if (c.type === 'tab-new') {
 		let tab = tabs.create(c.cwd, c.after, c.autoclose, c.interactive, timezone, c.trust, c.systemPrompt)
 		let text = c.interactive === false ? projectContext.report(tab, c.trust) : undefined
 		outcome = { tab, ...(text && { reply: { type: 'warning', text } as const }) }
-	} else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
-	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
+	} else if (c.type === 'tab-close') {
+		outcome = { refused: tabs.close(c.sessionId) }
+		if (outcome.refused === undefined) tabs.drop(c.sessionId)
+		return outcome
+	} else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last, timezone)
 	else if (c.type === 'tab-move') {
 		let from = f.open.indexOf(c.sessionId)
 		if (from < 0) return { refused: 'not a tab' }
 		f.open.splice(from, 1)
 		tabs.insert(c.sessionId, c.index)
+		tabs.place(c.sessionId)
+		return outcome
 	}
-	if (outcome.refused !== undefined) return outcome
-	if (JSON.stringify(tabs.file()) !== before) tabs.publish()
+	if (outcome.tab !== undefined && f.open.join('\n') !== order) tabs.place(outcome.tab)
 	return outcome
 }
 
@@ -431,6 +462,8 @@ export const tabs = {
 	start,
 	act,
 	update,
+	place,
+	drop,
 	observe,
 	unread,
 	left,
