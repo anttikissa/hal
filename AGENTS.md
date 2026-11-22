@@ -12,10 +12,7 @@ only when applicable):
     Implemented by: <model id, e.g. anthropic/claude-opus-5-5>
     Session: <session id, e.g. 157-cms>
 
-Pull and push frequently. Set pull.rebase=true and rebase.autoStash=true.
-<!-- TODO - to be reviewed by a human -181-dog -->
-If others are working, use --no-autostash.
-Rebase only when that checkout is clean and no other agent is editing it.
+Pull and push frequently, always with `git pull --rebase --autostash`.
 
 Work is not done until its commit lands on main in the Hal source directory.
 Commits in a worktree do not count.
