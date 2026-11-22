@@ -29,6 +29,7 @@ import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
 import { status } from './status.ts'
 import { projectContext } from './project-context.ts'
+import { promptCache } from './prompt-cache.ts'
 
 type TabsFile = { open: string[]; closed: { id: string; index: number }[]; attention: string[] }
 export type TabCommand = Extract<Command, { type: `tab-${string}` }>
@@ -389,8 +390,8 @@ function act(c: TabCommand, timezone?: string): Outcome {
 }
 
 // Hears every session event (host.broadcast): a tab wants attention when
-// its turn ends or fails or asks a question, and the tab bar shows its
-// state and name.
+// its turn ends or fails or asks a question, unless a script drives it
+// (nobody would read the mark), and the tab bar shows its state and name.
 function observe(id: string, event: Event): void {
 	if (!['state', 'turn-start', 'prompt', 'turn-end', 'question', 'answer', 'meta'].includes(event.type)) return
 	let f: TabsFile
@@ -403,7 +404,7 @@ function observe(id: string, event: Event): void {
 	let wants =
 		event.type === 'question' ||
 		(event.type === 'turn-end' && (event.status === 'completed' || event.status === 'error'))
-	if (wants && !f.attention.includes(id)) f.attention.push(id)
+	if (wants && !f.attention.includes(id) && promptCache.interactive(id)) f.attention.push(id)
 	// The user answered an asking turn: a new turn runs.
 	if (event.type === 'state' && states.busy(event.state)) {
 		tabs.state.kept.delete(id)
