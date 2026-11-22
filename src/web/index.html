@@ -246,11 +246,6 @@
 			.Transcript .rows > * {
 				margin: 0 0 0.5lh;
 			}
-			/* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
-   it shares the cards' left edge; a 52px target from the screen edge
-   (the gutter clips anything further left) whose upright rectangle,
-   75% black like the notice outline, is centered on their
-   3px bar, just above the transcript's foot. */
 			.Transcript > .to-bottom {
 				position: sticky;
 				bottom: 0;
@@ -259,34 +254,31 @@
 			}
 			.to-bottom button {
 				position: absolute;
-				bottom: calc(4px - 0.5lh);
-				left: calc(-1 * var(--gut));
-				width: 52px;
-				height: 52px;
-				padding: 0 0 0 calc(var(--gut) + 1.5px - 4px);
-				border: 0;
-				background: none;
-				display: flex;
-				align-items: center;
-				justify-content: flex-start;
-				color: var(--text);
-				animation: fade-in 150ms var(--ease-out);
-			}
-			.to-bottom .pill {
+				right: 8px;
+				bottom: 8px;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				width: 8px;
-				height: 52px;
-				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
-				-webkit-backdrop-filter: blur(2px);
-				backdrop-filter: blur(2px);
+				gap: 5px;
+				min-width: 48px;
+				height: 48px;
+				padding: 0 12px;
+				border-radius: 24px;
+				border: 1px solid currentColor;
+				color: var(--text);
+				background: var(--overlay-bg);
+			}
+			.to-bottom button[data-count]::after {
+				content: attr(data-count);
 			}
 			.to-bottom svg {
-				flex: none;
-				width: 10px;
-				height: 14px;
-				fill: currentColor;
+				width: 22px;
+				height: 22px;
+				stroke: currentColor;
+				fill: none;
+				stroke-width: 2;
+				stroke-linecap: round;
+				stroke-linejoin: round;
 			}
 			@keyframes fade-in {
 				from {

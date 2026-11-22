@@ -99,7 +99,20 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// reader back down. Checked on scroll and when rows change, since
 	// content growing below a still reader moves the bottom away.
 	let [away, setAway] = createSignal(false)
-	let check = () => el && setAway(scroll.gap(el) > scroll.awayPx)
+	let seen = new Map<string, string>()
+	let [missed, setMissed] = createSignal(0)
+	let check = () => {
+		if (!el) return
+		let above = scroll.gap(el) > scroll.awayPx
+		setAway(above)
+		let list = rows(),
+			key = id(),
+			last = list.at(-1)?.key
+		if (!last) return setMissed(0)
+		if (!above || !seen.has(key)) seen.set(key, last)
+		let index = list.findLastIndex((r) => r.key === seen.get(key))
+		setMissed(index < 0 ? 0 : list.length - index - 1)
+	}
 	// Headers stick only on blocks over 10 lines tall, of every kind, and
 	// only while they fit in a third of the transcript: a long open title
 	// pinned at the top would hide the body scrolling under it.
@@ -223,6 +236,41 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		added.observe(list, { childList: true })
 		return () => added.disconnect()
 	})
+	let timer = 0
+	let held = false
+	function scheduleSearch() {
+		clearTimeout(timer)
+		let key = id()
+		if (!key || document.hidden || held || shown().length >= 1000) return
+		if (!start() && app.state.older.get(key)?.older === undefined) return
+		timer = window.setTimeout(() => {
+			if (id() === key && app.state.shown === key && !document.hidden && !held) more()
+		}, 80)
+	}
+	createEffect(
+		() => shown().length,
+		() => untrack(scheduleSearch),
+	)
+	onSettled(() => {
+		let down = () => {
+			held = true
+			clearTimeout(timer)
+		}
+		let up = () => {
+			held = false
+			scheduleSearch()
+		}
+		let events = new AbortController()
+		let options = { capture: true, passive: true, signal: events.signal }
+		for (let name of ['keydown', 'wheel', 'scroll', 'visibilitychange'])
+			document.addEventListener(name, scheduleSearch, options)
+		document.addEventListener('pointerdown', down, options)
+		for (let name of ['pointerup', 'pointercancel']) document.addEventListener(name, up, options)
+		return () => {
+			events.abort()
+			clearTimeout(timer)
+		}
+	})
 	// One check a frame, however many events arrive in it.
 	let frame = 0
 	createEffect(shown, () => {
@@ -239,16 +287,15 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 				<Show when={away()}>
 					<button
 						type="button"
-						aria-label="Scroll to the bottom"
+						aria-label={missed() ? `Scroll to the bottom: ${missed()} new cards` : 'Scroll to the bottom'}
+						data-count={missed() || undefined}
 						title="Scroll to the bottom"
 						onPointerDown={(e) => e.preventDefault()}
 						onClick={scroll.bottom}
 					>
-						<span class="pill">
-							<svg viewBox="0 0 12 16" aria-hidden="true">
-								<path d="M1 1h10L6 7zM1 8h10l-5 6z" />
-							</svg>
-						</span>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M12 4v15m-7-7 7 7 7-7" />
+						</svg>
 					</button>
 				</Show>
 			</div>
