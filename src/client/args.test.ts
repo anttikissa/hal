@@ -77,6 +77,7 @@ test('print target and delivery flags validate combinations', () => {
 	for (let flags of [
 		['--session'],
 		['--session', '12', '--keep'],
+		['--session', '12', '--system-prompt', 'replacement'],
 		['--steer', '--queue'],
 		['--session', '12', '-d', '/tmp'],
 	])

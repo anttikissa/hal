@@ -13,10 +13,23 @@ import { promptCache } from './prompt-cache.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { sessions } from './sessions.ts'
+import { decisions } from './decisions.ts'
+import { pages } from './pages.ts'
 
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
+	if (budget.model && decisions.is(budget.model)) {
+		let offset = pages.marks(id).prompt
+		let r = offset === undefined ? undefined : pages.lineAt(history.file(id), offset).record
+		if (r?.type !== 'user') throw new Error('Missing current decision input')
+		return [
+			{
+				role: 'user' as const,
+				blocks: r.blocks.map((b) => (b.type === 'text' ? { ...b, text: blobs.expand(id, b.text) } : b)),
+			},
+		]
+	}
 	for (let text of neighbors.notes(id, sessions.open(id).cwd)) history.append(id, { type: 'notice', text })
 	let settingsNote = config.told(id)
 	if (settingsNote) history.append(id, { type: 'notice', text: settingsNote })

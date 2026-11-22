@@ -179,6 +179,7 @@ function create(init: {
 	autoclose?: boolean
 	interactive?: boolean
 	projectTrust?: string | false
+	systemPrompt?: string
 }): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
@@ -197,6 +198,7 @@ function create(init: {
 		slots: settings.subagentSlots(),
 		...(init.interactive !== undefined && { interactive: init.interactive }),
 		...(init.projectTrust !== undefined && { projectTrust: init.projectTrust }),
+		...(init.systemPrompt !== undefined && { systemPrompt: init.systemPrompt }),
 		...(selection.id === 'hal/tool' && { blocks: { ...toolBlocks } }),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)

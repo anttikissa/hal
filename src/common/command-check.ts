@@ -139,7 +139,7 @@ function invalid(value: unknown): string | undefined {
 			return `tab-new: ${flag} must be a boolean`
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
-	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
+	if (c.type === 'tab-new') return str('cwd') ?? str('after', true) ?? str('systemPrompt', true)
 	if (c.type === 'push-subscribe') {
 		let s = c.subscription as Record<string, unknown> | undefined
 		let keys = s?.keys as Record<string, unknown> | undefined

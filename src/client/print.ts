@@ -13,6 +13,7 @@ type Job = {
 	cwd: string
 	dir?: string
 	model?: string
+	systemPrompt?: string
 	session?: string
 	keep?: true
 	noUser?: true
@@ -85,7 +86,15 @@ function run(job: Job, io: Out): { onEvent(event: Event): void; begin(): void; d
 		id = connection.nextId()
 		// -d trusts its project for this run; --no-trust overrides (task tzr).
 		let trust = job.noTrust ? false : job.dir !== undefined || undefined
-		connection.send({ type: 'tab-new', cwd: job.cwd, interactive: false, autoclose: !job.keep, trust, id })
+		connection.send({
+			type: 'tab-new',
+			cwd: job.cwd,
+			interactive: false,
+			autoclose: !job.keep,
+			trust,
+			systemPrompt: job.systemPrompt,
+			id,
+		})
 	}
 	let onEvent = (e: Event) => {
 		if (settled) return

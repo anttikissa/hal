@@ -16,6 +16,7 @@ export type Args = (
 			prompt: string
 			dir?: string
 			model?: string
+			systemPrompt?: string
 			session?: string
 			keep?: true
 			noUser?: true
@@ -32,6 +33,7 @@ const help = `Usage:
                               (instructions, skills, plugins) for this run
     --no-trust                leave project instructions, skills and plugins out
     -m, --model <model>       model to use
+    --system-prompt <text>    replace the new session's system prompt
     -s, --session <id|tab>    send to an existing session instead
     --steer | --soft-steer | --queue
                               delivery to a busy session (default: soft-steer)
@@ -63,6 +65,7 @@ type Out = {
 	host?: string
 	dir?: string
 	model?: string
+	systemPrompt?: string
 	session?: string
 	keep?: true
 	delivery?: Delivery
@@ -106,6 +109,9 @@ command('-p, --print <prompt>', 'print', () => {
 	})
 	arg('-m, --model <model>', (out, model) => {
 		out.model = model
+	})
+	arg('--system-prompt <text>', (out, text) => {
+		out.systemPrompt = text
 	})
 	arg('-s, --session <id|tab>', (out, session) => {
 		out.session = session
@@ -183,6 +189,7 @@ function parse(argv: string[]): Args {
 		if (out.anthropicUrl && !['terminal', 'serve', 'print'].includes(out.kind))
 			fail('--anthropic-url applies only to hal, hal serve and hal -p')
 		if (out.session && out.keep) fail('--keep cannot be used with --session')
+		if (out.session && out.systemPrompt !== undefined) fail('--system-prompt cannot be used with --session')
 		if (out.session && out.noTrust) fail('--no-trust cannot be used with --session')
 		if (out.session && out.dir) fail('--dir cannot be used with --session; use /cd to change its directory')
 		return out as Args

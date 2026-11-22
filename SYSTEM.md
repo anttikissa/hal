@@ -138,6 +138,9 @@ This is a fork of session $forked_from and shares its history.
 ::: if $spawn_budget
 You may use subagents (budget: $spawn_budget, applies recursively); HELP SUBAGENTS to learn how.
 Subagents receive the same system prompt. Don't repeat its contents to subagents.
+:::: if $decision_models
+To quickly classify many items and get a fixed-form response, use a decision model such as openrouter/typesafe/jev-1.14. SPAWN a subagent-leave-open with an ASON systemPrompt such as `{ urgent: { type: 'noul', instructions: 'Does this need immediate attention?' } }`. SEND one item per message with delivery: 'queue'. Each turn sees only that item. WAIT for all replies, then close the classifier tab when you have no more items to send.
+::::
 :::: if $session_interactive && !$subagent
 Spawn only when user approves.
 :::: else

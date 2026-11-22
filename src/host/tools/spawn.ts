@@ -33,7 +33,7 @@ SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }?
 	tools?: string[]           tools the session may call, e.g. ["read", "grep"]; default this session's
 	systemPrompt?: string      replaces the whole system prompt
 - subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a session for the user.
-- The task holds the goal and constraints, without redundant instructions: the session already has its AGENTS.md, skills and system prompt, so never write "Read AGENTS.md". Required unless kind is interactive.
+- Give the goal and constraints in the task. Only kind subagent requires a task; a leave-open subagent can wait for SEND.
 - fresh starts with only the task; fork copies this session's history so far.
 - limit is at most this session's slots left minus 1. Each subagent spawn costs one slot from this session and every ancestor. Interactive sessions are free and use the configured budget.
 - tools: [] gives none. A focus aid, not a sandbox: BASH and EVAL can do anything.
@@ -42,7 +42,6 @@ SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }?
 
 const kinds: SpawnKind[] = ['subagent', 'subagent-leave-open', 'interactive']
 
-// task is required unless kind is interactive, so the schema cannot require it.
 const parameters = {
 	type: 'object',
 	properties: {
@@ -80,7 +79,7 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0)
 		throw new Error('limit must be a non-negative integer')
 	let task = text(input, 'task') ?? ''
-	if (!task && kind !== 'interactive') throw new Error('task is required unless kind is interactive')
+	if (!task && kind === 'subagent') throw new Error('task is required for kind subagent')
 	let model = text(input, 'model')
 	let note = ''
 	if (model !== undefined) {

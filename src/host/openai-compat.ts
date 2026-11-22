@@ -14,6 +14,7 @@ import { compatCatalog } from './compat-catalog.ts'
 export type { Endpoint } from './compat-catalog.ts'
 import { effortLevels, type EffortLevel } from '../common/effort-levels.ts'
 import { effortCatalog } from './effort-catalog.ts'
+import { decisions } from './decisions.ts'
 
 // `images`: whether the endpoint takes image input.
 function toMessages(req: ProviderRequest, images = true): unknown[] {
@@ -213,6 +214,13 @@ function create(name: string): Provider {
 			let routed = cred && openaiCompat.opencodeRoute(base, req, cred.value)
 			if (routed) return { ...routed, headers: { ...routed.headers, ...ep?.headers?.(req) }, account: cred!.account }
 			let { headers } = cred ? { headers: { authorization: `Bearer ${cred.value}` } } : openaiCompat.endpoint(name)
+			if (name === 'openrouter' && decisions.ids.has(req.model))
+				return {
+					url: `${base.replace(/\/v1$/, '')}/alpha/decisions`,
+					headers,
+					body: decisions.body(req),
+					json: decisions.answer,
+				}
 			return {
 				url: `${base}/chat/completions`,
 				headers: { ...headers, ...ep?.headers?.(req) },
@@ -231,11 +239,13 @@ function create(name: string): Provider {
 		// GET /models, which OpenRouter, Ollama and most servers offer.
 		async models(signal) {
 			let { base, headers } = openaiCompat.endpoint(name)
-			let res = await provider.fetch(`${base}/models`, { headers, signal })
-			if (!res.ok) throw new Error(`HTTP ${res.status} listing models`)
+			let query = name === 'openrouter' ? '?output_modalities=text,decisions' : ''
+			let res = await provider.fetch(`${base}/models${query}`, { headers, signal })
+			if (!res.ok) throw new Error(`HTTP ${res.status} listing models: ${await res.text()}`)
 			let body = (await res.json()) as {
 				data?: {
 					id?: unknown
+					architecture?: { output_modalities?: string[] }
 					reasoning?: { supported_efforts?: unknown; default_effort?: string; mandatory?: boolean }
 				}[]
 			}
@@ -245,6 +255,7 @@ function create(name: string): Provider {
 			}
 			for (let m of body.data ?? []) {
 				if (name !== 'openrouter' || typeof m.id !== 'string') continue
+				if (m.architecture?.output_modalities?.includes('decisions')) decisions.ids.add(m.id)
 				let r = m.reasoning
 				let supported = r?.supported_efforts
 				if (supported === undefined) {

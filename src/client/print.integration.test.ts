@@ -64,7 +64,10 @@ test('print new tab autocloses after its first prompt, while --keep stays open',
 	let user = client()
 	user.conn.send({ type: 'tab-new', cwd: '/tmp' })
 	for (let keep of [undefined, true] as const) {
-		let run = print.run({ prompt: 'task', cwd: '/tmp', ...(keep && { keep }) }, { out: () => {}, err: () => {} })
+		let run = print.run(
+			{ prompt: 'task', cwd: '/tmp', systemPrompt: 'Classify one item.', ...(keep && { keep }) },
+			{ out: () => {}, err: () => {} },
+		)
 		let conn = host.connect(run.onEvent),
 			send = connection.send
 		let before = calls.length
@@ -72,6 +75,7 @@ test('print new tab autocloses after its first prompt, while --keep stays open',
 		try {
 			run.begin()
 			await until(() => calls.length === before + 1)
+			expect(calls[before]!.input.system).toBe('Classify one item.')
 			let tab = user.of('tabs').at(-1)!.tabs.at(-1)!.id
 			calls[before]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
 			expect(await run.done).toBe(0)

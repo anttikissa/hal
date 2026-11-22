@@ -120,7 +120,15 @@ export type Command = (
 	// command that creates, reopens or picks a tab names it in its ack.
 	// After an open tab: inherit its cwd, model and effort; otherwise use
 	// cwd and the default model, appending the new tab.
-	| { type: 'tab-new'; cwd: string; after?: string; autoclose?: boolean; interactive?: boolean; trust?: boolean }
+	| {
+			type: 'tab-new'
+			cwd: string
+			after?: string
+			autoclose?: boolean
+			interactive?: boolean
+			trust?: boolean
+			systemPrompt?: string
+	  }
 	// Out of the tabs, remembering its position; the session and any
 	// running turn carry on. Closing the last tab is refused.
 	| { type: 'tab-close'; sessionId: string }

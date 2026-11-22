@@ -44,6 +44,7 @@ export type HttpRequest = {
 	account?: string
 	encoding?: 'zstd' | 'gzip'
 	parse?: Provider['parse']
+	json?: (text: string) => Iterable<StreamEvent>
 }
 
 type Failure = NonNullable<ErrorEvent['failure']>
@@ -386,7 +387,8 @@ async function* stream(
 			return
 		}
 		let counted: { input?: number; cacheRead?: number; cacheWrite?: number } = {}
-		for await (let event of (http.parse ?? p.parse)(provider.sse(res.body, conn.signal))) {
+		let events = http.json ? http.json(await res.text()) : (http.parse ?? p.parse)(provider.sse(res.body, conn.signal))
+		for await (let event of events) {
 			if (signal?.aborted) throw new Canceled()
 			if (event.type === 'error') {
 				// Name the account, as an HTTP failure does: rotation tries several.

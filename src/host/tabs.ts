@@ -218,6 +218,7 @@ function create(
 	interactive = true,
 	timezone?: string,
 	trust?: boolean,
+	systemPrompt?: string,
 ): string {
 	// A tab on hal/intro (the default model until config.ason sets one) is
 	// the welcome guide, which speaks first: no prompt needed to start it.
@@ -230,7 +231,7 @@ function create(
 	let intro = interactive && (model ?? models.defaultModel()) === 'hal/intro'
 	let dir = parent?.cwd ?? cwd
 	let projectTrust = trust === undefined ? undefined : trust && projectContext.root(dir)
-	let id = sessions.create({ cwd: dir, autoclose, interactive, projectTrust, ...(model && { model }) }).id
+	let id = sessions.create({ cwd: dir, autoclose, interactive, projectTrust, systemPrompt, ...(model && { model }) }).id
 	if (!intro) greetings.open(id, timezone)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
 	if (intro && !status.transition(id, { type: 'submit' })) turns.start(id)
@@ -311,7 +312,7 @@ function act(c: TabCommand, timezone?: string): Outcome {
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
 	if (c.type === 'tab-new') {
-		let tab = tabs.create(c.cwd, c.after, c.autoclose, c.interactive, timezone, c.trust)
+		let tab = tabs.create(c.cwd, c.after, c.autoclose, c.interactive, timezone, c.trust, c.systemPrompt)
 		let text = c.interactive === false ? projectContext.report(tab, c.trust) : undefined
 		outcome = { tab, ...(text && { reply: { type: 'warning', text } as const }) }
 	} else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }

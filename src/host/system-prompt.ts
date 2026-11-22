@@ -10,6 +10,7 @@ import { paths } from './paths.ts'
 import { projectContext } from './project-context.ts'
 import { scheduler } from './scheduler.ts'
 import { promptLang, type PromptRender, type PromptSource } from './prompt-lang.ts'
+import { provider } from './provider.ts'
 export type { PromptSource } from './prompt-lang.ts'
 const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
@@ -111,6 +112,10 @@ function vars(input: PromptInput, sources?: PromptSource[], problems?: string[])
 		subagent: input.parent ? 'true' : 'false',
 		subagent_parent: input.parent ?? '',
 		spawn_budget: String(input.slots ?? settings.subagentSlots()),
+		decision_models: String(
+			(!input.tools || ['spawn', 'send', 'wait'].every((t) => input.tools!.includes(t))) &&
+				!!provider.state.providers.openrouter?.available?.(),
+		),
 		fork: input.forkedFrom ? 'true' : 'false',
 		forked_from: input.forkedFrom ?? '',
 		user_notes: input.noUser ? 'false' : 'true',

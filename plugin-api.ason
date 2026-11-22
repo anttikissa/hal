@@ -1,5 +1,5 @@
 {
-	version: 49,
+	version: 50,
 	changes: [
 		{
 			version: 2,
@@ -954,6 +954,16 @@
 					target: 'host/providers/openai.provider',
 					description: 'Replaces knownModels, webSearchModels and known with webSearch(model)',
 					port: 'Override webSearch(model) instead of editing webSearchModels'
+				}
+			]
+		},
+		{
+			version: 50,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/provider.HttpRequest',
+					description: 'Supports JSON replies'
 				}
 			]
 		}
