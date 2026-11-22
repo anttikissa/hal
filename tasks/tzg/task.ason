@@ -11,7 +11,7 @@
 		'Bug fix: a tab that grew while shown kept its first row pinned, so showing it again built every card (ADEMark A11: 2000 rows, ~10 s in WKWebView, 1.3 s headless Chrome). Invariant: a tab shown again at the bottom builds only its newest rows (Transcript reopened); a reader above keeps its rows. Headless Chrome long-2000 switch: 1.2-1.6 s before, under 60 ms after.',
 		'Scrolling up added 60 earlier rows in one frame: a 66 ms frame in headless Chrome, 4-5 dropped frames per scroll in ADEMark A11 (WKWebView). Invariant: rows load 5 at a time near the top; headless Chrome long-2000 scroll: no frame over 17 ms in 3 of 4 tries (one 33 ms).',
 		'ADEMark A11 receipts stop moving at step 973 because the 20 wheel events end there, not because rows ran out; preloading (c4150ac9, f3e661e5, reverted) left gaps unchanged (median 4). The benchmark OCRs every captured frame synchronously on its capture queue, a possible cause of its frame gaps.',
-		'Browser Find reaches the newest 1,000 rendered rows of the active visible session without scrolling. Render 40 initially and reveal older rows in five-row increments between interactions using the existing host history paging and scroll anchoring. Stop background work at the target or the beginning of history.',
+		'To keep typing and scrolling responsive, an idle transcript does not expand its rendered history. Browser Find searches rows already rendered.',
 		'The web return-to-live button floats at the lower right with a 48px thumb target. It counts new transcript cards since the last visit to live; chunks and prepends do not count. Terminal unchanged.'
 	],
 	needs: ['4s', 's0'],

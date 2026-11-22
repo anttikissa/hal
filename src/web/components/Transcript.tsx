@@ -236,41 +236,6 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		added.observe(list, { childList: true })
 		return () => added.disconnect()
 	})
-	let timer = 0
-	let held = false
-	function scheduleSearch() {
-		clearTimeout(timer)
-		let key = id()
-		if (!key || document.hidden || held || shown().length >= 1000) return
-		if (!start() && app.state.older.get(key)?.older === undefined) return
-		timer = window.setTimeout(() => {
-			if (id() === key && app.state.shown === key && !document.hidden && !held) more()
-		}, 80)
-	}
-	createEffect(
-		() => shown().length,
-		() => untrack(scheduleSearch),
-	)
-	onSettled(() => {
-		let down = () => {
-			held = true
-			clearTimeout(timer)
-		}
-		let up = () => {
-			held = false
-			scheduleSearch()
-		}
-		let events = new AbortController()
-		let options = { capture: true, passive: true, signal: events.signal }
-		for (let name of ['keydown', 'wheel', 'scroll', 'visibilitychange'])
-			document.addEventListener(name, scheduleSearch, options)
-		document.addEventListener('pointerdown', down, options)
-		for (let name of ['pointerup', 'pointercancel']) document.addEventListener(name, up, options)
-		return () => {
-			events.abort()
-			clearTimeout(timer)
-		}
-	})
 	// One check a frame, however many events arrive in it.
 	let frame = 0
 	createEffect(shown, () => {
