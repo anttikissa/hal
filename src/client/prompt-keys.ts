@@ -31,9 +31,6 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 	if (top && !st.editing) {
 		let begun = amend.begin(st.transcript)
 		if (!begun) return false
-		let target = begun.editing.target
-		let after = target && st.transcript.items.slice(st.transcript.items.findIndex((i) => i.key === target) + 1)
-		if (after && after.some((i) => i.type === 'command' && i.from === undefined)) return false
 		st.editing = begun.editing
 		let { anchor: _, ...rest } = st.prompt
 		st.prompt = { ...rest, text: begun.editing.original, cursor: begun.editing.original.length }

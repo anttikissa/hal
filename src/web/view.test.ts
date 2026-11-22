@@ -178,6 +178,15 @@ test('Up while the model works edits the last prompt, whatever the input holds; 
 	})
 })
 
+test('Up after a slash command in a working session leaves the turn running', () => {
+	let running = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'running', phase: 'streaming' } } },
+		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake', n: 5 },
+		{ type: 'command', sessionId, text: '/cards tool' },
+	])
+	expect(view.editKey(running, 'up', '')).toBeUndefined()
+})
+
 test('commands show who sent them, and their output; a canceled question says so', () => {
 	let form = { text: 'Create?', fields: [{ type: 'choice' as const, name: 'create', options: ['yes', 'no'] }] }
 	let st = fold([

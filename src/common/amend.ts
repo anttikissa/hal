@@ -96,9 +96,10 @@ function begin(t: Transcript | undefined): { editing: Editing; command?: unknown
 	if (!states.busy(t.state)) return undefined
 	let last = t.items.findLast(mine)
 	if (!last) return undefined
-	let changed = t.items
-		.slice(t.items.indexOf(last) + 1)
-		.some((i) => i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
+	let later = t.items.slice(t.items.indexOf(last) + 1)
+	// A slash command since then: Up recalls it, as in a shell.
+	if (later.some((i) => i.type === 'command' && i.from === undefined)) return undefined
+	let changed = later.some((i) => i.type === 'tool' && !toolDetails.harmless(i.name, i.input))
 	return {
 		editing: { sessionId, original: literal.escape(last.text), target: last.key, changed, paused: true },
 		command: { type: 'pause', sessionId },

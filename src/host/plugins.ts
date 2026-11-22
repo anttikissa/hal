@@ -497,11 +497,20 @@ function describe(): string {
 			if (f.portable) parts.push('portable')
 			if (f.disabled) parts.push('disabled')
 			if (f.expires) parts.push(`${f.expired ? 'expired' : 'expires'} ${f.expires}`)
-			parts.push(f.hooks.length ? f.hooks.map((h) => h.target).join(', ') : 'no hooks')
+			parts.push(f.hooks.length ? hookList(f.hooks.map((h) => h.target)) : 'no hooks')
 			if (f.error) parts.push(`error: ${f.error}`)
 			return parts.join('  ')
 		})
 		.join('\n')
+}
+
+// Targets such as "common/colors.tool around"; a module with more than
+// three hooks shows as "common/colors: 60 hooks" so one theme fits a line.
+function hookList(targets: string[]): string {
+	let byModule = Map.groupBy(targets, (t) => t.slice(0, t.lastIndexOf('.', t.indexOf(' '))))
+	return [...byModule]
+		.map(([module, ts]) => (ts.length > 3 ? `${module}: ${ts.length} hooks` : ts.join(', ')))
+		.join(', ')
 }
 
 export const plugins = {
