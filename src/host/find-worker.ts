@@ -215,12 +215,9 @@ async function search(c: Search): Promise<void> {
 		let q = findQuery.parse(c.query, c.kinds),
 			now = Date.now()
 		let ids = findWorker.scope(q, c.here, c.tabs ?? [])
-		// No query: the sessions whose histories changed last (task 6m).
+		// No query: the tabs active last (task 6m).
 		if (!c.query.trim()) {
-			let recent = [...findIndex.state.meta.values()].map((m) => ({
-				m,
-				at: statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt),
-			}))
+			let recent = [...findIndex.state.meta.values()].map((m) => ({ m, at: findIndex.active(m) }))
 			recent.sort((a, b) => b.at - a.at)
 			send(
 				recent.slice(0, limit).map(({ m, at }) => ({
@@ -268,8 +265,7 @@ async function search(c: Search): Promise<void> {
 			if (tier === 'metadata') {
 				for (let m of findIndex.state.meta.values()) {
 					// A title or cwd describes the tab now: date it by the tab's last activity.
-					let ts = statSync(history.file(m.id), { throwIfNoEntry: false })?.mtimeMs ?? Date.parse(m.createdAt)
-					let row = { sessionId: m.id, card: '', kind: tier, ts, at: 0 }
+					let row = { sessionId: m.id, card: '', kind: tier, ts: findIndex.active(m), at: 0 }
 					take({ ...row, blockId: '', text: `${m.id} ${m.name ?? ''}` })
 					take({ ...row, blockId: 'cwd', text: m.cwd })
 				}

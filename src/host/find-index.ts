@@ -40,6 +40,7 @@ function init(): void {
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
 		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, card TEXT, kind TEXT, ts REAL, text TEXT, at INTEGER, UNIQUE(sessionId,blockId,kind));
 		CREATE INDEX IF NOT EXISTS doc_kind ON docs(kind);
+		CREATE INDEX IF NOT EXISTS doc_activity ON docs(sessionId, ts) WHERE kind != 'other';
 		CREATE VIRTUAL TABLE IF NOT EXISTS words USING fts5(text, content='docs', content_rowid='id', tokenize='unicode61');
 		CREATE VIRTUAL TABLE IF NOT EXISTS grams USING fts5(text, content='docs', content_rowid='id', tokenize='trigram');
 		CREATE TRIGGER IF NOT EXISTS doc_insert AFTER INSERT ON docs BEGIN
@@ -197,6 +198,16 @@ function mark(sessionId: string): Mark | undefined {
 		| undefined
 }
 
+// When the tab last did something: its newest prompt, reply, tool or
+// commit. Hal's own records (prompt file changes, restart notices) land
+// in hundreds of tabs at once, so they do not count; a tab without
+// activity dates from its creation.
+function active(meta: SessionMeta): number {
+	let latest = "SELECT MAX(ts) ts FROM docs WHERE sessionId=? AND kind != 'other'"
+	let row = findIndex.state.db!.query(latest).get(meta.id) as { ts: number | null }
+	return row.ts ?? Date.parse(meta.createdAt)
+}
+
 function start(sessionId: string): number {
 	let m = findIndex.mark(sessionId),
 		stat = statSync(history.file(sessionId), { throwIfNoEntry: false })
@@ -270,6 +281,7 @@ export const findIndex = {
 	rows,
 	records,
 	mark,
+	active,
 	start,
 	catchup,
 }
