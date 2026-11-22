@@ -47,6 +47,9 @@ function file(): TabsFile {
 		liveFiles.close(data)
 		throw new Error(`${path}: open, closed and attention must be lists`)
 	}
+	// Closed tabs want nothing; older files kept their marks.
+	let open = new Set(data.open)
+	if (data.attention.some((id) => !open.has(id))) data.attention = data.attention.filter((id) => open.has(id))
 	return (tabs.state.file = data)
 }
 
@@ -204,8 +207,8 @@ function publish(): void {
 	for (let client of host.state.clients) client.deliver(event)
 }
 
-// Tells every client one tab's new row, if it changed. Its project and
-// color stay: a meta change (name, model, cwd) publishes every tab.
+// Tells every client one tab's new row, if it changed. Its project color
+// stays: a cwd change publishes every tab.
 function update(id: string): void {
 	let f = tabs.file()
 	let before = tabs.state.rows.get(id)
@@ -280,6 +283,7 @@ function close(id: string): string | undefined {
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })
 	f.closed = closed.slice(-tabs.closedKept)
+	f.attention = f.attention.filter((x) => x !== id)
 	projectContext.changed()
 	return undefined
 }
@@ -323,6 +327,16 @@ function is(c: Command): c is TabCommand {
 // Carries out a tab command; a change goes to every client.
 function act(c: TabCommand, timezone?: string): Outcome {
 	let f = tabs.file()
+	// A turn that asked keeps its mark until the user sends something (task nd6);
+	// a tab marked by /unread keeps it until its client shows another (task wr5).
+	// Clients send this on every tab list while the shown tab is marked.
+	if (c.type === 'tab-seen') {
+		let id = c.sessionId
+		if (!f.attention.includes(id) || notify.asked(id) || tabs.state.kept.has(id)) return {}
+		f.attention = f.attention.filter((x) => x !== id)
+		tabs.update(id)
+		return {}
+	}
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
 	if (c.type === 'tab-new') {
@@ -332,10 +346,6 @@ function act(c: TabCommand, timezone?: string): Outcome {
 	} else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last, timezone)
-	// A turn that asked keeps its mark until the user sends something (task nd6);
-	// a tab marked by /unread keeps it until its client shows another (task wr5).
-	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId) && !tabs.state.kept.has(c.sessionId))
-		f.attention = f.attention.filter((id) => id !== c.sessionId)
 	else if (c.type === 'tab-move') {
 		let from = f.open.indexOf(c.sessionId)
 		if (from < 0) return { refused: 'not a tab' }
@@ -368,8 +378,11 @@ function observe(id: string, event: Event): void {
 		tabs.state.kept.delete(id)
 		if (f.attention.includes(id)) f.attention = f.attention.filter((x) => x !== id)
 	}
-	if (event.type === 'meta') tabs.publish()
-	else tabs.update(id)
+	// A new cwd can recolor other tabs of its project and change its plugins.
+	if (event.type === 'meta' && event.meta.cwd !== tabs.state.rows.get(id)?.cwd) {
+		projectContext.changed()
+		tabs.publish()
+	} else tabs.update(id)
 }
 
 // Marks tabs unread (/unread). `shown`, the tab the command ran in, keeps
