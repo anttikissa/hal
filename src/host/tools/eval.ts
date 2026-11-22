@@ -5,6 +5,7 @@
 import { ason } from '../../common/ason.ts'
 import { approval } from '../approval.ts'
 import { history } from '../history.ts'
+import { jobs } from '../jobs.ts'
 import { nativeTool } from '../native-tool.ts'
 import { slash } from '../slash.ts'
 import { tools, type Tool, type ToolContext } from '../tools.ts'
@@ -28,7 +29,7 @@ let files = (await tool('GREP "TODO" { files: true }')).split("\n")
 return files.filter(f => f.startsWith("src/host"))
 !!END
 - await host((a, b) => ..., a, b) runs a function inside the Hal host, for its live state, and returns its value. The function sees only its arguments, ctx and tool, and imports Hal modules with await import("hal/host/tools.ts"). It blocks all of Hal while it runs synchronously: keep it short.
-- ctx has cwd, sessionId and callId. Aborting the call kills the process.`
+- ctx has cwd, sessionId and callId. Aborting the call kills the process and everything it started. Timers left running keep the process alive after the call returns, as a background job: STOP t<number> stops it.`
 
 const parameters = {
 	type: 'object',
@@ -71,6 +72,7 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	let settled = false
 	let proc = Bun.spawn([process.execPath, childPath], {
 		cwd: ctx.cwd,
+		detached: true,
 		stdin: 'ignore',
 		stdout: 'ignore',
 		stderr: 'pipe',
@@ -100,8 +102,27 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 		if (error) result.reject(new Error(text))
 		else result.resolve(text)
 	}
+	// Its own process group, as for BASH: processes the code started die too.
+	function kill() {
+		try {
+			process.kill(-proc.pid, 'SIGKILL')
+		} catch {}
+	}
+	// Timers the code left keep its process alive after the call returns,
+	// as a background job that STOP, /kill, closing the tab and Hal exiting
+	// stop. A call without a card cannot be named, so its process dies.
+	function linger() {
+		let n = ctx.callId === undefined ? undefined : history.callNumber(ctx.sessionId, ctx.callId)
+		if (n === undefined) return kill()
+		let id = `${ctx.sessionId}:${n}`
+		jobs.state.running.set(id, { sessionId: ctx.sessionId, stop: kill })
+		void proc.exited.then(() => jobs.drop(id))
+	}
 	function receive(message: Message) {
-		if (message.t === 'done' || message.t === 'fail') return settle(message.t === 'fail', message.text)
+		if (message.t === 'done' || message.t === 'fail') {
+			if (!settled) linger()
+			return settle(message.t === 'fail', message.text)
+		}
 		if (message.t === 'notice') {
 			history.append(ctx.sessionId, { type: 'notice', text: message.text })
 			return slash.output(ctx.sessionId, message.text, true)
@@ -111,10 +132,8 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 			(e) => send({ t: 'reply', id: message.id, error: e instanceof Error ? (e.stack ?? String(e)) : Bun.inspect(e) }),
 		)
 	}
-	// Timers the code left behind keep running after the call returns, so
-	// only a running call dies with its abort.
 	function abort() {
-		proc.kill('SIGKILL')
+		kill()
 		settle(true, 'EVAL aborted')
 	}
 

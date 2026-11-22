@@ -274,7 +274,8 @@ export const jobs = {
 	steered,
 	byMessage,
 	why,
-	// `running`: background commands of this process, by id.
+	// `running`: background commands and lingering EVAL processes of this
+	// process, by id.
 	state: { running: new Map<string, Job>(), delivering: new Map<string, string>() },
 	// How long a background call waits for a command that fails at once.
 	graceMs: 100,
@@ -287,6 +288,7 @@ export const jobs = {
 	label,
 	forget,
 	finish,
+	drop,
 	tell,
 	running,
 	kill,

@@ -267,7 +267,10 @@ function stop(t: Target): string {
 			let stopped = false
 			if (!at.call)
 				for (let [key, running] of tools.running)
-					if (key.startsWith(`${at.sessionId}:`) && !['bash', 'wait', 'stop', 'spawn'].includes(running.call.name)) {
+					if (
+						key.startsWith(`${at.sessionId}:`) &&
+						!['bash', 'eval', 'wait', 'stop', 'spawn'].includes(running.call.name)
+					) {
 						lines.push(
 							`Warning: ${at.sessionId} t${history.callNumber(at.sessionId, running.call.id)} (${running.call.name.toUpperCase()}) has no individual STOP support and may still finish after the agent stops.`,
 						)
@@ -287,7 +290,7 @@ function stop(t: Target): string {
 			if (at.call && !ids.length) {
 				let running = tools.running.get(`${at.sessionId}:${at.call.id}`)
 				if (running) {
-					if (!['bash', 'wait'].includes(at.call.name))
+					if (!['bash', 'eval', 'wait'].includes(at.call.name))
 						throw new Error(
 							`running ${at.call.name.toUpperCase()} cannot be interrupted individually; stop session ${at.sessionId} instead`,
 						)
