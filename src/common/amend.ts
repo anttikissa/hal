@@ -84,8 +84,8 @@ function begin(t: Transcript | undefined): { editing: Editing; command?: unknown
 	// the inbox or in history. Sent to a working session it steers (no
 	// pause); otherwise it starts a turn, which Up pauses.
 	let sent = drafts.pending(sessionId).at(-1)
-	if (sent?.delivery === 'queue') return undefined
-	if (sent && !/^\/[a-z]/i.test(sent.text.trimStart())) {
+	if (sent?.delivery === 'queue' || (sent && /^\/[a-z]/i.test(sent.text.trimStart()))) return undefined
+	if (sent) {
 		let editing: Editing = { sessionId, original: sent.text, inbox: sent.id }
 		return states.busy(t.state)
 			? { editing }

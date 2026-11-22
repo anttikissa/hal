@@ -11,6 +11,7 @@
 
 import { promptLayout } from './prompt-layout.ts'
 import { literal } from './literal.ts'
+import { drafts } from './drafts.ts'
 import type { Transcript } from './transcript.ts'
 
 // While browsing a session: the entry shown and its text.
@@ -18,14 +19,18 @@ export type Browse = { index: number; text: string; edited?: true }
 
 export type Shown = { text: string; cursor: number }
 
-// Human prompts and slash commands sent to the session, oldest first;
-// prompts escaped to send as prompts again.
+// Human prompts and slash commands sent to the session, oldest first,
+// then those sent and not acknowledged yet; prompts escaped to send as
+// prompts again.
 function entries(t: Transcript): string[] {
-	return t.items.flatMap((i) =>
-		((i.type === 'prompt' && i.origin !== 'model') || i.type === 'command') && i.from === undefined
-			? [i.type === 'prompt' ? literal.escape(i.text) : i.text]
-			: [],
-	)
+	return [
+		...t.items.flatMap((i) =>
+			((i.type === 'prompt' && i.origin !== 'model') || i.type === 'command') && i.from === undefined
+				? [i.type === 'prompt' ? literal.escape(i.text) : i.text]
+				: [],
+		),
+		...drafts.pending(t.meta.id).map((s) => s.text),
+	]
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are

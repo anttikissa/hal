@@ -9,6 +9,7 @@ import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { editPrompt } from './edit-prompt.ts'
 import { keys } from './keys.ts'
+import { recall } from '../common/recall.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -48,6 +49,29 @@ const open = (state: object) =>
 	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history, state } } as Event)
 const escape = () =>
 	keys.key({ key: 'Escape', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, { kind: 'other' })
+
+test('Up right after sending a slash command, while working, shows it and leaves the turn running', () => {
+	open({ type: 'running', phase: 'streaming' })
+	app.input('/help foo')
+	app.send()
+	let shown = ''
+	let up = () =>
+		keys.key({ key: 'ArrowUp', shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, {
+			kind: 'message',
+			text: '',
+			cursor: 0,
+			write: (s: { text: string }) => void (shown = s.text),
+		} as any)
+	up()
+	expect(sent.filter((c) => c.type === 'pause')).toEqual([])
+	expect(shown).toBe('/help foo')
+	app.onEvent({ type: 'command', sessionId, text: '/help foo' } as Event)
+	drafts.reset()
+	recall.reset()
+	up()
+	expect(sent.filter((c) => c.type === 'pause')).toEqual([])
+	expect(shown).toBe('/help foo')
+})
 
 test('editing an earlier prompt pauses, keeps the draft, and Escape continues with the draft back', () => {
 	open({ type: 'running', phase: 'streaming' })
