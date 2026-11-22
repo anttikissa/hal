@@ -170,6 +170,11 @@ test('arguments: strings, objects, comments as purpose, bare words, COMMAND', ()
 		input: { to: '2', text: 'hi' },
 	})
 	expect(nativeTool.resolve('BASH { cmd: "ls" }')).toEqual({ name: 'bash', input: { command: 'ls' } })
+	expect(nativeTool.resolve('WAIT "13-mac" "13-lye" t5 { timeout: 120 }').input).toEqual({
+		targets: ['13-mac', '13-lye', 't5'],
+		timeout: 120,
+	})
+	expect(nativeTool.resolve('WAIT { session: "09-ada" }').input).toEqual({ targets: '09-ada' })
 	expect(nativeTool.resolve('WAIT { for: ["09-ada"], timeout: 60 }')).toEqual({
 		name: 'wait',
 		input: { targets: ['09-ada'], timeout: 60 },

@@ -1,7 +1,5 @@
 // WAIT lets the model wait until one of its sessions or tool calls
 // finishes, fails or asks (work.ts).
-import { callText } from '../../common/call-text.ts'
-import { nativeTool } from '../native-tool.ts'
 import type { Tool, ToolContext } from '../tools.ts'
 import { work } from '../work.ts'
 
@@ -29,14 +27,7 @@ const parameters = {
 const syntax = {
 	positional: ['targets'],
 	usage: ['WAIT { timeout? }?', 'WAIT "<session id> | <tool call id>" ... { timeout? }?'],
-	aliases: { for: 'targets', ids: 'targets', sessions: 'targets' },
-	resolve(raw: string) {
-		let { values } = callText.values(raw)
-		let input = values.every((v) => typeof v === 'string' || typeof v === 'number' || Array.isArray(v))
-			? { targets: values.flat() }
-			: nativeTool.generic(tool, raw)
-		return { name: 'wait', input }
-	},
+	aliases: { for: 'targets', id: 'targets', ids: 'targets', session: 'targets', sessions: 'targets' },
 }
 
 async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> {

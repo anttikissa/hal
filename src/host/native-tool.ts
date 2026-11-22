@@ -91,11 +91,17 @@ function generic(tool: Tool<unknown>, raw: string): Record<string, unknown> {
 			}
 			continue
 		}
-		let key = positional[next++]
+		let key = positional[next]
 		if (key === undefined)
 			throw new Error(
 				`${tool.name.toUpperCase()} takes ${positional.length} plain argument${positional.length === 1 ? '' : 's'}, got another: ${JSON.stringify(value)}. ${usage()}`,
 			)
+		// A list field takes every plain argument: WAIT "a" "b" { timeout }.
+		if (properties[key]?.type === 'array') {
+			input[key] = [...((input[key] as unknown[]) ?? []), ...[value].flat()]
+			continue
+		}
+		next++
 		if (Object.hasOwn(input, key)) throw new Error(`${tool.name.toUpperCase()} got '${key}' twice. ${usage()}`)
 		input[key] = value
 	}
