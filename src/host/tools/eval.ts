@@ -1,6 +1,7 @@
-// Lets the model run JavaScript/TypeScript inside the running host, to
-// inspect live state or chain tool calls in code (task v99): only the
-// returned value enters context.
+// Lets the model run JavaScript/TypeScript and chain tool calls in code
+// (task v99): only the returned value enters context. The code runs in a
+// child process (eval-child.ts), so it can never block the host's event
+// loop; tool() and host() are requests this module answers.
 import { ason } from '../../common/ason.ts'
 import { approval } from '../approval.ts'
 import { history } from '../history.ts'
@@ -11,10 +12,10 @@ import { tools, type Tool, type ToolContext } from '../tools.ts'
 // Configuration: true puts the whole help in the system prompt; false
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = false
-const summary = 'run async JavaScript/TypeScript in the Hal host; tool() chains Hal tools'
+const summary = 'run async JavaScript/TypeScript in a child process; tool() chains Hal tools'
 const help = String.raw`## EVAL
 
-Run JavaScript/TypeScript inside the running Hal host process. The code goes between !!START and !!END lines.
+Run JavaScript/TypeScript in a child process of Hal. The code goes between !!START and !!END lines.
 EVAL /* <purpose> */
 !!START
 <code>
@@ -26,8 +27,8 @@ EVAL /* Find host TODO files */
 let files = (await tool('GREP "TODO" { files: true }')).split("\n")
 return files.filter(f => f.startsWith("src/host"))
 !!END
-- Import Hal modules with await import("hal/host/tools.ts"). ctx has cwd, sessionId and signal.
-- Synchronous code freezes all of Hal: keep it under 100 ms. Await tools and I/O; avoid spawnSync, execSync, *Sync file calls and busy-waits. Looping over fewer than 1,000 items is fine; for more, await between chunks or use BASH. Wait with await new Promise(r => setTimeout(r, ms)).`
+- await host((a, b) => ..., a, b) runs a function inside the Hal host, for its live state, and returns its value. The function sees only its arguments, ctx and tool, and imports Hal modules with await import("hal/host/tools.ts"). It blocks all of Hal while it runs synchronously: keep it short.
+- ctx has cwd, sessionId and callId. Aborting the call kills the process.`
 
 const parameters = {
 	type: 'object',
@@ -37,27 +38,10 @@ const parameters = {
 
 const syntax = { usage: ['EVAL', '!!START', '<code>', '!!END'], block: 'code', resolve }
 
-const transpiler = new Bun.Transpiler({ loader: 'ts', deadCodeElimination: false })
+const childPath = `${import.meta.dir}/../eval-child.ts`
 
-// Code that parses as one expression returns its value; otherwise it is a
-// function body that may `return`. Both may `await`.
-function compile(code: string): string {
-	try {
-		return transpiler.transformSync(`(async () => (\n${code}\n))`)
-	} catch {
-		return transpiler.transformSync(`(async () => {\n${code}\n})`)
-	}
-}
-
-function show(value: unknown): string {
-	return typeof value === 'string' ? value : Bun.inspect(value)
-}
-
-// The host's real console would write over the UI; collect output instead.
-function capture(logs: string[]) {
-	let log = (...args: unknown[]) => void logs.push(args.map(show).join(' '))
-	return { log, info: log, warn: log, error: log, debug: log, dir: log }
-}
+type Request = { t: 'tool'; id: number; cmd: string } | { t: 'host'; id: number; source: string; args: unknown[] }
+type Message = Request | { t: 'done'; text: string } | { t: 'fail'; text: string } | { t: 'notice'; text: string }
 
 // Runs one Hal tool from its call text, with the tool's own checks; a call
 // that would ask the user for approval is refused instead.
@@ -71,49 +55,74 @@ function toolFn(ctx: ToolContext) {
 	}
 }
 
-// Timers whose callbacks fail after the call has returned report a notice.
-function timers(ctx: ToolContext) {
-	function schedule(repeat: boolean, callback: (...args: unknown[]) => unknown, ms?: number, ...args: unknown[]) {
-		let failed = false
-		let timer = (repeat ? setInterval : setTimeout)(() => {
-			if (failed) return
-			void invoke()
-		}, ms)
-		async function invoke() {
-			try {
-				await callback(...args)
-			} catch (e) {
-				if (failed) return
-				failed = true
-				clearInterval(timer)
-				let text = `Eval ${ctx.callId ?? ''} ${repeat ? 'interval stopped' : 'timeout failed'}: ${e instanceof Error ? (e.stack ?? String(e)) : show(e)}`
-				history.append(ctx.sessionId, { type: 'notice', text })
-				slash.output(ctx.sessionId, text, true)
-			}
-		}
-		return timer
-	}
-	return [schedule.bind(null, false), schedule.bind(null, true)]
+// host(fn, ...args): the function's source runs here, in the host.
+async function inHost(source: string, args: unknown[], ctx: ToolContext): Promise<unknown> {
+	let fn = new Function('ctx', 'tool', `return (${source})`)(ctx, toolFn(ctx))
+	return await fn(...args)
+}
+
+function answer(request: Request, ctx: ToolContext): Promise<unknown> {
+	return request.t === 'tool' ? toolFn(ctx)(request.cmd) : inHost(request.source, request.args, ctx)
 }
 
 async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> {
 	if (typeof input.code !== 'string' || !input.code.trim()) throw new Error('EVAL needs code')
-	let logs: string[] = []
-	let js = compile(input.code).trim().replace(/;$/, '')
-	let fn = new Function('console', 'ctx', 'tool', 'setTimeout', 'setInterval', `return ${js}`)(
-		capture(logs),
-		ctx,
-		toolFn(ctx),
-		...timers(ctx),
-	)
-	try {
-		let value = await fn()
-		if (value !== undefined) logs.push(show(value))
-		return logs.join('\n') || 'undefined'
-	} catch (e) {
-		logs.push(e instanceof Error ? (e.stack ?? String(e)) : `Thrown: ${show(e)}`)
-		throw new Error(logs.join('\n'))
+	let result = Promise.withResolvers<string>()
+	let settled = false
+	let proc = Bun.spawn([process.execPath, childPath], {
+		cwd: ctx.cwd,
+		stdin: 'ignore',
+		stdout: 'ignore',
+		stderr: 'pipe',
+		serialization: 'advanced',
+		ipc: (message: Message) => receive(message),
+	})
+	let stderr = new Response(proc.stderr).text()
+
+	// The process may have exited by the time an answer is ready.
+	function send(message: Record<string, unknown>) {
+		try {
+			proc.send(message)
+		} catch {}
 	}
+	// A value that cannot be cloned crosses as its inspected text.
+	function reply(id: number, value: unknown) {
+		try {
+			proc.send({ t: 'reply', id, value })
+		} catch {
+			send({ t: 'reply', id, value: Bun.inspect(value) })
+		}
+	}
+	function settle(error: boolean, text: string) {
+		if (settled) return
+		settled = true
+		ctx.signal.removeEventListener('abort', abort)
+		if (error) result.reject(new Error(text))
+		else result.resolve(text)
+	}
+	function receive(message: Message) {
+		if (message.t === 'done' || message.t === 'fail') return settle(message.t === 'fail', message.text)
+		if (message.t === 'notice') {
+			history.append(ctx.sessionId, { type: 'notice', text: message.text })
+			return slash.output(ctx.sessionId, message.text, true)
+		}
+		answer(message, ctx).then(
+			(value) => reply(message.id, value),
+			(e) => send({ t: 'reply', id: message.id, error: e instanceof Error ? (e.stack ?? String(e)) : Bun.inspect(e) }),
+		)
+	}
+	// Timers the code left behind keep running after the call returns, so
+	// only a running call dies with its abort.
+	function abort() {
+		proc.kill('SIGKILL')
+		settle(true, 'EVAL aborted')
+	}
+
+	if (ctx.signal.aborted) abort()
+	else ctx.signal.addEventListener('abort', abort)
+	send({ t: 'run', code: input.code, ctx: { cwd: ctx.cwd, sessionId: ctx.sessionId, callId: ctx.callId } })
+	void proc.exited.then(async (code) => settle(true, `EVAL process exited with code ${code}\n${await stderr}`.trim()))
+	return result.promise
 }
 
 // The code is the literal text after leading /* purpose */ comments, so
