@@ -29,6 +29,7 @@ type Agent = {
 	exited?: string
 	mcp?: McpBridge
 	turnSignal?: AbortSignal
+	canceling?: Promise<void>
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -227,6 +228,15 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let cwd = sessions.open(sessionId).cwd
 	let agent = await agentFor(sessionId, cwd)
+	if (agent.canceling) {
+		await Promise.race([
+			agent.canceling,
+			new Promise<void>((resolve) => {
+				if (signal.aborted) return resolve()
+				signal.addEventListener('abort', () => resolve(), { once: true })
+			}),
+		])
+	}
 	if (signal.aborted) return
 	let fresh = unseen(agent, req.messages, cwd)
 	let text: string
@@ -278,23 +288,36 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	}
 	agent.onUpdate = onUpdate
 	agent.turnSignal = signal
-	let steered = Promise.withResolvers<undefined>()
+	let settled = Promise.withResolvers<undefined>()
+	let reply: Promise<any> | undefined
 	let onAbort = () => {
-		if (signal.reason === jobs.steered) {
-			if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
-			steered.resolve(undefined)
-			return
+		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
+		if (signal.reason !== jobs.steered && agent.acpSession) {
+			agent.tools.clear()
+			write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
+			if (reply) {
+				let wait = Promise.race([
+					reply.then(
+						() => {},
+						() => {},
+					),
+					Bun.sleep(5000),
+				]).finally(() => {
+					if (agent.canceling === wait) agent.canceling = undefined
+				})
+				agent.canceling = wait
+			}
 		}
-		write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
+		settled.resolve(undefined)
 	}
 	signal.addEventListener('abort', onAbort)
 	try {
-		let reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: [{ type: 'text', text }] })
+		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: [{ type: 'text', text }] })
 		// agy has the input now, whatever happens to this turn.
 		agent.prefix = req.messages.length
 		agent.hash = hash(req.messages)
 		save(sessionId, agent)
-		let result = await Promise.race([reply, steered.promise])
+		let result = await Promise.race([reply, settled.promise])
 		if (signal.aborted) {
 			void reply.catch(() => {})
 			return
