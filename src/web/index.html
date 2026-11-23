@@ -559,33 +559,10 @@
 			.CardHeader .side:empty {
 				display: none;
 			}
-			.Transcript .rows > :is(.Card, .Question) {
-				view-timeline: --sticky-card block;
-			}
 			.CardHeader {
-				position: sticky;
-				top: 0;
-				z-index: 1;
+				position: relative;
 				--sticky-bg: var(--card-bg, var(--canvas));
 				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
-			}
-			@supports (animation-timeline: --sticky-card) {
-				.CardHeader:not(.inline),
-				.CardHeader.inline .stamp,
-				.CardHeader.inline .side > * {
-					animation: sticky-shade linear both;
-					animation-timeline: --sticky-card;
-					animation-range: exit-crossing 20px exit-crossing 40px;
-				}
-			}
-			@keyframes sticky-shade {
-				to {
-					background-color: color-mix(
-						in oklab,
-						color-mix(in oklab, var(--sticky-bg) 80%, var(--overlay-bg)) 65%,
-						transparent
-					);
-				}
 			}
 			.CardHeader.inline {
 				position: static;
@@ -605,17 +582,43 @@
 			}
 			.CardHeader.inline .stamp,
 			.CardHeader.inline .side > * {
-				position: sticky;
-				top: 0;
-				z-index: 1;
+				position: static;
 				align-self: start;
 				background: color-mix(in oklab, var(--sticky-bg) 65%, transparent);
 			}
-			.Transcript .rows > :not([data-tall]) :is(.CardHeader.inline .stamp, .CardHeader.inline .side > *) {
-				position: static;
+			.Transcript .rows > [data-tall] .CardHeader:not(.inline),
+			.Transcript .rows > [data-tall] .CardHeader.inline .stamp,
+			.Transcript .rows > [data-tall] .CardHeader.inline .side > * {
+				position: sticky;
+				top: 0;
+				z-index: 1;
 			}
-			.Transcript .rows > :not([data-tall]) .CardHeader:not(.inline) {
-				position: relative;
+			/* Scroll-driven sticky shading runs only on tall cards with a fine
+			   pointer: attaching view-timeline/z-index to every header promotes
+			   each one into its own WebKit layer, which iOS drops mid-scroll
+			   under programmatic bottom-following jumps (task gwr). */
+			@media (hover: hover) and (pointer: fine) {
+				@supports (animation-timeline: --sticky-card) {
+					.Transcript .rows > :is(.Card, .Question)[data-tall] {
+						view-timeline: --sticky-card block;
+					}
+					.Transcript .rows > [data-tall] .CardHeader:not(.inline),
+					.Transcript .rows > [data-tall] .CardHeader.inline .stamp,
+					.Transcript .rows > [data-tall] .CardHeader.inline .side > * {
+						animation: sticky-shade linear both;
+						animation-timeline: --sticky-card;
+						animation-range: exit-crossing 20px exit-crossing 40px;
+					}
+				}
+			}
+			@keyframes sticky-shade {
+				to {
+					background-color: color-mix(
+						in oklab,
+						color-mix(in oklab, var(--sticky-bg) 80%, var(--overlay-bg)) 65%,
+						transparent
+					);
+				}
 			}
 			.CardHeader.inline .stamp {
 				padding-block: var(--card-inset);
