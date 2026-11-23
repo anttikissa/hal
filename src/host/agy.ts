@@ -6,8 +6,8 @@
 // session with a transcript whenever the history no longer extends what
 // agy saw (restart, /compact, /rebase, /edit, fork, another model's
 // turn). Task xbp.
-import type { Message, StreamEvent } from '../common/blocks.ts'
-import type { ProviderRequest, SseMessage } from './provider.ts'
+import { blocks, type ImageBlock, type Message, type StreamEvent } from '../common/blocks.ts'
+import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import type { Capability } from './model-effort.ts'
 import type { EffortLevel } from '../common/effort-levels.ts'
 import { strings } from '../common/strings.ts'
@@ -194,23 +194,50 @@ function hash(messages: Message[]) {
 // Hal's notes about hosted tools repeat what agy did; agy knows.
 const hostedNote = /^<hal-note>Your \S+ (?:ran|failed) on the provider:/
 
-function render(messages: Message[], note: boolean): string {
-	let out: string[] = []
+type AcpContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+
+function imagePart(img: ImageBlock, req: ProviderRequest): AcpContent {
+	let data = req.image?.(img.blob)
+	return data
+		? { type: 'image', data: data.data, mimeType: data.mediaType }
+		: { type: 'text', text: provider.imageNote('the image file is no longer available') }
+}
+
+function toContent(messages: Message[], req: ProviderRequest, note: boolean): AcpContent[] {
+	let out: AcpContent[] = []
+	let pushText = (text: string) => {
+		let last = out.at(-1)
+		if (last?.type === 'text') last.text += `\n\n${text}`
+		else out.push({ type: 'text', text })
+	}
 	for (let m of messages) {
-		let parts: string[] = []
+		let parts: AcpContent[] = []
+		let addText = (text: string) => {
+			let last = parts.at(-1)
+			if (last?.type === 'text') last.text += `\n${text}`
+			else parts.push({ type: 'text', text })
+		}
 		for (let b of m.blocks) {
 			if (b.type === 'text') {
 				if (!note && hostedNote.test(b.text)) continue
-				parts.push(b.text)
-			} else if (b.type === 'tool_call') parts.push(`[tool call] ${String(b.input.cmd ?? JSON.stringify(b.input))}`)
-			else if (b.type === 'tool_result')
-				parts.push(`[tool result${b.isError ? ', error' : ''}] ${strings.sliceText(b.output, 0, 4000)}`)
-			else if (b.type === 'image') parts.push('[image omitted]')
+				addText(b.text)
+			} else if (b.type === 'tool_call') addText(`[tool call] ${String(b.input.cmd ?? JSON.stringify(b.input))}`)
+			else if (b.type === 'tool_result') {
+				addText(`[tool result${b.isError ? ', error' : ''}] ${strings.sliceText(b.output, 0, 4000)}`)
+				for (let img of blocks.resultImages(b)) parts.push(imagePart(img, req))
+			} else if (b.type === 'image') parts.push(imagePart(b, req))
 		}
 		if (!parts.length) continue
-		out.push(note ? `## ${m.role === 'user' ? 'User' : 'Assistant'}\n${parts.join('\n')}` : parts.join('\n'))
+		if (note) {
+			let head = `## ${m.role === 'user' ? 'User' : 'Assistant'}`
+			if (parts[0]?.type === 'text') parts[0] = { type: 'text', text: `${head}\n${parts[0].text}` }
+			else parts.unshift({ type: 'text', text: head })
+		}
+		for (let p of parts)
+			if (p.type === 'text') pushText(p.text)
+			else out.push(p)
 	}
-	return out.join('\n\n')
+	return out
 }
 
 // What agy has not seen yet: messages after its prefix, if they are only
@@ -239,9 +266,10 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	}
 	if (signal.aborted) return
 	let fresh = unseen(agent, req.messages, cwd)
-	let text: string
+	let content: AcpContent[]
 	if (fresh) {
-		text = render(fresh, false) || 'Continue where you left off.'
+		content = toContent(fresh, req, false)
+		if (!content.length) content = [{ type: 'text', text: 'Continue where you left off.' }]
 	} else {
 		let created = await call(agent, 'session/new', { cwd, mcpServers: [] })
 		agent.acpSession = created.sessionId
@@ -250,10 +278,18 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.tools.clear()
 		state.offered = (created.models?.availableModels ?? []).map((m: { modelId: string }) => m.modelId)
 		let last = req.messages.findLastIndex((m) => m.role === 'assistant')
-		let before = req.messages.slice(0, last + 1)
-		let now = render(req.messages.slice(last + 1), false)
-		text = before.length
-			? `<hal-transcript>\nThe conversation so far in this Hal session, which you continue. Earlier tool calls were Hal's, not yours.\n\n${render(before, true)}\n</hal-transcript>\n\n${now}`
+		let before = toContent(req.messages.slice(0, last + 1), req, true)
+		let now = toContent(req.messages.slice(last + 1), req, false)
+		content = before.length
+			? [
+					{
+						type: 'text',
+						text: "<hal-transcript>\nThe conversation so far in this Hal session, which you continue. Earlier tool calls were Hal's, not yours.",
+					},
+					...before,
+					{ type: 'text', text: '</hal-transcript>' },
+					...now,
+				]
 			: now
 	}
 	let wanted =
@@ -312,7 +348,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	}
 	signal.addEventListener('abort', onAbort)
 	try {
-		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: [{ type: 'text', text }] })
+		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
 		// agy has the input now, whatever happens to this turn.
 		agent.prefix = req.messages.length
 		agent.hash = hash(req.messages)
