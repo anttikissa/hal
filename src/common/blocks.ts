@@ -100,7 +100,7 @@ export type UserText = TextBlock & Sender
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
 // A tool the provider ran itself: shown as a finished tool card, never
 // executed by Hal. Replay tells its input and output in a user-side note.
-export type HostedToolBlock = {
+export type HostedToolBlock = ToolDisplay & {
 	type: 'hosted_tool'
 	id: string
 	name: string

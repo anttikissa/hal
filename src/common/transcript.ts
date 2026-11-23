@@ -154,14 +154,19 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 			})
 		else if (b.type === 'hosted_tool') {
 			let ts = by.ts?.[i] !== undefined ? { ts: by.ts[i] } : {}
+			let disp = {
+				...(b.presentation !== undefined && { presentation: b.presentation }),
+				...(b.presentationError !== undefined && { presentationError: b.presentationError }),
+			}
 			out.push(
-				{ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...ts },
+				{ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...disp, ...ts },
 				{
 					type: 'tool-result',
 					id: b.id,
 					output: b.output,
 					...(b.isError && { isError: true }),
 					key: transcript.key(ns?.[i], 1, at + out.length + 1),
+					...disp,
 					...ts,
 				},
 			)

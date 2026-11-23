@@ -10,7 +10,8 @@
 		'Step 2 (2026-11-23): Mid-turn steering (both Enter/steer and Ctrl-Enter/SEND soft-steer) injects a second session/prompt directly into agy acp without session/cancel; agy finishes any in-flight tool and steers the running turn. Verified against agy 1.5.15.',
 		'Step 3 (2026-11-23): Stop sends session/cancel, clears in-flight tool tracking, and awaits cancel settlement (with 5 s bound) before the next session/prompt. Verified against agy 1.5.15: Stop pauses cleanly and an immediate next prompt succeeds in the same ACP session.',
 		'Step 4 (2026-11-23): Added Provider.noAutoRetry (true for agy) so Hal never auto-retries failed agy turns or auto-continues unfinished agy turns on host restart; failures show directly to the user.',
-		'Step 5 (2026-11-23): Pasted images and tool-result images are sent as ACP image content blocks ({ type: "image", data, mimeType }) instead of "[image omitted]"; pastes/files continue via Hal blob expansion. Verified against agy 1.5.15 identifying a red PNG attachment.'
+		'Step 5 (2026-11-23): Pasted images and tool-result images are sent as ACP image content blocks ({ type: "image", data, mimeType }) instead of "[image omitted]"; pastes/files continue via Hal blob expansion. Verified against agy 1.5.15 identifying a red PNG attachment.',
+		'Step 6 (2026-11-23): agy tool calls render as readable Hal tool cards in terminal and web via ToolPresentation on HostedToolBlock (src/host/agy-cards.ts): bash commands with stripped agy timestamps, numbered diffs via textDiff, read/search cards, and Hal MCP tools mapped back to native Hal cards with captured output.'
 	],
 	needs: []
 }

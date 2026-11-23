@@ -12,6 +12,7 @@ import { sessions } from './sessions.ts'
 import { tools, type Tool } from './tools.ts'
 
 export type McpBridge = { port: number; stop(): void }
+export type McpResult = { name: string; output: string; isError?: boolean }
 
 type RpcRequest = { jsonrpc?: string; id?: number | string; method?: string; params?: Record<string, any> }
 type SocketState = { buf: string }
@@ -67,6 +68,7 @@ async function handle(
 	sessionId: string,
 	msg: RpcRequest,
 	getSignal: () => AbortSignal,
+	onResult?: (res: McpResult) => void,
 ): Promise<Record<string, unknown> | undefined> {
 	if (msg.id === undefined) return undefined
 	let reply = (result: unknown) => ({ jsonrpc: '2.0', id: msg.id, result })
@@ -89,12 +91,17 @@ async function handle(
 					? (msg.params.arguments as Record<string, unknown>)
 					: {}
 			try {
-				return reply(await agyMcp.call(sessionId, name, args, getSignal()))
+				let res = await agyMcp.call(sessionId, name, args, getSignal())
+				let text = res.content
+					.filter((c): c is { type: 'text'; text: string } => c.type === 'text' && typeof c.text === 'string')
+					.map((c) => c.text)
+					.join('\n')
+				onResult?.({ name, output: text, ...(res.isError && { isError: true }) })
+				return reply(res)
 			} catch (e) {
-				return reply({
-					content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }],
-					isError: true,
-				})
+				let text = `Error: ${e instanceof Error ? e.message : String(e)}`
+				onResult?.({ name, output: text, isError: true })
+				return reply({ content: [{ type: 'text', text }], isError: true })
 			}
 		}
 		default:
@@ -102,7 +109,7 @@ async function handle(
 	}
 }
 
-function start(sessionId: string, getSignal: () => AbortSignal): McpBridge {
+function start(sessionId: string, getSignal: () => AbortSignal, onResult?: (res: McpResult) => void): McpBridge {
 	let sockets = new Set<Socket<SocketState>>()
 	let decoder = new TextDecoder()
 	let server = Bun.listen<SocketState>({
@@ -126,7 +133,7 @@ function start(sessionId: string, getSignal: () => AbortSignal): McpBridge {
 						continue
 					}
 					void agyMcp
-						.handle(sessionId, msg, getSignal)
+						.handle(sessionId, msg, getSignal, onResult)
 						.then((res) => {
 							if (res && sockets.has(socket)) socket.write(JSON.stringify(res) + '\n')
 						})

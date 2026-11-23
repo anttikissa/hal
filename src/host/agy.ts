@@ -16,7 +16,8 @@ import { paths } from './paths.ts'
 import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
-import { agyMcp, type McpBridge } from './agy-mcp.ts'
+import { agyCards } from './agy-cards.ts'
+import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -24,6 +25,7 @@ type Agent = {
 	next: number
 	calls: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>
 	tools: Map<string, Update>
+	mcpResults: Map<string, McpResult[]>
 	onUpdate?: (u: Update) => void
 	stderr: string
 	exited?: string
@@ -102,9 +104,18 @@ function capability(model: string): Capability {
 function spawn(sessionId: string, cwd: string): Agent {
 	let mcp: McpBridge | undefined
 	let agent: Agent
+	let mcpResults = new Map<string, McpResult[]>()
 	let args = ['agy', 'acp', '--disable-telemetry', '--dangerously-skip-permissions']
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
-		mcp = agyMcp.start(sessionId, () => agent?.turnSignal ?? new AbortController().signal)
+		mcp = agyMcp.start(
+			sessionId,
+			() => agent?.turnSignal ?? new AbortController().signal,
+			(res) => {
+				let queue = mcpResults.get(res.name)
+				if (queue) queue.push(res)
+				else mcpResults.set(res.name, [res])
+			},
+		)
 		args.push('--ide-mcp-port', String(mcp.port))
 	}
 	let proc = Bun.spawn(args, {
@@ -113,7 +124,7 @@ function spawn(sessionId: string, cwd: string): Agent {
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
-	agent = { proc, next: 0, calls: new Map(), tools: new Map(), stderr: '', mcp, prefix: 0 }
+	agent = { proc, next: 0, calls: new Map(), tools: new Map(), mcpResults, stderr: '', mcp, prefix: 0 }
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
 	void readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => {
 		agent.stderr = strings.sliceText(agent.stderr + line + '\n', -4000)
@@ -311,14 +322,10 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 			agent.tools.set(u.toolCallId, tool)
 			if (tool.status === 'completed' || tool.status === 'failed') {
 				agent.tools.delete(u.toolCallId)
-				emit({
-					type: 'hosted_tool',
-					id: tool.toolCallId,
-					name: tool.name ?? tool.kind ?? 'tool',
-					input: tool.rawInput ?? tool.args ?? {},
-					output: toolOutput(tool),
-					...(tool.status === 'failed' && { isError: true }),
-				})
+				let rawName = String(tool.name ?? '')
+				let mcpName = rawName.startsWith('mcp_ide-tools_') ? rawName.slice('mcp_ide-tools_'.length) : undefined
+				let mcpResult = mcpName ? agent.mcpResults.get(mcpName)?.shift() : undefined
+				emit(agyCards.hosted(tool, cwd, mcpResult))
 			}
 		}
 	}
@@ -371,16 +378,6 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
 		if (agent.turnSignal === signal) agent.turnSignal = undefined
 	}
-}
-
-function toolOutput(tool: Update): string {
-	let parts: string[] = []
-	for (let c of tool.content ?? []) {
-		if (c.type === 'diff') parts.push(`--- ${c.path}\n${c.oldText ?? ''}\n+++ ${c.path}\n${c.newText}`)
-		else if (c.type === 'content' && c.content?.type === 'text') parts.push(c.content.text)
-	}
-	if (!parts.length && tool.rawOutput && Object.keys(tool.rawOutput).length) parts.push(JSON.stringify(tool.rawOutput))
-	return parts.join('\n') || tool.title || ''
 }
 
 // The turn as SSE bytes, which provider.stream parses back with parse().
