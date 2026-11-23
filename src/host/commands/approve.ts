@@ -3,6 +3,7 @@
 // the held Bash call once in the background or declines it; either way
 // the session hears how, as from the call's own job.
 import type { SlashCommand } from '../commands.ts'
+import { agyApproval } from '../agy-approval.ts'
 import { history } from '../history.ts'
 import { jobs } from '../jobs.ts'
 import { tools } from '../tools.ts'
@@ -10,6 +11,7 @@ import { tools } from '../tools.ts'
 export const command: SlashCommand = {
 	run(args, answers, ctx) {
 		if (!answers) return { error: '/approve runs only from its approval question' }
+		if (args.startsWith('agy:')) return agyApproval.answer(args.slice(4), answers)
 		let id = ctx.sessionId
 		let found = history
 			.readSync(id)

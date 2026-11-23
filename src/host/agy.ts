@@ -6,20 +6,24 @@
 // session with a transcript whenever the history no longer extends what
 // agy saw (restart, /compact, /rebase, /edit, fork, another model's
 // turn). Task xbp.
-import { blocks, type ImageBlock, type Message, type StreamEvent } from '../common/blocks.ts'
-import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import type { StreamEvent } from '../common/blocks.ts'
+import type { ProviderRequest, SseMessage } from './provider.ts'
+import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
 import { paths } from './paths.ts'
 import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
+import { agyApproval } from './agy-approval.ts'
 import { agyCards } from './agy-cards.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
 import { agyModels } from './agy-models.ts'
+import { agyPrompt, type AcpContent } from './agy-prompt.ts'
 
 type Update = Record<string, any>
 type Agent = {
+	sessionId: string
 	proc: ReturnType<typeof Bun.spawn>
 	next: number
 	calls: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>
@@ -33,6 +37,7 @@ type Agent = {
 	turnSignal?: AbortSignal
 	canceling?: Promise<void>
 	idleTimer?: ReturnType<typeof setTimeout>
+	skipPermissions: boolean
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -117,11 +122,12 @@ function rpcError(err: any, stderr?: string): Error {
 	return new Error(formatError(`agy${code}: ${msg}`, data, stderr))
 }
 
-function spawn(sessionId: string, cwd: string): Agent {
+function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent {
 	let mcp: McpBridge | undefined
 	let agent: Agent
 	let mcpResults = new Map<string, McpResult[]>()
-	let args = [...agy.command(), 'acp', '--disable-telemetry', '--dangerously-skip-permissions']
+	let args = [...agy.command(), 'acp', '--disable-telemetry']
+	if (skipPermissions) args.push('--dangerously-skip-permissions')
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
 		mcp = agyMcp.start(
 			sessionId,
@@ -148,11 +154,24 @@ function spawn(sessionId: string, cwd: string): Agent {
 		throw new Error(`agy failed to start (${args.join(' ')} in ${cwd}): ${detail}`)
 	}
 	let stderrDone = Promise.resolve()
-	agent = { proc, next: 0, calls: new Map(), tools: new Map(), mcpResults, stderr: '', stderrDone, mcp, prefix: 0 }
+	agent = {
+		sessionId,
+		proc,
+		next: 0,
+		calls: new Map(),
+		tools: new Map(),
+		mcpResults,
+		stderr: '',
+		stderrDone,
+		mcp,
+		skipPermissions,
+		prefix: 0,
+	}
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
 	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => appendStderr(agent, line))
 	void proc.exited.then(async (code) => {
 		if (agent.idleTimer) clearTimeout(agent.idleTimer)
+		agyApproval.cancelSession(sessionId)
 		await agent.stderrDone.catch(() => {})
 		agent.mcp?.stop()
 		let why = code === null ? `signal ${proc.signalCode ?? 'unknown'}` : `code ${code}`
@@ -179,6 +198,7 @@ function stop(sessionId: string): void {
 	state.agents.delete(sessionId)
 	if (agent.idleTimer) clearTimeout(agent.idleTimer)
 	agent.idleTimer = undefined
+	agyApproval.cancelSession(sessionId)
 	agent.mcp?.stop()
 	try {
 		agent.proc.kill()
@@ -237,8 +257,16 @@ function receive(agent: Agent, line: string): void {
 		return
 	}
 	if (msg.method === 'session/update') return agent.onUpdate?.(msg.params.update)
+	if (msg.method === 'session/request_permission' && msg.id !== undefined) {
+		void agyApproval
+			.request(agent.sessionId, msg.params, agent.turnSignal)
+			.then((result) => {
+				if (!agent.exited) write(agent, { id: msg.id, result })
+			})
+			.catch((e) => diag.log(`agy permission ${agent.sessionId}: ${e instanceof Error ? e.message : e}`))
+		return
+	}
 	if (msg.method && msg.id !== undefined) {
-		// Permissions are skipped at launch; Hal offers agy no files or terminal.
 		write(agent, { id: msg.id, error: { code: -32601, message: `Hal does not support ${msg.method}` } })
 		return
 	}
@@ -250,9 +278,11 @@ function receive(agent: Agent, line: string): void {
 }
 
 async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
+	let skipPermissions = settings.agyPermissions() !== 'ask'
 	let agent = state.agents.get(sessionId)
-	if (agent && !agent.exited) return agent
-	agent = spawn(sessionId, cwd)
+	if (agent && !agent.exited && (agent.skipPermissions === skipPermissions || agent.turnSignal)) return agent
+	if (agent) agy.stop(sessionId)
+	agent = spawn(sessionId, cwd, skipPermissions)
 	state.agents.set(sessionId, agent)
 	try {
 		await call(agent, 'initialize', {
@@ -269,69 +299,6 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 	}
 	await resume(sessionId, agent, cwd)
 	return agent
-}
-
-function hash(messages: Message[]) {
-	return String(Bun.hash(JSON.stringify(messages.map((m) => ({ role: m.role, blocks: m.blocks })))))
-}
-
-// Hal's notes about hosted tools repeat what agy did; agy knows.
-const hostedNote = /^<hal-note>Your \S+ (?:ran|failed) on the provider:/
-
-type AcpContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
-
-function imagePart(img: ImageBlock, req: ProviderRequest): AcpContent {
-	let data = req.image?.(img.blob)
-	return data
-		? { type: 'image', data: data.data, mimeType: data.mediaType }
-		: { type: 'text', text: provider.imageNote('the image file is no longer available') }
-}
-
-function toContent(messages: Message[], req: ProviderRequest, note: boolean): AcpContent[] {
-	let out: AcpContent[] = []
-	let pushText = (text: string) => {
-		let last = out.at(-1)
-		if (last?.type === 'text') last.text += `\n\n${text}`
-		else out.push({ type: 'text', text })
-	}
-	for (let m of messages) {
-		let parts: AcpContent[] = []
-		let addText = (text: string) => {
-			let last = parts.at(-1)
-			if (last?.type === 'text') last.text += `\n${text}`
-			else parts.push({ type: 'text', text })
-		}
-		for (let b of m.blocks) {
-			if (b.type === 'text') {
-				if (!note && hostedNote.test(b.text)) continue
-				addText(b.text)
-			} else if (b.type === 'tool_call') addText(`[tool call] ${String(b.input.cmd ?? JSON.stringify(b.input))}`)
-			else if (b.type === 'tool_result') {
-				addText(`[tool result${b.isError ? ', error' : ''}] ${strings.sliceText(b.output, 0, 4000)}`)
-				for (let img of blocks.resultImages(b)) parts.push(imagePart(img, req))
-			} else if (b.type === 'image') parts.push(imagePart(b, req))
-		}
-		if (!parts.length) continue
-		if (note) {
-			let head = `## ${m.role === 'user' ? 'User' : 'Assistant'}`
-			if (parts[0]?.type === 'text') parts[0] = { type: 'text', text: `${head}\n${parts[0].text}` }
-			else parts.unshift({ type: 'text', text: head })
-		}
-		for (let p of parts)
-			if (p.type === 'text') pushText(p.text)
-			else out.push(p)
-	}
-	return out
-}
-
-// What agy has not seen yet: messages after its prefix, if they are only
-// agy's own reply and new user input. Undefined: agy must start over.
-function unseen(agent: Agent, messages: Message[], cwd: string): Message[] | undefined {
-	if (!agent.acpSession || agent.cwd !== cwd || messages.length < agent.prefix) return undefined
-	if (hash(messages.slice(0, agent.prefix)) !== agent.hash) return undefined
-	let rest = messages.slice(agent.prefix)
-	let i = rest[0]?.role === 'assistant' ? 1 : 0
-	return rest.slice(i).every((m) => m.role === 'user') ? rest.slice(i) : undefined
 }
 
 async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, signal: AbortSignal): Promise<void> {
@@ -353,10 +320,10 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		])
 	}
 	if (signal.aborted) return
-	let fresh = unseen(agent, req.messages, cwd)
+	let fresh = agyPrompt.unseen(agent, req.messages, cwd)
 	let content: AcpContent[]
 	if (fresh) {
-		content = toContent(fresh, req, false)
+		content = agyPrompt.toContent(fresh, req, false)
 		if (!content.length) content = [{ type: 'text', text: 'Continue where you left off.' }]
 	} else {
 		let created = await call(agent, 'session/new', { cwd, mcpServers: [] })
@@ -366,20 +333,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.tools.clear()
 		agyModels.record(created.models?.availableModels ?? [])
 		recordConfigOptions(agent, created.configOptions)
-		let last = req.messages.findLastIndex((m) => m.role === 'assistant')
-		let before = toContent(req.messages.slice(0, last + 1), req, true)
-		let now = toContent(req.messages.slice(last + 1), req, false)
-		content = before.length
-			? [
-					{
-						type: 'text',
-						text: "<hal-transcript>\nThe conversation so far in this Hal session, which you continue. Earlier tool calls were Hal's, not yours.",
-					},
-					...before,
-					{ type: 'text', text: '</hal-transcript>' },
-					...now,
-				]
-			: now
+		content = agyPrompt.seed(req)
 	}
 	let { modelId: wanted, level } = agyModels.resolve(req.model, req.effort)
 	if (agent.model !== wanted) {
@@ -450,7 +404,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
 		// agy has the input now, whatever happens to this turn.
 		agent.prefix = req.messages.length
-		agent.hash = hash(req.messages)
+		agent.hash = agyPrompt.hash(req.messages)
 		save(sessionId, agent)
 		let result = await Promise.race([reply, settled.promise])
 		if (signal.aborted) {

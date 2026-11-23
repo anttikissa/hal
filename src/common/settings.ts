@@ -53,6 +53,14 @@ const table: Setting[] = [
 		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (yolo).',
 	},
 	{
+		name: 'agyPermissions',
+		label: 'Antigravity permissions',
+		type: { kind: 'choice', options: ['skip', 'ask'] },
+		default: 'skip',
+		description:
+			'How agy acp handles tool permissions: skip passes --dangerously-skip-permissions; ask shows permission requests in Hal’s approval UI.',
+	},
+	{
 		name: 'scratch',
 		label: 'Scratch paths',
 		type: { kind: 'text' },
@@ -272,6 +280,7 @@ export const settings = {
 	subagentSlots: (): number => settings.value('subagentSlots') as number,
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'yolo' => settings.value('security') as 'best-effort' | 'yolo',
+	agyPermissions: (): 'skip' | 'ask' => settings.value('agyPermissions') as 'skip' | 'ask',
 	scratch: (): string => settings.value('scratch') as string,
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).

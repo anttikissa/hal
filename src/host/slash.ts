@@ -292,6 +292,7 @@ async function listing(id: string): Promise<Event & { type: 'models' }> {
 function dismiss(id: string, question: string): void {
 	history.append(id, { type: 'answer', question, answers: {}, canceled: true })
 	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, canceled: true })
+	for (let fn of slash.state.dismissed) fn(id, question)
 }
 
 // Queued message `item`, the `n`th, dropped: withdrawn, and a card that
@@ -334,6 +335,7 @@ function placed(id: string): { streaming?: true } {
 }
 
 export const slash = {
+	state: { dismissed: new Set<(sessionId: string, questionId: string) => void>() },
 	command,
 	listing,
 	context,
