@@ -12,7 +12,8 @@
 		'Step 4 (2026-11-23): Added Provider.noAutoRetry (true for agy) so Hal never auto-retries failed agy turns or auto-continues unfinished agy turns on host restart; failures show directly to the user.',
 		'Step 5 (2026-11-23): Pasted images and tool-result images are sent as ACP image content blocks ({ type: "image", data, mimeType }) instead of "[image omitted]"; pastes/files continue via Hal blob expansion. Verified against agy 1.5.15 identifying a red PNG attachment.',
 		'Step 6 (2026-11-23): agy tool calls render as readable Hal tool cards in terminal and web via ToolPresentation on HostedToolBlock (src/host/agy-cards.ts): bash commands with stripped agy timestamps, numbered diffs via textDiff, read/search cards, and Hal MCP tools mapped back to native Hal cards with captured output.',
-		'Step 7 (2026-11-23): Full error and stderr pass-through: flush trailing stderr lines and drain stderr before reporting process exit, report spawn failures with command/cwd without leaking MCP sockets, format JSON-RPC error code/message/data with stderr, and append an `agy acp --login` hint on expired/missing auth errors.'
+		'Step 7 (2026-11-23): Full error and stderr pass-through: flush trailing stderr lines and drain stderr before reporting process exit, report spawn failures with command/cwd without leaking MCP sockets, format JSON-RPC error code/message/data with stderr, and append an `agy acp --login` hint on expired/missing auth errors.',
+		'Step 8 (2026-11-23): Model catalog and effort mapping moved to src/host/agy-models.ts; host startup refreshes agy models (via `agy models`) with display names and per-model effort levels (low/medium/high/xhigh/max -> Low/Medium/High/Extra/Max), also synced from session/new and thought_level configOptions.'
 	],
 	needs: []
 }

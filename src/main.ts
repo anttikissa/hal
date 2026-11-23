@@ -236,6 +236,14 @@ async function settle(): Promise<void> {
 // ChatGPT login's models, so the first picker shows them (task q7).
 async function refreshModels(): Promise<void> {
 	void models.fetchList('openai').catch((e) => diag.log(`models of openai: ${e}`))
+	void models
+		.fetchList('agy')
+		.then((ids) => {
+			if (!ids?.length) return
+			let names = models.nameEvent(ids)
+			if (names) for (let client of host.state.clients) client.deliver(names)
+		})
+		.catch((e) => diag.log(`models of agy: ${e}`))
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
 	let gone = await modelsDev.refresh([...new Set(picked)])
 	let names = models.nameEvent([...new Set(picked)])

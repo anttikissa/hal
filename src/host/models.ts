@@ -145,7 +145,9 @@ function nameEvent(
 function names(ids: string[]): Record<string, string> {
 	let out: Record<string, string> = {}
 	for (let id of ids) {
-		let name = id.startsWith('hal/') ? synthetic.descriptions[id.slice(4)] : modelsDev.displayName(id)
+		let parsed = blocks.parseModelId(id)
+		let own = parsed && provider.state.providers[parsed.provider]?.displayName?.(parsed.model)
+		let name = id.startsWith('hal/') ? synthetic.descriptions[id.slice(4)] : (own ?? modelsDev.displayName(id))
 		if (name) out[id] = name
 	}
 	return out

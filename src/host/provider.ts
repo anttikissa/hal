@@ -86,6 +86,8 @@ export type Provider = {
 	// The reasoning effort a request for `model` sets, if it sets one:
 	// block headers show it (task hp).
 	effort?(model: string): string | undefined
+	// Display name for `model` when the provider supplies its own catalog.
+	displayName?(model: string): string | undefined
 	capability?(model: string): Capability | undefined
 }
 

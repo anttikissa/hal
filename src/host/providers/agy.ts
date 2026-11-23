@@ -3,6 +3,7 @@
 import type { Provider } from '../provider.ts'
 
 const load = () => (require('../agy.ts') as typeof import('../agy.ts')).agy
+const loadModels = () => (require('../agy-models.ts') as typeof import('../agy-models.ts')).agyModels
 
 export const provider: Provider = {
 	available: () => !!Bun.which('agy'),
@@ -11,8 +12,9 @@ export const provider: Provider = {
 	request: () => ({ url: 'acp:agy', headers: {}, body: null }),
 	open: (_http, req, signal) => load().open(req, signal),
 	parse: (messages) => load().parse(messages),
-	models: async () => load().models(),
-	known: () => load().known(),
+	models: (signal) => load().models(signal),
+	known: () => loadModels().known(),
+	displayName: (model) => loadModels().displayName(model),
 	contextWindow: () => 1_048_576,
-	capability: (model) => load().capability(model),
+	capability: (model) => loadModels().capability(model),
 }

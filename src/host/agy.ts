@@ -8,8 +8,6 @@
 // turn). Task xbp.
 import { blocks, type ImageBlock, type Message, type StreamEvent } from '../common/blocks.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
-import type { Capability } from './model-effort.ts'
-import type { EffortLevel } from '../common/effort-levels.ts'
 import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
 import { paths } from './paths.ts'
@@ -18,6 +16,7 @@ import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
 import { agyCards } from './agy-cards.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
+import { agyModels } from './agy-models.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -39,6 +38,8 @@ type Agent = {
 	prefix: number
 	hash?: string
 	model?: string
+	effort?: string
+	thoughtLevels?: string[]
 }
 
 // What survives a host restart: the agy session and the history prefix
@@ -74,32 +75,18 @@ async function resume(sessionId: string, agent: Agent, cwd: string): Promise<voi
 
 const state = {
 	agents: new Map<string, Agent>(),
-	// Model ids agy offered last (with effort suffixes), for the picker.
-	offered: [] as string[],
 }
 
-const known = () => [
-	'gemini-4-neon',
-	'gemini-4-argon',
-	'gemini-4-hydrogen',
-	'gemini-3.8-flash',
-	'claude-opus-5-5',
-	'claude-sonnet-5-5',
-	'gpt-oss-120b',
-]
-
-function models(): string[] {
-	let bases = state.offered.map((id) => id.replace(/-(low|medium|high|xhigh)$/, ''))
-	return bases.length ? [...new Set(bases)] : known()
-}
-
-function capability(model: string): Capability {
-	let levels: EffortLevel[] = /neon|hydrogen/.test(model)
-		? ['low', 'medium', 'high', 'xhigh']
-		: model.startsWith('gpt-oss')
-			? ['medium']
-			: ['low', 'medium', 'high']
-	return { levels, default: levels.includes('high') ? 'high' : levels[0]!, wire: () => ({}) }
+function recordConfigOptions(agent: Agent, options: any[] | undefined): void {
+	if (!Array.isArray(options)) return
+	let thought = options.find((o) => o?.id === 'thought_level')
+	if (thought) {
+		if (typeof thought.currentValue === 'string') agent.effort = thought.currentValue
+		if (Array.isArray(thought.options))
+			agent.thoughtLevels = thought.options
+				.map((o: any) => o?.value)
+				.filter((v: unknown): v is string => typeof v === 'string')
+	}
 }
 
 const stderrLimit = 64_000
@@ -346,7 +333,8 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.cwd = cwd
 		agent.model = created.models?.currentModelId
 		agent.tools.clear()
-		state.offered = (created.models?.availableModels ?? []).map((m: { modelId: string }) => m.modelId)
+		agyModels.record(created.models?.availableModels ?? [])
+		recordConfigOptions(agent, created.configOptions)
 		let last = req.messages.findLastIndex((m) => m.role === 'assistant')
 		let before = toContent(req.messages.slice(0, last + 1), req, true)
 		let now = toContent(req.messages.slice(last + 1), req, false)
@@ -362,17 +350,25 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 				]
 			: now
 	}
-	let wanted =
-		[`${req.model}-${req.effort}`, `${req.model}-high`, `${req.model}-medium`].find((id) =>
-			state.offered.includes(id),
-		) ?? req.model
+	let { modelId: wanted, level } = agyModels.resolve(req.model, req.effort)
 	if (agent.model !== wanted) {
 		await call(agent, 'session/set_model', { sessionId: agent.acpSession, modelId: wanted })
 		agent.model = wanted
+		if (level && wanted.endsWith(`-${level}`)) agent.effort = level
+	}
+	if (level && !wanted.endsWith(`-${level}`) && agent.thoughtLevels?.includes(level) && agent.effort !== level) {
+		let updated = await call(agent, 'session/set_config_option', {
+			sessionId: agent.acpSession,
+			configId: 'thought_level',
+			value: level,
+		})
+		recordConfigOptions(agent, updated?.configOptions)
+		agent.effort = level
 	}
 	if (signal.aborted) return
 	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
+		if (kind === 'config_option_update') return recordConfigOptions(agent, u.configOptions)
 		if (kind === 'agent_message_chunk' && u.content?.type === 'text') emit({ type: 'text', text: u.content.text })
 		else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
 			emit({ type: 'thinking', text: u.content.text })
@@ -487,4 +483,10 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncIterable<Stream
 	for await (let m of messages) yield JSON.parse(m.data) as StreamEvent
 }
 
-export const agy = { state, command: (): string[] => ['agy'], known, models, capability, open, parse }
+export const agy = {
+	state,
+	command: (): string[] => ['agy'],
+	models: (signal?: AbortSignal) => agyModels.fetch(agy.command(), signal),
+	open,
+	parse,
+}
