@@ -6,6 +6,8 @@ import { realpathSync } from 'fs'
 import { resolve } from 'path'
 import { blocks, type ImageBlock, type Message } from '../common/blocks.ts'
 import { strings } from '../common/strings.ts'
+import { liveFiles } from './live-file.ts'
+import { paths } from './paths.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 
 export type AcpContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
@@ -17,8 +19,29 @@ export type PrefixState = {
 	hash?: string
 }
 
+type Saved = { acpSession?: string; cwd?: string; prefix?: number; hash?: string }
+
+function loadSaved(sessionId: string): Saved {
+	let data = liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
+	let copy = { acpSession: data.acpSession, cwd: data.cwd, prefix: data.prefix, hash: data.hash }
+	liveFiles.close(data)
+	return copy
+}
+
+function saveState(sessionId: string, state: PrefixState): void {
+	let data = liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
+	Object.assign(data, { acpSession: state.acpSession, cwd: state.cwd, prefix: state.prefix, hash: state.hash })
+	liveFiles.save(data)
+	liveFiles.close(data)
+}
+
 // Hal's notes about hosted tools repeat what agy did; agy knows.
-const hostedNote = /^<hal-note>Your \S+ (?:ran|failed) on the provider:/
+const hasHostedNote = /^<hal-note>Your \S+ (?:ran|failed) on the provider:/m
+const hostedNote = /<hal-note>Your \S+ (?:ran|failed) on the provider:[\s\S]*?<\/hal-note>\n?/g
+
+function stripHostedNotes(text: string): string {
+	return hasHostedNote.test(text) ? text.replace(hostedNote, '').trim() : text
+}
 
 function hash(messages: Message[]): string {
 	return String(Bun.hash(JSON.stringify(messages.map((m) => ({ role: m.role, blocks: m.blocks })))))
@@ -47,8 +70,9 @@ function toContent(messages: Message[], req: ProviderRequest, note: boolean): Ac
 		}
 		for (let b of m.blocks) {
 			if (b.type === 'text') {
-				if (!note && hostedNote.test(b.text)) continue
-				addText(b.text)
+				let text = note ? b.text : stripHostedNotes(b.text)
+				if (!text) continue
+				addText(text)
 			} else if (b.type === 'tool_call') addText(`[tool call] ${String(b.input.cmd ?? JSON.stringify(b.input))}`)
 			else if (b.type === 'tool_result') {
 				addText(`[tool result${b.isError ? ', error' : ''}] ${strings.sliceText(b.output, 0, 4000)}`)
@@ -113,4 +137,4 @@ function seed(req: ProviderRequest): AcpContent[] {
 	]
 }
 
-export const agyPrompt = { hash, toContent, unseen, system, seed }
+export const agyPrompt = { hash, toContent, unseen, system, seed, loadSaved, saveState }

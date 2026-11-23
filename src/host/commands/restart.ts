@@ -19,9 +19,9 @@ import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { host } from '../host.ts'
 import { jobs } from '../jobs.ts'
-import { restartNote } from '../restart-note.ts'
+import { restartNote, type RestartInitiator } from '../restart-note.ts'
 import { paths } from '../paths.ts'
-import { rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tabs } from '../tabs.ts'
 import { clients } from '../clients.ts'
 import { serverLog } from '../server-log.ts'
@@ -99,6 +99,20 @@ function flagged(): FlaggedCall[] {
 		)
 }
 
+function initiator(sessionId: string): RestartInitiator | undefined {
+	if (!existsSync(history.file(sessionId))) return undefined
+	let records = history.readSync(sessionId)
+	let lastEnd = records.findLastIndex((r) => r.type === 'turn_end')
+	let afterEnd = lastEnd >= 0 ? (records[lastEnd]!.n ?? 0) : 0
+	let cmd = records
+		.slice(lastEnd + 1)
+		.findLast(
+			(r) => r.type === 'command' && r.origin === 'model' && r.n !== undefined && /^\/restart(?:\s|$)/.test(r.text),
+		)
+	if (!cmd?.n) return undefined
+	return { sessionId, origin: 'model', afterEnd, commandN: cmd.n }
+}
+
 export const command: SlashCommand = {
 	help: () =>
 		[
@@ -151,7 +165,7 @@ export const command: SlashCommand = {
 						? 'only a client can restart itself; use /restart host'
 						: `unknown scope ${scope}; use ${scopes.join(', ')}`,
 			}
-		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`)
+		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`, model ? initiator(ctx.sessionId) : undefined)
 		let asker = clients.state.senders.get(ctx.sessionId)
 		serverLog.log(
 			`restart ${scope} requested in ${ctx.sessionId} by ${model ? 'the model' : asker ? serverLog.client(asker) : 'a client'}`,

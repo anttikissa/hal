@@ -12,8 +12,6 @@ import type { ProviderRequest, SseMessage } from './provider.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
-import { paths } from './paths.ts'
-import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
 import { projectContext } from './project-context.ts'
@@ -45,39 +43,38 @@ type Agent = {
 	cwd?: string
 	prefix: number
 	hash?: string
+	resumeError?: string
 	model?: string
 	effort?: string
 	thoughtLevels?: string[]
 }
 
-// What survives a host restart: the agy session and the history prefix
-// it has seen, in the Hal session's directory (a fork does not copy it).
-type Saved = { acpSession?: string; cwd?: string; prefix?: number; hash?: string }
-
-function saved(sessionId: string): Saved {
-	return liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
-}
-
-function save(sessionId: string, agent: Agent): void {
-	let data = saved(sessionId)
-	Object.assign(data, { acpSession: agent.acpSession, cwd: agent.cwd, prefix: agent.prefix, hash: agent.hash })
-	liveFiles.save(data)
-	liveFiles.close(data)
-}
-
-// Picks up the agy session saved before a restart; on failure the next
-// prompt seeds a new one with a transcript.
+// Picks up the agy session saved in agy.ason before a restart; on failure
+// explicit prompts seed a new one, while resumeOnly recovery stops.
 async function resume(sessionId: string, agent: Agent, cwd: string, system: string): Promise<void> {
-	let data = saved(sessionId)
-	let { acpSession, prefix, hash } = data
-	let same = data.cwd === cwd
-	liveFiles.close(data)
-	if (!acpSession || !same) return
+	agent.resumeError = undefined
+	let data = agyPrompt.loadSaved(sessionId)
+	if (!data.acpSession) {
+		agent.resumeError = 'no saved agy session'
+		return
+	}
+	if (data.cwd !== cwd) {
+		agent.resumeError = `working directory changed (${data.cwd ?? 'unknown'} to ${cwd})`
+		return
+	}
 	try {
-		await call(agent, 'session/resume', { sessionId: acpSession, cwd, mcpServers: [], ...meta(system) })
-		Object.assign(agent, { acpSession, cwd, prefix: prefix ?? 0, hash })
+		await call(agent, 'session/resume', { sessionId: data.acpSession, cwd, mcpServers: [], ...meta(system) })
+		Object.assign(agent, {
+			acpSession: data.acpSession,
+			cwd,
+			prefix: data.prefix ?? 0,
+			hash: data.hash,
+			resumeError: undefined,
+		})
 	} catch (e) {
-		diag.log(`agy: resuming ${acpSession} failed, seeding a new session: ${e instanceof Error ? e.message : e}`)
+		let detail = e instanceof Error ? e.message : String(e)
+		agent.resumeError = `session/resume failed: ${detail}`
+		diag.log(`agy: resuming ${data.acpSession} failed, seeding a new session: ${detail}`)
 	}
 }
 
@@ -370,6 +367,11 @@ async function turn(
 	if (fresh) {
 		content = agyPrompt.toContent(fresh, req, false)
 		if (!content.length) content = [{ type: 'text', text: 'Continue where you left off.' }]
+	} else if (req.resumeOnly) {
+		let why = agent.resumeError ?? 'session history diverged from saved agy prefix'
+		throw new Error(
+			`Host restarted after /restart, but agy could not resume its previous session (${why}); not starting a fresh session automatically because it may repeat completed work.`,
+		)
 	} else {
 		let created = await call(agent, 'session/new', { cwd, mcpServers: [], ...meta(system) })
 		agent.acpSession = created.sessionId
@@ -454,7 +456,7 @@ async function turn(
 		// agy has the input now, whatever happens to this turn.
 		agent.prefix = req.messages.length
 		agent.hash = agyPrompt.hash(req.messages)
-		save(sessionId, agent)
+		agyPrompt.saveState(sessionId, agent)
 		let result = await Promise.race([reply, settled.promise])
 		if (signal.aborted) {
 			void reply.catch(() => {})

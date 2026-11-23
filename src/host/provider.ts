@@ -30,6 +30,9 @@ export type ProviderRequest = {
 	// The session the request is for, for providers that want it.
 	sessionId?: string
 	cacheId?: string
+	// Automatic restart recovery: require resuming the saved provider
+	// context rather than silently seeding a fresh session.
+	resumeOnly?: boolean
 }
 
 // `account` names the credentials used, for providers with several
