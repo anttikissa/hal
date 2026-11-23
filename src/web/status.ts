@@ -18,12 +18,13 @@ const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 const general = (plan: { windows: Record<string, number> }) =>
 	Object.keys(plan.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))
 
+const kilo = (n: number) => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
+
 function context(st: ViewState): StatusPart | undefined {
 	let stats = st.transcript?.stats
-	if (stats?.contextUnknown && !stats.context) return { text: 'unknown' }
-	if (!stats?.window) return
-	let percent = Math.round(((stats.context ?? 0) / stats.window) * 100)
-	return { text: `${percent}%`, heat: clamp(percent) }
+	if (!stats?.context) return
+	if (!stats.window) return { text: kilo(stats.context) }
+	return { text: kilo(stats.context), heat: clamp((stats.context / stats.window) * 100) }
 }
 
 // The usage windows the gauges show, shortest first; windows a full one
@@ -49,7 +50,6 @@ function groups(st: ViewState): StatusGroup[] {
 	let t = st.transcript
 	if (!t) return []
 	let { meta, stats } = t
-	let kilo = (n: number) => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
 	let out: StatusGroup[] = [
 		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
 		{ parts: [{ text: meta.cwd }], path: true },
@@ -57,13 +57,17 @@ function groups(st: ViewState): StatusGroup[] {
 	]
 	if (stats?.files)
 		out.push({ parts: [{ text: `${stats.files} file${stats.files === 1 ? '' : 's'}` }], href: `/${meta.id}/changes` })
-	let pct = status.context(st)
-	if (stats?.window)
+	if (stats?.window) {
+		let percent = Math.round(((stats.context ?? 0) / stats.window) * 100)
 		out.push({
-			parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, pct!, { text: ')' }],
+			parts: [
+				{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` },
+				{ text: `${percent}%`, heat: clamp(percent) },
+				{ text: ')' },
+			],
 			href: `/context/${meta.id}`,
 		})
-	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
+	} else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
 	else if (stats?.contextUnknown) out.push({ parts: [{ text: 'context unknown' }], href: `/context/${meta.id}` })
 	if (stats?.plan) {
 		let plan = stats.plan
