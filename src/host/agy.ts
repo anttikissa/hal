@@ -15,6 +15,7 @@ import { sessions } from './sessions.ts'
 import { paths } from './paths.ts'
 import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
+import { jobs } from './jobs.ts'
 import { agyMcp, type McpBridge } from './agy-mcp.ts'
 
 type Update = Record<string, any>
@@ -22,6 +23,7 @@ type Agent = {
 	proc: ReturnType<typeof Bun.spawn>
 	next: number
 	calls: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>
+	tools: Map<string, Update>
 	onUpdate?: (u: Update) => void
 	stderr: string
 	exited?: string
@@ -110,7 +112,7 @@ function spawn(sessionId: string, cwd: string): Agent {
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
-	agent = { proc, next: 0, calls: new Map(), stderr: '', mcp, prefix: 0 }
+	agent = { proc, next: 0, calls: new Map(), tools: new Map(), stderr: '', mcp, prefix: 0 }
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
 	void readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => {
 		agent.stderr = strings.sliceText(agent.stderr + line + '\n', -4000)
@@ -225,6 +227,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let cwd = sessions.open(sessionId).cwd
 	let agent = await agentFor(sessionId, cwd)
+	if (signal.aborted) return
 	let fresh = unseen(agent, req.messages, cwd)
 	let text: string
 	if (fresh) {
@@ -234,6 +237,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.acpSession = created.sessionId
 		agent.cwd = cwd
 		agent.model = created.models?.currentModelId
+		agent.tools.clear()
 		state.offered = (created.models?.availableModels ?? []).map((m: { modelId: string }) => m.modelId)
 		let last = req.messages.findLastIndex((m) => m.role === 'assistant')
 		let before = req.messages.slice(0, last + 1)
@@ -250,17 +254,17 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		await call(agent, 'session/set_model', { sessionId: agent.acpSession, modelId: wanted })
 		agent.model = wanted
 	}
-	let tools = new Map<string, Update>()
-	agent.onUpdate = (u) => {
+	if (signal.aborted) return
+	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
 		if (kind === 'agent_message_chunk' && u.content?.type === 'text') emit({ type: 'text', text: u.content.text })
 		else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
 			emit({ type: 'thinking', text: u.content.text })
 		else if (kind === 'tool_call' || kind === 'tool_call_update') {
-			let tool = { ...tools.get(u.toolCallId), ...u }
-			tools.set(u.toolCallId, tool)
+			let tool = { ...agent.tools.get(u.toolCallId), ...u }
+			agent.tools.set(u.toolCallId, tool)
 			if (tool.status === 'completed' || tool.status === 'failed') {
-				tools.delete(u.toolCallId)
+				agent.tools.delete(u.toolCallId)
 				emit({
 					type: 'hosted_tool',
 					id: tool.toolCallId,
@@ -272,8 +276,17 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 			}
 		}
 	}
+	agent.onUpdate = onUpdate
 	agent.turnSignal = signal
-	let onAbort = () => write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
+	let steered = Promise.withResolvers<undefined>()
+	let onAbort = () => {
+		if (signal.reason === jobs.steered) {
+			if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
+			steered.resolve(undefined)
+			return
+		}
+		write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
+	}
 	signal.addEventListener('abort', onAbort)
 	try {
 		let reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: [{ type: 'text', text }] })
@@ -281,7 +294,11 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.prefix = req.messages.length
 		agent.hash = hash(req.messages)
 		save(sessionId, agent)
-		let result = await reply
+		let result = await Promise.race([reply, steered.promise])
+		if (signal.aborted) {
+			void reply.catch(() => {})
+			return
+		}
 		let u = result?.usage
 		if (u)
 			emit({
@@ -292,8 +309,8 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		emit({ type: 'done', reason: reason === 'max_tokens' ? 'max_tokens' : reason === 'refusal' ? 'refusal' : 'end' })
 	} finally {
 		signal.removeEventListener('abort', onAbort)
-		agent.onUpdate = undefined
-		agent.turnSignal = undefined
+		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
+		if (agent.turnSignal === signal) agent.turnSignal = undefined
 	}
 }
 
@@ -309,19 +326,34 @@ function toolOutput(tool: Update): string {
 
 // The turn as SSE bytes, which provider.stream parses back with parse().
 // A comment every 20 s keeps the stream timeout off while agy works.
-function open(req: ProviderRequest): Promise<ReadableStream<Uint8Array>> {
+function open(req: ProviderRequest, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
 	let encoder = new TextEncoder()
 	let abort = new AbortController()
+	let forward = () => {
+		if (!abort.signal.aborted) abort.abort(signal?.reason)
+	}
+	signal?.addEventListener('abort', forward)
+	if (signal?.aborted) forward()
 	let timer: ReturnType<typeof setInterval>
 	return Promise.resolve(
 		new ReadableStream<Uint8Array>({
 			start(controller) {
-				let send = (e: StreamEvent) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`))
-				timer = setInterval(() => controller.enqueue(encoder.encode(': working\n\n')), 20_000)
+				let send = (e: StreamEvent) => {
+					if (abort.signal.aborted) return
+					try {
+						controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`))
+					} catch {}
+				}
+				timer = setInterval(() => {
+					try {
+						controller.enqueue(encoder.encode(': working\n\n'))
+					} catch {}
+				}, 20_000)
 				prompt(req, send, abort.signal)
 					.catch((e) => send({ type: 'error', message: e instanceof Error ? e.message : String(e) }))
 					.finally(() => {
 						clearInterval(timer)
+						signal?.removeEventListener('abort', forward)
 						try {
 							controller.close()
 						} catch {}
@@ -329,7 +361,8 @@ function open(req: ProviderRequest): Promise<ReadableStream<Uint8Array>> {
 			},
 			cancel() {
 				clearInterval(timer)
-				abort.abort()
+				signal?.removeEventListener('abort', forward)
+				if (!abort.signal.aborted) abort.abort(signal?.aborted ? signal.reason : undefined)
 			},
 		}),
 	)

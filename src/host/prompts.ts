@@ -32,6 +32,7 @@ import { naming } from './naming.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
+import { provider } from './provider.ts'
 import { slash } from './slash.ts'
 import { rebasePlans } from './rebase-plans.ts'
 import { status } from './status.ts'
@@ -106,11 +107,12 @@ function submit(
 		// running call flagged unsafeToStop defers it until the call ends
 		// (task ker); after Escape nothing runs on to protect.
 		let running = turns.state.running.get(id)
-		if (interrupt && running) {
+		let inTurn = !queue && !!running && !!provider.state.providers[running.provider]?.inTurnSteer
+		if ((interrupt || inTurn) && running) {
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
 			// Stopped by Escape: nothing runs on, so an interjection goes at once too.
-			if (delivery !== 'soft-steer' || running.controller.signal.aborted) prompts.force(running)
+			if (inTurn || delivery !== 'soft-steer' || running.controller.signal.aborted) prompts.force(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		// A turn parked on approval goes on with it; the approval stays open

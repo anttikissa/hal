@@ -63,7 +63,10 @@ export type Provider = {
 	spent?(account: string): void
 	// The request's stream over another transport (a WebSocket), as SSE
 	// bytes; undefined sends it over HTTP.
-	open?(http: HttpRequest, req: ProviderRequest): Promise<ReadableStream<Uint8Array> | undefined>
+	open?(http: HttpRequest, req: ProviderRequest, signal?: AbortSignal): Promise<ReadableStream<Uint8Array> | undefined>
+	// Provider runs tools inside one long turn; soft-steer messages interrupt
+	// the stream so the provider can inject them into the running turn.
+	inTurnSteer?: boolean
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	available?(): boolean
@@ -352,7 +355,7 @@ async function* stream(
 			yield { type: 'error', message: `${modelId} is rate limited`, failure: 'limited', retryAt: limited }
 			return
 		}
-		let socket = await p.open?.(http, { ...input, model: id.model })
+		let socket = await p.open?.(http, { ...input, model: id.model }, signal)
 		let res: Response
 		try {
 			res = socket
