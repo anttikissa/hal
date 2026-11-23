@@ -176,6 +176,17 @@ function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown 
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }
 
+// A tap on a modal row selects it, then opens or closes a category or
+// presses Enter on anything else. A row other than the one being edited
+// takes no tap.
+function modalTap(st: ViewState, index: number): { state: ViewState; key: Key } | undefined {
+	let modal = st.modal
+	if (!modal || (modal.edit && modal.edit.index !== index)) return undefined
+	let row = modal.tree?.rows[index]
+	let key = row?.path ? (row.open ? 'left' : 'right') : 'enter'
+	return { state: { ...st, modal: { ...modal, selected: index } }, key: { key } }
+}
+
 // The search box, or with `edit` the /config edit field, now says `text`
 // (typed natively in its input).
 function search(st: ViewState, text: string, edit = false): ViewState {
@@ -415,6 +426,7 @@ export const view = {
 	formKey,
 	commandKey,
 	modalKey,
+	modalTap,
 	search,
 	submit,
 	editKey,

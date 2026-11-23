@@ -220,7 +220,7 @@ a tie (`claude` selects Opus 5.5). The words typed show bold and
 bright in the list where a word starts (the `5` of 5.6, not of 15),
 by the matcher (common/fuzzy.ts) the find modal reuses. Emptying the search
 (Ctrl-U) brings back the tree and the current model. On the web a tap
-is Enter.
+opens or closes a category and picks a model.
 
 ## Settings (/config, task c0h)
 

@@ -415,10 +415,10 @@ function modalKey(k: Key): void {
 }
 
 function modalPick(index: number): void {
-	let modal = app.state.view.modal
-	if (!modal || (modal.edit && modal.edit.index !== index)) return
-	app.state.view = { ...app.state.view, modal: { ...modal, selected: index } }
-	app.modalKey({ key: 'enter' })
+	let tap = view.modalTap(app.state.view, index)
+	if (!tap) return
+	app.state.view = tap.state
+	app.modalKey(tap.key)
 }
 // Sends what the box holds (Enter, or the Send button) as `delivery`
 // says (task csn); a command runs at once.

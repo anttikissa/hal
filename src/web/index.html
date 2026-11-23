@@ -2815,6 +2815,14 @@
 			.Picker .split {
 				display: contents;
 			}
+			/* A real flex box: under display: contents iOS left the list unscrollable. */
+			.Picker:not(.compact) .split {
+				display: flex;
+				flex-direction: column;
+				flex: 1;
+				min-height: 0;
+				min-width: 0;
+			}
 			.Picker .preview {
 				display: none;
 			}

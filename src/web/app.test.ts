@@ -125,15 +125,23 @@ test('Ctrl-M asks for models; the picker takes the keys and a click picks', () =
 	app.onEvent(snapshot({ type: 'idle' }))
 	expect(press('m', message(''), { ctrlKey: true })).toBe(true)
 	expect(fx.sent.at(-1)).toMatchObject({ type: 'models', sessionId })
-	app.onEvent({ type: 'models', sessionId, current: 'fake/m', items: ['fake/m', 'x/y'] })
+	app.onEvent({ type: 'models', sessionId, current: 'fake/m', items: ['fake/m', 'openai/gpt-6-sol', 'openai/gpt-5.5'] })
 	expect(app.state.view.modal).toBeDefined()
 	// Plain keys go to the search box.
 	expect(press('x', { kind: 'other' })).toBe(false)
-	// A tap on a category without a default opens it; then on its model.
-	app.modalPick(app.state.view.modal!.items.indexOf('▶ x'))
-	expect(fx.sent.at(-1)).toMatchObject({ type: 'models' })
-	app.modalPick(app.state.view.modal!.items.findIndex((item) => item.includes('x/y')))
-	expect(fx.sent.at(-1)).toMatchObject({ type: 'submit', text: '/model x/y' })
+	// A tap on a category opens or closes it, even one with a default;
+	// a tap on a model picks it.
+	let sent = fx.sent.length
+	let row = (key: 'path' | 'id', value: string) => app.state.view.modal!.tree!.rows.findIndex((r) => r[key] === value)
+	app.modalPick(row('path', 'openai'))
+	expect(app.state.view.modal!.items[row('path', 'openai')]).toStartWith('▼')
+	app.modalPick(row('path', 'openai'))
+	expect(app.state.view.modal!.items[row('path', 'openai')]).toStartWith('▶')
+	app.modalPick(row('path', 'openai'))
+	app.modalPick(row('path', 'openai/gpt'))
+	expect(fx.sent.slice(sent).filter((c) => c.type === 'submit')).toEqual([])
+	app.modalPick(row('id', 'openai/gpt-5.5'))
+	expect(fx.sent.at(-1)).toMatchObject({ type: 'submit', text: '/model openai/gpt-5.5' })
 	expect(app.state.view.modal).toBeUndefined()
 })
 
