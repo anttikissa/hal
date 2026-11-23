@@ -54,7 +54,7 @@ function file(text: string): { mediaType: string; bytes: Uint8Array; name: strin
 	let stat = statSync(p, { throwIfNoEntry: false })
 	if (!stat?.isFile()) return undefined
 	// Not read at all if it is too large to send.
-	let big = uploads.tooBig(stat.size)
+	let big = uploads.tooBig(stat.size, mediaType)
 	if (big) return { error: big }
 	let bytes: Uint8Array
 	try {
@@ -80,7 +80,7 @@ function upload(
 	send: (command: unknown) => void,
 	from = '',
 ): string {
-	let big = uploads.tooBig(bytes.length)
+	let big = uploads.tooBig(bytes.length, mediaType)
 	if (big) return big
 	let id = connection.nextId()
 	let placeholder = uploads.begin(sessionId, id, mediaType, from)

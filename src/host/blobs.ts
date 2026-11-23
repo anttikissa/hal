@@ -12,7 +12,23 @@
 // never the bytes; providers read them through image() per request.
 
 import type { Event } from '../common/protocol.ts'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import {
+	chmodSync,
+	closeSync,
+	copyFileSync,
+	existsSync,
+	linkSync,
+	mkdirSync,
+	openSync,
+	readdirSync,
+	readFileSync,
+	readSync,
+	renameSync,
+	statSync,
+	unlinkSync,
+	writeFileSync,
+	writeSync,
+} from 'fs'
 import { attachments, type Marker } from '../common/attachments.ts'
 import type { ImageBlock, UserBlock } from '../common/blocks.ts'
 import { imageDimensions } from '../common/image-dimensions.ts'
@@ -41,18 +57,25 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 	}
 }
 
+function check(mediaType: string, bytes: Uint8Array): void {
+	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream')
+		throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
+	let max = attachments.limit(mediaType)
+	if (!bytes.length) throw new Error('attachment is empty')
+	if (bytes.length > max) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
+	if (!blobs.looksLike(mediaType, bytes)) throw new Error(`attachment is not ${mediaType}`)
+}
+
 // The bytes of an attachment's base64 `data`; throws why it is refused.
 function decode(mediaType: string, data: string): Buffer {
 	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream')
 		throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
-	let max = attachments.maxBytes
+	let max = attachments.limit(mediaType)
 	// Checked before decoding: base64 is 4 characters per 3 bytes.
 	if (data.length > Math.ceil(max / 3) * 4) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
 	if (data.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error('attachment data is not base64')
 	let bytes = Buffer.from(data, 'base64')
-	if (!bytes.length) throw new Error('attachment is empty')
-	if (bytes.length > max) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
-	if (!blobs.looksLike(mediaType, bytes)) throw new Error(`attachment is not ${mediaType}`)
+	check(mediaType, bytes)
 	return bytes
 }
 
@@ -69,16 +92,35 @@ function store(sessionId: string, mediaType: string, data: string): Stored {
 	return { blob, mediaType, bytes: bytes.length, marker: attachments.marker(blob, mediaType, lines) }
 }
 
-// Checks a pasted image or text and keeps it as
-// paths.fileDir(name)/<name>; throws why it is refused. The same bytes
-// again (a resend) are fine; other bytes under a taken name are not.
-function stage(name: string, mediaType: string, data: string): Stored {
+function sameFile(a: string, b: string): boolean {
+	let sa = statSync(a, { throwIfNoEntry: false }),
+		sb = statSync(b, { throwIfNoEntry: false })
+	if (!sa?.isFile() || !sb?.isFile() || sa.size !== sb.size) return false
+	let fa = openSync(a, 'r'),
+		fb = openSync(b, 'r')
+	try {
+		let ba = Buffer.allocUnsafe(65536),
+			bb = Buffer.allocUnsafe(65536)
+		for (let pos = 0; pos < sa.size;) {
+			let n = readSync(fa, ba, 0, ba.length, pos)
+			let m = readSync(fb, bb, 0, n, pos)
+			if (n !== m || ba.subarray(0, n).compare(bb.subarray(0, m)) !== 0) return false
+			pos += n
+		}
+		return true
+	} finally {
+		closeSync(fa)
+		closeSync(fb)
+	}
+}
+
+function stageBytes(name: string, mediaType: string, bytes: Uint8Array): Stored {
 	if (attachments.nameType(name) !== mediaType)
 		throw new Error(`file name ${JSON.stringify(name)} does not fit ${mediaType}`)
-	let bytes = blobs.decode(mediaType, data)
+	check(mediaType, bytes)
 	let path = `${paths.fileDir(name)}/${name}`
 	if (existsSync(path)) {
-		if (!bytes.equals(readFileSync(path))) throw new Error(`file name ${name} is taken`)
+		if (!Buffer.from(bytes).equals(readFileSync(path))) throw new Error(`file name ${name} is taken`)
 	} else {
 		try {
 			mkdirSync(paths.fileDir(name), { recursive: true, mode: 0o700 })
@@ -86,35 +128,119 @@ function stage(name: string, mediaType: string, data: string): Stored {
 		} catch (e) {
 			// Another directory when this one cannot be written (paths.repickTmpDir).
 			if (!paths.repickTmpDir()) throw e
-			return blobs.stage(name, mediaType, data)
+			return blobs.stageBytes(name, mediaType, bytes)
 		}
 	}
 	return { blob: name.slice(0, 6), mediaType, bytes: bytes.length, marker: attachments.named(name) }
 }
 
+// Checks a pasted image or text and keeps it as
+// paths.fileDir(name)/<name>; throws why it is refused. The same bytes
+// again (a resend) are fine; other bytes under a taken name are not.
+function stage(name: string, mediaType: string, data: string): Stored {
+	if (attachments.nameType(name) !== mediaType)
+		throw new Error(`file name ${JSON.stringify(name)} does not fit ${mediaType}`)
+	return blobs.stageBytes(name, mediaType, blobs.decode(mediaType, data))
+}
+
+// Streams an HTTP upload straight to disk (O(1) RAM for binary files).
+async function stageStream(name: string, body: ReadableStream<Uint8Array>): Promise<Stored> {
+	let mediaType = attachments.nameType(name)
+	if (!mediaType) throw new Error(`invalid file name ${JSON.stringify(name)}`)
+	let max = attachments.limit(mediaType)
+	let reader = body.getReader()
+	if (mediaType !== 'application/octet-stream') {
+		let chunks: Uint8Array[] = [],
+			size = 0
+		try {
+			while (true) {
+				let { done, value } = await reader.read()
+				if (done || !value) break
+				size += value.length
+				if (size > max) {
+					await reader.cancel()
+					throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
+				}
+				chunks.push(value)
+			}
+		} finally {
+			reader.releaseLock()
+		}
+		return blobs.stageBytes(name, mediaType, Buffer.concat(chunks, size))
+	}
+	let openTmp = (): { dir: string; tmp: string; fd: number } => {
+		let dir = paths.fileDir(name)
+		let tmp = `${dir}/.${name}.${crypto.randomUUID()}.tmp`
+		try {
+			mkdirSync(dir, { recursive: true, mode: 0o700 })
+			return { dir, tmp, fd: openSync(tmp, 'wx', 0o600) }
+		} catch (e) {
+			if (!paths.repickTmpDir()) throw e
+			return openTmp()
+		}
+	}
+	let { dir, tmp, fd } = openTmp()
+	let size = 0,
+		kept = false
+	try {
+		while (true) {
+			let { done, value } = await reader.read()
+			if (done || !value) break
+			size += value.length
+			if (size > max) {
+				await reader.cancel()
+				throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
+			}
+			writeSync(fd, value)
+		}
+		closeSync(fd)
+		fd = -1
+		if (!size) throw new Error('attachment is empty')
+		let path = `${dir}/${name}`
+		if (existsSync(path)) {
+			if (!sameFile(path, tmp)) throw new Error(`file name ${name} is taken`)
+		} else {
+			renameSync(tmp, path)
+			kept = true
+		}
+		return { blob: name.slice(0, 6), mediaType, bytes: size, marker: attachments.named(name) }
+	} finally {
+		reader.releaseLock()
+		if (fd >= 0) closeSync(fd)
+		if (!kept)
+			try {
+				unlinkSync(tmp)
+			} catch {}
+	}
+}
+
 // Pasted file `name` still in paths.fileDir(name), if its bytes are
-// what its name says and not too large.
-function staged(name: string): { bytes: Buffer; mediaType: string } | undefined {
+// what its name says and not too large. Binary files are stat-only.
+function staged(name: string): { path: string; size: number; mediaType: string } | undefined {
 	let mediaType = attachments.nameType(name)
 	if (!mediaType) return undefined
 	let path = `${paths.fileDir(name)}/${name}`
-	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return undefined
-	let bytes = readFileSync(path)
-	return bytes.length <= attachments.maxBytes && blobs.looksLike(mediaType, bytes) ? { bytes, mediaType } : undefined
+	let stat = statSync(path, { throwIfNoEntry: false })
+	if (!stat?.isFile() || stat.size > attachments.limit(mediaType)) return undefined
+	if (mediaType !== 'application/octet-stream' && !blobs.looksLike(mediaType, readFileSync(path))) return undefined
+	return { path, size: stat.size, mediaType }
 }
 
-// Pasted file `name` for the web (/image/<name>, /paste/<name>): its
-// bytes, from paths.fileDir(name) or once /tmp is cleaned from a
-// session blob a prompt copied it into, and where it lives on disk:
-// `tmp` if still there, `blobs` for each session copy.
-function file(name: string): { bytes: Buffer; mediaType: string; tmp?: string; blobs: string[] } | undefined {
+// Pasted file `name` for the web (/image/<name>, /paste/<name>, /file/<name>):
+// its path and size from paths.fileDir(name) or once /tmp is cleaned from a
+// session blob a prompt copied it into, plus where it lives on disk.
+function file(
+	name: string,
+): { path: string; size: number; mediaType: string; tmp?: string; blobs: string[] } | undefined {
 	let mediaType = attachments.nameType(name)
 	if (!mediaType) return undefined
 	let dirs = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()) : []
 	let copies = dirs.map((d) => `${paths.sessionsDir()}/${d}/blobs/${name}`).filter((p) => existsSync(p))
 	let found = blobs.staged(name)
-	if (found) return { ...found, tmp: `${paths.fileDir(name)}/${name}`, blobs: copies }
-	return copies.length ? { bytes: readFileSync(copies[0]!), mediaType, blobs: copies } : undefined
+	if (found) return { ...found, tmp: found.path, blobs: copies }
+	let copy = copies[0]
+	let stat = copy ? statSync(copy, { throwIfNoEntry: false }) : undefined
+	return copy && stat?.isFile() ? { path: copy, size: stat.size, mediaType, blobs: copies } : undefined
 }
 
 // The session's blob with this exact id: its file and media type.
@@ -193,7 +319,12 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 		if (!fresh) return undefined
 		mkdirSync(blobs.dir(sessionId), { recursive: true })
 		let path = `${blobs.dir(sessionId)}/${m.file}`
-		writeFileSync(path, fresh.bytes, { mode: 0o600 })
+		try {
+			linkSync(fresh.path, path)
+		} catch {
+			copyFileSync(fresh.path, path)
+			chmodSync(path, 0o600)
+		}
 		return { path, mediaType: fresh.mediaType }
 	}
 	return found &&
@@ -276,12 +407,12 @@ function pasteText(sessionId: string, name: string): Event & { type: 'paste-text
 	let error =
 		!found || found.mediaType !== 'text/plain'
 			? `no paste ${name}`
-			: found.bytes.length > blobs.pasteMax
-				? `paste ${name} is too big to show inline (${found.bytes.length} bytes): ${found.tmp ?? found.blobs[0]}`
+			: found.size > blobs.pasteMax
+				? `paste ${name} is too big to show inline (${found.size} bytes): ${found.tmp ?? found.blobs[0]}`
 				: undefined
 	return error
 		? { type: 'paste-text', sessionId, name, error }
-		: { type: 'paste-text', sessionId, name, text: found!.bytes.toString('utf8') }
+		: { type: 'paste-text', sessionId, name, text: readFileSync(found!.path, 'utf8') }
 }
 
 export const blobs = {
@@ -293,6 +424,8 @@ export const blobs = {
 	store,
 	storeOutput,
 	stage,
+	stageBytes,
+	stageStream,
 	staged,
 	file,
 	find,

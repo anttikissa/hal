@@ -120,6 +120,10 @@ function label(b: Pick<ImageBlock, 'mediaType' | 'bytes'>): string {
 	return `[image ${size} ${ext}]`
 }
 
+function limit(mediaType?: string): number {
+	return mediaType === 'application/octet-stream' ? attachments.maxFileBytes : attachments.maxBytes
+}
+
 export const attachments = {
 	types,
 	textExts,
@@ -129,8 +133,11 @@ export const attachments = {
 	fileMarker,
 	newName,
 	nameType,
-	// Largest attachment, decoded.
+	// Largest image or text attachment, decoded (Anthropic caps images at 5 MB).
 	maxBytes: 5 * 1024 * 1024,
+	// Largest opaque binary attachment ([file/...], never sent inline to providers).
+	maxFileBytes: 50 * 1024 * 1024,
+	limit,
 	markers,
 	marker,
 	named,

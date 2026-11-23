@@ -224,3 +224,38 @@ test('a file address takes a link code; a used or expired one gets the gate, whi
 		clock.now = origNow
 	}
 })
+
+test('POST /upload streams files with cookie, same-origin, type and size checks', async () => {
+	await server.serve()
+	web.start()
+	let id = sessions.create({ cwd: testHome() }).id
+	let jar = await cookie()
+	let post = (name: string, body: BodyInit, headers: Record<string, string> = {}) =>
+		fetch(`${base()}/upload?name=${encodeURIComponent(name)}&session=${id}`, {
+			method: 'POST',
+			headers: { cookie: jar, origin: base(), ...headers },
+			body,
+		})
+
+	expect((await fetch(`${base()}/upload?name=abc123.mov`, { method: 'POST', body: 'x' })).status).toBe(401)
+	expect((await post('abc123.mov', 'x', { origin: 'https://evil.example' })).status).toBe(403)
+	expect((await post('../bad.mov', 'x')).status).toBe(400)
+	expect((await post('abc123.png', 'not a png')).status).toBe(400)
+	expect((await post('abc123.mov', '')).status).toBe(400)
+
+	// Binary files above the 5 MB image cap stream straight to disk and resolve on submit.
+	let mov = new Uint8Array(6 * 1024 * 1024)
+	mov.set([0, 0, 0, 20, 0x66, 0x74, 0x79, 0x70])
+	let ok = await post('vid001.mov', mov)
+	expect(ok.status).toBe(200)
+	expect(await ok.json()).toEqual({ blob: 'vid001', marker: '[file/vid001.mov]' })
+	expect((await post('vid001.mov', mov)).status).toBe(200)
+	expect((await post('vid001.mov', new Uint8Array([1, 2, 3]))).status).toBe(400)
+	expect(blobs.resolve(id, ['watch [file/vid001.mov]']).unknown).toEqual([])
+	expect(readFileSync(`${paths.sessionDir(id)}/blobs/vid001.mov`).length).toBe(mov.length)
+
+	// Images stay capped at 5 MB; binary files over 50 MB are rejected with 413.
+	let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.alloc(5 * 1024 * 1024)])
+	expect((await post('big001.png', png)).status).toBe(413)
+	expect((await post('big002.mov', new Uint8Array(50 * 1024 * 1024 + 1))).status).toBe(413)
+})

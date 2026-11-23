@@ -40,6 +40,7 @@
 
 import type { Server, ServerWebSocket } from 'bun'
 import { ason } from '../common/ason.ts'
+import { attachments } from '../common/attachments.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
@@ -54,6 +55,7 @@ import { webAuth } from './web-auth.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { webLinks } from './web-links.ts'
 import { webPage } from './web-page.ts'
+import { webUpload } from './web-upload.ts'
 import { serverLog } from './server-log.ts'
 
 // Browsers share cookies across ports of one host, so each port's Hal
@@ -231,9 +233,10 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 		})
 	}
 	let check = pathname === '/login' && get
+	let upload = pathname === '/upload' && req.method === 'POST'
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
 	let composerDebug = pathname === '/composer-debug' && req.method === 'POST' && settings.composerDebug()
-	if (!check && !blob && !changesData && pathname !== '/ws' && !diagnostic && !composerDebug)
+	if (!check && !blob && !changesData && pathname !== '/ws' && !upload && !diagnostic && !composerDebug)
 		return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
@@ -246,6 +249,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (changesData) return changesPage.serve(url)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
+	if (upload) return webUpload.receive(req, url, clients.fromRequest(req, srv.requestIP(req)?.address))
 	if (diagnostic) return webDiagnostics.receive(req)
 	if (composerDebug) return webDiagnostics.composer(req)
 	return web.upgrade(req, srv)
@@ -280,10 +284,10 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 function blob(pathname: string, dest?: string | null): Response {
 	if (filePage.owns(pathname)) return filePage.serve(pathname, webPage.css(), dest)
 	let m = /^\/blob\/([\w-]+)\/([0-9a-z]{6}|[0-9a-f]{12})$/.exec(pathname)
-	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
+	let found = m ? blobs.find(m[1]!, m[2]!) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })
 	let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
-	return new Response(new Uint8Array(found.bytes), {
+	return new Response(Bun.file(found.path), {
 		headers: {
 			'content-type': type,
 			'x-content-type-options': 'nosniff',
@@ -338,7 +342,13 @@ function start(): void {
 	let last = web.state.fixedPort ?? Math.max(preferred, 9100)
 	for (let port = preferred; port <= last; port++) {
 		try {
-			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
+			web.state.server = Bun.serve({
+				hostname: '127.0.0.1',
+				port,
+				maxRequestBodySize: attachments.maxFileBytes + 1024 * 1024,
+				fetch: web.fetch,
+				websocket,
+			})
 			webPage.state.watcher = webPage.watchSource()
 			settings.state.listeningPort = web.state.server.port
 			webLinks.moved()

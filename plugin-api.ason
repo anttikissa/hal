@@ -1,5 +1,5 @@
 {
-	version: 54,
+	version: 55,
 	changes: [
 		{
 			version: 2,
@@ -1020,6 +1020,28 @@
 					kind: 'compatible',
 					target: 'common/colors.colors',
 					description: 'Adds toolBrave, toolWebSearch, toolCompact, toolEval and toolMcp styles'
+				}
+			]
+		},
+		{
+			version: 55,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/attachments',
+					description: 'Adds maxFileBytes (50 MB) and limit(mediaType) for binary file attachments'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/blobs.staged',
+					description: 'Returns path and size instead of bytes',
+					port: 'Read the file at result.path when bytes are needed'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/blobs.file',
+					description: 'Returns path and size instead of bytes',
+					port: 'Read or stream result.path via Bun.file()'
 				}
 			]
 		}

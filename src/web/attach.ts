@@ -19,6 +19,22 @@ export type Pasted = {
 	getData(type: string): string
 }
 
+// Streams raw bytes over HTTP POST /upload so large files never base64-encode
+// onto the WebSocket or buffer in JS memory.
+async function send(sessionId: string, name: string, body: Blob): Promise<{ blob: string; marker: string }> {
+	let res = await fetch(`/upload?name=${encodeURIComponent(name)}&session=${encodeURIComponent(sessionId)}`, {
+		method: 'POST',
+		body,
+	})
+	let text = await res.text()
+	let data: { blob?: string; marker?: string; error?: string } = {}
+	try {
+		data = JSON.parse(text)
+	} catch {}
+	if (!res.ok) throw new Error(data.error || text.trim() || `HTTP ${res.status}`)
+	return { blob: data.blob!, marker: data.marker! }
+}
+
 // Starts uploading `blob` for the session shown; `from`: its file name.
 // An image over the size limit is shrunk to a JPEG that fits.
 function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
@@ -26,14 +42,15 @@ function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 	if (!id) return
 	let shrink = mediaType.startsWith('image/') && b.size > attachments.maxBytes
 	if (shrink) mediaType = 'image/jpeg'
-	let big = shrink ? undefined : uploads.tooBig(b.size)
+	let big = shrink ? undefined : uploads.tooBig(b.size, mediaType)
 	if (big) return app.setNotice(from ? `${from}: ${big}` : big)
 	let command = connection.nextId()
 	insert(uploads.begin(id, command, mediaType, from))
+	let name = uploads.name(command)!
 	;(shrink ? attach.fit(b) : Promise.resolve(b))
-		.then((b) => b.arrayBuffer())
+		.then((out) => attach.send(id, name, out))
 		.then(
-			(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
+			({ blob, marker }) => app.onEvent({ type: 'attached', sessionId: id, command, blob, marker }),
 			(e) =>
 				app.onEvent({
 					type: 'rejected',
@@ -90,4 +107,4 @@ function paste(data: Pasted, insert: Insert): boolean {
 	return true
 }
 
-export const attach = { accept, kind, blob, fit, files, paste }
+export const attach = { accept, kind, send, blob, fit, files, paste }

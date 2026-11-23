@@ -19,23 +19,40 @@ const sessionId = '1-abc'
 const meta = { id: sessionId, cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7])
 let sent: any[] = []
+let uploaded: {
+	sessionId: string
+	name: string
+	body: Blob
+	resolve: (r: { blob: string; marker: string }) => void
+	reject: (e: Error) => void
+}[] = []
 let caret = 0
-const orig = { send: connection.send, connected: connection.connected, store: drafts.store, rewrite: app.rewrite }
+const orig = {
+	send: connection.send,
+	connected: connection.connected,
+	store: drafts.store,
+	rewrite: app.rewrite,
+	upload: attach.send,
+}
 
 beforeEach(() => {
 	sent = []
+	uploaded = []
 	caret = 0
 	app.reset()
 	drafts.reset()
 	settings.state.raw = {}
 	connection.send = (c: any) => void sent.push(c)
 	connection.connected = () => true
+	attach.send = (sessionId, name, body) =>
+		new Promise((resolve, reject) => void uploaded.push({ sessionId, name, body, resolve, reject }))
 	drafts.store = { load: () => undefined, save: () => {} }
 	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } } as Event)
 })
 
 afterEach(() => {
 	Object.assign(connection, { send: orig.send, connected: orig.connected })
+	attach.send = orig.upload
 	drafts.store = orig.store
 	app.rewrite = orig.rewrite
 	drafts.reset()
@@ -50,11 +67,10 @@ const insert = (text: string) => {
 }
 const type = (text: string) => insert(text)
 const tick = () => new Promise((r) => setTimeout(r, 0))
-const attaches = () => sent.filter((c) => c.type === 'attach')
 const item = (b: Blob) => ({ kind: 'file', type: b.type, getAsFile: () => b })
 const clip = (items: any[], text = '') => ({ items, getData: (t: string) => (t === 'text/plain' ? text : '') })
 
-test('a pasted image shows its final marker at the caret at once and uploads under that name', async () => {
+test('a pasted image shows its final marker at the caret at once and uploads over HTTP under that name', async () => {
 	type('ab')
 	caret = 1
 	expect(
@@ -66,11 +82,14 @@ test('a pasted image shows its final marker at the caret at once and uploads und
 			insert,
 		),
 	).toBe(true)
-	let name = /^a \[image\/([0-9a-z]{6}\.png)\] b$/.exec(app.state.text)![1]
+	let name = /^a \[image\/([0-9a-z]{6}\.png)\] b$/.exec(app.state.text)![1]!
 	await tick()
-	let [c] = attaches()
-	expect(c).toMatchObject({ sessionId, mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name })
-	app.onEvent({ type: 'attached', sessionId, command: c.id, blob: name!.slice(0, 6), marker: `[image/${name}]` })
+	expect(uploaded).toHaveLength(1)
+	expect(sent.filter((c) => c.type === 'attach')).toEqual([])
+	let [u] = uploaded
+	expect([u!.sessionId, u!.name, new Uint8Array(await u!.body.arrayBuffer())]).toEqual([sessionId, name, png])
+	u!.resolve({ blob: name.slice(0, 6), marker: `[image/${name}]` })
+	await tick()
 	expect(app.state.text).toBe(`a [image/${name}] b`)
 	expect(drafts.text(sessionId)).toBe(app.state.text)
 })
@@ -78,14 +97,9 @@ test('a pasted image shows its final marker at the caret at once and uploads und
 test('a refused upload leaves an error text', async () => {
 	attach.files([new File([png], 'a.png', { type: 'image/png' })], insert)
 	await tick()
-	expect(attaches()).toHaveLength(1)
-	app.onEvent({
-		type: 'rejected',
-		sessionId,
-		command: 'attach',
-		reason: 'attachment is not image/png',
-		id: attaches()[0].id,
-	})
+	expect(uploaded).toHaveLength(1)
+	uploaded[0]!.reject(new Error('attachment is not image/png'))
+	await tick()
 	expect(app.state.text).not.toContain('[image/')
 	expect(app.state.text).toContain('attachment is not image/png')
 })
@@ -97,8 +111,9 @@ test('Send during an upload waits and goes with the marker', async () => {
 	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
 	expect(app.notice()).toBeTruthy()
 	await tick()
-	let marker = `[image/${attaches()[0].name}]`
-	app.onEvent({ type: 'attached', sessionId, command: attaches()[0].id, blob: 'b', marker })
+	let marker = `[image/${uploaded[0]!.name}]`
+	uploaded[0]!.resolve({ blob: 'b', marker })
+	await tick()
 	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: `see ${marker} ` })
 	expect(app.state.text).toBe('')
 })
@@ -109,9 +124,8 @@ test('long pasted text becomes a text attachment; short text pastes natively', a
 	expect(attach.paste(clip([], long), insert)).toBe(true)
 	expect(app.state.text).toMatch(/^\[paste\/[0-9a-z]{6}\.txt\] $/)
 	await tick()
-	expect(app.state.text).toBe(`[paste/${attaches()[0].name}] `)
-	expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe(long)
-	expect(attaches()[0].mediaType).toBe('text/plain')
+	expect(app.state.text).toBe(`[paste/${uploaded[0]!.name}] `)
+	expect(await uploaded[0]!.body.text()).toBe(long)
 })
 
 test('pasted PDF file uploads rather than pasting clipboard text', async () => {
@@ -119,10 +133,7 @@ test('pasted PDF file uploads rather than pasting clipboard text', async () => {
 	expect(attach.paste(clip([item(file)], 'ordinary text'), insert)).toBe(true)
 	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.pdf\] $/)
 	await tick()
-	expect(attaches()[0]).toMatchObject({
-		mediaType: 'application/octet-stream',
-		name: app.state.text.trimEnd().slice(6, -1),
-	})
+	expect(uploaded[0]!.name).toBe(app.state.text.trimEnd().slice(6, -1))
 })
 
 test('dropped binary, image and text files become markers at the caret in order', async () => {
@@ -139,11 +150,24 @@ test('dropped binary, image and text files become markers at the caret in order'
 			app.state.text,
 		)!
 	await tick()
-	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
-		[image, 'image/png', Buffer.from(png).toString()],
-		[file, 'application/octet-stream', '%PDF-1.4'],
-		[paste, 'text/plain', '# hi\n'],
+	expect(await Promise.all(uploaded.map(async (u) => [u.name, await u.body.text()]))).toEqual([
+		[image!, Buffer.from(png).toString()],
+		[file!, '%PDF-1.4'],
+		[paste!, '# hi\n'],
 	])
+})
+
+test('binary files allow up to 50 MB while oversized ones show a notice', async () => {
+	let video = new File([new Uint8Array(6 * 1024 * 1024)], 'clip.mov', { type: 'video/quicktime' })
+	attach.files([video], insert)
+	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.mov\] $/)
+	await tick()
+	expect(uploaded).toHaveLength(1)
+	let huge = { name: 'huge.mov', type: 'video/quicktime', size: 50 * 1024 * 1024 + 1 } as File
+	attach.files([huge], insert)
+	expect(uploaded).toHaveLength(1)
+	expect(app.notice()).toContain('huge.mov')
+	expect(app.notice()).toContain('50 MB')
 })
 
 test('a file is an image, text by extension or type, or opaque binary', () => {
@@ -177,10 +201,11 @@ test('an oversized image gets a marker immediately and uploads as a fitted JPEG'
 		attach.files([image], insert)
 		expect(app.state.text).toMatch(/^\[image\/[0-9a-z]{6}\.jpg\] $/)
 		expect(fitted).toBe(image)
-		expect(attaches()).toEqual([])
+		expect(uploaded).toEqual([])
 		await tick()
-		expect(attaches()).toHaveLength(1)
-		expect(attaches()[0]).toMatchObject({ mediaType: 'image/jpeg', data: Buffer.from('jpeg').toString('base64') })
+		expect(uploaded).toHaveLength(1)
+		expect(uploaded[0]!.name).toEndWith('.jpg')
+		expect(await uploaded[0]!.body.text()).toBe('jpeg')
 	} finally {
 		attach.fit = fit
 	}
@@ -209,7 +234,7 @@ test('pasteLines from config.ason reaches the page and decides which paste attac
 		await loadPage()
 		expect(attach.paste(clip([], three), insert)).toBe(true)
 		await tick()
-		expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe(three)
+		expect(await uploaded[0]!.body.text()).toBe(three)
 	} finally {
 		config.reset()
 		if (savedHome === undefined) paths.state.home = undefined

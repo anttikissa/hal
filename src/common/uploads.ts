@@ -40,6 +40,10 @@ function pad(text: string, before: string): string {
 	return (first && /\S$/.test(before) ? ' ' : '') + text + (last ? ' ' : '')
 }
 
+function name(id: string): string | undefined {
+	return uploads.state.pending.get(id)?.name
+}
+
 // The attach command carrying `bytes`, with the name begin() chose.
 function command(sessionId: string, id: string, mediaType: string, bytes: Uint8Array): object {
 	let name = uploads.state.pending.get(id)?.name
@@ -48,8 +52,8 @@ function command(sessionId: string, id: string, mediaType: string, bytes: Uint8A
 
 // The error text for something too large to send (the host would refuse
 // it, and one message that big may break the connection), or undefined.
-function tooBig(size: number): string | undefined {
-	let max = attachments.maxBytes
+function tooBig(size: number, mediaType?: string): string | undefined {
+	let max = attachments.limit(mediaType)
 	return size > max ? `[upload failed: larger than ${max / 1024 / 1024} MB]` : undefined
 }
 
@@ -127,6 +131,7 @@ function reset(): void {
 export const uploads = {
 	state: createState(),
 	begin,
+	name,
 	pad,
 	command,
 	tooBig,

@@ -92,7 +92,7 @@ function serve(pathname: string, css: string, dest?: string | null): Response {
 		return shared(pathname, css, dest)
 	if (raw) {
 		let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
-		return new Response(new Uint8Array(found.bytes), {
+		return new Response(Bun.file(found.path), {
 			headers: {
 				'content-type': type,
 				'content-disposition':
@@ -103,7 +103,7 @@ function serve(pathname: string, css: string, dest?: string | null): Response {
 		})
 	}
 	let where = [...(found.tmp ? [['file', found.tmp]] : []), ...found.blobs.map((p) => ['session copy', p])]
-	return page(name!, `/raw/${name}`, found.mediaType, found.bytes, where, css)
+	return page(name!, `/raw/${name}`, found.mediaType, found.path, found.size, where, css)
 }
 
 // A shared file or folder under paths.fileDir(), served as described at
@@ -126,7 +126,7 @@ function shared(pathname: string, css: string, dest?: string | null): Response {
 		return new Response(file, {
 			headers: { 'content-type': file.type, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' },
 		})
-	return page(name, `/raw/${rel}`, mediaType, readFileSync(path), [['file', path]], css)
+	return page(name, `/raw/${rel}`, mediaType, path, stat.size, [['file', path]], css)
 }
 
 // A folder without index.html: links to its servable entries.
@@ -152,13 +152,14 @@ function page(
 	name: string,
 	rawUrl: string,
 	mediaType: string,
-	bytes: Buffer,
+	path: string,
+	bytesLength: number,
 	where: string[][],
 	css: string,
 ): Response {
 	// "file /tmp/hal/image/ain96g.png (384 x 298, 50.4 kB)": no format,
 	// the extension already says it.
-	let detail = [mediaType.startsWith('image/') && dimensions(bytes, mediaType), size(bytes.length)]
+	let detail = [mediaType.startsWith('image/') && dimensions(readFileSync(path), mediaType), size(bytesLength)]
 		.filter(Boolean)
 		.join(', ')
 	let header = where
@@ -169,7 +170,7 @@ function page(
 		.join('')
 	let body =
 		mediaType === 'text/plain'
-			? `<pre>${escape(bytes.toString('utf8'))}</pre>`
+			? `<pre>${escape(readFileSync(path, 'utf8'))}</pre>`
 			: mediaType === 'application/octet-stream'
 				? `<p>Binary file. Use the host path above or download the original.</p>`
 				: `<img src="${escape(rawUrl)}" alt="${escape(attachments.nameType(name) ? attachments.named(name) : name)}">`
