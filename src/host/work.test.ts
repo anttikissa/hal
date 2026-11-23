@@ -1,15 +1,21 @@
 import { expect, test } from 'bun:test'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { calls, client, testHome, toolSession, until, useHost } from './host-fixture.test.ts'
+import { agy } from './agy.ts'
+import { agyMcp } from './agy-mcp.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { nativeTool } from './native-tool.ts'
+import { prompts } from './prompts.ts'
+import { provider } from './provider.ts'
+import { provider as agyProvider } from './providers/agy.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
 import { tools } from './tools.ts'
+import { turns } from './turns.ts'
 import { work } from './work.ts'
 
 useHost()
@@ -246,4 +252,138 @@ test('WAIT does not outrun a subagent report held for the owner’s snapshot', a
 	await waiting.promise
 	expect(status.inboxOf(self).some((m) => m.from === child && m.text.includes('ready after snapshot'))).toBe(true)
 	expect(work.listeners.size).toBe(0)
+})
+
+test('agy inTurnSteer keeps MCP WAIT alive on subagent report, wakes cleanly on steers and queued prompts, and cancels on pause', async () => {
+	let c = client()
+	let fakeAgy = `${testHome()}/fake-agy-wait.ts`
+	let logFile = `${testHome()}/fake-agy-wait.jsonl`
+	writeFileSync(
+		fakeAgy,
+		`import { appendFileSync } from 'fs'
+const send = (m: object) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+let buf = ''
+let pending: number[] = []
+for await (const chunk of process.stdin) {
+	buf += new TextDecoder().decode(chunk)
+	const lines = buf.split('\\n')
+	buf = lines.pop()!
+	for (const line of lines) {
+		if (!line.trim()) continue
+		const msg = JSON.parse(line)
+		appendFileSync(${JSON.stringify(logFile)}, JSON.stringify({ method: msg.method, params: msg.params }) + '\\n')
+		if (msg.method === 'initialize') send({ id: msg.id, result: { protocolVersion: 1 } })
+		else if (msg.method === 'session/new') send({ id: msg.id, result: { sessionId: 'acp-wait', models: { currentModelId: 'gemini-4-neon' } } })
+		else if (msg.method === 'session/set_model') send({ id: msg.id, result: {} })
+		else if (msg.method === 'session/prompt') pending.push(msg.id)
+		else if (msg.method === 'session/cancel') {
+			for (const id of pending.splice(0)) send({ id, result: { stopReason: 'cancelled' } })
+		}
+	}
+}
+`,
+	)
+	let origCmd = agy.command
+	let origStream = turns.stream
+	let hadAgy = Object.hasOwn(provider.state.providers, 'agy')
+	let origAgy = provider.state.providers.agy
+	let rpcLog = () => {
+		try {
+			return readFileSync(logFile, 'utf8')
+				.trim()
+				.split('\n')
+				.filter(Boolean)
+				.map((l) => JSON.parse(l) as { method: string; params?: any })
+		} catch {
+			return []
+		}
+	}
+	provider.state.providers.agy = agyProvider
+	agy.command = () => [process.execPath, fakeAgy]
+	turns.stream = (model, input, signal) =>
+		model.startsWith('agy/') ? provider.stream(model, input, signal) : origStream(model, input, signal)
+	try {
+		let self = sessions.create({ cwd: testHome(), model: 'agy/gemini-4-neon', projectTrust: 'allow' }).id
+		tabs.insert(self, 0)
+		c.conn.send({ type: 'open', sessionId: self })
+		await until(() => c.views.has(self))
+		let child1 = subagents.spawn(self, {
+			kind: 'subagent-leave-open',
+			model: 'fake/m1',
+			task: 'first worker',
+			name: 'first worker',
+			cwd: testHome(),
+			limit: 0,
+			fork: false,
+		})
+		let child2 = subagents.spawn(self, {
+			kind: 'subagent-leave-open',
+			model: 'fake/m1',
+			task: 'second worker',
+			name: 'second worker',
+			cwd: testHome(),
+			limit: 0,
+			fork: false,
+		})
+		await until(() => calls.length === 2)
+		c.conn.send({ type: 'submit', sessionId: self, text: 'wait on workers' })
+		await until(() => !!agy.state.agents.get(self)?.turnAbort)
+		let mcpSignal = () => agy.state.agents.get(self)!.turnAbort!.signal
+
+		// 1. Subagent finishes: advisory report triggers inTurnSteer, WAIT resolves cleanly with attention.
+		let wait1 = agyMcp.call(self, 'wait', { targets: [child1] }, mcpSignal())
+		await until(() => work.listeners.size === 1)
+		calls[0]!.push({ type: 'text', text: '<summary>worker 1 done</summary>' }, { type: 'done', reason: 'end' })
+		let res1 = await wait1
+		expect(res1.isError).toBeUndefined()
+		expect((res1.content[0] as { text: string }).text).toContain(`Work needs attention: ${child1}`)
+		expect(work.listeners.size).toBe(0)
+		await until(() =>
+			rpcLog().some((r) => r.method === 'session/prompt' && JSON.stringify(r.params).includes('worker 1 done')),
+		)
+
+		// 2. Human steer while child2 is still running: WAIT resolves cleanly (not error), no session/cancel.
+		let wait2 = agyMcp.call(self, 'wait', { targets: [child2] }, mcpSignal())
+		await until(() => work.listeners.size === 1)
+		expect(prompts.submit(self, 'change plan', undefined, 'steer')).toBeUndefined()
+		let res2 = await wait2
+		expect(res2.isError).toBeUndefined()
+		expect((res2.content[0] as { text: string }).text).toBe(
+			'A message arrived; it follows. WAIT again if still needed.',
+		)
+		expect(work.listeners.size).toBe(0)
+		await until(() =>
+			rpcLog().some((r) => r.method === 'session/prompt' && JSON.stringify(r.params).includes('change plan')),
+		)
+
+		// 3. Queued prompt while child2 is still running: WAIT promotes it and triggers inTurnSteer.
+		let wait3 = agyMcp.call(self, 'wait', { targets: [child2] }, mcpSignal())
+		await until(() => work.listeners.size === 1)
+		expect(prompts.submit(self, 'queued note', undefined, 'queue')).toBeUndefined()
+		let res3 = await wait3
+		expect(res3.isError).toBeUndefined()
+		expect((res3.content[0] as { text: string }).text).toBe(
+			'A message arrived; it follows. WAIT again if still needed.',
+		)
+		await until(() =>
+			rpcLog().some((r) => r.method === 'session/prompt' && JSON.stringify(r.params).includes('queued note')),
+		)
+		expect(rpcLog().some((r) => r.method === 'session/cancel')).toBe(false)
+
+		// 4. Pause/Escape cancels agy turn and aborts in-flight WAIT without leaking its listener.
+		let wait4 = agyMcp.call(self, 'wait', { targets: [child2] }, mcpSignal())
+		await until(() => work.listeners.size === 1)
+		c.conn.send({ type: 'pause', sessionId: self })
+		let res4 = await wait4
+		expect(res4.isError).toBe(true)
+		expect((res4.content[0] as { text: string }).text).toContain('Wait stopped')
+		expect(work.listeners.size).toBe(0)
+		await until(() => rpcLog().some((r) => r.method === 'session/cancel'))
+	} finally {
+		agy.stopAll()
+		agy.command = origCmd
+		turns.stream = origStream
+		if (hadAgy) provider.state.providers.agy = origAgy!
+		else delete provider.state.providers.agy
+	}
 })

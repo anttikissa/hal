@@ -2,11 +2,13 @@
 // security policy (agyPermissions 'hal'), or through Hal's approval
 // question UI ('ask'). Task xbp.
 
+import { existsSync } from 'fs'
 import { settings } from '../common/settings.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { approval } from './approval.ts'
 import { history } from './history.ts'
+import { projectContext } from './project-context.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 
@@ -162,4 +164,17 @@ function cancelSession(sessionId: string): void {
 	}
 }
 
-export const agyApproval = { state, request, answer, dismiss, cancelSession }
+// agy's own shell and file tools ignore Hal's tool list, and agy reads
+// <cwd>/AGENTS.md and GEMINI.md itself: refuse what Hal cannot enforce.
+function refusal(sessionId: string, cwd: string): string | undefined {
+	let session = sessions.open(sessionId)
+	if (session.tools && !session.tools.includes('bash'))
+		return `agy runs its own shell and file tools, which Hal cannot restrict, and this session may not run commands (tools: ${session.tools.join(', ') || 'none'}). Use another model for it.`
+	if (projectContext.allowed(cwd, session.projectTrust)) return undefined
+	let file = ['AGENTS.md', 'GEMINI.md'].map((name) => `${cwd}/${name}`).find((path) => existsSync(path))
+	if (file)
+		return `agy reads ${file} on its own, and this project is not trusted. Trust it with /trust, or use another model here.`
+	return undefined
+}
+
+export const agyApproval = { state, request, answer, dismiss, cancelSession, refusal }

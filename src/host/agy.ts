@@ -6,7 +6,6 @@
 // session with a transcript whenever the history no longer extends what
 // agy saw (restart, /compact, /rebase, /edit, fork, another model's
 // turn). Task xbp.
-import { existsSync } from 'fs'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { ProviderRequest, SseMessage } from './provider.ts'
 import { settings } from '../common/settings.ts'
@@ -14,7 +13,7 @@ import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
-import { projectContext } from './project-context.ts'
+import { turns } from './turns.ts'
 import { agyApproval } from './agy-approval.ts'
 import { agyCards } from './agy-cards.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
@@ -34,7 +33,8 @@ type Agent = {
 	stderrDone: Promise<void>
 	exited?: string
 	mcp?: McpBridge
-	turnSignal?: AbortSignal
+	turnAbort?: AbortController
+	turnGen: number
 	canceling?: Promise<void>
 	idleTimer?: ReturnType<typeof setTimeout>
 	skipPermissions: boolean
@@ -130,7 +130,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
 		mcp = agyMcp.start(
 			sessionId,
-			() => agent?.turnSignal,
+			() => agent?.turnAbort?.signal,
 			(res) => {
 				let queue = mcpResults.get(res.name)
 				if (queue) queue.push(res)
@@ -163,6 +163,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 		stderr: '',
 		stderrDone,
 		mcp,
+		turnGen: 0,
 		skipPermissions,
 		prefix: 0,
 	}
@@ -170,6 +171,8 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => appendStderr(agent, line))
 	void proc.exited.then(async (code) => {
 		if (agent.idleTimer) clearTimeout(agent.idleTimer)
+		agent.turnAbort?.abort()
+		agent.turnAbort = undefined
 		agyApproval.cancelSession(sessionId)
 		await agent.stderrDone.catch(() => {})
 		agent.mcp?.stop()
@@ -184,9 +187,9 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 
 function scheduleIdle(sessionId: string, agent: Agent): void {
 	if (agent.idleTimer) clearTimeout(agent.idleTimer)
-	if (agent.exited || agent.turnSignal || agy.idleTimeoutMs <= 0) return
+	if (agent.exited || agent.turnAbort || agy.idleTimeoutMs <= 0) return
 	agent.idleTimer = setTimeout(() => {
-		if (state.agents.get(sessionId) === agent && !agent.turnSignal) agy.stop(sessionId)
+		if (state.agents.get(sessionId) === agent && !agent.turnAbort) agy.stop(sessionId)
 	}, agy.idleTimeoutMs)
 	agent.idleTimer.unref?.()
 }
@@ -197,6 +200,8 @@ function stop(sessionId: string): void {
 	state.agents.delete(sessionId)
 	if (agent.idleTimer) clearTimeout(agent.idleTimer)
 	agent.idleTimer = undefined
+	agent.turnAbort?.abort()
+	agent.turnAbort = undefined
 	agyApproval.cancelSession(sessionId)
 	agent.mcp?.stop()
 	try {
@@ -261,7 +266,7 @@ function receive(agent: Agent, line: string): void {
 	}
 	if (msg.method === 'session/request_permission' && msg.id !== undefined) {
 		void agyApproval
-			.request(agent.sessionId, msg.params, agent.turnSignal)
+			.request(agent.sessionId, msg.params, agent.turnAbort?.signal)
 			.then((result) => {
 				if (!agent.exited) write(agent, { id: msg.id, result })
 			})
@@ -287,7 +292,7 @@ function meta(system: string): object {
 async function agentFor(sessionId: string, cwd: string, system: string): Promise<Agent> {
 	let skipPermissions = settings.agyPermissions() === 'skip'
 	let agent = state.agents.get(sessionId)
-	if (agent && !agent.exited && (agent.skipPermissions === skipPermissions || agent.turnSignal)) return agent
+	if (agent && !agent.exited && (agent.skipPermissions === skipPermissions || agent.turnAbort)) return agent
 	if (agent) agy.stop(sessionId)
 	agent = spawn(sessionId, cwd, skipPermissions)
 	state.agents.set(sessionId, agent)
@@ -308,25 +313,12 @@ async function agentFor(sessionId: string, cwd: string, system: string): Promise
 	return agent
 }
 
-// agy's own shell and file tools ignore Hal's tool list, and agy reads
-// <cwd>/AGENTS.md and GEMINI.md itself: refuse what Hal cannot enforce.
-function refusal(sessionId: string, cwd: string): string | undefined {
-	let session = sessions.open(sessionId)
-	if (session.tools && !session.tools.includes('bash'))
-		return `agy runs its own shell and file tools, which Hal cannot restrict, and this session may not run commands (tools: ${session.tools.join(', ') || 'none'}). Use another model for it.`
-	if (projectContext.allowed(cwd, session.projectTrust)) return undefined
-	let file = ['AGENTS.md', 'GEMINI.md'].map((name) => `${cwd}/${name}`).find((path) => existsSync(path))
-	if (file)
-		return `agy reads ${file} on its own, and this project is not trusted. Trust it with /trust, or use another model here.`
-	return undefined
-}
-
 async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, signal: AbortSignal): Promise<void> {
 	let sessionId = req.sessionId
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let session = sessions.open(sessionId)
 	let cwd = session.cwd
-	let refused = refusal(sessionId, cwd)
+	let refused = agyApproval.refusal(sessionId, cwd)
 	if (refused) throw new Error(refused)
 	let started = { model: session.model, effort: session.effort }
 	let system = agyPrompt.system(req, cwd)
@@ -422,20 +414,40 @@ async function turn(
 			}
 		}
 	}
+	let cancelTurn = (reason?: unknown) => {
+		let abort = agent.turnAbort
+		agent.turnAbort = undefined
+		abort?.abort(reason)
+		if (agent.acpSession && !agent.exited) {
+			agent.tools.clear()
+			try {
+				write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
+			} catch {}
+		}
+	}
 	agent.onUpdate = onUpdate
-	agent.turnSignal = signal
+	let gen = ++agent.turnGen
+	let turnAbort = (agent.turnAbort ??= new AbortController())
+	let steered = false
 	let settled = Promise.withResolvers<undefined>()
 	let reply: Promise<any> | undefined
 	let onAbort = () => {
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
-		// A steer adds a prompt to the running agy turn; /model and /cd
-		// abort the same way but must stop it.
+		// A steer injects a prompt into the running agy turn without aborting
+		// in-flight MCP tools; /model and /cd cancel the turn like Stop.
 		let now = sessions.open(sessionId)
 		let changed = now.cwd !== cwd || now.model !== started.model || now.effort !== started.effort
-		if ((signal.reason !== jobs.steered || changed) && agent.acpSession) {
-			agent.tools.clear()
-			write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
-			if (reply) {
+		if (signal.reason === jobs.steered && !changed) {
+			steered = true
+			let running = turns.state.running.get(sessionId)
+			running?.done?.finally(() => {
+				if (agent.turnGen !== gen) return
+				cancelTurn(running.controller.signal.reason)
+				scheduleIdle(sessionId, agent)
+			})
+		} else {
+			cancelTurn(signal.reason)
+			if (agent.acpSession && reply) {
 				let wait = Promise.race([
 					reply.then(
 						() => {},
@@ -477,7 +489,10 @@ async function turn(
 	} finally {
 		signal.removeEventListener('abort', onAbort)
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
-		if (agent.turnSignal === signal) agent.turnSignal = undefined
+		if (!steered && agent.turnAbort === turnAbort) {
+			agent.turnAbort = undefined
+			turnAbort.abort(signal.aborted ? signal.reason : undefined)
+		}
 	}
 }
 

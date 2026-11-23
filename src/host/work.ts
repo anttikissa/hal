@@ -11,6 +11,8 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
 import { notify } from './notify.ts'
+import { prompts } from './prompts.ts'
+import { provider } from './provider.ts'
 import { queueEdits } from './queue-edits.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
@@ -22,7 +24,7 @@ import { turns } from './turns.ts'
 import { tabs } from './tabs.ts'
 
 type Target = { sessionId: string; ref: string; n?: number; call?: ToolCallBlock }
-type Listener = { ids: Set<string>; check: () => void; queued?: boolean }
+type Listener = { ids: Set<string>; check: () => void; queued?: boolean; notified?: boolean; self?: string }
 
 function isTarget(value: unknown): boolean {
 	return typeof value === 'number' || (typeof value === 'string' && (session.isId(value) || /^#?t?\d+$/.test(value)))
@@ -114,7 +116,10 @@ function defaults(self: string): Target[] {
 }
 
 function changed(id: string, event: Event): void {
-	if (!['state', 'turn-end', 'question', 'tool-results', 'inbox', 'meta'].includes(event.type)) return
+	if (!['state', 'turn-end', 'question', 'tool-results', 'inbox', 'meta', 'prompt'].includes(event.type)) return
+	if (event.type === 'prompt' && event.senders?.every((s) => s.from === id) !== true) {
+		for (let listener of work.listeners) if (listener.self === id) listener.notified = true
+	}
 	work.wake(id)
 }
 
@@ -159,13 +164,14 @@ async function wait(targets: Target[], signal: AbortSignal, self?: string, secon
 					return finish(
 						`Work needs attention: ${ready.map((t) => t.ref).join(', ')}. Inspect the targets; available reports follow through their usual delivery.`,
 					)
-				if (self && work.messages(self)) finish('A message arrived; it follows. WAIT again if still needed.')
+				if (self && (work.messages(self) || listener.notified))
+					finish('A message arrived; it follows. WAIT again if still needed.')
 			} catch (e) {
 				finish(undefined, e)
 			}
 		}
 		let abort = () => finish(undefined, new Error(jobs.why(signal, 'Wait stopped')))
-		let listener = { ids: watched(), check }
+		let listener: Listener = { ids: watched(), check, self }
 		work.listeners.add(listener)
 		signal.addEventListener('abort', abort, { once: true })
 		if (signal.aborted) abort()
@@ -184,7 +190,11 @@ function messages(id: string): boolean {
 	let movable = editing < 0 ? queued : queued.slice(0, editing)
 	for (let m of movable)
 		history.append(id, { type: 'inbox', id: m.id, text: m.text, ...inbox.provenance(m), delivery: 'next-round' })
-	if (movable.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+	if (movable.length) {
+		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+		let running = turns.state.running.get(id)
+		if (running && provider.state.providers[running.provider]?.inTurnSteer) prompts.force(running)
+	}
 	return movable.length > 0 || waiting.some((m) => m.delivery !== 'after-turn')
 }
 
