@@ -1,10 +1,12 @@
 /// <reference lib="dom" />
-// The host's tabs above the conversation. Each number is lit in its
-// project color; the shown tab is a solid key in that color with its
-// name. A number rings while its tab waits for you; a working tab
-// blinks a block cursor. The strip scrolls natively, independent of
-// selection (task ce); the count at the right opens the full list and
-// dots when a tab off screen waits. Terminal paging stays in
+// The host's tabs above the conversation. On phones (<= 40rem), a
+// card-tinted title header sits over a compact scrollable number rail;
+// wider viewports fold them into one row with the shown tab as a
+// card-tinted face. Project color is a bottom LED bar on rail tabs and
+// a 3px left bar on the active card and list rows; status is a separate
+// round dot (pulsing while working, hollow while paused) so project and
+// status colors never overlap. The count at the right opens the full
+// list and dots when an offscreen tab waits. Terminal paging stays in
 // common/tab-pages.ts. Tab links retain native Cmd- and middle-click
 // behavior, and native link drags; a drag dropped on the strip
 // reorders the tabs.
@@ -29,8 +31,21 @@ const CELL = 44
 // Marks that wait for you, most urgent first: they dot the count.
 const WAITS: MarkKind[] = ['failed', 'approval', 'blocked', 'asking', 'done']
 
-// A blinking block while the tab works; other marks ring the number
-// (CSS) and only label it here.
+// Project color and matching card tint from the host theme.
+const projectVars = (tab: Tab | undefined) =>
+	tab?.color === undefined
+		? undefined
+		: { '--project': `var(--p${tab.color})`, '--project-bg': `var(--p${tab.color}-bg)` }
+
+// Lock every blinking tab indicator to the same 2s wall-clock phase.
+function syncBlink(el: HTMLElement): number {
+	return requestAnimationFrame(() => {
+		for (let animation of el.getAnimations()) animation.startTime = performance.now() - (Date.now() % 2000)
+	})
+}
+
+// A round status dot: pulsing while working, hollow while paused, solid
+// while waiting for the user.
 function Marker(props: { mark: Mark | undefined }) {
 	let marker!: HTMLSpanElement
 	// A memo: an effect reruns whenever its source does, equal or not,
@@ -38,9 +53,7 @@ function Marker(props: { mark: Mark | undefined }) {
 	let blinking = createMemo(() => props.mark?.blinks && props.mark.kind)
 	createEffect(blinking, (blinking) => {
 		if (!blinking) return
-		let frame = requestAnimationFrame(() => {
-			for (let animation of marker.getAnimations()) animation.startTime = performance.now() - (Date.now() % 2000)
-		})
+		let frame = syncBlink(marker)
 		return () => cancelAnimationFrame(frame)
 	})
 	return (
@@ -52,9 +65,32 @@ function Marker(props: { mark: Mark | undefined }) {
 					? [props.mark.kind, ...(props.mark.blinks ? ['blink'] : []), ...(props.mark.jobs ? ['with-jobs'] : [])]
 					: []),
 			]}
-			role="img"
+			role={props.mark ? 'img' : undefined}
 			aria-label={props.mark?.label}
 		/>
+	)
+}
+
+function HeadMark(props: { mark: Mark }) {
+	let el!: HTMLSpanElement
+	let blinking = createMemo(() => props.mark.blinks && props.mark.kind)
+	createEffect(blinking, (blinking) => {
+		if (!blinking) return
+		let frame = syncBlink(el)
+		return () => cancelAnimationFrame(frame)
+	})
+	return (
+		<span
+			ref={(e) => (el = e)}
+			class={
+				props.mark.blinks
+					? ['head-dot', props.mark.kind, 'blink', ...(props.mark.jobs ? ['with-jobs'] : [])]
+					: 'head-state'
+			}
+			aria-hidden="true"
+		>
+			{props.mark.blinks ? '' : props.mark.kind}
+		</span>
 	)
 }
 
@@ -84,7 +120,7 @@ function Link(props: {
 			data-id={props.tab.id}
 			data-drop={props.drop}
 			data-mark={mark()?.kind}
-			style={props.tab.color === undefined ? undefined : { '--project': `var(--p${props.tab.color})` }}
+			style={projectVars(props.tab)}
 			aria-current={props.shown ? 'page' : undefined}
 			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}${mark() ? ` · ${mark()!.label}` : ''}`}
 			onPointerDown={() => tabs.press(props.tab.id)}
@@ -238,9 +274,11 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 		dragged = undefined
 		setGap(undefined)
 	}
+	let shownTab = () => (props.shown ? byId().get(props.shown) : undefined)
+	let shownMark = () => (shownTab() ? tabMark.mark(shownTab()!) : undefined)
 	return (
 		<header
-			class="Tabs tab"
+			class="Tabs tab project-tint"
 			onClick={(e) => {
 				if (!(e.target as Element).closest('button,a,dialog')) props.firstCard()
 			}}
@@ -291,18 +329,46 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 						Notify
 					</button>
 				)}
-				<button
-					type="button"
-					class="count"
-					aria-label={`All ${props.tabs.length} tabs${waiting() ? `, one off screen ${waiting()!.label}` : ''}`}
-					aria-haspopup="dialog"
-					aria-expanded={open() ? 'true' : 'false'}
-					onClick={() => void setOpen(true)}
-				>
-					<span class="box">{props.tabs.length}</span>
-					{waiting() && <span class="dot" data-mark={waiting()!.kind} />}
-				</button>
 			</nav>
+			<Show when={shownTab()}>
+				{(tab) => (
+					<div class="head" style={projectVars(tab())} data-mark={shownMark()?.kind}>
+						<button
+							type="button"
+							class="title-btn"
+							aria-label={`Tab ${current() + 1}: ${tab().name}. Open all tabs`}
+							onClick={() => void setOpen(true)}
+						>
+							<span class="n">{current() + 1}</span>
+							<span class="name">{tab().name}</span>
+							<Show when={shownMark()}>{(m) => <HeadMark mark={m()} />}</Show>
+						</button>
+					</div>
+				)}
+			</Show>
+			<button
+				type="button"
+				class="count"
+				aria-label={`All ${props.tabs.length} tabs${waiting() ? `, one off screen ${waiting()!.label}` : ''}`}
+				aria-haspopup="dialog"
+				aria-expanded={open() ? 'true' : 'false'}
+				onClick={() => void setOpen(true)}
+			>
+				<svg
+					class="bars"
+					width="13"
+					height="13"
+					viewBox="0 0 14 14"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.4"
+					aria-hidden="true"
+				>
+					<path d="M2 3.5h10M2 7h10M2 10.5h10" />
+				</svg>
+				<span class="num">{props.tabs.length}</span>
+				{waiting() && <span class="dot" data-mark={waiting()!.kind} />}
+			</button>
 			<dialog
 				ref={(e) => (sheet = e)}
 				class="sheet"
@@ -310,6 +376,14 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 				onClose={() => setOpen(false)}
 				onClick={(e) => e.target === e.currentTarget && setOpen(false)}
 			>
+				<div class="sheet-head">
+					<span class="sheet-title">
+						Tabs <span class="sheet-count">{props.tabs.length}</span>
+					</span>
+					<button type="button" class="sheet-close" aria-label="Close tabs" onClick={() => setOpen(false)}>
+						<Icon name="close" />
+					</button>
+				</div>
 				<ul tabindex={-1} autofocus>
 					{/* Keyed by id: each tabs event brings new objects, and a row
 					    replaced between touch down and up loses its click. */}
@@ -317,7 +391,7 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 						{(id, i) => {
 							let tab = () => byId().get(id)!
 							return (
-								<li>
+								<li style={projectVars(tab())}>
 									<Link tab={tab()} n={i() + 1} shown={id === props.shown} name dir onPick={() => setOpen(false)} />
 									<button
 										type="button"
@@ -332,73 +406,77 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 						}}
 					</For>
 				</ul>
-				<button type="button" class="new" onClick={newTab}>
-					<Icon name="plus" />
-					New tab
-				</button>
-				<button
-					type="button"
-					onClick={() => {
-						// iOS opens the keyboard only for focus inside the tap: close the
-						// sheet, then open Find and focus its field before returning.
-						setOpen(false)
-						flush()
-						find.open()
-						flush()
-					}}
-				>
-					<Icon name="google" />
-					Find
-				</button>
-				<button
-					type="button"
-					onClick={() => {
-						setOpen(false)
-						setAlerts(true)
-					}}
-				>
-					<Icon name="bell" />
-					Notifications
-				</button>
-				<Show when={settings.webDiagnostics()}>
+				<div class="sheet-actions">
+					<button type="button" class="new" onClick={newTab}>
+						<Icon name="plus" />
+						New tab
+					</button>
 					<button
 						type="button"
 						onClick={() => {
-							diagnostics.record('manual')
-							diagnostics.report()
+							// iOS opens the keyboard only for focus inside the tap: close the
+							// sheet, then open Find and focus its field before returning.
+							setOpen(false)
+							flush()
+							find.open()
+							flush()
+						}}
+					>
+						<Icon name="google" />
+						Find
+					</button>
+					<button
+						type="button"
+						onClick={() => {
+							setOpen(false)
+							setAlerts(true)
+						}}
+					>
+						<Icon name="bell" />
+						Notifications
+					</button>
+					<button type="button" class="reload" onClick={() => location.reload()}>
+						<Icon name="reload" />
+						Reload page
+					</button>
+				</div>
+				<div class="sheet-tools">
+					<Show when={settings.webDiagnostics()}>
+						<button
+							type="button"
+							onClick={() => {
+								diagnostics.record('manual')
+								diagnostics.report()
+							}}
+						>
+							<Icon name="bug" />
+							Send diagnostics
+						</button>
+					</Show>
+					<button
+						type="button"
+						aria-pressed={touchProbe() ? 'true' : 'false'}
+						onClick={() => {
+							if (touchProbe()) touchDebug.stop()
+							else touchDebug.start()
+							setTouchProbe(!touchProbe())
+							setOpen(false)
 						}}
 					>
 						<Icon name="bug" />
-						Send diagnostics
+						Touch debug {touchProbe() ? 'on' : 'off'}
 					</button>
-				</Show>
-				<button
-					type="button"
-					aria-pressed={touchProbe() ? 'true' : 'false'}
-					onClick={() => {
-						if (touchProbe()) touchDebug.stop()
-						else touchDebug.start()
-						setTouchProbe(!touchProbe())
-						setOpen(false)
-					}}
-				>
-					<Icon name="bug" />
-					Touch debug {touchProbe() ? 'on' : 'off'}
-				</button>
-				<button
-					type="button"
-					onClick={() => {
-						setOpen(false)
-						touchDebug.inspect()
-					}}
-				>
-					<Icon name="bug" />
-					Touch debug logs
-				</button>
-				<button type="button" class="reload" onClick={() => location.reload()}>
-					<Icon name="reload" />
-					Reload page
-				</button>
+					<button
+						type="button"
+						onClick={() => {
+							setOpen(false)
+							touchDebug.inspect()
+						}}
+					>
+						<Icon name="bug" />
+						Touch debug logs
+					</button>
+				</div>
 			</dialog>
 			<Notifications open={alerts()} onClose={() => setAlerts(false)} />
 		</header>

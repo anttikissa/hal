@@ -52,9 +52,8 @@ browserTest('Unicode drafts keep the composer and tab navigation responsive', as
 	}
 })
 
-browserTest('tab squares align with numerals and blink in terminal colors', async () => {
+browserTest('tab status dots sit inside each tab and pulse in terminal colors', async () => {
 	let id = tabs.create('/tmp')
-	// The shown tab is a solid key; a second tab blinks in terminal colors.
 	tabs.create('/tmp')
 	let b = await browser()
 	try {
@@ -72,24 +71,19 @@ browserTest('tab squares align with numerals and blink in terminal colors', asyn
 		await b.waitFor(`!!${marker}?.classList.contains('with-jobs') && !!${marker}.getAnimations().length`)
 		let result = JSON.parse(
 			await b.evaluate(`JSON.stringify((() => {
-			let m = ${marker}, n = m.previousElementSibling;
-			let mr = m.getBoundingClientRect(), nr = n.getBoundingClientRect();
+			let m = ${marker}, tab = m.closest('.tab');
+			let mr = m.getBoundingClientRect(), tr = tab.getBoundingClientRect();
 			let a = m.getAnimations()[0]; a.pause(); a.effect.updateTiming({ delay: 0 });
 			let ctx = document.createElement('canvas').getContext('2d');
 			let rgb = color => { ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
-			let values = [100, 400, 600, 900, 1100, 1400, 1600, 1900].map(t => { a.currentTime = t; return [rgb(getComputedStyle(m).color), getComputedStyle(m).opacity]; });
+			let values = [0, 500, 1000, 1500].map(t => { a.currentTime = t; return [rgb(getComputedStyle(m).color), getComputedStyle(m).opacity]; });
 			let s = getComputedStyle(m);
-			return { center: Math.abs(mr.y + mr.height / 2 - nr.y - nr.height / 2), gap: mr.x - nr.right, values, lit: rgb(s.getPropertyValue('--mark-lit').trim()), dark: rgb(s.getPropertyValue('--mark-dark').trim()), alt: rgb(s.getPropertyValue('--jobs-fg').trim()) };
+			return { inside: mr.left >= tr.left && mr.right <= tr.right && mr.top >= tr.top && mr.bottom <= tr.bottom, round: s.borderRadius, values, lit: rgb(s.getPropertyValue('--mark-lit').trim()), dark: rgb(s.getPropertyValue('--mark-dark').trim()), alt: rgb(s.getPropertyValue('--jobs-fg').trim()) };
 		})())`),
 		)
-		expect(result.center).toBeLessThan(0.5)
-		expect(result.gap).toBeGreaterThan(0)
-		expect(result.values).toEqual(
-			[result.lit, result.lit, result.dark, result.dark, result.alt, result.alt, result.dark, result.dark].map((c) => [
-				c,
-				'1',
-			]),
-		)
+		expect(result.inside).toBe(true)
+		expect(result.round).toBe('50%')
+		expect(result.values).toEqual([result.lit, result.dark, result.alt, result.dark].map((c) => [c, '1']))
 	} finally {
 		await b.call('Emulation.setEmulatedMedia', { features: [] })
 		await b.close()
@@ -175,17 +169,24 @@ browserTest(
 				`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`,
 			)
 			expect(await b.evaluate(`history.length`)).toBe(entries)
-			// A phone: the same one row, its tab count opening the sheet.
+			// A phone: two-tier header (title + count over scrollable rail).
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width: 390,
 				height: 800,
 				deviceScaleFactor: 1,
 				mobile: true,
 			})
-			expect(await b.evaluate(`document.querySelector('.Tabs').getBoundingClientRect().height < 50`)).toBe(true)
+			expect(
+				await b.evaluate(
+					`getComputedStyle(document.querySelector('.Tabs .head')).display !== 'none' && document.querySelector('.Tabs').getBoundingClientRect().height <= 90`,
+				),
+			).toBe(true)
 			await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .count').click()`)
 			await b.waitFor(
 				`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`,
+			)
+			expect(await b.evaluate(`document.querySelector('.Tabs .sheet ul').getBoundingClientRect().height >= 44`)).toBe(
+				true,
 			)
 			await b.evaluate(
 				`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent.trim() === 'Find').click()`,
@@ -279,6 +280,16 @@ browserTest(
 				"new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelectorAll('.track .tab')[10].click() })",
 			)
 			await b.waitFor(`location.pathname === '/${ids[10]}' && (${geometry}).offCenter <= 44`)
+			// Opening the list sheet shows a tall vertical scrollable list of tabs.
+			await b.evaluate(`document.querySelector('.Tabs .count').click()`)
+			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+			let sheetList = await b.evaluate(
+				`(() => { let ul = document.querySelector('.Tabs .sheet ul'); return { height: ul.getBoundingClientRect().height, scrollHeight: ul.scrollHeight }; })()`,
+			)
+			expect(sheetList.height).toBeGreaterThan(250)
+			expect(sheetList.scrollHeight).toBeGreaterThan(sheetList.height)
+			await b.evaluate(`document.querySelector('.Tabs .sheet .sheet-close').click()`)
+			await b.waitFor(`!document.querySelector('.Tabs .sheet').open`)
 			// At the scroll end the last tab counts as on screen, so the dot goes.
 			await b.evaluate(`document.querySelector('.track').scrollTo({ left: 1e6, behavior: 'instant' })`)
 			await b.waitFor(`(${geometry}).last === 20 && (${geometry}).dot === ''`)

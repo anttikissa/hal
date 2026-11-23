@@ -3246,22 +3246,30 @@
 					height: calc(var(--app-height, 100dvh) - 1rem);
 				}
 			}
-			/* Tabs (tasks 3k, ce): one row with native momentum scrolling; new tab
-   (fine pointers only) and the tab count stay fixed at the right. Each
-   number is lit in its project color; the shown tab is a solid key in
-   that color with its name. Under 50px tall. */
+			/* Tabs (tasks 3k, ce, mgs): on phones (<= 40rem) a card-tinted title
+   header sits over a full-width scrollable number rail; wider screens
+   fold them into one 36px row with the shown tab as a card-tinted face.
+   Project color is a bottom LED bar on rail tabs and a 3px left bar on
+   the active card and list rows; status is a separate round dot. */
 			.Tabs {
 				flex: none;
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) auto;
 				padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 			}
+			.Tabs .head {
+				display: none;
+			}
 			.Tabs .strip {
+				grid-column: 1;
+				grid-row: 1;
 				display: flex;
 				align-items: stretch;
-				height: 44px;
-				padding-left: 0.5ch;
+				height: 36px;
 				white-space: nowrap;
 				overflow: hidden;
 				container-type: inline-size;
+				box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--border) 22%, transparent);
 			}
 			.Tabs .track {
 				position: relative;
@@ -3287,45 +3295,54 @@
 				flex: none;
 				align-items: center;
 				justify-content: center;
-				padding: 0.25lh 0;
+				padding: 0;
 				background: none;
 				text-decoration: none;
-				color: var(--inactive-fg);
+				color: var(--text);
 			}
 			.Tabs .face {
 				display: contents;
 			}
-			.Tabs .tab[aria-current] {
-				color: var(--active-fg);
-			}
 			.Tabs .strip .tab {
 				position: relative;
-				min-width: 44px;
+				min-width: 38px;
 				padding: 0 0.75ch;
-				color: var(--project, var(--inactive-fg));
+				color: var(--text);
 			}
-			/* The shown tab is a solid key in its project color. */
+			/* Project color on rail tabs: a bottom LED bar, separate from numbers and status. */
+			.Tabs .strip .tab::before {
+				content: '';
+				position: absolute;
+				left: 9px;
+				right: 9px;
+				bottom: 0;
+				height: 2px;
+				background: var(--project, transparent);
+			}
+			/* On wide screens the shown tab uses Hal's card grammar: dark tint, 3px left LED. */
 			.Tabs .strip .tab[aria-current] {
-				padding: 0;
+				padding: 0 1ch;
+				background: var(--project-bg, var(--button));
+				border-left: 3px solid var(--project, var(--title-fg, var(--text)));
+				color: var(--title-fg, var(--text));
+			}
+			.Tabs .strip .tab[aria-current]::before {
+				display: none;
 			}
 			.Tabs .strip .tab[aria-current] .face {
-				--mark-lit: var(--canvas);
-				--mark-dark: color-mix(in oklab, var(--canvas) 40%, transparent);
 				display: flex;
 				align-items: center;
-				height: 30px;
-				padding: 0 1ch;
-				background: var(--project, var(--active-fg));
-				color: var(--canvas);
+				gap: 0.75ch;
+				min-width: 0;
 			}
-			/* The whole name, up to the strip width less the count, the key's
-   number, marker and padding (44px each) and a neighbor number on each
-   side (20px). */
+			.Tabs .strip .tab[aria-current] .n {
+				color: var(--project, var(--title-fg, var(--text)));
+			}
 			.Tabs .strip .name {
-				max-width: calc(100cqw - 2 * 44px - 2 * 20px);
-				margin-left: 1ch;
+				max-width: calc(100cqw - 3 * 44px - 2 * 24px);
 				overflow: hidden;
 				text-overflow: ellipsis;
+				white-space: nowrap;
 			}
 			.Tabs .strip .tab[data-drop]::after {
 				content: '';
@@ -3333,7 +3350,7 @@
 				top: 0;
 				bottom: 0;
 				width: 3px;
-				background: var(--active-fg);
+				background: var(--title-fg, var(--text));
 			}
 			.Tabs .strip .tab[data-drop='before']::after {
 				left: 0;
@@ -3341,59 +3358,41 @@
 			.Tabs .strip .tab[data-drop='after']::after {
 				right: 0;
 			}
-			/* A tab that waits for you rings its number in its mark's color;
-   a working tab blinks a block cursor instead. */
-			.Tabs .n {
-				display: inline-grid;
-				place-items: center;
-				min-width: 26px;
-				height: 26px;
-				padding: 0 5px;
-				border: 1.5px solid transparent;
-				border-radius: 13px;
-			}
-			.Tabs .sheet .n {
-				min-width: calc(var(--digits) * 1ch + 12px);
-			}
-			.Tabs [data-mark]:not(:has(.blink)) .n {
-				border-color: var(--mark-lit);
-			}
-			.Tabs [data-mark='paused'] .n {
-				border-style: dashed;
-			}
-			.Tabs .strip .tab[aria-current]:is(:not([data-mark]), :has(.blink)) .n {
-				min-width: 0;
-				padding: 0;
-				border: 0;
-			}
+			/* Status dot: top-right corner on rail cells, inline on desktop active cards
+   and in the list sheet. Hollow when paused; pulses in theme colors when working. */
 			.Tabs .marker {
-				display: inline-flex;
-				flex: none;
-				align-items: center;
-				justify-content: center;
-				width: 1ch;
-				height: 1cap;
-				margin-left: 0.25ch;
-				overflow: hidden;
+				position: absolute;
+				top: 5px;
+				right: 5px;
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: currentColor;
 				color: var(--mark-lit);
 			}
-			.Tabs .marker:not(.blink) {
-				width: 0;
-				margin-left: 0;
+			.Tabs .strip .marker:not([aria-label]) {
+				display: none;
 			}
-			.Tabs .marker.blink::before {
-				content: '';
-				width: 0.5em;
-				height: 0.5em;
-				background: currentColor;
+			.Tabs .strip .tab[aria-current] .marker {
+				position: static;
+				order: 2;
+				flex: none;
 			}
-			.Tabs .strip :focus-visible {
+			.Tabs .marker.paused {
+				background: transparent;
+				border: 1.5px solid var(--mark-lit);
+			}
+			.Tabs .strip :focus-visible,
+			.Tabs .head :focus-visible,
+			.Tabs .count:focus-visible {
 				outline-offset: -1px;
 			}
-			.Tabs .marker.blink {
-				animation: marker-blink 2s steps(1, end) infinite;
+			.Tabs .marker.blink,
+			.Tabs .head-dot.blink {
+				animation: marker-blink 2s ease-in-out infinite;
 			}
-			.Tabs .marker.working.with-jobs {
+			.Tabs .marker.working.with-jobs,
+			.Tabs .head-dot.working.with-jobs {
 				--mark-alt: var(--jobs-fg);
 			}
 			@keyframes marker-blink {
@@ -3413,7 +3412,8 @@
 			.Chat.stale .Card .cursor,
 			.Chat.stale .CardHeader .spinner.on::after,
 			.Chat.stale .status .dot,
-			.Chat.stale .Tabs .marker.blink {
+			.Chat.stale .Tabs .marker.blink,
+			.Chat.stale .Tabs .head-dot.blink {
 				animation-play-state: paused;
 			}
 			.Tabs button {
@@ -3422,33 +3422,32 @@
 				color: inherit;
 				padding: 0.25lh 1ch;
 			}
-			/* The count opens the full list; its dot marks a tab off screen that waits. */
+			/* The count opens the full list; its dot marks an offscreen tab that waits. */
 			.Tabs .count {
-				position: relative;
-				display: grid;
-				place-items: center;
+				grid-column: 2;
+				grid-row: 1;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 5px;
 				min-width: 44px;
-				padding: 0;
+				padding: 0 10px;
+				background: var(--canvas);
+				border-left: 1px solid color-mix(in oklab, var(--border) 22%, transparent);
+				box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--border) 22%, transparent);
 				color: var(--title-fg, var(--text));
-			}
-			.Tabs .count .box {
-				min-width: 24px;
-				height: 22px;
-				padding: 0 3px;
-				border: 1px solid;
 				font-size: 12px;
-				line-height: 20px;
-				text-align: center;
+			}
+			.Tabs .count .bars {
+				flex: none;
+				color: var(--quiet);
 			}
 			.Tabs .count .dot {
-				position: absolute;
-				top: 5px;
-				right: 4px;
-				width: 9px;
-				height: 9px;
+				flex: none;
+				width: 7px;
+				height: 7px;
 				border-radius: 50%;
 				background: var(--mark-lit);
-				box-shadow: 0 0 0 2px var(--canvas);
 			}
 			@media (hover: hover) and (pointer: fine) {
 				.Tabs button:hover,
@@ -3461,49 +3460,119 @@
 				touch-action: manipulation;
 			}
 			.Tabs .close {
-				color: var(--inactive-fg);
+				color: var(--quiet);
+			}
+			/* Phones and narrow panes (<= 40rem): two-tier console — card-tinted title
+   header + count on row 1, full-width scrollable number rail on row 2. */
+			@media (width <= 40rem) {
+				.Tabs .head {
+					grid-column: 1;
+					grid-row: 1;
+					display: flex;
+					align-items: stretch;
+					min-width: 0;
+					height: 40px;
+					background: var(--project-bg, var(--button));
+					border-left: 3px solid var(--project, var(--title-fg, var(--text)));
+					box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--border) 22%, transparent);
+				}
+				.Tabs .head .title-btn {
+					flex: 1;
+					min-width: 0;
+					height: 100%;
+					display: flex;
+					align-items: center;
+					gap: 0.75ch;
+					padding: 0 1ch;
+					text-align: left;
+					color: var(--title-fg, var(--text));
+				}
+				.Tabs .head .n {
+					flex: none;
+					color: var(--project, var(--title-fg, var(--text)));
+				}
+				.Tabs .head .name {
+					flex: 1;
+					min-width: 0;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					white-space: nowrap;
+				}
+				.Tabs .head .head-dot {
+					flex: none;
+					width: 6px;
+					height: 6px;
+					border-radius: 50%;
+					background: currentColor;
+					color: var(--mark-lit);
+				}
+				.Tabs .head .head-state {
+					flex: none;
+					font-size: 11px;
+					color: var(--mark-lit);
+				}
+				.Tabs .strip {
+					grid-column: 1 / -1;
+					grid-row: 2;
+				}
+				.Tabs .strip .name {
+					display: none;
+				}
+				.Tabs .strip .tab[aria-current] {
+					padding: 0 0.75ch;
+					border-left: 0;
+					background: var(--project-bg, var(--button));
+					color: var(--title-fg, var(--text));
+				}
+				.Tabs .strip .tab[aria-current]::before {
+					display: block;
+					left: 0;
+					right: 0;
+					height: 3px;
+					background: var(--project, var(--title-fg, var(--text)));
+				}
+				.Tabs .strip .tab[aria-current] .face {
+					display: contents;
+				}
+				.Tabs .strip .tab[aria-current] .n {
+					color: var(--title-fg, var(--text));
+				}
+				.Tabs .strip .tab[aria-current] .marker {
+					position: absolute;
+					order: 0;
+				}
 			}
 			@media (pointer: coarse) {
 				.Tabs button {
 					min-width: 44px;
+				}
+				.Tabs .head {
+					height: 44px;
+				}
+				.Tabs .strip {
+					height: 44px;
+				}
+				.Tabs .strip .tab {
+					min-width: 44px;
+				}
+				.Tabs .count {
+					min-height: 44px;
+				}
+				.Tabs .marker {
+					top: 6px;
+					right: 6px;
 				}
 				/* Phones open a new tab from the list. */
 				.Tabs .strip .new {
 					display: none;
 				}
 			}
-			@media (pointer: fine) {
-				.Tabs .strip {
-					height: 36px;
-				}
-				.Tabs .strip .tab {
-					min-width: 38px;
-					padding: 0 0.5ch;
-				}
-				/* The new-tab button takes one more cell. */
-				.Tabs .strip .name {
-					max-width: calc(100cqw - 3 * 44px - 2 * 20px);
-				}
-				.Tabs .strip .tab[aria-current] .face {
-					height: 26px;
-				}
-				.Tabs .n {
-					min-width: 22px;
-					height: 22px;
-					padding: 0 4px;
-					border-radius: 11px;
-				}
-				.Tabs .count .dot {
-					top: 2px;
-					right: 3px;
-				}
-			}
 			.Tabs .sheet {
 				width: 100%;
 				max-width: 100%;
-				max-height: 80dvh;
+				max-height: 84dvh;
 				margin: auto 0 0;
-				padding: 0.5lh 1ch max(0.5lh, env(safe-area-inset-bottom));
+				padding: 0 0 max(0.5lh, env(safe-area-inset-bottom));
 				background: var(--canvas);
 				color: var(--text);
 				border: 0;
@@ -3512,9 +3581,37 @@
 			.Tabs .sheet[open] {
 				display: flex;
 				flex-direction: column;
-				gap: 0.25lh;
+				gap: 0;
+			}
+			.Tabs .sheet-head {
+				flex: none;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				min-height: 40px;
+				padding: 0 0 0 1.25ch;
+				border-bottom: 1px solid color-mix(in oklab, var(--border) 25%, transparent);
+			}
+			.Tabs .sheet-title {
+				color: var(--title-fg, var(--text));
+				font-size: 13px;
+			}
+			.Tabs .sheet-count {
+				color: var(--quiet);
+				margin-left: 0.5ch;
+			}
+			.Tabs .sheet-close {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-width: 44px;
+				height: 40px;
+				padding: 0;
+				color: var(--quiet);
 			}
 			.Tabs .sheet ul {
+				flex: 0 1 auto;
+				min-height: 0;
 				margin: 0;
 				padding: 0;
 				list-style: none;
@@ -3558,77 +3655,122 @@
 			.Notifications .history .line {
 				overflow-wrap: anywhere;
 			}
+			/* Each list row carries its project color on the left 3px LED, its
+   status as a dedicated dot column, and its shown state in its own
+   project tint — never clashing with status green. */
 			.Tabs .sheet li {
 				display: flex;
 				align-items: stretch;
 				justify-content: space-between;
+				border-left: 3px solid var(--project, transparent);
+				border-bottom: 1px solid color-mix(in oklab, var(--border) 16%, transparent);
 			}
-			/* The shown tab in the list is lit like a card: bar on the left, tint. */
 			.Tabs .sheet li:has([aria-current]) {
-				background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent);
-				box-shadow: inset 3px 0 0 var(--active-fg);
+				background: var(--project-bg, var(--button));
+				border-left-color: var(--project, var(--title-fg, var(--text)));
 			}
 			.Tabs .sheet .tab {
 				flex: 1;
+				min-width: 0;
 				width: auto;
 				justify-content: flex-start;
-				gap: 1ch;
-				padding: 0.5lh 1ch;
+				gap: 0.85ch;
+				padding: 0.45lh 1ch;
+				min-height: 44px;
+				color: var(--text);
+			}
+			.Tabs .sheet .tab[aria-current] {
+				color: var(--title-fg, var(--text));
+			}
+			.Tabs .sheet .n {
+				flex: none;
+				width: calc(var(--digits) * 1ch);
+				text-align: right;
+				color: var(--quiet);
+			}
+			.Tabs .sheet .tab[aria-current] .n {
+				color: var(--project, var(--title-fg, var(--text)));
+			}
+			.Tabs .sheet .marker {
+				position: static;
+				flex: none;
+				width: 7px;
+				height: 7px;
+			}
+			.Tabs .sheet .marker:not([aria-label]) {
+				visibility: hidden;
 			}
 			.Tabs .sheet .name {
 				flex: 1;
 				min-width: 0;
+				line-height: 1.35;
 				overflow-wrap: anywhere;
 			}
-			/* The tab list shows each cwd in a column, its project strip left of it
-   as in the status row; narrow screens keep only the bar over the number. */
 			.Tabs .sheet .dir {
 				flex: none;
-				width: min(40%, 32ch);
+				width: min(36%, 30ch);
 				padding-left: 1ch;
-				border-left: 3px solid transparent;
-				color: var(--inactive-fg);
+				color: var(--quiet);
+				font-size: 12px;
+				text-align: right;
 				overflow-wrap: anywhere;
-			}
-			.Tabs .sheet .tab[style*='--project'] .dir {
-				border-left-color: var(--project);
 			}
 			@media (max-width: 40rem) {
 				.Tabs .sheet .dir {
 					display: none;
-				}
-				.Tabs .sheet .n {
-					position: relative;
-				}
-				.Tabs .sheet .tab[style*='--project'] .n::before {
-					content: '';
-					position: absolute;
-					top: -5px;
-					left: 0;
-					right: 0;
-					height: 3px;
-					background: var(--project);
 				}
 			}
 			.Tabs .sheet :focus-visible {
 				outline-offset: -1px;
 			}
 			.Tabs .sheet .close {
+				flex: none;
 				display: flex;
 				align-items: center;
 				justify-content: center;
 				min-width: 44px;
 				min-height: 44px;
-				font-size: 1.5em;
-				padding: 0.25lh 1ch;
+				font-size: 1em;
+				padding: 0;
+				color: var(--quiet);
 			}
-			.Tabs .sheet .new {
-				padding: 0.5lh 1ch;
-				background: var(--button);
+			.Tabs .sheet-actions {
+				flex: none;
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 6px;
+				padding: 8px 1ch 4px;
+				border-top: 1px solid color-mix(in oklab, var(--border) 25%, transparent);
 			}
-			.Tabs .sheet .reload {
-				padding: 0.5lh 1ch;
+			.Tabs .sheet-actions button {
+				min-height: 38px;
+				padding: 0 1ch;
 				background: var(--button);
+				color: var(--title-fg, var(--text));
+				font-size: 13px;
+			}
+			.Tabs .sheet-tools {
+				flex: none;
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				justify-content: center;
+				gap: 2px 12px;
+				padding: 2px 1ch 0;
+			}
+			.Tabs .sheet-tools button {
+				min-height: 32px;
+				padding: 2px 6px;
+				font-size: 12px;
+				color: var(--quiet);
+			}
+			@media (pointer: coarse) {
+				.Tabs .sheet-actions button {
+					min-height: 44px;
+				}
+				.Tabs .sheet-tools button {
+					min-height: 40px;
+				}
 			}
 			.Tabs .sheet::backdrop {
 				background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent);
