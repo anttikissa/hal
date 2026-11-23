@@ -28,6 +28,7 @@ type Agent = {
 	mcpResults: Map<string, McpResult[]>
 	onUpdate?: (u: Update) => void
 	stderr: string
+	stderrDone: Promise<void>
 	exited?: string
 	mcp?: McpBridge
 	turnSignal?: AbortSignal
@@ -101,11 +102,38 @@ function capability(model: string): Capability {
 	return { levels, default: levels.includes('high') ? 'high' : levels[0]!, wire: () => ({}) }
 }
 
+const stderrLimit = 64_000
+const authHint =
+	/\b(unauthenticated|not logged in|login required|sign[- ]?in|auth(?:entication)? (?:required|failed|expired)|token expired|credentials? (?:expired|invalid|missing)|oauth)\b/i
+
+function appendStderr(agent: Agent, line: string): void {
+	let next = `${agent.stderr}${line}\n`
+	agent.stderr = next.length > stderrLimit ? strings.sliceText(next, -stderrLimit) : next
+}
+
+function formatError(head: string, detail?: string, stderr?: string): string {
+	let parts = [head]
+	if (detail && !head.includes(detail)) parts.push(detail)
+	let errText = stderr?.trim()
+	if (errText && !parts.some((p) => p.includes(errText))) parts.push(`stderr:\n${errText}`)
+	let full = parts.join('\n')
+	if (authHint.test(full)) full += '\nSign in again by running `agy acp --login` in a terminal.'
+	return full
+}
+
+function rpcError(err: any, stderr?: string): Error {
+	let code = err?.code !== undefined ? ` (${err.code})` : ''
+	let msg = typeof err?.message === 'string' && err.message ? err.message : 'ACP error'
+	let data =
+		err?.data === undefined ? undefined : typeof err.data === 'string' ? err.data : JSON.stringify(err.data, null, 2)
+	return new Error(formatError(`agy${code}: ${msg}`, data, stderr))
+}
+
 function spawn(sessionId: string, cwd: string): Agent {
 	let mcp: McpBridge | undefined
 	let agent: Agent
 	let mcpResults = new Map<string, McpResult[]>()
-	let args = ['agy', 'acp', '--disable-telemetry', '--dangerously-skip-permissions']
+	let args = [...agy.command(), 'acp', '--disable-telemetry', '--dangerously-skip-permissions']
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
 		mcp = agyMcp.start(
 			sessionId,
@@ -118,21 +146,29 @@ function spawn(sessionId: string, cwd: string): Agent {
 		)
 		args.push('--ide-mcp-port', String(mcp.port))
 	}
-	let proc = Bun.spawn(args, {
-		cwd,
-		stdin: 'pipe',
-		stdout: 'pipe',
-		stderr: 'pipe',
-	})
-	agent = { proc, next: 0, calls: new Map(), tools: new Map(), mcpResults, stderr: '', mcp, prefix: 0 }
+	let proc: ReturnType<typeof Bun.spawn>
+	try {
+		proc = Bun.spawn(args, {
+			cwd,
+			stdin: 'pipe',
+			stdout: 'pipe',
+			stderr: 'pipe',
+		})
+	} catch (e) {
+		mcp?.stop()
+		let detail = e instanceof Error ? e.message : String(e)
+		throw new Error(`agy failed to start (${args.join(' ')} in ${cwd}): ${detail}`)
+	}
+	let stderrDone = Promise.resolve()
+	agent = { proc, next: 0, calls: new Map(), tools: new Map(), mcpResults, stderr: '', stderrDone, mcp, prefix: 0 }
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
-	void readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => {
-		agent.stderr = strings.sliceText(agent.stderr + line + '\n', -4000)
-	})
-	void proc.exited.then((code) => {
+	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => appendStderr(agent, line))
+	void proc.exited.then(async (code) => {
+		await agent.stderrDone.catch(() => {})
 		agent.mcp?.stop()
-		agent.exited = `agy acp exited with code ${code}${agent.stderr ? `:\n${agent.stderr}` : ''}`
-		for (let call of agent.calls.values()) call.reject(new Error(agent.exited))
+		let why = code === null ? `signal ${proc.signalCode ?? 'unknown'}` : `code ${code}`
+		agent.exited = formatError(`agy acp exited with ${why}`, undefined, agent.stderr)
+		for (let pending of agent.calls.values()) pending.reject(new Error(agent.exited))
 		agent.calls.clear()
 		if (state.agents.get(sessionId) === agent) state.agents.delete(sessionId)
 	})
@@ -148,19 +184,33 @@ async function readLines(stream: ReadableStream<Uint8Array>, each: (line: string
 		buf = lines.pop()!
 		for (let line of lines) if (line.trim()) each(line)
 	}
+	buf += decoder.decode()
+	if (buf.trim()) each(buf)
 }
 
 function write(agent: Agent, msg: object): void {
 	let stdin = agent.proc.stdin as import('bun').FileSink
-	stdin.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n')
-	stdin.flush()
+	try {
+		stdin.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n')
+		stdin.flush()
+	} catch (e) {
+		throw new Error(
+			agent.exited ??
+				formatError(`agy stdin write failed: ${e instanceof Error ? e.message : e}`, undefined, agent.stderr),
+		)
+	}
 }
 
 function call(agent: Agent, method: string, params: object): Promise<any> {
 	if (agent.exited) return Promise.reject(new Error(agent.exited))
 	let id = ++agent.next
 	let reply = new Promise((resolve, reject) => agent.calls.set(id, { resolve, reject }))
-	write(agent, { id, method, params })
+	try {
+		write(agent, { id, method, params })
+	} catch (e) {
+		agent.calls.delete(id)
+		return Promise.reject(e)
+	}
 	return reply
 }
 
@@ -169,7 +219,7 @@ function receive(agent: Agent, line: string): void {
 	try {
 		msg = JSON.parse(line)
 	} catch {
-		agent.stderr = strings.sliceText(agent.stderr + line + '\n', -4000)
+		appendStderr(agent, line)
 		return
 	}
 	if (msg.method === 'session/update') return agent.onUpdate?.(msg.params.update)
@@ -181,7 +231,7 @@ function receive(agent: Agent, line: string): void {
 	let pending = agent.calls.get(msg.id)
 	if (!pending) return
 	agent.calls.delete(msg.id)
-	if (msg.error) pending.reject(new Error(`agy ${msg.error.message ?? 'error'}: ${JSON.stringify(msg.error)}`))
+	if (msg.error) pending.reject(rpcError(msg.error, agent.stderr))
 	else pending.resolve(msg.result)
 }
 
@@ -190,10 +240,19 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 	if (agent && !agent.exited) return agent
 	agent = spawn(sessionId, cwd)
 	state.agents.set(sessionId, agent)
-	await call(agent, 'initialize', {
-		protocolVersion: 1,
-		clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-	})
+	try {
+		await call(agent, 'initialize', {
+			protocolVersion: 1,
+			clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+		})
+	} catch (e) {
+		if (state.agents.get(sessionId) === agent) state.agents.delete(sessionId)
+		agent.mcp?.stop()
+		try {
+			agent.proc.kill()
+		} catch {}
+		throw e
+	}
 	await resume(sessionId, agent, cwd)
 	return agent
 }
@@ -428,4 +487,4 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncIterable<Stream
 	for await (let m of messages) yield JSON.parse(m.data) as StreamEvent
 }
 
-export const agy = { state, known, models, capability, open, parse }
+export const agy = { state, command: (): string[] => ['agy'], known, models, capability, open, parse }
