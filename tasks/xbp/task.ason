@@ -5,7 +5,8 @@
 	notes: [
 		"Checked by hand 2026-11-23 against agy 1.5.15 with a scratch home: a first prompt edited a file through agy; after a host restart the transcript seed let agy answer about the earlier turn; a following prompt on the live host reused the agy process and session (agy's ACP log: one session/new, two session/prompt). agy's session/new lists model ids with effort suffixes (gemini-4-neon-high) and also Claude Opus/Sonnet 5.5. Not yet checked: stop mid-turn, switching to another model and back. No tests yet: first playable, experimental.",
 		"Open (review by 14-huh, openai/gpt-6.2-astra): Hal's automatic retries after a failed agy turn send 'continue' to an agy that may already have done the work; agy supports session/load and resume, unused; Hal's approval UI is unused (permissions skipped); SPAWN with an agy model would not honor tools restrictions.",
-		"Resume checked by hand 2026-11-23: after a host restart agy's log showed session/resume and no session/new, and the model recalled a word from before the restart."
+		"Resume checked by hand 2026-11-23: after a host restart agy's log showed session/resume and no session/new, and the model recalled a word from before the restart.",
+		'Step 1 (2026-11-23): Hal tools (send, spawn, inspect, read_entry, wait, stop, command, compact, notify, eval, brave, mcp, plugins) exposed to agy acp over --ide-mcp-port loopback TCP MCP bridge (src/host/agy-mcp.ts); verified against agy 1.5.15 calling inspect host.'
 	],
 	needs: []
 }

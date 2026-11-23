@@ -15,6 +15,7 @@ import { sessions } from './sessions.ts'
 import { paths } from './paths.ts'
 import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
+import { agyMcp, type McpBridge } from './agy-mcp.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -24,6 +25,8 @@ type Agent = {
 	onUpdate?: (u: Update) => void
 	stderr: string
 	exited?: string
+	mcp?: McpBridge
+	turnSignal?: AbortSignal
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -94,18 +97,26 @@ function capability(model: string): Capability {
 }
 
 function spawn(sessionId: string, cwd: string): Agent {
-	let proc = Bun.spawn(['agy', 'acp', '--disable-telemetry', '--dangerously-skip-permissions'], {
+	let mcp: McpBridge | undefined
+	let agent: Agent
+	let args = ['agy', 'acp', '--disable-telemetry', '--dangerously-skip-permissions']
+	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
+		mcp = agyMcp.start(sessionId, () => agent?.turnSignal ?? new AbortController().signal)
+		args.push('--ide-mcp-port', String(mcp.port))
+	}
+	let proc = Bun.spawn(args, {
 		cwd,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
-	let agent: Agent = { proc, next: 0, calls: new Map(), stderr: '', prefix: 0 }
+	agent = { proc, next: 0, calls: new Map(), stderr: '', mcp, prefix: 0 }
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
 	void readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => {
 		agent.stderr = strings.sliceText(agent.stderr + line + '\n', -4000)
 	})
 	void proc.exited.then((code) => {
+		agent.mcp?.stop()
 		agent.exited = `agy acp exited with code ${code}${agent.stderr ? `:\n${agent.stderr}` : ''}`
 		for (let call of agent.calls.values()) call.reject(new Error(agent.exited))
 		agent.calls.clear()
@@ -174,7 +185,7 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 }
 
 function hash(messages: Message[]) {
-	return String(Bun.hash(JSON.stringify(messages.map(({ cache: _, ...m }) => m))))
+	return String(Bun.hash(JSON.stringify(messages.map((m) => ({ role: m.role, blocks: m.blocks })))))
 }
 
 // Hal's notes about hosted tools repeat what agy did; agy knows.
@@ -261,6 +272,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 			}
 		}
 	}
+	agent.turnSignal = signal
 	let onAbort = () => write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
 	signal.addEventListener('abort', onAbort)
 	try {
@@ -281,6 +293,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	} finally {
 		signal.removeEventListener('abort', onAbort)
 		agent.onUpdate = undefined
+		agent.turnSignal = undefined
 	}
 }
 
