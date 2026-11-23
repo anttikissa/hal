@@ -239,7 +239,8 @@
 			.Transcript .rows > * {
 				margin: 0 0 0.5lh;
 			}
-			.Transcript > .to-bottom, .Transcript + .to-bottom {
+			.Transcript > .to-bottom,
+			.Transcript + .to-bottom {
 				position: relative;
 				flex: none;
 				height: 0;
@@ -1330,6 +1331,10 @@
 				max-width: 18ch;
 				border-left: 3px solid var(--project, transparent);
 			}
+			/* The model reads in full; the cwd and activity give way first. */
+			.StatusRow .model {
+				flex: none;
+			}
 			.StatusRow .path,
 			.StatusRow .model > span,
 			.StatusRow .activity .text {
@@ -1434,19 +1439,21 @@
 				}
 			}
 			/* Wide: each window's own gauge, the model's full name, a longer path. */
-			@container (min-width: 80ch) {
-				.StatusRow .windows {
-					display: flex;
-				}
-				.StatusRow .gauge,
-				.StatusRow .model .short {
-					display: none;
-				}
-				.StatusRow .model .full {
-					display: inline;
-				}
-				.StatusRow .cwd {
-					max-width: 40ch;
+			@media (width > 40rem) {
+				@container (min-width: 80ch) {
+					.StatusRow .windows {
+						display: flex;
+					}
+					.StatusRow .gauge,
+					.StatusRow .model .short {
+						display: none;
+					}
+					.StatusRow .model .full {
+						display: inline;
+					}
+					.StatusRow .cwd {
+						max-width: 40ch;
+					}
 				}
 			}
 			@media (pointer: fine) {
@@ -1469,6 +1476,44 @@
 				.StatusRow .more {
 					width: 40px;
 					height: 32px;
+				}
+			}
+			/* Phones: the activity, context and session id read in full on a
+   text line above the chips; the quota and menu stay right. */
+			@media (width <= 40rem) {
+				.StatusRow {
+					flex-wrap: wrap;
+					height: auto;
+				}
+				/* Each line's text items start from nothing, so a line never
+   wraps, and grow to their whole text: the model first, then the cwd
+   and the activity. */
+				.StatusRow :is(.activity, .cwd, .model) {
+					flex: 1 1 0;
+					max-width: max-content;
+				}
+				.StatusRow .model {
+					flex-grow: 1000;
+				}
+				.StatusRow .activity {
+					order: -4;
+					height: 22px;
+					padding-left: 0;
+				}
+				.StatusRow .context {
+					order: -3;
+				}
+				.StatusRow .id {
+					display: inline;
+					order: -2;
+					margin: 0 var(--gutter) 0 auto;
+				}
+				.StatusRow .spacer {
+					order: -1;
+					flex-basis: 100%;
+				}
+				.StatusRow .chip.budget {
+					margin-right: auto;
 				}
 			}
 			@media (hover: hover) and (pointer: fine) {
@@ -3208,6 +3253,7 @@
 				padding-left: 0.5ch;
 				white-space: nowrap;
 				overflow: hidden;
+				container-type: inline-size;
 			}
 			.Tabs .track {
 				position: relative;
@@ -3251,26 +3297,27 @@
 				color: var(--project, var(--inactive-fg));
 			}
 			/* The shown tab is a solid key in its project color. */
+			.Tabs .strip .tab[aria-current] {
+				padding: 0;
+			}
 			.Tabs .strip .tab[aria-current] .face {
 				--mark-lit: var(--canvas);
 				--mark-dark: color-mix(in oklab, var(--canvas) 40%, transparent);
 				display: flex;
 				align-items: center;
 				height: 30px;
-				padding: 0 1.25ch;
+				padding: 0 1ch;
 				background: var(--project, var(--active-fg));
 				color: var(--canvas);
 			}
+			/* The whole name, up to the strip width less the count, the key's
+   number, marker and padding (44px each) and a neighbor number on each
+   side (20px). */
 			.Tabs .strip .name {
-				max-width: 12ch;
+				max-width: calc(100cqw - 2 * 44px - 2 * 20px);
 				margin-left: 1ch;
 				overflow: hidden;
 				text-overflow: ellipsis;
-			}
-			@media (min-width: 40rem) {
-				.Tabs .strip .name {
-					max-width: 22ch;
-				}
 			}
 			.Tabs .strip .tab[data-drop]::after {
 				content: '';
@@ -3424,6 +3471,10 @@
 				.Tabs .strip .tab {
 					min-width: 38px;
 					padding: 0 0.5ch;
+				}
+				/* The new-tab button takes one more cell. */
+				.Tabs .strip .name {
+					max-width: calc(100cqw - 3 * 44px - 2 * 20px);
 				}
 				.Tabs .strip .tab[aria-current] .face {
 					height: 26px;

@@ -21,7 +21,7 @@ useWeb()
 useChrome()
 
 browserTest(
-	'the chip row keeps one line at every width and opens live session details without losing the draft',
+	'the chip row reads in full on two lines on phones, one line wider, and opens live session details without losing the draft',
 	async () => {
 		providerHome()
 		let b = await browser()
@@ -72,12 +72,12 @@ browserTest(
 				});
 				return { height: q('.StatusRow').getBoundingClientRect().height, overflow: document.documentElement.scrollWidth > innerWidth || q('.StatusRow').scrollWidth > q('.StatusRow').clientWidth, reach, cwd: q('.StatusRow .cwd').getAttribute('aria-label'), id: shown('.StatusRow .id') ? q('.StatusRow .id').textContent : '', windows: shown('.windows'), gauge: shown('.gauge'), quota: q('.gauge').getAttribute('aria-label'), bars: q('.budget .stack')?.children.length, link: !!q('.StatusRow > a'), duplicated: !!q('.Composer .status') };
 			})()`)
-				expect(row.height).toBe(40)
+				expect(row.height).toBe(width <= 640 ? 62 : 40)
 				expect(row.overflow).toBe(false)
 				expect(row.reach).toBe(true)
 				expect(row.cwd).toBe(`Directory ${meta.cwd}`)
-				// Only the id and each window's own gauge depend on room.
-				expect(row.id).toBe(width < 600 ? '' : id)
+				// Only each window's own gauge depends on room.
+				expect(row.id).toBe(id)
 				expect(row.windows).toBe(width > 600)
 				expect(row.gauge).toBe(width < 600)
 				expect(row.quota).toBe('Quota: 5h 17% used')
