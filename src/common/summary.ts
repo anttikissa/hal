@@ -62,8 +62,10 @@ function strip(text: string, questions = false): string {
 }
 
 // Hide redundant notification text, never an answer's only visible content.
+// Leading blank lines (e.g. a provider continuing after a tool/task) add no
+// empty rows at the top of a card, while indentation on line 1 stays intact.
 function answer(text: string): string {
-	let body = names.strip(summary.strip(text, true))
+	let body = names.strip(summary.strip(text, true)).replace(/^(?:[ \t]*\n)+/, '')
 	return body.trim() ? body : (summary.extract(text) ?? body)
 }
 

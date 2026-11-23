@@ -91,3 +91,9 @@ test('questions remain inline beside prose and literal code in replayed answers'
 	// Invariant: newlines just inside the tag add no blank rows.
 	expect(summary.answer('Task.\n\n<question>\n1. A?\n</question>')).toBe('Task.\n\n1. A?')
 })
+
+test('leading blank lines are stripped from answers without dropping first-line indentation', () => {
+	expect(summary.answer('\n\nDone.\n\nSecond paragraph.')).toBe('Done.\n\nSecond paragraph.')
+	expect(summary.answer(' \t\n\n  indented\nline 2')).toBe('  indented\nline 2')
+	expect(summary.answer('\n\n')).toBe('')
+})
