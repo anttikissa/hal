@@ -1,14 +1,14 @@
-// Picks the newest model id for a short family name (opus, sol; openai,
-// gpt, anthropic and claude map to a family), so a default model needs
-// no exact id. Dated snapshot ids are skipped; at equal versions, larger
-// tiers win.
+// Picks the newest model id for a short family name (opus, sol, neon;
+// openai, gpt, anthropic, claude and gemini map to a family), so a
+// default model needs no exact id. Dated snapshot ids are skipped; at
+// equal versions, larger tiers win.
 const newest = new Intl.Collator('en', { numeric: true })
 
 function select(input: string, ids: string[]): string | undefined {
 	let family = modelAliases.families[input] ?? input
 	if (!/^[a-z]+$/.test(family)) return undefined
-	let pattern = ['sol', 'astra', 'luna', 'terra'].includes(family)
-		? new RegExp(`^(?:gpt-)?(\\d+(?:[.-]\\d+)*)-${family}$|^${family}-(\\d+(?:[.-]\\d+)*)$`, 'i')
+	let pattern = ['sol', 'astra', 'luna', 'terra', 'neon'].includes(family)
+		? new RegExp(`^(?:gpt-|gemini-)?(\\d+(?:[.-]\\d+)*)-${family}$|^${family}-(\\d+(?:[.-]\\d+)*)$`, 'i')
 		: new RegExp(
 				`^(?:claude-)?${family}[-_]?[kmv]?(\\d+(?:[.-]\\d+)*)${['glm', 'qwen', 'kimi', 'deepseek', 'minimax'].includes(family) ? '(?:-(?<tier>(?:max|pro|plus|flash|mini|air)(?:-prime|-\\d{4})?|prime))?' : ''}$`,
 				'i',
@@ -38,6 +38,6 @@ function select(input: string, ids: string[]): string | undefined {
 }
 
 export const modelAliases = {
-	families: { openai: 'sol', gpt: 'sol', anthropic: 'opus', claude: 'opus' } as Record<string, string>,
+	families: { openai: 'sol', gpt: 'sol', anthropic: 'opus', claude: 'opus', gemini: 'neon' } as Record<string, string>,
 	select,
 }
