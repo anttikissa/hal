@@ -67,6 +67,9 @@ export type Provider = {
 	// Provider runs tools inside one long turn; soft-steer messages interrupt
 	// the stream so the provider can inject them into the running turn.
 	inTurnSteer?: boolean
+	// Provider executes side-effectful tools itself, so Hal must not
+	// automatically retry failed or interrupted turns with "continue".
+	noAutoRetry?: boolean
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	available?(): boolean

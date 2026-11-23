@@ -8,6 +8,7 @@ import { clock } from './clock.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { jobs } from './jobs.ts'
+import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
@@ -166,7 +167,12 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
+function mayRetry(name: string): boolean {
+	return !provider.state.providers[name]?.noAutoRetry
+}
+
 export const turnPolicy = {
+	mayRetry,
 	stopped,
 	pauseReason,
 	endEvent,

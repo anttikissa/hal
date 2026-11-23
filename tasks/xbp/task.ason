@@ -8,7 +8,8 @@
 		"Resume checked by hand 2026-11-23: after a host restart agy's log showed session/resume and no session/new, and the model recalled a word from before the restart.",
 		'Step 1 (2026-11-23): Hal tools (send, spawn, inspect, read_entry, wait, stop, command, compact, notify, eval, brave, mcp, plugins) exposed to agy acp over --ide-mcp-port loopback TCP MCP bridge (src/host/agy-mcp.ts); verified against agy 1.5.15 calling inspect host.',
 		'Step 2 (2026-11-23): Mid-turn steering (both Enter/steer and Ctrl-Enter/SEND soft-steer) injects a second session/prompt directly into agy acp without session/cancel; agy finishes any in-flight tool and steers the running turn. Verified against agy 1.5.15.',
-		'Step 3 (2026-11-23): Stop sends session/cancel, clears in-flight tool tracking, and awaits cancel settlement (with 5 s bound) before the next session/prompt. Verified against agy 1.5.15: Stop pauses cleanly and an immediate next prompt succeeds in the same ACP session.'
+		'Step 3 (2026-11-23): Stop sends session/cancel, clears in-flight tool tracking, and awaits cancel settlement (with 5 s bound) before the next session/prompt. Verified against agy 1.5.15: Stop pauses cleanly and an immediate next prompt succeeds in the same ACP session.',
+		'Step 4 (2026-11-23): Added Provider.noAutoRetry (true for agy) so Hal never auto-retries failed agy turns or auto-continues unfinished agy turns on host restart; failures show directly to the user.'
 	],
 	needs: []
 }

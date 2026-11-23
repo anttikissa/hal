@@ -323,15 +323,17 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (interrupted) host.broadcast(id, { type: 'assistant-interrupted', sessionId: id, record: interrupted })
 				if (Object.keys(round.usage).length)
 					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
-				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {
-					shrunk = true
-					continue
-				}
-				if (last?.type === 'error' && last.failure && !last.canceled && !signal.aborted) {
-					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id) })
-					await turnPolicy.waitOut(id, last, failures++, signal)
-					if (turns.state.running.get(id) !== running) return
-					continue
+				if (last?.type === 'error' && !signal.aborted && turnPolicy.mayRetry(running.provider)) {
+					if (compact.retry(id, last, shrunk)) {
+						shrunk = true
+						continue
+					}
+					if (last.failure && !last.canceled) {
+						host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id) })
+						await turnPolicy.waitOut(id, last, failures++, signal)
+						if (turns.state.running.get(id) !== running) return
+						continue
+					}
 				}
 				if (signal.aborted) {
 					let clear = contextTransitions.pending(id)?.kind === 'clear'

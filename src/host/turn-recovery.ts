@@ -2,6 +2,7 @@
 // it after a host restart without scanning closed, idle histories.
 // Tasks: bx, svt, rqq.
 import { existsSync } from 'fs'
+import { blocks } from '../common/blocks.ts'
 import { states } from '../common/states.ts'
 import { contextTransitions } from './context-transitions.ts'
 import { busy } from './busy.ts'
@@ -11,6 +12,8 @@ import { host } from './host.ts'
 import { marksWorker } from './marks-worker.ts'
 import { pages } from './pages.ts'
 import { prompts } from './prompts.ts'
+import { provider } from './provider.ts'
+import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
@@ -56,6 +59,18 @@ async function recover(): Promise<void> {
 			continue
 		}
 		if (state.type !== 'running') continue
+		let providerName = blocks.parseModelId(sessions.open(id).model)?.provider
+		if (providerName && provider.state.providers[providerName]?.noAutoRetry) {
+			history.append(id, {
+				type: 'turn_end',
+				status: 'error',
+				error: `Host restarted while ${providerName} was running; not retrying automatically because it may have already done work.`,
+				usage: {},
+			})
+			status.state.states.delete(id)
+			busy.drop(id)
+			continue
+		}
 		let n = states.recoveries(records)
 		if (n >= states.maxRecoveries()) {
 			turns.stop(id, `continued ${n} times without progress; it may be what stops the host`)

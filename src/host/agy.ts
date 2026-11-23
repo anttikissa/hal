@@ -241,7 +241,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	let fresh = unseen(agent, req.messages, cwd)
 	let text: string
 	if (fresh) {
-		text = render(fresh, false) || 'Hal retried after an error. Continue where you left off.'
+		text = render(fresh, false) || 'Continue where you left off.'
 	} else {
 		let created = await call(agent, 'session/new', { cwd, mcpServers: [] })
 		agent.acpSession = created.sessionId
