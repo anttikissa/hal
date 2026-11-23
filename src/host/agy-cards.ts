@@ -15,6 +15,28 @@ import { toolPresentations } from './tool-presentation.ts'
 type AcpTool = Record<string, any>
 
 const MCP_PREFIX = 'mcp_ide-tools_'
+const READ_ONLY_KINDS = new Set(['read', 'search', 'think', 'fetch'])
+const READ_ONLY_TOOLS = new Set([
+	'grep_search',
+	'find_by_name',
+	'list_dir',
+	'search_web',
+	'list_resources',
+	'read_resource',
+	'read_url_content',
+	'view_file_outline',
+	'view_code_item',
+	'command_status',
+])
+
+function isReadOnly(name: string, kind: string | undefined, input: Record<string, unknown>): boolean {
+	if (kind && READ_ONLY_KINDS.has(kind)) return true
+	if (READ_ONLY_TOOLS.has(name)) return true
+	if (name === 'manage_task') return input.Action === 'list' || input.Action === 'status'
+	if (name === 'manage_subagents') return input.Action === 'list'
+	if (name === 'swarm') return input.action === 'status' || input.action === 'models'
+	return false
+}
 
 function str(v: unknown): string | undefined {
 	return typeof v === 'string' && v.trim() ? v.trim() : undefined
@@ -190,14 +212,8 @@ function hosted(tool: AcpTool, cwd: string, mcpResult?: McpResult): HostedToolBl
 		}
 	}
 
-	// Searches and directory listings.
-	let readOnly =
-		kind === 'search' ||
-		kind === 'think' ||
-		rawName === 'grep_search' ||
-		rawName === 'find_by_name' ||
-		rawName === 'list_dir' ||
-		rawName === 'search_web'
+	// Searches, listings and other tools: read-only gets toolRead, others toolBash.
+	let readOnly = isReadOnly(rawName, kind, rawInput)
 	let output = stripAgyMeta(rawText(tool))
 	let verb =
 		rawName === 'grep_search'

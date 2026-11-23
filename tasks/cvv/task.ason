@@ -1,0 +1,7 @@
+{
+	title: 'Fill remaining built-in, hosted and agy tool card colors',
+	spec: 'Built-in and provider-hosted tools without an explicit colors entry get one matching their read-only or side-effect kind: toolBrave and toolWebSearch delegate to toolRead; toolCompact, toolEval and toolMcp delegate to toolBash, in both src/common/colors.ts and themes/hal.ts. agy-cards.ts marks ACP fetch kind, list_resources, read_resource, read_url_content, view_file_outline, view_code_item, command_status, manage_task list/status, manage_subagents list and swarm status/models as readOnly: true so they use toolRead instead of toolBash.',
+	status: 'done',
+	needs: [],
+	foldInto: ['xbp', 'd3', 'a0z']
+}

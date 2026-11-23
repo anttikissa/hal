@@ -1,5 +1,5 @@
 {
-	version: 53,
+	version: 54,
 	changes: [
 		{
 			version: 2,
@@ -1010,6 +1010,16 @@
 					target: 'common/usage-windows.usageWindows',
 					description: 'Drops shortest',
 					port: 'Compare usageWindows.minutes of the windows instead'
+				}
+			]
+		},
+		{
+			version: 54,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/colors.colors',
+					description: 'Adds toolBrave, toolWebSearch, toolCompact, toolEval and toolMcp styles'
 				}
 			]
 		}
