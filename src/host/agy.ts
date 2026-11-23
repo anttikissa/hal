@@ -12,6 +12,9 @@ import type { Capability } from './model-effort.ts'
 import type { EffortLevel } from '../common/effort-levels.ts'
 import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
+import { paths } from './paths.ts'
+import { liveFiles } from './live-file.ts'
+import { diag } from './diag.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -25,8 +28,39 @@ type Agent = {
 	acpSession?: string
 	cwd?: string
 	prefix: number
-	hash?: bigint | number
+	hash?: string
 	model?: string
+}
+
+// What survives a host restart: the agy session and the history prefix
+// it has seen, in the Hal session's directory (a fork does not copy it).
+type Saved = { acpSession?: string; cwd?: string; prefix?: number; hash?: string }
+
+function saved(sessionId: string): Saved {
+	return liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
+}
+
+function save(sessionId: string, agent: Agent): void {
+	let data = saved(sessionId)
+	Object.assign(data, { acpSession: agent.acpSession, cwd: agent.cwd, prefix: agent.prefix, hash: agent.hash })
+	liveFiles.save(data)
+	liveFiles.close(data)
+}
+
+// Picks up the agy session saved before a restart; on failure the next
+// prompt seeds a new one with a transcript.
+async function resume(sessionId: string, agent: Agent, cwd: string): Promise<void> {
+	let data = saved(sessionId)
+	let { acpSession, prefix, hash } = data
+	let same = data.cwd === cwd
+	liveFiles.close(data)
+	if (!acpSession || !same) return
+	try {
+		await call(agent, 'session/resume', { sessionId: acpSession, cwd, mcpServers: [] })
+		Object.assign(agent, { acpSession, cwd, prefix: prefix ?? 0, hash })
+	} catch (e) {
+		diag.log(`agy: resuming ${acpSession} failed, seeding a new session: ${e instanceof Error ? e.message : e}`)
+	}
 }
 
 const state = {
@@ -135,11 +169,12 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 		protocolVersion: 1,
 		clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
 	})
+	await resume(sessionId, agent, cwd)
 	return agent
 }
 
 function hash(messages: Message[]) {
-	return Bun.hash(JSON.stringify(messages.map(({ cache: _, ...m }) => m)))
+	return String(Bun.hash(JSON.stringify(messages.map(({ cache: _, ...m }) => m))))
 }
 
 // Hal's notes about hosted tools repeat what agy did; agy knows.
@@ -233,6 +268,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		// agy has the input now, whatever happens to this turn.
 		agent.prefix = req.messages.length
 		agent.hash = hash(req.messages)
+		save(sessionId, agent)
 		let result = await reply
 		let u = result?.usage
 		if (u)
