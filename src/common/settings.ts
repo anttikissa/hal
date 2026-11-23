@@ -55,10 +55,10 @@ const table: Setting[] = [
 	{
 		name: 'agyPermissions',
 		label: 'Antigravity permissions',
-		type: { kind: 'choice', options: ['skip', 'ask'] },
-		default: 'skip',
+		type: { kind: 'choice', options: ['hal', 'ask', 'skip'] },
+		default: 'hal',
 		description:
-			'How agy acp handles tool permissions: skip passes --dangerously-skip-permissions; ask shows permission requests in Hal’s approval UI.',
+			'How agy acp handles tool permissions: hal answers them like Hal’s own tools under the Security setting (dangerous commands ask, secret reads are refused); ask shows every request in Hal’s approval UI; skip passes --dangerously-skip-permissions.',
 	},
 	{
 		name: 'scratch',
@@ -290,7 +290,7 @@ export const settings = {
 	subagentSlots: (): number => settings.value('subagentSlots') as number,
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'yolo' => settings.value('security') as 'best-effort' | 'yolo',
-	agyPermissions: (): 'skip' | 'ask' => settings.value('agyPermissions') as 'skip' | 'ask',
+	agyPermissions: (): 'hal' | 'ask' | 'skip' => settings.value('agyPermissions') as 'hal' | 'ask' | 'skip',
 	scratch: (): string => settings.value('scratch') as string,
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).

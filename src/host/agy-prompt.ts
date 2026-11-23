@@ -7,7 +7,6 @@ import { resolve } from 'path'
 import { blocks, type ImageBlock, type Message } from '../common/blocks.ts'
 import { strings } from '../common/strings.ts'
 import { provider, type ProviderRequest } from './provider.ts'
-import { systemPrompt } from './system-prompt.ts'
 
 export type AcpContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
 
@@ -79,43 +78,31 @@ function unseen(state: PrefixState, messages: Message[], cwd: string): Message[]
 	return rest.slice(i).every((m) => m.role === 'user') ? rest.slice(i) : undefined
 }
 
-// agy reads <cwd>/AGENTS.md on its own, but not parent-directory AGENTS.md,
-// CLAUDE.md, or ~/.agents/AGENTS.md. Send only the files agy misses with
-// the first prompt of a fresh ACP session, honoring Hal's project trust.
-function extraInstructions(cwd: string, projectTrust?: string | false): string {
-	let raw = systemPrompt.agents(cwd, undefined, projectTrust)
-	if (!raw) return ''
+// Hal's system prompt, appended to agy's own through session/new's
+// _meta.antigravity.systemPrompt. agy reads <cwd>/AGENTS.md on its own,
+// so its copy is left out.
+function system(req: ProviderRequest, cwd: string): string {
+	let text = req.system ?? ''
+	if (!text) return ''
 	let own = resolve(cwd, 'AGENTS.md')
-	let realOwn = own
+	let names = [own]
 	try {
-		realOwn = realpathSync(own)
+		names.push(realpathSync(own))
 	} catch {}
-	let kept = raw
-		.split(/\n\n(?=<file path=")/)
-		.filter((part) => {
-			let m = /^<file path="([^"]+)">/.exec(part)
-			if (!m) return true
-			let p = m[1]!
-			if (p === own || p === realOwn) return false
-			try {
-				return realpathSync(p) !== realOwn
-			} catch {
-				return true
-			}
-		})
-		.join('\n\n')
-	return kept ? `<project-instructions>\n${kept}\n</project-instructions>` : ''
+	for (let name of names) {
+		let start = text.indexOf(`<file path="${name}">\n`)
+		let end = start < 0 ? -1 : text.indexOf('\n</file>', start)
+		if (end >= 0) text = text.slice(0, start) + text.slice(end + '\n</file>'.length)
+	}
+	return `${text}\n\nYour own tools replace Hal's BASH, READ, EDIT and GREP; Hal's other tools are your ide-tools MCP tools.`
 }
 
-function seed(req: ProviderRequest, cwd?: string, projectTrust?: string | false): AcpContent[] {
+function seed(req: ProviderRequest): AcpContent[] {
 	let last = req.messages.findLastIndex((m) => m.role === 'assistant')
 	let before = agyPrompt.toContent(req.messages.slice(0, last + 1), req, true)
 	let now = agyPrompt.toContent(req.messages.slice(last + 1), req, false)
-	let extra = cwd ? agyPrompt.extraInstructions(cwd, projectTrust) : ''
-	let head: AcpContent[] = extra ? [{ type: 'text', text: extra }] : []
-	if (!before.length) return [...head, ...now]
+	if (!before.length) return now
 	return [
-		...head,
 		{
 			type: 'text',
 			text: "<hal-transcript>\nThe conversation so far in this Hal session, which you continue. Earlier tool calls were Hal's, not yours.",
@@ -126,4 +113,4 @@ function seed(req: ProviderRequest, cwd?: string, projectTrust?: string | false)
 	]
 }
 
-export const agyPrompt = { hash, toContent, unseen, extraInstructions, seed }
+export const agyPrompt = { hash, toContent, unseen, system, seed }

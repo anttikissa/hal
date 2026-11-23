@@ -6,6 +6,7 @@
 // session with a transcript whenever the history no longer extends what
 // agy saw (restart, /compact, /rebase, /edit, fork, another model's
 // turn). Task xbp.
+import { existsSync } from 'fs'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { ProviderRequest, SseMessage } from './provider.ts'
 import { settings } from '../common/settings.ts'
@@ -15,6 +16,7 @@ import { paths } from './paths.ts'
 import { liveFiles } from './live-file.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
+import { projectContext } from './project-context.ts'
 import { agyApproval } from './agy-approval.ts'
 import { agyCards } from './agy-cards.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
@@ -65,14 +67,14 @@ function save(sessionId: string, agent: Agent): void {
 
 // Picks up the agy session saved before a restart; on failure the next
 // prompt seeds a new one with a transcript.
-async function resume(sessionId: string, agent: Agent, cwd: string): Promise<void> {
+async function resume(sessionId: string, agent: Agent, cwd: string, system: string): Promise<void> {
 	let data = saved(sessionId)
 	let { acpSession, prefix, hash } = data
 	let same = data.cwd === cwd
 	liveFiles.close(data)
 	if (!acpSession || !same) return
 	try {
-		await call(agent, 'session/resume', { sessionId: acpSession, cwd, mcpServers: [] })
+		await call(agent, 'session/resume', { sessionId: acpSession, cwd, mcpServers: [], ...meta(system) })
 		Object.assign(agent, { acpSession, cwd, prefix: prefix ?? 0, hash })
 	} catch (e) {
 		diag.log(`agy: resuming ${acpSession} failed, seeding a new session: ${e instanceof Error ? e.message : e}`)
@@ -131,7 +133,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
 		mcp = agyMcp.start(
 			sessionId,
-			() => agent?.turnSignal ?? new AbortController().signal,
+			() => agent?.turnSignal,
 			(res) => {
 				let queue = mcpResults.get(res.name)
 				if (queue) queue.push(res)
@@ -256,7 +258,10 @@ function receive(agent: Agent, line: string): void {
 		appendStderr(agent, line)
 		return
 	}
-	if (msg.method === 'session/update') return agent.onUpdate?.(msg.params.update)
+	if (msg.method === 'session/update') {
+		if (msg.params?.sessionId === agent.acpSession) agent.onUpdate?.(msg.params.update)
+		return
+	}
 	if (msg.method === 'session/request_permission' && msg.id !== undefined) {
 		void agyApproval
 			.request(agent.sessionId, msg.params, agent.turnSignal)
@@ -277,8 +282,13 @@ function receive(agent: Agent, line: string): void {
 	else pending.resolve(msg.result)
 }
 
-async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
-	let skipPermissions = settings.agyPermissions() !== 'ask'
+// Hal's system prompt rides on session/new and session/resume.
+function meta(system: string): object {
+	return system ? { _meta: { antigravity: { systemPrompt: { append: system } } } } : {}
+}
+
+async function agentFor(sessionId: string, cwd: string, system: string): Promise<Agent> {
+	let skipPermissions = settings.agyPermissions() === 'skip'
 	let agent = state.agents.get(sessionId)
 	if (agent && !agent.exited && (agent.skipPermissions === skipPermissions || agent.turnSignal)) return agent
 	if (agent) agy.stop(sessionId)
@@ -297,8 +307,21 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 		} catch {}
 		throw e
 	}
-	await resume(sessionId, agent, cwd)
+	await resume(sessionId, agent, cwd, system)
 	return agent
+}
+
+// agy's own shell and file tools ignore Hal's tool list, and agy reads
+// <cwd>/AGENTS.md and GEMINI.md itself: refuse what Hal cannot enforce.
+function refusal(sessionId: string, cwd: string): string | undefined {
+	let session = sessions.open(sessionId)
+	if (session.tools && !session.tools.includes('bash'))
+		return `agy runs its own shell and file tools, which Hal cannot restrict, and this session may not run commands (tools: ${session.tools.join(', ') || 'none'}). Use another model for it.`
+	if (projectContext.allowed(cwd, session.projectTrust)) return undefined
+	let file = ['AGENTS.md', 'GEMINI.md'].map((name) => `${cwd}/${name}`).find((path) => existsSync(path))
+	if (file)
+		return `agy reads ${file} on its own, and this project is not trusted. Trust it with /trust, or use another model here.`
+	return undefined
 }
 
 async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, signal: AbortSignal): Promise<void> {
@@ -306,11 +329,32 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let session = sessions.open(sessionId)
 	let cwd = session.cwd
-	let agent = await agentFor(sessionId, cwd)
+	let refused = refusal(sessionId, cwd)
+	if (refused) throw new Error(refused)
+	let started = { model: session.model, effort: session.effort }
+	let system = agyPrompt.system(req, cwd)
+	let agent = await agentFor(sessionId, cwd, system)
 	if (agent.idleTimer) {
 		clearTimeout(agent.idleTimer)
 		agent.idleTimer = undefined
 	}
+	try {
+		await turn(agent, req, emit, signal, cwd, started, system)
+	} finally {
+		scheduleIdle(sessionId, agent)
+	}
+}
+
+async function turn(
+	agent: Agent,
+	req: ProviderRequest,
+	emit: (e: StreamEvent) => void,
+	signal: AbortSignal,
+	cwd: string,
+	started: { model: string; effort?: string },
+	system: string,
+): Promise<void> {
+	let sessionId = agent.sessionId
 	if (agent.canceling) {
 		await Promise.race([
 			agent.canceling,
@@ -327,14 +371,14 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		content = agyPrompt.toContent(fresh, req, false)
 		if (!content.length) content = [{ type: 'text', text: 'Continue where you left off.' }]
 	} else {
-		let created = await call(agent, 'session/new', { cwd, mcpServers: [] })
+		let created = await call(agent, 'session/new', { cwd, mcpServers: [], ...meta(system) })
 		agent.acpSession = created.sessionId
 		agent.cwd = cwd
 		agent.model = created.models?.currentModelId
 		agent.tools.clear()
 		agyModels.record(created.models?.availableModels ?? [])
 		recordConfigOptions(agent, created.configOptions)
-		content = agyPrompt.seed(req, cwd, session.projectTrust)
+		content = agyPrompt.seed(req)
 	}
 	let { modelId: wanted, level } = agyModels.resolve(req.model, req.effort)
 	if (agent.model !== wanted) {
@@ -382,7 +426,11 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	let reply: Promise<any> | undefined
 	let onAbort = () => {
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
-		if (signal.reason !== jobs.steered && agent.acpSession) {
+		// A steer adds a prompt to the running agy turn; /model and /cd
+		// abort the same way but must stop it.
+		let now = sessions.open(sessionId)
+		let changed = now.cwd !== cwd || now.model !== started.model || now.effort !== started.effort
+		if ((signal.reason !== jobs.steered || changed) && agent.acpSession) {
 			agent.tools.clear()
 			write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
 			if (reply) {
@@ -428,7 +476,6 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		signal.removeEventListener('abort', onAbort)
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
 		if (agent.turnSignal === signal) agent.turnSignal = undefined
-		scheduleIdle(sessionId, agent)
 	}
 }
 

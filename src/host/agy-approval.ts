@@ -1,6 +1,8 @@
-// Routes `agy acp` `session/request_permission` calls through Hal's
-// approval question UI when `agyPermissions` is `'ask'`. Task xbp.
+// Answers `agy acp` `session/request_permission` calls: by Hal's own
+// security policy (agyPermissions 'hal'), or through Hal's approval
+// question UI ('ask'). Task xbp.
 
+import { settings } from '../common/settings.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { approval } from './approval.ts'
@@ -74,15 +76,34 @@ function buildForm(
 	}
 }
 
+// agyPermissions 'hal': what Hal itself would ask about. Commands
+// matching dangerous patterns go to the user, reads of sensitive paths
+// are refused, the rest runs; under security 'yolo' everything runs.
+function automatic(params: Record<string, any>): 'allow' | 'reject' | undefined {
+	let mode = settings.agyPermissions()
+	if (mode === 'ask') return undefined
+	if (mode === 'skip' || settings.security() === 'yolo') return 'allow'
+	let raw = params?.toolCall?.rawInput ?? {}
+	if (typeof raw.CommandLine === 'string') return approval.findings(raw.CommandLine).length ? undefined : 'allow'
+	let path =
+		typeof raw.Path === 'string' ? raw.Path : typeof raw.AbsolutePath === 'string' ? raw.AbsolutePath : undefined
+	return path && approval.sensitive(path) ? 'reject' : 'allow'
+}
+
 function request(sessionId: string, params: Record<string, any>, signal?: AbortSignal): Promise<PermissionResult> {
 	let rawOptions: PermissionOption[] = Array.isArray(params?.options) ? params.options : []
 	let reject = rawOptions.find((o) => o.kind?.includes('reject'))
 	let cancelled = (): PermissionResult => ({ outcome: { outcome: 'cancelled' } })
+	let select = (o?: PermissionOption): PermissionResult =>
+		o ? { outcome: { outcome: 'selected', optionId: o.optionId } } : cancelled()
 	if (!rawOptions.length) return Promise.resolve(cancelled())
-	if (sessions.open(sessionId).interactive === false)
-		return Promise.resolve(reject ? { outcome: { outcome: 'selected', optionId: reject.optionId } } : cancelled())
+	let auto = automatic(params)
+	if (auto === 'allow')
+		return Promise.resolve(
+			select(rawOptions.find((o) => o.kind === 'allow_once') ?? rawOptions.find((o) => o.kind?.includes('allow'))),
+		)
+	if (auto === 'reject' || sessions.open(sessionId).interactive === false) return Promise.resolve(select(reject))
 	if (signal?.aborted) return Promise.resolve(cancelled())
-
 	ensureHook()
 	let reqId = crypto.randomUUID().slice(0, 8)
 	let labeled = uniqueLabels(rawOptions)

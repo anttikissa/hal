@@ -4,6 +4,7 @@
 // tools, so Hal omits those and exposes the rest according to the
 // session's tool list. Task xbp.
 
+import { readFileSync } from 'fs'
 import type { Socket } from 'bun'
 import { blocks } from '../common/blocks.ts'
 import { blobs } from './blobs.ts'
@@ -67,7 +68,7 @@ async function call(
 async function handle(
 	sessionId: string,
 	msg: RpcRequest,
-	getSignal: () => AbortSignal,
+	getSignal: () => AbortSignal | undefined,
 	onResult?: (res: McpResult) => void,
 ): Promise<Record<string, unknown> | undefined> {
 	if (msg.id === undefined) return undefined
@@ -91,7 +92,9 @@ async function handle(
 					? (msg.params.arguments as Record<string, unknown>)
 					: {}
 			try {
-				let res = await agyMcp.call(sessionId, name, args, getSignal())
+				let signal = getSignal()
+				if (!signal) throw new Error(`Hal tools run only during a turn of session ${sessionId}.`)
+				let res = await agyMcp.call(sessionId, name, args, signal)
 				let text = res.content
 					.filter((c): c is { type: 'text'; text: string } => c.type === 'text' && typeof c.text === 'string')
 					.map((c) => c.text)
@@ -109,7 +112,29 @@ async function handle(
 	}
 }
 
-function start(sessionId: string, getSignal: () => AbortSignal, onResult?: (res: McpResult) => void): McpBridge {
+// The OS user that owns the connecting loopback socket, from Linux's
+// /proc/net/tcp; undefined elsewhere.
+function peerUid(port: number, peerPort: number): number | undefined {
+	let table: string
+	try {
+		table = readFileSync('/proc/net/tcp', 'utf8')
+	} catch {
+		return undefined
+	}
+	let hex = (n: number) => n.toString(16).toUpperCase().padStart(4, '0')
+	for (let line of table.split('\n').slice(1)) {
+		let cols = line.trim().split(/\s+/)
+		if (cols[1]?.endsWith(`:${hex(peerPort)}`) && cols[2]?.endsWith(`:${hex(port)}`)) return Number(cols[7])
+	}
+	return -1
+}
+
+// `getSignal` gives the running turn's signal; Hal tools run only then.
+function start(
+	sessionId: string,
+	getSignal: () => AbortSignal | undefined,
+	onResult?: (res: McpResult) => void,
+): McpBridge {
 	let sockets = new Set<Socket<SocketState>>()
 	let decoder = new TextDecoder()
 	let server = Bun.listen<SocketState>({
@@ -117,10 +142,16 @@ function start(sessionId: string, getSignal: () => AbortSignal, onResult?: (res:
 		port: 0,
 		socket: {
 			open(socket) {
+				let uid = agyMcp.peerUid(server.port, socket.remotePort)
+				if (uid !== undefined && uid !== process.getuid?.()) {
+					diag.log(`agy-mcp ${sessionId}: refused a connection from uid ${uid}`)
+					return void socket.end()
+				}
 				socket.data = { buf: '' }
 				sockets.add(socket)
 			},
 			data(socket, chunk) {
+				if (!sockets.has(socket)) return
 				socket.data.buf += decoder.decode(chunk, { stream: true })
 				let lines = socket.data.buf.split('\n')
 				socket.data.buf = lines.pop()!
@@ -161,4 +192,4 @@ function start(sessionId: string, getSignal: () => AbortSignal, onResult?: (res:
 	}
 }
 
-export const agyMcp = { excluded, list, call, handle, start }
+export const agyMcp = { excluded, list, call, handle, peerUid, start }

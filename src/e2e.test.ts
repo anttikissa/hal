@@ -488,7 +488,7 @@ for await (let chunk of Bun.stdin.stream()) {
 	type(p, '\x12') // Ctrl-R
 	await until('restarted host ready', () => seen(p, 'AGY(after cancel)', mark) && seen(p, '/keys', mark))
 	type(p, 'after restart\r')
-	await until('reply after restart', () => seen(p, 'AGY(after restart)', mark))
+	await until('reply after restart', () => seen(p, 'AGY(after restart)', mark) && ends().length === 4)
 	let methods = rpcMethods()
 	expect(methods.filter((m) => m === 'session/new')).toHaveLength(1)
 	expect(methods.filter((m) => m === 'session/resume')).toHaveLength(1)
