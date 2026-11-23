@@ -391,3 +391,110 @@ test('a peer that takes over keeps tabs and names the old host changed after the
 	expect(open()).toContain(added!)
 	expect(name(added!)).toBe('Kept after takeover')
 }, 30_000)
+
+test('agy replays a recorded ACP session: prompt, tool cards, cancel, and resume after restart', async () => {
+	let fixture = `${import.meta.dir}/fixtures/agy-acp.jsonl`
+	let logFile = `${home}/agy-rpc.log`
+	let fakeAgy = `${home}/fake-agy.ts`
+	writeFileSync(
+		fakeAgy,
+		`import { appendFileSync, readFileSync } from 'fs'
+const log = ${JSON.stringify(logFile)}
+const recs = readFileSync(${JSON.stringify(fixture)}, 'utf8').trim().split('\\n').map((l) => JSON.parse(l))
+const byKind = (k: string) => recs.find((r: any) => r.kind === k)?.result
+const updates = recs.filter((r: any) => r.kind === 'update').map((r: any) => r.update)
+if (process.argv[2] === 'models') {
+	for (let m of byKind('session/new').models.availableModels) process.stdout.write(m.modelId + '\\t' + m.name + '\\n')
+	process.exit(0)
+}
+const send = (m: object) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+let sid = byKind('session/new').sessionId
+let cancelPending: (() => void) | undefined
+const dec = new TextDecoder()
+let buf = ''
+for await (let chunk of Bun.stdin.stream()) {
+	buf += dec.decode(chunk, { stream: true })
+	let lines = buf.split('\\n')
+	buf = lines.pop()!
+	for (let line of lines) {
+		if (!line.trim()) continue
+		let m = JSON.parse(line)
+		appendFileSync(log, JSON.stringify({ method: m.method, params: m.params }) + '\\n')
+		if (m.method === 'initialize') send({ id: m.id, result: byKind('initialize') })
+		else if (m.method === 'session/new') send({ id: m.id, result: byKind('session/new') })
+		else if (m.method === 'session/resume') {
+			sid = m.params.sessionId
+			send({ id: m.id, result: {} })
+		} else if (m.method === 'session/set_model' || m.method === 'session/set_config_option') send({ id: m.id, result: {} })
+		else if (m.method === 'session/cancel') {
+			cancelPending?.()
+			cancelPending = undefined
+		} else if (m.method === 'session/prompt') {
+			let text = (m.params.prompt ?? []).map((p: any) => p.text ?? '').join('\\n').replace(/<hal-note>[\\s\\S]*?<\\/hal-note>/g, '')
+			let lastLine = text.trim().split('\\n').at(-1) ?? ''
+			if (lastLine.includes('hold')) {
+				send({ method: 'session/update', params: { sessionId: sid, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'AGY_PART1' } } } })
+				cancelPending = () => send({ id: m.id, result: { stopReason: 'cancelled' } })
+			} else {
+				if (lastLine.includes('tool'))
+					for (let u of updates) send({ method: 'session/update', params: { sessionId: sid, update: u } })
+				else
+					send({ method: 'session/update', params: { sessionId: sid, update: { sessionUpdate: 'usage_update', used: 10226, size: 1048576 } } })
+				send({ method: 'session/update', params: { sessionId: sid, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'AGY(' + lastLine + ')' } } } })
+				send({ id: m.id, result: byKind('session/prompt') })
+			}
+		}
+	}
+}
+`,
+	)
+	writeFileSync(
+		`${home}/local.ts`,
+		readFileSync(`${home}/local.ts`, 'utf8') +
+			`import { agy } from ${JSON.stringify(`${import.meta.dir}/host/agy.ts`)}\n` +
+			`agy.command = () => [process.execPath, ${JSON.stringify(fakeAgy)}]\n`,
+	)
+	writeFileSync(
+		`${home}/sessions/1-ready/session.ason`,
+		ason.stringify({
+			id: '1-ready',
+			cwd: `${import.meta.dir}/..`,
+			model: 'agy/gemini-4-neon',
+			createdAt: new Date().toISOString(),
+		}) + '\n',
+	)
+	let rpcMethods = () =>
+		existsSync(logFile)
+			? readFileSync(logFile, 'utf8')
+					.trim()
+					.split('\n')
+					.filter(Boolean)
+					.map((l) => JSON.parse(l).method as string)
+			: []
+
+	let p = run()
+	await until('the agy tab to be shown', () => seen(p, '1-ready'))
+	type(p, 'run tool\r')
+	await until('agy tool cards and reply', () => seen(p, 'AGY(run tool)') && seen(p, 'bash Echo probe-ok'))
+
+	type(p, 'hold agy\r')
+	await until('streamed partial reply', () => seen(p, 'AGY_PART1'))
+	type(p, '\x1b')
+	await until('paused after cancel', () => seen(p, 'Paused.') && rpcMethods().includes('session/cancel'))
+	type(p, 'after cancel\r')
+	await until('reply after cancel', () => seen(p, 'AGY(after cancel)') && ends().length === 3)
+
+	let mark = p.out.length
+	type(p, '\x12') // Ctrl-R
+	await until('restarted host ready', () => seen(p, 'AGY(after cancel)', mark) && seen(p, '/keys', mark))
+	type(p, 'after restart\r')
+	await until('reply after restart', () => seen(p, 'AGY(after restart)', mark))
+	let methods = rpcMethods()
+	expect(methods.filter((m) => m === 'session/new')).toHaveLength(1)
+	expect(methods.filter((m) => m === 'session/resume')).toHaveLength(1)
+	expect(ends()).toEqual(['completed', 'paused', 'completed', 'completed'])
+
+	type(p, '\x03')
+	await until('quit', () => p.exit !== undefined)
+	expect(p.exit).toBe(0)
+}, 30_000)
