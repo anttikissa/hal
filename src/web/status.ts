@@ -24,6 +24,7 @@ const general = (plan: { windows: Record<string, number> }) =>
 
 function context(st: ViewState): StatusPart | undefined {
 	let stats = st.transcript?.stats
+	if (stats?.contextUnknown && !stats.context) return { text: 'unknown' }
 	if (!stats?.window) return
 	let percent = Math.round(((stats.context ?? 0) / stats.window) * 100)
 	return { text: `${percent}%`, heat: clamp(percent) }
@@ -79,6 +80,7 @@ function groups(st: ViewState): StatusGroup[] {
 			href: `/context/${meta.id}`,
 		})
 	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
+	else if (stats?.contextUnknown) out.push({ parts: [{ text: 'context unknown' }], href: `/context/${meta.id}` })
 	if (stats?.plan) {
 		let plan = stats.plan
 		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}` : ''}` }]

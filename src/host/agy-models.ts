@@ -17,6 +17,8 @@ export type ModelEntry = {
 const state = {
 	offered: [] as string[],
 	catalog: new Map<string, ModelEntry>(),
+	// Context windows reported by agy via usage_update.size, per base model.
+	windows: new Map<string, number>(),
 }
 
 const effortSuffix = /^(.*)-(low|medium|high|xhigh|max)$/
@@ -134,4 +136,8 @@ function resolve(model: string, effort?: string): { modelId: string; level?: Eff
 	return { modelId, level }
 }
 
-export const agyModels = { state, record, known, fetch, displayName, capability, resolve }
+function contextWindow(model: string): number | undefined {
+	return state.windows.get(model)
+}
+
+export const agyModels = { state, record, known, fetch, displayName, contextWindow, capability, resolve }

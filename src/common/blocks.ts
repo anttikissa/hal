@@ -148,8 +148,9 @@ export type StreamEvent =
 	| { type: 'signature'; value: string }
 	| ({ type: 'tool_call' } & Omit<ToolCallBlock, 'type'>)
 	| HostedToolBlock
-	// `account`: the credentials' label that served the request.
-	| { type: 'usage'; usage: Usage; account?: string }
+	// `account`: the credentials' label that served the request;
+	// `context`: live context occupancy when reported apart from cumulative usage.
+	| { type: 'usage'; usage: Usage; context?: number; account?: string }
 	| DoneEvent
 	| ErrorEvent
 
@@ -158,6 +159,7 @@ export type Turn = {
 	provider: string
 	blocks: AssistantBlock[]
 	usage: Usage
+	context?: number
 	account?: string
 	end?: DoneEvent | ErrorEvent
 }
@@ -201,6 +203,7 @@ function apply(turn: Turn, event: StreamEvent): void {
 			break
 		case 'usage':
 			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v
+			if (event.context !== undefined) turn.context = event.context
 			if (event.account) turn.account = event.account
 			break
 		default:

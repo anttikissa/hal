@@ -70,6 +70,9 @@ export type Provider = {
 	// Provider executes side-effectful tools itself, so Hal must not
 	// automatically retry failed or interrupted turns with "continue".
 	noAutoRetry?: boolean
+	// Provider owns its own conversation context; before it reports usage,
+	// Hal shows context as unknown instead of 0.
+	externalContext?: boolean
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	available?(): boolean

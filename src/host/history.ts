@@ -74,7 +74,7 @@ function contextNotice(id: string, records: HistoryRecord[], usage: Usage): void
 
 // What the running turn's latest round with usage took in, if any.
 function contextOf(r: Running): { context?: number } {
-	let c = taken(r.turn.usage) || r.context
+	let c = r.turn.context ?? (taken(r.turn.usage) || r.context)
 	return c ? { context: c } : {}
 }
 

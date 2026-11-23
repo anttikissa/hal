@@ -9,6 +9,7 @@ import type { Plan, Stats } from '../common/snapshot.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'
+import { provider } from './provider.ts'
 import { subscriptions } from '../common/subscriptions.ts'
 import { contextPage } from './context-page.ts'
 import { pages } from './pages.ts'
@@ -64,6 +65,8 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	if (context) out.context = context
 	let window = models.contextWindow(model)
 	if (window) out.window = window
+	let parsed = blocks.parseModelId(model)
+	if (!context && parsed && provider.state.providers[parsed.provider]?.externalContext) out.contextUnknown = true
 	let p = stats.plan(id, model)
 	if (p) out.plan = p
 	return out
@@ -71,8 +74,12 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 
 // A finished provider round, before the turn ends: its intake is the
 // context now.
-function round(id: string, usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number }): Stats {
-	let context = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+function round(
+	id: string,
+	usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number },
+	explicit?: number,
+): Stats {
+	let context = explicit ?? (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
 	if (context) stats.state.context.set(id, context)
 	contextPage.notify(id)
 	return stats.of(id)

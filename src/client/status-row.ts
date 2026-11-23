@@ -85,6 +85,7 @@ function left(info: StatusInfo, full = true): Part[][] {
 			].map((p) => ({ ...p, href: `/context/${info.id}` })),
 		)
 	} else if (s?.context) out.push([{ text: kilo(s.context), href: `/context/${info.id}` }])
+	else if (s?.contextUnknown) out.push([{ text: 'context unknown', href: `/context/${info.id}` }])
 	return out
 }
 

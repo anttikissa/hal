@@ -71,5 +71,12 @@ export type Snapshot = {
 // started. `plan`: the subscription account the session's next request
 // goes to: its /status id (o3), how many subscriptions the provider
 // has, the key into the client-wide subscription usage store.
-export type Stats = { context?: number; window?: number; files?: number; plan?: Plan; effort?: string }
+export type Stats = {
+	context?: number
+	window?: number
+	contextUnknown?: true
+	files?: number
+	plan?: Plan
+	effort?: string
+}
 export type Plan = { account: string; accounts: number; key: string }

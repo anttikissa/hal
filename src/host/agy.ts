@@ -366,9 +366,15 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.effort = level
 	}
 	if (signal.aborted) return
+	let lastUsed: number | undefined
 	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
 		if (kind === 'config_option_update') return recordConfigOptions(agent, u.configOptions)
+		if (kind === 'usage_update') {
+			if (typeof u.size === 'number' && u.size > 0) agyModels.state.windows.set(req.model, u.size)
+			if (typeof u.used === 'number' && u.used > 0) lastUsed = u.used
+			return
+		}
 		if (kind === 'agent_message_chunk' && u.content?.type === 'text') emit({ type: 'text', text: u.content.text })
 		else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
 			emit({ type: 'thinking', text: u.content.text })
@@ -421,11 +427,15 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 			return
 		}
 		let u = result?.usage
-		if (u)
-			emit({
-				type: 'usage',
-				usage: { input: u.inputTokens ?? 0, cacheRead: u.cachedReadTokens ?? 0, output: u.outputTokens ?? 0 },
-			})
+		let usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number } = {}
+		if (u) {
+			if (typeof u.inputTokens === 'number' && u.inputTokens > 0) usage.input = u.inputTokens
+			if (typeof u.cachedReadTokens === 'number' && u.cachedReadTokens > 0) usage.cacheRead = u.cachedReadTokens
+			if (typeof u.cachedWriteTokens === 'number' && u.cachedWriteTokens > 0) usage.cacheWrite = u.cachedWriteTokens
+			if (typeof u.outputTokens === 'number' && u.outputTokens > 0) usage.output = u.outputTokens
+		}
+		if (Object.keys(usage).length || lastUsed !== undefined)
+			emit({ type: 'usage', usage, ...(lastUsed !== undefined && { context: lastUsed }) })
 		let reason = result?.stopReason
 		emit({ type: 'done', reason: reason === 'max_tokens' ? 'max_tokens' : reason === 'refusal' ? 'refusal' : 'end' })
 	} finally {

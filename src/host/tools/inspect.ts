@@ -88,7 +88,7 @@ const kilo = (n: number) => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
 
 function context(id: string): string {
 	let s = stats.of(id)
-	if (!s.context) return 'none'
+	if (!s.context) return s.contextUnknown ? 'unknown' : 'none'
 	return s.window
 		? `${kilo(s.context)}/${kilo(s.window)} (${Math.round((s.context / s.window) * 100)}%)`
 		: kilo(s.context)
