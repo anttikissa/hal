@@ -40,4 +40,16 @@ function seek(
 	return more ? 'older' : 'missing'
 }
 
-export const target = { parse, href: (session: string, key: string) => transcript.href(session, key), row, seek }
+// A jump to session `session`'s first message: it holds each earlier
+// page and fetches the next, applying them together with the last.
+function walking(t: (Target & { found?: true }) | undefined, session: string): boolean {
+	return t?.session === session && t.key === '1' && !t.found
+}
+
+export const target = {
+	parse,
+	href: (session: string, key: string) => transcript.href(session, key),
+	row,
+	seek,
+	walking,
+}
