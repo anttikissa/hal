@@ -181,6 +181,7 @@ function resolve(input: string): { id?: string; login?: string } {
 		!version &&
 		![
 			'sol',
+			'neon',
 			'opus',
 			'astra',
 			'luna',
@@ -201,7 +202,9 @@ function resolve(input: string): { id?: string; login?: string } {
 			? 'openai'
 			: ['opus', 'sonnet', 'fable', 'haiku'].includes(family)
 				? 'anthropic'
-				: undefined
+				: family === 'neon'
+					? 'agy'
+					: undefined
 	let candidates = models
 		.known()
 		.filter((id) => (own ? id.startsWith(`${own}/`) : id.split('/').slice(1).join('/').toLowerCase().includes(family)))
@@ -212,12 +215,14 @@ function resolve(input: string): { id?: string; login?: string } {
 	let providers = own ? [own] : ['opencode-go', 'openrouter']
 	for (let name of providers) {
 		let available =
-			name === 'openai' || name === 'anthropic'
-				? !!(
-						auth.envKey(name as Kind) ||
-						(existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length)
-					)
-				: !!(apiKeys.get(name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
+			name === 'agy'
+				? !!provider.state.providers.agy?.available?.()
+				: name === 'openai' || name === 'anthropic'
+					? !!(
+							auth.envKey(name as Kind) ||
+							(existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length)
+						)
+					: !!(apiKeys.get(name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
 		if (!available) continue
 		let found = version
 			? candidates.find((id) => id.startsWith(`${name}/`))
@@ -233,7 +238,9 @@ function resolve(input: string): { id?: string; login?: string } {
 				? '/login chatgpt'
 				: own === 'anthropic'
 					? '/login claude'
-					: '/login opencode or /login openrouter',
+					: own === 'agy'
+						? 'install the Antigravity CLI (agy) and sign in'
+						: '/login opencode or /login openrouter',
 	}
 }
 
