@@ -1,7 +1,7 @@
 {
 	title: 'Web tab strip: lit numbers, key, rings and a count',
 	spec: "The web tab strip runs edge to edge and scrolls natively; it has no chevrons and no menu button. It is 44px tall (36px on fine pointers). Each number is lit in its tab's project color (the inactive color without one). The shown tab is a solid key in that color, 30px tall (26px on fine pointers), with its number and name in the canvas color. A tab that waits for the user rings its number in its mark color from the host theme (by data-mark kind, task fr's common mapping); paused rings are dashed. A working tab blinks a block after its number; marks show no glyphs. At the right, a count shows the total in a 12px box and opens the full list; a dot in the mark color shows the most urgent waiting mark (failed, approval, blocked, asking, done) among tabs under 10% visible, and its label says so. The new-tab button shows only on fine pointers. Selecting a tab centers it on the nearest tab start; scrolling never selects. The list sheet uses the same faces. This replaces task ce's chevrons, task 3k's web menu button and equal web cells, task gn's tinted current cell and task fr's web glyphs; the terminal is unchanged.",
-	status: 'planned',
+	status: 'done',
 	notes: [
 		"The shown tab is wider than the others, so the visible range comes from each tab's rendered rect, and centering targets the tab start nearest the ideal center: proximity snapping lands there anyway, and an exact center would snap back. The track is position: relative so offsetLeft is track-relative.",
 		'Mark colors moved from .marker classes to [data-mark] on the tab link (host/web-page.ts), so a ring, a blink and the count dot share one theme rule.',
