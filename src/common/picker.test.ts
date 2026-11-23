@@ -193,6 +193,26 @@ test('a family lists its flagships; variants and non-chat models wait in closed 
 	expect(enter(picker.step(st, key('d', 'daybreak'), all).state)).toBe('/model openai/gpt-daybreak-blue-latest')
 })
 
+test('any variant of a family two newest versions is a flagship unless minor', () => {
+	let all = [
+		'agy/gemini-4-neon',
+		'agy/gemini-4-argon',
+		'agy/gemini-3.8-flash',
+		'agy/gemini-4-mini',
+		'agy/gemini-pro-orchestrator-neon',
+		'google/gemini-3.1-pro-preview',
+		'google/gemini-3-flash-preview',
+	]
+	let text = rows(picker.open('agy/gemini-4-neon', all)).join('\n')
+	expect(text).toMatch(/✓ 4-neon\t/)
+	expect(text).toMatch(/4-argon\t/)
+	expect(text).toMatch(/3\.8-flash\t/)
+	expect(text).toMatch(/▶ older$/m)
+	expect(text).not.toMatch(/4-mini|orchestrator/)
+	let google = rows(picker.open('google/gemini-3.1-pro-preview', all)).join('\n')
+	expect(google).not.toMatch(/older/)
+})
+
 test('left and right open and close categories while searching too', () => {
 	let st = type(picker.open('hal/intro', tree), 'opus')
 	expect(selected(st)).toMatch(/opus/)
