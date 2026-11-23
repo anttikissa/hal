@@ -18,7 +18,8 @@
 		'Deep history keeps at most 200 transcript rows mounted. A linked card and the live end must each be reachable without mounting the intervening rows.',
 		'Top (status-bar tap) and End share one jump rule (scroll.ts near/dim/land): a target under 2 screens away with no fling running scrolls smoothly; otherwise the transcript fades out (150 ms, ease-in-out; 600 ms when earlier history must load first), jumps with overflow hidden for a frame, then fades back in (reverse of the fade-out). The progress box appears only after 400 ms, with one fixed text, so fast jumps show nothing.',
 		'Bug fixed: a Top tap during an iOS fling landed on the first message, then the momentum stale scroll event (scrollTop past the content end) sent the view to the live end. iOS momentum outlives scrollTop writes; only overflow: hidden stops it. Invariant: a jump during a fling lands on its target and stays there.',
-		'Transcript effect callbacks read signals only inside untrack: the browser tests fail on Solid STRICT_READ_UNTRACKED diagnostics (task f09).'
+		'Transcript effect callbacks read signals only inside untrack: the browser tests fail on Solid STRICT_READ_UNTRACKED diagnostics (task f09).',
+		'Bug fix: Transcript shift() and showEnd() mounted up to 200 virtual-scrolled cards without scroll.quiet(), triggering 300 ms opacity Web Animations (cardMotion.enter) on every mounted card during iOS fling-ups and exhausting GPU/IOSurface layer memory (WebKit Jetsam crash). Invariant: virtual-window row shifts and end jumps mount inside scroll.quiet() so revealed history cards never start enter animations. Verified on iPhone Safari by the user.'
 	],
 	needs: ['4s', 's0'],
 	foldInto: ['4s', 'e5h', '981', '3y', '5cz', 'rha', 't1a', 'mfj', 'ykr', 's0']

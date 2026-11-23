@@ -131,8 +131,10 @@ export function Transcript(props: {
 		let shift = (next: number, moved: () => number) => {
 			scroll.reading()
 			placed = `${id()}\n${all()[next]!.key}`
-			setStart(next)
-			flush()
+			scroll.quiet(() => {
+				setStart(next)
+				flush()
+			})
 			setPad(scroll.state.pad - moved())
 			last = el.scrollTop
 			if (!scroll.state.moving?.()) settle()
@@ -190,8 +192,10 @@ export function Transcript(props: {
 		)
 		scroll.state.showEnd = () => {
 			if (all().length > start() + limit) {
-				setStart(Math.max(0, all().length - first))
-				flush()
+				scroll.quiet(() => {
+					setStart(Math.max(0, all().length - first))
+					flush()
+				})
 			}
 		}
 		el.addEventListener('scroll', advance, { passive: true })
