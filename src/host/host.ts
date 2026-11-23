@@ -39,6 +39,7 @@ import { wire } from './wire.ts'
 import { queueEdits } from './queue-edits.ts'
 import { recap } from './recap.ts'
 import { promptCache } from './prompt-cache.ts'
+import { provider } from './provider.ts'
 import { settings } from '../common/settings.ts'
 import { webDiagnostics } from './web-diagnostics.ts'
 import { diag } from './diag.ts'
@@ -350,6 +351,13 @@ function broadcast(id: string, event: Event): void {
 // The turns stay unfinished, so the next Hal continues them. But if the
 // user quit and no other Hal process is running, they are saved as paused
 // instead: work the user stopped stays stopped until the user looks at it.
+function stopProviders(): void {
+	for (let name of Object.keys(provider.state.providers)) {
+		let desc = Object.getOwnPropertyDescriptor(provider.state.providers, name)
+		if (desc && 'value' in desc) (desc.value as { stopAll?(): void })?.stopAll?.()
+	}
+}
+
 function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
@@ -358,6 +366,7 @@ function init(): void {
 		for (let r of turns.state.running.values()) r.controller.abort()
 		jobs.killAll()
 		mcp.stopAll()
+		stopProviders()
 	})
 	clock.init()
 }
@@ -374,6 +383,7 @@ function reset(): void {
 	tools.running.clear()
 	jobs.killAll()
 	mcp.stopAll()
+	stopProviders()
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()

@@ -32,6 +32,7 @@ type Agent = {
 	mcp?: McpBridge
 	turnSignal?: AbortSignal
 	canceling?: Promise<void>
+	idleTimer?: ReturnType<typeof setTimeout>
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -151,6 +152,7 @@ function spawn(sessionId: string, cwd: string): Agent {
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
 	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => appendStderr(agent, line))
 	void proc.exited.then(async (code) => {
+		if (agent.idleTimer) clearTimeout(agent.idleTimer)
 		await agent.stderrDone.catch(() => {})
 		agent.mcp?.stop()
 		let why = code === null ? `signal ${proc.signalCode ?? 'unknown'}` : `code ${code}`
@@ -160,6 +162,31 @@ function spawn(sessionId: string, cwd: string): Agent {
 		if (state.agents.get(sessionId) === agent) state.agents.delete(sessionId)
 	})
 	return agent
+}
+
+function scheduleIdle(sessionId: string, agent: Agent): void {
+	if (agent.idleTimer) clearTimeout(agent.idleTimer)
+	if (agent.exited || agent.turnSignal || agy.idleTimeoutMs <= 0) return
+	agent.idleTimer = setTimeout(() => {
+		if (state.agents.get(sessionId) === agent && !agent.turnSignal) agy.stop(sessionId)
+	}, agy.idleTimeoutMs)
+	agent.idleTimer.unref?.()
+}
+
+function stop(sessionId: string): void {
+	let agent = state.agents.get(sessionId)
+	if (!agent) return
+	state.agents.delete(sessionId)
+	if (agent.idleTimer) clearTimeout(agent.idleTimer)
+	agent.idleTimer = undefined
+	agent.mcp?.stop()
+	try {
+		agent.proc.kill()
+	} catch {}
+}
+
+function stopAll(): void {
+	for (let id of state.agents.keys()) agy.stop(id)
 }
 
 async function readLines(stream: ReadableStream<Uint8Array>, each: (line: string) => void): Promise<void> {
@@ -312,6 +339,10 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let cwd = sessions.open(sessionId).cwd
 	let agent = await agentFor(sessionId, cwd)
+	if (agent.idleTimer) {
+		clearTimeout(agent.idleTimer)
+		agent.idleTimer = undefined
+	}
 	if (agent.canceling) {
 		await Promise.race([
 			agent.canceling,
@@ -442,6 +473,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		signal.removeEventListener('abort', onAbort)
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
 		if (agent.turnSignal === signal) agent.turnSignal = undefined
+		scheduleIdle(sessionId, agent)
 	}
 }
 
@@ -495,8 +527,12 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncIterable<Stream
 
 export const agy = {
 	state,
+	// Stop an idle agy acp process after 15 minutes; the next prompt resumes via agy.ason.
+	idleTimeoutMs: 15 * 60_000,
 	command: (): string[] => ['agy'],
 	models: (signal?: AbortSignal) => agyModels.fetch(agy.command(), signal),
+	stop,
+	stopAll,
 	open,
 	parse,
 }

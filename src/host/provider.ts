@@ -73,6 +73,9 @@ export type Provider = {
 	// Provider owns its own conversation context; before it reports usage,
 	// Hal shows context as unknown instead of 0.
 	externalContext?: boolean
+	// Optional lifecycle hooks for providers that run per-session processes.
+	stop?(sessionId: string): void
+	stopAll?(): void
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	available?(): boolean

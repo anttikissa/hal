@@ -2,7 +2,8 @@
 // with agy.ts loaded on first use (task xbp).
 import type { Provider } from '../provider.ts'
 
-const load = () => (require('../agy.ts') as typeof import('../agy.ts')).agy
+let loaded: typeof import('../agy.ts').agy | undefined
+const load = () => (loaded ??= (require('../agy.ts') as typeof import('../agy.ts')).agy)
 const loadModels = () => (require('../agy-models.ts') as typeof import('../agy-models.ts')).agyModels
 
 export const provider: Provider = {
@@ -18,4 +19,6 @@ export const provider: Provider = {
 	displayName: (model) => loadModels().displayName(model),
 	contextWindow: (model) => loadModels().contextWindow(model),
 	capability: (model) => loadModels().capability(model),
+	stop: (sessionId) => loaded?.stop(sessionId),
+	stopAll: () => loaded?.stopAll(),
 }

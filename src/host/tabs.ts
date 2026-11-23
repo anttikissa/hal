@@ -22,6 +22,7 @@ import { models } from './models.ts'
 import { notify } from './notify.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
+import { provider } from './provider.ts'
 import { projects } from './projects.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { states } from '../common/states.ts'
@@ -292,6 +293,10 @@ function stopOwned(id: string): void {
 			tabs.stopOwned(child)
 	}
 	jobs.kill(id)
+	for (let name of Object.keys(provider.state.providers)) {
+		let desc = Object.getOwnPropertyDescriptor(provider.state.providers, name)
+		if (desc && 'value' in desc) (desc.value as { stop?(id: string): void })?.stop?.(id)
+	}
 	if (states.busy(status.stateOf(id))) {
 		let refused = turns.stop(id, 'tab closed', true)
 		if (refused) throw new Error(`cannot stop ${id}: ${refused}`)
