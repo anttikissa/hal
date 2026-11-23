@@ -1,0 +1,10 @@
+{
+	title: 'Antigravity (agy) as a Hal model through ACP',
+	spec: "Model ids agy/<model> (gemini-4-neon, gemini-3.8-flash, ...) run Google's unmodified agy CLI as an Agent Client Protocol server (agy acp --disable-telemetry --dangerously-skip-permissions), one process per Hal session, started on its first agy request, so a Google AI subscription works in Hal under Google's own login; Hal never handles Google credentials. agy keeps its own conversation and runs its own tools: Hal sends only the user input that is new since agy last saw the history, and starts a new agy session seeded with a text transcript of the Hal history whenever the history no longer extends what agy saw (host restart, compact, rebase, edit, fork, cwd change, another model's turn). agy's tool calls become hosted_tool blocks: shown as finished tool cards, never run by Hal, replayed to other models as notes. Text and thinking stream; usage comes from the prompt result; stop sends session/cancel. Effort picks agy's model variant (<model>-<effort>). Hal's system prompt and tools do not reach agy. Rationale: Google allows subscription use only through its own agent binary spoken to over ACP; extracting or proxying its tokens risks account suspension.",
+	status: 'done',
+	notes: [
+		"Checked by hand 2026-11-23 against agy 1.5.15 with a scratch home: a first prompt edited a file through agy; after a host restart the transcript seed let agy answer about the earlier turn; a following prompt on the live host reused the agy process and session (agy's ACP log: one session/new, two session/prompt). agy's session/new lists model ids with effort suffixes (gemini-4-neon-high) and also Claude Opus/Sonnet 5.5. Not yet checked: stop mid-turn, switching to another model and back. No tests yet: first playable, experimental.",
+		"Open (review by 14-huh, openai/gpt-6.2-astra): Hal's automatic retries after a failed agy turn send 'continue' to an agy that may already have done the work; agy supports session/load and resume, unused; Hal's approval UI is unused (permissions skipped); SPAWN with an agy model would not honor tools restrictions."
+	],
+	needs: []
+}
