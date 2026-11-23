@@ -139,7 +139,7 @@ function statusTap(top: () => void): () => void {
 	let onScroll = () => {
 		if (scrollY > 0) return
 		if (touching || performance.now() < dragUntil) return requestAnimationFrame(park)
-		if (performance.now() > quietUntil || !document.activeElement?.matches('textarea, input')) top()
+		if (performance.now() > quietUntil && !document.activeElement?.matches('textarea, input')) top()
 		requestAnimationFrame(park)
 	}
 	let down = () => (touching = true)
@@ -152,7 +152,14 @@ function statusTap(top: () => void): () => void {
 		[window, 'scroll', onScroll],
 		[window, 'pageshow', settle],
 		[document, 'focusin', focus],
-		[document, 'focusout', () => setTimeout(focus)],
+		[
+			document,
+			'focusout',
+			() => {
+				quietUntil = performance.now() + 600
+				setTimeout(focus)
+			},
+		],
 		[document, 'touchstart', down],
 		[document, 'touchend', up],
 		[document, 'touchcancel', up],
