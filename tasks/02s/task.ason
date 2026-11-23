@@ -11,7 +11,8 @@
 		'User 2026-10-10: add 2 CSS px of visible separation between labeled composer icons and their names, including Send. Translate the small labels down 2px to preserve the approved icon positions and button geometry.',
 		'User follow-up 2026-10-10: lower both icons and names another 1 CSS px, retaining their new separation. Final transforms are translateY(2px) for labeled action icons and translateY(3px) for their small labels; hit areas remain unchanged.',
 		'User 2026-10-10: back 0.5px; final transforms are translateY(1.5px) for icons and translateY(2.5px) for names.',
-		'Composer action buttons use aria-description for the caption instead of title, so hover shows only our caption and screen readers still hear it, also on touch.'
+		'Composer action buttons use aria-description for the caption instead of title, so hover shows only our caption and screen readers still hear it, also on touch.',
+		"User 2026-11-23: Added Amend ('Amend prompt', edit icon, caption 'Replace the prompt and run it again.') for web prompt editing when replacing or rewinding; the Pause/Continue toggle is hidden during prompt editing (still shown for queued-message editing)."
 	],
 	needs: ['v0g', 'nzv']
 }

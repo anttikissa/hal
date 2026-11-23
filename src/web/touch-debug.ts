@@ -125,6 +125,7 @@ function start(): void {
 				'Nudge',
 				'Attach file',
 				'Save queued message',
+				'Amend prompt',
 			].includes(action)
 		)
 			return action

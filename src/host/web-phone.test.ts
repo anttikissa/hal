@@ -270,3 +270,89 @@ browserTest("the tab list's Find focuses its search field inside the tap", async
 		await b.close()
 	}
 })
+
+browserTest(
+	'prompt editing hides Continue and shows Amend (or Send after side effects), disabled until changed',
+	async () => {
+		let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'first prompt' }] })
+		history.append(id, {
+			type: 'assistant',
+			block: { type: 'tool_call', id: 'c1', name: 'bash', input: { command: 'touch x', description: 'Touch' } },
+		})
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: '' }] })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'second prompt' }] })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: 'working' } })
+		history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+		let b = await browser()
+		try {
+			await server.serve()
+			web.start()
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('[aria-label="Edit prompt"]').length === 2`)
+			let type = (text: string) =>
+				b.evaluate(
+					`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`,
+				)
+			let state = () =>
+				b.evaluate(`(() => {
+					let go = document.querySelector('.actions .go'), r = go.getBoundingClientRect();
+					return {
+						toggle: !!document.querySelector('.actions .toggle'),
+						queue: !!document.querySelector('[aria-label="Queue"]'),
+						label: go.getAttribute('aria-label'),
+						name: go.textContent.trim(),
+						disabled: go.disabled,
+						width: r.width,
+						height: r.height,
+						overflow: document.documentElement.scrollWidth > innerWidth + 1,
+					};
+				})()`)
+			for (let [width, height, touch] of [
+				[390, 760, true],
+				[1280, 800, false],
+			] as const) {
+				await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+				await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+				expect(await b.evaluate(`document.querySelector('.actions .toggle')?.getAttribute('aria-label')`)).toBe(
+					'Continue',
+				)
+				// Newest prompt (no side effects since): Amend, disabled until edited; no Continue toggle.
+				await b.evaluate(`document.querySelectorAll('[aria-label="Edit prompt"]')[1].click()`)
+				await b.waitFor(
+					`!!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'second prompt'`,
+				)
+				let unchanged = await state()
+				expect(unchanged).toMatchObject({
+					toggle: false,
+					queue: false,
+					label: 'Amend prompt',
+					name: 'Amend',
+					disabled: true,
+					overflow: false,
+				})
+				expect(unchanged.width).toBeGreaterThanOrEqual(44)
+				expect(unchanged.height).toBeGreaterThanOrEqual(44)
+				await type('second prompt fixed')
+				expect(await state()).toMatchObject({ toggle: false, label: 'Amend prompt', disabled: false, overflow: false })
+				await b.evaluate(`document.querySelector('.EditBar button').click()`)
+				await b.waitFor(`!document.querySelector('.EditBar') && !!document.querySelector('.actions .toggle')`)
+				// Earlier prompt with side-effect tool after it: Send, disabled until edited; no Continue toggle.
+				await b.evaluate(`document.querySelectorAll('[aria-label="Edit prompt"]')[0].click()`)
+				await b.waitFor(
+					`!!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'first prompt'`,
+				)
+				expect(await state()).toMatchObject({ toggle: false, label: 'Send', name: 'Send', disabled: true })
+				await type('first prompt new')
+				expect(await state()).toMatchObject({ toggle: false, label: 'Send', name: 'Send', disabled: false })
+				await b.evaluate(`document.querySelector('.EditBar button').click()`)
+				await b.waitFor(`!document.querySelector('.EditBar')`)
+			}
+		} finally {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+			await b.close()
+		}
+	},
+	20_000,
+)

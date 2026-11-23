@@ -210,6 +210,7 @@ export function Composer(props: {
 	}
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let queueEditing = () => !!props.view.editing?.queueEdit
+	let promptEditing = () => !!props.view.editing && !props.view.editing.queueEdit
 	let saving = () => !!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving
 	let canSave = () => !!props.view.transcript && queueEdit.ready(props.view.transcript.meta.id)
 	let paused = () => props.view.transcript?.state.type === 'paused'
@@ -259,7 +260,15 @@ export function Composer(props: {
 	// A mouse keeps focus. The main button runs a command, steers a
 	// running turn or sends a message.
 	let action = (): keyof typeof BUTTONS =>
-		queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
+		queueEditing()
+			? 'save'
+			: promptEditing() && !props.view.editing?.changed
+				? 'amend'
+				: view.commandDraft(props.text)
+					? 'run'
+					: busy()
+						? 'steer'
+						: 'send'
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		sync()
@@ -395,17 +404,26 @@ export function Composer(props: {
 					<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
 				</div>
 				<div
-					class={['actions', { 'nudge-actions': !busy() && !paused(), tucked: !busy() && !paused() && !nudgeable() }]}
+					class={[
+						'actions',
+						{
+							'nudge-actions': !promptEditing() && !busy() && !paused(),
+							tucked: !promptEditing() && !busy() && !paused() && !nudgeable(),
+						},
+					]}
 				>
 					{/* Pause and continue without Escape (task v0g); the tap keeps the
-					    keyboard. Idle, Play nudges the model on (task yhn). */}
-					<Action
-						kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'}
-						class="toggle"
-						disabled={!busy() && !paused() && !nudgeable()}
-						onClick={toggle}
-					/>
-					<Show when={busy() && !queueEditing() && !view.commandDraft(props.text)}>
+					    keyboard. Idle, Play nudges the model on (task yhn). Hidden while
+					    editing a prompt: Cancel already leaves and resumes. */}
+					<Show when={!promptEditing()}>
+						<Action
+							kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'}
+							class="toggle"
+							disabled={!busy() && !paused() && !nudgeable()}
+							onClick={toggle}
+						/>
+					</Show>
+					<Show when={busy() && !props.view.editing && !view.commandDraft(props.text)}>
 						<Action kind="queue" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)} />
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
@@ -414,7 +432,12 @@ export function Composer(props: {
 					<Action
 						kind={action()}
 						class="go"
-						disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())}
+						disabled={
+							!props.text.trim() ||
+							!!props.view.form ||
+							(queueEditing() && !canSave()) ||
+							(promptEditing() && props.text === props.view.editing?.original)
+						}
 						onClick={() => send()}
 					/>
 				</div>
@@ -466,6 +489,7 @@ const BUTTONS = {
 	send: { icon: 'send', name: 'Send', label: 'Send', caption: 'Send message to start a turn.' },
 	run: { icon: 'run', name: 'Run', label: 'Run', caption: 'Run the command.' },
 	save: { icon: 'send', name: 'Save', label: 'Save queued message', caption: 'Keep its place in the queue.' },
+	amend: { icon: 'edit', name: 'Amend', label: 'Amend prompt', caption: 'Replace the prompt and run it again.' },
 } satisfies Record<string, { icon: IconName; name: string; label: string; caption: string }>
 
 // iOS can finish a touch on a button without a click (task qp9): a touch
