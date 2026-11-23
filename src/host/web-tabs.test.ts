@@ -54,6 +54,8 @@ browserTest('Unicode drafts keep the composer and tab navigation responsive', as
 
 browserTest('tab squares align with numerals and blink in terminal colors', async () => {
 	let id = tabs.create('/tmp')
+	// The shown tab is a solid key; a second tab blinks in terminal colors.
+	tabs.create('/tmp')
 	let b = await browser()
 	try {
 		await server.serve()
@@ -66,10 +68,11 @@ browserTest('tab squares align with numerals and blink in terminal colors', asyn
 			.list()
 			.map((t) => ({ ...t, state: { type: 'running' as const, phase: 'streaming' as const }, jobs: 1 }))
 		for (let c of host.state.clients) c.deliver({ type: 'tabs', tabs: list })
-		await b.waitFor(`!!document.querySelector('.Tabs .strip .marker.working.with-jobs')?.getAnimations().length`)
+		let marker = `document.querySelector('.Tabs .strip .tab:not([aria-current]) .marker.working')`
+		await b.waitFor(`!!${marker}?.classList.contains('with-jobs') && !!${marker}.getAnimations().length`)
 		let result = JSON.parse(
 			await b.evaluate(`JSON.stringify((() => {
-			let m = document.querySelector('.Tabs .strip .marker.working'), n = m.previousElementSibling;
+			let m = ${marker}, n = m.previousElementSibling;
 			let mr = m.getBoundingClientRect(), nr = n.getBoundingClientRect();
 			let a = m.getAnimations()[0]; a.pause(); a.effect.updateTiming({ delay: 0 });
 			let ctx = document.createElement('canvas').getContext('2d');
@@ -140,14 +143,14 @@ browserTest(
 			// Closing the shown tab lands on its neighbor, replacing the entry.
 			let entries = await b.evaluate(`history.length`)
 			// A real click: focus moves, running focus handlers as the sheet opens.
-			let menu = JSON.parse(
-				await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .menu').getBoundingClientRect())`),
+			let count = JSON.parse(
+				await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .count').getBoundingClientRect())`),
 			)
 			for (let type of ['mousePressed', 'mouseReleased'])
 				await b.call('Input.dispatchMouseEvent', {
 					type,
-					x: menu.x + menu.width / 2,
-					y: menu.y + menu.height / 2,
+					x: count.x + count.width / 2,
+					y: count.y + count.height / 2,
 					button: 'left',
 					clickCount: 1,
 				})
@@ -172,7 +175,7 @@ browserTest(
 				`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`,
 			)
 			expect(await b.evaluate(`history.length`)).toBe(entries)
-			// A phone: the same one row, its menu opening the sheet.
+			// A phone: the same one row, its tab count opening the sheet.
 			await b.call('Emulation.setDeviceMetricsOverride', {
 				width: 390,
 				height: 800,
@@ -180,7 +183,7 @@ browserTest(
 				mobile: true,
 			})
 			expect(await b.evaluate(`document.querySelector('.Tabs').getBoundingClientRect().height < 50`)).toBe(true)
-			await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .menu').click()`)
+			await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .count').click()`)
 			await b.waitFor(
 				`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`,
 			)
@@ -190,13 +193,13 @@ browserTest(
 			await b.waitFor(`document.querySelector('.Picker[open]') && !document.querySelector('.Tabs .sheet').open`)
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
 			await b.waitFor(`!document.querySelector('.Picker[open]')`)
-			await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+			await b.evaluate(`document.querySelector('.Tabs .count').click()`)
 			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
 			await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
 			await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
 			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
-			// The menu's Notifications sheet opens and closes.
-			await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+			// The list's Notifications sheet opens and closes.
+			await b.evaluate(`document.querySelector('.Tabs .count').click()`)
 			await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
 			await b.evaluate(
 				`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent === 'Notifications').click()`,
@@ -215,7 +218,7 @@ browserTest(
 )
 
 browserTest(
-	'web tab paging scrolls with overlap without selecting, and selection recenters',
+	'the web tab strip scrolls natively without selecting, its count dots a waiting tab off screen, and selection centers',
 	async () => {
 		providerHome()
 		let ids = Array.from({ length: 21 }, () => sessions.create({ cwd: testHome() }).id)
@@ -232,30 +235,21 @@ browserTest(
 			})
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await b.call('Page.navigate', { url: `${base()}/${ids[0]}?auth=${webAuth.issue()}` })
-			await b.waitFor(
-				`document.querySelectorAll('.track .tab').length === 21 && document.querySelector('.edge.left')?.disabled`,
-			)
+			await b.waitFor(`document.querySelectorAll('.track .tab').length === 21`)
 			let geometry = `(() => {
 			let track = document.querySelector('.track'), r = track.getBoundingClientRect(), links = [...track.querySelectorAll('.tab')];
 			let visible = links.filter(a => { let t = a.getBoundingClientRect(); return t.left >= r.left - 1 && t.right <= r.right + 1 });
-			let left = document.querySelector('.edge.left'), right = document.querySelector('.edge.right');
-			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, leftDisabled: left.disabled, rightDisabled: right.disabled, opacity: getComputedStyle(left).opacity, target: left.getBoundingClientRect().width, height: left.getBoundingClientRect().height, offscreen: left.classList.contains('offscreen'), border: getComputedStyle(left).borderBottomWidth, weight: getComputedStyle(left).fontWeight, color: getComputedStyle(left).color, activeColor: getComputedStyle(track.querySelector('[aria-current]')).color, gap: Math.abs(visible[0].getBoundingClientRect().left - r.left), snap: getComputedStyle(track).scrollSnapType };
+			let key = track.querySelector('[aria-current]').getBoundingClientRect(), count = document.querySelector('.Tabs .count').getBoundingClientRect();
+			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, height: links[1].getBoundingClientRect().height, width: Math.min(...links.map(a => a.getBoundingClientRect().width)), count: Math.min(count.width, count.height), offCenter: Math.abs(key.left + key.width / 2 - r.left - r.width / 2), dot: document.querySelector('.Tabs .count .dot')?.dataset.mark ?? '', snap: getComputedStyle(track).scrollSnapType };
 		})()`
-			let scrollPage = (side: 'left' | 'right') =>
-				b.evaluate(
-					`new Promise(resolve => { let track = document.querySelector('.track'); track.addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.edge.${side}').click() })`,
-				)
 			let first = await b.evaluate(geometry)
 			expect(first.first).toBe(0)
 			expect(first.last).toBeGreaterThan(0)
-			expect(first.opacity).toBe('0.5')
-			expect(first.target).toBe(24)
 			expect(first.height).toBeGreaterThanOrEqual(44)
-			expect(first.gap).toBeLessThanOrEqual(1)
+			expect(first.width).toBeGreaterThanOrEqual(44)
+			expect(first.count).toBeGreaterThanOrEqual(44)
+			expect(first.dot).toBe('')
 			expect(first.snap).toBe('x') // CSSOM omits the default proximity value.
-			expect(await b.evaluate("[...document.querySelectorAll('.edge')].every(e => !/[0-9]/.test(e.textContent))")).toBe(
-				true,
-			)
 			// Native touch scrolling moves only the strip, not the active session.
 			let swipe = await b.evaluate(
 				"(() => { let r = document.querySelector('.track').getBoundingClientRect(); return { x: r.right - 20, y: r.y + r.height / 2 } })()",
@@ -273,47 +267,22 @@ browserTest(
 				"new Promise(resolve => { let track = document.querySelector('.track'), last = track.scrollLeft, still = 0; let check = () => { let now = track.scrollLeft; still = now === last ? still + 1 : 0; last = now; if (still >= 10) resolve(); else requestAnimationFrame(check); }; requestAnimationFrame(check) })",
 			)
 			await b.waitFor(`(${geometry}).scroll > 0`)
-			expect((await b.evaluate(geometry)).path).toBe(`/${ids[0]}`)
-			// Tapping the already selected tab reveals it again smoothly.
-			await b.evaluate(
-				"new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.track [aria-current]').click() })",
-			)
-			await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
-			await scrollPage('right')
-			await b.waitFor(`(${geometry}).first === ${first.last} && (${geometry}).gap <= 1`)
-			let next = await b.evaluate(geometry)
-			expect(next.path).toBe(`/${ids[0]}`)
-			expect(next.offscreen).toBe(true)
-			expect(next.border).toBe('0px')
-			expect(next.weight).toBe('700')
-			expect(next.color).toBe(next.activeColor)
-			// Urgent hidden status redraws its edge, but never recenters.
-			status.transition(ids[0]!, { type: 'submit' })
-			status.transition(ids[0]!, { type: 'end', error: 'test failure' })
-			await b.waitFor("!!document.querySelector('.edge.left .failed')")
-			expect((await b.evaluate(geometry)).scroll).toBeCloseTo(next.scroll, 0)
-			await scrollPage('left')
-			await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
-			// Select a hidden session using its native link; selection reveals it.
+			let swiped = await b.evaluate(geometry)
+			expect(swiped.path).toBe(`/${ids[0]}`)
+			// A failed tab off screen dots the count, but never recenters.
+			status.transition(ids[20]!, { type: 'submit' })
+			status.transition(ids[20]!, { type: 'end', error: 'test failure' })
+			await b.waitFor(`(${geometry}).dot === 'failed'`)
+			expect((await b.evaluate(geometry)).scroll).toBeCloseTo(swiped.scroll, 0)
+			// Select a hidden session using its native link; selection centers it.
 			await b.evaluate(
 				"new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelectorAll('.track .tab')[10].click() })",
 			)
-			await b.waitFor(
-				`location.pathname === '/${ids[10]}' && (${geometry}).first > 0 && (${geometry}).last >= 10 && (${geometry}).first <= 10`,
-			)
-			let centered = await b.evaluate(geometry)
-			expect(Math.abs((centered.first + centered.last) / 2 - 10)).toBeLessThanOrEqual(0.5)
-			// Page all the way to the end without changing that selection.
-			for (let i = 0; i < 21; i++) {
-				let before = await b.evaluate(geometry)
-				if (before.rightDisabled) break
-				await scrollPage('right')
-				await b.waitFor(`(${geometry}).first > ${before.first} && (${geometry}).gap <= 1`)
-			}
-			let end = await b.evaluate(geometry)
-			expect(end.rightDisabled).toBe(true)
-			expect(end.last).toBe(20)
-			expect(end.path).toBe(`/${ids[10]}`)
+			await b.waitFor(`location.pathname === '/${ids[10]}' && (${geometry}).offCenter <= 44`)
+			// At the scroll end the last tab counts as on screen, so the dot goes.
+			await b.evaluate(`document.querySelector('.track').scrollTo({ left: 1e6, behavior: 'instant' })`)
+			await b.waitFor(`(${geometry}).last === 20 && (${geometry}).dot === ''`)
+			expect((await b.evaluate(geometry)).path).toBe(`/${ids[10]}`)
 		} finally {
 			await b.close()
 		}

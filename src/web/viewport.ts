@@ -132,10 +132,20 @@ function statusTap(top: () => void): () => void {
 		typing()
 		settle()
 	}
+	// A drag at the transcript's top can carry over to the document and
+	// reach 0 too; a status-bar tap sends the page no touches.
+	let touching = false,
+		dragUntil = 0
 	let onScroll = () => {
 		if (scrollY > 0) return
-		if (performance.now() > quietUntil) top()
+		if (touching || performance.now() < dragUntil) return requestAnimationFrame(park)
+		if (performance.now() > quietUntil || !document.activeElement?.matches('textarea, input')) top()
 		requestAnimationFrame(park)
+	}
+	let down = () => (touching = true)
+	let up = () => {
+		touching = false
+		dragUntil = performance.now() + 400
 	}
 	let vv = visualViewport
 	let on: [EventTarget | null, string, () => void][] = [
@@ -143,6 +153,9 @@ function statusTap(top: () => void): () => void {
 		[window, 'pageshow', settle],
 		[document, 'focusin', focus],
 		[document, 'focusout', () => setTimeout(focus)],
+		[document, 'touchstart', down],
+		[document, 'touchend', up],
+		[document, 'touchcancel', up],
 		[vv, 'resize', settle],
 	]
 	for (let [t, k, f] of on) t?.addEventListener(k, f, { passive: true })

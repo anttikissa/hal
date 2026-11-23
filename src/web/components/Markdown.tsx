@@ -94,10 +94,14 @@ export function Markdown(props: {
 			let css = getComputedStyle(el)
 			return `${el.clientWidth}:${css.fontSize}:${css.lineHeight}`
 		}
-		let previous = layout()
+		// Only a held height needs the check. The first callback that holds
+		// one records the start: reading layout as each card mounts forced a
+		// layout per card while a window of cards mounted.
+		let previous: string | undefined
 		let observer = new ResizeObserver(() => {
+			if (!props.streaming && !el.style.minHeight) return void (previous = undefined)
 			let next = layout()
-			if (next === previous) return
+			if (next === (previous ??= next)) return
 			previous = next
 			peak = 0
 			el.style.minHeight = ''

@@ -79,7 +79,7 @@ browserTest(
 			expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
 			// It flashes; scrolled out of view, the address drops its #block.
 			expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
-			await b.evaluate(`document.querySelector('.Transcript').scrollTop = 0`)
+			await b.evaluate(`document.querySelector('.Transcript').scrollTop = 1e9`)
 			await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
 		} finally {
 			await b.close()
@@ -145,7 +145,7 @@ browserTest('answering a linked question keeps following new output at the botto
 		})
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#q${question.n}` })
 		await b.waitFor(`!!document.querySelector('.Question.target')`)
-		let bottom = `document.querySelector('.Transcript').scrollTop >= -1`
+		let bottom = `((t)=>t.scrollHeight-t.clientHeight-t.scrollTop<=1)(document.querySelector('.Transcript'))`
 		await b.waitFor(bottom)
 		history.append(id, { type: 'answer', question: 'approval', answers: { answer: 'yes' } })
 		host.broadcast(id, { type: 'answer', sessionId: id, question: 'approval', answers: { answer: 'yes' } })

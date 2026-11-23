@@ -1,8 +1,7 @@
-// The web status block's facts (tasks a0, 5f): the details dialog's
-// groups, the overview's context, the model name's quota fill and the
-// wide layout's usage windows, all from pushed Stats. Percentages carry
-// `heat`, the whole percent used, which the page colors with the
-// shared curve (.heat-N, colors.heat).
+// The web status row's facts (tasks a0, 5f): the details dialog's
+// groups, the row's context and the usage windows its gauges show, all
+// from pushed Stats. Percentages carry `heat`, the whole percent used,
+// which the page colors with the shared curve (.heat-N, colors.heat).
 
 import { subscriptions } from '../common/subscriptions.ts'
 import { titles } from '../common/titles.ts'
@@ -12,9 +11,6 @@ import type { ViewState } from './view.ts'
 export type StatusPart = { text: string; heat?: number }
 // `path`: cut from the start when too wide, keeping the directory's name.
 export type StatusGroup = { parts: StatusPart[]; path?: true; href?: string }
-// The model name as a quota indicator: the shortest window's name, its
-// percent used and remaining.
-export type Quota = { window: string; used: number; remaining: number }
 export type UsageWindow = { name: string; used: number; resets?: string }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
@@ -30,20 +26,8 @@ function context(st: ViewState): StatusPart | undefined {
 	return { text: `${percent}%`, heat: clamp(percent) }
 }
 
-// None without quota data (API keys, no response yet): the name stays
-// neutral rather than implying a full or empty quota.
-function quota(st: ViewState): Quota | undefined {
-	let plan = st.transcript?.stats?.plan
-	if (!plan) return
-	let all = windows(st)
-	let window = usageWindows.shortest(Object.fromEntries(all.map((w) => [w.name, w.used])))
-	if (window === undefined) return
-	let used = all.find((w) => w.name === window)!.used
-	return { window, used, remaining: 100 - used }
-}
-
-// The windows after the model name on wide layouts, shortest first;
-// windows a full one outlasts are left out.
+// The usage windows the gauges show, shortest first; windows a full one
+// outlasts are left out.
 function windows(st: ViewState): UsageWindow[] {
 	let plan = st.transcript?.stats?.plan
 	if (!plan) return []
@@ -91,4 +75,4 @@ function groups(st: ViewState): StatusGroup[] {
 	return out
 }
 
-export const status = { groups, context, quota, windows, reset: (at: string) => usageWindows.reset(at) }
+export const status = { groups, context, windows, reset: (at: string) => usageWindows.reset(at) }

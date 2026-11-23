@@ -1,17 +1,19 @@
 /// <reference lib="dom" />
-// The host's tabs above the conversation. When they overflow, the strip
-// scrolls independently of selection (task ce); terminal paging stays in
-// common/tab-pages.ts.
-// Native horizontal momentum scrolling; edge buttons provide secondary paging.
-// Tab links retain native Cmd- and middle-click behavior, and native link
-// drags; a drag dropped on the strip reorders the tabs.
+// The host's tabs above the conversation. Each number is lit in its
+// project color; the shown tab is a solid key in that color with its
+// name. A number rings while its tab waits for you; a working tab
+// blinks a block cursor. The strip scrolls natively, independent of
+// selection (task ce); the count at the right opens the full list and
+// dots when a tab off screen waits. Terminal paging stays in
+// common/tab-pages.ts. Tab links retain native Cmd- and middle-click
+// behavior, and native link drags; a drag dropped on the strip
+// reorders the tabs.
 
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import { home } from '../../common/home.ts'
 import { settings } from '../../common/settings.ts'
 import type { Tab } from '../../common/protocol.ts'
-import type { Edge } from '../../common/tab-pages.ts'
-import { tabMark, type Mark } from '../../common/tab-mark.ts'
+import { tabMark, type Mark, type MarkKind } from '../../common/tab-mark.ts'
 import { tabPages } from '../../common/tab-pages.ts'
 import { router } from '../router.ts'
 import { Notifications } from './Notifications.tsx'
@@ -22,9 +24,13 @@ import { touchDebug } from '../touch-debug.ts'
 import { find } from '../find.ts'
 import { Icon } from './Icon.tsx'
 
-// Characters a name gets in a cell.
-const NAME = 12
+// A tab's width, for drag autoscroll.
+const CELL = 44
+// Marks that wait for you, most urgent first: they dot the count.
+const WAITS: MarkKind[] = ['failed', 'approval', 'blocked', 'asking', 'done']
 
+// A blinking block while the tab works; other marks ring the number
+// (CSS) and only label it here.
 function Marker(props: { mark: Mark | undefined }) {
 	let marker!: HTMLSpanElement
 	// A memo: an effect reruns whenever its source does, equal or not,
@@ -48,15 +54,7 @@ function Marker(props: { mark: Mark | undefined }) {
 			]}
 			role="img"
 			aria-label={props.mark?.label}
-		>
-			{props.mark?.kind === 'paused' ? (
-				<Icon name="pauseFill" />
-			) : props.mark?.glyph === '▪' ? (
-				''
-			) : (
-				(props.mark?.glyph ?? '')
-			)}
-		</span>
+		/>
 	)
 }
 
@@ -76,44 +74,38 @@ function Link(props: {
 	dir?: boolean
 	drop?: 'before' | 'after'
 	onPick?: () => void
+	firstCard?: () => void
 }) {
+	let mark = () => tabMark.mark(props.tab)
 	return (
 		<a
 			href={router.format(props.tab.id)}
 			class="tab"
 			data-id={props.tab.id}
 			data-drop={props.drop}
+			data-mark={mark()?.kind}
 			style={props.tab.color === undefined ? undefined : { '--project': `var(--p${props.tab.color})` }}
 			aria-current={props.shown ? 'page' : undefined}
-			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}`}
+			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}${mark() ? ` · ${mark()!.label}` : ''}`}
 			onPointerDown={() => tabs.press(props.tab.id)}
-			onClick={(e) => click(e, props.tab.id, props.onPick)}
+			onClick={(e) => {
+				if (props.shown && props.firstCard && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+					e.preventDefault()
+					props.firstCard()
+				} else click(e, props.tab.id, props.onPick)
+			}}
 		>
-			<span class="n">{props.n}</span>
-			<Marker mark={tabMark.mark(props.tab)} />
-			{props.name && <span class="name">{props.tab.name}</span>}
-			{props.dir && <span class="dir">{home.short(props.tab.cwd)}</span>}
+			<span class="face">
+				<span class="n">{props.n}</span>
+				<Marker mark={mark()} />
+				{props.name && <span class="name">{props.tab.name}</span>}
+				{props.dir && <span class="dir">{home.short(props.tab.cwd)}</span>}
+			</span>
 		</a>
 	)
 }
 
-// Hidden counts and urgent status; never a session-selection link.
-function EdgeButton(props: { edge: Edge; left: boolean; active: boolean; onClick: () => void }) {
-	return (
-		<button
-			type="button"
-			class={['edge', props.left ? 'left' : 'right', ...(props.active ? ['offscreen'] : [])]}
-			disabled={!props.edge.count}
-			aria-label={`Scroll tabs ${props.left ? 'left' : 'right'}: ${props.edge.count} hidden${props.active ? ', active tab here' : ''}${props.edge.mark ? `, ${props.edge.mark.label}` : ''}`}
-			onClick={props.onClick}
-		>
-			{props.left ? '‹' : '›'}
-			<Marker mark={props.edge.mark} />
-		</button>
-	)
-}
-
-export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
+export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
 	let [touchProbe, setTouchProbe] = createSignal(false)
 	let [requested, setRequested] = createSignal(false)
 	let enable = () =>
@@ -136,65 +128,61 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 			if (!o && sheet.open) sheet.close()
 		}),
 	)
-	let pages!: HTMLElement
 	let track!: HTMLElement
-	let probe!: HTMLElement
 	let byId = createMemo(() => new Map(props.tabs.map((tab) => [tab.id, tab])))
 	let ids = createMemo(() => props.tabs.map((tab) => tab.id), {
 		equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
 	})
-	let [room, setRoom] = createSignal({ width: 0, ch: 8 })
-	// start..end-1 are fully visible; edge marks come only from tabs under 10% visible.
+	let [width, setWidth] = createSignal(0)
+	// start..end-1 are fully visible; tabs under 10% visible count as off screen for the count's dot.
 	let [visible, setVisible] = createSignal({ start: 0, end: 0, markStart: 0, markEnd: 0 })
 	let current = () => props.tabs.findIndex((t) => t.id === props.shown)
-	let layout = createMemo(() => {
-		let { width, ch } = room()
-		let d = tabPages.digits(props.tabs.length)
-		let base = Math.max(44, (d + 2) * ch)
-		let named = base + (NAME + 1) * ch
-		let names = props.tabs.length * named <= width
-		let overflow = !names && props.tabs.length * base > width
-		let edge = 24
-		let available = Math.max(1, width - (overflow ? 2 * edge : 0))
-		let per = Math.max(1, Math.floor(available / base))
-		// Fill fractional leftover room instead of black gaps beside the cells.
-		let cell = overflow ? available / per : names ? named : base
-		return { names, overflow, edge, cell, d }
-	})
+	// The shown tab is wider than the others, so ranges come from rendered rects.
 	let measureVisible = () => {
 		if (!track) return
-		let n = props.tabs.length
-		// Rendered cells round to layout units; layout().cell drifts over many tabs.
-		let cell = track.scrollWidth / n || layout().cell
-		let right = track.scrollLeft + track.clientWidth
-		let start = Math.max(0, Math.ceil((track.scrollLeft - 1) / cell))
-		let end = right >= track.scrollWidth - 1 ? n : Math.min(n, Math.floor((right + 1) / cell))
-		let markStart = Math.max(0, Math.ceil(track.scrollLeft / cell - 0.9))
-		let markEnd = Math.max(end, Math.min(n, Math.floor(right / cell - 0.1) + 1))
-		setVisible({ start, end, markStart: Math.min(start, markStart), markEnd })
+		let { left, right } = track.getBoundingClientRect()
+		let start = -1,
+			end = 0,
+			markStart = -1,
+			markEnd = 0
+		for (let [i, tab] of [...track.children].entries()) {
+			let r = tab.getBoundingClientRect()
+			let seen = Math.min(r.right, right) - Math.max(r.left, left)
+			if (seen >= r.width - 1) {
+				if (start < 0) start = i
+				end = i + 1
+			}
+			if (seen > r.width / 10) {
+				if (markStart < 0) markStart = i
+				markEnd = i + 1
+			}
+		}
+		start = Math.max(0, start)
+		setVisible({ start, end, markStart: Math.max(0, Math.min(start, markStart)), markEnd: Math.max(end, markEnd) })
 		tabs.onScreen(start, end)
 	}
+	// Centers the shown tab on the nearest tab start, where scroll snapping lands anyway.
 	let center = (smooth: boolean) => {
-		if (!track) return
-		let cell = layout().cell
-		let target = Math.round(((current() + 0.5) * cell - track.clientWidth / 2) / cell) * cell
+		let key = track?.children[current()] as HTMLElement | undefined
+		if (!key) return measureVisible()
+		let ideal = key.offsetLeft + key.offsetWidth / 2 - track.clientWidth / 2
+		let target = 0
+		for (let tab of track.children as HTMLCollectionOf<HTMLElement>)
+			if (Math.abs(tab.offsetLeft - ideal) < Math.abs(target - ideal)) target = tab.offsetLeft
 		smooth &&= !matchMedia('(prefers-reduced-motion: reduce)').matches
-		track.scrollTo({ left: Math.max(0, target), behavior: smooth ? 'smooth' : 'instant' })
+		track.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'instant' })
 		measureVisible()
 	}
 	onSettled(() => {
-		let measure = () => {
-			setRoom({ width: pages.clientWidth, ch: probe.getBoundingClientRect().width / 10 || 8 })
-		}
-		let seen = new ResizeObserver(measure)
-		seen.observe(pages)
+		let seen = new ResizeObserver(() => setWidth(track.clientWidth))
+		seen.observe(track)
 		return () => seen.disconnect()
 	})
 	// Status/mark updates must not reset a manually scrolled strip.
 	let centered = ''
 	// Only a tab switch in an already laid-out strip animates; first paint and resizes jump.
 	createEffect(
-		() => `${props.shown}/${current()}:${room().width}:${layout().cell}:${props.tabs.length}`,
+		() => `${props.shown}/${current()}:${width()}:${props.tabs.length}`,
 		(key) => {
 			if (key === centered) return
 			let [was, ...rest] = centered.split(':')
@@ -204,23 +192,14 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 			return () => cancelAnimationFrame(frame)
 		},
 	)
-	let edge = (left: boolean): Edge => {
-		let { start, end, markStart, markEnd } = visible()
-		let hidden = left ? props.tabs.slice(0, start) : props.tabs.slice(end)
-		let unseen = left ? props.tabs.slice(0, markStart) : props.tabs.slice(markEnd)
-		return { count: hidden.length, mark: tabPages.urgent(unseen) }
-	}
-	let page = (left: boolean) => {
-		let { start, end } = visible()
-		let cell = layout().cell
-		let target = left ? (start + 1) * cell - track.clientWidth : (end - 1) * cell
-		// Even a one-cell viewport must make progress.
-		if (end - start <= 1) target = track.scrollLeft + (left ? -cell : cell)
-		track.scrollTo({
-			left: target,
-			behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-		})
-	}
+	let waiting = createMemo(() => {
+		let { markStart, markEnd } = visible()
+		let marks = [...props.tabs.slice(0, markStart), ...props.tabs.slice(markEnd)].map(tabMark.mark)
+		for (let kind of WAITS) {
+			let mark = marks.find((m) => m?.kind === kind)
+			if (mark) return mark
+		}
+	})
 	let newTab = () => {
 		setOpen(false)
 		tabs.newTab()
@@ -248,11 +227,11 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		// Browsers do not autoscroll the strip; dragover repeats while the pointer
 		// rests. It scrolls 8 cells a second, however often dragover fires.
 		let now = performance.now()
-		let step = (Math.min(100, now - lastOver) * layout().cell * 8) / 1000
+		let step = (Math.min(100, now - lastOver) * CELL * 8) / 1000
 		lastOver = now
 		let { left, right } = track.getBoundingClientRect()
-		if (e.clientX < left + layout().edge) track.scrollLeft -= step
-		else if (e.clientX > right - layout().edge) track.scrollLeft += step
+		if (e.clientX < left + CELL) track.scrollLeft -= step
+		else if (e.clientX > right - CELL) track.scrollLeft += step
 		setGap(gapAt(e))
 	}
 	let endDrag = () => {
@@ -262,7 +241,10 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	return (
 		<header
 			class="Tabs tab"
-			style={{ '--digits': layout().d, '--cell': `${layout().cell}px`, '--edge': `${layout().edge}px` }}
+			onClick={(e) => {
+				if (!(e.target as Element).closest('button,a,dialog')) props.firstCard()
+			}}
+			style={{ '--digits': tabPages.digits(props.tabs.length) }}
 		>
 			<nav
 				class={['strip', ...(gap() === undefined ? [] : ['dragging'])]}
@@ -282,53 +264,23 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				}}
 				onDragEnd={endDrag}
 			>
-				<button
-					type="button"
-					class="menu"
-					aria-label="All tabs"
-					aria-haspopup="dialog"
-					aria-expanded={open() ? 'true' : 'false'}
-					onClick={() => void setOpen(true)}
-				>
-					<Icon name="menu" />
-				</button>
-				<div class="pages" ref={(e) => (pages = e)}>
-					<span class="probe" ref={(e) => (probe = e)} aria-hidden="true">
-						0000000000
-					</span>
-					{layout().overflow && (
-						<EdgeButton
-							edge={edge(true)}
-							left
-							active={current() >= 0 && current() < visible().start}
-							onClick={() => page(true)}
-						/>
-					)}
-					<div class="track" ref={(e) => (track = e)} onScroll={measureVisible}>
-						<For each={ids()}>
-							{(id, i) => {
-								let tab = () => byId().get(id)!
-								return (
-									<Link
-										tab={tab()}
-										n={i() + 1}
-										shown={id === props.shown}
-										name={layout().names}
-										drop={drop(i())}
-										onPick={() => requestAnimationFrame(() => center(true))}
-									/>
-								)
-							}}
-						</For>
-					</div>
-					{layout().overflow && (
-						<EdgeButton
-							edge={edge(false)}
-							left={false}
-							active={current() >= visible().end}
-							onClick={() => page(false)}
-						/>
-					)}
+				<div class="track" ref={(e) => (track = e)} onScroll={measureVisible}>
+					<For each={ids()}>
+						{(id, i) => {
+							let tab = () => byId().get(id)!
+							return (
+								<Link
+									tab={tab()}
+									n={i() + 1}
+									shown={id === props.shown}
+									name={id === props.shown}
+									drop={drop(i())}
+									firstCard={props.firstCard}
+									onPick={() => requestAnimationFrame(() => center(true))}
+								/>
+							)
+						}}
+					</For>
 				</div>
 				<button type="button" class="new" aria-label="New tab" onClick={newTab}>
 					<Icon name="plus" />
@@ -339,6 +291,17 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 						Notify
 					</button>
 				)}
+				<button
+					type="button"
+					class="count"
+					aria-label={`All ${props.tabs.length} tabs${waiting() ? `, one off screen ${waiting()!.label}` : ''}`}
+					aria-haspopup="dialog"
+					aria-expanded={open() ? 'true' : 'false'}
+					onClick={() => void setOpen(true)}
+				>
+					<span class="box">{props.tabs.length}</span>
+					{waiting() && <span class="dot" data-mark={waiting()!.kind} />}
+				</button>
 			</nav>
 			<dialog
 				ref={(e) => (sheet = e)}

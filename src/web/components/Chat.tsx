@@ -7,6 +7,7 @@
 // every file drag, so a dropped file never replaces it (task n5).
 
 import { createMemo, createSignal, flush, Show, onSettled } from 'solid-js'
+import { backfill } from '../../common/backfill.ts'
 import { connection } from '../../common/connection.ts'
 import type { Sending } from '../../common/drafts.ts'
 import { notices } from '../../common/notices.ts'
@@ -28,8 +29,38 @@ import { StatusRow } from './StatusRow.tsx'
 import { Transcript, reopened } from './Transcript.tsx'
 import { Icon } from './Icon.tsx'
 
+let [jumping, setJumping] = createSignal(false)
+let jump: typeof app.state.target
+function cancelJump() {
+	if (jump && app.state.target === jump) app.state.target = undefined
+	jump = undefined
+	setJumping(false)
+	scroll.undim()
+}
+function firstCard() {
+	let session = app.sessionId()
+	if (!session) return
+	scroll.reading()
+	cancelJump()
+	let first = scroll.state.el?.querySelector('.rows > [data-scroll-key="1"]')
+	let top = scroll.state.el?.getBoundingClientRect().top ?? 0
+	if (first && scroll.near(first.getBoundingClientRect().top - top))
+		return first.scrollIntoView({ block: 'start', behavior: 'smooth' })
+	let request = (jump = app.state.target = { session, key: '1' })
+	setJumping(true)
+	scroll.dim(backfill.complete(app.state.older, session) ? 150 : 600)
+	flush()
+	requestAnimationFrame(() =>
+		requestAnimationFrame(() => {
+			if (request !== jump || session !== app.sessionId()) return
+			app.seek()
+			app.changed()
+		}),
+	)
+}
+
 const snap = () => ({
-	target: app.state.target?.found && app.state.target.key,
+	target: app.state.target?.found ? app.state.target : undefined,
 	pages: app.state.pages,
 	tabs: app.state.tabs,
 	shown: app.state.shown,
@@ -67,11 +98,11 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	// Earlier history arrived above; a reader still near the top gets
 	// the page before.
 	if (next.pages !== before.pages) {
-		scroll.quiet(() => {
+		scroll.prepend(() => {
 			set(next)
 			flush()
 		})
-		if (scroll.atTop()) app.older()
+		if (!app.state.target && scroll.atTop()) scroll.state.pageReady?.()
 		return
 	}
 	if (
@@ -89,13 +120,17 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 // brought it may have moved the view, as a tab's first snapshot does).
 function reveal(): void {
 	let t = app.state.target
-	if (!t?.found || t.shown) return
+	if (!t?.found || t.shown || t.session !== app.sessionId()) return
 	flush()
 	let card = document.querySelector('.Transcript .rows > .target')
 	if (!card) return
-	t.shown = true
+	scroll.reading()
 	card.scrollIntoView({ block: 'start' })
-	flash.card(card)
+	let box = card.getBoundingClientRect(),
+		frame = scroll.state.el?.getBoundingClientRect()
+	if (!frame || box.bottom <= frame.top || box.top >= frame.bottom) return
+	t.shown = true
+	if (t !== jump) flash.card(card)
 	away(card)
 }
 
@@ -180,16 +215,44 @@ export function Chat() {
 	let updateAvailable = field('updateAvailable')
 	let fresh = field('fresh')
 	let pending = createMemo(() => state().pending, { equals: same })
+	let shownTab = () => tabs().find((t) => t.id === shown())
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
 	onSettled(() => {
-		app.changed = () => {
+		let show = () => {
+			if (jump && (jump !== app.state.target || jump.session !== app.sessionId())) cancelJump()
 			redraw(state(), setState)
 			reveal()
+			if (jump?.shown) {
+				jump = undefined
+				setJumping(false)
+			}
+		}
+		app.changed = () => {
+			if (!jump?.found || jump.shown) return show()
+			scroll.land(show)
 		}
 		notices.onChange = () => app.changed()
 		let onKey = (e: KeyboardEvent) => {
-			if (keys.key(e, target(e))) e.preventDefault()
+			let where = target(e)
+			if (keys.key(e, where)) e.preventDefault()
+			else if (
+				e.key === 'Home' &&
+				!e.defaultPrevented &&
+				!e.isComposing &&
+				!e.shiftKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				!e.ctrlKey &&
+				where.kind !== 'message' &&
+				where.kind !== 'field' &&
+				!app.state.view.modal &&
+				!document.querySelector('dialog[open]') &&
+				app.sessionId()
+			) {
+				e.preventDefault()
+				if (!e.repeat) firstCard()
+			}
 			// Show the outcome now, not a microtask later.
 			flush()
 		}
@@ -231,11 +294,12 @@ export function Chat() {
 		document.addEventListener('copy', onCopy)
 		let stop = viewport.page()
 		let stopFlash = flash.buttons()
-		let stopTap = viewport.statusTap(() =>
-			document.querySelector('.Transcript')?.scrollTo({ top: -1e9, behavior: 'smooth' }),
-		)
+		let stopTap = viewport.statusTap(firstCard)
+		let transcript = document.querySelector('.Transcript')!
+		for (let event of ['wheel', 'touchmove']) transcript.addEventListener(event, cancelJump, { passive: true })
 		app.start()
 		return () => {
+			for (let event of ['wheel', 'touchmove']) transcript.removeEventListener(event, cancelJump)
 			document.removeEventListener('keydown', onKey)
 			document.removeEventListener('paste', onPaste)
 			document.removeEventListener('copy', onCopy)
@@ -247,7 +311,20 @@ export function Chat() {
 	})
 	return (
 		<div class={['Chat', 'project', { offline: !connected(), stale: !fresh() }]}>
-			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
+			<Tabs firstCard={firstCard} tabs={tabs()} shown={shown()} pushReady={pushReady()} />
+			<div
+				class="jump"
+				style={
+					shownTab()?.hal || shownTab()?.color === undefined
+						? undefined
+						: { '--project': `var(--p${shownTab()!.color})` }
+				}
+			>
+				<div role="status" class={{ on: jumping() }}>
+					<span aria-hidden={jumping() ? undefined : 'true'}>Loading earlier messages…</span>
+					<i />
+				</div>
+			</div>
 			<Show when={updateAvailable()}>
 				<div class="source-update">
 					<button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}>
@@ -256,15 +333,15 @@ export function Chat() {
 					</button>
 				</div>
 			</Show>
-			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
+			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} onEnd={cancelJump} />
 			<Notices entries={stack()} />
 			<StatusRow
 				view={view()}
 				connected={connected()}
 				fresh={fresh()}
-				color={tabs().find((t) => t.id === shown())?.color}
-				hal={!!tabs().find((t) => t.id === shown())?.hal}
-				untrusted={!!tabs().find((t) => t.id === shown())?.untrusted}
+				color={shownTab()?.color}
+				hal={!!shownTab()?.hal}
+				untrusted={!!shownTab()?.untrusted}
 			/>
 			<EditBar view={view()} />
 			<Composer

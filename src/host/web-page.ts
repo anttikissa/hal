@@ -125,7 +125,7 @@ function css(): string {
 		done: tab.doneFg!,
 	})) {
 		rules.push(
-			`.Tabs .marker.${kind} { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`,
+			`.Tabs [data-mark='${kind}'] { --mark-lit: ${oklch.toCss(fg)}; --mark-dark: ${oklch.toCss(kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg))} }`,
 		)
 	}
 	// Percentages used, one class per whole percent (colors.heat).

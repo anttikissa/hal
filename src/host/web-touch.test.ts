@@ -110,9 +110,9 @@ browserTest(
 			await b.evaluate(`(() => {
 			let go = document.querySelector('.Composer .go'), r = go.getBoundingClientRect(), init = { bubbles: true, cancelable: true, pointerType: 'touch', clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
 			go.dispatchEvent(new PointerEvent('pointerdown', init)); go.dispatchEvent(new PointerEvent('pointerup', init));
-			document.querySelector('.details-target').dispatchEvent(new MouseEvent('click', { ...init, detail: 1 }));
+			document.querySelector('.StatusRow .more').dispatchEvent(new MouseEvent('click', { ...init, detail: 1 }));
 		})()`)
-			expect(await b.evaluate(`document.querySelector('.StatusDetails').open`)).toBe(false)
+			expect(await b.evaluate(`document.querySelector('#panel-menu').matches(':popover-open')`)).toBe(false)
 			await b.waitFor(`document.querySelector('textarea').value === ''`)
 			expect(await prompts()).toBe(3)
 		} finally {
@@ -145,7 +145,7 @@ browserTest(
 			expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
 			expect(await b.evaluate(`localStorage.getItem('hal.touch-debug.log')`)).toBe(null)
 			let toggle = async () => {
-				await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
+				await b.evaluate(`document.querySelector('.Tabs .count').click()`)
 				await b.waitFor(`document.querySelector('.Tabs dialog').open`)
 				await b.evaluate(
 					`new Promise(resolve => { document.querySelector('.Tabs dialog').addEventListener('close', resolve, { once: true }); [...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent.includes('Touch debug')).click(); })`,
@@ -233,7 +233,7 @@ browserTest(
 			await b.waitFor(`!!document.querySelector('.StatusRow .model')?.textContent`)
 			expect(await b.evaluate(`!!document.querySelector('.TouchDebug')`)).toBe(false)
 			let inspect = async () => {
-				await b.evaluate(`document.querySelector('[aria-label="All tabs"]').click()`)
+				await b.evaluate(`document.querySelector('.Tabs .count').click()`)
 				await b.waitFor(`document.querySelector('.Tabs dialog').open`)
 				await b.evaluate(
 					`[...document.querySelectorAll('.Tabs dialog button')].find(b => b.textContent === 'Touch debug logs').click()`,

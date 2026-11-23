@@ -146,6 +146,10 @@ function receiveView(current: ViewState, event: Event): ViewState {
 		}
 	}
 	if (event.type === 'history' && backfill.onPage(st.older, event)) {
+		if (!held && st.target?.session === id && st.target.key === '1' && !st.target.found && event.older !== undefined) {
+			app.older()
+			return next
+		}
 		next = { ...next, transcript: backfill.apply(st.older, next.transcript) }
 		if (id === app.sessionId()) st.pages++
 	}

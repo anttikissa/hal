@@ -76,7 +76,11 @@ export function Question(props: {
 		app.submitForm()
 	}
 	return (
-		<form class={['Question question', props.target ? 'target' : '']} onSubmit={submit}>
+		<form
+			data-scroll-key={props.item.key}
+			class={['Question question', props.target ? 'target' : '']}
+			onSubmit={submit}
+		>
 			<CardHeader
 				time={titles.time(props.item.ts)}
 				label={

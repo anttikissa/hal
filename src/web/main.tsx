@@ -1,3 +1,4 @@
+import { scroll } from './scroll.ts'
 /// <reference lib="dom" />
 // The browser client's entry point: host/web.ts bundles this file (and
 // what it imports) into index.html. Runs in the browser only;
@@ -57,7 +58,7 @@ if (typeof document !== 'undefined') {
 				height: innerHeight,
 				viewportHeight: vv?.height ?? innerHeight,
 				viewportTop: Math.max(0, vv?.offsetTop ?? 0),
-				scrollTop: -(document.querySelector('.Transcript')?.scrollTop ?? 0),
+				scrollTop: scroll.state.el ? scroll.gap(scroll.state.el) : 0,
 				appHeight: parseFloat(document.documentElement.style.getPropertyValue('--app-height')) || innerHeight,
 				composerFocused: !!document.activeElement?.closest('.Composer'),
 				heap: Math.round((memory.used() ?? 0) / 2 ** 20),

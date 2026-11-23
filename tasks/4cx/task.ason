@@ -1,0 +1,13 @@
+{
+	title: 'Web chip row over the composer, with docked panels',
+	spec: "The web status is one row over the composer: 40px tall on touch screens, 32px with a fine pointer; each touch target reaches 44px, extending 4px up into the transcript, never over the composer. Left: the session id (when the row is at least 60ch), the cwd chip (truncated from the start, edged in the project color), the model chip (short name; the full name from 80ch) and the spawn-budget chip: one thin 1px bar per subagent, no gaps or grouping, the number at 0 or above 8. Right: activity (tone dot and text), context percent in heat, a quota gauge (one ring per usage window) below 80ch or each window's own ring and percent from 80ch, and a session menu button. The cwd, budget, quota and menu chips open popover panels (popovertarget): a sheet across the app on touch screens, docked over its chip with a pointer, standing on the chip row so the composer and its draft stay in view and usable. A scrim above the row takes taps there and only closes the panel. The cwd panel lists the open tabs' directories in their colors plus a search-or-path field (/cd). The budget panel steps the budget and applies it on close; Escape keeps the old one. The quota panel lists each window's use and reset. The menu holds Find, Fork, Notifications, Session details and Close tab (in red). Escape closes a panel and never reaches the session; closing returns focus to its chip. The model chip opens the model picker. Mockup approved by the user 2026-11-23 (session 54-dot).",
+	status: 'planned',
+	notes: [
+		"A popover's ::backdrop lets taps through (UA pointer-events: none), and showPopover inside beforetoggle throws; Panel.tsx therefore renders a plain .Scrim layer beside the popover.",
+		'keys.ts pauses the session on Escape, so the panel stops keydown propagation; the Session details row hides the menu (flush) before showModal, so closing the dialog returns focus to the menu button.',
+		"Panels hold a .field form, so tests and code select the composer's field as .Composer .field.",
+		"The model name's quota fill (task 5f) is gone: the gauge replaced it, and status.quota and usageWindows.shortest were deleted."
+	],
+	needs: ['a0', '7na', 'r92', '5f'],
+	foldInto: ['a0', '7na', '5f']
+}

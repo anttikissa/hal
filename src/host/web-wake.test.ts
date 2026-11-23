@@ -64,7 +64,7 @@ browserTest(
 				await b.evaluate(`(() => {
 				let t = document.querySelector('textarea'); t.value = 'draft survives wake';
 				t.dispatchEvent(new Event('input', { bubbles: true }));
-				let main = document.querySelector('.Transcript'); main.scrollTop = -300;
+				let main = document.querySelector('.Transcript'); main.scrollTop -= 300;
 			})()`)
 				await b.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 				await b.evaluate(`(() => {

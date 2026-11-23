@@ -178,7 +178,7 @@ browserTest('a bottom reader stays at the bottom as content and composer change'
 				for (let i = 0; i < 40; i++) yield { type: 'text', text: `Line ${i} text.\n\n` }
 				yield { type: 'done', reason: 'end' }
 			})()
-		let atBottom = `document.querySelector('.Transcript').scrollTop >= -1`
+		let atBottom = `((t)=>t.scrollHeight-t.scrollTop-t.clientHeight<=1)(document.querySelector('.Transcript'))`
 		let frames = `new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`
 		await b.waitFor(
 			`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
@@ -195,16 +195,16 @@ browserTest('a bottom reader stays at the bottom as content and composer change'
 				box.value = value; box.dispatchEvent(new InputEvent('input', { bubbles: true }))
 				for (let i = 0; i < 3; i++) {
 					await new Promise(r => requestAnimationFrame(r))
-					gaps.push(-t.scrollTop)
+					gaps.push(t.scrollHeight-t.clientHeight-t.scrollTop)
 				}
 			}
 			return gaps
 		})()`)
 		expect(gaps.every((gap: number) => gap <= 1)).toBe(true)
-		await b.evaluate(`document.querySelector('.Transcript').scrollTop = -1500`)
+		await b.evaluate(`document.querySelector('.Transcript').scrollTop -= 1500`)
 		await b.waitFor(`!!document.querySelector('.to-bottom button')`)
 		await b.evaluate(`document.querySelector('.to-bottom button').click()`)
-		expect(await b.evaluate(atBottom)).toBe(true)
+		await b.waitFor(atBottom)
 	} finally {
 		await b.close()
 	}
@@ -323,7 +323,7 @@ browserTest(
 			} }).observe(t, { childList: true, subtree: true })
 			document.addEventListener('selectionchange', () => { if (getSelection().isCollapsed) events.push('collapsed; focus ' + (document.activeElement?.tagName)) })
 			document.activeElement?.blur?.()
-			t.scrollTop = -1e6
+			t.scrollTop = 0
 			window.first = t.querySelector('.Card')
 			window.firstTop = first.getBoundingClientRect().top
 			getSelection().selectAllChildren(document.body)

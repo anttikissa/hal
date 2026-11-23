@@ -209,21 +209,14 @@
 				color: var(--text);
 				background: color-mix(in oklab, var(--overlay-bg) 75%, transparent);
 			}
-			/* The one scroller: nothing inside it scrolls; long lines wrap.
-   column-reverse puts its scroll origin at the bottom. scroll.ts keeps
-   the reader's place as content grows or the view resizes; the
-   browser's own anchoring is off, as it would correct twice. The
-   rows' auto margin keeps a short transcript at the top. */
 			/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
 			.Transcript {
 				flex: 1;
 				min-height: 0;
-				display: flex;
-				flex-direction: column-reverse;
+				display: block;
 				overflow: hidden auto;
-				overflow-anchor: none;
 				overscroll-behavior: contain;
 				--gut: max(1ch, env(safe-area-inset-left));
 				padding: 0.5lh max(1ch, env(safe-area-inset-right)) 0.5lh var(--gut);
@@ -246,12 +239,15 @@
 			.Transcript .rows > * {
 				margin: 0 0 0.5lh;
 			}
-			.Transcript > .to-bottom {
-				position: sticky;
-				bottom: 0;
+			.Transcript > .to-bottom, .Transcript + .to-bottom {
+				position: relative;
+				flex: none;
 				height: 0;
-				z-index: 1;
+				z-index: 2;
 			}
+			/* The End button: a translucent circle (a pill with a count); the
+   arrow and ring stay at full strength. Pressed, it scales to 0.96 and
+   lights at once; released, the color fades back. */
 			.to-bottom button {
 				position: absolute;
 				right: 8px;
@@ -260,25 +256,110 @@
 				align-items: center;
 				justify-content: center;
 				gap: 5px;
-				min-width: 48px;
-				height: 48px;
-				padding: 0 12px;
-				border-radius: 24px;
+				min-width: 44px;
+				height: 44px;
+				padding: 0 11px;
+				border-radius: 22px;
 				border: 1px solid currentColor;
-				color: var(--text);
-				background: var(--overlay-bg);
+				color: var(--title-fg);
+				background: color-mix(in oklab, var(--canvas) 60%, transparent);
+				touch-action: manipulation;
+				transition:
+					scale 120ms var(--ease-out),
+					background-color 120ms var(--ease-out),
+					color 120ms var(--ease-out);
+			}
+			@media (pointer: fine) {
+				.to-bottom button {
+					min-width: 40px;
+					height: 40px;
+					padding: 0 9px;
+				}
+			}
+			.to-bottom button:is(:active, [data-activated]) {
+				scale: 0.96;
+				color: var(--canvas);
+				background: var(--title-fg);
+				transition-duration: var(--snap-ms);
 			}
 			.to-bottom button[data-count]::after {
 				content: attr(data-count);
 			}
 			.to-bottom svg {
-				width: 22px;
-				height: 22px;
+				width: 20px;
+				height: 20px;
 				stroke: currentColor;
 				fill: none;
-				stroke-width: 2;
+				stroke-width: 1.75;
 				stroke-linecap: round;
 				stroke-linejoin: round;
+			}
+			/* The Top jump's progress: a zero-height anchor under the tab strip,
+   so the box floats over the transcript. It fades in from 400 to 600
+   ms, so a jump that ends sooner never shows; while loading, a light
+   sweeps its bottom edge in the tab's color. */
+			.jump {
+				position: relative;
+				flex: none;
+				height: 0;
+				z-index: 3;
+				pointer-events: none;
+				--jump-color: var(--project, var(--accent));
+			}
+			.jump > div {
+				position: absolute;
+				top: 8px;
+				left: 50%;
+				translate: -50% 0;
+				display: grid;
+				align-items: center;
+				height: 32px;
+				padding: 0 1.5ch 0 1.25ch;
+				border-left: 3px solid var(--jump-color);
+				background: var(--overlay-bg);
+				color: var(--title-fg);
+				font-size: 12px;
+				white-space: nowrap;
+				overflow: hidden;
+				opacity: 0;
+				scale: 0.95;
+				transition:
+					opacity 150ms var(--ease-out),
+					scale 150ms var(--ease-out);
+			}
+			.jump > .on {
+				opacity: 1;
+				scale: 1;
+				transition-duration: 200ms;
+				transition-delay: 400ms;
+			}
+			.jump i {
+				position: absolute;
+				left: 0;
+				bottom: 0;
+				width: 30%;
+				height: 2px;
+				background: var(--jump-color);
+			}
+			.jump .on i {
+				animation: sweep 900ms linear infinite;
+			}
+			@keyframes sweep {
+				from {
+					translate: -100% 0;
+				}
+				to {
+					translate: 340% 0;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.jump > div,
+				.to-bottom button:is(:active, [data-activated]) {
+					scale: 1;
+				}
+				.jump i {
+					display: none;
+				}
 			}
 			@keyframes fade-in {
 				from {
@@ -1199,7 +1280,6 @@
 					animation: none;
 				}
 			}
-			/* Two explicit lines, no accidental wrapping; the whole overview is a target. */
 			/* --gutter: the composer's side padding in its own font, as a length, so
    the smaller status row lines up with it (the cwd strip, task 22). */
 			@property --gutter {
@@ -1210,143 +1290,406 @@
 			.Chat {
 				--gutter: 1ch;
 			}
+			/* The chip row: one line over the composer. Chips open their panels;
+   detail drops as the row narrows (task 5f). */
 			.StatusRow {
 				flex: none;
-				padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left));
+				display: flex;
+				align-items: center;
+				height: 40px;
+				padding: 0 env(safe-area-inset-right) 0 max(var(--gutter), env(safe-area-inset-left));
 				font-size: 12px;
-			}
-			.StatusRow .overview {
-				position: relative;
-				display: block;
-				width: 100%;
-				min-height: 44px;
-				padding: 0.125lh 0;
-				background: none;
-				color: inherit;
-				font: inherit;
-				text-align: left;
-				touch-action: manipulation;
-			}
-			.StatusRow .details-target {
-				position: absolute;
-				inset: 0;
-				width: 100%;
-				height: 100%;
-				background: none;
-			}
-			.StatusRow .budget {
-				flex: none;
-				position: relative;
-			}
-			.StatusRow .budget.pile {
-				top: var(--lift, 0);
-			}
-			.StatusRow .budget:empty {
-				display: none;
-			}
-			.StatusRow .primary {
-				display: grid;
-				grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto;
-				align-items: baseline;
-				gap: 1ch;
-			}
-			.StatusRow {
+				white-space: nowrap;
 				container-type: inline-size;
 			}
-			.StatusRow .secondary {
+			.StatusRow .chip {
 				display: flex;
-				gap: 1ch;
-				justify-content: space-between;
-			}
-			.StatusRow .name,
-			.StatusRow .activity,
-			.StatusRow .cwd,
-			.StatusRow .model,
-			.StatusRow .windows {
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
+				align-items: center;
+				gap: 0.75ch;
+				height: 32px;
 				min-width: 0;
+				padding: 0 1ch;
+				background: none;
+				color: var(--text);
+				font: inherit;
 			}
-			.StatusRow .activity {
-				max-width: 40vw;
+			.StatusRow .chip.box {
+				height: 30px;
+				margin-right: 1ch;
+				background: var(--button);
+			}
+			.StatusRow .chip.hal-home {
+				color: var(--fg);
+			}
+			.StatusRow :is(.chip, .more)[aria-expanded='true'] {
+				background: var(--highlight);
+				color: var(--canvas);
 			}
 			.StatusRow .cwd {
-				flex: 1;
+				flex: 0 1 auto;
+				max-width: 18ch;
+				border-left: 3px solid var(--project, transparent);
+			}
+			.StatusRow .path,
+			.StatusRow .model > span,
+			.StatusRow .activity .text {
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.StatusRow .path {
 				direction: rtl;
-				text-align: left;
 			}
-			.StatusRow .cwd[style*='--project'] {
-				border-left: 3px solid var(--project);
-				padding-left: 1ch;
+			.StatusRow .caret {
+				font-size: 10px;
 			}
-			.StatusRow .model {
-				flex: 0 1 auto;
-				max-width: 75%;
+			.StatusRow .untrusted {
+				margin-right: 1ch;
 			}
-			/* The official model name where it fits, the short one when narrow (task r7r). */
-			.StatusRow .model .short {
-				display: none;
-			}
-			.StatusRow .windows {
-				flex: 0 1 auto;
-				display: flex;
-				gap: 2ch;
-			}
-			.StatusRow .window .bar {
-				display: inline-block;
-				width: 6ch;
-				height: 0.7em;
-				border: 1px solid var(--heat);
-				vertical-align: baseline;
-			}
-			.StatusRow .window .bar > span {
-				display: block;
-				height: 100%;
-				background: var(--heat);
-			}
-			/* A window another full window outlasts cannot bind: quiet, no heat. */
 			.StatusRow .id {
 				display: none;
+				margin-right: 1ch;
+				color: var(--quiet);
 			}
-			/* Wide: id and windows; detail drops as room shrinks. */
+			/* The spawn budget: one thin bar per subagent, a number past eight. */
+			.StatusRow .budget {
+				flex: none;
+				justify-content: center;
+				width: 24px;
+				padding: 0;
+			}
+			.StatusRow .stack {
+				display: flex;
+				flex-direction: column;
+				gap: 2.5px;
+				width: 7px;
+			}
+			.StatusRow .stack i {
+				height: 1px;
+				background: currentColor;
+			}
+			.StatusRow .spacer {
+				flex: 1;
+			}
+			.StatusRow .activity {
+				display: flex;
+				align-items: center;
+				gap: 0.75ch;
+				min-width: 0;
+				padding: 0 1ch;
+			}
+			.StatusRow .dot {
+				flex: none;
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: currentColor;
+			}
+			.StatusRow .context {
+				padding: 0 1ch;
+			}
+			.StatusRow .quota {
+				flex: none;
+				color: inherit;
+			}
+			.StatusRow .windows {
+				display: none;
+			}
+			.ring {
+				display: block;
+				flex: none;
+			}
+			.ring .track {
+				stroke: color-mix(in oklab, currentColor 35%, var(--canvas));
+			}
+			.StatusRow .more {
+				flex: none;
+				width: 44px;
+				height: 40px;
+				padding: 0;
+				background: none;
+				color: var(--title-fg);
+			}
+			/* Touch targets reach 44px, 4px up into the transcript; the row stays
+   40px tall and the composer keeps its own taps. */
+			@media (pointer: coarse) {
+				.StatusRow > button {
+					position: relative;
+					z-index: 1;
+				}
+				.StatusRow > button::after {
+					content: '';
+					position: absolute;
+					inset: 50% 0 auto;
+					height: 44px;
+					translate: 0 calc(-50% - 2px);
+				}
+			}
+			/* The official model name where it fits, the short one when narrow (task r7r). */
+			.StatusRow .model .full {
+				display: none;
+			}
 			@container (min-width: 60ch) {
 				.StatusRow .id {
 					display: inline;
 				}
 			}
-			@container (max-width: 140ch) {
-				.StatusRow .window .reset {
-					display: none;
-				}
-			}
-			@container (max-width: 110ch) {
-				.StatusRow .window .bar {
-					display: none;
-				}
-			}
+			/* Wide: each window's own gauge, the model's full name, a longer path. */
 			@container (min-width: 80ch) {
-				.StatusRow .model.quota {
-					color: inherit;
-				}
-			}
-			/* Narrow, without the windows: the model name fills with the quota left,
-   a hard stop clipped to the glyphs. */
-			@container (max-width: 80ch) {
 				.StatusRow .windows {
+					display: flex;
+				}
+				.StatusRow .gauge,
+				.StatusRow .model .short {
 					display: none;
 				}
 				.StatusRow .model .full {
-					display: none;
-				}
-				.StatusRow .model .short {
 					display: inline;
 				}
-				.StatusRow .model.quota {
-					color: transparent;
-					background: linear-gradient(to right, var(--heat) var(--fill), var(--fg) var(--fill));
-					-webkit-background-clip: text;
-					background-clip: text;
+				.StatusRow .cwd {
+					max-width: 40ch;
+				}
+			}
+			@media (pointer: fine) {
+				.StatusRow {
+					height: 32px;
+				}
+				.StatusRow .chip {
+					height: 26px;
+				}
+				.StatusRow .chip.box {
+					height: 24px;
+				}
+				.StatusRow .budget {
+					width: 20px;
+				}
+				.StatusRow .stack {
+					gap: 2px;
+					width: 6px;
+				}
+				.StatusRow .more {
+					width: 40px;
+					height: 32px;
+				}
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.StatusRow :is(.chip, .more):not([aria-expanded='true']):hover {
+					background: color-mix(in oklab, var(--text) 14%, transparent);
+				}
+				.StatusRow .chip.box:not([aria-expanded='true']):hover {
+					background: color-mix(in oklab, var(--text) 14%, var(--button));
+				}
+			}
+			/* Panels the chips open sit on the chip row, so the composer and its
+   draft stay in view and usable: a sheet across the app on touch
+   screens, docked over its chip with a pointer. --y is the row's
+   height above the app's foot (Panel.tsx). */
+			.Panel {
+				--dock: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + var(--y, 0px));
+				position: fixed;
+				inset: auto auto var(--dock) var(--app-left, 0px);
+				width: var(--app-width, 100vw);
+				max-width: none;
+				max-height: calc((var(--app-height, 100dvh) - var(--y, 0px)) * 0.9);
+				margin: 0;
+				padding: 0;
+				border: 0;
+				border-top: 1px solid var(--border);
+				color: var(--text);
+				font-size: 15px;
+				white-space: normal;
+			}
+			.Panel:popover-open {
+				display: flex;
+				flex-direction: column;
+				overflow: auto;
+			}
+			.Panel:focus {
+				outline: none;
+			}
+			.Panel > * {
+				flex: none;
+			}
+			/* Fixed inside the app (its transform holds it), over all but the
+   chip row and the composer. */
+			.Scrim {
+				position: fixed;
+				z-index: 10;
+				inset: 0 0 var(--y, 0px);
+				background: color-mix(in oklab, var(--canvas) 60%, transparent);
+				visibility: hidden;
+				opacity: 0;
+				transition:
+					opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+					visibility 160ms;
+			}
+			.Scrim.open {
+				visibility: visible;
+				opacity: 1;
+			}
+			.Panel :focus-visible {
+				outline-offset: -1px;
+			}
+			.Panel .head {
+				order: -2;
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 1ch;
+				padding: 0.5lh 1.25ch 0.25lh;
+			}
+			.Panel .title {
+				color: var(--title-fg);
+				font-weight: inherit;
+			}
+			.Panel :is(.sub, .group) {
+				color: var(--quiet);
+				font-size: 12px;
+			}
+			.Panel .group {
+				padding: 0.5lh 1.25ch 0.125lh;
+			}
+			.Panel .row {
+				display: flex;
+				justify-content: flex-start;
+				align-items: center;
+				gap: 1ch;
+				width: 100%;
+				min-height: 44px;
+				padding: 0 1.25ch;
+				background: none;
+				color: var(--text);
+				font: inherit;
+				text-align: left;
+			}
+			.Panel .row.current {
+				background: color-mix(in oklab, var(--text) 30%, transparent);
+				color: var(--title-fg);
+			}
+			.Panel .row.led {
+				border-left: 3px solid var(--project, transparent);
+			}
+			.Panel .row.status-hot {
+				color: var(--fg);
+			}
+			.Panel .icon {
+				width: 18px;
+				height: 18px;
+			}
+			/* Every panel's input sits in one place: at the foot on touch screens,
+   under the title with a pointer. */
+			.Panel .field {
+				order: 1;
+				position: sticky;
+				bottom: 0;
+				margin-top: auto;
+				padding: 0.25lh 0 0.5lh;
+				background: inherit;
+			}
+			.Panel .input {
+				display: flex;
+				align-items: center;
+				gap: 1ch;
+				height: 40px;
+				margin: 0 1.25ch;
+				padding: 0 1ch;
+				background: var(--field);
+				border: 1px solid var(--border);
+				color: var(--quiet);
+			}
+			.Panel .input:focus-within {
+				border-color: var(--title-fg);
+			}
+			.Panel .input input {
+				flex: 1;
+				min-width: 0;
+				padding: 0;
+				border: 0;
+				background: none;
+				color: var(--title-fg);
+				font: inherit;
+				outline: none;
+			}
+			.Panel .input input::placeholder {
+				color: var(--quiet);
+			}
+			.Panel .desc {
+				margin: 0;
+				padding: 0 1.25ch 0.5lh;
+				font-size: 13px;
+			}
+			/* The budget field: a number box, then minus and plus. */
+			.Panel .step {
+				display: flex;
+				gap: 0.75ch;
+				padding-inline: 1.25ch;
+			}
+			.Panel .step .input {
+				flex: 1;
+				margin: 0;
+			}
+			.Panel .step input {
+				appearance: textfield;
+			}
+			.Panel .step input::-webkit-inner-spin-button,
+			.Panel .step input::-webkit-outer-spin-button {
+				appearance: none;
+				margin: 0;
+			}
+			.Panel .step button {
+				flex: none;
+				width: 48px;
+				height: 40px;
+				padding: 0;
+				background: none;
+				border: 1px solid var(--border);
+				color: var(--title-fg);
+			}
+			.Panel .quotas {
+				display: grid;
+				grid-template-columns: 3ch auto 1fr;
+				align-items: center;
+				column-gap: 1ch;
+				padding: 0.25lh 1.25ch 0.5lh;
+			}
+			.Panel .resets {
+				grid-column: 3;
+				margin-bottom: 0.5lh;
+				font-size: 13px;
+			}
+			@media (pointer: coarse) {
+				.Panel .input input {
+					font-size: 16px;
+				}
+			}
+			@media (pointer: fine) {
+				.Panel {
+					inset: auto var(--r) var(--dock) var(--x);
+					width: 40ch;
+					max-height: calc(var(--app-height, 100dvh) - var(--y, 0px) - 8px);
+					border: 1px solid var(--border);
+					font-size: 13px;
+				}
+				.Panel .row {
+					min-height: 32px;
+				}
+				.Panel .icon {
+					width: 16px;
+					height: 16px;
+				}
+				.Panel .field {
+					order: -1;
+					position: static;
+					margin-top: 0;
+					padding-top: 0;
+				}
+				.Panel .step button {
+					width: 40px;
+				}
+			}
+			@media (hover: hover) and (pointer: fine) {
+				.Panel .row:not(.current):hover,
+				.Panel .step button:hover {
+					background: color-mix(in oklab, var(--text) 14%, transparent);
 				}
 			}
 			.hidden-text {
@@ -1901,12 +2244,7 @@
 					padding-block: 6px;
 				}
 				.StatusRow {
-					padding-block: 0;
-				}
-				.StatusRow .overview {
 					font-size: 11px;
-					padding-block: 2px;
-					line-height: 16px;
 				}
 				.StatusDetails {
 					font-size: 11px;
@@ -2624,21 +2962,23 @@
 					background: var(--pick-hover);
 				}
 			}
-			:is(.Changes, .Picker, .StatusDetails),
+			:is(.Changes, .Picker, .StatusDetails, .Panel),
 			:is(.Changes, .Picker, .StatusDetails)::backdrop {
 				transition:
 					opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
 					overlay 160ms allow-discrete,
 					display 160ms allow-discrete;
 			}
-			:is(.Changes, .Picker, .StatusDetails):not([open]) {
+			:is(.Changes, .Picker, .StatusDetails):not([open]),
+			.Panel:not(:popover-open) {
 				opacity: 0;
 			}
 			:is(.Changes, .Picker, .StatusDetails):not([open])::backdrop {
 				opacity: 0;
 			}
 			@starting-style {
-				:is(.Changes, .Picker, .StatusDetails)[open] {
+				:is(.Changes, .Picker, .StatusDetails)[open],
+				.Panel:popover-open {
 					opacity: 0;
 				}
 				:is(.Changes, .Picker, .StatusDetails)[open]::backdrop {
@@ -2853,11 +3193,10 @@
 					height: calc(var(--app-height, 100dvh) - 1rem);
 				}
 			}
-			/* Tabs (tasks 3k, ce): one row with native momentum scrolling between
-   narrow secondary chevrons; menu and new-tab stay fixed. Equal cell
-   widths are set by Tabs.tsx. The shown tab's
-   cell is tinted with a lit bar under it; its content is centered, and a
-   marker that appears widens it smoothly. Under 50px tall. */
+			/* Tabs (tasks 3k, ce): one row with native momentum scrolling; new tab
+   (fine pointers only) and the tab count stay fixed at the right. Each
+   number is lit in its project color; the shown tab is a solid key in
+   that color with its name. Under 50px tall. */
 			.Tabs {
 				flex: none;
 				padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
@@ -2865,17 +3204,13 @@
 			.Tabs .strip {
 				display: flex;
 				align-items: stretch;
+				height: 44px;
+				padding-left: 0.5ch;
 				white-space: nowrap;
 				overflow: hidden;
 			}
-			.Tabs .pages {
-				position: relative;
-				flex: 1;
-				min-width: 0;
-				display: flex;
-				overflow: hidden;
-			}
 			.Tabs .track {
+				position: relative;
 				display: flex;
 				flex: 1;
 				min-width: 0;
@@ -2893,58 +3228,49 @@
 			.Tabs .strip.dragging .track {
 				scroll-snap-type: none;
 			}
-			.Tabs .track:not(:has(.name)) .tab {
-				flex-grow: 1;
-			}
-			.Tabs .edge:disabled {
-				opacity: 0.5;
-				cursor: default;
-			}
-			.Tabs .edge.offscreen {
-				color: var(--active-fg);
-				font-weight: 700;
-			}
-			.Tabs .strip .edge {
-				padding-inline: 0;
-				min-width: 24px;
-				min-height: 44px;
-			}
-			.Tabs .probe {
-				position: absolute;
-				visibility: hidden;
-				pointer-events: none;
-			}
 			.Tabs .tab {
 				display: flex;
 				flex: none;
 				align-items: center;
 				justify-content: center;
-				width: var(--cell);
 				padding: 0.25lh 0;
 				background: none;
 				text-decoration: none;
 				color: var(--inactive-fg);
 			}
-			.Tabs .sheet .tab .n {
-				display: inline-block;
-				width: calc(var(--digits) * 1ch);
-				text-align: right;
+			.Tabs .face {
+				display: contents;
 			}
 			.Tabs .tab[aria-current] {
 				color: var(--active-fg);
 			}
-			/* Project color (task 22): a bar over the tab number, a strip left of the cwd. */
 			.Tabs .strip .tab {
 				position: relative;
+				min-width: 44px;
+				padding: 0 0.75ch;
+				color: var(--project, var(--inactive-fg));
 			}
-			.Tabs .strip .tab[style*='--project']::before {
-				content: '';
-				position: absolute;
-				top: 0;
-				left: 20%;
-				right: 20%;
-				height: 3px;
-				background: var(--project);
+			/* The shown tab is a solid key in its project color. */
+			.Tabs .strip .tab[aria-current] .face {
+				--mark-lit: var(--canvas);
+				--mark-dark: color-mix(in oklab, var(--canvas) 40%, transparent);
+				display: flex;
+				align-items: center;
+				height: 30px;
+				padding: 0 1.25ch;
+				background: var(--project, var(--active-fg));
+				color: var(--canvas);
+			}
+			.Tabs .strip .name {
+				max-width: 12ch;
+				margin-left: 1ch;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			@media (min-width: 40rem) {
+				.Tabs .strip .name {
+					max-width: 22ch;
+				}
 			}
 			.Tabs .strip .tab[data-drop]::after {
 				content: '';
@@ -2960,15 +3286,30 @@
 			.Tabs .strip .tab[data-drop='after']::after {
 				right: 0;
 			}
-			.Tabs .strip .tab[aria-current] {
-				background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent);
-				box-shadow: inset 0 -3px 0 var(--active-fg);
+			/* A tab that waits for you rings its number in its mark's color;
+   a working tab blinks a block cursor instead. */
+			.Tabs .n {
+				display: inline-grid;
+				place-items: center;
+				min-width: 26px;
+				height: 26px;
+				padding: 0 5px;
+				border: 1.5px solid transparent;
+				border-radius: 13px;
 			}
-			.Tabs .sheet .tab[aria-current] .n {
-				font-weight: 600;
+			.Tabs .sheet .n {
+				min-width: calc(var(--digits) * 1ch + 12px);
 			}
-			.Tabs .tab .n {
-				text-box: trim-both cap alphabetic;
+			.Tabs [data-mark]:not(:has(.blink)) .n {
+				border-color: var(--mark-lit);
+			}
+			.Tabs [data-mark='paused'] .n {
+				border-style: dashed;
+			}
+			.Tabs .strip .tab[aria-current]:is(:not([data-mark]), :has(.blink)) .n {
+				min-width: 0;
+				padding: 0;
+				border: 0;
 			}
 			.Tabs .marker {
 				display: inline-flex;
@@ -2978,46 +3319,21 @@
 				width: 1ch;
 				height: 1cap;
 				margin-left: 0.25ch;
-			}
-			.Tabs .marker.working::before,
-			.Tabs .marker.jobs::before,
-			.Tabs .marker.retrying::before {
-				content: '';
-				width: 0.4em;
-				height: 0.4em;
-				background: currentColor;
-			}
-			.Tabs .strip .marker {
 				overflow: hidden;
+				color: var(--mark-lit);
 			}
-			.Tabs .strip .marker:not([aria-label]) {
+			.Tabs .marker:not(.blink) {
 				width: 0;
 				margin-left: 0;
 			}
+			.Tabs .marker.blink::before {
+				content: '';
+				width: 0.5em;
+				height: 0.5em;
+				background: currentColor;
+			}
 			.Tabs .strip :focus-visible {
 				outline-offset: -1px;
-			}
-			.Tabs .strip .name {
-				width: 12ch;
-				margin-left: 1ch;
-				overflow: hidden;
-				text-overflow: ellipsis;
-			}
-			.Tabs .edge {
-				display: flex;
-				flex: none;
-				align-items: center;
-				justify-content: center;
-				width: var(--edge);
-				padding: 0.25lh 0;
-				text-decoration: none;
-				color: var(--inactive-fg);
-			}
-			.Tabs .edge[hidden] {
-				display: none;
-			}
-			.Tabs .marker {
-				color: var(--mark-lit);
 			}
 			.Tabs .marker.blink {
 				animation: marker-blink 2s steps(1, end) infinite;
@@ -3045,42 +3361,82 @@
 			.Chat.stale .Tabs .marker.blink {
 				animation-play-state: paused;
 			}
-			.Tabs .marker.blocked {
-				font-weight: 600;
-			}
-			.Tabs .marker .icon {
-				width: 0.8em;
-				height: 0.8em;
-				vertical-align: 0;
-			}
 			.Tabs button {
 				flex: none;
 				background: transparent;
 				color: inherit;
 				padding: 0.25lh 1ch;
 			}
+			/* The count opens the full list; its dot marks a tab off screen that waits. */
+			.Tabs .count {
+				position: relative;
+				display: grid;
+				place-items: center;
+				min-width: 44px;
+				padding: 0;
+				color: var(--title-fg, var(--text));
+			}
+			.Tabs .count .box {
+				min-width: 24px;
+				height: 22px;
+				padding: 0 3px;
+				border: 1px solid;
+				font-size: 12px;
+				line-height: 20px;
+				text-align: center;
+			}
+			.Tabs .count .dot {
+				position: absolute;
+				top: 5px;
+				right: 4px;
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: var(--mark-lit);
+				box-shadow: 0 0 0 2px var(--canvas);
+			}
 			@media (hover: hover) and (pointer: fine) {
 				.Tabs button:hover,
-				.Tabs .tab:hover,
-				.Tabs .edge:hover {
+				.Tabs .tab:hover {
 					background: color-mix(in oklab, currentColor var(--mix-hover), transparent);
 				}
 			}
 			.Tabs .tab,
-			.Tabs .edge,
 			.Tabs button {
 				touch-action: manipulation;
 			}
-			.Tabs .menu,
 			.Tabs .close {
 				color: var(--inactive-fg);
 			}
 			@media (pointer: coarse) {
-				.Tabs .strip {
-					min-height: 44px;
-				}
 				.Tabs button {
 					min-width: 44px;
+				}
+				/* Phones open a new tab from the list. */
+				.Tabs .strip .new {
+					display: none;
+				}
+			}
+			@media (pointer: fine) {
+				.Tabs .strip {
+					height: 36px;
+				}
+				.Tabs .strip .tab {
+					min-width: 38px;
+					padding: 0 0.5ch;
+				}
+				.Tabs .strip .tab[aria-current] .face {
+					height: 26px;
+				}
+				.Tabs .n {
+					min-width: 22px;
+					height: 22px;
+					padding: 0 4px;
+					border-radius: 11px;
+				}
+				.Tabs .count .dot {
+					top: 2px;
+					right: 3px;
 				}
 			}
 			.Tabs .sheet {

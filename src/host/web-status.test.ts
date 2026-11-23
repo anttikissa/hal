@@ -21,7 +21,7 @@ useWeb()
 useChrome()
 
 browserTest(
-	'compact status keeps two lines and opens full live details without losing the draft',
+	'the chip row keeps one line at every width and opens live session details without losing the draft',
 	async () => {
 		providerHome()
 		let b = await browser()
@@ -34,7 +34,7 @@ browserTest(
 			web.start()
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
+			await b.waitFor("!!document.querySelector('.StatusRow .id')?.textContent")
 			let id = await b.evaluate('location.pathname.slice(1)')
 			let meta = {
 				id,
@@ -55,7 +55,7 @@ browserTest(
 			host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: stats.of(meta.id) })
 			status.transition(meta.id, { type: 'submit' })
 			await b.waitFor(
-				"document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')",
+				"document.querySelector('.StatusRow .context.heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')",
 			)
 			await b.evaluate(
 				"let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))",
@@ -63,40 +63,45 @@ browserTest(
 			for (let width of [320, 390, 1024, 1600]) {
 				await b.call('Emulation.setDeviceMetricsOverride', { width, height: 760, deviceScaleFactor: 1, mobile: true })
 				await b.evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))')
-				let geometry = await b.evaluate(`(() => {
-				let q = s => document.querySelector(s), r = s => q(s).getBoundingClientRect();
-				return { height: r('.overview').height, lineHeight: parseFloat(getComputedStyle(q('.overview')).lineHeight), primary: r('.primary').height, secondary: r('.secondary').height, overflow: document.documentElement.scrollWidth > innerWidth, cwd: q('.cwd').innerText, id: q('.id').checkVisibility() ? q('.id').innerText : '', windows: q('.windows').checkVisibility() ? q('.windows').innerText.replace(/\\s+/g, ' ') : '', fill: getComputedStyle(q('.model')).getPropertyValue('--fill'), duplicated: !!q('.Composer .status') };
+				let row = await b.evaluate(`(() => {
+				let q = s => document.querySelector(s), shown = s => q(s).checkVisibility();
+				// Each chip takes a touch from 4px above the row to its foot.
+				let reach = [...document.querySelectorAll('.StatusRow > button')].filter(e => e.checkVisibility()).every(e => {
+					let r = e.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+					return [y - 23, y + 18].every(y => document.elementFromPoint(x, y)?.closest('button') === e);
+				});
+				return { height: q('.StatusRow').getBoundingClientRect().height, overflow: document.documentElement.scrollWidth > innerWidth || q('.StatusRow').scrollWidth > q('.StatusRow').clientWidth, reach, cwd: q('.StatusRow .cwd').getAttribute('aria-label'), id: shown('.StatusRow .id') ? q('.StatusRow .id').textContent : '', windows: shown('.windows'), gauge: shown('.gauge'), quota: q('.gauge').getAttribute('aria-label'), bars: q('.budget .stack')?.children.length, link: !!q('.StatusRow > a'), duplicated: !!q('.Composer .status') };
 			})()`)
-				expect(geometry.height).toBeGreaterThanOrEqual(44)
-				expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
-				expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
-				expect(geometry.overflow).toBe(false)
-				// Full cwd at every width; only id and windows depend on room.
-				expect(geometry.cwd).toBe(meta.cwd)
-				expect(geometry.id).toBe(width < 600 ? '' : `${id}: `)
-				expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
-				expect(geometry.fill).toBe('83%')
-				expect(geometry.duplicated).toBe(false)
-				expect(await b.evaluate("document.querySelector('.budget').textContent")).toBe('⣄')
-				expect(await b.evaluate("document.querySelector('.budget').closest('a')")).toBe(null)
+				expect(row.height).toBe(40)
+				expect(row.overflow).toBe(false)
+				expect(row.reach).toBe(true)
+				expect(row.cwd).toBe(`Directory ${meta.cwd}`)
+				// Only the id and each window's own gauge depend on room.
+				expect(row.id).toBe(width < 600 ? '' : id)
+				expect(row.windows).toBe(width > 600)
+				expect(row.gauge).toBe(width < 600)
+				expect(row.quota).toBe('Quota: 5h 17% used')
+				expect(row.bars).toBe(3)
+				expect(row.link).toBe(false)
+				expect(row.duplicated).toBe(false)
 			}
 			sessions.update(meta.id, { slots: 0 })
-			await b.waitFor("document.querySelector('.budget').textContent === ''")
+			await b.waitFor("document.querySelector('.budget').textContent === '0'")
 			status.transition(meta.id, { type: 'end' })
 			await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
 			// A master update alone must repaint quota on this idle view. No
 			// replacement Stats, transcript, status nodes or draft are needed.
 			await b.evaluate(
-				"window.quotaNodes = [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')]",
+				"window.quotaNodes = [document.querySelector('.gauge'), document.querySelector('.window'), document.querySelector('.StatusRow')]",
 			)
 			accounts.test['5h'].used = 52
 			for (let client of host.state.clients) client.deliver({ type: 'subscription-usage', accounts })
 			await b.waitFor(
-				"document.querySelector('.windows').textContent.includes('52% used') && getComputedStyle(document.querySelector('.model')).getPropertyValue('--fill') === '48%'",
+				"document.querySelector('.window').textContent.includes('52%') && document.querySelector('.gauge').getAttribute('aria-label') === 'Quota: 5h 52% used'",
 			)
 			expect(
 				await b.evaluate(
-					"window.quotaNodes.every((n, i) => n === [document.querySelector('.model'), document.querySelector('.window'), document.querySelector('.StatusRow')][i])",
+					"window.quotaNodes.every((n, i) => n === [document.querySelector('.gauge'), document.querySelector('.window'), document.querySelector('.StatusRow')][i])",
 				),
 			).toBe(true)
 			expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
@@ -109,15 +114,29 @@ browserTest(
 			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
 			expect(await b.evaluate('window.quotaMutations')).toBe(0)
 			await b.evaluate('window.quotaObserver.disconnect()')
-			await b.evaluate("document.querySelector('.details-target').focus()")
-			await b.call('Input.dispatchKeyEvent', {
-				type: 'keyDown',
-				key: 'Enter',
-				code: 'Enter',
-				windowsVirtualKeyCode: 13,
-				text: '\r',
-			})
-			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+			let enter = async () => {
+				await b.call('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					key: 'Enter',
+					code: 'Enter',
+					windowsVirtualKeyCode: 13,
+					text: '\r',
+				})
+				await b.call('Input.dispatchKeyEvent', {
+					type: 'keyUp',
+					key: 'Enter',
+					code: 'Enter',
+					windowsVirtualKeyCode: 13,
+				})
+			}
+			await b.evaluate("document.querySelector('.StatusRow .more').focus()")
+			await enter()
+			// The toggle event moves focus into the menu just after it opens.
+			await b.waitFor("document.querySelector('#panel-menu').contains(document.activeElement)")
+			await b.evaluate(
+				"[...document.querySelectorAll('#panel-menu .row')].find(r => r.textContent.includes('Session details')).focus()",
+			)
+			await enter()
 			await b.waitFor("document.querySelector('.StatusDetails').open")
 			let text = await b.evaluate("document.querySelector('.StatusDetails').textContent")
 			expect(text).toContain(meta.name)
@@ -143,7 +162,7 @@ browserTest(
 				windowsVirtualKeyCode: 27,
 			})
 			await b.waitFor("!document.querySelector('.StatusDetails').open")
-			expect(await b.evaluate("document.activeElement === document.querySelector('.details-target')")).toBe(true)
+			expect(await b.evaluate("document.activeElement === document.querySelector('.StatusRow .more')")).toBe(true)
 			expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
 		} finally {
 			stats.of = statsOf
@@ -281,6 +300,7 @@ browserTest(
 			await b.waitFor(
 				`!!document.querySelector('.StatusRow .id')?.textContent && !!document.querySelector('textarea:not(:disabled)')`,
 			)
+			let details = `document.querySelector('.StatusRow .more').click(); [...document.querySelectorAll('#panel-menu .row')].find(r => r.textContent.includes('Session details')).click()`
 			for (let width of [390, 1280]) {
 				await b.call('Emulation.setDeviceMetricsOverride', {
 					width,
@@ -288,7 +308,7 @@ browserTest(
 					deviceScaleFactor: 1,
 					mobile: width === 390,
 				})
-				await b.evaluate(`document.querySelector('.StatusRow .details-target').click()`)
+				await b.evaluate(details)
 				await b.waitFor(`document.querySelector('.StatusDetails').open`)
 				let r = await b.evaluate(
 					`(() => { let b = document.querySelector('.StatusDetails form button'), r = b.getBoundingClientRect(); return { text: b.textContent, height: r.height, left: r.left, right: r.right, viewport: innerWidth }; })()`,
@@ -299,9 +319,7 @@ browserTest(
 				expect(r.right).toBeLessThanOrEqual(r.viewport)
 				await b.evaluate(`document.querySelector('.StatusDetails').close()`)
 			}
-			await b.evaluate(
-				`document.querySelector('.StatusRow .details-target').click(); document.querySelector('.StatusDetails form button').click()`,
-			)
+			await b.evaluate(`${details}; document.querySelector('.StatusDetails form button').click()`)
 			await b.waitFor(`!!document.querySelector('.Login')`)
 			expect(webAuth.list()).toHaveLength(0)
 		} finally {

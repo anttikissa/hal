@@ -75,27 +75,25 @@ test('details show all session facts and heat percentages from pushed Stats, inc
 	).toEqual({ text: '81%', heat: 81 })
 })
 
-test('the model name fills by the shortest window, not the most used, ignoring model-specific ones', () => {
+test('usage windows sort shortest first, not by use, ignoring model-specific ones', () => {
 	let plan = {
 		account: 'a1',
 		accounts: 1,
 		...planData({ '7d': 95, '7d_sonnet': 99, '5h': 30 }, { '5h': '2026-09-26T05:00:00Z' }),
 	}
-	expect(status.quota(withStats({ plan }))).toEqual({ window: '5h', used: 30, remaining: 70 })
 	expect(status.windows(withStats({ plan }))).toEqual([
 		{ name: '5h', used: 30, resets: '2026-09-26T05:00:00Z' },
 		{ name: '7d', used: 95 },
 	])
 })
 
-test('a full 7d hides the 5h, and the name fills by the 7d', () => {
+test('a full 7d hides the 5h', () => {
 	let plan = {
 		account: 'a1',
 		accounts: 1,
 		...planData({ '5h': 12, '7d': 100 }, { '5h': '2026-10-02T10:10:00Z', '7d': '2026-10-05T21:00:00Z' }),
 	}
 	expect(status.windows(withStats({ plan })).map((w) => w.name)).toEqual(['7d'])
-	expect(status.quota(withStats({ plan }))).toEqual({ window: '7d', used: 100, remaining: 0 })
 	// A full 5h that resets first leaves the 7d in play.
 	let short = {
 		...plan,
@@ -104,9 +102,7 @@ test('a full 7d hides the 5h, and the name fills by the 7d', () => {
 	expect(status.windows(withStats({ plan: short })).map((w) => w.name)).toEqual(['5h', '7d'])
 })
 
-test('without quota data the name stays neutral and no windows show', () => {
-	let none = withStats({})
-	expect(status.quota(none)).toBeUndefined()
-	expect(status.windows(none)).toEqual([])
-	expect(status.quota(withStats({ plan: { account: 'a1', accounts: 1, key: 'absent' } }))).toBeUndefined()
+test('without quota data no windows show', () => {
+	expect(status.windows(withStats({}))).toEqual([])
+	expect(status.windows(withStats({ plan: { account: 'a1', accounts: 1, key: 'absent' } }))).toEqual([])
 })

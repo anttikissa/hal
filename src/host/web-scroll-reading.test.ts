@@ -80,7 +80,7 @@ browserTest(
 			// 20px above the bottom is above it: growth below leaves the view.
 			await b.evaluate(`(async () => {
 				let t = document.querySelector('.Transcript');
-				t.scrollTop = -20;
+				t.scrollTop = t.scrollHeight-t.clientHeight-20;
 				await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 				window.last = [...t.querySelectorAll('.Card')].at(-1);
 				window.lastTop = last.getBoundingClientRect().top;

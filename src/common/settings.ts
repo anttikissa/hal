@@ -221,19 +221,27 @@ function fromText(type: SettingType, text: string): unknown {
 	return text
 }
 
+// Setting `s`'s effective value in `raw`, and a warning for a bad value.
+function effective(s: Setting, raw: Record<string, unknown>): { value: unknown; warning?: string } {
+	let key = s.name in raw ? s.name : s.name.replace(/^cardVerbosity/, 'blockVerbosity')
+	if (!(key in raw)) return { value: s.default }
+	let why = settings.problem(s.type, raw[key])
+	if (!why) return { value: raw[key] }
+	return {
+		value: s.default,
+		warning: `${key}: ${why}, got ${JSON.stringify(raw[key]) ?? String(raw[key])}; using the default`,
+	}
+}
+
 // Every declared setting's effective value, plus a warning for each
 // unknown key or bad value. Never throws.
 function check(raw: Record<string, unknown>): { values: Record<string, unknown>; warnings: string[] } {
 	let values: Record<string, unknown> = {}
 	let warnings: string[] = []
 	for (let s of settings.table) {
-		values[s.name] = s.default
-		let key = s.name in raw ? s.name : s.name.replace(/^cardVerbosity/, 'blockVerbosity')
-		if (!(key in raw)) continue
-		let v = raw[key]
-		let why = settings.problem(s.type, v)
-		if (!why) values[s.name] = v
-		else warnings.push(`${key}: ${why}, got ${JSON.stringify(raw[key]) ?? String(raw[key])}; using the default`)
+		let { value, warning } = effective(s, raw)
+		values[s.name] = value
+		if (warning) warnings.push(warning)
 	}
 	for (let key of Object.keys(raw)) {
 		if (!settings.table.some((s) => s.name === key.replace(/^blockVerbosity/, 'cardVerbosity')))
@@ -242,8 +250,10 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 	return { values, warnings }
 }
 
+// Checks only the one setting: cards read theirs as each mounts.
 function value(name: string): unknown {
-	return settings.check(settings.state.raw).values[name.replace(/^blockVerbosity/, 'cardVerbosity')]
+	let s = settings.table.find((s) => s.name === name.replace(/^blockVerbosity/, 'cardVerbosity'))
+	return s && effective(s, settings.state.raw).value
 }
 
 // The effective values of the settings marked `browser`, as the JSON the

@@ -454,6 +454,7 @@ export function Card(props: {
 		<Show when={shown()}>
 			{(s) => (
 				<article
+					data-scroll-key={props.row.key}
 					ref={(e) => (root = e)}
 					class={[
 						'Card',

@@ -32,7 +32,7 @@ browserTest(
 			let geometry = () =>
 				b.evaluate(`(() => {
 			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect().toJSON();
-			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled, front: document.elementFromPoint(rect('.go').x + 22, rect('.go').y + 22)?.closest('button') === q('.go'), opaque: getComputedStyle(q('.go')).backgroundColor === getComputedStyle(q('.entry')).backgroundColor };
+			return { nudge: rect('.toggle'), send: rect('.go'), field: rect('.Composer .field'), entry: rect('.entry'), same: q('textarea') === window.oldEditor, focused: document.activeElement === q('textarea'), cursor: q('textarea').selectionStart, disabled: q('.toggle').disabled, front: document.elementFromPoint(rect('.go').x + 22, rect('.go').y + 22)?.closest('button') === q('.go'), opaque: getComputedStyle(q('.go')).backgroundColor === getComputedStyle(q('.entry')).backgroundColor };
 		})()`)
 			for (let [width, height, touch] of [
 				[390, 760, true],
@@ -99,9 +99,7 @@ browserTest(
 				mobile: true,
 			})
 			await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-			await b.waitFor(
-				"document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.includes('Session ')",
-			)
+			await b.waitFor("document.querySelector('textarea') && !!document.querySelector('.StatusRow .id')?.textContent")
 			let draft = Array.from({ length: 30 }, (_, i) => `Draft line ${i}: preserve this text`).join('\n')
 			await b.evaluate(
 				`let t = document.querySelector('textarea'); t.value = ${JSON.stringify(draft)}; t.dispatchEvent(new Event('input', { bubbles: true }))`,
@@ -110,7 +108,7 @@ browserTest(
 				b.evaluate(`(() => {
 			${height ? `document.documentElement.style.setProperty('--app-height', '${height}px');` : ''}
 			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect(), font = s => parseFloat(getComputedStyle(q(s)).fontSize);
-			return { transcriptFont: font('.Transcript'), statusFont: font('.overview'), draftFont: font('textarea'), draftHeight: rect('textarea').height, scrollable: q('textarea').scrollHeight > q('textarea').clientHeight, transcriptHeight: rect('.Transcript').height, targets: [...document.querySelectorAll('.overview, .entry button')].every(e => e.getBoundingClientRect().height >= 44), overflow: document.documentElement.scrollWidth > innerWidth, value: q('textarea').value };
+			return { transcriptFont: font('.Transcript'), statusFont: font('.StatusRow'), draftFont: font('textarea'), draftHeight: rect('textarea').height, scrollable: q('textarea').scrollHeight > q('textarea').clientHeight, transcriptHeight: rect('.Transcript').height, targets: [...document.querySelectorAll('.entry button')].every(e => e.getBoundingClientRect().height >= 44), overflow: document.documentElement.scrollWidth > innerWidth, value: q('textarea').value };
 		})()`)
 			let portrait = await geometry()
 			expect(portrait.transcriptFont).toBe(14)
@@ -250,7 +248,7 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 })
 
 // iOS opens the keyboard only for focus inside the tap (task qh4).
-browserTest('menu Find focuses its search field inside the tap', async () => {
+browserTest("the tab list's Find focuses its search field inside the tap", async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -259,8 +257,8 @@ browserTest('menu Find focuses its search field inside the tap', async () => {
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
 		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('button.menu')")
-		await b.evaluate("document.querySelector('button.menu').click()")
+		await b.waitFor("document.querySelector('.Tabs .count')")
+		await b.evaluate("document.querySelector('.Tabs .count').click()")
 		await b.waitFor("document.querySelector('dialog.sheet').open")
 		let focused = await b.evaluate(`(() => {
 			[...document.querySelectorAll('dialog.sheet button')].find((x) => x.textContent.trim() === 'Find').click()
