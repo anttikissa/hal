@@ -281,7 +281,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'question')
 		return [{ type: 'question', id: r.id, form: r.form, ...(r.from && { command: true as const }), ts: r.ts }]
 	if (
-		(r.type === 'output' && r.transitionDone) ||
+		(r.type === 'output' && (r.transitionDone || r.transition)) ||
 		((r.type === 'command' || r.type === 'output') && r.origin === 'model')
 	)
 		return [] // model-run: its tool card shows it (9g)

@@ -27,7 +27,8 @@ function output(
 	fields: { transition?: ContextTransition; transitionDone?: string; transitionCancel?: string },
 ): void {
 	let r = history.append(id, { type: 'output', text, ...fields })
-	if (!fields.transitionDone) host.broadcast(id, { type: 'output', sessionId: id, text, n: r.n, ts: r.ts })
+	if (!fields.transitionDone && !fields.transition)
+		host.broadcast(id, { type: 'output', sessionId: id, text, n: r.n, ts: r.ts })
 }
 
 function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: Sender = {}, summary?: string): Reply {
@@ -60,7 +61,7 @@ function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: 
 		}
 		contextTransitions.apply(id)
 	} else if (kind === 'clear' && (state.type !== 'running' || state.phase !== 'tools')) running.controller.abort()
-	return { result: `/${kind} accepted; the host applies it after this exchange settles.` }
+	return { result: running ? `Context will ${kind} after this round.` : `Context ${kind}ed.` }
 }
 
 function cancel(id: string): void {
@@ -69,18 +70,20 @@ function cancel(id: string): void {
 		contextTransitions.output(id, 'Automatic context continuation canceled.', { transitionCancel: intent.id })
 }
 
+// Answers calls left open by a crash in the current exchange. Like
+// replay, a later prompt or continue closes earlier calls for good.
 function settle(id: string): void {
 	let records = history.readSync(id)
 	let unanswered = new Set<string>()
 	for (let r of records.slice(records.findLastIndex((r) => r.type === 'reset' || r.type === 'compact') + 1)) {
 		if (r.type === 'assistant' && r.block.type === 'tool_call') unanswered.add(r.block.id)
-		if (r.type === 'user') for (let b of r.blocks) if (b.type === 'tool_result') unanswered.delete(b.id)
+		if (r.type === 'continue' || (r.type === 'user' && r.blocks.length)) unanswered.clear()
 	}
 	if (unanswered.size) {
 		let results = [...unanswered].map((id) => ({
 			type: 'tool_result' as const,
 			id,
-			output: 'No result: the host stopped before settlement; this call may or may not have run.',
+			output: 'No result: the host stopped while this call ran; it may or may not have run.',
 			isError: true,
 		}))
 		let r = history.append(id, { type: 'user', blocks: results })

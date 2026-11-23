@@ -347,6 +347,19 @@ test('checkpoint recovery installs the accepted summary exactly once', async () 
 	}
 })
 
+test('compact leaves calls an earlier restart closed alone', () => {
+	let c = client(),
+		id = created(c)
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'work' }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'old', name: 'bash', input: {} } })
+	history.append(id, { type: 'continue', reason: 'The host restarted during the turn.' })
+	let intent = { id: 'i', kind: 'compact' as const, summary: 'state', sender: { origin: 'model' as const } }
+	history.append(id, { type: 'output', text: 'intent', transition: intent })
+	contextTransitions.apply(id)
+	let results = history.readSync(id).flatMap((r) => (r.type === 'user' ? r.blocks : []))
+	expect(results.some((b) => b.type === 'tool_result')).toBe(false)
+})
+
 test('Escape cancels pending compact without restarting its paused turn after recovery', async () => {
 	let c = client(),
 		id = created(c)
