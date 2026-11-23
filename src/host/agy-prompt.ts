@@ -2,9 +2,12 @@
 // images) and tracks whether a Hal history extends what `agy` has seen.
 // Task xbp.
 
+import { realpathSync } from 'fs'
+import { resolve } from 'path'
 import { blocks, type ImageBlock, type Message } from '../common/blocks.ts'
 import { strings } from '../common/strings.ts'
 import { provider, type ProviderRequest } from './provider.ts'
+import { systemPrompt } from './system-prompt.ts'
 
 export type AcpContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
 
@@ -76,12 +79,43 @@ function unseen(state: PrefixState, messages: Message[], cwd: string): Message[]
 	return rest.slice(i).every((m) => m.role === 'user') ? rest.slice(i) : undefined
 }
 
-function seed(req: ProviderRequest): AcpContent[] {
+// agy reads <cwd>/AGENTS.md on its own, but not parent-directory AGENTS.md,
+// CLAUDE.md, or ~/.agents/AGENTS.md. Send only the files agy misses with
+// the first prompt of a fresh ACP session, honoring Hal's project trust.
+function extraInstructions(cwd: string, projectTrust?: string | false): string {
+	let raw = systemPrompt.agents(cwd, undefined, projectTrust)
+	if (!raw) return ''
+	let own = resolve(cwd, 'AGENTS.md')
+	let realOwn = own
+	try {
+		realOwn = realpathSync(own)
+	} catch {}
+	let kept = raw
+		.split(/\n\n(?=<file path=")/)
+		.filter((part) => {
+			let m = /^<file path="([^"]+)">/.exec(part)
+			if (!m) return true
+			let p = m[1]!
+			if (p === own || p === realOwn) return false
+			try {
+				return realpathSync(p) !== realOwn
+			} catch {
+				return true
+			}
+		})
+		.join('\n\n')
+	return kept ? `<project-instructions>\n${kept}\n</project-instructions>` : ''
+}
+
+function seed(req: ProviderRequest, cwd?: string, projectTrust?: string | false): AcpContent[] {
 	let last = req.messages.findLastIndex((m) => m.role === 'assistant')
 	let before = agyPrompt.toContent(req.messages.slice(0, last + 1), req, true)
 	let now = agyPrompt.toContent(req.messages.slice(last + 1), req, false)
-	if (!before.length) return now
+	let extra = cwd ? agyPrompt.extraInstructions(cwd, projectTrust) : ''
+	let head: AcpContent[] = extra ? [{ type: 'text', text: extra }] : []
+	if (!before.length) return [...head, ...now]
 	return [
+		...head,
 		{
 			type: 'text',
 			text: "<hal-transcript>\nThe conversation so far in this Hal session, which you continue. Earlier tool calls were Hal's, not yours.",
@@ -92,4 +126,4 @@ function seed(req: ProviderRequest): AcpContent[] {
 	]
 }
 
-export const agyPrompt = { hash, toContent, unseen, seed }
+export const agyPrompt = { hash, toContent, unseen, extraInstructions, seed }

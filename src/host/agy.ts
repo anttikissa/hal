@@ -304,7 +304,8 @@ async function agentFor(sessionId: string, cwd: string): Promise<Agent> {
 async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, signal: AbortSignal): Promise<void> {
 	let sessionId = req.sessionId
 	if (!sessionId) throw new Error('agy needs a Hal session')
-	let cwd = sessions.open(sessionId).cwd
+	let session = sessions.open(sessionId)
+	let cwd = session.cwd
 	let agent = await agentFor(sessionId, cwd)
 	if (agent.idleTimer) {
 		clearTimeout(agent.idleTimer)
@@ -333,7 +334,7 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 		agent.tools.clear()
 		agyModels.record(created.models?.availableModels ?? [])
 		recordConfigOptions(agent, created.configOptions)
-		content = agyPrompt.seed(req)
+		content = agyPrompt.seed(req, cwd, session.projectTrust)
 	}
 	let { modelId: wanted, level } = agyModels.resolve(req.model, req.effort)
 	if (agent.model !== wanted) {
