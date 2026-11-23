@@ -74,6 +74,18 @@ test('frontier bodies map validated explicit effort without changing default pol
 	expect(modelEffort.wire('custom', 'unknown')).toEqual({})
 })
 
+test('a later version of a known family inherits its newest sibling; older and unknown models keep their own', () => {
+	let messages = [{ role: 'user' as const, blocks: [{ type: 'text' as const, text: 'hi' }] }]
+	for (let model of ['gpt-6.2-astra', 'gpt-7-astra', 'gpt-6.10-sol', 'gpt-6.2-sol-2026-11-01'])
+		expect(openai.body({ model, effort: 'max', messages }, false).reasoning).toEqual({ summary: 'auto', effort: 'max' })
+	expect(() => modelEffort.validate('openai/gpt-6.2-astra', 'none')).toThrow('unsupported effort')
+	expect(modelEffort.describe('openai/gpt-7-luna')?.levels).toContain('none')
+	expect(modelEffort.describe('openai/gpt-6-sol')?.levels).toContain('none')
+	expect(modelEffort.describe('anthropic/claude-opus-6-20261013')?.default).toBe('medium')
+	expect(anthropic.body({ model: 'claude-fable-6-2', messages }, false).thinking).toMatchObject({ type: 'adaptive' })
+	expect(modelEffort.describe('openai/gpt-7-nova')).toBeUndefined()
+})
+
 test('gateway metadata distinguishes missing/null effort values and mandatory thinking; endpoint hook reaches body', async () => {
 	let fetch = provider.fetch
 	let endpoint = openaiCompat.endpoint

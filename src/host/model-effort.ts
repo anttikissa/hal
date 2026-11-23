@@ -19,9 +19,34 @@ const responses = (levels: EffortLevel[], defaultLevel: EffortLevel = 'medium'):
 const standard: EffortLevel[] = ['low', 'medium', 'high']
 const frontier: EffortLevel[] = [...standard, 'xhigh', 'max']
 
+// The newest model Hal knows in each family. A later version inherits
+// its settings: gpt-6.2-astra and gpt-7-astra use gpt-6-astra's,
+// claude-opus-6 uses claude-opus-5-5's.
+const newest: Record<string, string[]> = {
+	openai: ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-5.6-terra', 'gpt-5.6', 'gpt-5.3-codex'],
+	anthropic: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-2'],
+}
+// Family prefix, version, family suffix; a dated snapshot suffix is ignored.
+const versioned = (model: string) =>
+	/^(gpt-|claude-[a-z]+-)(\d+(?:[.-]\d{1,2})?)(-[a-z]+)?(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$/.exec(model)
+const versionOrder = new Intl.Collator('en', { numeric: true })
+
+// The model whose settings `model` uses: itself, or the newest known
+// model of its family when `model` is a later version.
+function lineage(provider: string, model: string): string {
+	let m = versioned(model)
+	if (!m) return model
+	for (let known of newest[provider] ?? []) {
+		let k = versioned(known)!
+		if (k[1] === m[1] && k[3] === m[3] && versionOrder.compare(m[2]!, k[2]!) > 0) return known
+	}
+	return model
+}
+
 function capability(provider: string, model: string): Capability | undefined {
 	let supplied = registry.state.providers[provider]?.capability?.(model)
 	if (supplied) return supplied
+	model = modelEffort.lineage(provider, model)
 	if (provider === 'openai') {
 		if (/^gpt-(6\.1-sol|6-astra)(?:-\d{4}-\d{2}-\d{2})?$/.test(model)) return responses(frontier)
 		if (/^gpt-6-(sol|luna)(?:-\d{4}-\d{2}-\d{2})?$/.test(model)) return responses(['none', ...frontier])
@@ -104,4 +129,4 @@ function wire(provider: string, model: string, selected?: string, maxTokens?: nu
 	modelEffort.validate(`${provider}/${model}`, level)
 	return cap!.wire(level as EffortLevel, maxTokens)
 }
-export const modelEffort = { capability, describe, validate, nearest, wire }
+export const modelEffort = { capability, lineage, describe, validate, nearest, wire }

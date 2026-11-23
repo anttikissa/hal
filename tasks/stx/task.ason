@@ -1,0 +1,10 @@
+{
+	title: 'Later model versions inherit effort settings',
+	spec: "A later version of a known model family uses the settings of the newest version Hal knows in that family: effort levels, default, wire format, Anthropic adaptive thinking and OpenAI reasoning. gpt-6.2-astra and gpt-7-astra use gpt-6-astra's; gpt-6.3-sol uses gpt-6.1-sol's; claude-opus-6 uses claude-opus-5-5's. A family is the provider plus the name around the version (gpt-N-astra, claude-opus-N). The list of newest known models sits in src/host/model-effort.ts. Older versions and models without a matching known family keep their own exact rules. This replaces the w7 rule that unknown models offer no effort control. A release that breaks its family's settings gets an explicit entry when it appears; Hal does not guess ahead.",
+	status: 'done',
+	notes: [
+		'Bug fix, invariant: a selected effort reaches the wire for every later version of a known family. /effort high on gpt-6.2-astra was dropped as "no effort control" because the table matched only exact ids (23 Nov).'
+	],
+	needs: ['w7'],
+	foldInto: ['w7']
+}

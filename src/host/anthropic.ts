@@ -101,9 +101,12 @@ function toMessages(req: ProviderRequest): any[] {
 	return out
 }
 
-// Models that reject a manual thinking budget.
+// Models that reject a manual thinking budget; later versions of these
+// families too.
 function adaptive(model: string): boolean {
-	return /^claude-(?:opus-(?:4-[678]|5(?:-|$))|sonnet-(?:4-6|5(?:-|$))|fable-5(?:-|$))/.test(model)
+	return /^claude-(?:opus-(?:4-[678]|5(?:-|$))|sonnet-(?:4-6|5(?:-|$))|fable-5(?:-|$))/.test(
+		modelEffort.lineage('anthropic', model),
+	)
 }
 
 // `webSearch`: whether the endpoint offers Anthropic's hosted web search.

@@ -75,7 +75,7 @@ function assistantItem(b: ReplayBlock): unknown {
 }
 
 function reasons(model: string): boolean {
-	return /^(gpt-[56]|o\d|codex)/.test(model)
+	return /^(gpt-(?:[5-9]|[1-9]\d)|o\d|codex)/.test(model)
 }
 
 // `webSearch`: whether the endpoint offers OpenAI's hosted web search.
