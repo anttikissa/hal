@@ -111,11 +111,13 @@ function setNotice(notice: string | undefined): void {
 	app.setView({ ...app.state.view, notice })
 }
 
+const offlineNotice = 'not connected; try again in a moment'
+
 // Sends a command that makes no sense later: refused with a notice
 // while disconnected. True if sent.
 function sendNow(command: unknown): boolean {
 	if (!connection.connected()) {
-		app.setNotice('not connected; try again in a moment')
+		app.setNotice(offlineNotice)
 		return false
 	}
 	connection.send(command)
@@ -316,7 +318,8 @@ function onState(state: LinkState): void {
 	if (state.type === 'connected') {
 		tabs.connected()
 		push.visibility(app.state.shown)
-		app.setNotice(undefined)
+		if (app.state.view.notice === offlineNotice) app.setNotice(undefined)
+		else app.changed()
 	}
 }
 

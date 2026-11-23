@@ -2,6 +2,9 @@
 	title: 'Web shows the lost link once, in the status line',
 	spec: 'While the web page has no host link, the composer status line alone says reconnecting; the link state sets no notice, so retries (joining, then disconnected) do not flip text above the composer. Reconnecting clears the notice, such as a stale "not connected" refusal. Invariant (bug fix): one reconnecting text, steady while retries cycle; the old notice alternated connecting… and disconnected; reconnecting… on every attempt and duplicated the status line.',
 	status: 'done',
+	notes: [
+		'Bug fix: onState(connected) unconditionally called app.setNotice(undefined), so returning from the iOS file picker (whose focus wake triggers a reconnect) erased unrelated notices such as the 5 MB attachment-size error before the user saw them. Invariant: reconnecting clears only the offline refusal notice and preserves other active notices.'
+	],
 	needs: [],
 	foldInto: ['4s']
 }

@@ -156,13 +156,18 @@ test('settings arrows adjust values but leave inline editing native', () => {
 	expect(fx.sent).toHaveLength(count)
 })
 
-test('the link state leaves the notice to the status line and clears it on connect', () => {
+test('the link state leaves the notice to the status line and clears only offline refusals on connect', () => {
 	app.setNotice('not connected; try again in a moment')
 	app.onState({ type: 'joining' })
 	app.onState({ type: 'disconnected', retryAt: 0 })
 	expect(app.notice()).toBe('not connected; try again in a moment')
 	app.onState({ type: 'connected', role: 'client' })
 	expect(app.notice()).toBeUndefined()
+	// Returning from a native picker reconnects the socket; keep unrelated errors visible.
+	app.setNotice('clip.mp4: larger than 5 MB')
+	app.onState({ type: 'joining' })
+	app.onState({ type: 'connected', role: 'client' })
+	expect(app.notice()).toBe('clip.mp4: larger than 5 MB')
 })
 
 test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the shared editor, as native edits', () => {
