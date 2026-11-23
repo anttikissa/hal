@@ -94,7 +94,7 @@ function system(req: ProviderRequest, cwd: string): string {
 		let end = start < 0 ? -1 : text.indexOf('\n</file>', start)
 		if (end >= 0) text = text.slice(0, start) + text.slice(end + '\n</file>'.length)
 	}
-	return `${text}\n\nYour own tools replace Hal's BASH, READ, EDIT and GREP; Hal's other tools are your ide-tools MCP tools.`
+	return `${text}\n\nYour own tools replace Hal's BASH, READ, EDIT and GREP; Hal's other tools are your ide-tools MCP tools. Write file paths as plain inline code, not markdown file:// links.`
 }
 
 function seed(req: ProviderRequest): AcpContent[] {

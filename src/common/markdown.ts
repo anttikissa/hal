@@ -108,10 +108,24 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 			let label = scan(s, i + 1, { ...st, bold: true }, ']', open)
 			let rest = label ? s.slice(label.end) : ''
 			let url = /^\((https?:\/\/[^\s)]+|\/[\w-]+(?:\/[\w.-]+)*(?:#[a-z]?\d+(?:\.\d+)?)?)\)/.exec(rest)
-			// While the text may grow, "](" and a partial http(s) address
-			// may still come.
-			let maybe = open && (!label?.closed || rest === '' || /^\((h(t(t(p(s?(:(\/(\/[^\s)]*)?)?)?)?)?)?)?)?$/.test(rest))
-			if (label && (url || maybe)) {
+			// Models using IDE prompts often write [file](file:///...); drop
+			// the unusable file:// target and show only the readable label.
+			let file = !url && /^\(file:\/\/[^\s)]+\)/.exec(rest)
+			// While the text may grow, "](" and a partial http(s) or file://
+			// address may still come.
+			let maybe =
+				open &&
+				(!label?.closed ||
+					rest === '' ||
+					/^\((h(t(t(p(s?(:(\/(\/[^\s)]*)?)?)?)?)?)?)?|f(i(l(e(:(\/(\/[^\s)]*)?)?)?)?)?)?)?$/.test(rest))
+			if (label && (url || file || maybe)) {
+				if (file) {
+					let plain = scan(s, i + 1, st, ']', open)!
+					let isPath = !plain.runs.some((r) => /\s/.test(r.text))
+					join(isPath ? plain.runs.map((r) => ({ ...r, code: true })) : plain.runs)
+					i = label.end + file[0].length
+					continue
+				}
 				let href = url?.[1]
 				join(label.runs.map((r) => ({ ...r, href })))
 				i = url ? label.end + url[0].length : s.length

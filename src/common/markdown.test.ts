@@ -80,9 +80,13 @@ describe('inline', () => {
 		expect(done('[A1] and [x] done')).toBe('[A1] and [x] done')
 	})
 
-	test('only http and https addresses become links', () => {
+	test('only http and https addresses become links; file:// markdown links drop their target', () => {
 		expect(done('[x](javascript:alert(1))')).toBe('[x](javascript:alert(1))')
 		expect(markdown.inline('[x](javascript:alert(1))', true).some((r) => r.href)).toBe(false)
+		expect(done('see [Tabs.tsx](file:///root/hal/src/web/components/Tabs.tsx#L10-L20)')).toBe('see `Tabs.tsx`')
+		expect(done('see [the tab bar](file:///root/hal/src/web/components/Tabs.tsx)')).toBe('see the tab bar')
+		expect(markdown.inline('[Tabs.tsx](file:///root/hal/src/web/components/Tabs.tsx)').some((r) => r.href)).toBe(false)
+		expect(open('see [Tabs.tsx](file:///root/h')).toBe('see **Tabs.tsx**')
 	})
 
 	test('bare http(s) URLs are links, without sentence punctuation', () => {
