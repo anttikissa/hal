@@ -57,13 +57,18 @@ function taken(u: Usage): number {
 	return (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
 }
 
-function contextNotice(id: string, records: HistoryRecord[], usage: Usage): void {
-	let context = taken(usage)
+function contextNotice(id: string, records: HistoryRecord[], usage: Usage, liveContext?: number): void {
+	let context = liveContext ?? taken(usage)
 	if (context < 150_000) return
 	let last = replay
 		.current(records)
-		.findLast((r) => r.type === 'compact' || r.type === 'reset' || (r.type === 'round' && taken(r.usage) > 0))
-	let previous = last?.type === 'round' ? taken(last.usage) : 0
+		.findLast(
+			(r) =>
+				r.type === 'compact' ||
+				r.type === 'reset' ||
+				(liveContext !== undefined ? r.type === 'turn_end' && !!r.context : r.type === 'round' && taken(r.usage) > 0),
+		)
+	let previous = last?.type === 'turn_end' ? (last.context ?? 0) : last?.type === 'round' ? taken(last.usage) : 0
 	let crossed = [150_000, 200_000, 250_000].filter((threshold) => previous < threshold && context >= threshold)
 	if (crossed.length)
 		history.append(id, {
@@ -304,7 +309,7 @@ async function* record(
 				...(turn.account && { account: turn.account }),
 				...(running.ns[0] !== undefined && { block: running.ns[0] }),
 			})
-			contextNotice(id, inputRecords, turn.usage)
+			contextNotice(id, inputRecords, turn.usage, turn.context)
 		}
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
 	}

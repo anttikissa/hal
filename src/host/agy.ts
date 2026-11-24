@@ -52,6 +52,8 @@ type Agent = {
 	cwd?: string
 	prefix: number
 	hash?: string
+	basePrefix?: number
+	baseHash?: string
 	model?: string
 	effort?: string
 	thoughtLevels?: string[]
@@ -64,7 +66,14 @@ async function resume(sessionId: string, agent: Agent, cwd: string, system: stri
 	if (!data.acpSession || data.cwd !== cwd || data.account !== agent.account) return
 	try {
 		await call(agent, 'session/resume', { sessionId: data.acpSession, cwd, mcpServers: [], ...meta(system) })
-		Object.assign(agent, { acpSession: data.acpSession, cwd, prefix: data.prefix ?? 0, hash: data.hash })
+		Object.assign(agent, {
+			acpSession: data.acpSession,
+			cwd,
+			prefix: data.prefix ?? 0,
+			hash: data.hash,
+			basePrefix: data.basePrefix,
+			baseHash: data.baseHash,
+		})
 	} catch (e) {
 		diag.log(`agy: resuming ${data.acpSession} failed, seeding a new session: ${e instanceof Error ? e.message : e}`)
 	}
@@ -349,8 +358,7 @@ async function turn(
 	let fresh = agyPrompt.unseen(agent, req.messages, cwd)
 	let content: AcpContent[]
 	if (fresh) {
-		content = agyPrompt.toContent(fresh, req, false)
-		if (!content.length) content = [{ type: 'text', text: 'Continue where you left off.' }]
+		content = agyPrompt.promptContent(fresh.messages, req, fresh.edited)
 	} else {
 		let created = await call(agent, 'session/new', { cwd, mcpServers: [], ...meta(system) })
 		agent.acpSession = created.sessionId
@@ -477,9 +485,7 @@ async function turn(
 	try {
 		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
 		// agy has the input now, whatever happens to this turn.
-		agent.prefix = req.messages.length
-		agent.hash = agyPrompt.hash(req.messages)
-		agyPrompt.saveState(sessionId, agent)
+		agyPrompt.recordPrefix(sessionId, agent, req.messages, fresh)
 		let result = await Promise.race([reply, settled.promise])
 		if (signal.aborted) {
 			void reply.catch(() => {})
@@ -489,7 +495,10 @@ async function turn(
 		if (!agent.emailChecked && agent.logPath) {
 			agent.emailChecked = true
 			let found = agyLog.email(agyLog.readFrom(agent.logPath, 0))
-			if (found) agyAccounts.learnEmail(agent.accountRef, found)
+			if (found && agyAccounts.learnEmail(agent.accountRef, found)) {
+				agent.account = found
+				agyPrompt.saveState(sessionId, agent)
+			}
 		}
 		let usage = agyLog.extractUsage(result?.usage)
 		if (Object.keys(usage).length || lastUsed !== undefined)

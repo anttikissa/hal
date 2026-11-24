@@ -5,7 +5,7 @@
 // Tasks: nzv, nvm.
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 
-export type Notice = { source: number; text: string; sectionUpdate?: true }
+export type Notice = { source: number; text: string; sectionUpdate?: true; hosted?: true }
 type Known = { cwd?: string; model?: string; end?: TurnStatus; waiting?: string }
 
 function text(r: HistoryRecord, known: Known): string | undefined {

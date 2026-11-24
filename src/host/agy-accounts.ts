@@ -174,18 +174,21 @@ function save(email: string, geminiDir: string): void {
 
 // Backfills `email` on an unnamed agy entry (e.g. `{ keychain: true }`) once
 // agy reports the signed-in email in its ACP log.
-function learnEmail(account: AgyAccount, email: string): void {
-	if (account.email || !email.includes('@') || !existsSync(paths.authFile())) return
+function learnEmail(account: AgyAccount, email: string): boolean {
+	if (account.email || !email.includes('@') || !existsSync(paths.authFile())) return false
 	let { data, list: accounts } = agyAccounts.all()
 	let found = accounts.find((a) =>
 		account.geminiDir ? a.geminiDir === account.geminiDir : a.keychain && account.keychain,
 	)
-	if (!found || found.email) return
+	if (!found || found.email) return false
 	found.entry.email = email
 	liveFiles.save(data)
 	for (let map of [state.chosen, state.picked]) {
 		for (let [k, v] of map) if (v === account.name) map.set(k, email)
 	}
+	account.email = email
+	account.name = email
+	return true
 }
 
 // agy's notice for a spent quota, sent as the turn's text: "⚠ Individual

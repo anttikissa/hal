@@ -237,10 +237,14 @@ function edit(id: string, message: string, text: string, command?: string, held 
 }
 
 // Whether the records after a prompt leave the world as it was: no
-// tool call except read-only ones (tools.readOnly).
+// tool call except read-only ones (tools.readOnly). Provider-hosted
+// tools (such as agy's own shell/file tools) are treated as effectful.
 function harmless(records: HistoryRecord[]): boolean {
 	return records.every(
-		(r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name, r.block.input),
+		(r) =>
+			r.type !== 'assistant' ||
+			(r.block.type !== 'tool_call' && r.block.type !== 'hosted_tool') ||
+			(r.block.type === 'tool_call' && tools.readOnly(r.block.name, r.block.input)),
 	)
 }
 

@@ -10,7 +10,7 @@ import type { ToolPresentation } from './tool-presentation.ts'
 
 export type ToolDisplay = { presentation?: ToolPresentation; presentationError?: string }
 
-export type TextBlock = { type: 'text'; text: string; naming?: true }
+export type TextBlock = { type: 'text'; text: string; naming?: true; hosted?: true }
 
 // `signature` is opaque and only meaningful to `provider`, the provider
 // that produced it; others must not send it back. History keeps it in

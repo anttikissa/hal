@@ -241,7 +241,15 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		else if (msg.blocks.length) out.push(msg)
 	}
 	let flush = () => {
-		if (facts.length) out.push({ role: 'user', blocks: [{ type: 'text', text: facts.map((n) => n.text).join('\n') }] })
+		if (!facts.length) return
+		let list: UserBlock[] = []
+		for (let f of facts) {
+			let last = list.at(-1)
+			if (f.hosted) list.push({ type: 'text', text: f.text, hosted: true })
+			else if (last?.type === 'text' && !last.hosted) last.text += `\n${f.text}`
+			else list.push({ type: 'text', text: f.text })
+		}
+		out.push({ role: 'user', blocks: list })
 		facts = []
 	}
 	let prev: HistoryRecord | undefined
@@ -314,7 +322,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			flush()
 		} else if (r.type === 'assistant') {
 			if (r.block.type === 'hosted_tool') {
-				facts.push({ source: r.n ?? i + 1, text: replayText.hosted(r.block) })
+				facts.push({ source: r.n ?? i + 1, text: replayText.hosted(r.block), hosted: true })
 				continue
 			}
 			let b = r.block

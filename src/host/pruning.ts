@@ -11,6 +11,7 @@ import { diag } from './diag.ts'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { tokenCalibration } from './token-calibration.ts'
 import { blobs } from './blobs.ts'
+import { provider } from './provider.ts'
 import { strings } from '../common/strings.ts'
 
 type Saved = { boundary: number; checkpoint: number; pressure: number; omitted: number[]; consumed: number[] }
@@ -145,6 +146,8 @@ function project(
 	let edited = new Set(records.filter((r) => JSON.stringify(r) !== JSON.stringify(original.get(r.n))).map((r) => r.n))
 	for (let r of all) if (r.type === 'rebase' && r.applied) for (let edit of r.edit) edited.add(edit.n)
 	all = records = projectCurrent(records).map(materialize)
+	let parsed = budget.model ? conversationBlocks.parseModelId(budget.model) : undefined
+	if (parsed && provider.state.providers[parsed.provider]?.externalContext) return records
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let active = records.slice(at + 1)
 	let boundary = records[at]?.n ?? 0
