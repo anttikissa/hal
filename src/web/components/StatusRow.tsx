@@ -212,6 +212,9 @@ export function StatusRow(props: {
 					</For>
 				</span>
 			</Show>
+			<Show when={!names_().length && slot()}>
+				<span class="windows">{slot()}</span>
+			</Show>
 			<button
 				type="button"
 				ref={(e) => (chip.menu = e)}
