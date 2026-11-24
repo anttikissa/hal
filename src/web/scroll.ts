@@ -57,7 +57,7 @@ function reading() {
 }
 function atTop() {
 	let el = scroll.state.el
-	return !!el && el.scrollTop - scroll.state.pad < scroll.nearTop
+	return !!el && el.scrollTop < scroll.nearTop
 }
 function quiet(change: () => void): void {
 	scroll.state.quiet = true
@@ -68,6 +68,29 @@ function quiet(change: () => void): void {
 	}
 }
 
+// The first row whose bottom is in view: the row the reader sees.
+function seen(el: HTMLElement) {
+	let top = el.getBoundingClientRect().top
+	return [...el.querySelectorAll<HTMLElement>('.rows > [data-scroll-key]')].find(
+		(r) => r.getBoundingClientRect().bottom > top,
+	)
+}
+// Rows change above the reader: the row in view keeps its exact place,
+// measured. The write holds scrolling for a frame, since iOS momentum
+// outlives scrollTop writes.
+function keep(change: () => void) {
+	let el = scroll.state.el,
+		row = el && seen(el)
+	if (!el || !row) return quiet(change)
+	let y = row.getBoundingClientRect().top
+	quiet(change)
+	let shift = row.isConnected ? row.getBoundingClientRect().top - y : 0
+	if (!shift) return
+	note('keep')
+	el.style.overflow = 'hidden'
+	el.scrollTop += shift
+	requestAnimationFrame(() => (el.style.overflow = ''))
+}
 function prepend(change: () => void) {
 	let el = scroll.state.el,
 		row = el?.querySelector('.rows > [data-scroll-key]')
@@ -80,7 +103,9 @@ function prepend(change: () => void) {
 		if (shift) el.scrollTop += shift
 	}
 }
-function init(el: HTMLElement, onTop: () => void, onSettle: () => void) {
+// `slide`: the transcript's window may move; called as the view moves,
+// settles or earlier history arrives near the top.
+function init(el: HTMLElement, slide: () => void) {
 	scroll.state.el = el
 	live = true
 	let rows = el.querySelector(':scope > .rows')!
@@ -101,8 +126,7 @@ function init(el: HTMLElement, onTop: () => void, onSettle: () => void) {
 		if (touching || !moving) return
 		moving = false
 		note('settled')
-		onSettle()
-		if (!live && atTop()) onTop()
+		slide()
 	}
 	let arm = () => {
 		clearTimeout(timer)
@@ -124,12 +148,10 @@ function init(el: HTMLElement, onTop: () => void, onSettle: () => void) {
 	let scrolled = () => {
 		if (!live || el.scrollTop < lastLiveTop - 1) live = gap(el) < 2
 		if (moving) arm()
-		if (!live && atTop() && (!moving || CSS.supports('overflow-anchor', 'auto'))) onTop()
+		slide()
 	}
 	scroll.state.moving = () => moving
-	scroll.state.pageReady = () => {
-		if (!moving || CSS.supports('overflow-anchor', 'auto')) onTop()
-	}
+	scroll.state.pageReady = slide
 	el.addEventListener('touchend', lift, { passive: true })
 	el.addEventListener('touchcancel', lift, { passive: true })
 	el.addEventListener('scrollend', settled)
@@ -159,13 +181,10 @@ function save(id: string) {
 		scroll.state.places.delete(id)
 		return
 	}
-	let top = el.getBoundingClientRect().top
-	let row = [...el.querySelectorAll<HTMLElement>('.rows > [data-scroll-key]')].find(
-		(r) => r.getBoundingClientRect().bottom > top,
-	)
+	let row = seen(el)
 	scroll.state.places.set(id, {
 		key: row?.dataset.scrollKey,
-		offset: row ? row.getBoundingClientRect().top - top : 0,
+		offset: row ? row.getBoundingClientRect().top - el.getBoundingClientRect().top : 0,
 		fallback: el.scrollTop,
 	})
 }
@@ -189,8 +208,6 @@ export const scroll = {
 		moving: undefined as (() => boolean) | undefined,
 		pageReady: undefined as (() => void) | undefined,
 		el: null as HTMLElement | null,
-		// The space above the rows (Transcript.tsx), so the top is measured from the rows.
-		pad: 0,
 		quiet: false,
 		places: new Map<string, Place>(),
 	},
@@ -204,6 +221,7 @@ export const scroll = {
 	reading,
 	atTop,
 	quiet,
+	keep,
 	prepend,
 	init,
 	save,

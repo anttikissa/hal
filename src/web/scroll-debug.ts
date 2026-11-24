@@ -19,8 +19,8 @@ let rows: Row[] = [],
 	wrote = 0,
 	saving: ReturnType<typeof setTimeout> | undefined
 
-// Where the view is: scrollTop, the space above the rows, the first
-// mounted row and the row at the view's center with its content offset.
+// Where the view is: scrollTop, the first mounted row and the row at
+// the view's center with its content offset.
 function where(): Row {
 	let el = scroll.state.el
 	if (!el) return {}
@@ -32,7 +32,6 @@ function where(): Row {
 		st: Math.round(el.scrollTop),
 		sh: el.scrollHeight,
 		ch: el.clientHeight,
-		pad: Math.round(scroll.state.pad),
 		first: el.querySelector<HTMLElement>('.rows > [data-scroll-key]')?.dataset.scrollKey,
 		key: center?.dataset.scrollKey,
 		y: center && Math.round(center.getBoundingClientRect().top - box.top + el.scrollTop),

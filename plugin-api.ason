@@ -1,5 +1,5 @@
 {
-	version: 57,
+	version: 58,
 	changes: [
 		{
 			version: 2,
@@ -1078,6 +1078,23 @@
 					kind: 'compatible',
 					target: 'web/card-rows.cardRows',
 					description: 'Adds height, span, space and locate'
+				}
+			]
+		},
+		{
+			version: 58,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'web/card-rows.cardRows',
+					description: 'Drops height, span, space and locate',
+					port: 'Measure mounted rows instead'
+				},
+				{
+					kind: 'breaking',
+					target: 'web/scroll.scroll',
+					description: 'Drops state.pad; init takes one slide callback; adds keep',
+					port: 'Pass one callback to init'
 				}
 			]
 		}

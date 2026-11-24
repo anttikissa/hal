@@ -23,16 +23,11 @@ import type { SessionMeta } from '../../common/session.ts'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
-import { backfill } from '../../common/backfill.ts'
-import { bashResult } from '../../common/bash-result.ts'
-import { card } from '../../common/card.ts'
 import { forms } from '../../common/forms.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript, type Item } from '../../common/transcript.ts'
 import { transcriptLive } from '../../common/transcript-live.ts'
 import { app } from '../app.ts'
-import { cardRows } from '../card-rows.ts'
-import { folds } from '../folds.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type ViewState } from '../view.ts'
@@ -99,141 +94,40 @@ export function Transcript(props: {
 			let key = all()[i]?.key
 			if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
 		})
-	// Space above the rows stands for the rows not mounted and the history
-	// not fetched, so a fling up has room. Moving the window changes this
-	// margin, never scrollTop: on iOS a scrollTop write ends a fling. The
-	// margin becomes its estimate once scrolling settles.
-	let rowsEl!: HTMLElement
-	let last = 0
-	let placed: string | undefined
-	let heights = new Map<string, number>()
-	let cachedWidth = 0
-	let syncWidth = () => {
-		let w = rowsEl?.clientWidth ?? 0
-		if (w > 0 && Math.abs(w - cachedWidth) > 2) {
-			heights.clear()
-			cachedWidth = w
-		}
-		return w
+	// The window slides as the reader nears either end of it. Heights are
+	// never estimated: the row in view keeps its exact place, measured
+	// (scroll.keep). Without overflow-anchor (iOS) it slides only while
+	// nothing moves the view: iOS momentum outlives scrollTop writes.
+	// Only the reader turns it back, so two slides never undo each other.
+	let prior = { up: false, top: NaN }
+	let slide = () => {
+		if (props.target && !props.target.shown) return
+		if (scroll.state.moving?.() && !CSS.supports('overflow-anchor', 'auto')) return
+		let i = start(),
+			top = el.scrollTop,
+			ahead = Math.min(el.clientHeight * 8, el.scrollHeight / 4),
+			up = top < ahead
+		if (up && i <= page) app.older()
+		if (up !== prior.up && Math.abs(top - prior.top) < 1) return
+		let next = up ? Math.max(0, i - step) : Math.min(i + step, all().length - limit)
+		if (up ? next >= i : next <= i || scroll.gap(el) > ahead || cut(next) > top - ahead) return
+		scroll.note(`slide ${next}`)
+		scroll.keep(() => {
+			setStart(next)
+			flush()
+		})
+		prior = { up, top: el.scrollTop }
+		requestAnimationFrame(slide)
 	}
-	let measureRow = () => {
-		let w = syncWidth() || el.clientWidth || innerWidth
-		let sample = rowsEl.firstElementChild as HTMLElement | null
-		let lh = (sample && parseFloat(getComputedStyle(sample).lineHeight)) || 20
-		let cols = Math.max(20, Math.floor((w - 20) / 8.4))
-		let session = id(),
-			blocks = shared.blocks
-		return (row: Row) => {
-			let item = row.item
-			let bash = !!bashResult.background(item) || (item.type === 'tool' && item.name === 'bash')
-			let open =
-				untrack(() =>
-					folds.level(
-						`${session}#${row.job ? row.key : item.key}`,
-						folds.start(session, item, card.initial(item, blocks, card.failed(row.result, bash))),
-					),
-				) === 'long'
-			if (open) {
-				let cached = heights.get(`${session}\0${row.key}`)
-				if (cached !== undefined) return cached
-			}
-			return cardRows.height(row, open, cols, lh)
-		}
-	}
-	let setPad = (px: number) => {
-		px = Math.max(0, Math.round(px))
-		scroll.state.pad = px
-		rowsEl.style.marginTop = `${px}px`
-	}
-	let estimate = () => {
-		let rows = all(),
-			i = start()
-		let b = app.state.older.get(id()),
-			sample = b?.older ? (b.loaded.slice(0, 50) ?? []) : []
-		let unfetched =
-			b?.older && sample.length
-				? (b.older / JSON.stringify(sample).length) * sample.length * (rows.length / b.loaded.length)
-				: 0
-		if (!i && !unfetched) return 0
-		return cardRows.space(rows, i, unfetched, measureRow())
-	}
-	let settle = () => {
-		if (!rowsEl) return
-		let pad = scroll.state.pad,
-			next = estimate()
-		if (Math.abs(next - pad) < 1) return
-		let top = el.scrollTop + next - pad
-		scroll.note(`settle ${pad}>${next}`)
-		setPad(next)
-		el.scrollTop = top
-		last = el.scrollTop
+	// Pixels the rows above row `next` take; sliding down past them must
+	// leave the reader far from the top, or the window would slide back.
+	let cut = (next: number) => {
+		let key = all()[next]?.key,
+			row = key === undefined ? null : el.querySelector<HTMLElement>(`[data-scroll-key="${CSS.escape(key)}"]`)
+		return row ? row.offsetTop - (el.querySelector<HTMLElement>('.rows > [data-scroll-key]')?.offsetTop ?? 0) : Infinity
 	}
 	onSettled(() => {
-		last = el.scrollTop
-		let shift = (next: number, moved: () => number) => {
-			scroll.reading()
-			scroll.note(`shift ${next}`)
-			placed = `${id()}\n${all()[next]!.key}`
-			scroll.quiet(() => {
-				setStart(next)
-				flush()
-			})
-			setPad(scroll.state.pad - moved())
-			last = el.scrollTop
-			if (!scroll.state.moving?.()) settle()
-		}
-		// The view is in the space above the rows (the scrollbar, or a fling
-		// outrunning them): the window moves to the row estimated there.
-		let place = () => {
-			let pad = scroll.state.pad,
-				center = el.scrollTop + el.clientHeight / 2,
-				i = start()
-			if (center >= pad) return false
-			let rows = all(),
-				h = measureRow()
-			let row = cardRows.locate(rows, i, pad, center, h)
-			// Not fetched yet: rows mounted now would be replaced page by page.
-			if (row < 0 && !backfill.complete(app.state.older, id())) {
-				app.older()
-				return true
-			}
-			let next = Math.max(0, row - limit / 2)
-			if (next < i) shift(next, () => cardRows.span(rows, next, i, h))
-			return true
-		}
-		let advance = () => {
-			let top = el.scrollTop,
-				delta = top - last,
-				pad = scroll.state.pad
-			last = top
-			if (!delta || (props.target && !props.target.shown)) return
-			let i = start(),
-				up = delta < 0
-			if (top < pad && !i && backfill.complete(app.state.older, id())) return settle()
-			if (up && i <= page) app.older()
-			if (place()) return
-			let ahead = Math.max(el.clientHeight * 8, Math.abs(delta) * 8)
-			if (up ? top - pad > ahead : scroll.gap(el) > ahead) return
-			let next = up ? Math.max(0, i - step) : Math.min(i + step, all().length - limit)
-			if (up ? next >= i : next <= i) return
-			let box = el.getBoundingClientRect()
-			let anchor = document
-				.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
-				?.closest('[data-scroll-key]')
-			if (!anchor) return
-			let index = all().findIndex((row) => row.key === anchor.getAttribute('data-scroll-key'))
-			if (index < next || index >= next + limit) return
-			let y = anchor.getBoundingClientRect().top
-			shift(next, () => anchor.getBoundingClientRect().top - y)
-		}
-		let dispose = scroll.init(
-			el,
-			() => {
-				place()
-				if (!start()) app.older()
-			},
-			settle,
-		)
+		let dispose = scroll.init(el, slide)
 		scroll.state.showEnd = () => {
 			if (all().length > start() + limit) {
 				scroll.note('showEnd')
@@ -243,23 +137,11 @@ export function Transcript(props: {
 				})
 			}
 		}
-		el.addEventListener('scroll', advance, { passive: true })
 		return () => {
-			el.removeEventListener('scroll', advance)
 			scroll.state.showEnd = undefined
 			dispose()
 		}
 	})
-	// Another tab, or the window moved by a jump: the margin is estimated
-	// again at once, keeping the view in place until the jump positions it.
-	createEffect(
-		() => `${id()}\n${starts().get(id())}`,
-		(now) => {
-			if (now === placed) return
-			placed = now
-			untrack(settle)
-		},
-	)
 	// Scrolled well above the bottom: a pill on the cards' bar takes the
 	// reader back down. Checked on scroll and when rows change, since
 	// content growing below a still reader moves the bottom away.
@@ -297,28 +179,11 @@ export function Transcript(props: {
 	// only while they fit in a third of the transcript: a long open title
 	// pinned at the top would hide the body scrolling under it.
 	let tall = new ResizeObserver((entries) => {
-		let session = untrack(id),
-			w = syncWidth()
 		let found = entries.map(({ target }) => {
 			let block = target as HTMLElement
 			let head = block.querySelector<HTMLElement>(':scope .CardHeader:not(.inline)')
 			let fits = !head || head.offsetHeight <= el.clientHeight / 3
-			let lh = parseFloat(getComputedStyle(block).lineHeight) || 20
-			let h = block.offsetHeight
-			if (
-				w > 0 &&
-				h > 0 &&
-				block.isConnected &&
-				block.parentElement === rowsEl &&
-				(block.classList.contains('open') || block.classList.contains('Question'))
-			) {
-				let key = block.dataset.scrollKey
-				if (key) {
-					if (heights.size >= 4000) heights.clear()
-					heights.set(`${session}\0${key}`, h + lh * 0.5)
-				}
-			}
-			return [block, fits && h > 10 * lh] as const
+			return [block, fits && block.offsetHeight > 10 * parseFloat(getComputedStyle(block).lineHeight)] as const
 		})
 		for (let [block, on] of found) block.toggleAttribute('data-tall', on)
 	})
@@ -451,7 +316,7 @@ export function Transcript(props: {
 	return (
 		<>
 			<main class="Transcript" role="log" ref={(e) => (el = e)}>
-				<div class="rows" ref={(e) => (rowsEl = e)}>
+				<div class="rows">
 					<For each={shown()} keyed={(row) => row.key}>
 						{(row) => {
 							let cursor = createMemo(() => marked(row().key, CURSOR))
