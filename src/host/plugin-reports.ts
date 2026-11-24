@@ -2,6 +2,7 @@
 // shared notice area and history without changing unrelated sessions.
 import type { NoticeEvent } from '../common/notices.ts'
 import { basename } from 'path'
+import { agyMcp } from './agy-mcp.ts'
 import { diag } from './diag.ts'
 import { fileEditors } from './file-editors.ts'
 import { host } from './host.ts'
@@ -69,6 +70,7 @@ function via(path: string, source: string, side?: 'client' | 'server'): void {
 // and shutdown stay quiet; failures go through report().
 function changed(path: string, what: string): void {
 	if (!plugins.state.started) return
+	agyMcp.notifyToolsChanged()
 	pluginSync.changed(path)
 	let from = pluginReports.state.sources.get(path)
 	pluginReports.state.sources.delete(path)

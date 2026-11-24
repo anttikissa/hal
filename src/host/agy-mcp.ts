@@ -1,4 +1,4 @@
-// Exposes Hal's session, coordination and plugin tools to an `agy acp`
+// Exposes Hal's session, coordination, help and plugin tools to an `agy acp`
 // process over its `--ide-mcp-port` loopback TCP socket (newline-delimited
 // JSON-RPC 2.0 MCP, spoken through `nc`). agy keeps its own file/shell
 // tools, so Hal omits those and exposes the rest according to the
@@ -9,35 +9,55 @@ import type { Socket } from 'bun'
 import { blocks } from '../common/blocks.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
+import { nativeTool } from './native-tool.ts'
+import { promptCache } from './prompt-cache.ts'
 import { sessions } from './sessions.ts'
+import { systemPrompt } from './system-prompt.ts'
 import { tools, type Tool } from './tools.ts'
 
-export type McpBridge = { port: number; stop(): void }
+export type McpBridge = { port: number; notifyToolsChanged(): void; stop(): void }
 export type McpResult = { name: string; output: string; isError?: boolean }
 
 type RpcRequest = { jsonrpc?: string; id?: number | string; method?: string; params?: Record<string, any> }
-type SocketState = { buf: string }
+type SocketState = { buf: string; decoder: TextDecoder; pending: Uint8Array[] }
 
-const excluded = new Set(['bash', 'read', 'edit', 'grep', 'help'])
+const excluded = new Set(['bash', 'read', 'edit', 'grep'])
+const bridges = new Set<McpBridge>()
+const encoder = new TextEncoder()
 
-function describe(tool: Tool<unknown>): string {
-	let head = tool.description ?? tool.summary ?? tool.name
-	if (!tool.help) return head
-	let body = tool.help
+function describe(tool: Tool<unknown>, sessionId: string): string {
+	let head = tool.description ?? tool.summary
+	if (!tool.help) return head ?? tool.name
+	let open = sessions.state.open.has(sessionId)
+	let interactive = open ? promptCache.interactive(sessionId) : true
+	let body = nativeTool.guide(tool, interactive)
+	if (open) {
+		let problems: string[] = []
+		let rendered = systemPrompt.template(body, promptCache.input(sessionId, { interactive }), problems)
+		if (!problems.length) body = rendered
+	}
+	body = body
 		.replace(/^:::.*$/gm, '')
 		.replace(/\n{3,}/g, '\n\n')
 		.trim()
-	return body ? `${head}\n\n${body}` : head
+	if (!body) return head ?? tool.name
+	return head ? `${head}\n\n${body}` : body
 }
 
-function list(sessionId: string): { name: string; description: string; inputSchema: Record<string, unknown> }[] {
+function list(sessionId: string): {
+	name: string
+	description: string
+	inputSchema: Record<string, unknown>
+	annotations?: { readOnlyHint: true }
+}[] {
 	return tools
 		.allowed(sessionId)
 		.filter((t) => !agyMcp.excluded.has(t.name))
 		.map((t) => ({
 			name: t.name,
-			description: describe(t),
+			description: agyMcp.describe(t, sessionId),
 			inputSchema: t.parameters ?? { type: 'object', properties: {} },
+			...(tools.readOnly(t.name) && { annotations: { readOnlyHint: true as const } }),
 		}))
 }
 
@@ -47,14 +67,21 @@ async function call(
 	args: Record<string, unknown>,
 	signal: AbortSignal,
 ): Promise<{ content: Record<string, unknown>[]; isError?: boolean }> {
-	if (agyMcp.excluded.has(name) || !tools.allowed(sessionId).some((t) => t.name === name))
+	let found = tools.allowed(sessionId).find((t) => t.name === name)
+	if (agyMcp.excluded.has(name) || !found)
 		return {
 			content: [{ type: 'text', text: `Tool '${name}' is not available in this Hal session.` }],
 			isError: true,
 		}
+	let props = (found.parameters as { properties?: Record<string, unknown> } | undefined)?.properties
+	let input = args
+	if ('toolSummary' in args && (!props || !Object.hasOwn(props, 'toolSummary'))) {
+		input = { ...args }
+		delete input.toolSummary
+	}
 	let meta = sessions.open(sessionId)
 	let result = await tools.run(
-		{ type: 'tool_call', id: crypto.randomUUID(), name, input: args },
+		{ type: 'tool_call', id: crypto.randomUUID(), name, input },
 		{ cwd: meta.cwd, sessionId, model: meta.model, signal },
 	)
 	let content: Record<string, unknown>[] = [{ type: 'text', text: result.output }]
@@ -78,7 +105,7 @@ async function handle(
 		case 'initialize':
 			return reply({
 				protocolVersion: msg.params?.protocolVersion ?? '2024-11-05',
-				capabilities: { tools: {} },
+				capabilities: { tools: { listChanged: true } },
 				serverInfo: { name: 'hal', version: '1.0.0' },
 			})
 		case 'ping':
@@ -129,6 +156,30 @@ function peerUid(port: number, peerPort: number): number | undefined {
 	return -1
 }
 
+function flush(socket: Socket<SocketState>): void {
+	let queue = socket.data.pending
+	while (queue.length) {
+		let head = queue[0]!
+		let written = socket.write(head)
+		if (written <= 0) break
+		if (written < head.byteLength) {
+			queue[0] = head.subarray(written)
+			break
+		}
+		queue.shift()
+	}
+}
+
+function send(socket: Socket<SocketState>, sockets: Set<Socket<SocketState>>, msg: Record<string, unknown>): void {
+	if (!sockets.has(socket)) return
+	socket.data.pending.push(encoder.encode(`${JSON.stringify(msg)}\n`))
+	if (socket.data.pending.length === 1) flush(socket)
+}
+
+function notifyToolsChanged(): void {
+	for (let bridge of agyMcp.bridges) bridge.notifyToolsChanged()
+}
+
 // `getSignal` gives the running turn's signal; Hal tools run only then.
 function start(
 	sessionId: string,
@@ -136,7 +187,21 @@ function start(
 	onResult?: (res: McpResult) => void,
 ): McpBridge {
 	let sockets = new Set<Socket<SocketState>>()
-	let decoder = new TextDecoder()
+	let dispatch = (socket: Socket<SocketState>, line: string) => {
+		if (!line.trim()) return
+		let msg: RpcRequest
+		try {
+			msg = JSON.parse(line)
+		} catch {
+			return
+		}
+		void agyMcp
+			.handle(sessionId, msg, getSignal, onResult)
+			.then((res) => {
+				if (res) send(socket, sockets, res)
+			})
+			.catch((e) => diag.log(`agy-mcp ${sessionId}: ${e instanceof Error ? e.message : e}`))
+	}
 	let server = Bun.listen<SocketState>({
 		hostname: '127.0.0.1',
 		port: 0,
@@ -147,29 +212,25 @@ function start(
 					diag.log(`agy-mcp ${sessionId}: refused a connection from uid ${uid}`)
 					return void socket.end()
 				}
-				socket.data = { buf: '' }
+				socket.data = { buf: '', decoder: new TextDecoder(), pending: [] }
 				sockets.add(socket)
 			},
 			data(socket, chunk) {
 				if (!sockets.has(socket)) return
-				socket.data.buf += decoder.decode(chunk, { stream: true })
+				socket.data.buf += socket.data.decoder.decode(chunk, { stream: true })
 				let lines = socket.data.buf.split('\n')
 				socket.data.buf = lines.pop()!
-				for (let line of lines) {
-					if (!line.trim()) continue
-					let msg: RpcRequest
-					try {
-						msg = JSON.parse(line)
-					} catch {
-						continue
-					}
-					void agyMcp
-						.handle(sessionId, msg, getSignal, onResult)
-						.then((res) => {
-							if (res && sockets.has(socket)) socket.write(JSON.stringify(res) + '\n')
-						})
-						.catch((e) => diag.log(`agy-mcp ${sessionId}: ${e instanceof Error ? e.message : e}`))
-				}
+				for (let line of lines) dispatch(socket, line)
+			},
+			end(socket) {
+				if (!sockets.has(socket)) return
+				socket.data.buf += socket.data.decoder.decode()
+				let tail = socket.data.buf
+				socket.data.buf = ''
+				if (tail) dispatch(socket, tail)
+			},
+			drain(socket) {
+				if (sockets.has(socket)) flush(socket)
 			},
 			close(socket) {
 				sockets.delete(socket)
@@ -179,9 +240,13 @@ function start(
 			},
 		},
 	})
-	return {
+	let bridge: McpBridge = {
 		port: server.port,
+		notifyToolsChanged() {
+			for (let s of sockets) send(s, sockets, { jsonrpc: '2.0', method: 'notifications/tools/list_changed' })
+		},
 		stop() {
+			agyMcp.bridges.delete(bridge)
 			for (let s of sockets)
 				try {
 					s.end()
@@ -190,6 +255,8 @@ function start(
 			server.stop(true)
 		},
 	}
+	agyMcp.bridges.add(bridge)
+	return bridge
 }
 
-export const agyMcp = { excluded, list, call, handle, peerUid, start }
+export const agyMcp = { excluded, bridges, describe, list, call, handle, peerUid, notifyToolsChanged, start }

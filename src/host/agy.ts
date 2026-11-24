@@ -365,6 +365,7 @@ async function turn(
 		agent.cwd = cwd
 		agent.model = created.models?.currentModelId
 		agent.tools.clear()
+		agent.mcpResults.clear()
 		agyModels.record(created.models?.availableModels ?? [])
 		recordConfigOptions(agent, created.configOptions)
 		content = agyPrompt.seed(req)
@@ -437,6 +438,7 @@ async function turn(
 		abort?.abort(reason)
 		if (agent.acpSession && !agent.exited) {
 			agent.tools.clear()
+			agent.mcpResults.clear()
 			try {
 				write(agent, { method: 'session/cancel', params: { sessionId: agent.acpSession } })
 			} catch {}
