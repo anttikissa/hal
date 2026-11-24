@@ -1,9 +1,7 @@
 // Find unfinished turns and queued work from session marks, then continue
 // it after a host restart without scanning closed, idle histories.
-// Tasks: bx, svt, rqq, xbp.
+// Tasks: bx, svt, rqq.
 import { existsSync } from 'fs'
-import { blocks } from '../common/blocks.ts'
-import type { HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { contextTransitions } from './context-transitions.ts'
 import { busy } from './busy.ts'
@@ -13,30 +11,11 @@ import { host } from './host.ts'
 import { marksWorker } from './marks-worker.ts'
 import { pages } from './pages.ts'
 import { prompts } from './prompts.ts'
-import { provider } from './provider.ts'
-import { restartNote, type RestartInitiator } from './restart-note.ts'
-import { sessions } from './sessions.ts'
 import { status } from './status.ts'
-import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
-import { turnPolicy } from './turn-policy.ts'
 import { turns } from './turns.ts'
 
-const selfRestartReason =
-	'Your requested host restart completed. Do not run it again. Continue remaining work; verify uncertain effects before repeating them.'
-const resumeOnlySessions = new Set<string>()
-
-function matchesInitiator(id: string, records: HistoryRecord[], initiator?: RestartInitiator): boolean {
-	if (!initiator || initiator.origin !== 'model' || initiator.sessionId !== id) return false
-	let lastEnd = records.findLastIndex((r) => r.type === 'turn_end')
-	let afterEnd = lastEnd >= 0 ? (records[lastEnd]!.n ?? 0) : 0
-	if (afterEnd !== initiator.afterEnd) return false
-	let cmd = records.slice(lastEnd + 1).find((r) => r.type === 'command' && r.n === initiator.commandN)
-	return cmd?.type === 'command' && cmd.origin === 'model' && /^\/restart(?:\s|$)/.test(cmd.text)
-}
-
 async function recover(): Promise<void> {
-	let initiator = restartNote.takeInitiator()
 	for (let id of new Set([...tabs.file().open, ...busy.list()])) {
 		// A hundred tabs' checks are sync reads: yield between slices (task 7j).
 		if (performance.now() >= pages.deadline()) await new Promise((resolve) => setImmediate(resolve))
@@ -77,19 +56,6 @@ async function recover(): Promise<void> {
 			continue
 		}
 		if (state.type !== 'running') continue
-		let providerName = blocks.parseModelId(sessions.open(id).model)?.provider
-		let noAutoRetry = !!(providerName && provider.state.providers[providerName]?.noAutoRetry)
-		let selfRestart = noAutoRetry && matchesInitiator(id, records, initiator)
-		if (noAutoRetry && !selfRestart) {
-			let error = `Host restarted while ${providerName} was running; not retrying automatically because it may have already done work.`
-			status.state.states.set(id, state)
-			let recorded = history.append(id, { type: 'turn_end', status: 'error', error, usage: {} })
-			host.broadcast(id, turnPolicy.endEvent(id, recorded, error))
-			status.transition(id, { type: 'end', error })
-			busy.drop(id)
-			subagents.report(id)
-			continue
-		}
 		let n = states.recoveries(records)
 		if (n >= states.maxRecoveries()) {
 			turns.stop(id, `continued ${n} times without progress; it may be what stops the host`)
@@ -97,21 +63,10 @@ async function recover(): Promise<void> {
 		}
 		history.append(id, {
 			type: 'continue',
-			reason: selfRestart
-				? selfRestartReason
-				: 'The host restarted during the turn. Continue without repeating completed work.',
+			reason: 'The host restarted during the turn. Continue without repeating completed work.',
 		})
-		if (selfRestart) resumeOnlySessions.add(id)
 		turns.start(id)
 	}
-}
-
-function takeResumeOnly(id: string): boolean {
-	return resumeOnlySessions.delete(id)
-}
-
-function reset(): void {
-	resumeOnlySessions.clear()
 }
 
 function leftWork(id: string): boolean {
@@ -129,4 +84,4 @@ function leftWork(id: string): boolean {
 		})
 }
 
-export const turnRecovery = { recover, leftWork, takeResumeOnly, reset }
+export const turnRecovery = { recover, leftWork }

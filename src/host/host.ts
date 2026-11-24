@@ -34,8 +34,6 @@ import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
 import { serverLog } from './server-log.ts'
 import { handover } from './commands/restart.ts'
-import { restartNote } from './restart-note.ts'
-import { turnRecovery } from './turn-recovery.ts'
 import { warnings } from './warnings.ts'
 import { wire } from './wire.ts'
 import { queueEdits } from './queue-edits.ts'
@@ -375,8 +373,6 @@ function init(): void {
 // Forgets every client and turn (tests).
 function reset(): void {
 	scheduler.reset()
-	restartNote.reset()
-	turnRecovery.reset()
 	history.stop(false)
 	queueEdits.state.clear()
 	find.reset()

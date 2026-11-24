@@ -30,9 +30,6 @@ export type ProviderRequest = {
 	// The session the request is for, for providers that want it.
 	sessionId?: string
 	cacheId?: string
-	// Automatic restart recovery: require resuming the saved provider
-	// context rather than silently seeding a fresh session.
-	resumeOnly?: boolean
 }
 
 // `account` names the credentials used, for providers with several
@@ -71,7 +68,7 @@ export type Provider = {
 	// the stream so the provider can inject them into the running turn.
 	inTurnSteer?: boolean
 	// Provider executes side-effectful tools itself, so Hal must not
-	// automatically retry failed or interrupted turns with "continue".
+	// automatically retry failed provider rounds.
 	noAutoRetry?: boolean
 	// Provider owns its own conversation context; before it reports usage,
 	// Hal shows context as unknown instead of 0.

@@ -9,7 +9,6 @@ import { models } from './models.ts'
 import { nativeTool } from './native-tool.ts'
 import { promptCache } from './prompt-cache.ts'
 import { sessions } from './sessions.ts'
-import { turnRecovery } from './turn-recovery.ts'
 import { turns } from './turns.ts'
 import { bash } from './tools/bash.ts'
 
@@ -19,7 +18,6 @@ async function* stream(
 	running: { effort?: string },
 	signal: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
-	let resumeOnly = turnRecovery.takeResumeOnly(id)
 	let { system, cacheId } = promptCache.prepare(id, {
 		cwd: sessions.open(id).cwd,
 		model: models.qualified(model, running.effort),
@@ -43,7 +41,6 @@ async function* stream(
 			image: (blob, maxEdge) => blobs.image(id, blob, maxEdge),
 			sessionId: id,
 			cacheId,
-			...(resumeOnly && { resumeOnly: true }),
 		},
 		signal,
 	)) {
