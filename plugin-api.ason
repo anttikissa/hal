@@ -1,5 +1,5 @@
 {
-	version: 58,
+	version: 59,
 	changes: [
 		{
 			version: 2,
@@ -1095,6 +1095,16 @@
 					target: 'web/scroll.scroll',
 					description: 'Drops state.pad; init takes one slide callback; adds keep',
 					port: 'Pass one callback to init'
+				}
+			]
+		},
+		{
+			version: 59,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'web/scroll.scroll',
+					description: 'Adds anchors'
 				}
 			]
 		}

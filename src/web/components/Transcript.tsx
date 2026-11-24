@@ -96,13 +96,13 @@ export function Transcript(props: {
 		})
 	// The window slides as the reader nears either end of it. Heights are
 	// never estimated: the row in view keeps its exact place, measured
-	// (scroll.keep). Without overflow-anchor (iOS) it slides only while
+	// (scroll.keep). Unless the browser anchors (not iOS) it slides only while
 	// nothing moves the view: iOS momentum outlives scrollTop writes.
 	// Only the reader turns it back, so two slides never undo each other.
 	let prior = { up: false, top: NaN }
 	let slide = () => {
 		if (props.target && !props.target.shown) return
-		if (scroll.state.moving?.() && !CSS.supports('overflow-anchor', 'auto')) return
+		if (scroll.state.moving?.() && !scroll.anchors()) return
 		let i = start(),
 			top = el.scrollTop,
 			ahead = Math.min(el.clientHeight * 8, el.scrollHeight / 4),
