@@ -116,7 +116,18 @@ function init(el: HTMLElement, slide: () => void) {
 	}
 	let commits = new MutationObserver(hold)
 	commits.observe(rows, { childList: true, subtree: true, characterData: true })
-	let observer = new ResizeObserver(hold)
+	// iOS keeps the scroll position past the end when the view grows (the
+	// keyboard closes): blank space stays under the last line until a
+	// touch snaps it back. Not during a fling or bounce, which overshoot.
+	let resized = () => {
+		let end = el.scrollHeight - el.clientHeight
+		if (!moving && el.scrollTop > end + 1) {
+			note('clamp')
+			el.scrollTop = end
+		}
+		hold()
+	}
+	let observer = new ResizeObserver(resized)
 	observer.observe(rows)
 	observer.observe(el)
 	let touching = false,
