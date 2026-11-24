@@ -1,5 +1,5 @@
 {
-	version: 59,
+	version: 60,
 	changes: [
 		{
 			version: 2,
@@ -1105,6 +1105,17 @@
 					kind: 'compatible',
 					target: 'web/scroll.scroll',
 					description: 'Adds anchors'
+				}
+			]
+		},
+		{
+			version: 60,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'web/scroll.scroll',
+					description: 'Drops anchors',
+					port: "Use CSS.supports('overflow-anchor', 'auto') instead"
 				}
 			]
 		}

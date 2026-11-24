@@ -75,13 +75,6 @@ function seen(el: HTMLElement) {
 		(r) => r.getBoundingClientRect().bottom > top,
 	)
 }
-// Whether the browser keeps the view in place itself when rows change
-// above it. Learned from measured slides: iOS Safari 27 reports
-// overflow-anchor support yet does not anchor this transcript.
-let anchoring = false
-function anchors() {
-	return anchoring
-}
 // Rows change above the reader: the row in view keeps its exact place,
 // measured. The write holds scrolling for a frame, since iOS momentum
 // outlives scrollTop writes.
@@ -91,9 +84,7 @@ function keep(change: () => void) {
 	if (!el || !row) return quiet(change)
 	let y = row.getBoundingClientRect().top
 	quiet(change)
-	if (!row.isConnected) return
-	let shift = row.getBoundingClientRect().top - y
-	anchoring = !shift
+	let shift = row.isConnected ? row.getBoundingClientRect().top - y : 0
 	if (!shift) return
 	note('keep')
 	el.style.overflow = 'hidden'
@@ -103,7 +94,7 @@ function keep(change: () => void) {
 function prepend(change: () => void) {
 	let el = scroll.state.el,
 		row = el?.querySelector('.rows > [data-scroll-key]')
-	if (!el || !row || live || (el.scrollTop > 0 && anchoring)) return quiet(change)
+	if (!el || !row || live || (el.scrollTop > 0 && CSS.supports('overflow-anchor', 'auto'))) return quiet(change)
 	let y = row.getBoundingClientRect().top
 	quiet(change)
 	if (row.isConnected) {
@@ -242,7 +233,6 @@ export const scroll = {
 	atTop,
 	quiet,
 	keep,
-	anchors,
 	prepend,
 	init,
 	save,
