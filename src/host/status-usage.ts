@@ -1,6 +1,7 @@
 // /status: how much of each account's usage windows is spent, as one
 // Markdown table that the terminal and the web both render. Every read
 // refreshes the stored subscription data without a model turn.
+import { agyAccounts } from './agy-accounts.ts'
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'
@@ -17,7 +18,7 @@ import { web } from './web.ts'
 
 type Account = ReturnType<typeof auth.all>['list'][number]
 export type UsageRow = {
-	provider: Kind
+	provider: Kind | 'agy'
 	slot: string
 	account: string
 	plan?: string
@@ -29,6 +30,8 @@ export type UsageRow = {
 	apiKey: boolean
 	// Until when (epoch ms) a recorded rate limit holds the account; 0 if none.
 	limited?: number
+	// Verification required hold (no reset time; cleared on verification/success).
+	verify?: { message: string; url?: string }
 }
 
 // The latest rate limit recorded on any model of `kind` for `account`.
@@ -41,10 +44,11 @@ function limitedUntil(kind: string, account: string): number {
 	)
 }
 
-const TITLES: Record<Kind, string> = {
+const TITLES: Record<Kind | 'agy', string> = {
 	anthropic: 'Anthropic subscriptions:',
 	openai: 'OpenAI subscriptions:',
 	'opencode-go': 'OpenCode Go accounts:',
+	agy: 'Antigravity accounts:',
 }
 
 function bar(percent: number): string {
@@ -55,13 +59,20 @@ function bar(percent: number): string {
 
 function table(rows: UsageRow[], zone?: string): string {
 	let groups: string[] = []
-	for (let kind of ['anthropic', 'openai', 'opencode-go'] as const) {
+	for (let kind of ['anthropic', 'openai', 'opencode-go', 'agy'] as const) {
 		let accounts = rows.filter((row) => row.provider === kind)
 		if (!accounts.length) continue
 		let names = [
 			...new Set(accounts.flatMap((row) => Object.keys(row.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name)))),
 		].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-		let cols = names.length ? names : accounts.every((row) => row.apiKey) ? ['Limit'] : ['5h', '7d']
+		let cols =
+			kind === 'agy'
+				? ['Status']
+				: names.length
+					? names
+					: accounts.every((row) => row.apiKey)
+						? ['Limit']
+						: ['5h', '7d']
 		let lines = [
 			TITLES[kind],
 			'',
@@ -74,6 +85,18 @@ function table(rows: UsageRow[], zone?: string): string {
 			let safe = (value: string) => value.replace(/[|<>]/g, ' ').replace(/\*/g, '\\*')
 			let account = `${safe(row.account)}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
 			let cells = cols.map((name) => {
+				if (row.provider === 'agy') {
+					let parts: string[] = []
+					if (row.verify)
+						parts.push(
+							row.verify.url
+								? `Verification required — [Verify account](${row.verify.url})`
+								: `Verification required: ${safe(row.verify.message)}`,
+						)
+					if (row.limited)
+						parts.push(`limited until ${usageWindows.reset(new Date(row.limited).toISOString(), clock.now(), zone)}`)
+					return parts.length ? parts.join('<br>') : 'ok'
+				}
 				if (row.apiKey)
 					return row.limited
 						? `API key<br>rate limited until ${usageWindows.reset(new Date(row.limited).toISOString(), clock.now(), zone)}`
@@ -283,15 +306,35 @@ async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 			})
 		}
 	}
+	let agyList = agyAccounts.list()
+	if (agyList.length) {
+		let selected = model.startsWith('agy/') ? agyAccounts.selected(sessionId) : undefined
+		for (let [i, account] of agyList.entries()) {
+			rows.push({
+				provider: 'agy',
+				slot: `${auth.slot('agy', i)}${account.name === selected ? ' *' : ''}`,
+				account: account.name,
+				windows: {},
+				apiKey: false,
+				limited: statusUsage.limitedUntil('agy', account.name),
+				verify: agyAccounts.verifyOf(account.name),
+			})
+		}
+	}
 	return rows
 }
 
 async function show(sessionId: string, model: string): Promise<string> {
 	let rows = await statusUsage.rows(sessionId, model)
 	let broken = rows.some((row) => row.loginRequired)
+	let verifyLinks = rows.filter((row) => row.verify?.url).map((row) => `Verify ${row.account}: ${row.verify!.url}`)
 	// Times show in the asking client's zone, as its status line does.
 	let zone = clients.timezone(sessionId)
-	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
+	let footer = [
+		...(verifyLinks.length ? [verifyLinks.join('\n')] : []),
+		...(broken ? ['To log in again, run /login claude or /login chatgpt.'] : []),
+	].join('\n\n')
+	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${footer ? `\n\n${footer}` : ''}`
 }
 
 // Re-reads usage of the provider's skipped accounts; a refresh showing

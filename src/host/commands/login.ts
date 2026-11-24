@@ -10,9 +10,9 @@
 import type { SlashCommand } from '../commands.ts'
 import { apiKeys } from '../api-keys.ts'
 import { login } from '../login.ts'
+import { loginAgy } from '../login-agy.ts'
 import { chatgptLogin } from '../login-chatgpt.ts'
 
-const PROVIDERS = ['claude', 'chatgpt', 'opencode']
 const ALIASES: Record<string, string> = {
 	claude: 'claude',
 	anthropic: 'claude',
@@ -20,6 +20,8 @@ const ALIASES: Record<string, string> = {
 	openai: 'chatgpt',
 	opencode: 'opencode',
 	'opencode-go': 'opencode',
+	agy: 'agy',
+	antigravity: 'agy',
 	'claude-key': 'anthropic-key',
 	'anthropic-key': 'anthropic-key',
 	'chatgpt-key': 'openai-key',
@@ -27,37 +29,62 @@ const ALIASES: Record<string, string> = {
 	'opencode-go-key': 'opencode-go-key',
 	'openrouter-key': 'openrouter-key',
 }
-const METHODS: Record<string, string> = {
-	'Claude subscription': 'claude',
-	'ChatGPT subscription': 'chatgpt',
-	'Claude API key': 'anthropic-key',
-	'ChatGPT API key': 'openai-key',
-	'OpenCode API key': 'opencode-go-key',
-	'OpenRouter API key': 'openrouter-key',
+function methods(): Record<string, string> {
+	return {
+		'Claude subscription': 'claude',
+		'ChatGPT subscription': 'chatgpt',
+		...(loginAgy.available() && { 'Antigravity (agy)': 'agy' }),
+		'Claude API key': 'anthropic-key',
+		'ChatGPT API key': 'openai-key',
+		'OpenCode API key': 'opencode-go-key',
+		'OpenRouter API key': 'openrouter-key',
+	}
+}
+function providers(): string[] {
+	return loginAgy.available() ? ['claude', 'chatgpt', 'opencode', 'agy'] : ['claude', 'chatgpt', 'opencode']
 }
 const KEYS = 'API keys: set ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY or OPENROUTER_API_KEY'
 
 export const command: SlashCommand = {
 	help: () =>
-		'/login: choose a Claude or ChatGPT subscription login, or paste an API key for Claude, ChatGPT, OpenCode or OpenRouter.\n/login claude | chatgpt | opencode also work directly.\n\nKeys may instead be set in environment variables.',
-	complete: (args) => Object.keys(ALIASES).filter((p) => p.startsWith(args)),
+		`/login: choose a Claude, ChatGPT${loginAgy.available() ? ', Antigravity (agy)' : ''} or OpenCode login, or paste an API key for Claude, ChatGPT, OpenCode or OpenRouter.\n/login ${providers().join(' | ')} also work directly.\n\nKeys may instead be set in environment variables.`,
+	complete: (args) =>
+		Object.keys(ALIASES)
+			.filter((p) => (p !== 'agy' && p !== 'antigravity') || loginAgy.available())
+			.filter((p) => p.startsWith(args)),
 	async run(args, answers, ctx) {
-		let selected = args.trim()
+		let [first = '', rest = ''] = args.trim().split(/\s+/, 2)
+		let selected = first
 		if (!selected && !answers)
 			return {
 				ask: {
 					text: chatgptLogin.local()
 						? 'Select authentication method.'
 						: 'Select authentication method. For ChatGPT subscription login, first turn on Enable device code sign-in at https://chatgpt.com/#settings/Security',
-					fields: [{ type: 'choice', name: 'method', options: Object.keys(METHODS), initial: 0 }],
+					fields: [{ type: 'choice', name: 'method', options: Object.keys(methods()), initial: 0 }],
 				},
 			}
-		if (!selected) selected = METHODS[answers?.method ?? ''] ?? ''
+		if (!selected) selected = methods()[answers?.method ?? ''] ?? ''
 		let which = ALIASES[selected]
 		if (!which) {
 			return {
-				error: `${selected || 'unknown method'}: no such login method; /login ${PROVIDERS.join(' | ')} (${KEYS})`,
+				error: `${selected || 'unknown method'}: no such login method; /login ${providers().join(' | ')} (${KEYS})`,
 			}
+		}
+		if (which === 'agy') {
+			if (!loginAgy.available()) return { error: 'Antigravity CLI (agy) is not installed' }
+			if (!answers || answers.method !== undefined) {
+				let { id, url } = await loginAgy.start(ctx.sessionId)
+				return {
+					ask: {
+						text: `Open this URL to log in to Antigravity (agy):\n\n${url}\n\nThen paste the authorization code or the full callback URL.`,
+						fields: [{ type: 'secret', name: 'code', label: 'Code' }],
+					},
+					askArgs: `agy ${id}`,
+				}
+			}
+			let email = await loginAgy.finish(rest, answers.code ?? '')
+			return { say: `logged in to agy as ${email}` }
 		}
 		if (which === 'chatgpt') {
 			let email = await chatgptLogin.run((text) => ctx.say(text))

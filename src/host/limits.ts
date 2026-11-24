@@ -1,12 +1,18 @@
-// Provider rate limits and model access refusals, per model and account.
-// Kept in state/limits.ason so account rotation remembers both across
-// restarts; access refusals never appear as quota deadlines.
+// Provider rate limits, model access refusals and verification holds,
+// per model and account. Kept in state/limits.ason so account rotation
+// remembers them across restarts; access refusals and verification holds
+// never appear as quota deadlines.
 
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { clock } from './clock.ts'
 
-type Limit = string | { until: string; refusal: string }
+export type VerifyHold = { verify: string; url?: string }
+type Limit = string | { until: string; refusal: string } | VerifyHold
+
+function isVerify(entry: Limit | undefined): entry is VerifyHold {
+	return !!entry && typeof entry !== 'string' && 'verify' in entry
+}
 
 // "provider/model" or "provider/model account".
 function key(modelId: string, account?: string): string {
@@ -38,14 +44,36 @@ function until(key: string): number {
 // The complete access error while its account/model cooldown is active.
 function refusal(key: string): string | undefined {
 	let entry = limits.store()[key]
-	return entry && typeof entry !== 'string' && Date.parse(entry.until) > clock.now() ? entry.refusal : undefined
+	return entry && typeof entry !== 'string' && 'refusal' in entry && Date.parse(entry.until) > clock.now()
+		? entry.refusal
+		: undefined
 }
 
-// Records a limit; forgets ones already over.
+// Persistent verification hold (no reset time: stays until verified or a
+// later request succeeds).
+function verify(key: string): { message: string; url?: string } | undefined {
+	let entry = limits.store()[key]
+	return isVerify(entry) ? { message: entry.verify, ...(entry.url && { url: entry.url }) } : undefined
+}
+
+function setVerify(key: string, message: string, url?: string): void {
+	limits.store()[key] = { verify: message, ...(url && { url }) }
+}
+
+function clearVerify(key: string): boolean {
+	let data = limits.store()
+	if (!isVerify(data[key])) return false
+	delete data[key]
+	return true
+}
+
+// Records a limit; forgets ones already over (verification holds stay).
 function set(key: string, at: number, refusal?: string): void {
 	let data = limits.store()
-	for (let [k, v] of Object.entries(data))
+	for (let [k, v] of Object.entries(data)) {
+		if (isVerify(v)) continue
 		if (!(Date.parse(typeof v === 'string' ? v : v.until) > clock.now())) delete data[k]
+	}
 	if (at > clock.now()) {
 		let until = new Date(at).toISOString()
 		data[key] = refusal === undefined ? until : { until, refusal }
@@ -83,6 +111,9 @@ export const limits = {
 	until,
 	on,
 	refusal,
+	verify,
+	setVerify,
+	clearVerify,
 	set,
 	ofKind,
 	forget,

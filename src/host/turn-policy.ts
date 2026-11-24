@@ -167,10 +167,14 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
-// A provider that runs its own tools retries only a rate limit: that
-// round stopped before the limit, and the retry tells the model so.
+// A provider that runs its own tools retries only a rate limit or an
+// immediate account rotation: the failed round did not run tools.
 function mayRetry(name: string, error: ErrorEvent): boolean {
-	return !provider.state.providers[name]?.noAutoRetry || error.failure === 'limited'
+	return (
+		!provider.state.providers[name]?.noAutoRetry ||
+		error.failure === 'limited' ||
+		(error.failure === 'auth' && error.retryAt !== undefined)
+	)
 }
 
 export const turnPolicy = {

@@ -407,7 +407,13 @@ async function* stream(
 			if (event.type === 'error') {
 				// Name the account, as an HTTP failure does: rotation tries several.
 				event.message += await who(id.provider, http.account, event.status ?? 0)
-				yield failed(p, modelId, http.account, event, provider.resetAt(new Headers(), event.body ?? ''))
+				yield failed(
+					p,
+					modelId,
+					http.account,
+					event,
+					provider.resetAt(new Headers(), event.body ?? '') ?? event.retryAt,
+				)
 				return
 			}
 			if (event.type === 'usage') {

@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test'
-import { readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { ason } from '../common/ason.ts'
 import { calls, client, testHome, toolSession, until, useHost } from './host-fixture.test.ts'
 import { agy } from './agy.ts'
 import { agyMcp } from './agy-mcp.ts'
+import { auth } from './auth.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
@@ -298,6 +300,12 @@ for await (const chunk of process.stdin) {
 			return []
 		}
 	}
+	mkdirSync(`${testHome()}/secrets`, { recursive: true, mode: 0o700 })
+	writeFileSync(
+		`${testHome()}/secrets/auth.ason`,
+		ason.stringify({ agy: { email: 'test@example.com', keychain: true } }) + '\n',
+		{ mode: 0o600 },
+	)
 	provider.state.providers.agy = agyProvider
 	agy.command = () => [process.execPath, fakeAgy]
 	turns.stream = (model, input, signal) =>
@@ -381,6 +389,7 @@ for await (const chunk of process.stdin) {
 		await until(() => rpcLog().some((r) => r.method === 'session/cancel'))
 	} finally {
 		agy.stopAll()
+		auth.close()
 		agy.command = origCmd
 		turns.stream = origStream
 		if (hadAgy) provider.state.providers.agy = origAgy!

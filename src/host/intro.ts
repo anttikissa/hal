@@ -15,6 +15,7 @@ import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { nativeTool } from './native-tool.ts'
 import { profile } from './profile.ts'
+import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 import { theme } from './commands/theme.ts'
@@ -128,8 +129,13 @@ Type /login to set up a provider.`
 const saved = 'I saved your '
 const closing = "You're all set."
 const restart = 'Starting the intro.'
-const subscriptions =
-	'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
+const hasAgy = (): boolean =>
+	Boolean(Object.hasOwn(provider.state.providers, 'agy') && provider.state.providers.agy?.available?.())
+const subscriptionsPrefix = 'Hal works with your Claude,'
+const subscriptions = (): string =>
+	hasAgy()
+		? 'Hal works with your Claude, ChatGPT, OpenCode Go and Antigravity (agy) subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
+		: 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
 const yesNo = (name: string, text: string): Form => ({
 	text,
 	fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }],
@@ -294,14 +300,20 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// what the user wants, and they may not know Hal found the key.
 	if (!loggedIn.stored && login === undefined)
 		return reply({
-			say: `${subscriptions}${loggedIn.names.length ? ` Found: ${loggedIn.names.join(', ')}; Skip uses it.` : ''}`,
+			say: `${subscriptions()}${loggedIn.names.length ? ` Found: ${loggedIn.names.join(', ')}; Skip uses it.` : ''}`,
 			ask: {
 				text: 'Sign in now?',
 				fields: [
 					{
 						type: 'choice',
 						name: 'login',
-						options: ['/login claude', '/login chatgpt', '/login opencode', 'Skip'],
+						options: [
+							'/login claude',
+							'/login chatgpt',
+							'/login opencode',
+							...(hasAgy() ? ['/login agy'] : []),
+							'Skip',
+						],
 						initial: 0,
 					},
 				],
@@ -318,7 +330,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let chosen = answered(run, 'model')
 	if (options.size && chosen === undefined)
 		return reply({
-			say: `${loggedIn.names.length ? `Available logins: ${loggedIn.names.join(', ')}.` : 'Ollama runs models on this computer.'}${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
+			say: `${loggedIn.names.length ? `Available logins: ${loggedIn.names.join(', ')}.` : 'Ollama runs models on this computer.'}${said(run, subscriptionsPrefix) ? '' : ` ${subscriptions()}`}`,
 			ask: {
 				text: 'Which model should Hal use?',
 				fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }],
@@ -461,8 +473,9 @@ function next(
 			: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	// Not signed in (environment keys aside): the close always says how.
 	if (!loggedIn.stored)
-		now +=
-			"\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
+		now += hasAgy()
+			? "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT, OpenCode Go or Antigravity (agy) subscription, or adds an API key."
+			: "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
 	return now
 }
 

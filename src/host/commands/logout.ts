@@ -2,15 +2,23 @@
 // home's credentials file by the ids /status shows (a1, o3, g2). The
 // provider is not told; an environment key can only be unset.
 
+import { agyAccounts } from '../agy-accounts.ts'
 import { auth, type Kind } from '../auth.ts'
 import type { SlashCommand } from '../commands.ts'
 import { liveFiles } from '../live-file.ts'
 
 const KINDS: Kind[] = ['anthropic', 'openai', 'opencode-go']
 
+type Listed = {
+	id: string
+	kind: Kind | 'agy'
+	account: { name: string; entry: Record<string, any> }
+	stored: boolean
+}
+
 // Every account of every provider, by id.
-function accounts() {
-	return KINDS.flatMap((kind) => {
+function accounts(): Listed[] {
+	let out: Listed[] = KINDS.flatMap((kind) => {
 		let found
 		try {
 			found = auth.all(kind)
@@ -26,9 +34,16 @@ function accounts() {
 			stored: stored.includes(account.entry),
 		}))
 	})
+	let agyList = agyAccounts.all().list
+	for (let [i, account] of agyList.entries())
+		out.push({
+			id: auth.slot('agy', i),
+			kind: 'agy',
+			account: { name: account.name, entry: account.entry },
+			stored: true,
+		})
+	return out
 }
-
-type Listed = ReturnType<typeof accounts>[number]
 
 function label(a: Listed): string {
 	return `${a.id} ${a.account.name}`
@@ -36,7 +51,7 @@ function label(a: Listed): string {
 
 export const command: SlashCommand = {
 	help: () =>
-		'/logout <id...> removes provider accounts from the credentials file, by the ids /status shows (a1 Anthropic, o2 OpenAI, g1 OpenCode Go). Without ids it asks which. The remaining ids are renumbered. Accounts from environment variables are removed by unsetting the variable.',
+		'/logout <id...> removes provider accounts from the credentials file, by the ids /status shows (a1 Anthropic, o2 OpenAI, g1 OpenCode Go, y1 Antigravity). Without ids it asks which. The remaining ids are renumbered. Accounts from environment variables are removed by unsetting the variable.',
 	complete: (args) => {
 		let done = args.split(/\s+/)
 		let last = done.pop()!
@@ -70,9 +85,14 @@ export const command: SlashCommand = {
 			let left = [data[kind]].flat().filter((e) => !gone.has(e))
 			if (left.length) data[kind] = left
 			else delete data[kind]
-			// Names like "account 3" shift: let sessions pick again.
-			for (let map of [auth.state.chosen, auth.state.picked])
-				for (let key of map.keys()) if (key.startsWith(`${kind} `)) map.delete(key)
+			if (kind === 'agy') {
+				agyAccounts.state.chosen.clear()
+				agyAccounts.state.picked.clear()
+			} else {
+				// Names like "account 3" shift: let sessions pick again.
+				for (let map of [auth.state.chosen, auth.state.picked])
+					for (let key of map.keys()) if (key.startsWith(`${kind} `)) map.delete(key)
+			}
 		}
 		liveFiles.save(data)
 		return { say: `logged out of ${chosen.map(label).join(', ')}` }

@@ -140,8 +140,12 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 	provider: (r) => r.provider,
 	slot: (r) => r.slot,
 	account: (r) => r.account,
-	plan: (r) => (r.apiKey ? 'not applicable' : (r.subscriptionPlan ?? 'unknown')),
+	plan: (r) => (r.apiKey || r.provider === 'agy' ? 'not applicable' : (r.subscriptionPlan ?? 'unknown')),
 	status: (r) => {
+		if (r.provider === 'agy') {
+			if (r.verify) return `verification required: ${r.verify.message}${r.verify.url ? ` (${r.verify.url})` : ''}`
+			return r.limited ? 'rate limited' : 'ok'
+		}
 		if (r.apiKey) return 'API key (not queried)'
 		if (r.refreshError)
 			return `${statusUsage.problem(r.refreshError).text}; ${Object.keys(r.windows).length ? 'showing cached usage' : 'usage unavailable'}${r.loginRequired ? '; run /login ' + (r.provider === 'anthropic' ? 'claude' : 'chatgpt') : ''}`
@@ -153,7 +157,7 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 		return `${status}${r.error ? `; ${r.error}` : ''}`
 	},
 	windows: (r) =>
-		r.apiKey
+		r.apiKey || r.provider === 'agy'
 			? 'not applicable'
 			: [...new Set(['5h', '7d', ...Object.keys(r.windows)])]
 					.map((name) => {
@@ -169,7 +173,8 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 			)
 			.map(([key, at]) => `${key.slice(0, key.indexOf(' '))}: until ${at}`)
 			.join('\n') || 'none recorded',
-	error: (r) => r.refreshError ?? 'none',
+	error: (r) =>
+		r.verify ? `${r.verify.message}${r.verify.url ? ` ${r.verify.url}` : ''}` : (r.refreshError ?? 'none'),
 }
 
 // Stored logins straight from the credentials file: no refresh, no network.

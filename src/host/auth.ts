@@ -297,6 +297,11 @@ function limitedUntil(modelId: string): number {
 		try {
 			names = auth.all(kind).list.map((a) => a.name)
 		} catch {} // no login: the turn reports that
+	} else if (kind === 'agy') {
+		try {
+			let { agyAccounts } = require('./agy-accounts.ts') as typeof import('./agy-accounts.ts')
+			names = agyAccounts.list().map((a) => a.name)
+		} catch {}
 	}
 	// An account is out until its recorded 429 ends or, when a usage
 	// window it shares across models is spent, until that window resets.
@@ -406,8 +411,9 @@ export const auth = {
 	accountName,
 	pickAccount,
 	// The id /status shows and /logout takes: the provider's letter and
-	// the account's position in all() (a1, o3, g2).
-	slot: (kind: Kind, i: number): string => `${{ anthropic: 'a', openai: 'o', 'opencode-go': 'g' }[kind]}${i + 1}`,
+	// the account's position in all() (a1, o3, g2, y1).
+	slot: (kind: Kind | 'agy', i: number): string =>
+		`${{ anthropic: 'a', openai: 'o', 'opencode-go': 'g', agy: 'y' }[kind]}${i + 1}`,
 	skipped,
 	limitedUntil,
 	pick,

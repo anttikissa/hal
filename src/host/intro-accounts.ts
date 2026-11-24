@@ -36,10 +36,18 @@ function accounts(): { names: string[]; providers: string[]; stored: number } {
 			providers.push(kind)
 		}
 	}
+	let agyEntries = data.agy === undefined ? [] : Array.isArray(data.agy) ? data.agy : [data.agy]
+	for (let entry of agyEntries) {
+		if (entry?.keychain === true || (typeof entry?.geminiDir === 'string' && entry.geminiDir.length > 0)) {
+			names.push(`Antigravity${entry.email ? ` (${entry.email})` : ''}`)
+			providers.push('agy')
+			stored++
+		}
+	}
 	return { names, providers, stored }
 }
 
-// The claude and gpt aliases' current targets a credential can use,
+// The claude, gpt and neon aliases' current targets a credential can use,
 // by display name: label → id.
 // Then local Ollama models, if the greeting's warm-up found any.
 function choices(providers: string[]): Map<string, string> {
@@ -47,9 +55,11 @@ function choices(providers: string[]): Map<string, string> {
 	for (let [alias, family] of [
 		['claude', 'Claude'],
 		['gpt', 'GPT'],
+		['neon', 'Gemini'],
 	] as const) {
 		let id = models.resolve(alias).id
-		if (id && providers.includes(id.split('/')[0]!)) out.set(modelsDev.displayName(id) ?? family, id)
+		if (id && providers.includes(id.split('/')[0]!))
+			out.set(models.names([id])[id] ?? modelsDev.displayName(id) ?? family, id)
 	}
 	for (let id of models.cached('ollama')?.ids.slice(0, 4) ?? [])
 		out.set(`${id.slice('ollama/'.length)} (Ollama, local)`, id)

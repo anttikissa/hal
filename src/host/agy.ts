@@ -16,10 +16,13 @@ import { jobs } from './jobs.ts'
 import { turns } from './turns.ts'
 import { agyApproval } from './agy-approval.ts'
 import { agyCards } from './agy-cards.ts'
+import { agyLog } from './agy-log.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
 import { agyModels } from './agy-models.ts'
 import { agyPrompt, type AcpContent } from './agy-prompt.ts'
 import { agyAccounts, type AgyAccount } from './agy-accounts.ts'
+import { auth } from './auth.ts'
+import { clock } from './clock.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -41,6 +44,9 @@ type Agent = {
 	skipPermissions: boolean
 	// The account (agy-accounts.ts) agy runs logged in as.
 	account: string
+	accountRef: AgyAccount
+	logPath?: string
+	emailChecked?: boolean
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -55,7 +61,7 @@ type Agent = {
 // the next prompt seeds a new one with a transcript.
 async function resume(sessionId: string, agent: Agent, cwd: string, system: string): Promise<void> {
 	let data = agyPrompt.loadSaved(sessionId)
-	if (!data.acpSession || data.cwd !== cwd || (data.account ?? 'default') !== agent.account) return
+	if (!data.acpSession || data.cwd !== cwd || data.account !== agent.account) return
 	try {
 		await call(agent, 'session/resume', { sessionId: data.acpSession, cwd, mcpServers: [], ...meta(system) })
 		Object.assign(agent, { acpSession: data.acpSession, cwd, prefix: data.prefix ?? 0, hash: data.hash })
@@ -81,30 +87,10 @@ function recordConfigOptions(agent: Agent, options: any[] | undefined): void {
 }
 
 const stderrLimit = 64_000
-const authHint =
-	/\b(unauthenticated|not logged in|login required|sign[- ]?in|auth(?:entication)? (?:required|failed|expired)|token expired|credentials? (?:expired|invalid|missing)|oauth)\b/i
 
 function appendStderr(agent: Agent, line: string): void {
 	let next = `${agent.stderr}${line}\n`
 	agent.stderr = next.length > stderrLimit ? strings.sliceText(next, -stderrLimit) : next
-}
-
-function formatError(head: string, detail?: string, stderr?: string): string {
-	let parts = [head]
-	if (detail && !head.includes(detail)) parts.push(detail)
-	let errText = stderr?.trim()
-	if (errText && !parts.some((p) => p.includes(errText))) parts.push(`stderr:\n${errText}`)
-	let full = parts.join('\n')
-	if (authHint.test(full)) full += '\nSign in again by running `agy acp --login` in a terminal.'
-	return full
-}
-
-function rpcError(err: any, stderr?: string): Error {
-	let code = err?.code !== undefined ? ` (${err.code})` : ''
-	let msg = typeof err?.message === 'string' && err.message ? err.message : 'ACP error'
-	let data =
-		err?.data === undefined ? undefined : typeof err.data === 'string' ? err.data : JSON.stringify(err.data, null, 2)
-	return new Error(formatError(`agy${code}: ${msg}`, data, stderr))
 }
 
 function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account: AgyAccount): Agent {
@@ -155,6 +141,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account
 		turnGen: 0,
 		skipPermissions,
 		account: account.name,
+		accountRef: account,
 		prefix: 0,
 	}
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
@@ -167,7 +154,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account
 		await agent.stderrDone.catch(() => {})
 		agent.mcp?.stop()
 		let why = code === null ? `signal ${proc.signalCode ?? 'unknown'}` : `code ${code}`
-		agent.exited = formatError(`agy acp exited with ${why}`, undefined, agent.stderr)
+		agent.exited = agyLog.formatError(`agy acp exited with ${why}`, undefined, agent.stderr)
 		for (let pending of agent.calls.values()) pending.reject(new Error(agent.exited))
 		agent.calls.clear()
 		if (state.agents.get(sessionId) === agent) state.agents.delete(sessionId)
@@ -201,6 +188,7 @@ function stop(sessionId: string): void {
 
 function stopAll(): void {
 	for (let id of state.agents.keys()) agy.stop(id)
+	;(require('./login-agy.ts') as typeof import('./login-agy.ts')).loginAgy.cancel()
 }
 
 async function readLines(stream: ReadableStream<Uint8Array>, each: (line: string) => void): Promise<void> {
@@ -224,7 +212,7 @@ function write(agent: Agent, msg: object): void {
 	} catch (e) {
 		throw new Error(
 			agent.exited ??
-				formatError(`agy stdin write failed: ${e instanceof Error ? e.message : e}`, undefined, agent.stderr),
+				agyLog.formatError(`agy stdin write failed: ${e instanceof Error ? e.message : e}`, undefined, agent.stderr),
 		)
 	}
 }
@@ -270,7 +258,7 @@ function receive(agent: Agent, line: string): void {
 	let pending = agent.calls.get(msg.id)
 	if (!pending) return
 	agent.calls.delete(msg.id)
-	if (msg.error) pending.reject(rpcError(msg.error, agent.stderr))
+	if (msg.error) pending.reject(agyLog.rpcError(msg.error, agent.stderr))
 	else pending.resolve(msg.result)
 }
 
@@ -324,7 +312,8 @@ async function prompt(
 	let started = { model: session.model, effort: session.effort }
 	let system = agyPrompt.system(req, cwd)
 	let accounts = agyAccounts.list()
-	let account = accounts.find((a) => a.name === accountName) ?? accounts[0]!
+	let account = accounts.find((a) => a.name === accountName) ?? accounts[0]
+	if (!account) throw auth.fail('no agy login; run /login agy')
 	let agent = await agentFor(sessionId, cwd, system, account)
 	if (agent.idleTimer) {
 		clearTimeout(agent.idleTimer)
@@ -390,6 +379,14 @@ async function turn(
 	if (signal.aborted) return
 	let lastUsed: number | undefined
 	let quota: ReturnType<typeof agyAccounts.quota>
+	let pendingWarning: string | undefined
+	let emitted = false
+	let flushWarning = () => {
+		if (!pendingWarning) return
+		emit({ type: 'text', text: pendingWarning })
+		pendingWarning = undefined
+		emitted = true
+	}
 	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
 		if (kind === 'config_option_update') return recordConfigOptions(agent, u.configOptions)
@@ -399,16 +396,26 @@ async function turn(
 			return
 		}
 		if (kind === 'agent_message_chunk' && u.content?.type === 'text') {
-			let spent = agyAccounts.quota(String(u.content.text))
+			let text = String(u.content.text)
+			let spent = !emitted && !pendingWarning ? agyAccounts.quota(text) : undefined
 			if (spent) quota = spent
-			else emit({ type: 'text', text: u.content.text })
-		} else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
+			else if (!emitted && !pendingWarning && agyLog.warningText(text)) pendingWarning = text
+			else {
+				flushWarning()
+				emitted = true
+				emit({ type: 'text', text })
+			}
+		} else if (kind === 'agent_thought_chunk' && u.content?.type === 'text') {
+			flushWarning()
+			emitted = true
 			emit({ type: 'thinking', text: u.content.text })
-		else if (kind === 'tool_call' || kind === 'tool_call_update') {
+		} else if (kind === 'tool_call' || kind === 'tool_call_update') {
 			let tool = { ...agent.tools.get(u.toolCallId), ...u }
 			agent.tools.set(u.toolCallId, tool)
 			if (tool.status === 'completed' || tool.status === 'failed') {
 				agent.tools.delete(u.toolCallId)
+				flushWarning()
+				emitted = true
 				let rawName = String(tool.name ?? '')
 				let mcpName = rawName.startsWith('mcp_ide-tools_') ? rawName.slice('mcp_ide-tools_'.length) : undefined
 				let mcpResult = mcpName ? agent.mcpResults.get(mcpName)?.shift() : undefined
@@ -465,6 +472,8 @@ async function turn(
 		settled.resolve(undefined)
 	}
 	signal.addEventListener('abort', onAbort)
+	agent.logPath ??= agyLog.find(agent.proc.pid, agent.accountRef.geminiDir)
+	let logOffset = agyLog.size(agent.logPath)
 	try {
 		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
 		// agy has the input now, whatever happens to this turn.
@@ -476,23 +485,30 @@ async function turn(
 			void reply.catch(() => {})
 			return
 		}
-		let u = result?.usage
-		let usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number } = {}
-		if (u) {
-			if (typeof u.inputTokens === 'number' && u.inputTokens > 0) usage.input = u.inputTokens
-			if (typeof u.cachedReadTokens === 'number' && u.cachedReadTokens > 0) usage.cacheRead = u.cachedReadTokens
-			if (typeof u.cachedWriteTokens === 'number' && u.cachedWriteTokens > 0) usage.cacheWrite = u.cachedWriteTokens
-			if (typeof u.outputTokens === 'number' && u.outputTokens > 0) usage.output = u.outputTokens
+		agent.logPath ??= agyLog.find(agent.proc.pid, agent.accountRef.geminiDir)
+		if (!agent.emailChecked && agent.logPath) {
+			agent.emailChecked = true
+			let found = agyLog.email(agyLog.readFrom(agent.logPath, 0))
+			if (found) agyAccounts.learnEmail(agent.accountRef, found)
 		}
+		let usage = agyLog.extractUsage(result?.usage)
 		if (Object.keys(usage).length || lastUsed !== undefined)
 			emit({ type: 'usage', usage, ...(lastUsed !== undefined && { context: lastUsed }) })
 		if (quota) {
-			// provider.stream sets the account aside until the reset and the
-			// turn retries on the next account.
-			let body = JSON.stringify({ resets_in_seconds: quota.resetsIn })
-			emit({ type: 'error', message: quota.message, status: 429, body })
+			agent.acpSession = undefined
+			emit({ type: 'error', message: quota.message, status: 429, retryAt: clock.now() + quota.resetsIn * 1000 })
 			return
 		}
+		if (pendingWarning) {
+			let err = agyLog.warningError(pendingWarning, agent.logPath, logOffset, agent.account, sessionId)
+			if (err) {
+				agent.acpSession = undefined
+				emit(err)
+				return
+			}
+			flushWarning()
+		}
+		agyAccounts.verified(agent.account)
 		let reason = result?.stopReason
 		emit({ type: 'done', reason: reason === 'max_tokens' ? 'max_tokens' : reason === 'refusal' ? 'refusal' : 'end' })
 	} finally {

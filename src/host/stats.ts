@@ -7,6 +7,7 @@
 import { blocks } from '../common/blocks.ts'
 import type { Plan, Stats } from '../common/snapshot.ts'
 import type { HistoryRecord } from '../common/replay.ts'
+import { agyAccounts } from './agy-accounts.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'
 import { provider } from './provider.ts'
@@ -32,6 +33,22 @@ function lastContext(records: HistoryRecord[]): number | undefined {
 function plan(id: string, model: string): Plan | undefined {
 	let parsed = blocks.parseModelId(model)
 	let kind = parsed?.provider
+	if (kind === 'agy') {
+		try {
+			let list = agyAccounts.list()
+			let next = agyAccounts.next(parsed!.model, id)
+			if (!next) return undefined
+			let i = list.findIndex((a) => a.name === next.name)
+			if (i < 0) return undefined
+			return {
+				account: auth.slot('agy', i),
+				accounts: list.length,
+				key: subscriptions.key('agy', next.name),
+			}
+		} catch {
+			return undefined
+		}
+	}
 	if (kind !== 'anthropic' && kind !== 'openai') return undefined
 	try {
 		let { list } = auth.all(kind as Kind)

@@ -118,9 +118,11 @@ beforeEach(() => {
 			)
 		},
 	})
-	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: { apiKey: 'fake-key' } }) + '\n', {
-		mode: 0o600,
-	})
+	writeFileSync(
+		`${home}/secrets/auth.ason`,
+		ason.stringify({ anthropic: { apiKey: 'fake-key' }, agy: { email: 'test@example.com', keychain: true } }) + '\n',
+		{ mode: 0o600 },
+	)
 	// Provider tests exercise an already-set-up home; a fresh first tab is hal/intro.
 	mkdirSync(`${home}/sessions/1-ready`, { recursive: true })
 	mkdirSync(`${home}/state`)
