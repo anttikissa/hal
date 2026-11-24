@@ -40,6 +40,7 @@ function cancelJump() {
 function firstCard() {
 	let session = app.sessionId()
 	if (!session) return
+	scroll.note('top')
 	scroll.reading()
 	cancelJump()
 	let first = scroll.state.el?.querySelector('.rows > [data-scroll-key="1"]')
@@ -85,6 +86,7 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	// Another tab's transcript: back to where the reader left it.
 	let id = next.view.transcript?.meta.id
 	if (id !== before.view.transcript?.meta.id) {
+		scroll.note('switch')
 		if (id) reopened(id)
 		scroll.quiet(() => {
 			set(next)
@@ -98,6 +100,7 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	// Earlier history arrived above; a reader still near the top gets
 	// the page before.
 	if (next.pages !== before.pages) {
+		scroll.note('page')
 		scroll.prepend(() => {
 			set(next)
 			flush()
@@ -125,6 +128,7 @@ function reveal(): void {
 	let card = document.querySelector('.Transcript .rows > .target')
 	if (!card) return
 	scroll.reading()
+	scroll.note('reveal')
 	card.scrollIntoView({ block: 'start' })
 	let box = card.getBoundingClientRect(),
 		frame = scroll.state.el?.getBoundingClientRect()

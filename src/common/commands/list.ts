@@ -72,6 +72,7 @@ const list: CommandInfo[] = [
 	{ name: 'notifications', description: 'list past notifications', category: 'session' },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
+	{ name: 'scroll-log', description: "collect web pages' scroll logs", category: 'debug' },
 	{ name: 'sync', description: 'review USER.md and portable plugins that differ from the host', category: 'app' },
 	{ name: 'plugins', description: 'list plugins and their hooks; disable or enable one', category: 'debug' },
 	{ name: 'queue', description: 'list, run, drop or clear queued messages', category: 'session' },

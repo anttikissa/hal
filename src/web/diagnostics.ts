@@ -3,6 +3,7 @@
 // when the WebSocket does not work. Only fixed labels and numeric or
 // boolean state; no text and no persistent storage.
 import type { Event as HostEvent } from '../common/protocol.ts'
+import { scrollDebug } from './scroll-debug.ts'
 import {
 	diagnosticDetails,
 	type DiagnosticDetail,
@@ -208,6 +209,7 @@ function load(detail: DiagnosticDetail, start = performance.now(), tab = read?.(
 }
 
 function apply(event: HostEvent, update: () => void, tab: number, shown: boolean): void {
+	if (event.type === 'scroll-log') return void scrollDebug.send()
 	diagnostics.record('event', event.type)
 	let start = read && event.type === 'snapshot' ? performance.now() : undefined
 	update()

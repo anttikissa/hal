@@ -146,6 +146,15 @@ const table: Setting[] = [
 		browser: true,
 	},
 	{
+		name: 'scrollDebug',
+		label: 'Scroll debug',
+		type: { kind: 'boolean' },
+		default: false,
+		description:
+			"Web pages keep a log of every transcript scroll, jump and the code that moved the view (no text) in the browser, and send it to this host's state/scroll-debug.log when /scroll-log asks.",
+		browser: true,
+	},
+	{
 		name: 'composerDebug',
 		label: 'Composer debug',
 		type: { kind: 'boolean' },
@@ -307,5 +316,6 @@ export const settings = {
 	promptTime: (): boolean => settings.value('promptTime') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,
+	scrollDebug: (): boolean => settings.value('scrollDebug') as boolean,
 	shortRows: (): number => settings.value('cardVerbosityShortRows') as number,
 }

@@ -108,6 +108,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	ack: { id: 's', tab: 's?' },
 	restart: {},
 	'web-update': {},
+	'scroll-log': {},
 	redraw: { sessionId: 's' },
 	'auth-code': { code: 's', url: 's?', local: 's?' },
 	sync: {

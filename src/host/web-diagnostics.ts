@@ -130,10 +130,10 @@ function load(
 	})
 }
 
-// Opt-in composer probe (web/composer-debug.ts): the user's own logged-in
-// page, so rows (draft text included) are kept as sent, one JSON line each,
-// bounded per request and by file rotation.
-async function composer(req: Request): Promise<Response> {
+// Opt-in probes (web/composer-debug.ts, web/scroll-debug.ts): the user's
+// own logged-in page, so rows (draft text included) are kept as sent, one
+// JSON line each in state/<name>.log, bounded per request and by rotation.
+async function probe(req: Request, name: 'composer-debug' | 'scroll-debug'): Promise<Response> {
 	if (!req.headers.get('content-type')?.startsWith('application/json'))
 		return new Response('expected JSON\n', { status: 415 })
 	if (Number(req.headers.get('content-length')) > 4 * 1024 * 1024) return new Response('too large\n', { status: 413 })
@@ -147,7 +147,7 @@ async function composer(req: Request): Promise<Response> {
 	}
 	if (!object(body) || !Array.isArray(body.rows) || body.rows.length > 100)
 		return new Response('expected { rows: [...] } with at most 100 rows\n', { status: 400 })
-	let file = `${paths.stateDir()}/composer-debug.log`
+	let file = `${paths.stateDir()}/${name}.log`
 	let lines = body.rows
 		.map((row) => `${JSON.stringify({ page: body.page, ua: body.ua, ...(object(row) ? row : { row }) })}\n`)
 		.join('')
@@ -161,7 +161,7 @@ export const webDiagnostics = {
 	receive,
 	write,
 	load,
-	composer,
+	probe,
 	reset: () => {
 		windowAt = 0
 		received = 0

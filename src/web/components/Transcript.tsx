@@ -122,6 +122,7 @@ export function Transcript(props: {
 			next = estimate()
 		if (Math.abs(next - pad) < 1) return
 		let top = el.scrollTop + next - pad
+		scroll.note(`settle ${pad}>${next}`)
 		setPad(next)
 		el.scrollTop = top
 		last = el.scrollTop
@@ -130,6 +131,7 @@ export function Transcript(props: {
 		last = el.scrollTop
 		let shift = (next: number, moved: () => number) => {
 			scroll.reading()
+			scroll.note(`shift ${next}`)
 			placed = `${id()}\n${all()[next]!.key}`
 			scroll.quiet(() => {
 				setStart(next)
@@ -192,6 +194,7 @@ export function Transcript(props: {
 		)
 		scroll.state.showEnd = () => {
 			if (all().length > start() + limit) {
+				scroll.note('showEnd')
 				scroll.quiet(() => {
 					setStart(Math.max(0, all().length - first))
 					flush()
@@ -223,6 +226,7 @@ export function Transcript(props: {
 	let released: ReturnType<typeof setTimeout> | undefined
 	function end() {
 		props.onEnd?.()
+		scroll.note('end')
 		setPressed(true)
 		flush()
 		if (el && start() + limit >= all().length && scroll.near(scroll.gap(el))) scroll.bottom(true)

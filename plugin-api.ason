@@ -1,5 +1,5 @@
 {
-	version: 55,
+	version: 56,
 	changes: [
 		{
 			version: 2,
@@ -1042,6 +1042,32 @@
 					target: 'host/blobs.file',
 					description: 'Returns path and size instead of bytes',
 					port: 'Read or stream result.path via Bun.file()'
+				}
+			]
+		},
+		{
+			version: 56,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/web-diagnostics.webDiagnostics.composer',
+					description: 'Replaced by probe(req, name), which also serves /scroll-debug',
+					port: "Call webDiagnostics.probe(req, 'composer-debug')"
+				},
+				{
+					kind: 'compatible',
+					target: 'common/protocol.Event',
+					description: 'Adds scroll-log'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/settings.settings',
+					description: 'Adds scrollDebug'
+				},
+				{
+					kind: 'compatible',
+					target: 'web/scroll.scroll',
+					description: 'Adds note and state.note'
 				}
 			]
 		}

@@ -428,6 +428,7 @@ export type Event =
 	| { type: 'host-mode'; noUser: boolean }
 	| { type: 'restart' } // /restart all: terminals exit; web waits for host return.
 	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
+	| { type: 'scroll-log' } // /scroll-log: pages with scrollDebug post their scroll log.
 	// Repaint terminals following this session; no reload on the web.
 	| { type: 'redraw'; sessionId: string }
 	// Expand or collapse the blocks `target` names (/toggle, /expand,

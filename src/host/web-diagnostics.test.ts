@@ -104,3 +104,11 @@ test('diagnostic validation rejects malformed collections and numeric state', ()
 	expect(cleaned?.entries).toEqual([{ at: 1, kind: 'load', detail: 'parsed', ms: 2.5, bytes: 10, tab: 3 }])
 	expect(webDiagnostics.clean({ ...report(), entries: Array(33).fill(report().entries[0]) })).toBeUndefined()
 })
+
+// Timebomb, scroll probe task: scroll-debug.ts was added to find why the
+// web transcript jumps. Do not just move the date.
+test('review the scroll probe by 2026-12-15', () => {
+	let why =
+		'Jumps found and fixed, or none in state/scroll-debug.log: delete src/web/scroll-debug.ts, scroll.note and its calls, the scrollDebug setting, /scroll-log, the scroll-log event and POST /scroll-debug. Then delete this test.'
+	expect(Date.now() < Date.parse('2026-12-15'), why).toBe(true)
+})

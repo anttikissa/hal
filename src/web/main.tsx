@@ -13,6 +13,7 @@ import { subscriptions, type SubscriptionData } from '../common/subscriptions.ts
 import { app } from './app.ts'
 import { diagnostics } from './diagnostics.ts'
 import { composerDebug } from './composer-debug.ts'
+import { scrollDebug } from './scroll-debug.ts'
 import { memory } from './memory.ts'
 import { day } from './day.ts'
 import { App } from './components/App.tsx'
@@ -66,5 +67,6 @@ if (typeof document !== 'undefined') {
 		})
 	render(() => <App />, document.body)
 	if (settings.composerDebug()) composerDebug.init()
+	if (settings.scrollDebug()) scrollDebug.init()
 	memory.init()
 }

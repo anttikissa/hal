@@ -8,7 +8,12 @@ let live = true
 function gap(el: Box) {
 	return Math.max(0, el.scrollHeight - el.clientHeight - el.scrollTop)
 }
+// Names why the view moves, for the opt-in scroll probe (scroll-debug.ts).
+function note(why: string) {
+	scroll.state.note?.(why)
+}
 function bottom(smooth = false) {
+	note('bottom')
 	scroll.state.showEnd?.()
 	live = true
 	let el = scroll.state.el
@@ -38,6 +43,7 @@ function undim() {
 function land(jump: () => void) {
 	let el = scroll.state.el
 	if (dimmed?.playState === 'running') return void (dimmed.onfinish = () => land(jump))
+	note('land')
 	if (!el) return jump()
 	el.style.overflow = 'hidden'
 	jump()
@@ -70,6 +76,7 @@ function prepend(change: () => void) {
 	quiet(change)
 	if (row.isConnected) {
 		let shift = row.getBoundingClientRect().top - y
+		if (shift) note('prepend')
 		if (shift) el.scrollTop += shift
 	}
 }
@@ -78,7 +85,9 @@ function init(el: HTMLElement, onTop: () => void, onSettle: () => void) {
 	live = true
 	let rows = el.querySelector(':scope > .rows')!
 	let hold = () => {
-		if (live) bottom()
+		if (!live) return
+		note('follow')
+		bottom()
 	}
 	let commits = new MutationObserver(hold)
 	commits.observe(rows, { childList: true, subtree: true, characterData: true })
@@ -91,6 +100,7 @@ function init(el: HTMLElement, onTop: () => void, onSettle: () => void) {
 	let settled = () => {
 		if (touching || !moving) return
 		moving = false
+		note('settled')
 		onSettle()
 		if (!live && atTop()) onTop()
 	}
@@ -163,6 +173,7 @@ function restore(id: string) {
 	let el = scroll.state.el,
 		place = scroll.state.places.get(id)
 	if (!el) return
+	note('restore')
 	if (!place) return bottom()
 	live = false
 	let row = place.key && el.querySelector<HTMLElement>(`[data-scroll-key="${CSS.escape(place.key)}"]`)
@@ -174,6 +185,7 @@ export const scroll = {
 	nearTop: 800,
 	state: {
 		showEnd: undefined as (() => void) | undefined,
+		note: undefined as ((why: string) => void) | undefined,
 		moving: undefined as (() => boolean) | undefined,
 		pageReady: undefined as (() => void) | undefined,
 		el: null as HTMLElement | null,
@@ -183,6 +195,7 @@ export const scroll = {
 		places: new Map<string, Place>(),
 	},
 	gap,
+	note,
 	bottom,
 	near,
 	dim,

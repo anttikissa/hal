@@ -236,7 +236,8 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let upload = pathname === '/upload' && req.method === 'POST'
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
 	let composerDebug = pathname === '/composer-debug' && req.method === 'POST' && settings.composerDebug()
-	if (!check && !blob && !changesData && pathname !== '/ws' && !upload && !diagnostic && !composerDebug)
+	let scrollDebug = pathname === '/scroll-debug' && req.method === 'POST' && settings.scrollDebug()
+	if (!check && !blob && !changesData && pathname !== '/ws' && !upload && !diagnostic && !composerDebug && !scrollDebug)
 		return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
@@ -251,7 +252,8 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 	if (upload) return webUpload.receive(req, url, clients.fromRequest(req, srv.requestIP(req)?.address))
 	if (diagnostic) return webDiagnostics.receive(req)
-	if (composerDebug) return webDiagnostics.composer(req)
+	if (composerDebug) return webDiagnostics.probe(req, 'composer-debug')
+	if (scrollDebug) return webDiagnostics.probe(req, 'scroll-debug')
 	return web.upgrade(req, srv)
 }
 
