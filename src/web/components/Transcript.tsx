@@ -24,11 +24,15 @@ import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
 import { backfill } from '../../common/backfill.ts'
+import { bashResult } from '../../common/bash-result.ts'
+import { card } from '../../common/card.ts'
 import { forms } from '../../common/forms.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript, type Item } from '../../common/transcript.ts'
 import { transcriptLive } from '../../common/transcript-live.ts'
 import { app } from '../app.ts'
+import { cardRows } from '../card-rows.ts'
+import { folds } from '../folds.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type ViewState } from '../view.ts'
@@ -102,19 +106,56 @@ export function Transcript(props: {
 	let rowsEl!: HTMLElement
 	let last = 0
 	let placed: string | undefined
+	let heights = new Map<string, number>()
+	let cachedWidth = 0
+	let syncWidth = () => {
+		let w = rowsEl?.clientWidth ?? 0
+		if (w > 0 && Math.abs(w - cachedWidth) > 2) {
+			heights.clear()
+			cachedWidth = w
+		}
+		return w
+	}
+	let measureRow = () => {
+		let w = syncWidth() || el.clientWidth || innerWidth
+		let sample = rowsEl.firstElementChild as HTMLElement | null
+		let lh = (sample && parseFloat(getComputedStyle(sample).lineHeight)) || 20
+		let cols = Math.max(20, Math.floor((w - 20) / 8.4))
+		let session = id(),
+			blocks = shared.blocks
+		return (row: Row) => {
+			let item = row.item
+			let bash = !!bashResult.background(item) || (item.type === 'tool' && item.name === 'bash')
+			let open =
+				untrack(() =>
+					folds.level(
+						`${session}#${row.job ? row.key : item.key}`,
+						folds.start(session, item, card.initial(item, blocks, card.failed(row.result, bash))),
+					),
+				) === 'long'
+			if (open) {
+				let cached = heights.get(`${session}\0${row.key}`)
+				if (cached !== undefined) return cached
+			}
+			return cardRows.height(row, open, cols, lh)
+		}
+	}
 	let setPad = (px: number) => {
+		px = Math.max(0, Math.round(px))
 		scroll.state.pad = px
 		rowsEl.style.marginTop = `${px}px`
 	}
 	let estimate = () => {
-		let rowPx = rowsEl.offsetHeight / Math.max(1, shown().length)
+		let rows = all(),
+			i = start()
 		let b = app.state.older.get(id()),
-			sample = b?.loaded.slice(0, 50) ?? []
+			sample = b?.older ? (b.loaded.slice(0, 50) ?? []) : []
 		let unfetched =
 			b?.older && sample.length
-				? (b.older / JSON.stringify(sample).length) * sample.length * (all().length / b.loaded.length)
+				? (b.older / JSON.stringify(sample).length) * sample.length * (rows.length / b.loaded.length)
 				: 0
-		return Math.round((start() + unfetched) * rowPx)
+		if (!i && !unfetched) return 0
+		return cardRows.space(rows, i, unfetched, measureRow())
 	}
 	let settle = () => {
 		if (!rowsEl) return
@@ -148,15 +189,16 @@ export function Transcript(props: {
 				center = el.scrollTop + el.clientHeight / 2,
 				i = start()
 			if (center >= pad) return false
-			let rowPx = rowsEl.offsetHeight / Math.max(1, shown().length)
-			let row = i - Math.ceil((pad - center) / rowPx)
+			let rows = all(),
+				h = measureRow()
+			let row = cardRows.locate(rows, i, pad, center, h)
 			// Not fetched yet: rows mounted now would be replaced page by page.
 			if (row < 0 && !backfill.complete(app.state.older, id())) {
 				app.older()
 				return true
 			}
 			let next = Math.max(0, row - limit / 2)
-			if (next < i) shift(next, () => (i - next) * rowPx)
+			if (next < i) shift(next, () => cardRows.span(rows, next, i, h))
 			return true
 		}
 		let advance = () => {
@@ -255,11 +297,28 @@ export function Transcript(props: {
 	// only while they fit in a third of the transcript: a long open title
 	// pinned at the top would hide the body scrolling under it.
 	let tall = new ResizeObserver((entries) => {
+		let session = untrack(id),
+			w = syncWidth()
 		let found = entries.map(({ target }) => {
 			let block = target as HTMLElement
 			let head = block.querySelector<HTMLElement>(':scope .CardHeader:not(.inline)')
 			let fits = !head || head.offsetHeight <= el.clientHeight / 3
-			return [block, fits && block.offsetHeight > 10 * parseFloat(getComputedStyle(block).lineHeight)] as const
+			let lh = parseFloat(getComputedStyle(block).lineHeight) || 20
+			let h = block.offsetHeight
+			if (
+				w > 0 &&
+				h > 0 &&
+				block.isConnected &&
+				block.parentElement === rowsEl &&
+				(block.classList.contains('open') || block.classList.contains('Question'))
+			) {
+				let key = block.dataset.scrollKey
+				if (key) {
+					if (heights.size >= 4000) heights.clear()
+					heights.set(`${session}\0${key}`, h + lh * 0.5)
+				}
+			}
+			return [block, fits && h > 10 * lh] as const
 		})
 		for (let [block, on] of found) block.toggleAttribute('data-tall', on)
 	})

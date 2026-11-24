@@ -1,5 +1,5 @@
 {
-	version: 56,
+	version: 57,
 	changes: [
 		{
 			version: 2,
@@ -1068,6 +1068,16 @@
 					kind: 'compatible',
 					target: 'web/scroll.scroll',
 					description: 'Adds note and state.note'
+				}
+			]
+		},
+		{
+			version: 57,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'web/card-rows.cardRows',
+					description: 'Adds height, span, space and locate'
 				}
 			]
 		}
