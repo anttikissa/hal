@@ -1,45 +1,54 @@
 // /account: this session moves to a chosen login of its model's provider,
 // or to the next one. Rotation still leaves it once it is rate limited or
-// broken (auth.ts).
+// broken (auth.ts, agy-accounts.ts).
 
+import { agyAccounts } from '../agy-accounts.ts'
 import { auth, type Kind } from '../auth.ts'
 import type { SlashCommand } from '../commands.ts'
 
-function kindOf(model: string): Kind | undefined {
+function kindOf(model: string): Kind | 'agy' | undefined {
 	let kind = model.split('/')[0]
-	return kind === 'anthropic' || kind === 'openai' || kind === 'opencode-go' ? kind : undefined
+	return kind === 'anthropic' || kind === 'openai' || kind === 'opencode-go' || kind === 'agy' ? kind : undefined
 }
 
-function ids(kind: Kind): string[] {
-	return auth.all(kind).list.map((_, i) => auth.slot(kind, i))
+// Ids and names of the kind's accounts; agy's are named by their directory.
+function accounts(kind: Kind | 'agy'): { id: string; name: string }[] {
+	if (kind === 'agy') return agyAccounts.list().map((a) => ({ id: a.name, name: a.name }))
+	return auth.all(kind).list.map((a, i) => ({ id: auth.slot(kind, i), name: a.name }))
+}
+
+// The session's current and /account-picked account of the kind.
+function choices(kind: Kind | 'agy', sessionId: string): { picked: Map<string, string>; key: string; now: string } {
+	let [picked, chosen, key] =
+		kind === 'agy'
+			? [agyAccounts.state.picked, agyAccounts.state.chosen, sessionId]
+			: [auth.state.picked, auth.state.chosen, `${kind} ${sessionId}`]
+	return { picked, key, now: picked.get(key) ?? chosen.get(key) ?? '' }
 }
 
 export const command: SlashCommand = {
 	help: () =>
-		"/account <id> moves this session to that login of its model's provider (ids as /status shows: a2, o1), from the next request. Without an id it moves to the next login.",
+		"/account <id> moves this session to that login of its model's provider (ids as /status shows: a2, o1; agy accounts by name), from the next request. Without an id it moves to the next login.",
 	complete: (args, ctx) => {
 		let kind = kindOf(ctx.model)
 		if (!kind) return []
-		let names = auth.all(kind).list.map((a) => a.name)
-		return ids(kind)
-			.map((id, i) => ({ value: id, description: names[i]! }))
+		return accounts(kind)
+			.map((a) => ({ value: a.id, description: a.name }))
 			.filter((o) => o.value.startsWith(args.trim()))
 	},
 	run(args, _answers, ctx) {
 		let kind = kindOf(ctx.model)
 		if (!kind) return { error: `${ctx.model} has no accounts to switch` }
-		let key = `${kind} ${ctx.sessionId}`
-		let list = auth.all(kind).list.map((a) => a.name)
+		let list = accounts(kind)
+		let { picked, key, now } = choices(kind, ctx.sessionId)
 		let id = args.trim()
 		let i: number
 		if (id) {
-			i = ids(kind).indexOf(id)
-			if (i < 0) return { error: `${id}: no such ${kind} account; accounts are ${ids(kind).join(', ')}` }
-		} else {
-			let now = auth.state.picked.get(key) ?? auth.state.chosen.get(key) ?? ''
-			i = (list.indexOf(now) + 1) % list.length
-		}
-		auth.state.picked.set(key, list[i]!)
-		return { say: `this session uses ${kind} account ${auth.slot(kind, i)} ${list[i]} from its next request` }
+			i = list.findIndex((a) => a.id === id)
+			if (i < 0) return { error: `${id}: no such ${kind} account; accounts are ${list.map((a) => a.id).join(', ')}` }
+		} else i = (list.findIndex((a) => a.name === now) + 1) % list.length
+		picked.set(key, list[i]!.name)
+		let label = list[i]!.id === list[i]!.name ? list[i]!.name : `${list[i]!.id} ${list[i]!.name}`
+		return { say: `this session uses ${kind} account ${label} from its next request` }
 	},
 }

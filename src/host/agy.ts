@@ -19,6 +19,7 @@ import { agyCards } from './agy-cards.ts'
 import { agyMcp, type McpBridge, type McpResult } from './agy-mcp.ts'
 import { agyModels } from './agy-models.ts'
 import { agyPrompt, type AcpContent } from './agy-prompt.ts'
+import { agyAccounts, type AgyAccount } from './agy-accounts.ts'
 
 type Update = Record<string, any>
 type Agent = {
@@ -38,6 +39,8 @@ type Agent = {
 	canceling?: Promise<void>
 	idleTimer?: ReturnType<typeof setTimeout>
 	skipPermissions: boolean
+	// The account (agy-accounts.ts) agy runs logged in as.
+	account: string
 	// The agy session and the history prefix it has seen.
 	acpSession?: string
 	cwd?: string
@@ -52,7 +55,7 @@ type Agent = {
 // the next prompt seeds a new one with a transcript.
 async function resume(sessionId: string, agent: Agent, cwd: string, system: string): Promise<void> {
 	let data = agyPrompt.loadSaved(sessionId)
-	if (!data.acpSession || data.cwd !== cwd) return
+	if (!data.acpSession || data.cwd !== cwd || (data.account ?? 'default') !== agent.account) return
 	try {
 		await call(agent, 'session/resume', { sessionId: data.acpSession, cwd, mcpServers: [], ...meta(system) })
 		Object.assign(agent, { acpSession: data.acpSession, cwd, prefix: data.prefix ?? 0, hash: data.hash })
@@ -104,12 +107,13 @@ function rpcError(err: any, stderr?: string): Error {
 	return new Error(formatError(`agy${code}: ${msg}`, data, stderr))
 }
 
-function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent {
+function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account: AgyAccount): Agent {
 	let mcp: McpBridge | undefined
 	let agent: Agent
 	let mcpResults = new Map<string, McpResult[]>()
 	let args = [...agy.command(), 'acp', '--disable-telemetry']
 	if (skipPermissions) args.push('--dangerously-skip-permissions')
+	if (account.geminiDir) args.push('--gemini-dir', account.geminiDir)
 	if (Bun.which('nc') && agyMcp.list(sessionId).length) {
 		mcp = agyMcp.start(
 			sessionId,
@@ -126,6 +130,8 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 	try {
 		proc = Bun.spawn(args, {
 			cwd,
+			// Makes agy read the account's login from its gemini dir.
+			env: account.geminiDir ? { ...process.env, SSH_CONNECTION: '127.0.0.1 1 127.0.0.1 22' } : process.env,
 			stdin: 'pipe',
 			stdout: 'pipe',
 			stderr: 'pipe',
@@ -148,6 +154,7 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean): Agent 
 		mcp,
 		turnGen: 0,
 		skipPermissions,
+		account: account.name,
 		prefix: 0,
 	}
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
@@ -272,12 +279,18 @@ function meta(system: string): object {
 	return system ? { _meta: { antigravity: { systemPrompt: { append: system } } } } : {}
 }
 
-async function agentFor(sessionId: string, cwd: string, system: string): Promise<Agent> {
+async function agentFor(sessionId: string, cwd: string, system: string, account: AgyAccount): Promise<Agent> {
 	let skipPermissions = settings.agyPermissions() === 'skip'
 	let agent = state.agents.get(sessionId)
-	if (agent && !agent.exited && (agent.skipPermissions === skipPermissions || agent.turnAbort)) return agent
+	if (
+		agent &&
+		!agent.exited &&
+		agent.account === account.name &&
+		(agent.skipPermissions === skipPermissions || agent.turnAbort)
+	)
+		return agent
 	if (agent) agy.stop(sessionId)
-	agent = spawn(sessionId, cwd, skipPermissions)
+	agent = spawn(sessionId, cwd, skipPermissions, account)
 	state.agents.set(sessionId, agent)
 	try {
 		await call(agent, 'initialize', {
@@ -296,7 +309,12 @@ async function agentFor(sessionId: string, cwd: string, system: string): Promise
 	return agent
 }
 
-async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, signal: AbortSignal): Promise<void> {
+async function prompt(
+	req: ProviderRequest,
+	emit: (e: StreamEvent) => void,
+	signal: AbortSignal,
+	accountName?: string,
+): Promise<void> {
 	let sessionId = req.sessionId
 	if (!sessionId) throw new Error('agy needs a Hal session')
 	let session = sessions.open(sessionId)
@@ -305,7 +323,9 @@ async function prompt(req: ProviderRequest, emit: (e: StreamEvent) => void, sign
 	if (refused) throw new Error(refused)
 	let started = { model: session.model, effort: session.effort }
 	let system = agyPrompt.system(req, cwd)
-	let agent = await agentFor(sessionId, cwd, system)
+	let accounts = agyAccounts.list()
+	let account = accounts.find((a) => a.name === accountName) ?? accounts[0]!
+	let agent = await agentFor(sessionId, cwd, system, account)
 	if (agent.idleTimer) {
 		clearTimeout(agent.idleTimer)
 		agent.idleTimer = undefined
@@ -369,6 +389,7 @@ async function turn(
 	}
 	if (signal.aborted) return
 	let lastUsed: number | undefined
+	let quota: ReturnType<typeof agyAccounts.quota>
 	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
 		if (kind === 'config_option_update') return recordConfigOptions(agent, u.configOptions)
@@ -377,8 +398,11 @@ async function turn(
 			if (typeof u.used === 'number' && u.used > 0) lastUsed = u.used
 			return
 		}
-		if (kind === 'agent_message_chunk' && u.content?.type === 'text') emit({ type: 'text', text: u.content.text })
-		else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
+		if (kind === 'agent_message_chunk' && u.content?.type === 'text') {
+			let spent = agyAccounts.quota(String(u.content.text))
+			if (spent) quota = spent
+			else emit({ type: 'text', text: u.content.text })
+		} else if (kind === 'agent_thought_chunk' && u.content?.type === 'text')
 			emit({ type: 'thinking', text: u.content.text })
 		else if (kind === 'tool_call' || kind === 'tool_call_update') {
 			let tool = { ...agent.tools.get(u.toolCallId), ...u }
@@ -462,6 +486,13 @@ async function turn(
 		}
 		if (Object.keys(usage).length || lastUsed !== undefined)
 			emit({ type: 'usage', usage, ...(lastUsed !== undefined && { context: lastUsed }) })
+		if (quota) {
+			// provider.stream sets the account aside until the reset and the
+			// turn retries on the next account.
+			let body = JSON.stringify({ resets_in_seconds: quota.resetsIn })
+			emit({ type: 'error', message: quota.message, status: 429, body })
+			return
+		}
 		let reason = result?.stopReason
 		emit({ type: 'done', reason: reason === 'max_tokens' ? 'max_tokens' : reason === 'refusal' ? 'refusal' : 'end' })
 	} finally {
@@ -476,7 +507,7 @@ async function turn(
 
 // The turn as SSE bytes, which provider.stream parses back with parse().
 // A comment every 20 s keeps the stream timeout off while agy works.
-function open(req: ProviderRequest, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+function open(req: ProviderRequest, signal?: AbortSignal, account?: string): Promise<ReadableStream<Uint8Array>> {
 	let encoder = new TextEncoder()
 	let abort = new AbortController()
 	let forward = () => {
@@ -499,7 +530,7 @@ function open(req: ProviderRequest, signal?: AbortSignal): Promise<ReadableStrea
 						controller.enqueue(encoder.encode(': working\n\n'))
 					} catch {}
 				}, 20_000)
-				prompt(req, send, abort.signal)
+				prompt(req, send, abort.signal, account)
 					.catch((e) => send({ type: 'error', message: e instanceof Error ? e.message : String(e) }))
 					.finally(() => {
 						clearInterval(timer)

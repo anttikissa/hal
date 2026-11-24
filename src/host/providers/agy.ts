@@ -4,6 +4,7 @@ import type { Provider } from '../provider.ts'
 
 let loaded: typeof import('../agy.ts').agy | undefined
 const load = () => (loaded ??= (require('../agy.ts') as typeof import('../agy.ts')).agy)
+const loadAccounts = () => (require('../agy-accounts.ts') as typeof import('../agy-accounts.ts')).agyAccounts
 const loadModels = () => (require('../agy-models.ts') as typeof import('../agy-models.ts')).agyModels
 
 export const provider: Provider = {
@@ -11,8 +12,13 @@ export const provider: Provider = {
 	inTurnSteer: true,
 	noAutoRetry: true,
 	externalContext: true,
-	request: () => ({ url: 'acp:agy', headers: {}, body: null }),
-	open: (_http, req, signal) => load().open(req, signal),
+	request: (req) => ({
+		url: 'acp:agy',
+		headers: {},
+		body: null,
+		account: loadAccounts().pick(req.model, req.sessionId).name,
+	}),
+	open: (http, req, signal) => load().open(req, signal, http.account),
 	parse: (messages) => load().parse(messages),
 	models: (signal) => load().models(signal),
 	known: () => loadModels().known(),

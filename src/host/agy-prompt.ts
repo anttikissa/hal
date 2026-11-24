@@ -17,20 +17,27 @@ export type PrefixState = {
 	cwd?: string
 	prefix: number
 	hash?: string
+	account?: string
 }
 
-type Saved = { acpSession?: string; cwd?: string; prefix?: number; hash?: string }
+type Saved = { acpSession?: string; cwd?: string; prefix?: number; hash?: string; account?: string }
 
 function loadSaved(sessionId: string): Saved {
 	let data = liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
-	let copy = { acpSession: data.acpSession, cwd: data.cwd, prefix: data.prefix, hash: data.hash }
+	let copy = { acpSession: data.acpSession, cwd: data.cwd, prefix: data.prefix, hash: data.hash, account: data.account }
 	liveFiles.close(data)
 	return copy
 }
 
 function saveState(sessionId: string, state: PrefixState): void {
 	let data = liveFiles.liveFile<Saved>(`${paths.sessionDir(sessionId)}/agy.ason`, {}, { watch: false })
-	Object.assign(data, { acpSession: state.acpSession, cwd: state.cwd, prefix: state.prefix, hash: state.hash })
+	Object.assign(data, {
+		acpSession: state.acpSession,
+		cwd: state.cwd,
+		prefix: state.prefix,
+		hash: state.hash,
+		account: state.account,
+	})
 	liveFiles.save(data)
 	liveFiles.close(data)
 }

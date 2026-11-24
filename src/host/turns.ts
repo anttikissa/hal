@@ -323,7 +323,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (interrupted) host.broadcast(id, { type: 'assistant-interrupted', sessionId: id, record: interrupted })
 				if (Object.keys(round.usage).length || round.context)
 					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage, round.context) })
-				if (last?.type === 'error' && !signal.aborted && turnPolicy.mayRetry(running.provider)) {
+				if (last?.type === 'error' && !signal.aborted && turnPolicy.mayRetry(running.provider, last)) {
 					if (compact.retry(id, last, shrunk)) {
 						shrunk = true
 						continue
