@@ -389,12 +389,10 @@ async function turn(
 	let lastUsed: number | undefined
 	let quota: ReturnType<typeof agyAccounts.quota>
 	let pendingWarning: string | undefined
-	let emitted = false
 	let flushWarning = () => {
 		if (!pendingWarning) return
 		emit({ type: 'text', text: pendingWarning })
 		pendingWarning = undefined
-		emitted = true
 	}
 	let onUpdate = (u: Update) => {
 		let kind = u.sessionUpdate
@@ -406,17 +404,13 @@ async function turn(
 		}
 		if (kind === 'agent_message_chunk' && u.content?.type === 'text') {
 			let text = String(u.content.text)
-			let spent = !emitted && !pendingWarning ? agyAccounts.quota(text) : undefined
+			flushWarning()
+			let spent = agyAccounts.quota(text)
 			if (spent) quota = spent
-			else if (!emitted && !pendingWarning && agyLog.warningText(text)) pendingWarning = text
-			else {
-				flushWarning()
-				emitted = true
-				emit({ type: 'text', text })
-			}
+			else if (agyLog.warningText(text)) pendingWarning = text
+			else emit({ type: 'text', text })
 		} else if (kind === 'agent_thought_chunk' && u.content?.type === 'text') {
 			flushWarning()
-			emitted = true
 			emit({ type: 'thinking', text: u.content.text })
 		} else if (kind === 'tool_call' || kind === 'tool_call_update') {
 			let tool = { ...agent.tools.get(u.toolCallId), ...u }
@@ -424,7 +418,6 @@ async function turn(
 			if (tool.status === 'completed' || tool.status === 'failed') {
 				agent.tools.delete(u.toolCallId)
 				flushWarning()
-				emitted = true
 				let rawName = String(tool.name ?? '')
 				let mcpName = rawName.startsWith('mcp_ide-tools_') ? rawName.slice('mcp_ide-tools_'.length) : undefined
 				let mcpResult = mcpName ? agent.mcpResults.get(mcpName)?.shift() : undefined

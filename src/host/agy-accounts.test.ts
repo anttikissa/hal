@@ -229,7 +229,8 @@ for await (let chunk of Bun.stdin.stream()) {
 				send({ method: 'session/update', params: { sessionId: 'acp-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '\\n⚠ Verification Required\\n' } } } })
 				send({ id: m.id, result: { stopReason: 'end_turn' } })
 			} else if (text.includes('trigger-quota')) {
-				send({ method: 'session/update', params: { sessionId: 'acp-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '⚠ Individual quota reached. Resets in 1h2m3s.' } } } })
+				send({ method: 'session/update', params: { sessionId: 'acp-1', update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'working' } } } })
+				send({ method: 'session/update', params: { sessionId: 'acp-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '\\n⚠ Individual quota reached. Resets in 1h2m3s.\\n' } } } })
 				send({ id: m.id, result: { stopReason: 'end_turn' } })
 			} else {
 				send({ method: 'session/update', params: { sessionId: 'acp-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'hello from ' + (dir.endsWith('/one/gemini') ? 'one' : 'two') } } } })
@@ -271,12 +272,13 @@ for await (let chunk of Bun.stdin.stream()) {
 		{ type: 'done', reason: 'end' },
 	])
 
-	// Quota error on account two: clean message, no raw resets_in_seconds JSON body, sets limit.
+	// Quota after earlier output in the turn (55-bib): clean 429, no raw resets_in_seconds JSON body, sets limit.
 	let e3 = await collect('trigger-quota')
-	expect(e3).toHaveLength(1)
-	expect(e3[0]).toMatchObject({ type: 'error', status: 429, failure: 'limited', retryAt: now })
-	expect((e3[0] as any).body).toBeUndefined()
-	expect((e3[0] as any).message).toContain('Individual quota reached. Resets in 1h2m3s.')
+	expect(e3).toHaveLength(2)
+	expect(e3[0]).toEqual({ type: 'thinking', text: 'working' })
+	expect(e3[1]).toMatchObject({ type: 'error', status: 429, failure: 'limited', retryAt: now })
+	expect((e3[1] as any).body).toBeUndefined()
+	expect((e3[1] as any).message).toContain('Individual quota reached. Resets in 1h2m3s.')
 	expect(limits.on('agy/gemini-4-neon', 'two@example.com')).toBe(now + (3600 + 120 + 3) * 1000)
 
 	// Explicitly picking account one after verifying in browser succeeds and clears the hold.
