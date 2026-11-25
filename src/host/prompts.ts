@@ -42,6 +42,8 @@ import { tabs } from './tabs.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
 import { projectContext } from './project-context.ts'
+import { approval } from './approval.ts'
+import { saveSecret } from './tools/save_secret.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
 // client's id for it, kept with the prompt (or inbox message) so a
@@ -119,7 +121,7 @@ function submit(
 		// (turns.release; task 6q5).
 		if (!running && state.type === 'blocked' && state.reason === 'question' && !(agent && tabs.closed(id))) {
 			let open = forms.open(history.readSync(id))
-			if (open?.call !== undefined && !open.from && !status.transition(id, { type: 'answer' })) turns.start(id)
+			if (approval.releasable(open) && !status.transition(id, { type: 'answer' })) turns.start(id)
 		}
 		return
 	}
@@ -366,7 +368,8 @@ function resume(id: string): string | undefined {
 // why it is refused: not the open question (someone answered first),
 // or answers that don't fit the form.
 function reply(id: string, question: string, answers: Answers): string | undefined {
-	let open = forms.open(history.readSync(id))
+	let records = history.readSync(id)
+	let open = forms.open(records)
 	// A command's question may be open beside a turn blocked on login.
 	if (!open || open.id !== question || (!open.from && turns.state.running.has(id)))
 		return 'that question is not open (answered already?)'
@@ -387,9 +390,11 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 	}
 	let refused = status.transition(id, { type: 'answer' })
 	if (refused) return refused
-	history.append(id, { type: 'answer', question, ...kept })
-	host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
-	turns.start(id, undefined, trust ? undefined : answers)
+	let secret = saveSecret.answer(id, records, open.call, answers)
+	let recorded = secret?.canceled ? { answers: {}, canceled: true as const } : kept
+	history.append(id, { type: 'answer', question, ...recorded })
+	host.broadcast(id, { type: 'answer', sessionId: id, question, ...recorded })
+	turns.start(id, undefined, trust || secret ? undefined : answers)
 }
 
 export const prompts = {

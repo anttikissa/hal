@@ -11,10 +11,11 @@
 
 import { homedir } from 'os'
 import { resolve } from 'path'
-import type { ToolCallBlock } from '../common/blocks.ts'
+import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
+import { saveSecret } from './tools/save_secret.ts'
 
 type Mark = [number, number]
 
@@ -197,9 +198,10 @@ function findings(command: string): { at: Mark; reason: string }[] {
 	return out
 }
 
-// The question for a call that needs approval, or undefined if it may
-// run without asking.
-function form(call: ToolCallBlock): Form | undefined {
+// The question for a call that needs approval or user secret input, or
+// undefined if it may run without asking.
+function form(call: ToolCallBlock, cwd?: string, sessionId?: string): Form | undefined {
+	if (call.name === 'save_secret' && cwd !== undefined) return saveSecret.form(call, cwd, sessionId)
 	if (settings.security() === 'yolo' || call.name !== 'bash' || typeof call.input.command !== 'string') return undefined
 	let command = call.input.command
 	let found = approval.findings(command)
@@ -242,10 +244,27 @@ function later(form: Form): Form {
 	return { ...form, text: [text, ...reasons].join('\n') }
 }
 
-// The last round's calls, if they are held for approval and none has
+function isApproval(form: Form): boolean {
+	return form.fields.some((f) => f.name === 'run' && f.type === 'choice')
+}
+
+function releasable(open: { call?: string; from?: unknown; form: Form } | undefined): boolean {
+	return open?.call !== undefined && !open.from && approval.isApproval(open.form)
+}
+
+// A held call that already has its final result (declined approval, or
+// SAVE_SECRET written/canceled on answer), or undefined to run the tool.
+function result(sessionId: string, call: ToolCallBlock, decided: Map<string, boolean>): ToolResultBlock | undefined {
+	if (call.name === 'save_secret' && decided.has(call.id))
+		return saveSecret.result(sessionId, call, decided.get(call.id)!)
+	if (decided.get(call.id) === false) return approval.declined(call)
+	return undefined
+}
+
+// The last round's calls, if they are held for approval or secret input and none has
 // run: at least one was asked about, nothing answered them, and no host
 // continued the turn after every question was answered (then they may
-// have run). `decided`: call id → yes, from the answers so far.
+// have run). `decided`: call id → yes/saved, from the answers so far.
 function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<string, boolean> } | undefined {
 	let end = records.findLastIndex((r) => r.type === 'assistant')
 	let start = end
@@ -265,7 +284,10 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 			open = true
 		} else if (r.type === 'answer' && r.question === asked?.id) {
 			open = false
-			decided.set(asked.call!, String(r.answers.run).startsWith('yes'))
+			let ok = approval.isApproval(asked.form)
+				? String(r.answers.run).startsWith('yes')
+				: !r.canceled && Boolean(r.secrets?.length)
+			decided.set(asked.call!, ok)
 		} else if (r.type === 'continue' && !open) return undefined
 	}
 	return asked ? { calls, decided } : undefined
@@ -303,6 +325,9 @@ export const approval = {
 	declined,
 	unrun,
 	later,
+	isApproval,
+	releasable,
+	result,
 	held,
 	sensitive,
 }

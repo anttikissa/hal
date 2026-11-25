@@ -48,6 +48,7 @@ import { commandCheck } from '../common/command-check.ts'
 import { userQuit } from '../common/user-quit.ts'
 import { server } from './server.ts'
 import { scheduler } from './scheduler.ts'
+import { saveSecret } from './tools/save_secret.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -394,6 +395,7 @@ function reset(): void {
 	host.state.done.clear()
 	tabs.reset()
 	projectContext.reset()
+	saveSecret.reset()
 	push.reset()
 	noticeHistory.reset()
 	busy.reset()

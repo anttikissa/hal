@@ -164,6 +164,16 @@ function titled(name: string, input: Record<string, unknown>, output?: string): 
 		case 'notify':
 			if (str('text')) return { text: marked(str('text')!), key: 'text' }
 			break
+		case 'save_secret': {
+			let description = str('description')
+			if (description) return { text: marked(description), key: 'description' }
+			let varName = str('name'),
+				file = str('file')
+			if (varName && file) return { text: marked(`Save ${varName} to ${file}`), keys: ['name', 'file'] }
+			if (varName) return { text: marked(`Save ${varName}`), key: 'name' }
+			if (file) return { text: marked(`Save secret to ${file}`), key: 'file' }
+			break
+		}
 		// The files it changes, created ones marked + and deleted ones -,
 		// then its purpose: "edit a.ts, b.ts+: Purpose" (task yn7).
 		case 'edit': {

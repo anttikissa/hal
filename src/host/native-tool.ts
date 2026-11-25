@@ -256,9 +256,13 @@ function help(tool: Tool<unknown>, interactive = false): string {
 
 // A tool's help as this session sees it: purpose comments after a tool
 // name are taught only to interactive sessions (task 2bq).
+function stripPurpose(text: string): string {
+	return text.replace(/^([\t ]*[A-Z][A-Z_]*) \/\*.*?\*\//gm, '$1')
+}
+
 function guide(tool: Tool<unknown>, interactive: boolean): string {
 	let help = tool.help ?? ''
-	return interactive ? help : help.replace(/^([\t ]*[A-Z][A-Z_]*) \/\*.*?\*\//gm, '$1')
+	return interactive ? help : stripPurpose(help)
 }
 
 // The system prompt's $tools (task 5t3): the help of each tool with
@@ -272,7 +276,9 @@ function guides(allowed?: string[], interactive = true): string {
 	let sections = shown.filter((t) => t.inPrompt).map((t) => when(t, guide(t, interactive)))
 	let others = shown.flatMap((t) => {
 		let summary = t.summary ?? t.syntax?.summary
-		return !t.inPrompt && summary ? [when(t, `\t${t.name.toUpperCase()} ${summary}`)] : []
+		if (t.inPrompt || !summary) return []
+		let line = `\t${t.name.toUpperCase()} ${summary}`
+		return [when(t, interactive ? line : stripPurpose(line))]
 	})
 	if (others.length) sections.push(`## Other tools\n${others.join('\n')}`)
 	return sections.join('\n\n')

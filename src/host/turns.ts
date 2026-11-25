@@ -227,8 +227,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let held = approval.held(records)
 	// Its approval still open: a message ran the turn, not an answer.
 	let open = forms.open(records)
-	if (held && open?.call !== undefined && !open.from) {
-		turns.release(id, held.calls, open)
+	if (held && approval.releasable(open)) {
+		turns.release(id, held.calls, open!)
 		held = undefined
 	}
 	// The scripted reply of the round, read once its stream ended: a
@@ -375,11 +375,11 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				}
 			}
 			if (signal.aborted) continue
+			let cwd = sessions.open(id).cwd
 			for (let call of calls) {
-				let form = decided.has(call.id) ? undefined : approval.form(call)
+				let form = decided.has(call.id) ? undefined : approval.form(call, cwd, id)
 				if (form) return turns.ask(id, form, call.id)
 			}
-			let cwd = sessions.open(id).cwd
 			status.transition(id, { type: 'tools' })
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, model, endTurn: () => (ending = true) }
@@ -393,7 +393,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 						output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`,
 						isError: true,
 					}
-				if (decided.get(call.id) === false) return approval.declined(call)
+				let done = approval.result(id, call, decided)
+				if (done) return done
 				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
 				let stream = tools.streams(call) ? toolOutput.start(id, call.id) : undefined
 				if (tools.unsafe(call)) (running.unsafe ??= new Map()).set(call.id, { input: call.input, at: Date.now() })
