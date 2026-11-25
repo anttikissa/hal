@@ -113,7 +113,13 @@ browserTest(
 			)
 			let first = await b.evaluate(`location.pathname`)
 			expect(await b.evaluate(`document.querySelector('.Tabs .strip a.tab').getAttribute('href')`)).toBe(first)
-			await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
+			// Desktop uses the two-tier header: visible title header, larger burger, full-width rail below.
+			expect(
+				await b.evaluate(
+					`(() => { let h = document.querySelector('.Tabs .head').getBoundingClientRect(), s = document.querySelector('.Tabs .strip').getBoundingClientRect(), b = document.querySelector('.Tabs .count .bars').getBoundingClientRect(); return h.height === 40 && s.top >= h.bottom - 1 && b.width >= 18 })()`,
+				),
+			).toBe(true)
+			await b.evaluate(`document.querySelector('.Tabs > .new').click()`)
 			await b.waitFor(
 				`document.querySelectorAll('.Tabs .strip a.tab').length === 2 && location.pathname !== '${first}'`,
 			)

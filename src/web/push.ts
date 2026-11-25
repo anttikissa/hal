@@ -30,9 +30,6 @@ function key(): Uint8Array<ArrayBuffer> | undefined {
 }
 
 const state: { registration?: ServiceWorkerRegistration; subscription?: PushSubscription | null } = {}
-function available(): boolean {
-	return push.supported() && !!push.state.registration && !!push.key() && Notification.permission === 'default'
-}
 
 // A readable name for this device, for the device list.
 function device(): string {
@@ -151,14 +148,14 @@ async function enable(): Promise<void> {
 	push.send(subscription)
 }
 
-async function start(changed: () => void = () => {}): Promise<void> {
+async function start(): Promise<void> {
 	if (!push.supported()) return
 	let registration: ServiceWorkerRegistration
 	try {
 		registration = await navigator.serviceWorker.register('/sw.js')
 	} catch (e: any) {
 		setFailed(`service worker failed: ${e?.message ?? e}`)
-		return changed()
+		return
 	}
 	push.state.registration = registration
 	setReady(true)
@@ -167,7 +164,6 @@ async function start(changed: () => void = () => {}): Promise<void> {
 	push.state.subscription = subscription
 	setMine(subscription?.endpoint)
 	if (subscription) push.send(subscription) // reconnect a persisted subscription
-	changed()
 }
 
 function visibility(id?: string): void {
@@ -193,7 +189,6 @@ export const push = {
 	state,
 	supported,
 	key,
-	available,
 	device,
 	send,
 	devices,

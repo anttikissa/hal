@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
-// The host's tabs above the conversation. On phones (<= 40rem), a
-// card-tinted title header sits over a compact scrollable number rail;
-// wider viewports fold them into one row with the shown tab as a
-// card-tinted face. Project color is a bottom LED bar on rail tabs and
-// a 3px left bar on the active card and list rows; status is a separate
+// The host's tabs above the conversation: a two-tier console on both
+// phones and desktop — a card-tinted title header (with new-tab on fine
+// pointers and the list/count button) over a full-width scrollable
+// number rail. Project color is a bottom LED bar on rail tabs and a 3px
+// left bar on the active header and list rows; status is a separate
 // round dot (pulsing while working, hollow while paused) so project and
 // status colors never overlap. The count at the right opens the full
 // list and dots when an offscreen tab waits. Terminal paging stays in
@@ -20,7 +20,6 @@ import { tabPages } from '../../common/tab-pages.ts'
 import { router } from '../router.ts'
 import { Notifications } from './Notifications.tsx'
 import { tabs } from '../tabs.ts'
-import { push } from '../push.ts'
 import { diagnostics } from '../diagnostics.ts'
 import { touchDebug } from '../touch-debug.ts'
 import { find } from '../find.ts'
@@ -80,16 +79,19 @@ function HeadMark(props: { mark: Mark }) {
 		return () => cancelAnimationFrame(frame)
 	})
 	return (
-		<span
-			ref={(e) => (el = e)}
-			class={
-				props.mark.blinks
-					? ['head-dot', props.mark.kind, 'blink', ...(props.mark.jobs ? ['with-jobs'] : [])]
-					: 'head-state'
-			}
-			aria-hidden="true"
-		>
-			{props.mark.blinks ? '' : props.mark.kind}
+		<span class={['head-mark', props.mark.blinks && 'blinking']} aria-hidden="true">
+			<span
+				ref={(e) => (el = e)}
+				class={[
+					'head-dot',
+					props.mark.kind,
+					...(props.mark.blinks ? ['blink'] : []),
+					...(props.mark.jobs ? ['with-jobs'] : []),
+				]}
+			/>
+			<span class="head-state">
+				{props.mark.jobs && props.mark.kind === 'working' ? 'working + jobs' : props.mark.kind}
+			</span>
 		</span>
 	)
 }
@@ -141,14 +143,8 @@ function Link(props: {
 	)
 }
 
-export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
+export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string | undefined }) {
 	let [touchProbe, setTouchProbe] = createSignal(false)
-	let [requested, setRequested] = createSignal(false)
-	let enable = () =>
-		void push
-			.enable()
-			.then(() => setRequested(true))
-			.catch((e) => alert(`Notifications: ${e.message}`))
 	let [open, setOpen] = createSignal(false)
 	let [alerts, setAlerts] = createSignal(false)
 	let sheet!: HTMLDialogElement
@@ -284,6 +280,47 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 			}}
 			style={{ '--digits': tabPages.digits(props.tabs.length) }}
 		>
+			<Show when={shownTab()}>
+				{(tab) => (
+					<div class="head" style={projectVars(tab())} data-mark={shownMark()?.kind}>
+						<button
+							type="button"
+							class="title-btn"
+							aria-label={`Tab ${current() + 1}: ${tab().name}. Open all tabs`}
+							onClick={() => void setOpen(true)}
+						>
+							<span class="n">{current() + 1}</span>
+							<span class="name">{tab().name}</span>
+							<Show when={shownMark()}>{(m) => <HeadMark mark={m()} />}</Show>
+						</button>
+					</div>
+				)}
+			</Show>
+			<button type="button" class="new" aria-label="New tab" onClick={newTab}>
+				<Icon name="plus" />
+			</button>
+			<button
+				type="button"
+				class="count"
+				aria-label={`All ${props.tabs.length} tabs${waiting() ? `, one off screen ${waiting()!.label}` : ''}`}
+				aria-haspopup="dialog"
+				aria-expanded={open() ? 'true' : 'false'}
+				onClick={() => void setOpen(true)}
+			>
+				<svg
+					class="bars"
+					viewBox="0 0 18 18"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.65"
+					stroke-linecap="square"
+					aria-hidden="true"
+				>
+					<path d="M2 4h14M2 9h14M2 14h14" />
+				</svg>
+				<span class="num">{props.tabs.length}</span>
+				{waiting() && <span class="dot" data-mark={waiting()!.kind} />}
+			</button>
 			<nav
 				class={['strip', ...(gap() === undefined ? [] : ['dragging'])]}
 				aria-label="Tabs"
@@ -311,7 +348,7 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 									tab={tab()}
 									n={i() + 1}
 									shown={id === props.shown}
-									name={id === props.shown}
+									name={false}
 									drop={drop(i())}
 									firstCard={props.firstCard}
 									onPick={() => requestAnimationFrame(() => center(true))}
@@ -320,55 +357,7 @@ export function Tabs(props: { firstCard: () => void; tabs: Tab[]; shown: string 
 						}}
 					</For>
 				</div>
-				<button type="button" class="new" aria-label="New tab" onClick={newTab}>
-					<Icon name="plus" />
-				</button>
-				{props.pushReady && !requested() && push.available() && (
-					<button type="button" class="notify" onClick={enable}>
-						<Icon name="bell" />
-						Notify
-					</button>
-				)}
 			</nav>
-			<Show when={shownTab()}>
-				{(tab) => (
-					<div class="head" style={projectVars(tab())} data-mark={shownMark()?.kind}>
-						<button
-							type="button"
-							class="title-btn"
-							aria-label={`Tab ${current() + 1}: ${tab().name}. Open all tabs`}
-							onClick={() => void setOpen(true)}
-						>
-							<span class="n">{current() + 1}</span>
-							<span class="name">{tab().name}</span>
-							<Show when={shownMark()}>{(m) => <HeadMark mark={m()} />}</Show>
-						</button>
-					</div>
-				)}
-			</Show>
-			<button
-				type="button"
-				class="count"
-				aria-label={`All ${props.tabs.length} tabs${waiting() ? `, one off screen ${waiting()!.label}` : ''}`}
-				aria-haspopup="dialog"
-				aria-expanded={open() ? 'true' : 'false'}
-				onClick={() => void setOpen(true)}
-			>
-				<svg
-					class="bars"
-					width="13"
-					height="13"
-					viewBox="0 0 14 14"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.4"
-					aria-hidden="true"
-				>
-					<path d="M2 3.5h10M2 7h10M2 10.5h10" />
-				</svg>
-				<span class="num">{props.tabs.length}</span>
-				{waiting() && <span class="dot" data-mark={waiting()!.kind} />}
-			</button>
 			<dialog
 				ref={(e) => (sheet = e)}
 				class="sheet"

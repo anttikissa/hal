@@ -16,7 +16,6 @@ import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
 import { scroll } from '../scroll.ts'
 import { flash } from '../flash.ts'
-import { push } from '../push.ts'
 import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
 import { EditBar } from './EditBar.tsx'
@@ -72,7 +71,6 @@ const snap = () => ({
 	notice: app.notice(),
 	connected: connection.connected(),
 	fresh: app.fresh(),
-	pushReady: !!push.state.registration,
 	notices: notices.state.entries,
 	updateAvailable: app.state.updateAvailable,
 })
@@ -204,7 +202,7 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, menu, notice, connected, linked, pushReady] = [
+	let [tabs, shown, view, text, menu, notice, connected, linked] = [
 		field('tabs'),
 		field('shown'),
 		field('view'),
@@ -213,7 +211,6 @@ export function Chat() {
 		field('notice'),
 		field('connected'),
 		field('target'),
-		field('pushReady'),
 	]
 	let stack = field('notices')
 	let updateAvailable = field('updateAvailable')
@@ -315,7 +312,7 @@ export function Chat() {
 	})
 	return (
 		<div class={['Chat', 'project', { offline: !connected(), stale: !fresh() }]}>
-			<Tabs firstCard={firstCard} tabs={tabs()} shown={shown()} pushReady={pushReady()} />
+			<Tabs firstCard={firstCard} tabs={tabs()} shown={shown()} />
 			<div
 				class="jump"
 				style={

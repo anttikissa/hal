@@ -497,7 +497,7 @@ function start(): void {
 	addEventListener('popstate', () => tabs.onPopState())
 	addEventListener('hashchange', () => app.aim())
 	app.aim()
-	void push.start(() => app.changed()).catch(() => {})
+	void push.start().catch(() => {})
 	let visible = () => {
 		push.visibility(app.state.shown)
 		if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen(true)
