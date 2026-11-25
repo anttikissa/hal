@@ -153,7 +153,7 @@ test('Tab completes prefixes, not passive highlights, before or after model sugg
 	expect(sent.some((c) => c.type === 'submit')).toBe(false)
 })
 
-test('Tab extends a shared prefix, then accepts the highlighted choice, before or after replies', () => {
+test('Tab extends a shared prefix, then stops with the menu open, before or after replies', () => {
 	for (let ready of [false, true]) {
 		let input = '/cd ~/gh'
 		let candidates = ['/cd ~/ghost/', '/cd ~/ghost-old/']
@@ -168,15 +168,30 @@ test('Tab extends a shared prefix, then accepts the highlighted choice, before o
 		if (ready) app.onEvent(next)
 		press('Tab')
 		if (!ready) app.onEvent(next)
-		expect(app.state.text).toBe('/cd ~/ghost/')
-		expect(app.state.menu).toBeUndefined()
-		expect(drafts.text(sessionId)).toBe('/cd ~/ghost/')
+		expect(app.state.text).toBe('/cd ~/ghost')
+		expect(app.state.menu?.choices.map((c) => c.value)).toEqual(candidates)
 	}
-	let input = '/model gpt-6.1-so'
-	let candidates = ['/model openai/gpt-6.1-sol', '/model openrouter/openai/gpt-6.1-sol']
+})
+
+test('Tab lists shared provider prefixes; choosing one lists its models', () => {
+	let input = '/model op'
+	let candidates = ['/model openai/gpt-6-sol', '/model openai/gpt-6-astra', '/model opus', '/model openrouter/x/y']
 	app.input(input)
 	app.onEvent({ type: 'completions', sessionId, text: input, items: candidates })
 	press('Tab')
-	expect(app.state.text).toBe(candidates[0]!)
-	expect(app.state.menu).toBeUndefined()
+	expect(app.state.text).toBe(input)
+	let menu = app.state.menu!
+	expect(menu.choices.map((c) => [c.label, c.description])).toEqual([
+		['openai/', '2 choices'],
+		['opus', ''],
+		['openrouter/x/y', ''],
+	])
+	press('Tab')
+	expect(app.state.text).toBe(input)
+	press('ArrowDown')
+	press('ArrowUp')
+	press('Tab')
+	expect(app.state.text).toBe('/model openai/')
+	expect(app.state.menu?.choices.map((c) => c.value)).toEqual(candidates.slice(0, 2))
+	expect(sent.some((c) => c.type === 'submit')).toBe(false)
 })

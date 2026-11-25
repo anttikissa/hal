@@ -293,7 +293,7 @@ function completed(event: Event & { type: 'completions' }): void {
 	let st = app.state
 	if (st.transcript?.meta.id !== event.sessionId || st.prompt.text !== event.text) return
 	// The terminal lists every choice; it has no menu to show a filled default as one of them.
-	let { text, choices } = completion.apply(event.text, event.items, false)
+	let { text, choices } = completion.apply(event.text, completion.group(event.text, event.items).items, false)
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
 	if (!event.items.length || st.notice === 'no completions')

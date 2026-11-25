@@ -292,8 +292,8 @@ function key(e: KeyInput, target: Target): boolean {
 				type: 'completions',
 				sessionId: app.sessionId()!,
 				text: st.text,
-				items: st.menu.choices.map((c) => c.value),
-				descriptions: st.menu.choices.map((c) => c.description),
+				items: st.known!.items,
+				descriptions: st.known!.descriptions,
 			})
 		}
 		return true

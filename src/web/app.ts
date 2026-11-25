@@ -213,11 +213,6 @@ function onEvent(event: Event): void {
 					event.items.length > 1 && done.notice
 						? completions.receive(event.text, event.items, st.menu, event.descriptions)
 						: undefined
-				if (menu && done.text === st.text) {
-					st.menu = menu
-					app.choose(menu.selected)
-					return
-				}
 				st.view = { ...st.view, notice: event.items.length ? undefined : done.notice }
 				if (done.text !== st.text) app.rewrite(() => ({ text: done.text, cursor: done.text.length }))
 				st.menu = menu
@@ -348,13 +343,15 @@ function input(text: string): void {
 	app.changed()
 }
 
+// A group keeps the menu open on what it holds.
 function choose(index: number): void {
-	let item = app.state.menu?.choices[index]
+	let st = app.state
+	let item = st.menu?.choices[index]
 	if (!item) return
-	app.state.menu = undefined
-	app.state.known = undefined
+	st.menu = undefined
+	if (!item.group) st.known = undefined
 	app.rewrite(() => ({ text: item.value, cursor: item.value.length }))
-	app.state.suppressed = item.value
+	if (!item.group) st.suppressed = item.value
 	app.changed()
 }
 

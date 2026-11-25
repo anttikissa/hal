@@ -4,7 +4,8 @@
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 
-export type Choice = { value: string; label: string; description: string }
+// `group`: a shared prefix; choosing it lists what it holds.
+export type Choice = { value: string; label: string; description: string; group?: true }
 export type Menu = { input: string; choices: Choice[]; selected: number; explicit?: boolean }
 export type Known = { input: string; items: string[]; descriptions?: string[] }
 
@@ -22,17 +23,21 @@ function predict(text: string, known: Known | undefined, current?: Menu): Menu |
 
 function receive(input: string, items: string[], previous?: Menu, descriptions?: string[]): Menu | undefined {
 	if (!items.length) return undefined
-	let short = completion.apply(input, items).choices
-	let choices = items.map((value, i) => {
+	let shown = completion.group(input, items, descriptions)
+	let short = completion.apply(input, shown.items).choices
+	let choices = shown.items.map((value, i) => {
 		let name = value.trimEnd().split(' ')[0]!
 		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
 		// Only the host or the command list describes a candidate (task 4qh).
 		let description =
-			descriptions?.[i] || (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) || ''
+			shown.descriptions?.[i] ||
+			(name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ||
+			''
+		let group = shown.groups.includes(value)
 		return (
 			previous?.choices.find(
 				(choice) => choice.value === value && choice.label === label && choice.description === description,
-			) ?? { value, label, description }
+			) ?? { value, label, description, ...(group && { group: true as const }) }
 		)
 	})
 	if (
