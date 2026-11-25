@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'The model tool reuses slash.command, so it records the same command history and runs the same guards as typing a slash command. Eligibility is an explicit modelUsable registry flag, not inferred from server-side availability; slash.runCommand reports reply output/errors. Session-busy guards still prevent /clear and /compact while the model turn is active.',
-		'The denylist replaces the earlier modelUsable registry flags. /redraw needs a host command and a transient redraw event because the original command ran only in terminals. The shared host completion path filters hidden entries for both clients.'
+		'The denylist replaces the earlier modelUsable registry flags. /redraw needs a host command and a transient redraw event because the original command ran only in terminals. The shared host completion path filters hidden entries for both clients.',
+		"Decided 2026-11-25 (user): COMMAND's summary line shows /cd ../new-project, /move 10 and /close as examples; the user often asks an agent to close its tab."
 	],
 	needs: [],
 	foldInto: ['2t']

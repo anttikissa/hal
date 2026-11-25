@@ -10,7 +10,7 @@ import type { Tool, ToolContext } from '../tools.ts'
 // Configuration: true puts the whole help in the system prompt; false
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = false
-const summary = 'run slash command like "/cd ../other"'
+const summary = 'run slash command like "/cd ../new-project", "/move 10", or "/close"'
 const help = `## COMMAND
 
 Run a model-usable slash command in this session, as if typed by the user.
