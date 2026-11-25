@@ -114,7 +114,7 @@ const parameters = {
 
 const syntax: SyntaxSpec = {
 	usage: [
-		'EDIT                                     // Exception: EDIT takes lines, not literals.',
+		'EDIT',
 		'<path>@<version> replace A-B             // One or more operations; HELP EDIT lists all.',
 		'!!NEW',
 		'<new lines>                              // Literal text up to !!END.',
