@@ -1,22 +1,20 @@
 // Prompt the user for a secret in a hidden field and write NAME=value
-// atomically (mode 0600) to an env file on the host. The value never enters
-// history, events, logs or model input (task ydz).
+// atomically to an env file on the host. The value never enters history,
+// events, logs or model input (task ydz).
 
-import { spawnSync } from 'child_process'
 import { randomBytes } from 'crypto'
 import {
+	accessSync,
 	chmodSync,
+	constants,
 	existsSync,
-	lstatSync,
 	readFileSync,
-	readlinkSync,
-	realpathSync,
 	renameSync,
 	statSync,
 	unlinkSync,
 	writeFileSync,
 } from 'fs'
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
+import { basename, dirname, join, resolve } from 'path'
 import type { ToolCallBlock, ToolResultBlock } from '../../common/blocks.ts'
 import type { Answers, Form } from '../../common/forms.ts'
 import type { HistoryRecord } from '../../common/replay.ts'
@@ -28,15 +26,17 @@ import { tools, type Tool, type ToolContext } from '../tools.ts'
 // Configuration: true puts the whole help in the system prompt; false
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = false
+const enableIf = '$session_interactive'
 const summary =
 	'/* Add or update API_KEY in .env */ { file: ".env", name: "API_KEY" } // prompt user securely for the key; model never sees it'
 const help = `## SAVE_SECRET
 
-Prompt the user for a secret in a hidden field and write NAME=value into an env file (mode 0600). The value goes only to the host and never reaches the model, history, events or logs.
+Prompt the user for a secret in a hidden field and write NAME=value into an env file (mode 0600 if new). The value goes only to the host and never reaches the model, history, events or logs.
 SAVE_SECRET /* <purpose> */ { file, name }
-	file: string    env file path (absolute or relative to cwd); must not be tracked in git (git-ignored files are allowed)
-	name: string    env variable name ([A-Z_][A-Z0-9_]*)
-- Creates the file if missing, replaces an existing NAME= line, or appends NAME=value.
+	file: string    env file path (absolute or relative to cwd)
+	name: string    env variable name ([A-Za-z_][A-Za-z0-9_]*)
+- Creates the file with mode 0600 if missing; otherwise preserves permissions.
+- Replaces an existing NAME= line or appends NAME=value.
 - Returns only "saved", "canceled", or an error.`
 
 const parameters = {
@@ -57,7 +57,7 @@ const syntax = {
 	positional: [] as string[],
 }
 
-const envNameRe = /^[A-Z_][A-Z0-9_]*$/
+const envNameRe = /^[A-Za-z_][A-Za-z0-9_]*$/
 const allowedFields = new Set(['file', 'name', 'description'])
 
 type Outcome = { output: string; isError?: true }
@@ -65,58 +65,6 @@ type Outcome = { output: string; isError?: true }
 const state = {
 	// Per-call outcomes from saveSecret.answer when a write fails (keyed by sessionId:callId).
 	outcomes: new Map<string, Outcome>(),
-}
-
-function canonical(path: string, depth = 0): string {
-	if (depth > 40) throw new Error(`too many symbolic links: ${paths.display(path)}`)
-	let abs = resolve(path)
-	try {
-		return realpathSync(abs)
-	} catch (e: any) {
-		if (e.code !== 'ENOENT' && e.code !== 'ENOTDIR') throw e
-		try {
-			if (lstatSync(abs).isSymbolicLink()) return canonical(resolve(dirname(abs), readlinkSync(abs)), depth + 1)
-		} catch (le: any) {
-			if (le.code !== 'ENOENT' && le.code !== 'ENOTDIR') throw le
-		}
-		let parent = dirname(abs)
-		if (parent === abs) return abs
-		return join(canonical(parent, depth), basename(abs))
-	}
-}
-
-function nearestExistingDir(path: string): string {
-	let cur = dirname(resolve(path))
-	while (true) {
-		try {
-			if (statSync(cur).isDirectory()) return cur
-		} catch {}
-		let parent = dirname(cur)
-		if (parent === cur) return cur
-		cur = parent
-	}
-}
-
-function checkGitPath(path: string): void {
-	let abs = resolve(path)
-	if (abs.split('/').includes('.git')) throw new Error(`refused: ${paths.display(abs)} is inside .git`)
-	let dir = nearestExistingDir(abs)
-	let top = spawnSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' })
-	if (top.error) throw new Error(`git check failed: ${top.error.message}`)
-	if (top.status !== 0) {
-		if (/not a git repository/i.test(top.stderr ?? '')) return
-		throw new Error(`git check failed: ${(top.stderr || '').trim() || `exit ${top.status}`}`)
-	}
-	let root = top.stdout.trim()
-	let rootReal = realpathSync(root)
-	let rel = relative(rootReal, canonical(abs))
-	if (rel === '..' || rel.startsWith('../') || isAbsolute(rel)) return
-	let ignored = spawnSync('git', ['-C', root, 'check-ignore', '--quiet', '--', rel], { encoding: 'utf8' })
-	if (ignored.error) throw new Error(`git check-ignore failed: ${ignored.error.message}`)
-	if (ignored.status === 0) return
-	if (ignored.status === 1)
-		throw new Error(`refused: ${paths.display(abs)} is inside a git repository and not git-ignored`)
-	throw new Error(`git check-ignore failed: ${(ignored.stderr || '').trim() || `exit ${ignored.status}`}`)
 }
 
 function validate(cwd: string, input: Record<string, unknown>): { target: string; name: string } {
@@ -128,72 +76,49 @@ function validate(cwd: string, input: Record<string, unknown>): { target: string
 		throw new Error('file must be a non-empty path without NUL bytes')
 	let name = input.name
 	if (typeof name !== 'string' || !envNameRe.test(name))
-		throw new Error(`name must match [A-Z_][A-Z0-9_]*; got ${JSON.stringify(name)}`)
+		throw new Error(`name must match [A-Za-z_][A-Za-z0-9_]*; got ${JSON.stringify(name)}`)
 	let target = resolve(cwd, paths.expand(file))
-	let canon = canonical(target)
-	checkGitPath(target)
-	if (canon !== target) checkGitPath(canon)
 	let dir = dirname(target)
 	if (!existsSync(dir) || !statSync(dir).isDirectory())
 		throw new Error(`directory does not exist: ${paths.display(dir)}`)
-	if (existsSync(target) && statSync(target).isDirectory())
-		throw new Error(`file is a directory: ${paths.display(target)}`)
+	accessSync(dir, constants.W_OK)
+	if (existsSync(target)) {
+		if (statSync(target).isDirectory()) throw new Error(`file is a directory: ${paths.display(target)}`)
+		accessSync(target, constants.W_OK)
+	}
 	return { target, name }
 }
 
-function linePattern(name: string): RegExp {
-	return new RegExp(`^(export\\s+)?${name}=`)
+function keyPattern(name: string): RegExp {
+	return new RegExp(`(^|[\\r\\n])(${name}=)[^\\r\\n]*`)
 }
 
 function hasKey(target: string, name: string): boolean {
-	if (!existsSync(target)) return false
-	let text = readFileSync(target, 'utf8')
-	let re = linePattern(name)
-	return text.split('\n').some((line) => re.test(line.endsWith('\r') ? line.slice(0, -1) : line))
+	return existsSync(target) && keyPattern(name).test(readFileSync(target, 'utf8'))
 }
 
 function updateEnvText(existing: string, name: string, value: string): string {
-	if (!existing) return `${name}=${value}\n`
-	let trailing = existing.endsWith('\n')
-	let rawLines = (trailing ? existing.slice(0, -1) : existing).split('\n')
-	let re = linePattern(name)
-	let replaced = false
-	let out: string[] = []
-	for (let raw of rawLines) {
-		let cr = raw.endsWith('\r') ? '\r' : ''
-		let line = cr ? raw.slice(0, -1) : raw
-		let m = re.exec(line)
-		if (m) {
-			if (!replaced) {
-				out.push(`${m[1] ?? ''}${name}=${value}${cr}`)
-				replaced = true
-			}
-			continue
-		}
-		out.push(raw)
-	}
-	if (!replaced) {
-		let cr = existing.includes('\r\n') ? '\r' : ''
-		out.push(`${name}=${value}${cr}`)
-		return `${out.join('\n')}\n`
-	}
-	return `${out.join('\n')}${trailing ? '\n' : ''}`
+	let re = keyPattern(name)
+	if (re.test(existing)) return existing.replace(re, (_, pre, eq) => `${pre}${eq}${value}`)
+	let nl = existing.includes('\r\n') ? '\r\n' : '\n'
+	let sep = existing && !/[\r\n]$/.test(existing) ? nl : ''
+	return `${existing}${sep}${name}=${value}${nl}`
 }
 
 function writeEnv(target: string, name: string, value: string): void {
-	if (!envNameRe.test(name)) throw new Error(`name must match [A-Z_][A-Z0-9_]*; got ${JSON.stringify(name)}`)
+	if (!envNameRe.test(name)) throw new Error(`name must match [A-Za-z_][A-Za-z0-9_]*; got ${JSON.stringify(name)}`)
 	if (typeof value !== 'string') throw new Error('secret value must be a string')
 	if (/[\r\n]/.test(value)) throw new Error('secret value must not contain a line break')
 	if (value.includes('\0')) throw new Error('secret value must not contain a NUL byte')
-	let dest = canonical(target)
-	let existing = existsSync(dest) ? readFileSync(dest, 'utf8') : ''
+	let existed = existsSync(target)
+	let mode = existed ? statSync(target).mode & 0o777 : 0o600
+	let existing = existed ? readFileSync(target, 'utf8') : ''
 	let next = updateEnvText(existing, name, value)
-	let tmp = join(dirname(dest), `.${basename(dest)}.${randomBytes(6).toString('hex')}.tmp`)
+	let tmp = join(dirname(target), `.${basename(target)}.${randomBytes(6).toString('hex')}.tmp`)
 	try {
 		writeFileSync(tmp, next, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
-		chmodSync(tmp, 0o600)
-		renameSync(tmp, dest)
-		chmodSync(dest, 0o600)
+		chmodSync(tmp, mode)
+		renameSync(tmp, target)
 	} catch (e) {
 		try {
 			unlinkSync(tmp)
@@ -286,4 +211,4 @@ export const saveSecret = {
 	reset,
 }
 
-export const tool: Tool = { name: 'save_secret', inPrompt, summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'save_secret', inPrompt, enableIf, summary, help, parameters, syntax, run }

@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test'
-import { spawnSync } from 'child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'fs'
+import { chmodSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { history } from '../history.ts'
 import { calls, client, created, testHome, until, useHost } from '../host-fixture.test.ts'
 import { nativeTool } from '../native-tool.ts'
+import { sessions } from '../sessions.ts'
 import { tools } from '../tools.ts'
 import { saveSecret } from './save_secret.ts'
 
@@ -15,19 +15,14 @@ useHost()
 const results = (call: (typeof calls)[number]) =>
 	call.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
 
-function git(cwd: string, args: string[]): void {
-	let r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
-	if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`)
-}
-
-test('SAVE_SECRET prompts securely, writes 0600, warns on replace and never leaks the secret', async () => {
+test('SAVE_SECRET prompts securely, creates 0600, preserves existing mode, warns on replace and never leaks', async () => {
 	let work = join(testHome(), 'app')
 	mkdirSync(work)
 	let envFile = join(work, '.env.prod')
 	let c = client()
 	let id = created(c, work)
 
-	// First call: missing file -> no replace warning; value written with 0600 and never leaked.
+	// First call: missing file -> no replace warning; created with mode 0600.
 	c.conn.send({ type: 'submit', sessionId: id, text: 'set key' })
 	await until(() => calls.length === 1)
 	calls[0]!.push(
@@ -56,10 +51,9 @@ test('SAVE_SECRET prompts securely, writes 0600, warns on replace and never leak
 	expect(results(calls[1]!)).toEqual([expect.objectContaining({ id: 's1', output: 'saved' })])
 	expect(results(calls[1]!)[0].isError).toBeUndefined()
 
-	// Add other lines and loosen permissions, then replace via a second SAVE_SECRET call.
+	// Existing file with 0640 preserves its mode on update.
 	writeFileSync(envFile, `# comment\nOTHER=1\nRESEND_API_KEY=${secret1}\nRESEND_API_KEY_2=keep\n`)
-	chmodSync(envFile, 0o644)
-	expect(statSync(envFile).mode & 0o777).toBe(0o644)
+	chmodSync(envFile, 0o640)
 
 	calls[1]!.push(
 		{
@@ -80,7 +74,7 @@ test('SAVE_SECRET prompts securely, writes 0600, warns on replace and never leak
 	await until(() => calls.length === 3)
 
 	expect(readFileSync(envFile, 'utf8')).toBe(`# comment\nOTHER=1\nRESEND_API_KEY=${secret2}\nRESEND_API_KEY_2=keep\n`)
-	expect(statSync(envFile).mode & 0o777).toBe(0o600)
+	expect(statSync(envFile).mode & 0o777).toBe(0o640)
 	expect(results(calls[2]!).at(-1)).toMatchObject({ id: 's2', output: 'saved' })
 
 	calls[2]!.push({ type: 'text', text: 'all set' }, { type: 'done', reason: 'end' })
@@ -184,84 +178,75 @@ test('Escape, empty input and newline values never write and never leak; multi-c
 	for (let s of leaked) expect(allText).not.toContain(s)
 })
 
-test('writeEnv replaces or appends cleanly, keeps other lines, enforces 0600 and rejects newlines', () => {
+test('writeEnv replaces or appends cleanly, preserves mode and CRLF, handles $ literals and rejects newlines', () => {
 	let dir = join(testHome(), 'envtest')
 	mkdirSync(dir)
 	let file = join(dir, '.env')
 
-	// Append to a file without a trailing newline and with loose permissions.
+	// Append to a file without a trailing newline and preserve existing permissions.
 	writeFileSync(file, 'FIRST=1\n# SECOND=commented\nSECOND_EXTRA=keep')
 	chmodSync(file, 0o644)
 	saveSecret.writeEnv(file, 'SECOND', 'val # with spaces "raw"')
 	expect(readFileSync(file, 'utf8')).toBe(
 		'FIRST=1\n# SECOND=commented\nSECOND_EXTRA=keep\nSECOND=val # with spaces "raw"\n',
 	)
-	expect(statSync(file).mode & 0o777).toBe(0o600)
+	expect(statSync(file).mode & 0o777).toBe(0o644)
 
-	// Replace existing export line in place, preserving export prefix.
-	writeFileSync(file, 'A=1\nexport B=old\nC=3\n')
-	saveSecret.writeEnv(file, 'B', 'new_val')
-	expect(readFileSync(file, 'utf8')).toBe('A=1\nexport B=new_val\nC=3\n')
+	// Replace and append on CRLF files, keeping $ sequences literal and allowing lowercase names.
+	writeFileSync(file, 'A=1\r\nmy_key=old\r\nC=3\r\n')
+	saveSecret.writeEnv(file, 'my_key', 'new$$1$&val')
+	saveSecret.writeEnv(file, 'EXTRA', '2')
+	expect(readFileSync(file, 'utf8')).toBe('A=1\r\nmy_key=new$$1$&val\r\nC=3\r\nEXTRA=2\r\n')
 
 	// Reject CR/LF without changing the file.
-	expect(() => saveSecret.writeEnv(file, 'B', 'bad\nline')).toThrow(/line break/)
-	expect(() => saveSecret.writeEnv(file, 'B', 'bad\rline')).toThrow(/line break/)
-	expect(readFileSync(file, 'utf8')).toBe('A=1\nexport B=new_val\nC=3\n')
+	expect(() => saveSecret.writeEnv(file, 'my_key', 'bad\nline')).toThrow(/line break/)
+	expect(() => saveSecret.writeEnv(file, 'my_key', 'bad\rline')).toThrow(/line break/)
+	expect(readFileSync(file, 'utf8')).toBe('A=1\r\nmy_key=new$$1$&val\r\nC=3\r\nEXTRA=2\r\n')
 })
 
-test('git work tree files are refused unless git-ignored and untracked; invalid names fail without prompting', async () => {
-	let repo = join(testHome(), 'repo')
-	let outside = join(testHome(), 'outside')
-	mkdirSync(repo)
-	mkdirSync(outside)
-	git(repo, ['init', '-q'])
-	git(repo, ['config', 'user.email', 'test@example.invalid'])
-	git(repo, ['config', 'user.name', 'Test'])
-	writeFileSync(join(repo, '.gitignore'), '.env.ignored\n.env.tracked\n')
-	writeFileSync(join(repo, '.env.tracked'), 'OLD=1\n')
-	git(repo, ['add', '-f', '.gitignore', '.env.tracked'])
-	git(repo, ['commit', '-q', '-m', 'init'])
-	symlinkSync(join(repo, '.env.unignored'), join(outside, 'link-into-repo'))
+test('invalid names and bad targets fail without prompting; non-interactive sessions lack SAVE_SECRET', async () => {
+	let work = join(testHome(), 'bad')
+	mkdirSync(work)
+	mkdirSync(join(work, 'adir'))
 
 	let c = client()
-	let id = created(c, repo)
+	let id = created(c, work)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'try bad' })
 	await until(() => calls.length === 1)
 	calls[0]!.push(
-		{ type: 'tool_call', id: 'g1', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env.unignored", name: "K" }' } },
-		{ type: 'tool_call', id: 'g2', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env.tracked", name: "K" }' } },
-		{ type: 'tool_call', id: 'g3', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".git/env", name: "K" }' } },
-		{
-			type: 'tool_call',
-			id: 'g4',
-			name: 'tool',
-			input: { cmd: `SAVE_SECRET { file: ${JSON.stringify(join(outside, 'link-into-repo'))}, name: "K" }` },
-		},
-		{ type: 'tool_call', id: 'n1', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env.ignored", name: "bad" }' } },
-		{ type: 'tool_call', id: 'n2', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env.ignored", name: "1A" }' } },
-		{ type: 'tool_call', id: 'ok', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env.ignored", name: "OK_1" }' } },
+		{ type: 'tool_call', id: 'n1', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env", name: "1A" }' } },
+		{ type: 'tool_call', id: 'n2', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env", name: "BAD=KEY" }' } },
+		{ type: 'tool_call', id: 'd1', name: 'tool', input: { cmd: 'SAVE_SECRET { file: "missing/.env", name: "OK" }' } },
+		{ type: 'tool_call', id: 'd2', name: 'tool', input: { cmd: 'SAVE_SECRET { file: "adir", name: "OK" }' } },
+		{ type: 'tool_call', id: 'ok', name: 'tool', input: { cmd: 'SAVE_SECRET { file: ".env", name: "ok_key" }' } },
 		{ type: 'done', reason: 'tool_use' },
 	)
 
-	// Only the git-ignored, valid call opens a question; all invalid ones skip prompting.
 	await until(() => transcript.question(c.views.get(id)))
 	let q = transcript.question(c.views.get(id))!
-	expect(q.form.fields[0]?.label).toBe('OK_1')
-	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { secret: 'ignored_ok_secret' } })
+	expect(q.form.fields[0]?.label).toBe('ok_key')
+	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { secret: 'good_val' } })
 	await until(() => calls.length === 2)
 
 	let out = results(calls[1]!)
-	expect(out.slice(0, 6).every((r: any) => r.isError)).toBe(true)
-	expect(out[0].output).toContain('not git-ignored')
-	expect(out[1].output).toContain('not git-ignored')
-	expect(out[2].output).toContain('.git')
-	expect(out[3].output).toContain('not git-ignored')
-	expect(out[4].output).toContain('[A-Z_][A-Z0-9_]*')
-	expect(out[5].output).toContain('[A-Z_][A-Z0-9_]*')
-	expect(out[6]).toMatchObject({ id: 'ok', output: 'saved' })
-	expect(existsSync(join(repo, '.env.unignored'))).toBe(false)
-	expect(readFileSync(join(repo, '.env.ignored'), 'utf8')).toBe('OK_1=ignored_ok_secret\n')
-	expect(statSync(join(repo, '.env.ignored')).mode & 0o777).toBe(0o600)
+	expect(out.slice(0, 4).every((r: any) => r.isError)).toBe(true)
+	expect(out[0].output).toContain('[A-Za-z_][A-Za-z0-9_]*')
+	expect(out[1].output).toContain('[A-Za-z_][A-Za-z0-9_]*')
+	expect(out[2].output).toContain('directory does not exist')
+	expect(out[3].output).toContain('file is a directory')
+	expect(out[4]).toMatchObject({ id: 'ok', output: 'saved' })
+	expect(readFileSync(join(work, '.env'), 'utf8')).toBe('ok_key=good_val\n')
+
+	// Non-interactive sessions do not have SAVE_SECRET available.
+	let sub = sessions.create({ cwd: work, interactive: false })
+	expect(tools.allowed(id).some((t) => t.name === 'save_secret')).toBe(true)
+	expect(tools.allowed(sub.id).some((t) => t.name === 'save_secret')).toBe(false)
+	let blocked = await tools.run(
+		{ type: 'tool_call', id: 'no', name: 'save_secret', input: { file: '.env', name: 'OK' } },
+		{ sessionId: sub.id, cwd: work, signal: new AbortController().signal },
+	)
+	expect(blocked.isError).toBe(true)
+	expect(blocked.output).toContain('SAVE_SECRET is not available')
 })
 
 test('HELP, Other tools line and card headlines describe SAVE_SECRET clearly', async () => {
@@ -277,7 +262,7 @@ test('HELP, Other tools line and card headlines describe SAVE_SECRET clearly', a
 
 	let guides = nativeTool.guides()
 	expect(guides).toContain(
-		'SAVE_SECRET /* Add or update API_KEY in .env */ { file: ".env", name: "API_KEY" } // prompt user securely for the key; model never sees it',
+		'::: if $session_interactive\n\tSAVE_SECRET /* Add or update API_KEY in .env */ { file: ".env", name: "API_KEY" } // prompt user securely for the key; model never sees it\n:::',
 	)
 
 	expect(
