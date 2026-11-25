@@ -18,7 +18,8 @@ An idle session stays idle through bare /login method selection, concurrent Chat
 		"Reply's after-the-turn callback is named after, not then: an object with a then field is a thenable, which await would call (unicorn/no-thenable).",
 		"Completion labels cut where the items' shared part last breaks (space or /), not at each item's last space: invariant: a multi-word argument (a session name for /go) is listed whole, a path by its last part. Labels once showed only a name's last word ('monitoring', '(fork)').",
 		'Bug fix 2026-10-06: a command module that fails to load breaks only its own command; every other command keeps working. Invariant restored: one bad file in src/host/commands/ never refuses all submits. Cause: a running host cached an older toggle.ts; newer expand.ts and collapse.ts (read from the directory per lookup) imported an export it lacked, so commands.all() threw and every slash command, /restart included, was refused. The failing command now replies with the path and the full error.',
-		'Command names are case-insensitive: /TODO runs /todo (commands.parse lowercases the name; client and web typed-command checks, send-keys commandDraft and rebase queue checks match case-insensitively).'
+		'Command names are case-insensitive: /TODO runs /todo (commands.parse lowercases the name; client and web typed-command checks, send-keys commandDraft and rebase queue checks match case-insensitively).',
+		'Invariant restored: every command runs against the host code loaded with it. Commands loaded on first use, so after a pull /close loaded a new close.ts against the old tabs.ts in memory (tabs.places is not a function). main.later now runs commands.preload, which requires one command file per event-loop slice after the first frame: 60 files, longest slice 5-7 ms, about 25 ms in total (server CPU, measured). Command edits take effect on restart, like other host code.'
 	],
 	needs: ['w4']
 }

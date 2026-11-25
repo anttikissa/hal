@@ -78,11 +78,16 @@ function dir(): string {
 	return `${import.meta.dir}/commands`
 }
 
+function files(): string[] {
+	return readdirSync(commands.dir())
+		.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+		.sort()
+}
+
 // Every command by name, sorted, read from the directory each time.
 function all(): Map<string, SlashCommand> {
 	let found = new Map<string, SlashCommand>()
-	for (let file of readdirSync(commands.dir()).sort()) {
-		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
+	for (let file of commands.files()) {
 		let name = file.slice(0, -3),
 			path = `${commands.dir()}/${file}`
 		// One module that fails to load (e.g. it needs code newer than the
@@ -99,6 +104,19 @@ function all(): Map<string, SlashCommand> {
 		}
 	}
 	return found
+}
+
+// Loads every command module, one per event-loop slice, so each matches
+// the host code loaded at startup: a command first run after a pull
+// would otherwise load new code against old modules. A failure shows
+// when its command runs (all()).
+function preload(left = commands.files()): void {
+	let file = left.shift()
+	if (!file) return
+	try {
+		require(`${commands.dir()}/${file}`)
+	} catch {}
+	setTimeout(() => commands.preload(left))
 }
 
 // "/name args" as its parts; undefined for anything else, such as a
@@ -164,6 +182,8 @@ export const commands = {
 	dir,
 	home: (): string => homedir(),
 	all,
+	files,
+	preload,
 	parse,
 	candidates,
 	complete,

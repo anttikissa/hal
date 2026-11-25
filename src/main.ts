@@ -26,6 +26,7 @@ import { config } from './host/config.ts'
 import { lifecycle } from './host/lifecycle.ts'
 import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
+import { commands } from './host/commands.ts'
 import { host } from './host/host.ts'
 import { warnings } from './host/warnings.ts'
 import { restartGuard, restartProcess } from './host/commands/restart.ts'
@@ -203,6 +204,7 @@ async function becomeHost(): Promise<boolean> {
 	main.later(() => {
 		find.init()
 		resources.init()
+		commands.preload()
 		web.start()
 		if (
 			web.state.server &&
