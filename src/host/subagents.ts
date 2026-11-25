@@ -66,6 +66,7 @@ function allowedTools(parent: SessionMeta, asked: string[] | undefined): string[
 // Opens the child and starts its first turn; returns its id. Throws,
 // spending nothing, when a parent ancestor has too few slots left or the
 // child's model is rate limited on every account (it would only wait).
+// Every kind costs a slot; spawn_budget counts spawns, not subagents.
 function spawn(parent: string, s: Spawn): string {
 	let meta = sessions.open(parent)
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
@@ -79,15 +80,13 @@ function spawn(parent: string, s: Spawn): string {
 		throw new Error('mode fork cannot take systemPrompt: the copied history assumes Hal’s system prompt')
 	let allowed = allowedTools(meta, s.tools)
 	let charged: SessionMeta[] = []
-	if (s.kind !== 'interactive') {
-		let left = meta.slots ?? settings.subagentSlots()
-		if (s.limit > left - 1)
-			throw new Error(`limit ${s.limit} needs at least ${s.limit + 1} spawn slots, but this session has ${left} left`)
-		for (let at: SessionMeta | undefined = meta; at; at = at.parent ? sessions.open(at.parent) : undefined) {
-			if (charged.includes(at)) throw new Error(`parent cycle at ${at.id}`)
-			if ((at.slots ?? settings.subagentSlots()) === 0) throw new Error(`session ${at.id} has 0 spawn slots left`)
-			charged.push(at)
-		}
+	let left = meta.slots ?? settings.subagentSlots()
+	if (s.kind !== 'interactive' && s.limit > left - 1)
+		throw new Error(`limit ${s.limit} needs at least ${s.limit + 1} spawn slots, but this session has ${left} left`)
+	for (let at: SessionMeta | undefined = meta; at; at = at.parent ? sessions.open(at.parent) : undefined) {
+		if (charged.includes(at)) throw new Error(`parent cycle at ${at.id}`)
+		if ((at.slots ?? settings.subagentSlots()) === 0) throw new Error(`session ${at.id} has 0 spawn slots left`)
+		charged.push(at)
 	}
 	let child = sessions.create({
 		cwd: s.cwd,

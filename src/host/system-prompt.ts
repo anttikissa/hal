@@ -152,6 +152,12 @@ function template(text: string, input: PromptInput, problems?: string[]): string
 	return promptLang.render('<help>', systemPrompt.vars(input), [], problems, undefined, { text })
 }
 
+// Whether a template condition holds, e.g. a tool's enableIf. A broken
+// one is false; the system prompt reports it.
+function holds(condition: string, vars: Record<string, string>): boolean {
+	return promptLang.render('<enableIf>', vars, [], [], undefined, { text: `:: if ${condition}\n1\n::` }) === '1'
+}
+
 export type PromptInput = {
 	cwd: string
 	model: string
@@ -239,6 +245,7 @@ export const systemPrompt = {
 	vars,
 	assemble,
 	template,
+	holds,
 	inspect,
 	build,
 }

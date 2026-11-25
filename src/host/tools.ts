@@ -20,6 +20,8 @@ import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { history } from './history.ts'
 import { sessions } from './sessions.ts'
+import { systemPrompt } from './system-prompt.ts'
+import { promptCache } from './prompt-cache.ts'
 import { strings } from '../common/strings.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
@@ -95,8 +97,8 @@ export type ToolCard = {
 // capitalized name and summary ('read a history entry' becomes
 // 'READ_ENTRY read a history entry'). `inPrompt`: `help` is the tool's
 // own section in the system prompt (src/host/native-tool.ts guides).
-// `promptIf`: a template condition, e.g. '$spawn_budget', for showing the
-// tool in the prompt at all.
+// `enableIf`: a template condition, e.g. '$spawn_budget'; while false,
+// the session's prompt, HELP and calls lack the tool.
 // `help`: what HELP <TOOL> shows, rendered with the prompt's template
 // language (src/host/prompt-lang.ts) and the session's variables.
 //
@@ -124,7 +126,7 @@ export type Tool<Output = string> = {
 	syntax?: SyntaxSpec
 	summary?: string
 	inPrompt?: boolean
-	promptIf?: string
+	enableIf?: string
 	help?: string
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
@@ -147,12 +149,22 @@ function all(): Tool<ToolOutput>[] {
 	return found
 }
 
-// The tools a session may call: SPAWN's restriction (task 0rc), or all.
-// Any tool brings HELP, which the native tool's description names.
-// A session running a turn is open; tools also run for sessionless callers.
+// The tools a session may call: SPAWN's restriction (task 0rc) and each
+// tool's enableIf, or all. Any tool brings HELP, which the native tool's
+// description names. A session running a turn is open; tools also run for
+// sessionless callers.
 function allowed(sessionId: string): Tool<ToolOutput>[] {
-	let names = sessions.state.open.get(sessionId)?.tools
-	return tools.all().filter((t) => !names || names.includes(t.name) || (t.name === 'help' && names.length > 0))
+	let meta = sessions.state.open.get(sessionId)
+	let names = meta?.tools
+	let vars: Record<string, string> | undefined
+	let enabled = (t: Tool<ToolOutput>) => {
+		if (!t.enableIf || !meta) return true
+		vars ??= systemPrompt.vars(promptCache.input(sessionId))
+		return systemPrompt.holds(t.enableIf, vars)
+	}
+	return tools
+		.all()
+		.filter((t) => (!names || names.includes(t.name) || (t.name === 'help' && names.length > 0)) && enabled(t))
 }
 
 // Lines offset..offset+limit-1 (1-based) of `text`, each at most

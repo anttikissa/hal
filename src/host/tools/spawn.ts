@@ -14,8 +14,8 @@ import type { Tool, ToolContext } from '../tools.ts'
 // Configuration: true puts the whole help in the system prompt; false
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = false
-// Only sessions with a spawn budget see SPAWN under Other tools.
-const promptIf = '$spawn_budget'
+// Each spawn costs a slot, so only sessions with a spawn budget have SPAWN.
+const enableIf = '$spawn_budget'
 const summary = 'open a subagent or a session for the user'
 const help = `## SPAWN
 
@@ -35,7 +35,7 @@ SPAWN { kind?, mode?, model?, cwd?, name?, limit?, tools?, systemPrompt? }?
 - subagent reports and closes after a clean finish; subagent-leave-open reports and stays open; interactive opens a session for the user.
 - Give the goal and constraints in the task. Only kind subagent requires a task; a leave-open subagent can wait for SEND.
 - fresh starts with only the task; fork copies this session's history so far.
-- limit is at most this session's slots left minus 1. Each subagent spawn costs one slot from this session and every ancestor. Interactive sessions are free and use the configured budget.
+- limit is at most this session's slots left minus 1. Each spawn costs one slot from this session and every ancestor. An interactive session starts with the configured budget.
 - tools: [] gives none. A focus aid, not a sandbox: BASH and EVAL can do anything.
 - systemPrompt includes AGENTS.md and skills only if asked. Keep it short; weak models do best with only what the task needs. Add as needed: $tools (guides for its tools), $agents (AGENTS.md files), $skills (skill list), $date, $session_cwd.
 - A <question> keeps a subagent open; answer through SEND. HELP SUBAGENTS covers coordination and resuming.`
@@ -113,4 +113,4 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 	return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.${note}`
 }
 
-export const tool: Tool = { name: 'spawn', inPrompt, promptIf, summary, help, parameters, syntax, run }
+export const tool: Tool = { name: 'spawn', inPrompt, enableIf, summary, help, parameters, syntax, run }

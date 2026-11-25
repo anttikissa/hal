@@ -1,5 +1,5 @@
 {
-	version: 60,
+	version: 61,
 	changes: [
 		{
 			version: 2,
@@ -1116,6 +1116,17 @@
 					target: 'web/scroll.scroll',
 					description: 'Drops anchors',
 					port: "Use CSS.supports('overflow-anchor', 'auto') instead"
+				}
+			]
+		},
+		{
+			version: 61,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/tools.Tool',
+					description: 'Renames promptIf to enableIf, which also hides the tool from HELP and refuses calls',
+					port: 'Rename the field'
 				}
 			]
 		}

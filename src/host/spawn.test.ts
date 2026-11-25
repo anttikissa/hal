@@ -283,7 +283,7 @@ test('a blank interactive session opens next to its parent and does nothing', as
 	let child = tabs.file().open[1]!
 	expect(sessions.open(child)).toMatchObject({ spawn: 'interactive', slots: 3 })
 	expect(sessions.open(child).parent).toBeUndefined()
-	expect(sessions.open(p).slots).toBe(3)
+	expect(sessions.open(p).slots).toBe(2)
 	expect(status.stateOf(child).type).toBe('idle')
 	expect(history.readSync(child)).toEqual([])
 })

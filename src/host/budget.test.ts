@@ -7,6 +7,7 @@ import { subagents } from './subagents.ts'
 import { forks } from './forks.ts'
 import { command } from './commands/budget.ts'
 import { slash } from './slash.ts'
+import { tools } from './tools.ts'
 import { client, toolSession, useHost } from './host-fixture.test.ts'
 
 useHost()
@@ -53,14 +54,20 @@ test('configuration seeds new budgets and missing counts fall back without chang
 	expect(() => config.update({ subagentSlots: -1 })).toThrow('expected an integer')
 })
 
-test('interactive spawns are free and ordinary forks copy the count into an independent tree', () => {
+test('interactive spawns cost a slot and ordinary forks copy the count into an independent tree', () => {
 	let root = toolSession(client())
-	sessions.open(root).slots = 0
+	sessions.open(root).slots = 1
 	let interactive = subagents.spawn(root, { kind: 'interactive', task: '', fork: true, cwd: '/tmp', limit: 99 })
 	expect(sessions.open(interactive)).toMatchObject({ forkedFrom: root, slots: settings.subagentSlots() })
 	expect(sessions.open(interactive).parent).toBeUndefined()
 	expect(sessions.open(root).slots).toBe(0)
+	expect(() => subagents.spawn(root, { kind: 'interactive', task: '', fork: false, cwd: '/tmp', limit: 0 })).toThrow(
+		`session ${root} has 0 spawn slots left`,
+	)
+	let hasSpawn = () => tools.allowed(root).some((t) => t.name === 'spawn')
+	expect(hasSpawn()).toBe(false)
 	command.run('2', undefined, slash.context(root))
+	expect(hasSpawn()).toBe(true)
 	let copy = forks.create(root)
 	expect(sessions.open(copy)).toMatchObject({ forkedFrom: root, slots: 2 })
 	expect(sessions.open(copy).parent).toBeUndefined()
