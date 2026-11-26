@@ -41,6 +41,8 @@ export const command: SlashCommand & { levels(id: string): string[] } = {
 				'astra',
 				'luna',
 				'terra',
+				'gemini',
+				'neon',
 				'kimi',
 				'qwen',
 				'deepseek',
