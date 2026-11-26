@@ -39,7 +39,7 @@ test('every status read refreshes subscriptions and failed auth leaves cached wi
 		expect(result).toContain(`PID: ${process.pid}`)
 		expect(result).toContain('12% used')
 		expect(result).toContain('login expired — showing cached usage')
-		expect(result).toContain('To log in again, run /login claude or /login chatgpt.')
+		expect(result).toContain('To log in to a@example.com again, run /login claude.')
 		expect(result).not.toContain('/private/auth.ason')
 		data.anthropic['a@example.com']['5h'].observed = new Date(when).toISOString()
 		result = await statusUsage.show('s', 'fake/m1')

@@ -326,13 +326,15 @@ async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 
 async function show(sessionId: string, model: string): Promise<string> {
 	let rows = await statusUsage.rows(sessionId, model)
-	let broken = rows.some((row) => row.loginRequired)
+	let relogins = rows
+		.filter((row) => row.loginRequired)
+		.map((row) => `To log in to ${row.account} again, run /login ${row.provider === 'openai' ? 'chatgpt' : 'claude'}.`)
 	let verifyLinks = rows.filter((row) => row.verify?.url).map((row) => `Verify ${row.account}: ${row.verify!.url}`)
 	// Times show in the asking client's zone, as its status line does.
 	let zone = clients.timezone(sessionId)
 	let footer = [
 		...(verifyLinks.length ? [verifyLinks.join('\n')] : []),
-		...(broken ? ['To log in again, run /login claude or /login chatgpt.'] : []),
+		...(relogins.length ? [relogins.join('\n')] : []),
 	].join('\n\n')
 	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${footer ? `\n\n${footer}` : ''}`
 }
