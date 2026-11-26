@@ -2,7 +2,6 @@
 // and fetching earlier transcript pages while scrolling up.
 
 import { expect, test } from 'bun:test'
-import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import type { Target } from './keys.ts'
@@ -51,22 +50,28 @@ test('arrows inside a draft stay native; its first row starts history browsing u
 	expect(app.state.text).toBe('')
 })
 
-test('an edited entry becomes the draft; sending an entry brings the own text back', () => {
+test('an edited recalled entry stays on its slot without overwriting the draft; held Up stops at line 1', () => {
 	app.onEvent(snapshot({ type: 'idle' }, [{ type: 'user', blocks: [{ type: 'text', text: 'first' }], ts }]))
-	app.input('')
-	press('ArrowUp', message(''))
+	app.input('mine')
+	// Held ArrowUp repeat does not jump into history.
+	expect(press('ArrowUp', message('mine', 0), { repeat: true })).toBe(false)
+	expect(app.state.text).toBe('mine')
+	press('ArrowUp', message('mine', 0))
 	expect(app.state.text).toBe('first')
 	app.input('first!')
-	expect(fx.stored.get(sessionId)?.text).toBe('first!')
+	// Draft underneath stays untouched; edit is stored on the prompt slot.
+	expect(fx.stored.get(sessionId)?.text).toBe('mine')
 	expect(press('ArrowDown', message('first!'))).toBe(true)
-	app.input('')
-	press('ArrowUp', message(''))
-	// A draft received underneath browsing is not replaced by recall.
-	drafts.edit(sessionId, 'mine')
-	press('Enter', message('first'))
-	expect(fx.sent.findLast((c) => c.type === 'submit')).toMatchObject({ text: 'first' })
+	expect(app.state.text).toBe('mine')
+	// Returning before sending restores the edited slot.
+	expect(press('ArrowUp', message('mine', 0))).toBe(true)
+	expect(app.state.text).toBe('first!')
+	// Sending restores the draft and clears saved slot edits.
+	press('Enter', message('first!'))
+	expect(fx.sent.findLast((c) => c.type === 'submit')).toMatchObject({ text: 'first!' })
 	expect(app.state.text).toBe('mine')
 	expect(fx.stored.get(sessionId)?.text).toBe('mine')
+	expect(fx.stored.get(sessionId)?.edits).toBeUndefined()
 })
 
 test('scrolling near the top fetches the page before; it goes in front', () => {
@@ -127,6 +132,6 @@ for (let restore of ['delete', 'undo'])
 		press('ArrowDown', message('first'))
 		press('ArrowDown', message('second'))
 		press('ArrowDown', message('third'))
-		expect(app.state.text).toBe('second')
-		expect(fx.stored.get(sessionId)?.text).toBe('second')
+		expect(app.state.text).toBe('')
+		expect(fx.stored.get(sessionId)?.text ?? '').toBe('')
 	})

@@ -5,6 +5,7 @@
 // persist separately from the draft.
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
+import { editPrompt } from './edit-prompt.ts'
 import { restart } from './restart.ts'
 import { store } from './draft-store.ts'
 import { backfill, type Backfill } from '../common/backfill.ts'
@@ -224,6 +225,7 @@ function onEvent(event: Event): void {
 		return
 	}
 	let id = app.sessionId()
+	if (event.type === 'snapshot') editPrompt.restore()
 	// A recalled entry or an edit stays in the box; the draft changes underneath.
 	if (id && (changed || event.type === 'snapshot') && !st.view.editing) st.text = recall.shown(id) ?? drafts.text(id)
 	queuedPrompt.sync()
@@ -339,7 +341,7 @@ function input(text: string): void {
 		}
 	}
 	let id = app.sessionId()
-	if (id && !queueEdit.input(id, text) && !st.view.editing && recall.typed(id, text)) drafts.edit(id, text)
+	if (id) editPrompt.input(id, text)
 	app.changed()
 }
 
@@ -452,6 +454,7 @@ function send(delivery: Delivery = 'steer'): void {
 	else if (c) connection.send(c)
 	diagnostics.record('outcome', c?.type === 'submit' ? 'submitted' : c ? 'command' : keep ? 'refused' : 'empty')
 	if (!keep) {
+		editPrompt.finish(st.view.editing, st.text)
 		// A recalled entry or an edit was sent: the user's own text comes back.
 		let back = (c?.type === 'submit' && recall.stop(c.sessionId)) || st.view.editing
 		st.view = { ...st.view, editing: undefined }
@@ -541,11 +544,8 @@ export const app = {
 	setView,
 	setNotice,
 	sendNow,
-	// Play's nudge (task yhn): a prompt sent as if typed, pending until the host takes it.
-	nudge: (id: string, text: string): void => {
-		drafts.submit(id, text)
-		app.changed()
-	},
+	// Play's nudge (task yhn): a prompt sent as if typed.
+	nudge: (id: string, text: string): void => (drafts.submit(id, text), app.changed()),
 	onEvent,
 	receiveView,
 	settled,
@@ -553,7 +553,7 @@ export const app = {
 	seek,
 	// Changes the box's text (and caret) by `change`; the Composer edits
 	// the textarea in place instead.
-	rewrite: (change: (p: { text: string; cursor: number; anchor?: number }) => { text: string }): void =>
+	rewrite: (change: (p: { text: string; cursor: number; anchor?: number }) => { text: string }, _focus = false): void =>
 		app.input(change({ text: app.state.text, cursor: app.state.text.length }).text),
 	older,
 	onState,

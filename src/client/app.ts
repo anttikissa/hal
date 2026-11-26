@@ -217,6 +217,7 @@ function onEvent(event: Event): void {
 		let t = transcriptLive.fold(st.transcript, event)
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
+		if (event.type === 'snapshot' && t) promptKeys.restore(st, t)
 		if (event.type === 'snapshot' && t && (!st.editing || st.editing.queueEdit))
 			app.setPrompt(
 				queueEdit.editing(t.meta.id) ? queueEdit.text(t.meta.id) : (recall.shown(t.meta.id) ?? drafts.text(t.meta.id)),
@@ -278,6 +279,7 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 		st.notice = refused
 		return false
 	}
+	if (editing) amend.finish(editing, text)
 	st.editing = undefined
 	if (command) {
 		st.notice = undefined
@@ -393,8 +395,7 @@ function onKeys(events: KeyEvent[]): void {
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
 		let id = st.transcript?.meta.id
-		if (edited && id && !queueEdit.input(id, state.text) && !st.editing && recall.typed(id, state.text))
-			drafts.edit(id, state.text)
+		if (edited && id) promptKeys.typed(st, id, state.text)
 		// A recalled entry or an edit was sent: the user's own text comes back.
 		if (action?.type === 'submit' && id && (recall.stop(id) || (editing && !editing.queueEdit)))
 			app.setPrompt(drafts.text(id))

@@ -1,8 +1,12 @@
 import { beforeEach, expect, test } from 'bun:test'
+import { drafts } from './drafts.ts'
 import { recall } from './recall.ts'
 import { transcriptLive } from './transcript-live.ts'
 
-beforeEach(() => recall.reset())
+beforeEach(() => {
+	recall.reset()
+	drafts.reset()
+})
 
 const list = ['one', 'two\nlines', 'three']
 const up = (text: string, cursor = 0, width = Infinity) => recall.step('s', list, text, cursor, -1, width, 'mine')
@@ -69,14 +73,20 @@ test('the first Up skips the entry still in the editor', () => {
 	expect(recall.step('t', ['only'], 'only', 0, -1, Infinity, '')).toBeUndefined()
 })
 
-test('editing keeps the browsing position and saves even restored text as the draft', () => {
+test('editing saves per slot without overwriting the draft, and stepping away and back restores it', () => {
 	up('mine')
 	expect(recall.typed('s', 'three')).toBe(false)
 	expect(recall.shown('s')).toBe('three')
-	expect(recall.typed('s', 'three!')).toBe(true)
+	expect(recall.typed('s', 'three!')).toBe(false)
 	expect(recall.shown('s')).toBe('three!')
-	expect(recall.typed('s', 'three')).toBe(true)
-	expect(up('three')).toEqual({ text: 'two\nlines', cursor: 9 })
+	expect(up('three!')).toEqual({ text: 'two\nlines', cursor: 9 })
+	expect(down('two\nlines', 9)).toEqual({ text: 'three!', cursor: 6 })
+	expect(down('three!', 6)).toEqual({ text: 'mine', cursor: 4 })
+	// Pressing Up again before sending still returns the unsent edit on that slot.
+	expect(up('mine')).toEqual({ text: 'three!', cursor: 6 })
+	// Restoring the original text removes the slot edit.
+	expect(recall.typed('s', 'three')).toBe(false)
+	expect(drafts.slot('s', '2')).toBeUndefined()
 })
 
 test('browsing belongs to its session', () => {

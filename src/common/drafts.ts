@@ -38,6 +38,14 @@ export type Sending = {
 	aside?: boolean
 }
 
+export type AmendSaved = {
+	target?: string
+	inbox?: string
+	aside?: true
+	paused?: boolean
+	window?: string
+}
+
 export type Local = {
 	// What the editor holds.
 	text: string
@@ -49,6 +57,10 @@ export type Local = {
 	sending: Sending[]
 	// Protected queue edit, separate from the shared draft.
 	queueEdit?: QueueEditing
+	// Unsent edits to earlier prompts (amend or recall), by slot key.
+	edits?: Record<string, string>
+	// Active amend session, restored on reload in the same window.
+	amend?: AmendSaved
 }
 
 // `window`: names this window (queue-edit.ts), if the store is shared with others.
@@ -62,10 +74,11 @@ type DraftsState = {
 	sessions: Map<string, Local>
 	// The draft command in flight for each session: its id and text.
 	inFlight: Map<string, Sending>
+	window: string
 }
 
 function createState(): DraftsState {
-	return { sessions: new Map(), inFlight: new Map() }
+	return { sessions: new Map(), inFlight: new Map(), window: crypto.randomUUID() }
 }
 
 function empty(): Local {
@@ -115,7 +128,98 @@ function valid(l: Local | undefined): Local | undefined {
 		(e.window === undefined || typeof e.window === 'string')
 			? e
 			: undefined
-	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
+	let edits: Record<string, string> | undefined
+	if (l.edits && typeof l.edits === 'object' && !Array.isArray(l.edits)) {
+		let out: Record<string, string> = {}
+		for (let [k, v] of Object.entries(l.edits)) if (typeof v === 'string') out[k] = v
+		if (Object.keys(out).length) edits = out
+	}
+	let a = l.amend
+	let amend =
+		a &&
+		typeof a === 'object' &&
+		!Array.isArray(a) &&
+		(typeof a.target === 'string' || typeof a.inbox === 'string') &&
+		(a.target === undefined || typeof a.target === 'string') &&
+		(a.inbox === undefined || typeof a.inbox === 'string') &&
+		(a.aside === undefined || a.aside === true) &&
+		(a.paused === undefined || typeof a.paused === 'boolean') &&
+		(a.window === undefined || typeof a.window === 'string')
+			? a
+			: undefined
+	return {
+		text: l.text,
+		base: l.base,
+		dirty: l.dirty === true,
+		sending,
+		...(queueEdit ? { queueEdit } : {}),
+		...(edits ? { edits } : {}),
+		...(amend ? { amend } : {}),
+	}
+}
+
+function hasLocal(l: Local): boolean {
+	return !!(l.text || l.sending.length || l.queueEdit || l.amend || (l.edits && Object.keys(l.edits).length))
+}
+
+function windowId(): string {
+	return drafts.store.window?.() ?? drafts.state.window
+}
+
+function slot(id: string, key: string): string | undefined {
+	return drafts.local(id).edits?.[key]
+}
+
+function saveSlot(id: string, key: string, text: string, original: string): void {
+	let l = drafts.local(id)
+	if (text === original) {
+		if (!l.edits || !(key in l.edits)) return
+		delete l.edits[key]
+		if (!Object.keys(l.edits).length) delete l.edits
+		drafts.save(id)
+		return
+	}
+	if (l.edits?.[key] === text) return
+	;(l.edits ??= {})[key] = text
+	drafts.save(id)
+}
+
+function deleteSlot(id: string, key: string): void {
+	let l = drafts.local(id)
+	if (!l.edits || !(key in l.edits)) return
+	delete l.edits[key]
+	if (!Object.keys(l.edits).length) delete l.edits
+	drafts.save(id)
+}
+
+function setAmend(id: string, a: Omit<AmendSaved, 'window'>): void {
+	let l = drafts.local(id)
+	let next: AmendSaved = {
+		...(a.target !== undefined ? { target: a.target } : {}),
+		...(a.inbox !== undefined ? { inbox: a.inbox } : {}),
+		...(a.aside ? { aside: true } : {}),
+		...(a.paused !== undefined ? { paused: a.paused } : {}),
+		window: drafts.windowId(),
+	}
+	let cur = l.amend
+	if (
+		cur &&
+		cur.target === next.target &&
+		cur.inbox === next.inbox &&
+		cur.aside === next.aside &&
+		cur.paused === next.paused &&
+		cur.window === next.window
+	)
+		return
+	l.amend = next
+	drafts.save(id)
+}
+
+function clearAmend(id: string): void {
+	let l = drafts.local(id)
+	if (!l.amend) return
+	delete l.amend
+	drafts.save(id)
 }
 
 function save(id: string): void {
@@ -170,6 +274,10 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 	if (how.queueEdit !== undefined) sending.queueEdit = how.queueEdit
 	if (how.aside) sending.aside = true
 	l.sending.push(sending)
+	if (!how.queueEdit) {
+		delete l.edits
+		delete l.amend
+	}
 	if (!how.queueEdit && !how.aside && (!l.text.trim() || text.includes(l.text.trim()))) {
 		if (l.text.trim()) sending.base = l.base
 		l.text = ''
@@ -297,6 +405,13 @@ export const drafts = {
 	empty,
 	local,
 	valid,
+	hasLocal,
+	windowId,
+	slot,
+	saveSlot,
+	deleteSlot,
+	setAmend,
+	clearAmend,
 	save,
 	text,
 	pending,

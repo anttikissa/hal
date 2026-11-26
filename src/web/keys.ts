@@ -71,6 +71,7 @@ export type KeyInput = {
 	altKey: boolean
 	metaKey: boolean
 	isComposing?: boolean
+	repeat?: boolean
 }
 
 // A key that types a character: one code point, no Ctrl, Alt or Cmd.
@@ -202,7 +203,24 @@ function key(e: KeyInput, target: Target): boolean {
 	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
 	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active)
 		return queuedPrompt.cancel()
-	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()
+	if (plain && e.key === 'Escape' && st.view.editing && !st.view.editing.queueEdit) {
+		let edit = view.editKey(st.view, 'escape', st.text)
+		if (!edit) return false
+		st.view = edit.view
+		if (edit.command) connection.send(edit.command)
+		if (edit.view.editing) {
+			app.changed()
+			return true
+		}
+		let next = editPrompt.draft(app.sessionId())
+		if (target.kind === 'message') {
+			if (next !== st.text) {
+				target.write?.(editor.splice(st.text, next), next.length, next.length)
+				app.input(next)
+			} else app.changed()
+		} else app.rewrite(() => ({ text: next, cursor: next.length }), true)
+		return true
+	}
 	let edge =
 		target.kind === 'message' &&
 		(e.key === 'ArrowUp'
@@ -210,29 +228,27 @@ function key(e: KeyInput, target: Target): boolean {
 			: e.key === 'ArrowDown'
 				? (target.bottom ?? !st.text.slice(target.cursor).includes('\n'))
 				: true)
-	if (plain && edge && target.kind === 'message' && e.key === 'ArrowUp' && !st.view.editing) {
+	let heldUp = !!e.repeat && e.key === 'ArrowUp'
+	if (plain && edge && !heldUp && target.kind === 'message' && e.key === 'ArrowUp' && !st.view.editing) {
 		let waiting = queueEdit.candidate(st.view.transcript)
 		if (waiting) return queuedPrompt.begin(waiting.id)
 	}
 	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original)
 		return queuedPrompt.cancel()
-	if (
-		plain &&
-		edge &&
-		e.key === 'ArrowDown' &&
-		st.view.editing?.aside &&
-		st.view.editing.rewind === undefined &&
-		st.text === st.view.editing.original
-	)
-		return editPrompt.leave()
 	let edit =
-		plain && edge && target.kind === 'message' && arrows[e.key]
+		plain && edge && !heldUp && target.kind === 'message' && arrows[e.key]
 			? view.editKey(st.view, arrows[e.key]!, st.text)
 			: undefined
 	if (edit) {
+		let leaving = !edit.view.editing
 		st.view = edit.view
 		if (edit.command) connection.send(edit.command)
-		app.input(edit.view.editing ? edit.text : editPrompt.draft(app.sessionId()))
+		let next = leaving ? editPrompt.draft(app.sessionId()) : edit.text
+		if (next !== st.text) {
+			let cursor = leaving ? recall.topEnd(next, Infinity) : (edit.cursor ?? next.length)
+			if (target.kind === 'message') target.write?.(editor.splice(st.text, next), cursor, cursor)
+			app.input(next)
+		} else app.changed()
 		return true
 	}
 	if (e.key === 'Escape') {
@@ -257,6 +273,7 @@ function key(e: KeyInput, target: Target): boolean {
 		plain &&
 		!sel &&
 		edge &&
+		!heldUp &&
 		(e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
 		keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)
 	)
@@ -345,9 +362,9 @@ function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): boolean {
 	let st = app.state
 	let t = st.view.transcript
-	if (!t || st.view.editing?.queueEdit) return false
+	if (!t || st.view.editing) return false
 	let id = t.meta.id
-	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
+	let shown = recall.step(id, recall.items(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
 	if (!shown) return false
 	target.write?.(editor.splice(st.text, shown.text), shown.cursor, shown.cursor)
 	app.input(shown.text)

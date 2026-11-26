@@ -41,27 +41,24 @@ test('Up and Down browse the prompts sent; the draft stays the text being writte
 	expect(drafted).toEqual([])
 })
 
-test('an edited entry becomes the draft; sending an entry brings the own text back', () => {
+test('editing a recalled entry keeps it per slot without overwriting the draft; sending brings the own text back', () => {
 	sentBefore('first')
 	type('mine')
 	up()
 	type('!')
-	expect(drafts.text('s1')).toBe('first!')
-	// Past the newest entry, Down restores the edited draft.
+	// Draft stays untouched; edit lives on the recalled slot.
+	expect(drafts.text('s1')).toBe('mine')
 	down()
-	expect(appView.view().prompt.text).toBe('first!')
-	app.onKeys([
-		key('backspace'),
-		key('backspace'),
-		key('backspace'),
-		key('backspace'),
-		key('backspace'),
-		key('backspace'),
-	])
-	type('mine')
+	expect(appView.view().prompt.text).toBe('mine')
+	// Returning before sending restores the unsent slot edit; Cmd-Z undoes the recall step, Cmd-Shift-Z redoes it.
 	up()
+	expect(appView.view().prompt.text).toBe('first!')
+	app.onKeys([{ ...key('z'), cmd: true }])
+	expect(appView.view().prompt.text).toBe('mine')
+	app.onKeys([{ ...key('z'), cmd: true, shift: true }])
+	expect(appView.view().prompt.text).toBe('first!')
 	enter()
-	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'first' })
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'first!' })
 	expect(appView.view().prompt.text).toBe('mine')
 	expect(drafts.text('s1')).toBe('mine')
 })

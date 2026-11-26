@@ -1,5 +1,5 @@
 {
-	version: 62,
+	version: 63,
 	changes: [
 		{
 			version: 2,
@@ -1160,6 +1160,52 @@
 					kind: 'compatible',
 					target: 'host/prompt-lang.promptLang.render',
 					description: 'if conditions accept bare values such as true or 1'
+				}
+			]
+		},
+		{
+			version: 63,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'common/drafts.Local',
+					description: 'Adds optional edits and amend fields for local per-prompt persistence'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/drafts.drafts',
+					description: 'Adds hasLocal, windowId, slot, saveSlot, deleteSlot, setAmend and clearAmend'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/amend.amend',
+					description: 'Adds unsavedNotice, canceledNotice, slotKey, text, syncActive, typed, finish and restore'
+				},
+				{
+					kind: 'compatible',
+					target: 'common/recall.recall',
+					description: 'Adds items and accepts keyed RecallItem entries in step'
+				},
+				{
+					kind: 'breaking',
+					target: 'common/recall.recall.typed',
+					description: 'Returns false while browsing and saves edits per slot instead of overwriting the draft',
+					port: 'Read drafts.slot(id, key) for per-slot edits; typed returns true only when editing the bottom draft'
+				},
+				{
+					kind: 'compatible',
+					target: 'web/keys.KeyInput',
+					description: 'Adds optional repeat flag'
+				},
+				{
+					kind: 'compatible',
+					target: 'web/edit-prompt.editPrompt',
+					description: 'Adds input, restore and finish'
+				},
+				{
+					kind: 'compatible',
+					target: 'client/prompt-keys.promptKeys',
+					description: 'Adds typed and restore'
 				}
 			]
 		}

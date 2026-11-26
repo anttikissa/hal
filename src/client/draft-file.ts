@@ -6,7 +6,7 @@
 
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
-import type { Local } from '../common/drafts.ts'
+import { drafts, type Local } from '../common/drafts.ts'
 
 function path(id: string): string {
 	if (!/^[\w-]+$/.test(id)) throw new Error(`invalid session id: ${JSON.stringify(id)}`)
@@ -30,7 +30,7 @@ function save(id: string, local: Local): void {
 	let file = draftFile.path(id)
 	let tmp = `${file}.${process.pid}.tmp`
 	try {
-		if (!local.text && !local.sending.length && !local.queueEdit) return rmSync(file, { force: true })
+		if (!drafts.hasLocal(local)) return rmSync(file, { force: true })
 		mkdirSync(draftFile.dir(), { recursive: true, mode: 0o700 })
 		writeFileSync(tmp, ason.stringify(local) + '\n', { mode: 0o600 })
 		renameSync(tmp, file)

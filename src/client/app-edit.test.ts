@@ -1,6 +1,7 @@
 // App tests for editing the last prompt while or after a turn runs, and the queued-message editor.
 
 import { expect, test } from 'bun:test'
+import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import type { SessionState } from '../common/states.ts'
@@ -29,7 +30,7 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	working()
 	up()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
-	expect(appView.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
+	expect(appView.view().prompt).toMatchObject({ text: 'fix ti', cursor: 6 })
 	expect(appView.view().editing).toContain('[editing prompt]')
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
@@ -65,8 +66,10 @@ test('an edit not yet acknowledged is sent again as an edit by the next client',
 	}
 })
 
-test('Down with the text unchanged, or Escape, continues the paused turn', () => {
-	working()
+test('Down leaves and continues keeping unsaved amend edits; Escape warns when changed and leaves when unchanged', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'hi', provider: 'anthropic', n: 1 })
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'fix ti', provider: 'anthropic', n: 5 })
 	up()
 	paused()
 	down()
@@ -77,13 +80,32 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	up()
 	paused()
 	type('!')
-	// Changed: Down is no way out; Escape discards the edit.
-	down()
+	// Escape with unsaved changes keeps amend open and shows a notice; second Escape clears only the notice.
+	escape()
+	expect(appView.view().editing).toContain('[editing prompt]')
+	expect(appView.view().notice).toBe(amend.unsavedNotice)
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	escape()
+	expect(appView.view().editing).toContain('[editing prompt]')
+	expect(appView.view().notice).toBeUndefined()
+	// Down leaves amend, continues the paused turn, restores the draft, and preserves undo and saved edits.
+	down()
 	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(appView.view().prompt.text).toBe('')
 	expect(appView.view().editing).toBeUndefined()
+	// Cmd-Z undoes stepping out of the edit text.
+	app.onKeys([{ ...key('z'), cmd: true }])
+	expect(appView.view().prompt.text).toBe('fix ti!')
+	// Clearing the draft and pressing Up again restores the saved amend edit.
+	app.onKeys([{ ...key('z'), cmd: true, shift: true }])
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
+	up()
+	expect(appView.view().prompt.text).toBe('fix ti!')
+	// Stepping Up to an earlier prompt and back Down keeps the edit and preserves undo.
+	up()
+	expect(appView.view().prompt.text).toBe('hi')
+	down()
+	expect(appView.view().prompt.text).toBe('fix ti!')
 })
 
 test('Up recalls an invalid slash command instead of amending the earlier running prompt', () => {

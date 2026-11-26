@@ -78,7 +78,7 @@ export function useApp(): void {
 export const press = (
 	key: string,
 	target: Target,
-	mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {},
+	mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey' | 'repeat', boolean>> = {},
 ) => keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
 export const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
 export const snapshot = (state: object, history: object[] = [], draft?: object): Event =>

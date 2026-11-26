@@ -1,6 +1,6 @@
 // The browser's local copy of drafts, for typing while disconnected
 // and prompts not yet acknowledged when the tab closes.
-import type { Local } from '../common/drafts.ts'
+import { drafts, type Local } from '../common/drafts.ts'
 
 export const store = {
 	state: { window: undefined as string | undefined },
@@ -24,7 +24,7 @@ export const store = {
 	},
 	save: (id: string, local: Local): void => {
 		try {
-			if (!local.text && !local.sending.length && !local.queueEdit) localStorage.removeItem(`hal-draft:${id}`)
+			if (!drafts.hasLocal(local)) localStorage.removeItem(`hal-draft:${id}`)
 			else localStorage.setItem(`hal-draft:${id}`, JSON.stringify(local))
 		} catch {
 			// Storage full or disabled: the host still has the draft.

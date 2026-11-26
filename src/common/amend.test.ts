@@ -195,3 +195,42 @@ test('human steering subcards retain exact edit addresses and parent rewind boun
 		text: `/edit ${first.key}.0\nchanged`,
 	})
 })
+
+test('amend edits persist per slot, restore in the same window after reload, and clear on submit', () => {
+	let stored = new Map<string, any>()
+	let win = 'win-1'
+	let origStore = drafts.store
+	let origSend = drafts.send
+	drafts.store = {
+		window: () => win,
+		load: (id) => stored.get(id) && structuredClone(stored.get(id)),
+		save: (id, l) => void (drafts.hasLocal(l) ? stored.set(id, structuredClone(l)) : stored.delete(id)),
+	}
+	drafts.send = () => {}
+	try {
+		drafts.reset()
+		let t = session({ type: 'paused' })
+		let key = t.items.findLast((i) => i.type === 'prompt')!.key
+		let editing = amend.at(t, key)!.editing
+		amend.typed(editing, 'expanded paragraph')
+		expect(amend.text(editing)).toBe('expanded paragraph')
+		expect(stored.get('s1')?.edits).toEqual({ [key]: 'expanded paragraph' })
+		expect(stored.get('s1')?.amend).toMatchObject({ target: key, aside: true, window: 'win-1' })
+		// Reload in the same window restores active amend and text.
+		drafts.reset()
+		expect(amend.restore(t)).toMatchObject({ editing: { target: key, aside: true }, text: 'expanded paragraph' })
+		// Another window does not pop into active amend, though slot edits stay available.
+		win = 'win-2'
+		expect(amend.restore(t)).toBeUndefined()
+		expect(amend.text(editing)).toBe('expanded paragraph')
+		// Submitting clears saved slot edits and active amend.
+		win = 'win-1'
+		drafts.submit('s1', 'sent')
+		expect(stored.get('s1')?.edits).toBeUndefined()
+		expect(stored.get('s1')?.amend).toBeUndefined()
+	} finally {
+		drafts.store = origStore
+		drafts.send = origSend
+		drafts.reset()
+	}
+})

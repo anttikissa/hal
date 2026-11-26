@@ -1,0 +1,10 @@
+{
+	title: 'Keep per-prompt edits, undo and Escape guard across history and amend',
+	spec: 'In both web and terminal, every prompt slot and the bottom draft keep their own unsent text in local draft storage until a message is sent. Up and Down always move between prompts and the draft without overwriting the draft or discarding edits; Down past the newest amend prompt leaves amend mode, restores the draft, keeps the amend text saved on that prompt, and continues a paused turn. Escape in amend mode leaves when unchanged and otherwise keeps the editor open with a notice; web Cancel leaves while keeping unsent edits with a notice. Active unsent amend edits restore after a reload or restart in the same window. Held Up key repeat on web stops at the first visual row without entering history or amend. Browser and terminal undo stay intact across history and amend transitions. Queued-message editing keeps its existing lock behavior.',
+	status: 'done',
+	notes: [
+		'Bug fix (56-vpn): holding ArrowUp on a 541-char amend in web overshot line 1, stepped to an older prompt without saving, and called app.input directly, wiping browser undo. Invariant restored: unsent edits to any prompt live in drafts.Local.edits (keyed by inbox id or transcript item key) separately from drafts.Local.text, active unsent amend state lives in drafts.Local.amend scoped by window id for reload restore, web transitions write through target.write/app.rewrite and stop held ArrowUp repeat at line 1, and terminal transitions record snapshots via promptUndo.record instead of prompt.cleared.'
+	],
+	needs: ['cfx', '91', 'dg', '26q'],
+	foldInto: ['cfx', '91', 'dg', '26q']
+}

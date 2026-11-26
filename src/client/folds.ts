@@ -14,11 +14,9 @@ import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
 import { appModals } from './app-modals.ts'
 import { draftPastes } from '../common/draft-pastes.ts'
-import { drafts } from '../common/drafts.ts'
 import { prompt } from '../common/prompt.ts'
 import { promptUndo } from '../common/prompt-undo.ts'
-import { queueEdit } from '../common/queue-edit.ts'
-import { recall } from '../common/recall.ts'
+import { promptKeys } from './prompt-keys.ts'
 
 let draft: ReturnType<typeof draftPastes.create> | undefined
 let requested = false
@@ -97,7 +95,7 @@ function open(): void {
 				if (typeof expanded === 'string') app.state.notice = expanded
 				else {
 					app.state.prompt = prompt.withoutTyped(promptUndo.record(expanded, app.state.prompt))
-					if (!queueEdit.input(id, expanded.text) && recall.typed(id, expanded.text)) drafts.edit(id, expanded.text)
+					promptKeys.typed(app.state, id, expanded.text)
 				}
 				draft = undefined
 				app.show()

@@ -146,23 +146,103 @@ function bar(editing: Editing): string {
 	return amend.hint(editing).split(']')[0] + ']'
 }
 
+function slotKey(editing: Editing): string | undefined {
+	return editing.inbox ?? editing.target
+}
+
+// What the box holds for `editing`: saved unsent changes, else the original prompt.
+function text(editing: Editing): string {
+	let key = amend.slotKey(editing)
+	return (key && drafts.slot(editing.sessionId, key)) ?? editing.original
+}
+
+function syncActive(editing: Editing, value: string): void {
+	if (editing.queueEdit) return
+	if (value !== editing.original)
+		drafts.setAmend(editing.sessionId, {
+			target: editing.target,
+			inbox: editing.inbox,
+			aside: editing.aside,
+			paused: editing.paused,
+		})
+	else drafts.clearAmend(editing.sessionId)
+}
+
+function typed(editing: Editing, value: string): void {
+	if (editing.queueEdit) return
+	let key = amend.slotKey(editing)
+	if (!key) return
+	drafts.saveSlot(editing.sessionId, key, value, editing.original)
+	amend.syncActive(editing, value)
+}
+
+function finish(editing: Editing, value: string): void {
+	if (editing.queueEdit) return
+	drafts.clearAmend(editing.sessionId)
+	let key = amend.slotKey(editing)
+	if (key && !value.trim()) drafts.deleteSlot(editing.sessionId, key)
+}
+
+// Restores an active amend after a page reload or terminal restart in the same window.
+function restore(t: Transcript): { editing: Editing; text: string } | undefined {
+	let id = t.meta.id
+	let saved = drafts.local(id).amend
+	if (!saved || (saved.window !== undefined && saved.window !== drafts.windowId())) return undefined
+	let key = saved.inbox ?? saved.target
+	let value = key ? drafts.slot(id, key) : undefined
+	if (value === undefined) {
+		drafts.clearAmend(id)
+		return undefined
+	}
+	if (saved.inbox) {
+		let waiting = t.inbox.find((m) => m.id === saved.inbox && m.from === undefined && m.origin !== 'model')
+		let pending = waiting ? undefined : drafts.pending(id).find((s) => s.id === saved.inbox)
+		let original = waiting ? literal.escape(waiting.text) : pending?.text
+		if (original !== undefined) {
+			let editing: Editing = {
+				sessionId: id,
+				original,
+				inbox: saved.inbox,
+				...(saved.aside ? { aside: true } : {}),
+				...(saved.paused !== undefined ? { paused: saved.paused } : {}),
+			}
+			return { editing, text: value }
+		}
+	}
+	if (saved.target) {
+		let begun = amend.at(t, saved.target)
+		if (begun) {
+			let editing: Editing = { ...begun.editing }
+			if (!saved.aside) delete editing.aside
+			if (saved.paused !== undefined) editing.paused = saved.paused
+			else delete editing.paused
+			return { editing, text: value }
+		}
+	}
+	drafts.clearAmend(id)
+	return undefined
+}
+
 export const amend = {
+	unsavedNotice: 'Not dismissed: unsaved changes. Press Down to leave and keep them.',
+	canceledNotice: 'Edit canceled. Your changes are kept: open this prompt again to get them back.',
 	// `browse`: Up and Down move between queued messages (terminal).
-	hint: (editing?: Editing, text = editing?.original, browse = false) => {
+	hint: (editing?: Editing, value = editing?.original, browse = false) => {
 		if (!editing) return ''
 		if (editing.queueEdit) {
 			let label = '[editing queued message] '
-			if (!text?.trim()) return `${label}enter: drop, esc: back`
-			if (text !== editing.original) return `${label}enter: save, esc: back`
+			if (!value?.trim()) return `${label}enter: drop, esc: back`
+			if (value !== editing.original) return `${label}enter: save, esc: back`
 			return `${label}${browse ? '↑/↓: browse queue, esc' : '↓/esc'}: back, empty + enter: drop`
 		}
 		let waiting = editing.inbox !== undefined && !editing.paused
-		let changed = text !== editing.original
+		let changed = value !== editing.original
 		let label = waiting ? 'editing waiting message' : 'editing prompt'
 		if (editing.rewind !== undefined) label += ` u${editing.target}`
 		let edit = editing.rewind !== undefined ? 'edit and discard later prompts' : 'edit'
 		let enter = changed ? `enter: ${waiting ? 'save' : editing.changed ? 'send as new' : edit}, ` : ''
-		return `[${label}] ${enter}${changed ? '' : '↓/'}esc: ${waiting ? 'back' : changed ? 'cancel' : 'continue'}`
+		let leave = changed ? '↓' : '↓/esc'
+		return `[${label}] ${enter}${leave}: ${waiting ? 'back' : 'continue'}`
 	},
 	step(editing: Editing, t: Transcript, dir: -1 | 1) {
 		if (editing.queueEdit) return undefined
@@ -173,6 +253,12 @@ export const amend = {
 		let begun = item && at(t, item.key)
 		return begun && { ...begun.editing, aside: editing.aside, paused: editing.paused, inbox: undefined }
 	},
+	slotKey,
+	text,
+	syncActive,
+	typed,
+	finish,
+	restore,
 	editable,
 	at,
 	bar,

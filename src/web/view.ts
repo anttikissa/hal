@@ -12,9 +12,11 @@ import { bashResult } from '../common/bash-result.ts'
 import { card } from '../common/card.ts'
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
+import { drafts } from '../common/drafts.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
+import { recall } from '../common/recall.ts'
 import { settingsModal } from '../common/settings-modal.ts'
 import { settings } from '../common/settings.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
@@ -227,31 +229,65 @@ function submit(
 	return command ? { command, keep: false } : { keep: false }
 }
 
-// Up, Down or Escape with `text` in the input, for editing the last
-// prompt: the view after, the command to send and the input's new text;
+// Up, Down or Escape with `text` in the input, for editing a prompt:
+// the view after, the command to send, the input's new text and caret;
 // undefined if the key means nothing here.
 function editKey(
 	st: ViewState,
 	key: 'up' | 'down' | 'escape',
 	text: string,
-): { view: ViewState; command?: unknown; text: string } | undefined {
+): { view: ViewState; command?: unknown; text: string; cursor?: number } | undefined {
 	let editing = st.editing
-	if (editing && key !== 'escape' && st.transcript) {
+	if (editing?.queueEdit) return undefined
+	let clearNotice = st.notice === amend.unsavedNotice ? undefined : st.notice
+	if (key === 'escape') {
+		if (!editing) return undefined
+		if (text !== editing.original) {
+			amend.typed(editing, text)
+			return { view: { ...st, notice: amend.unsavedNotice }, text }
+		}
+		drafts.clearAmend(editing.sessionId)
+		let command = amend.resume(editing, st.transcript)
+		let out: { view: ViewState; command?: unknown; text: string } = {
+			view: { ...st, editing: undefined, notice: clearNotice },
+			text: '',
+		}
+		if (command) out.command = command
+		return out
+	}
+	if (editing && st.transcript) {
+		amend.typed(editing, text)
 		let next = amend.step(editing, st.transcript, key === 'up' ? -1 : 1)
-		if (next) return { view: { ...st, editing: next }, text: next.original }
+		if (next) {
+			let nextText = amend.text(next)
+			amend.syncActive(next, nextText)
+			let cursor = key === 'up' ? nextText.length : recall.topEnd(nextText, Infinity)
+			return { view: { ...st, editing: next, notice: clearNotice }, text: nextText, cursor }
+		}
 		if (key === 'up') return { view: st, text }
+		drafts.clearAmend(editing.sessionId)
+		let command = amend.resume(editing, st.transcript)
+		let out: { view: ViewState; command?: unknown; text: string } = {
+			view: { ...st, editing: undefined, notice: clearNotice },
+			text: '',
+		}
+		if (command) out.command = command
+		return out
 	}
 	if (key === 'up') {
 		let begun = !editing && amend.begin(st.transcript)
-		return begun
-			? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original }
-			: undefined
+		if (!begun) return undefined
+		let nextText = amend.text(begun.editing)
+		amend.syncActive(begun.editing, nextText)
+		let out: { view: ViewState; command?: unknown; text: string; cursor?: number } = {
+			view: { ...st, editing: begun.editing },
+			text: nextText,
+			cursor: nextText.length,
+		}
+		if (begun.command) out.command = begun.command
+		return out
 	}
-	if (!editing || editing.aside || (key === 'down' && text !== editing.original)) return undefined
-	let command = amend.resume(editing, st.transcript)
-	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: '' }
-	if (command) out.command = command
-	return out
+	return undefined
 }
 
 // The passing notice, else the hint while editing the last prompt.

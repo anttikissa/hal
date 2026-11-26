@@ -5,8 +5,9 @@
 // transcript has them, so every client's prompts are in it.
 //
 // The recalled entry is only shown: the session's draft (drafts.ts)
-// stays the user's own text until they edit the entry, which then
-// becomes the draft (`typed`) without losing the browsing position.
+// stays the user's own text. Edits to any recalled entry are saved on
+// that prompt's slot until a message is sent, so stepping away and back
+// restores them without overwriting the draft.
 // Browsing belongs to the session and survives switching sessions.
 
 import { promptLayout } from './prompt-layout.ts'
@@ -14,23 +15,29 @@ import { literal } from './literal.ts'
 import { drafts } from './drafts.ts'
 import type { Transcript } from './transcript.ts'
 
-// While browsing a session: the entry shown and its text.
-export type Browse = { index: number; text: string; edited?: true }
+export type RecallItem = { key: string; text: string }
+
+// While browsing a session: the entry shown, its slot key and original text.
+export type Browse = { index: number; key: string; original: string; text: string }
 
 export type Shown = { text: string; cursor: number }
 
 // Human prompts and slash commands sent to the session, oldest first,
 // then those sent and not acknowledged yet; prompts escaped to send as
 // prompts again.
-function entries(t: Transcript): string[] {
+function items(t: Transcript): RecallItem[] {
 	return [
 		...t.items.flatMap((i) =>
 			((i.type === 'prompt' && i.origin !== 'model') || i.type === 'command') && i.from === undefined
-				? [i.type === 'prompt' ? literal.escape(i.text) : i.text]
+				? [{ key: i.key, text: i.type === 'prompt' ? literal.escape(i.text) : i.text }]
 				: [],
 		),
-		...drafts.pending(t.meta.id).map((s) => s.text),
+		...drafts.pending(t.meta.id).map((s) => ({ key: s.id, text: s.text })),
 	]
+}
+
+function entries(t: Transcript): string[] {
+	return recall.items(t).map((i) => i.text)
 }
 
 // Where the cursor goes on `text`'s top row: its end, as the rows are
@@ -47,7 +54,7 @@ function topEnd(text: string, width: number): number {
 // width, Infinity for logical lines.
 function step(
 	id: string,
-	list: string[],
+	list: (string | RecallItem)[],
 	text: string,
 	cursor: number,
 	dir: -1 | 1,
@@ -59,36 +66,47 @@ function step(
 	if (dir < 0 ? row > 0 : row < rows.length - 1) return undefined
 	let st = recall.state
 	let b = st.get(id)
-	let index = Math.min(b?.index ?? list.length, list.length)
+	let entry = (i: number): RecallItem => {
+		let x = list[i]!
+		return typeof x === 'string' ? { key: String(i), text: x } : x
+	}
+	let at = b ? list.findIndex((x, i) => (typeof x === 'string' ? String(i) : x.key) === b.key) : -1
+	let index = b ? (at >= 0 ? at : Math.min(b.index, list.length)) : list.length
 	if (dir < 0) {
-		// The prompt just sent may still be in the editor (an edit of
-		// it): the first Up skips it.
-		if (!b && list[index - 1] === text) index--
+		// The prompt just sent may still be in the editor: the first Up skips it
+		// unless that slot has unsent edits waiting to be returned to.
+		if (!b && index > 0 && entry(index - 1).text === text && drafts.slot(id, entry(index - 1).key) === undefined)
+			index--
 		if (index <= 0) return undefined
+		if (b) drafts.saveSlot(id, b.key, text, b.original)
 		index--
-		let entry = list[index]!
-		st.set(id, { index, text: entry })
-		return { text: entry, cursor: entry.length }
+		let item = entry(index)
+		let shown = drafts.slot(id, item.key) ?? item.text
+		st.set(id, { index, key: item.key, original: item.text, text: shown })
+		return { text: shown, cursor: shown.length }
 	}
 	if (!b) return undefined
+	drafts.saveSlot(id, b.key, text, b.original)
 	index++
-	let next = index < list.length ? list[index]! : undefined
-	if (next === undefined) st.delete(id)
-	else st.set(id, { index, text: next })
-	let shown = next ?? draft
-	return { text: shown, cursor: recall.topEnd(shown, width) }
+	if (index < list.length) {
+		let item = entry(index)
+		let shown = drafts.slot(id, item.key) ?? item.text
+		st.set(id, { index, key: item.key, original: item.text, text: shown })
+		return { text: shown, cursor: recall.topEnd(shown, width) }
+	}
+	st.delete(id)
+	return { text: draft, cursor: recall.topEnd(draft, width) }
 }
 
-// The editor now says `text`: true if that is the user's own (to keep
-// as the draft), false while it still shows a recalled entry untouched.
-// Editing keeps the position, and the edited text becomes the draft.
+// The editor now says `text`: true if that is the user's own draft
+// (not browsing), false while browsing (saved per slot instead of
+// overwriting the draft).
 function typed(id: string, text: string): boolean {
 	let b = recall.state.get(id)
 	if (!b) return true
-	if (b.text === text) return !!b.edited
 	b.text = text
-	b.edited = true
-	return true
+	drafts.saveSlot(id, b.key, text, b.original)
+	return false
 }
 
 // The recalled entry the session shows, if browsing.
@@ -107,6 +125,7 @@ function reset(): void {
 
 export const recall = {
 	state: new Map<string, Browse>(),
+	items,
 	entries,
 	topEnd,
 	step,

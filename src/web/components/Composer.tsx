@@ -87,12 +87,14 @@ export function Composer(props: {
 		input = e
 		for (let name of ['input', 'compositionend', 'keyup', 'blur']) e.addEventListener(name, sync)
 		keys.insert = insert
-		app.rewrite = (change) => {
-			if (document.activeElement !== e) return app.input(change({ text: e.value, cursor: e.value.length }).text)
+		app.rewrite = (change, focus = false) => {
+			if (!focus && document.activeElement !== e)
+				return app.input(change({ text: e.value, cursor: e.value.length }).text)
 			let back = e.selectionDirection === 'backward'
 			let [cursor, anchor] = back ? [e.selectionStart, e.selectionEnd] : [e.selectionEnd, e.selectionStart]
 			let p = change({ text: e.value, cursor, anchor }) as { text: string; cursor: number; anchor?: number }
 			editor.write(e, editor.splice(e.value, p.text), p.cursor, p.anchor ?? p.cursor)
+			if (app.state.text !== p.text) app.input(p.text)
 		}
 	}
 	// A memo gates on equality: the effect runs only when a form or the

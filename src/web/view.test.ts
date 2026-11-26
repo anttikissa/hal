@@ -1,3 +1,4 @@
+import { amend } from '../common/amend.ts'
 import { titles } from '../common/titles.ts'
 import { settings } from '../common/settings.ts'
 import { expect, test } from 'bun:test'
@@ -154,7 +155,7 @@ test('the open question is filled in with browser keys and answered; afterwards 
 	expect(shown(st)).toEqual([{ kind: 'question warning', text: '  rm -rf x\n\nyes' }])
 })
 
-test('Up while the model works edits the last prompt, whatever the input holds; Enter sends it, Down or Escape continues', () => {
+test('Up while the model works edits the last prompt, whatever the input holds; Enter sends, Down continues, Escape guards unsaved changes', () => {
 	let running = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'running', phase: 'streaming' } } },
 		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake', n: 5 },
@@ -168,14 +169,24 @@ test('Up while the model works edits the last prompt, whatever the input holds; 
 		command: { type: 'submit', sessionId, text: '/edit 5\nfix it' },
 		keep: false,
 	})
-	expect(view.editKey(editing, 'down', 'fix it')).toBeUndefined()
-	let down = view.editKey(editing, 'down', 'fix ti')!
-	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
+	// Escape with unsaved changes stays open with a notice; unchanged Escape leaves and continues.
 	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({
-		view: { ...editing, editing: undefined },
+		view: { ...editing, notice: amend.unsavedNotice },
+		text: 'fix it',
+	})
+	expect(view.editKey(editing, 'escape', 'fix ti')).toEqual({
+		view: { ...editing, editing: undefined, notice: undefined },
 		command: { type: 'continue', sessionId },
 		text: '',
 	})
+	// Down leaves and continues even with unsaved changes, keeping the edit on the prompt.
+	let down = view.editKey(editing, 'down', 'fix it')!
+	expect(down).toEqual({
+		view: { ...editing, editing: undefined, notice: undefined },
+		command: { type: 'continue', sessionId },
+		text: '',
+	})
+	expect(amend.text(editing.editing!)).toBe('fix it')
 })
 
 test('Up after a slash command in a working session leaves the turn running', () => {
