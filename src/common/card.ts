@@ -39,8 +39,9 @@ function kind(item: Shown, failed = false): Kind | undefined {
 	return undefined
 }
 
+// A question has no start setting: it starts long.
 function toggles(item: Shown): boolean {
-	return card.kind(item) !== undefined
+	return card.kind(item) !== undefined || item.type === 'question'
 }
 
 // The config.ason key of `kind`'s start state: cardVerbosityTool.
