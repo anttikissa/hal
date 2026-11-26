@@ -7,6 +7,7 @@ import { settings } from '../common/settings.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { approval } from './approval.ts'
+import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { projectContext } from './project-context.ts'
 import { sessions } from './sessions.ts'
@@ -19,6 +20,7 @@ type Pending = {
 	questionId?: string
 	options: { label: string; optionId: string }[]
 	resolve: (res: PermissionResult) => void
+	settled: Promise<void>
 }
 
 const state = {
@@ -92,20 +94,22 @@ function automatic(params: Record<string, any>): 'allow' | 'reject' | undefined 
 	return path && approval.sensitive(path) ? 'reject' : 'allow'
 }
 
-function request(sessionId: string, params: Record<string, any>, signal?: AbortSignal): Promise<PermissionResult> {
+function request(
+	sessionId: string,
+	params: Record<string, any>,
+	signal?: AbortSignal,
+): PermissionResult | Promise<PermissionResult> {
+	let cancelled = (): PermissionResult => ({ outcome: { outcome: 'cancelled' } })
+	if (!signal || signal.aborted) return cancelled()
 	let rawOptions: PermissionOption[] = Array.isArray(params?.options) ? params.options : []
 	let reject = rawOptions.find((o) => o.kind?.includes('reject'))
-	let cancelled = (): PermissionResult => ({ outcome: { outcome: 'cancelled' } })
 	let select = (o?: PermissionOption): PermissionResult =>
 		o ? { outcome: { outcome: 'selected', optionId: o.optionId } } : cancelled()
-	if (!rawOptions.length) return Promise.resolve(cancelled())
+	if (!rawOptions.length) return cancelled()
 	let auto = automatic(params)
 	if (auto === 'allow')
-		return Promise.resolve(
-			select(rawOptions.find((o) => o.kind === 'allow_once') ?? rawOptions.find((o) => o.kind?.includes('allow'))),
-		)
-	if (auto === 'reject' || sessions.open(sessionId).interactive === false) return Promise.resolve(select(reject))
-	if (signal?.aborted) return Promise.resolve(cancelled())
+		return select(rawOptions.find((o) => o.kind === 'allow_once') ?? rawOptions.find((o) => o.kind?.includes('allow')))
+	if (auto === 'reject' || sessions.open(sessionId).interactive === false) return select(reject)
 	ensureHook()
 	let reqId = crypto.randomUUID().slice(0, 8)
 	let labeled = uniqueLabels(rawOptions)
@@ -113,15 +117,19 @@ function request(sessionId: string, params: Record<string, any>, signal?: AbortS
 
 	return new Promise<PermissionResult>((resolve) => {
 		let done = false
+		let settled = Promise.withResolvers<void>()
 		let pending: Pending = {
 			sessionId,
 			options: labeled,
+			settled: settled.promise,
 			resolve(res) {
 				if (done) return
 				done = true
 				state.pending.delete(reqId)
-				signal?.removeEventListener('abort', onAbort)
+				signal.removeEventListener('abort', onAbort)
 				resolve(res)
+				// Let agy.ts's .then() write the permission reply before waitPending resumes.
+				queueMicrotask(() => settled.resolve())
 			},
 		}
 		let onAbort = () => {
@@ -132,12 +140,84 @@ function request(sessionId: string, params: Record<string, any>, signal?: AbortS
 			pending.resolve(cancelled())
 		}
 		state.pending.set(reqId, pending)
-		signal?.addEventListener('abort', onAbort, { once: true })
+		signal.addEventListener('abort', onAbort, { once: true })
 		let reply = slash.report(sessionId, 'approve', `agy:${reqId}`, { ask: form })
 		if (reply.error) return pending.resolve(cancelled())
 		let open = forms.open(history.readSync(sessionId))
 		if (open?.from?.command === 'approve' && open.from.args === `agy:${reqId}`) pending.questionId = open.id
 	})
+}
+
+async function waitPending(sessionId: string, signal?: AbortSignal): Promise<boolean> {
+	let waited = false
+	while (!signal?.aborted) {
+		let open = [...state.pending.values()].filter((p) => p.sessionId === sessionId)
+		if (!open.length) return waited
+		waited = true
+		await new Promise<void>((resolve) => {
+			let done = false
+			let finish = () => {
+				if (done) return
+				done = true
+				signal?.removeEventListener('abort', finish)
+				resolve()
+			}
+			if (signal?.aborted) return finish()
+			signal?.addEventListener('abort', finish, { once: true })
+			void Promise.all(open.map((p) => p.settled)).then(finish)
+		})
+	}
+	return waited
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+	if (signal?.aborted || ms <= 0) return Promise.resolve()
+	return new Promise((resolve) => {
+		let finish = () => {
+			clearTimeout(timer)
+			signal?.removeEventListener('abort', finish)
+			resolve()
+		}
+		let timer = setTimeout(finish, ms)
+		signal?.addEventListener('abort', finish, { once: true })
+	})
+}
+
+async function withWait<T>(
+	sessionId: string,
+	signal: AbortSignal,
+	isWaitingError: (e: unknown) => boolean,
+	run: () => Promise<T>,
+): Promise<T | undefined> {
+	let attempt = 0
+	while (true) {
+		await agyApproval.waitPending(sessionId, signal)
+		if (signal.aborted) return undefined
+		try {
+			return await run()
+		} catch (e) {
+			if (signal.aborted) return undefined
+			if (!isWaitingError(e)) throw e
+			if (await agyApproval.waitPending(sessionId, signal)) continue
+			let delay = agyApproval.retryDelaysMs[attempt++]
+			if (delay === undefined) throw e
+			await agyApproval.sleep(delay, signal)
+		}
+	}
+}
+
+function handle(
+	sessionId: string,
+	params: Record<string, any>,
+	signal: AbortSignal | undefined,
+	reply: (result: PermissionResult) => void,
+): void {
+	let res = agyApproval.request(sessionId, params, signal)
+	if (res instanceof Promise) {
+		void res.then(reply).catch((e) => diag.log(`agy permission ${sessionId}: ${e instanceof Error ? e.message : e}`))
+	} else {
+		reply(res)
+	}
 }
 
 function answer(reqId: string, answers: Answers): { error?: string } {
@@ -177,4 +257,16 @@ function refusal(sessionId: string, cwd: string): string | undefined {
 	return undefined
 }
 
-export const agyApproval = { state, request, answer, dismiss, cancelSession, refusal }
+export const agyApproval = {
+	state,
+	retryDelaysMs: [25, 50, 100, 150, 200],
+	request,
+	handle,
+	waitPending,
+	sleep,
+	withWait,
+	answer,
+	dismiss,
+	cancelSession,
+	refusal,
+}

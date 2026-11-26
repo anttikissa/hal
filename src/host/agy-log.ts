@@ -7,6 +7,7 @@
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from 'fs'
 import { homedir } from 'os'
 import type { ErrorEvent, Usage } from '../common/blocks.ts'
+import { strings } from '../common/strings.ts'
 import { agyAccounts } from './agy-accounts.ts'
 import { clock } from './clock.ts'
 
@@ -182,8 +183,10 @@ export const agyLog = {
 	parseFailure,
 	warningError,
 	extractUsage,
+	appendStderr,
 	formatError,
 	rpcError,
+	waitingForPermission,
 }
 
 // Converts an agy "⚠ ..." warning banner into a Hal error event by reading
@@ -221,6 +224,13 @@ function extractUsage(u: any): Usage {
 	return usage
 }
 
+const stderrLimit = 64_000
+
+function appendStderr(prev: string, line: string): string {
+	let next = `${prev}${line}\n`
+	return next.length > stderrLimit ? strings.sliceText(next, -stderrLimit) : next
+}
+
 const authHint =
 	/\b(unauthenticated|not logged in|login required|sign[- ]?in|auth(?:entication)? (?:required|failed|expired)|token expired|credentials? (?:expired|invalid|missing)|oauth)\b/i
 
@@ -240,4 +250,8 @@ function rpcError(err: any, stderr?: string): Error {
 	let data =
 		err?.data === undefined ? undefined : typeof err.data === 'string' ? err.data : JSON.stringify(err.data, null, 2)
 	return new Error(agyLog.formatError(`agy${code}: ${msg}`, data, stderr))
+}
+
+function waitingForPermission(err: unknown): boolean {
+	return err instanceof Error && /waiting for a permission or question answer/i.test(err.message)
 }

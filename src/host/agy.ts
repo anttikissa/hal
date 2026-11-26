@@ -9,7 +9,6 @@
 import type { StreamEvent } from '../common/blocks.ts'
 import type { ProviderRequest, SseMessage } from './provider.ts'
 import { settings } from '../common/settings.ts'
-import { strings } from '../common/strings.ts'
 import { sessions } from './sessions.ts'
 import { diag } from './diag.ts'
 import { jobs } from './jobs.ts'
@@ -39,6 +38,7 @@ type Agent = {
 	mcp?: McpBridge
 	turnAbort?: AbortController
 	turnGen: number
+	prompts: Set<Promise<any>>
 	canceling?: Promise<void>
 	idleTimer?: ReturnType<typeof setTimeout>
 	skipPermissions: boolean
@@ -81,25 +81,6 @@ async function resume(sessionId: string, agent: Agent, cwd: string, system: stri
 
 const state = {
 	agents: new Map<string, Agent>(),
-}
-
-function recordConfigOptions(agent: Agent, options: any[] | undefined): void {
-	if (!Array.isArray(options)) return
-	let thought = options.find((o) => o?.id === 'thought_level')
-	if (thought) {
-		if (typeof thought.currentValue === 'string') agent.effort = thought.currentValue
-		if (Array.isArray(thought.options))
-			agent.thoughtLevels = thought.options
-				.map((o: any) => o?.value)
-				.filter((v: unknown): v is string => typeof v === 'string')
-	}
-}
-
-const stderrLimit = 64_000
-
-function appendStderr(agent: Agent, line: string): void {
-	let next = `${agent.stderr}${line}\n`
-	agent.stderr = next.length > stderrLimit ? strings.sliceText(next, -stderrLimit) : next
 }
 
 function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account: AgyAccount): Agent {
@@ -148,13 +129,16 @@ function spawn(sessionId: string, cwd: string, skipPermissions: boolean, account
 		stderrDone,
 		mcp,
 		turnGen: 0,
+		prompts: new Set(),
 		skipPermissions,
 		account: account.name,
 		accountRef: account,
 		prefix: 0,
 	}
 	void readLines(proc.stdout as ReadableStream<Uint8Array>, (line) => receive(agent, line))
-	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => appendStderr(agent, line))
+	agent.stderrDone = readLines(proc.stderr as ReadableStream<Uint8Array>, (line) => {
+		agent.stderr = agyLog.appendStderr(agent.stderr, line)
+	})
 	void proc.exited.then(async (code) => {
 		if (agent.idleTimer) clearTimeout(agent.idleTimer)
 		agent.turnAbort?.abort()
@@ -244,7 +228,7 @@ function receive(agent: Agent, line: string): void {
 	try {
 		msg = JSON.parse(line)
 	} catch {
-		appendStderr(agent, line)
+		agent.stderr = agyLog.appendStderr(agent.stderr, line)
 		return
 	}
 	if (msg.method === 'session/update') {
@@ -252,12 +236,9 @@ function receive(agent: Agent, line: string): void {
 		return
 	}
 	if (msg.method === 'session/request_permission' && msg.id !== undefined) {
-		void agyApproval
-			.request(agent.sessionId, msg.params, agent.turnAbort?.signal)
-			.then((result) => {
-				if (!agent.exited) write(agent, { id: msg.id, result })
-			})
-			.catch((e) => diag.log(`agy permission ${agent.sessionId}: ${e instanceof Error ? e.message : e}`))
+		agyApproval.handle(agent.sessionId, msg.params, agent.turnAbort?.signal, (result) => {
+			if (!agent.exited) write(agent, { id: msg.id, result })
+		})
 		return
 	}
 	if (msg.method && msg.id !== undefined) {
@@ -269,6 +250,14 @@ function receive(agent: Agent, line: string): void {
 	agent.calls.delete(msg.id)
 	if (msg.error) pending.reject(agyLog.rpcError(msg.error, agent.stderr))
 	else pending.resolve(msg.result)
+}
+
+function awaitCancel(agent: Agent): void {
+	if (!agent.acpSession || !agent.prompts.size) return
+	let wait = Promise.race([Promise.allSettled(agent.prompts).then(() => {}), Bun.sleep(5000)]).finally(() => {
+		if (agent.canceling === wait) agent.canceling = undefined
+	})
+	agent.canceling = wait
 }
 
 // Hal's system prompt rides on session/new and session/resume.
@@ -366,8 +355,9 @@ async function turn(
 		agent.model = created.models?.currentModelId
 		agent.tools.clear()
 		agent.mcpResults.clear()
+		agyPrompt.resetPrefix(agent)
 		agyModels.record(created.models?.availableModels ?? [])
-		recordConfigOptions(agent, created.configOptions)
+		agyModels.recordConfigOptions(agent, created.configOptions)
 		content = agyPrompt.seed(req)
 	}
 	let { modelId: wanted, level } = agyModels.resolve(req.model, req.effort)
@@ -382,7 +372,7 @@ async function turn(
 			configId: 'thought_level',
 			value: level,
 		})
-		recordConfigOptions(agent, updated?.configOptions)
+		agyModels.recordConfigOptions(agent, updated?.configOptions)
 		agent.effort = level
 	}
 	if (signal.aborted) return
@@ -394,9 +384,11 @@ async function turn(
 		emit({ type: 'text', text: pendingWarning })
 		pendingWarning = undefined
 	}
+	let sawUpdate = false
 	let onUpdate = (u: Update) => {
+		sawUpdate = true
 		let kind = u.sessionUpdate
-		if (kind === 'config_option_update') return recordConfigOptions(agent, u.configOptions)
+		if (kind === 'config_option_update') return agyModels.recordConfigOptions(agent, u.configOptions)
 		if (kind === 'usage_update') {
 			if (typeof u.size === 'number' && u.size > 0) agyModels.state.windows.set(req.model, u.size)
 			if (typeof u.used === 'number' && u.used > 0) lastUsed = u.used
@@ -442,7 +434,6 @@ async function turn(
 	let turnAbort = (agent.turnAbort ??= new AbortController())
 	let steered = false
 	let settled = Promise.withResolvers<undefined>()
-	let reply: Promise<any> | undefined
 	let onAbort = () => {
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined
 		// A steer injects a prompt into the running agy turn without aborting
@@ -459,18 +450,7 @@ async function turn(
 			})
 		} else {
 			cancelTurn(signal.reason)
-			if (agent.acpSession && reply) {
-				let wait = Promise.race([
-					reply.then(
-						() => {},
-						() => {},
-					),
-					Bun.sleep(5000),
-				]).finally(() => {
-					if (agent.canceling === wait) agent.canceling = undefined
-				})
-				agent.canceling = wait
-			}
+			awaitCancel(agent)
 		}
 		settled.resolve(undefined)
 	}
@@ -478,14 +458,28 @@ async function turn(
 	agent.logPath ??= agyLog.find(agent.proc.pid, agent.accountRef.geminiDir)
 	let logOffset = agyLog.size(agent.logPath)
 	try {
-		reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
-		// agy has the input now, whatever happens to this turn.
-		agyPrompt.recordPrefix(sessionId, agent, req.messages, fresh)
-		let result = await Promise.race([reply, settled.promise])
-		if (signal.aborted) {
-			void reply.catch(() => {})
-			return
-		}
+		let result = await agyApproval.withWait(
+			sessionId,
+			signal,
+			(e) => !agent.exited && agyLog.waitingForPermission(e),
+			async () => {
+				sawUpdate = false
+				let snap = agyPrompt.snapshot(agent)
+				let reply = call(agent, 'session/prompt', { sessionId: agent.acpSession, prompt: content })
+				agent.prompts.add(reply)
+				let clear = () => void agent.prompts.delete(reply)
+				reply.then(clear, clear)
+				// agy has the input now, whatever happens to this turn.
+				agyPrompt.recordPrefix(sessionId, agent, req.messages, fresh)
+				try {
+					return await Promise.race([reply, settled.promise])
+				} catch (e) {
+					if (!agent.exited && (agyLog.waitingForPermission(e) || !sawUpdate)) agyPrompt.restore(sessionId, agent, snap)
+					throw e
+				}
+			},
+		)
+		if (signal.aborted) return
 		agent.logPath ??= agyLog.find(agent.proc.pid, agent.accountRef.geminiDir)
 		if (!agent.emailChecked && agent.logPath) {
 			agent.emailChecked = true
@@ -515,6 +509,12 @@ async function turn(
 		agyAccounts.verified(agent.account)
 		let reason = result?.stopReason
 		emit({ type: 'done', reason: reason === 'max_tokens' ? 'max_tokens' : reason === 'refusal' ? 'refusal' : 'end' })
+	} catch (e) {
+		if (!signal.aborted && !agent.exited && agent.prompts.size) {
+			cancelTurn()
+			awaitCancel(agent)
+		}
+		throw e
 	} finally {
 		signal.removeEventListener('abort', onAbort)
 		if (agent.onUpdate === onUpdate) agent.onUpdate = undefined

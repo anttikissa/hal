@@ -22,6 +22,8 @@ export type PrefixState = {
 	account?: string
 }
 
+export type PrefixSnapshot = Pick<PrefixState, 'prefix' | 'hash' | 'basePrefix' | 'baseHash'>
+
 export type UnseenResult = {
 	messages: Message[]
 	edited?: true
@@ -191,6 +193,22 @@ function recordPrefix(sessionId: string, state: PrefixState, messages: Message[]
 	agyPrompt.saveState(sessionId, state)
 }
 
+function snapshot(state: PrefixState): PrefixSnapshot {
+	return { prefix: state.prefix, hash: state.hash, basePrefix: state.basePrefix, baseHash: state.baseHash }
+}
+
+function resetPrefix(state: PrefixState): void {
+	state.prefix = 0
+	state.hash = undefined
+	state.basePrefix = undefined
+	state.baseHash = undefined
+}
+
+function restore(sessionId: string, state: PrefixState, snap: PrefixSnapshot): void {
+	Object.assign(state, snap)
+	agyPrompt.saveState(sessionId, state)
+}
+
 // Hal's system prompt, appended to agy's own through session/new's
 // _meta.antigravity.systemPrompt. agy reads <cwd>/AGENTS.md on its own,
 // so its copy is left out.
@@ -281,6 +299,9 @@ export const agyPrompt = {
 	unseen,
 	promptContent,
 	recordPrefix,
+	snapshot,
+	resetPrefix,
+	restore,
 	system,
 	seed,
 	loadSaved,

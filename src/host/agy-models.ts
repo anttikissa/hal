@@ -140,4 +140,25 @@ function contextWindow(model: string): number | undefined {
 	return state.windows.get(model)
 }
 
-export const agyModels = { state, record, known, fetch, displayName, contextWindow, capability, resolve }
+function recordConfigOptions(target: { effort?: string; thoughtLevels?: string[] }, options: any[] | undefined): void {
+	if (!Array.isArray(options)) return
+	let thought = options.find((o) => o?.id === 'thought_level')
+	if (!thought) return
+	if (typeof thought.currentValue === 'string') target.effort = thought.currentValue
+	if (Array.isArray(thought.options))
+		target.thoughtLevels = thought.options
+			.map((o: any) => o?.value)
+			.filter((v: unknown): v is string => typeof v === 'string')
+}
+
+export const agyModels = {
+	state,
+	record,
+	recordConfigOptions,
+	known,
+	fetch,
+	displayName,
+	contextWindow,
+	capability,
+	resolve,
+}
