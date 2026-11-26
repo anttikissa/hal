@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { agyAccounts } from './agy-accounts.ts'
 import { statusUsage } from './status-usage.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
@@ -8,12 +9,14 @@ import { limits } from './limits.ts'
 
 test('every status read refreshes subscriptions and failed auth leaves cached windows with short advice', async () => {
 	let all = auth.all,
+		agyList = agyAccounts.list,
 		refresh = statusUsage.refresh,
 		store = usage.store,
 		windows = usage.windows,
 		now = clock.now
 	let when = Date.now()
 	clock.now = () => when
+	agyAccounts.list = () => []
 	let data = { anthropic: { 'a@example.com': { '5h': { used: 12, observed: new Date(when - 120000).toISOString() } } } }
 	let requests = 0
 	auth.all = ((kind: string) => ({
@@ -47,6 +50,7 @@ test('every status read refreshes subscriptions and failed auth leaves cached wi
 		expect(result).toContain('login expired')
 	} finally {
 		auth.all = all
+		agyAccounts.list = agyList
 		statusUsage.refresh = refresh
 		usage.store = store
 		usage.windows = windows

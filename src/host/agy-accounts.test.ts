@@ -9,6 +9,7 @@ import { ason } from '../common/ason.ts'
 import { agy } from './agy.ts'
 import { agyAccounts } from './agy-accounts.ts'
 import { agyLog } from './agy-log.ts'
+import { agyQuota } from './agy-quota.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { command as accountCmd } from './commands/account.ts'
@@ -30,6 +31,7 @@ import { turnPolicy } from './turn-policy.ts'
 const savedHome = paths.state.home
 const origNow = clock.now
 const origCmd = agy.command
+const origQuotaFetch = agyQuota.fetch
 const origAvail = loginAgy.available
 const origProviders = { ...provider.state.providers }
 const origProfile = profile.text
@@ -54,6 +56,7 @@ afterEach(() => {
 	limits.close()
 	sessions.closeAll()
 	agy.command = origCmd
+	agyQuota.fetch = origQuotaFetch
 	loginAgy.available = origAvail
 	provider.state.providers = { ...origProviders }
 	profile.text = origProfile
@@ -94,6 +97,10 @@ test('auth.ason agy entries drive listing, slots, stats.plan, /account, /status 
 	})
 	expect(stats.plan('s1', 'agy/gemini-4-neon')).toMatchObject({ account: 'y2', accounts: 2 })
 
+	agyQuota.fetch = async (account) =>
+		account.name === 'first@example.com'
+			? { '5h': { used: 10, resets: new Date(now + 3600_000).toISOString() }, '7d': { used: 2 } }
+			: { '5h': { used: 0 }, '7d': { used: 0 } }
 	limits.set(limits.key('agy', 'first@example.com'), now + 3600_000)
 	agyAccounts.needsVerification(
 		'second@example.com',
@@ -102,8 +109,12 @@ test('auth.ason agy entries drive listing, slots, stats.plan, /account, /status 
 	)
 	let shown = await statusUsage.show('s1', 'agy/gemini-4-neon')
 	expect(shown).toContain('Antigravity accounts:')
-	expect(shown).toContain('| y1 | first@example.com | limited until')
-	expect(shown).toContain('| y2 * | second@example.com | Verification required')
+	expect(shown).toContain('| Slot | Account | 5h | 7d | Status |')
+	expect(shown).toContain('| y1 | first@example.com |')
+	expect(shown).toContain('10% used')
+	expect(shown).toContain('| limited until')
+	expect(shown).toContain('| y2 * | second@example.com |')
+	expect(shown).toContain('| Verification required')
 	expect(shown).toContain('https://accounts.google.com/v3/verify')
 
 	expect(logoutCmd.run('y2', undefined, ctx)).toEqual({ say: 'logged out of y2 second@example.com' })

@@ -42,7 +42,7 @@ What each shows:
 	host            fields pid, version, started, uptime, clients (count)
 	models          models by provider, the default, and which are rate limited until when
 	clients         connected clients; fields kind, pid, hostname, version (the code it runs), size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the calling session)
-	subscriptions   refreshes every Anthropic and OpenAI subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan, status, windows (percent used, resets), limits (recorded account/model skips), error. API keys are listed, not queried. A failed refresh marks the result as an error without hiding other accounts.
+	subscriptions   refreshes every Anthropic, OpenAI and Antigravity subscription without a model request; fields provider, slot (* marks the caller-selected or preferred account), account, plan, status, windows (percent used, resets), limits (recorded account/model skips), error. API keys are listed, not queried. A failed refresh marks the result as an error without hiding other accounts.
 	logins          stored logins (provider, type, account) from the credentials file, without network
 	files           uncommitted files of the caller's Git root, each with every session and call that declared and changed it since its last commit, newest first, and whether the file still matches the newest`
 
@@ -144,7 +144,10 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 	status: (r) => {
 		if (r.provider === 'agy') {
 			if (r.verify) return `verification required: ${r.verify.message}${r.verify.url ? ` (${r.verify.url})` : ''}`
-			return r.limited ? 'rate limited' : 'ok'
+			if (r.refreshError)
+				return `${statusUsage.problem(r.refreshError).text}; usage unavailable${r.loginRequired ? '; run /login agy' : ''}`
+			if (r.limited) return 'rate limited'
+			return Object.values(r.windows).some((w) => w.used >= 100) ? 'quota exhausted' : 'ok'
 		}
 		if (r.apiKey) return 'API key (not queried)'
 		if (r.refreshError)
@@ -157,7 +160,7 @@ const SUBSCRIPTION: Record<string, (row: UsageRow) => string> = {
 		return `${status}${r.error ? `; ${r.error}` : ''}`
 	},
 	windows: (r) =>
-		r.apiKey || r.provider === 'agy'
+		r.apiKey
 			? 'not applicable'
 			: [...new Set(['5h', '7d', ...Object.keys(r.windows)])]
 					.map((name) => {

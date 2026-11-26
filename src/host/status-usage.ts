@@ -2,6 +2,7 @@
 // Markdown table that the terminal and the web both render. Every read
 // refreshes the stored subscription data without a model turn.
 import { agyAccounts } from './agy-accounts.ts'
+import { agyQuota } from './agy-quota.ts'
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'
@@ -65,14 +66,11 @@ function table(rows: UsageRow[], zone?: string): string {
 		let names = [
 			...new Set(accounts.flatMap((row) => Object.keys(row.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name)))),
 		].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-		let cols =
-			kind === 'agy'
-				? ['Status']
-				: names.length
-					? names
-					: accounts.every((row) => row.apiKey)
-						? ['Limit']
-						: ['5h', '7d']
+		let agyStatus = kind === 'agy' && accounts.some((row) => row.verify || row.limited)
+		let cols = [
+			...(names.length ? names : accounts.every((row) => row.apiKey) ? ['Limit'] : ['5h', '7d']),
+			...(agyStatus ? ['Status'] : []),
+		]
 		let lines = [
 			TITLES[kind],
 			'',
@@ -85,7 +83,7 @@ function table(rows: UsageRow[], zone?: string): string {
 			let safe = (value: string) => value.replace(/[|<>]/g, ' ').replace(/\*/g, '\\*')
 			let account = `${safe(row.account)}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
 			let cells = cols.map((name) => {
-				if (row.provider === 'agy') {
+				if (name === 'Status') {
 					let parts: string[] = []
 					if (row.verify)
 						parts.push(
@@ -309,17 +307,35 @@ async function rows(sessionId: string, model: string): Promise<UsageRow[]> {
 	let agyList = agyAccounts.list()
 	if (agyList.length) {
 		let selected = model.startsWith('agy/') ? agyAccounts.selected(sessionId) : undefined
-		for (let [i, account] of agyList.entries()) {
-			rows.push({
-				provider: 'agy',
-				slot: `${auth.slot('agy', i)}${account.name === selected ? ' *' : ''}`,
-				account: account.name,
-				windows: {},
-				apiKey: false,
-				limited: statusUsage.limitedUntil('agy', account.name),
-				verify: agyAccounts.verifyOf(account.name),
-			})
-		}
+		let agyRows = await Promise.all(
+			agyList.map(async (account, i): Promise<UsageRow> => {
+				let windows: Windows = {}
+				let error: string | undefined
+				let refreshError: string | undefined
+				let loginRequired = false
+				try {
+					windows = await agyQuota.fetch(account)
+				} catch (e) {
+					let failure = statusUsage.problem(e)
+					refreshError = statusUsage.redact(e instanceof Error ? e.message : String(e), account.entry)
+					error = failure.text
+					loginRequired = failure.login
+				}
+				return {
+					provider: 'agy',
+					slot: `${auth.slot('agy', i)}${account.name === selected ? ' *' : ''}`,
+					account: account.name,
+					error,
+					refreshError,
+					loginRequired,
+					windows,
+					apiKey: false,
+					limited: statusUsage.limitedUntil('agy', account.name),
+					verify: agyAccounts.verifyOf(account.name),
+				}
+			}),
+		)
+		rows.push(...agyRows)
 	}
 	return rows
 }
@@ -328,7 +344,10 @@ async function show(sessionId: string, model: string): Promise<string> {
 	let rows = await statusUsage.rows(sessionId, model)
 	let relogins = rows
 		.filter((row) => row.loginRequired)
-		.map((row) => `To log in to ${row.account} again, run /login ${row.provider === 'openai' ? 'chatgpt' : 'claude'}.`)
+		.map((row) => {
+			let cmd = row.provider === 'openai' ? 'chatgpt' : row.provider === 'agy' ? 'agy' : 'claude'
+			return `To log in to ${row.account} again, run /login ${cmd}.`
+		})
 	let verifyLinks = rows.filter((row) => row.verify?.url).map((row) => `Verify ${row.account}: ${row.verify!.url}`)
 	// Times show in the asking client's zone, as its status line does.
 	let zone = clients.timezone(sessionId)

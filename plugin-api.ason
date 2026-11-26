@@ -1,5 +1,5 @@
 {
-	version: 63,
+	version: 64,
 	changes: [
 		{
 			version: 2,
@@ -1206,6 +1206,16 @@
 					kind: 'compatible',
 					target: 'client/prompt-keys.promptKeys',
 					description: 'Adds typed and restore'
+				}
+			]
+		},
+		{
+			version: 64,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/agy-quota.agyQuota',
+					description: 'Adds fetch, parse and timeoutMs for Antigravity /quota checks'
 				}
 			]
 		}
