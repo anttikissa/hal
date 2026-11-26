@@ -59,7 +59,9 @@ function buildForm(
 				: {}
 	let command = typeof rawInput.CommandLine === 'string' ? rawInput.CommandLine : undefined
 	let findings = command ? approval.findings(command) : []
-	let head = `Antigravity permission needed: ${tool.title ?? tool.name ?? 'tool call'}`
+	let head = command
+		? 'Antigravity permission needed'
+		: `Antigravity permission needed: ${tool.title ?? tool.name ?? 'tool call'}`
 	let text = [head, ...new Set(findings.map((f) => f.reason))].join('\n')
 	let rest = Object.fromEntries(Object.entries(rawInput).filter(([k]) => k !== 'toolSummary'))
 	let quoteText = command ?? (Object.keys(rest).length ? toolDetails.value(rest).join('\n') : undefined)
