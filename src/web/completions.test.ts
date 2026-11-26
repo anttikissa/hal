@@ -11,6 +11,11 @@ test('candidates show only descriptions the host or the command list supplies (t
 	expect(paths.choices[1]!.value).toBe('/cd ~/profile.pdf')
 	let go = completions.receive('/go ~/h', ['/go ~/hal', '/go ~/hal-old'], undefined, ['directory', 'directory'])!
 	expect(go.choices.map((c) => c.description)).toEqual(['directory', 'directory'])
+	let models = completions.receive('/model o', ['/model opus', '/model openai/gpt-6-sol'], undefined, [
+		'anthropic/claude-opus-5-5',
+		'openai/gpt-6-sol',
+	])!
+	expect(models.choices.map((c) => c.description)).toEqual(['anthropic/claude-opus-5-5', ''])
 })
 
 test('model descriptions stay aligned and preserve menu identity while filtering', () => {

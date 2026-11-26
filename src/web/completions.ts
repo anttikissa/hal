@@ -28,11 +28,13 @@ function receive(input: string, items: string[], previous?: Menu, descriptions?:
 	let choices = shown.items.map((value, i) => {
 		let name = value.trimEnd().split(' ')[0]!
 		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
-		// Only the host or the command list describes a candidate (task 4qh).
+		// Only the host or the command list describes a candidate (task 4qh);
+		// a description that only repeats the candidate is left out.
 		let description =
 			shown.descriptions?.[i] ||
 			(name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ||
 			''
+		if (value.trimEnd().endsWith(` ${description}`)) description = ''
 		let group = shown.groups.includes(value)
 		return (
 			previous?.choices.find(

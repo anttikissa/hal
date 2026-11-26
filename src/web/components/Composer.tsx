@@ -345,7 +345,7 @@ export function Composer(props: {
 										onClick={click}
 									>
 										<strong>{choice.label}</strong>
-										<span>{choice.description}</span>
+										{choice.description && <span>{choice.description}</span>}
 									</button>
 								)
 							}}
