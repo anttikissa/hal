@@ -12,6 +12,7 @@ import { callText } from '../common/call-text.ts'
 import type { ToolCallBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
 import { type CallContext, type Tool, tools } from './tools.ts'
+import { systemPrompt } from './system-prompt.ts'
 import { quirks } from './quirks.ts'
 
 const name = 'tool'
@@ -254,25 +255,37 @@ function help(tool: Tool<unknown>, interactive = false): string {
 	].join('\n')
 }
 
-// A tool's help as this session sees it: purpose comments after a tool
-// name are taught only to interactive sessions (task 2bq).
-function guide(tool: Tool<unknown>, interactive: boolean): string {
-	let help = tool.help ?? ''
+// A tool's help as this session sees it: a function help fills in the
+// session's prompt variables; purpose comments after a tool name are
+// taught only to interactive sessions (task 2bq).
+function guide(tool: Tool<unknown>, interactive: boolean, vars: Record<string, string>): string {
+	let help = typeof tool.help === 'function' ? tool.help(vars) : (tool.help ?? '')
 	return interactive ? help : help.replace(/^([\t ]*[A-Z][A-Z_]*) \/\*.*?\*\//gm, '$1')
 }
 
 // The system prompt's $tools (task 5t3): the help of each tool with
 // inPrompt, then an Other tools line for each other tool with a summary
 // (HELP has none: the prompt names it); the model learns the rest with
-// HELP. `allowed`: the tools this session may call. A tool's enableIf
-// wraps its section or line in a template condition.
-function guides(allowed?: string[], interactive = true): string {
-	let shown = tools.all().filter((t) => !allowed || allowed.includes(t.name))
-	let when = (t: Tool<unknown>, text: string) => (t.enableIf ? `::: if ${t.enableIf}\n${text}\n:::` : text)
-	let sections = shown.filter((t) => t.inPrompt).map((t) => when(t, guide(t, interactive)))
+// HELP. `allowed`: the tools this session may call; a tool whose enableIf
+// fails is left out. Each guide renders on its own, so a $name it shows
+// stays as written.
+function guides(
+	allowed?: string[],
+	interactive = true,
+	vars: Record<string, string> = {},
+	problems?: string[],
+): string {
+	let shown = tools
+		.all()
+		.filter(
+			(t) => (!allowed || allowed.includes(t.name)) && (!t.enableIf || systemPrompt.holds(t.enableIf, vars, problems)),
+		)
+	let sections = shown
+		.filter((t) => t.inPrompt)
+		.map((t) => systemPrompt.template(nativeTool.guide(t, interactive, vars), problems))
 	let others = shown.flatMap((t) => {
 		let summary = t.summary ?? t.syntax?.summary
-		return !t.inPrompt && summary ? [when(t, `\t${t.name.toUpperCase()} ${summary}`)] : []
+		return !t.inPrompt && summary ? [`\t${t.name.toUpperCase()} ${summary}`] : []
 	})
 	if (others.length) sections.push(`## Other tools\n${others.join('\n')}`)
 	return sections.join('\n\n')

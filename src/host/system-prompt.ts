@@ -122,15 +122,8 @@ function vars(input: PromptInput, sources?: PromptSource[], problems?: string[])
 		skills: systemPrompt.skills(input.cwd, input.projectTrust),
 		agents: systemPrompt.agents(input.cwd, sources, input.projectTrust),
 	}
-	values.tools = toolGuides(input, values, problems)
+	values.tools = nativeTool.guides(input.tools, input.interactive ?? true, values, problems)
 	return values
-}
-
-// $tools: the guides hold directives and variables, and variable values
-// are not re-rendered, so they render here first.
-function toolGuides(input: PromptInput, values: Record<string, string>, problems?: string[]): string {
-	let text = nativeTool.guides(input.tools, input.interactive ?? true)
-	return promptLang.render('<tools>', values, [], problems, undefined, { text })
 }
 
 // SPAWN's systemPrompt (task 0rc) replaces SYSTEM.md; its @path
@@ -147,15 +140,16 @@ function assemble(input: PromptInput, sources?: PromptSource[], problems?: strin
 	)
 }
 
-// A tool's help text, rendered like the system prompt (HELP, task 5t3).
-function template(text: string, input: PromptInput, problems?: string[]): string {
-	return promptLang.render('<help>', systemPrompt.vars(input), [], problems, undefined, { text })
+// A tool's help text with its variables filled in: only directives
+// render, so a $name it shows stays as written (HELP, task 5t3).
+function template(text: string, problems?: string[]): string {
+	return promptLang.render('<help>', {}, [], problems, undefined, { text })
 }
 
 // Whether a template condition holds, e.g. a tool's enableIf. A broken
 // one is false; the system prompt reports it.
-function holds(condition: string, vars: Record<string, string>): boolean {
-	return promptLang.render('<enableIf>', vars, [], [], undefined, { text: `:: if ${condition}\n1\n::` }) === '1'
+function holds(condition: string, vars: Record<string, string>, problems: string[] = []): boolean {
+	return promptLang.render('<enableIf>', vars, [], problems, undefined, { text: `:: if ${condition}\n1\n::` }) === '1'
 }
 
 export type PromptInput = {

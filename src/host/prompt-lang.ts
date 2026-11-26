@@ -20,9 +20,10 @@
 //   Nest blocks by using more colons for inner blocks.
 //
 // Conditionals: `:: if <condition>` ... `:: else` ... `::`
-// - Operands are $variables or "quoted text".
-// - $x alone is false when empty, 0, false, no or off (any case), else true.
-// - !$x negates it. ! works only directly before a variable.
+// - Operands are $variables, "quoted text" or bare values such as true
+//   or 1, so a value filled in before rendering works like its variable.
+// - An operand alone is false when empty, 0, false, no or off (any case),
+//   else true. ! directly before it negates it.
 // - $a == $b and $a != $b compare exactly.
 // - $a like "glob" matches the whole value; * and ? are wildcards.
 // - Join conditions with &&; all must hold.
@@ -180,13 +181,13 @@ function render(
 					let keys: string[] = [],
 						operand = (token: string) => {
 							let name = /^\$\{?(\w+)\}?$/.exec(token)?.[1]
-							if (name === undefined) return token.slice(1, -1)
+							if (name === undefined) return token.startsWith('"') ? token.slice(1, -1) : token
 							keys.push(name)
 							if (Object.hasOwn(vars, name)) return vars[name]!
 							fault(n, `unknown key ${name}`)
 						}
-					let value = String.raw`(\$\{?\w+\}?|"[^"]*")`
-					let test = new RegExp(String.raw`^\s*(!?)\s*(\$\{?\w+\}?)\s*$`),
+					let value = String.raw`(\$\{?\w+\}?|"[^"]*"|[^\s"!=&$]+)`
+					let test = new RegExp(String.raw`^\s*(!?)\s*${value}\s*$`),
 						compare = new RegExp(String.raw`^\s*${value}\s*(==|!=|\slike\s)\s*${value}\s*$`)
 					let matches = command
 						.slice(3)

@@ -99,8 +99,10 @@ export type ToolCard = {
 // own section in the system prompt (src/host/native-tool.ts guides).
 // `enableIf`: a template condition, e.g. '$spawn_budget'; while false,
 // the session's prompt, HELP and calls lack the tool.
-// `help`: what HELP <TOOL> shows, rendered with the prompt's template
-// language (src/host/prompt-lang.ts) and the session's variables.
+// `help`: what HELP <TOOL> shows. A function gets the session's prompt
+// variables and fills them in itself; the result renders with the
+// template language's directives (src/host/prompt-lang.ts) and no
+// variables, so a $name it shows stays as written.
 //
 // Notation, in help and summaries:
 //   BASH            literal tool name
@@ -115,7 +117,8 @@ export type ToolCard = {
 //   name?: type   description     a field line; types: string, number,
 //                 boolean, string[], "a" | "b"
 // Field lines document; they may be stricter than run's validation.
-// Use $name variables only, never ${name}.
+// Fill variables in with ${vars.name}, conditions with
+// `::: if ${vars.name}`.
 export type Tool<Output = string> = {
 	name: string
 	// For tools without help: HELP's first line.
@@ -127,7 +130,7 @@ export type Tool<Output = string> = {
 	summary?: string
 	inPrompt?: boolean
 	enableIf?: string
-	help?: string
+	help?: string | ((vars: Record<string, string>) => string)
 	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
 

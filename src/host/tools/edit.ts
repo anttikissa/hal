@@ -27,7 +27,7 @@ import { strings } from '../../common/strings.ts'
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'change, create and delete files'
-const help = `## EDIT
+const help = (vars: Record<string, string>) => `## EDIT
 
 Edit files. Apply one atomic batch of operations across files. Each operation is a header line, followed by its block:
     <path>@<version> replace A-B       !!NEW, new lines, !!END
@@ -48,7 +48,7 @@ function process(user) {
 	const valid = user.name.length > 4
 !!END
 src/main.ts@4d9ej delete 9
-::: if $session_interactive
+::: if ${vars.session_interactive}
 - A descriptive /* comment */ is mandatory at the start of every EDIT: EDIT /* Rename helper to actualHelper in client files */
 :::`
 

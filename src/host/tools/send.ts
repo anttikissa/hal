@@ -24,7 +24,7 @@ import type { Tool, ToolContext } from '../tools.ts'
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = false
 const summary = 'message to session'
-const help = `## SEND
+const help = (vars: Record<string, string>) => `## SEND
 
 Send a message to another session. The message goes between !!START and !!END lines.
 SEND /* <purpose> */ "<session id>" { delivery? }?
@@ -35,7 +35,7 @@ SEND /* <purpose> */ "<session id>" { delivery? }?
 - soft-steer delivers at the next round without interrupting; queue after the current turn; steer sends it now (unsafe calls and background work are not stopped).
 - Use soft-steer for routine updates, steer to wake up a paused, failed, or waiting-for-answer session.
 - When a child asks you a question, answer with SEND.
-::: if $session_interactive
+::: if ${vars.session_interactive}
 - purpose shows the summary to user: e.g. /* Ask 12-abc to rerun the tests */
 :::`
 

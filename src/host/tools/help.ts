@@ -42,11 +42,8 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 		let found = nativeTool.find(input.name.toLowerCase())
 		if (!found.help) return nativeTool.help(found, interactive)
 		let problems: string[] = []
-		let text = systemPrompt.template(
-			nativeTool.guide(found, interactive),
-			promptCache.input(ctx.sessionId, { interactive }),
-			problems,
-		)
+		let vars = systemPrompt.vars(promptCache.input(ctx.sessionId, { interactive }))
+		let text = systemPrompt.template(nativeTool.guide(found, interactive, vars), problems)
 		if (problems.length) throw new Error(`HELP ${found.name.toUpperCase()}: ${problems.join('; ')}`)
 		return text
 	}

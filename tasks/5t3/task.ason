@@ -10,7 +10,8 @@
 		'Decided 2026-11-19 (user): every tool module declares const inPrompt (true or false) as configuration, under one comment telling humans what each value does. Tool.promptIf holds a template condition guides() wraps around the tool section or Other tools line; SPAWN uses $spawn_budget. guides() omits the Other tools heading when no other tool remains.',
 		"Fixed 2026-11-25: EDIT's HELP usage no longer calls EDIT an exception; BASH, EVAL, SEND, SPAWN and COMPACT also take raw lines in blocks now.",
 		"Changed 2026-11-25 (user): Tool.promptIf became enableIf. tools.allowed() evaluates it with the session's prompt variables (systemPrompt.holds), so a false condition removes the tool from the prompt, HELP and calls alike.",
-		'Decided 2026-11-25 (user): the Tools section updates as a diff, so a tool appearing or leaving (enableIf, plugins) costs one changed line instead of the whole section.'
+		'Decided 2026-11-25 (user): the Tools section updates as a diff, so a tool appearing or leaving (enableIf, plugins) costs one changed line instead of the whole section.',
+		'Changed 2026-11-26 (user): Tool.help may be a function of the prompt variables; it fills them in itself (${vars.session_id}, `::: if ${vars.session_interactive}`), and the result renders with directives only, so a $name a help shows stays as written. Restores the invariant: HELP SPAWN shows $tools, $agents and $skills as names; before, HELP expanded them into the whole system prompt. guides() renders each guide on its own and drops tools whose enableIf fails (systemPrompt.holds), so $tools never re-renders a guide.'
 	],
 	needs: ['0nt', 'hq6'],
 	foldInto: ['vd9']

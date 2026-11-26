@@ -30,10 +30,11 @@ function describe(tool: Tool<unknown>, sessionId: string): string {
 	if (!tool.help) return head ?? tool.name
 	let open = sessions.state.open.has(sessionId)
 	let interactive = open ? promptCache.interactive(sessionId) : true
-	let body = nativeTool.guide(tool, interactive)
+	let vars = open ? systemPrompt.vars(promptCache.input(sessionId, { interactive })) : {}
+	let body = nativeTool.guide(tool, interactive, vars)
 	if (open) {
 		let problems: string[] = []
-		let rendered = systemPrompt.template(body, promptCache.input(sessionId, { interactive }), problems)
+		let rendered = systemPrompt.template(body, problems)
 		if (!problems.length) body = rendered
 	}
 	body = body

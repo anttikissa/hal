@@ -44,7 +44,7 @@ test('nested matching fences select branches and render section headings without
 	).toEqual(['1: stray --> (comments do not nest)', '2: unclosed <!--'])
 })
 
-test('if compares with == and like, joins with && and rejects the old key="value" form', () => {
+test('if compares with == and like, joins with && and accepts bare values', () => {
 	let vars = { cwd: '~/.hal', src: '~/.hal', sub: '~/.hal/src' }
 	let pick = (condition: string) => render(`:: if ${condition}\nyes\n:: else\nno\n::`, vars)
 	expect(pick('$cwd == $src').text).toBe('yes')
@@ -58,7 +58,7 @@ test('if compares with == and like, joins with && and rejects the old key="value
 	expect(pick('cwd="~/.hal"').problems.join('\n')).toContain('invalid if directive; use $key, !$key')
 	expect(pick('$sub != $src').text).toBe('yes')
 	expect(pick('$cwd = $src').problems.join('\n')).toContain('invalid if directive')
-	expect(pick('$cwd == true').problems.join('\n')).toContain('invalid if directive')
+	expect(pick('$cwd == ~/.hal && true && !off && $sub != 1').text).toBe('yes')
 })
 
 test('bare if $x is false only for empty, 0, false, no and off; ! negates', () => {

@@ -1,5 +1,5 @@
 {
-	version: 61,
+	version: 62,
 	changes: [
 		{
 			version: 2,
@@ -1127,6 +1127,39 @@
 					target: 'host/tools.Tool',
 					description: 'Renames promptIf to enableIf, which also hides the tool from HELP and refuses calls',
 					port: 'Rename the field'
+				}
+			]
+		},
+		{
+			version: 62,
+			changes: [
+				{
+					kind: 'breaking',
+					target: 'host/tools.Tool',
+					description: 'help may be a function of the prompt variables; a string help no longer gets variables filled in',
+					port: 'Make help a function and fill in ${vars.name}; write conditions as `::: if ${vars.name}`'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/system-prompt.systemPrompt.template',
+					description: 'Takes (text, problems) and fills in no variables',
+					port: 'Pass the text from nativeTool.guide'
+				},
+				{
+					kind: 'breaking',
+					target: 'host/native-tool.nativeTool.guide',
+					description: 'Takes the prompt variables as a third argument',
+					port: 'Pass systemPrompt.vars(input)'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/native-tool.nativeTool.guides',
+					description: 'Takes the prompt variables and a problems list; evaluates enableIf itself'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/prompt-lang.promptLang.render',
+					description: 'if conditions accept bare values such as true or 1'
 				}
 			]
 		}

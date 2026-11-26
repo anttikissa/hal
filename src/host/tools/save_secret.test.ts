@@ -260,10 +260,10 @@ test('HELP, Other tools line and card headlines describe SAVE_SECRET clearly', a
 	expect(helpRes.output).toContain('SAVE_SECRET /* <purpose> */ { file, name }')
 	expect(helpRes.output).toContain('0600')
 
-	let guides = nativeTool.guides()
-	expect(guides).toContain(
-		'::: if $session_interactive\n\tSAVE_SECRET /* Add or update API_KEY in .env */ { file: ".env", name: "API_KEY" } // prompt user securely for the key; model never sees it\n:::',
-	)
+	let line =
+		'\tSAVE_SECRET /* Add or update API_KEY in .env */ { file: ".env", name: "API_KEY" } // prompt user securely for the key; model never sees it'
+	expect(nativeTool.guides(undefined, true, { session_interactive: 'true' })).toContain(line)
+	expect(nativeTool.guides(undefined, true, { session_interactive: 'false' })).not.toContain(line)
 
 	expect(
 		toolDetails.headline('save_secret', {

@@ -9,7 +9,7 @@ import type { CommitBlock } from '../../common/blocks.ts'
 // lists only the summary under Other tools (HELP <TOOL> shows the rest).
 const inPrompt = true
 const summary = 'run a shell command'
-const help = `## BASH
+const help = (vars: Record<string, string>) => `## BASH
 
 Run a shell command. To edit files, prefer EDIT.
 BASH /* <purpose> */ { timeout?, background?, unsafeToStop?, modifies? }?
@@ -25,9 +25,9 @@ BASH /* Create files */ { modifies: ["a.txt", "b.txt"] }
 !!START
 touch {a,b}.txt
 !!END
-- Avoid pattern "rm -rf $VAR"; "rm -rf /tmp/hal-$session_id-benchmark/" is ok.
-- Use /tmp/hal-$session_id- prefix for scratch files.
-::: if $session_interactive
+- Avoid pattern "rm -rf $VAR"; "rm -rf /tmp/hal-${vars.session_id}-benchmark/" is ok.
+- Use /tmp/hal-${vars.session_id}- prefix for scratch files.
+::: if ${vars.session_interactive}
 - Long-running commands must use background: true, except if they contain 'git commit', which must always run on foreground.
 - Start every BASH with a /* purpose */ comment. Start the purpose with a verb such as Find, Change, Fix, or Run.
 ::: else
