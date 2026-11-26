@@ -116,6 +116,26 @@
 			body {
 				margin: 0;
 			}
+			/* iOS 26+ blurs whatever sits under the status bar of Home Screen
+   apps. A fixed strip there in the page color makes WebKit skip the
+   blur; text clipping keeps it unpainted over content. */
+			.status-bar {
+				display: none;
+			}
+			@supports (-webkit-touch-callout: none) {
+				@media (display-mode: standalone), (display-mode: fullscreen) {
+					.status-bar {
+						display: block;
+						position: fixed;
+						inset: 0 0 auto;
+						height: 11px;
+						background-color: var(--canvas);
+						-webkit-background-clip: text;
+						background-clip: text;
+						z-index: 35;
+					}
+				}
+			}
 			/* The document is 1px taller than the screen and rests scrolled 1px
    down: iOS answers a status-bar tap by scrolling it to 0, which
    viewport.statusTap turns into scrolling the transcript to the top.

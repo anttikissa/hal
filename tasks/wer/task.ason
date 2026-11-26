@@ -1,0 +1,6 @@
+{
+	title: 'iOS Home Screen app shows no blur under the status bar',
+	spec: 'In the installed iOS web app, content under the status bar shows no scroll-edge blur or color smear. A fixed 11px strip at the top, in the page color with background-clip: text, makes WebKit (iOS 26+) skip the blur while staying unpainted over content; it shows only in standalone or fullscreen mode on iOS. apple-mobile-web-app-status-bar-style stays unset: black-translucent brings the blur back.',
+	status: 'done',
+	needs: []
+}

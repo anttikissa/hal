@@ -16,15 +16,18 @@ export function App() {
 		void app.authorized().then((ok) => (ok ? loggedIn() : setPhase('login')))
 	})
 	return (
-		<div class="App">
-			<Switch>
-				<Match when={phase() === 'login'}>
-					<Login onDone={loggedIn} />
-				</Match>
-				<Match when={phase() === 'chat'}>
-					<Chat />
-				</Match>
-			</Switch>
-		</div>
+		<>
+			<div class="status-bar" aria-hidden="true" />
+			<div class="App">
+				<Switch>
+					<Match when={phase() === 'login'}>
+						<Login onDone={loggedIn} />
+					</Match>
+					<Match when={phase() === 'chat'}>
+						<Chat />
+					</Match>
+				</Switch>
+			</div>
+		</>
 	)
 }
