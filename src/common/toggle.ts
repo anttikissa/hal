@@ -128,7 +128,8 @@ function noun(items: Item[]): string {
 function describe(p: Plan, fold: (item: Item) => Verbosity, done = false): string {
 	let open = p.open ?? fold(p.items[0]!) === 'short'
 	let ids = p.items.map((i) => titles.blockId(i))
-	return `${open ? 'Expand' : 'Collapse'}${done ? 'd' : ''} ${toggle.noun(p.items)}${ids.length > 1 ? ':' : ''} ${ids.length > 6 ? `${ids[0]}-${ids.at(-1)}` : ids.join(', ')}`
+	let verb = done ? (open ? 'Expanded' : 'Collapsed') : open ? 'Expand' : 'Collapse'
+	return `${verb} ${toggle.noun(p.items)}${ids.length > 1 ? ':' : ''} ${ids.length > 6 ? `${ids[0]}-${ids.at(-1)}` : ids.join(', ')}`
 }
 
 // How each block of `t` starts: the session's overrides over this
