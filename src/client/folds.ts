@@ -56,15 +56,19 @@ function transcriptOf(id: string): Transcript | undefined {
 	return st.transcript?.meta.id === id ? st.transcript : st.hidden.get(id)?.transcript
 }
 
-// Applies `mode` with `args` in session `id`. Returns why nothing
-// changed, or undefined.
+// Applies `mode` with `args` in session `id`. Returns what changed
+// ("Collapsed 3 user cards: u10, u20, u150") or why nothing did: the
+// changed cards may be in scrollback, which cannot redraw.
 function run(id: string, args: string, mode: Mode = 'toggle'): string | undefined {
 	let t = folds.transcriptOf(id)
 	if (!t) return undefined
-	let done = toggle.apply(mode, folds.of(id), toggle.items(t), args, toggle.starts(t))
-	if (typeof done === 'string') return done
+	let before = folds.at(id)
+	let p = toggle.plan(mode, toggle.items(t), args, before)
+	if (typeof p === 'string') return p
+	let done = toggle.describe(p, before, true)
+	toggle.apply(mode, folds.of(id), toggle.items(t), args, toggle.starts(t))
 	app.show()
-	return undefined
+	return done
 }
 
 // Typed /toggle, /expand or /collapse: true if `text` was one (and it ran).
@@ -72,8 +76,7 @@ function typed(text: string): boolean {
 	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/is.exec(text.trimEnd())
 	let id = app.state.transcript?.meta.id
 	if (!m || id === undefined) return false
-	let error = folds.run(id, m[2] ?? '', m[1]!.toLowerCase() as Mode)
-	if (error) app.state.notice = error
+	app.state.notice = folds.run(id, m[2] ?? '', m[1]!.toLowerCase() as Mode)
 	app.show()
 	return true
 }
@@ -102,8 +105,7 @@ function open(): void {
 				return undefined
 			}
 			draft = undefined
-			let error = folds.run(id, action.answers.target ?? '')
-			if (error) app.state.notice = error
+			app.state.notice = folds.run(id, action.answers.target ?? '')
 			return undefined
 		},
 		(m, k) => {
