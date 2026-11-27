@@ -10,8 +10,17 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { pruning } from './pruning.ts'
+import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
+
+export type RetryState = {
+	pruned?: true
+	fitBytes?: number
+	fitTries?: number
+	compacted?: true
+}
 
 // Whether the context holds any conversation since the latest boundary.
 function anything(records: HistoryRecord[]): boolean {
@@ -103,25 +112,49 @@ function reset(id: string): boolean {
 	return true
 }
 
-// Whether a failed round failed because its prompt was too long for the
-// model: Anthropic's "prompt is too long", OpenAI's
-// context_length_exceeded, or a 400/413 whose message says so.
+// Whether a failed round failed because its prompt or payload was too
+// large: any HTTP 413 (even with an empty body), Anthropic's "prompt is
+// too long", OpenAI's context_length_exceeded, or a 400 saying so.
 function tooLong(e: ErrorEvent): boolean {
+	if (e.status === 413) return true
 	let text = `${e.message}\n${e.body ?? ''}`
 	if (/prompt is too long|context_length_exceeded/i.test(text)) return true
-	return (
-		(e.status === 400 || e.status === 413) &&
-		/too long|too large|context (length|window)|maximum context|too many tokens/i.test(text)
-	)
+	return e.status === 400 && /too long|too large|context (length|window)|maximum context|too many tokens/i.test(text)
 }
 
-// A round refused as too long (tooLong) is no temporary failure: the
-// first time in a turn (`tried` false) the context is compacted and
-// true says to retry the round; after that the turn fails with it.
-function retry(id: string, e: ErrorEvent, tried: boolean): boolean {
+// A round refused as too large (tooLong) is no temporary failure: on 413,
+// first prune consumed heavy records losslessly, then compress remaining
+// active images on the wire, then fall back to one-time compact-and-retry.
+// On a token-limit refusal (400), compact once and retry.
+function retry(id: string, e: ErrorEvent, tried: boolean | RetryState): boolean {
 	if (e.canceled || !compact.tooLong(e)) return false
 	delete e.failure
-	if (tried || compact.run(id, true) === undefined) return false
+	if (typeof tried === 'boolean') {
+		if (tried || compact.run(id, true) === undefined) return false
+		slash.output(id, 'The provider said the prompt is too long: compacted, trying again')
+		return true
+	}
+	if (e.status === 413) {
+		if (!tried.pruned) {
+			tried.pruned = true
+			if (pruning.pruneNow(id)) {
+				slash.output(id, 'The provider said the request is too large: pruned old outputs and images, trying again')
+				return true
+			}
+		}
+		if ((tried.fitTries ?? 0) < 2 && pruning.hasActiveImages(id)) {
+			let limit = pruning.maxBytes(sessions.open(id).model)
+			tried.fitBytes = tried.fitTries
+				? Math.max(2 * 1024 * 1024, Math.floor((tried.fitBytes ?? limit) / 2))
+				: Math.min(limit, 12 * 1024 * 1024)
+			tried.fitTries = (tried.fitTries ?? 0) + 1
+			slash.output(id, 'The provider said the request is too large: compressed images for this request, trying again')
+			return true
+		}
+	}
+	if (tried.compacted) return false
+	tried.compacted = true
+	if (compact.run(id, true) === undefined) return false
 	slash.output(id, 'The provider said the prompt is too long: compacted, trying again')
 	return true
 }

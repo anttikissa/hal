@@ -56,11 +56,11 @@ function contents(req: ProviderRequest): unknown[] {
 		let images: unknown[] = []
 		for (let b of m.blocks) {
 			if (b.type === 'text') parts.push({ text: b.text })
-			else if (b.type === 'image') parts.push(image(req.image?.(b.blob)))
+			else if (b.type === 'image') parts.push(image(req.image?.(b.blob, undefined, { format: 'webp' })))
 			else {
 				let output = b.isError ? `Error: ${b.output}` : b.output
 				parts.push({ functionResponse: { id: b.id, name: names.get(b.id) ?? '', response: { output } } })
-				for (let i of blocks.resultImages(b)) images.push(image(req.image?.(i.blob)))
+				for (let i of blocks.resultImages(b)) images.push(image(req.image?.(i.blob, undefined, { format: 'webp' })))
 			}
 		}
 		parts.push(...images)

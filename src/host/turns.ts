@@ -21,7 +21,7 @@ import { settings } from '../common/settings.ts'
 import type { StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
 import { contextTransitions } from './context-transitions.ts'
-import { compact } from './compact.ts'
+import { compact, type RetryState } from './compact.ts'
 import { turnRecovery } from './turn-recovery.ts'
 import { turnPolicy } from './turn-policy.ts'
 import { diag } from './diag.ts'
@@ -48,7 +48,7 @@ import { projectContext } from './project-context.ts'
 // `unsafe`: calls flagged unsafeToStop that run (by id: input, since
 // when), so a steer waits for them all to end (`steered`, prompts.submit)
 // and a restart asks first (commands/restart.ts; task ker).
-type Running = {
+type Running = RetryState & {
 	provider: string
 	model?: string
 	effort?: string
@@ -245,8 +245,6 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let failure: string | undefined
 	// Failed rounds in a row, for the backoff.
 	let failures = 0
-	// Compacted once already for a prompt too long (compact.retry).
-	let shrunk = false
 	// Finished rounds, and why Hal paused the turn if it did.
 	let rounds = 0
 	let capped: string | undefined
@@ -324,10 +322,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (Object.keys(round.usage).length || round.context)
 					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage, round.context) })
 				if (last?.type === 'error' && !signal.aborted && turnPolicy.mayRetry(running.provider, last)) {
-					if (compact.retry(id, last, shrunk)) {
-						shrunk = true
-						continue
-					}
+					if (compact.retry(id, last, running)) continue
 					if (last.failure && !last.canceled) {
 						host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id) })
 						await turnPolicy.waitOut(id, last, failures++, signal)
@@ -360,6 +355,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (last?.type === 'done') {
 					failures = 0
 					rounds++
+					delete running.pruned
+					delete running.fitBytes
+					delete running.fitTries
 					last = turnPolicy.stopped(last)
 				}
 				if (replied?.ask && last?.type === 'done' && !signal.aborted) return turns.ask(id, replied.ask)

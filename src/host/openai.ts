@@ -31,9 +31,10 @@ function input(req: ProviderRequest): unknown[] {
 			for (let b of m.blocks) {
 				if (b.type === 'tool_result') {
 					out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
-					for (let i of blocks.resultImages(b)) parts.push(imagePart(req.image?.(i.blob)))
+					for (let i of blocks.resultImages(b))
+						parts.push(imagePart(req.image?.(i.blob, undefined, { format: 'webp' })))
 				} else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })
-				else parts.push(imagePart(req.image?.(b.blob)))
+				else parts.push(imagePart(req.image?.(b.blob, undefined, { format: 'webp' })))
 			}
 			if (parts.length) out.push({ role: 'user', content: parts })
 			continue

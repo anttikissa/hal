@@ -31,7 +31,7 @@ import {
 } from 'fs'
 import { attachments, type Marker } from '../common/attachments.ts'
 import type { ImageBlock, UserBlock } from '../common/blocks.ts'
-import { imageDimensions } from '../common/image-dimensions.ts'
+import { imageFit, type ImageOptions } from './image-fit.ts'
 import { paths } from './paths.ts'
 
 export type Stored = { blob: string; mediaType: string; bytes: number; marker: string }
@@ -266,35 +266,15 @@ function text(sessionId: string, blob: string): string {
 	return found.bytes.toString('utf8')
 }
 
-// Shrinks the image at argv[1] to fit a square of side argv[2] and writes
-// it to stdout. A child process, because Bun.Image is async and provider
-// requests are built synchronously. Its source lives here, not in a
-// script file, so a running host never pairs with a newer script.
-// Bun.Image writes a GIF as PNG.
-const SHRINK = `let [path, side] = process.argv.slice(1)
-await Bun.write(Bun.stdout, await new Bun.Image(path).resize(+side, +side, { fit: 'inside' }).bytes())`
-
-// An image as a provider request sends it. An image with a side over
-// `maxEdge` goes as a copy shrunk by SHRINK (a GIF's is a PNG), kept in
-// sessions/<id>/shrunk/ so every request sends the same bytes. Undefined
-// if the file is gone or cannot be shrunk.
-function image(sessionId: string, blob: string, maxEdge = Infinity): { mediaType: string; data: string } | undefined {
-	let found = blobs.find(sessionId, blob)
-	if (!found) return undefined
-	let bytes = readFileSync(found.path)
-	let size = imageDimensions.read(bytes, found.mediaType)
-	if (!size || Math.max(size.width, size.height) <= maxEdge)
-		return { mediaType: found.mediaType, data: bytes.toString('base64') }
-	let path = `${paths.sessionDir(sessionId)}/shrunk/${maxEdge}-${found.path.split('/').pop()}`
-	if (!existsSync(path)) {
-		let r = Bun.spawnSync([process.execPath, '-e', SHRINK, found.path, String(maxEdge)], { stderr: 'ignore' })
-		if (r.exitCode !== 0) return undefined
-		mkdirSync(`${paths.sessionDir(sessionId)}/shrunk`, { recursive: true, mode: 0o700 })
-		writeFileSync(`${path}.tmp`, r.stdout)
-		renameSync(`${path}.tmp`, path)
-	}
-	let mediaType = found.mediaType === 'image/gif' ? 'image/png' : found.mediaType
-	return { mediaType, data: readFileSync(path).toString('base64') }
+// An image as a provider request sends it (image-fit.ts), cached in
+// sessions/<id>/shrunk/ so every request sends identical bytes.
+function image(
+	sessionId: string,
+	blob: string,
+	maxEdge = Infinity,
+	opts?: ImageOptions,
+): { mediaType: string; data: string } | undefined {
+	return imageFit.encode(sessionId, blob, maxEdge, opts)
 }
 
 // The blob a marker names, if it is this session's and of its kind. A

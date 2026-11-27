@@ -4,9 +4,11 @@ import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type Thinkin
 import { modelNotices } from '../common/model-notices.ts'
 import { replay } from '../common/replay.ts'
 import { cacheMarker } from '../common/cache-marker.ts'
+import { tokenEstimates } from '../common/token-estimates.ts'
 import { blobs } from './blobs.ts'
 import { config } from './config.ts'
 import { history } from './history.ts'
+import { imageFit } from './image-fit.ts'
 import { models } from './models.ts'
 import { neighbors } from './neighbors.ts'
 import { promptCache } from './prompt-cache.ts'
@@ -74,14 +76,23 @@ async function* turn(
 	signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
+	let overhead = (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length
+	let messages = await historyInput.messages(id, {
+		overhead,
+		window: models.contextWindow(modelId),
+		model: modelId,
+	})
+	let byteLimit = pruning.maxBytes(modelId)
+	let fit = pruning.estimateBytes(id, messages, overhead, modelId) > byteLimit
+	let cap = fit ? imageFit.perImageCap(messages, byteLimit, tokenEstimates.characters(messages, overhead)) : undefined
 	let input = {
 		...opts,
-		messages: await historyInput.messages(id, {
-			overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length,
-			window: models.contextWindow(modelId),
-			model: modelId,
-		}),
-		image: (blob: string, maxEdge?: number) => blobs.image(id, blob, maxEdge),
+		messages,
+		image: (blob: string, maxEdge?: number, imageOpts?: Parameters<typeof blobs.image>[3]) =>
+			blobs.image(id, blob, maxEdge, {
+				...imageOpts,
+				...(fit && { fit: true, maxBytes: imageOpts?.maxBytes ? Math.min(imageOpts.maxBytes, cap!) : cap }),
+			}),
 	}
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined

@@ -11,6 +11,7 @@ import {
 	type UserBlock,
 } from '../common/blocks.ts'
 import { auth } from './auth.ts'
+import { imageFit } from './image-fit.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { modelEffort } from './model-effort.ts'
 import { provider as catalog } from './providers/anthropic.ts'
@@ -46,7 +47,7 @@ function redactedData(signature: string): string | undefined {
 function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
 	if (b.type === 'image') {
-		let image = req.image?.(b.blob, 2576)
+		let image = req.image?.(b.blob, 2576, { format: 'webp', maxBytes: imageFit.anthropicMaxBytes })
 		if (!image) return { type: 'text', text: provider.imageNote('Hal cannot read or shrink it') }
 		return { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }
 	}

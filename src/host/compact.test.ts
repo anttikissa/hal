@@ -280,7 +280,48 @@ describe('a prompt too long (task mq)', () => {
 			}),
 		).toBe(true)
 		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 413 })).toBe(true)
+		expect(compact.tooLong({ type: 'error', message: 'HTTP 413 from anthropic', status: 413 })).toBe(true)
 		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 500 })).toBe(false)
 		expect(compact.tooLong({ type: 'error', message: 'invalid tool schema', status: 400 })).toBe(false)
+	})
+
+	test('bare HTTP 413 escalates: prunes consumed images first, then compresses, then compacts once, then fails', async () => {
+		let c = client()
+		let id = created(c)
+		let png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('IHDR-image')]).toString('base64')
+		c.conn.send({ type: 'attach', sessionId: id, mediaType: 'image/png', data: png, id: 'old-pic' })
+		let oldMarker = c.of('attached').at(-1).marker
+		await ask(c, id, `first ${oldMarker}`)
+
+		c.conn.send({ type: 'attach', sessionId: id, mediaType: 'image/png', data: png, id: 'new-pic' })
+		let newMarker = c.of('attached').at(-1).marker
+		c.conn.send({ type: 'submit', sessionId: id, text: `second ${newMarker}` })
+		await until(() => calls.length === 2)
+
+		let err413 = { type: 'error' as const, message: 'HTTP 413 from anthropic', status: 413 }
+		// 1st 413: prunes consumed old image losslessly without compacting.
+		calls[1]!.push({ ...err413 })
+		await until(() => calls.length === 3)
+		expect(JSON.stringify(calls[2]!.input.messages)).toContain('[pruned image;')
+		expect(JSON.stringify(calls[2]!.input.messages)).not.toContain('Context was compacted')
+
+		// 2nd & 3rd 413: compresses active images on the wire (2 steps), still without compacting.
+		calls[2]!.push({ ...err413 })
+		await until(() => calls.length === 4)
+		expect(JSON.stringify(calls[3]!.input.messages)).not.toContain('Context was compacted')
+		calls[3]!.push({ ...err413 })
+		await until(() => calls.length === 5)
+		expect(JSON.stringify(calls[4]!.input.messages)).not.toContain('Context was compacted')
+
+		// 4th 413: falls back to one-time compact.
+		calls[4]!.push({ ...err413 })
+		await until(() => calls.length === 6)
+		expect(calls[5]!.input.messages[0].blocks[0].text).toStartWith('Context was compacted')
+
+		// 5th 413: stops escalating and fails loudly with the complete error.
+		calls[5]!.push({ ...err413 })
+		await until(() => c.of('turn-end').length === 2)
+		expect(c.of('turn-end').at(-1)).toMatchObject({ status: 'error', error: 'HTTP 413 from anthropic' })
+		expect(calls.length).toBe(6)
 	})
 })

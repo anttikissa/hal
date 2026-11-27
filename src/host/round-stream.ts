@@ -2,12 +2,15 @@
 // session's system prompt, history and native tool, and its stream with
 // each native tool call expanded into Hal's tool calls.
 import type { StreamEvent } from '../common/blocks.ts'
+import { tokenEstimates } from '../common/token-estimates.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { historyInput } from './history-input.ts'
+import { imageFit } from './image-fit.ts'
 import { models } from './models.ts'
 import { nativeTool } from './native-tool.ts'
 import { promptCache } from './prompt-cache.ts'
+import { pruning } from './pruning.ts'
 import { sessions } from './sessions.ts'
 import { turns } from './turns.ts'
 import { bash } from './tools/bash.ts'
@@ -15,7 +18,7 @@ import { bash } from './tools/bash.ts'
 async function* stream(
 	id: string,
 	model: string,
-	running: { effort?: string },
+	running: { effort?: string; fitBytes?: number },
 	signal: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
 	let { system, cacheId } = promptCache.prepare(id, {
@@ -25,12 +28,16 @@ async function* stream(
 		sessionId: id,
 	})
 	let defs = sessions.open(id).tools?.length === 0 ? [] : [nativeTool.def()]
+	let overhead = system.length + JSON.stringify(defs).length
 	let messages = await historyInput.messages(id, {
-		overhead: system.length + JSON.stringify(defs).length,
+		overhead,
 		window: models.contextWindow(model),
 		model,
 	})
 	if (signal.aborted) return
+	let byteLimit = running.fitBytes ?? pruning.maxBytes(model)
+	let fit = running.fitBytes !== undefined || pruning.estimateBytes(id, messages, overhead, model) > byteLimit
+	let cap = fit ? imageFit.perImageCap(messages, byteLimit, tokenEstimates.characters(messages, overhead)) : undefined
 	for await (let event of turns.stream(
 		model,
 		{
@@ -38,7 +45,11 @@ async function* stream(
 			effort: running.effort,
 			messages,
 			tools: defs,
-			image: (blob, maxEdge) => blobs.image(id, blob, maxEdge),
+			image: (blob, maxEdge, opts) =>
+				blobs.image(id, blob, maxEdge, {
+					...opts,
+					...(fit && { fit: true, maxBytes: opts?.maxBytes ? Math.min(opts.maxBytes, cap!) : cap }),
+				}),
 			sessionId: id,
 			cacheId,
 		},

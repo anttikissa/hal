@@ -26,7 +26,7 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 			let texts: string[] = []
 			let parts: unknown[] = []
 			let addImage = (blob: string) => {
-				let image = images ? req.image?.(blob) : undefined
+				let image = images ? req.image?.(blob, undefined, { format: 'jpeg' }) : undefined
 				if (image) parts.push({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.data}` } })
 				else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
 			}

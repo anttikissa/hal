@@ -1,5 +1,5 @@
 {
-	version: 64,
+	version: 65,
 	changes: [
 		{
 			version: 2,
@@ -1216,6 +1216,36 @@
 					kind: 'compatible',
 					target: 'host/agy-quota.agyQuota',
 					description: 'Adds fetch, parse and timeoutMs for Antigravity /quota checks'
+				}
+			]
+		},
+		{
+			version: 65,
+			changes: [
+				{
+					kind: 'compatible',
+					target: 'host/image-fit',
+					description: 'Adds wire image encoding and fitting module'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/blobs.image',
+					description: 'Adds optional ImageOptions argument'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/provider.ProviderRequest',
+					description: 'Adds optional ImageOptions to image callback'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/pruning',
+					description: 'Adds byteBudget, maxBytes, estimateBytes, pruneNow and hasActiveImages'
+				},
+				{
+					kind: 'compatible',
+					target: 'host/compact.retry',
+					description: 'Accepts RetryState for multi-step 413 escalation'
 				}
 			]
 		}

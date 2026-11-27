@@ -4,6 +4,7 @@
 // and abort live here once. Wire mappings: tasks/7f/mapping.md.
 
 import { blocks, type ErrorEvent, type Message, type StreamEvent } from '../common/blocks.ts'
+import type { ImageOptions } from './image-fit.ts'
 import { clock } from './clock.ts'
 import { limits } from './limits.ts'
 import { usage } from './usage.ts'
@@ -26,7 +27,7 @@ export type ProviderRequest = {
 	// An image block as sent (the session's blob, task 2a), read as the
 	// request is built. With `maxEdge`, a larger image is shrunk to fit.
 	// Undefined if it is gone or cannot be shrunk.
-	image?: (blob: string, maxEdge?: number) => ProviderImage | undefined
+	image?: (blob: string, maxEdge?: number, opts?: ImageOptions) => ProviderImage | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
 	cacheId?: string

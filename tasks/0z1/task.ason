@@ -1,0 +1,10 @@
+{
+	title: 'Prevent and recover from provider HTTP 413 errors',
+	spec: "Prevent provider HTTP 413 payload-too-large errors without degrading normal image detail, and recover automatically when a stricter proxy or provider still returns 413. Large PNGs (>200 KB) sent to WebP-capable providers (Anthropic, OpenAI, Gemini) encode once as lossless WebP when smaller, cached under sessions/<id>/shrunk/ so prompt caches stay byte-identical; original blobs remain untouched. Pruning enforces a provider-aware request byte budget (64 MB Anthropic, 16 MB Gemini, 24 MB default), batch-omitting already-consumed heavy records into projection.ason before requests overflow, without sliding round-to-round; records containing images always count as shrinkable even when their history reference JSON is short. Every HTTP 413 (including empty bodies) triggers escalation: prune remaining consumed heavy records first, then compress active images on the wire (WebP where supported, JPEG otherwise, lossless WebP first when it fits) for overflowing unprunable images, and fall back to one-time compact-and-retry before failing loudly with the complete error. Unprunable image batches exceeding the byte budget and single images over Anthropic's 5 MB base64 cap also fit automatically.",
+	status: 'done',
+	notes: [
+		'Observed in 58-mad (s660) and 50-ins (s675): 39-53 active 1368x741 PNG screenshots reached 128-136 MB base64 JSON (> Anthropic 128 MB HTTP body limit) while context stayed at 108-123k tokens across <8 turns, and Anthropic returned HTTP 413 with an empty body which compact.tooLong ignored. Added src/host/image-fit.ts (lossless WebP VP8L for >200 KB PNGs on WebP-capable providers, cached in shrunk/; JPEG fallback on non-WebP providers; iterative quality/edge fitting when over cap), byte-budget pruning and pruneNow in src/host/pruning.ts (plus hasImage so short tool_result references with images always count as shrinkable), and bare-413 escalation in src/host/compact.ts (prune -> 2-step image fit -> one-time compact -> fail loudly).'
+	],
+	needs: ['0d', 'mq', '2a'],
+	foldInto: ['0d', 'mq']
+}

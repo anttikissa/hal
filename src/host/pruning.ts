@@ -11,6 +11,8 @@ import { diag } from './diag.ts'
 import { tokenEstimates } from '../common/token-estimates.ts'
 import { tokenCalibration } from './token-calibration.ts'
 import { blobs } from './blobs.ts'
+import { history } from './history.ts'
+import { imageFit } from './image-fit.ts'
 import { provider } from './provider.ts'
 import { strings } from '../common/strings.ts'
 
@@ -134,6 +136,38 @@ function estimate(id: string, messages: Message[], overhead = 0, model?: string)
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + images
 }
 
+function maxBytes(model?: string): number {
+	let parsed = model ? conversationBlocks.parseModelId(model) : undefined
+	if (parsed?.provider === 'anthropic') return pruning.byteBudget.anthropic
+	if (parsed?.provider === 'gemini') return pruning.byteBudget.gemini
+	if (parsed?.provider === 'opencode-go' && /gemini/i.test(parsed.model)) return pruning.byteBudget.gemini
+	return pruning.byteBudget.default
+}
+
+// Conservative encoded payload size in bytes: text characters plus base64
+// wire bytes of active images.
+function estimateBytes(id: string, messages: Message[], overhead = 0, model?: string): number {
+	let images = 0
+	for (let m of messages)
+		for (let b of m.blocks) {
+			let list = b.type === 'image' ? [b] : b.type === 'tool_result' ? conversationBlocks.resultImages(b) : []
+			for (let image of list) {
+				let raw = imageFit.wireBytes(id, image.blob, model) || image.bytes || 0
+				images += Math.ceil(raw / 3) * 4
+			}
+		}
+	return tokenEstimates.characters(messages, overhead) + images
+}
+
+function hasImage(r: HistoryRecord): boolean {
+	return (
+		r.type === 'user' &&
+		r.blocks.some(
+			(b) => b.type === 'image' || (b.type === 'tool_result' && conversationBlocks.resultImages(b).length > 0),
+		)
+	)
+}
+
 function project(
 	id: string,
 	all: HistoryRecord[],
@@ -179,7 +213,8 @@ function project(
 			)
 		let add = (eligible: HistoryRecord[]) => {
 			let next = new Set(omitted)
-			for (let r of eligible) if (JSON.stringify(pruning.omit(id, r)).length < JSON.stringify(r).length) next.add(r.n!)
+			for (let r of eligible)
+				if (hasImage(r) || JSON.stringify(pruning.omit(id, r)).length < JSON.stringify(r).length) next.add(r.n!)
 			if (next.size === omitted.size) return false
 			omitted = next
 			return true
@@ -200,9 +235,47 @@ function project(
 			diag.log(`pruning ${id}: pressure boundary at checkpoint ${checkpoint}; omitted ${omitted.size} records`)
 			projected = apply(omitted)
 		}
+		let byteLimit = pruning.maxBytes(budget.model)
+		let payloadBytes = pruning.estimateBytes(id, replay.toMessages(projected), budget.overhead, budget.model)
+		if (payloadBytes > byteLimit && add(candidates(false))) {
+			diag.log(`pruning ${id}: byte budget (${payloadBytes} > ${byteLimit}); omitted ${omitted.size} records`)
+			projected = apply(omitted)
+		}
 		state.omitted = [...omitted]
 		liveFiles.save(state)
 		return projected
+	} finally {
+		liveFiles.close(state)
+	}
+}
+
+// Immediately omits all already-consumed heavy records after an HTTP 413.
+// Returns true if at least one record was newly omitted.
+function pruneNow(id: string): boolean {
+	let all = history.context(id)
+	let records = replay.current(all)
+	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
+	let active = records.slice(at + 1)
+	let boundary = records[at]?.n ?? 0
+	let state = pruning.saved(id)
+	try {
+		if (state.boundary !== boundary) {
+			state.boundary = boundary
+			state.checkpoint = 0
+			state.pressure = -1
+		}
+		let consumed = new Set(state.consumed)
+		let omitted = new Set(state.omitted)
+		let before = omitted.size
+		for (let r of active) {
+			if (r.n === undefined || omitted.has(r.n) || !consumed.has(r.n) || !pruning.heavy(r)) continue
+			if (hasImage(r) || JSON.stringify(pruning.omit(id, r)).length < JSON.stringify(r).length) omitted.add(r.n)
+		}
+		if (omitted.size === before) return false
+		state.omitted = [...omitted]
+		liveFiles.save(state)
+		diag.log(`pruning ${id}: reactive 413 prune; omitted ${omitted.size} records`)
+		return true
 	} finally {
 		liveFiles.close(state)
 	}
@@ -225,6 +298,18 @@ function consumed(id: string, records: HistoryRecord[]): void {
 	}
 }
 
+function hasActiveImages(id: string): boolean {
+	let records = replay.current(history.context(id))
+	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
+	let state = pruning.saved(id)
+	try {
+		let omitted = new Set(state.omitted)
+		return records.slice(at + 1).some((r) => (r.n === undefined || !omitted.has(r.n)) && hasImage(r))
+	} finally {
+		liveFiles.close(state)
+	}
+}
+
 export const pruning = {
 	saved,
 	marker,
@@ -235,7 +320,11 @@ export const pruning = {
 	imageTokens,
 	imageCost,
 	estimate,
+	maxBytes,
+	estimateBytes,
 	project,
+	pruneNow,
+	hasActiveImages,
 	consumed,
 	batchTurns: 8,
 	retainTurns: 4,
@@ -243,4 +332,9 @@ export const pruning = {
 	keptArgumentChars: 200,
 	pressureTokens: 180_000,
 	maxImageTokens: 4_800,
+	byteBudget: {
+		anthropic: 64 * 1024 * 1024,
+		gemini: 16 * 1024 * 1024,
+		default: 24 * 1024 * 1024,
+	},
 }

@@ -13,6 +13,7 @@ import { paths } from './paths.ts'
 let home = ''
 let priorHome = paths.state.home
 const oldPressure = pruning.pressureTokens
+const oldByteBudget = { ...pruning.byteBudget }
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-pruning-`)
 	paths.state.home = home
@@ -21,6 +22,7 @@ afterEach(() => {
 	sessions.closeAll()
 	history.state.running.clear()
 	pruning.pressureTokens = oldPressure
+	pruning.byteBudget = { ...oldByteBudget }
 	if (priorHome === undefined) paths.state.home = undefined
 	else paths.state.home = priorHome
 	rmSync(home, { recursive: true, force: true })
@@ -184,4 +186,38 @@ test('image estimates follow pixels measured on Opus 5.5 and gpt-6.1, not file b
 	let unreadable = pruning.estimate('none', messages)
 	expect(unreadable).toBeGreaterThan(pruning.maxImageTokens)
 	expect(unreadable).toBeLessThan(pruning.pressureTokens / 10)
+})
+
+test('byte budget prunes consumed images even below token pressure and can fire again in the same checkpoint', async () => {
+	let id = sessions.create({ cwd: home, model: 'anthropic/test' }).id
+	pruning.pressureTokens = Infinity
+	pruning.byteBudget.anthropic = 10_000
+	history.submit(id, 'inspect images')
+
+	// Two rounds within one turn (checkpoint stays 0), each adding an image over the byte cap.
+	for (let i = 0; i < 2; i++) {
+		await round(id, [
+			{ type: 'tool_call', id: `c${i}`, name: 'read', input: { path: `img${i}.png` } },
+			{ type: 'done', reason: 'tool_use' },
+		])
+		history.results(id, [
+			{
+				type: 'tool_result',
+				id: `c${i}`,
+				output: '',
+				image: { type: 'image', blob: `img${i}`, mediaType: 'image/png', bytes: 9_000 },
+			},
+		])
+		// Unconsumed image stays protected before the provider reads it.
+		let before = await historyInput.messages(id, { model: 'anthropic/test' })
+		expect(JSON.stringify(before)).toContain(`"blob":"img${i}"`)
+		await round(id, [
+			{ type: 'text', text: `saw ${i}` },
+			{ type: 'done', reason: 'end' },
+		])
+		// Once consumed, exceeding the byte budget prunes it durably (even when short output made marker text longer).
+		let after = await historyInput.messages(id, { model: 'anthropic/test' })
+		expect(JSON.stringify(after)).not.toContain(`"blob":"img${i}"`)
+		expect(JSON.stringify(after)).toContain('[pruned image;')
+	}
 })
