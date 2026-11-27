@@ -4,6 +4,7 @@
 // loop; tool() and host() are requests this module answers.
 import { ason } from '../../common/ason.ts'
 import { approval } from '../approval.ts'
+import { autoclose } from '../autoclose.ts'
 import { history } from '../history.ts'
 import { jobs } from '../jobs.ts'
 import { nativeTool } from '../native-tool.ts'
@@ -116,7 +117,11 @@ async function run(input: Record<string, unknown>, ctx: ToolContext): Promise<st
 		if (n === undefined) return kill()
 		let id = `${ctx.sessionId}:${n}`
 		jobs.state.running.set(id, { sessionId: ctx.sessionId, stop: kill })
-		void proc.exited.then(() => jobs.drop(id))
+		// Its exit may come after the turn ended; recheck autoclose then.
+		void proc.exited.then(() => {
+			jobs.drop(id)
+			autoclose.finished(ctx.sessionId)
+		})
 	}
 	function receive(message: Message) {
 		if (message.t === 'done' || message.t === 'fail') {

@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Incident 2026-11-22: a remote EVAL ran 32 lanes of await tool() on a plugin tool plus a 27 ms sync SQLite write each. Its plugin was deleted mid-run; tool() then rejected without a macrotask, so the lanes retried and wrote without yielding, and the host froze for ~6 min (no diag lines, web unreachable). Guidance (keep sync under 100 ms) cannot prevent this. Invariant restored: EVAL code never blocks the host event loop. Measured locally (12-too): child startup ~7 ms vs Worker ~2 ms, but Worker.terminate() waited 909 ms for a busy loop while SIGKILL took 1 ms, so a child process.',
-		'Invariant (2026-11-22, 12-too): no EVAL process outlives what can stop it. Before, a child kept alive by timers dropped its abort listener on return, so nothing but a host disconnect ended it, and STOP refused a running EVAL; processes the code spawned survived SIGKILL of the child.'
+		'Invariant (2026-11-22, 12-too): no EVAL process outlives what can stop it. Before, a child kept alive by timers dropped its abort listener on return, so nothing but a host disconnect ended it, and STOP refused a running EVAL; processes the code spawned survived SIGKILL of the child.',
+		'Invariant: a scheduled or autoclose session whose EVAL child outlives its turn still closes its tab. The lingering child was a running job when the turn ended, so autoclose.finished refused and nothing rechecked; its exit now rechecks autoclose. Found in session 58-fan on 2026-11-27: 51 hourly models.dev tabs had piled up since Nov 25.'
 	],
 	needs: ['3fv', 'ep8']
 }

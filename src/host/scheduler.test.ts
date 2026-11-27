@@ -95,6 +95,15 @@ test('fresh runs resolve defaults again and respect revoked project trust', asyn
 	await done()
 })
 
+// The EVAL child exits just after its turn ends; the tab still closes.
+test('a scheduled EVAL run closes its tab', async () => {
+	tabs.insert(owner, 0)
+	let job = add(", model:'hal/tool', prompt:'EVAL \"1+1\"'")
+	scheduler.run(job)
+	let id = job.run!.session!
+	await until(() => !tabs.file().open.includes(id))
+})
+
 test('restart records uncertain runs without retrying them', async () => {
 	let job = add()
 	scheduler.run(job)
