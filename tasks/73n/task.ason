@@ -1,0 +1,6 @@
+{
+	title: 'First-start defaults question',
+	spec: 'A new install asks one question: A) use the defaults (check models.dev for new models twice a day, minimal telemetry with no personal data, ...) or B) customize, which asks one question per default. Choosing A, whose text names telemetry, counts as the explicit opt-in the privacy rule requires.',
+	status: 'planned',
+	needs: ['jst']
+}

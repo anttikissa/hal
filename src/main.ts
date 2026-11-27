@@ -35,6 +35,7 @@ import { jobs } from './host/jobs.ts'
 import { liveFiles } from './host/live-file.ts'
 import { models } from './host/models.ts'
 import { modelsDev } from './host/models-dev.ts'
+import { modelWatch } from './host/model-watch.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
 import { promptCache } from './host/prompt-cache.ts'
@@ -219,6 +220,7 @@ async function becomeHost(): Promise<boolean> {
 		// Old marks of sessions not open yet convert off this thread too.
 		if (existsSync(paths.sessionsDir())) void marksWorker.upgrade(readdirSync(paths.sessionsDir()))
 		void main.refreshModels()
+		void modelWatch.run()
 	})
 	return true
 }
@@ -248,6 +250,12 @@ async function refreshModels(): Promise<void> {
 		.catch((e) => diag.log(`models of agy: ${e}`))
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
 	let gone = await modelsDev.refresh([...new Set(picked)])
+	if (settings.modelWatch())
+		try {
+			modelWatch.check()
+		} catch (e: any) {
+			diag.log(`model watch: ${e?.message ?? e}`)
+		}
 	let names = models.nameEvent([...new Set(picked)])
 	if (names) for (let client of host.state.clients) client.deliver(names)
 	if (!gone.length) return

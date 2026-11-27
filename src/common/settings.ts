@@ -130,6 +130,14 @@ const table: Setting[] = [
 		description: 'Send web push notifications to subscribed devices.',
 	},
 	{
+		name: 'modelWatch',
+		label: 'New model check',
+		type: { kind: 'boolean' },
+		default: true,
+		description:
+			'Check models.dev at start and twice a day, at a time picked at random for this install, and report models your providers added or removed.',
+	},
+	{
 		name: 'promptTime',
 		label: 'Prompt time headers',
 		type: { kind: 'boolean' },
@@ -313,6 +321,7 @@ export const settings = {
 	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
 	trustAllProjects: (): boolean => settings.value('trustAllProjects') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
+	modelWatch: (): boolean => settings.value('modelWatch') as boolean,
 	promptTime: (): boolean => settings.value('promptTime') as boolean,
 	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 	composerDebug: (): boolean => settings.value('composerDebug') as boolean,

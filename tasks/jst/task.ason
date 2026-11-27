@@ -1,0 +1,6 @@
+{
+	title: 'Built-in twice-daily models.dev new-model check',
+	spec: 'Without any schedule job or user action, the host reports models that its available providers gained or lost on models.dev since the last check, as one warning held until a client sees it. It checks after the startup refresh and twice a day: each install picks a random offset in the first 12 hours once and keeps it in state/model-watch.ason, so installs spread their fetches. The first check and a newly configured provider only save the lists. No push notification. The modelWatch setting (default on) turns it off.',
+	status: 'done',
+	needs: ['qq']
+}
