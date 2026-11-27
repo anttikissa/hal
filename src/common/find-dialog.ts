@@ -45,7 +45,7 @@ function title(status: string, failed?: boolean): string {
 	return failed ? 'Find' : `Find · ${status}`
 }
 const keys = [
-	'↓: filters · enter: open · esc: close',
+	'↑↓: move · tab: filters · enter: open · esc: close',
 	'←→: move · space: toggle · ↑↓: field/results · esc: close',
 	'↑↓: move · →: cards · enter: open · esc: close',
 	'↑↓: move · ←: tabs · enter: open · esc: close',
@@ -103,7 +103,7 @@ function more(m: ModalState, near: boolean): ModalState | undefined {
 }
 // The selection is in the last rows of the results.
 function near(m: ModalState): boolean {
-	return m.find!.focus === resultsFocus && m.selected >= m.items.length - 10
+	return (m.find!.focus === resultsFocus || m.find!.moved) && m.selected >= m.items.length - 10
 }
 // The terms to highlight; phrases keep their quotes so they mark whole.
 function words(text: string): string {
@@ -145,9 +145,11 @@ function requery(m: ModalState, text: string, back: string | undefined): ModalSt
 	let next = findDialog.focus(findDialog.input(m, text), resultsFocus)
 	return { ...next, find: { ...next.find!, back, moved: false } }
 }
-// Down goes field, filters, results; Up back. Left and Right move among
-// the filters, Space or Enter toggles one; Tab cycles every stop. In the
-// results Right lists the selected tab's cards and Left goes back.
+// Up and Down surf the search results from the field or the results list.
+// Tab cycles field, filters and results. On the filters Left and Right
+// move among them, Space or Enter toggles one, Up returns to the field
+// and Down moves to the results. In the results Right lists the selected
+// tab's cards and Left goes back.
 function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 	let f = m.find!
 	let to = (n: number) => ({ state: findDialog.focus(m, n) })
@@ -162,16 +164,16 @@ function step(m: ModalState, k: Key): ReturnType<typeof modals.step> {
 			return m.items.length ? { state: { ...findDialog.focus(m, resultsFocus), selected: 0, scroll: 0 } } : { state: m }
 		return { state: m }
 	}
-	if (f.focus === 0 && (k.key === 'down' || k.key === 'up')) return k.key === 'down' ? to(1) : { state: m }
 	if (f.focus === resultsFocus) {
 		let text = m.form!.values[0]!,
 			row = f.results[m.selected]
-		if (k.key === 'up' && m.selected === 0) return to(1)
+		if (k.key === 'up' && m.selected === 0) return to(0)
 		if (k.key === 'right' && row?.count)
 			return { state: findDialog.requery(m, findDialog.scoped(text, row.sessionId), f.back ?? text) }
 		if (k.key === 'left' && f.back !== undefined) return { state: findDialog.requery(m, f.back, undefined) }
 	}
 	if (k.key === 'up' || k.key === 'down') {
+		if (!m.items.length) return { state: m }
 		let r = modals.step(m, k)
 		return { state: { ...r.state, find: { ...f, moved: true } } }
 	}

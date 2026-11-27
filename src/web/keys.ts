@@ -131,7 +131,8 @@ function key(e: KeyInput, target: Target): boolean {
 			return true
 		}
 		if (st.view.modal.find) {
-			// Arrows move among field, filters and results; Space toggles a filter.
+			// Up/Down surf results; Tab cycles field, filters and results;
+			// Left/Right move among filters or expand/collapse tab cards; Space toggles a filter.
 			let f = st.view.modal.find.focus,
 				filters = f > 0 && f < findDialog.resultsFocus
 			let space = filters && k?.text === ' '
@@ -140,7 +141,7 @@ function key(e: KeyInput, target: Target): boolean {
 				e.ctrlKey ||
 				e.metaKey ||
 				e.altKey ||
-				(!space && !['enter', 'escape', 'up', 'down', ...(filters ? ['left', 'right'] : [])].includes(k.key))
+				(!space && !['enter', 'escape', 'tab', 'up', 'down', ...(f > 0 ? ['left', 'right'] : [])].includes(k.key))
 			)
 				return false
 			find.key(space ? { key: ' ' } : k)

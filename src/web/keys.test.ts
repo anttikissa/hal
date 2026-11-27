@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
+import { findDialog } from '../common/find-dialog.ts'
 import { forms } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
@@ -101,6 +102,55 @@ test('with the model picker open, typing goes to its search box, not the message
 	expect(press('a', other)).toBe(false)
 	expect(keys.paste(clip('x'), other)).toBe(false)
 	expect(typed).toEqual([])
+})
+
+test('in Ctrl-F, Up/Down surf results from the search field while Left/Right stay native and Tab reaches filters', () => {
+	let m = app.state.view.modal
+	expect(m).toBeUndefined()
+	let f = {
+		...findDialog.input(findDialog.open([...findDialog.filters]), 'hit'),
+		items: ['1-abc  one', '2-def  two'],
+	}
+	f.find!.results = [
+		{
+			sessionId: '1-abc',
+			name: 'one',
+			blockId: '1',
+			card: 'u1',
+			count: 0,
+			kind: 'user',
+			why: 'request',
+			cwd: '/w',
+			age: 0,
+			score: 2,
+			snippet: 'hit',
+			href: '/1-abc#1',
+		},
+		{
+			sessionId: '2-def',
+			name: 'two',
+			blockId: '1',
+			card: 'u1',
+			count: 0,
+			kind: 'user',
+			why: 'request',
+			cwd: '/w',
+			age: 0,
+			score: 1,
+			snippet: 'hit',
+			href: '/2-def#1',
+		},
+	]
+	app.setView({ ...app.state.view, modal: f })
+	expect(press('ArrowLeft', { kind: 'field' })).toBe(false)
+	expect(press('ArrowRight', { kind: 'field' })).toBe(false)
+	expect(press('ArrowDown', { kind: 'field' })).toBe(true)
+	expect(app.state.view.modal?.selected).toBe(1)
+	expect(app.state.view.modal?.find?.focus).toBe(0)
+	expect(press('ArrowUp', { kind: 'field' })).toBe(true)
+	expect(app.state.view.modal?.selected).toBe(0)
+	expect(press('Tab', { kind: 'field' })).toBe(true)
+	expect(app.state.view.modal?.find?.focus).toBe(1)
 })
 
 test('a paste outside any field goes into the box; in a field it stays native', () => {
