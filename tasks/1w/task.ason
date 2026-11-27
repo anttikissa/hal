@@ -7,7 +7,8 @@
 		'Per-tool colors are fields tool + Capitalized name (toolBash); aliases are functions calling another (toolGrep: () => colors.toolRead()). Unknown tools fall back to colors.tool; web view emits "tool tool-<name>" so CSS does the same fallback.',
 		'CSS is substituted into the cached page on every request, so eval/local.ts overrides show on reload. src/web never imports colors.ts.',
 		'Out-of-gamut OKLCH keeps hue and chroma and darkens until it fits (common/oklch.ts fit), down to the most vivid point of the hue at most; only past that, or for a color already darker (a card background), does it lose chroma. Never per-channel clipping, and never keep lightness by losing chroma for a bright color: that turned the bright orange of Hal into pale skin-pink peach in the terminal, while the web (unfitted, wide gamut) showed orange. The user wants vivid, like the old Hal.',
-		'Rows with a bg are painted as full-width cards (frame.paint); every styled row ends with SGR 39;49, so tests strip SGR (strings.walk) before comparing text.'
+		'Rows with a bg are painted as full-width cards (frame.paint); every styled row ends with SGR 39;49, so tests strip SGR (strings.walk) before comparing text.',
+		'Bug (27 Nov): commit b2375ddb deleted the /*COLORS*/ placeholder from src/web/index.html, stripping all theme CSS from served pages. Invariant: src/web/index.html keeps /*COLORS*/ and web-serve.test.ts verifies served pages inject the .page theme rules.'
 	],
 	needs: ['cc']
 }

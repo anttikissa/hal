@@ -19,7 +19,13 @@ useWeb()
 test('the host serves the web endpoint and stops it with the host', async () => {
 	await server.serve()
 	web.start()
-	expect((await fetch(`${base()}/`)).status).toBe(200)
+	let root = await fetch(`${base()}/`)
+	expect(root.status).toBe(200)
+	// The host injects the theme CSS into every served page (task 1w).
+	let html = await root.text()
+	expect(html).toContain('.page {')
+	expect(html).toContain('--canvas:')
+	expect(html).not.toContain('/*COLORS*/')
 	// A tab's address is the page too; other paths are not.
 	expect((await fetch(`${base()}/12-abc`)).status).toBe(200)
 	expect((await fetch(`${base()}/12-abc/x`)).status).toBe(404)
