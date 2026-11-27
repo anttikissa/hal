@@ -118,18 +118,20 @@ function onEvent(event: Event): boolean {
 	return true
 }
 
-// Each connection brings the tabs; tab-start picks the one to show.
+// Each connection brings the tabs; tab-start picks the one to show. A
+// reload never reopens the addressed tab: it may have closed since.
 function connected(): void {
 	delete app.state.seen
 	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 	let addressed = router.parse(router.href())
-	if (!app.state.shown && addressed) {
+	let reload = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'reload'
+	if (!app.state.shown && addressed && !reload) {
 		app.state.landing = addressed
 		let id = connection.nextId()
 		app.state.asked.add(id)
 		connection.send({ type: 'tab-resume', id, sessionId: addressed, timezone })
 	} else {
-		let last = app.state.shown ?? router.store.load()
+		let last = app.state.shown ?? addressed ?? router.store.load()
 		connection.send(last ? { type: 'tab-start', last, timezone } : { type: 'tab-start', timezone })
 	}
 }

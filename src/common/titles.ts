@@ -88,8 +88,9 @@ function stamp(ts: string | undefined, text: string): string {
 	return t ? `${t} ${text}` : text
 }
 
-// A turn end's row: '10:52 Paused.', '10:52 Paused: tab closed.'.
+// A turn end's row: '10:52 Paused.', '10:52 Tab closed.'.
 function ended(ts: string | undefined, status: string, reason?: string): string {
+	if (reason === 'tab closed') return stamp(ts, 'Tab closed.')
 	let why = reason ? `: ${reason.replace(/\.$/, '')}` : ''
 	return stamp(ts, `${status[0]!.toUpperCase()}${status.slice(1)}${why}.`)
 }

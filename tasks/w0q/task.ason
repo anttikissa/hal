@@ -1,0 +1,7 @@
+{
+	title: 'Reloads never reopen closed tabs; closed-tab turn ends read Tab closed',
+	spec: 'Restore invariant: a closed tab stays closed until the user reopens it. A web page that loads by reload (browser reload, update or restart reload; navigation type reload) shows its addressed tab only if still open (tab-start), else the default; only a fresh load of a session URL reopens a closed session. A turn paused because its tab closed ends with the row "Tab closed." (terminal and web), not "Paused: tab closed.": the reason is the whole message. Requested by the user in session 43-oem on 2026-11-12, after a /close was undone by an automatic reload.',
+	status: 'done',
+	needs: ['ng', 'f3y'],
+	foldInto: ['ng']
+}
